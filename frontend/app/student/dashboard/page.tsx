@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import DashboardLayout from '@/components/DashboardLayout';
+import DashboardLayout from '@/components/student/DashboardLayout';
 
 export default function StudentDashboardPage() {
   const router = useRouter();

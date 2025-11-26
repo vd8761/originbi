@@ -3,8 +3,8 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import AssessmentLayout from '@/components/AssessmentLayout';
-import AssessmentScreen from '@/components/AssessmentScreen';
+import AssessmentLayout from '@/components/student/AssessmentLayout';
+import AssessmentScreen from '@/components/student/AssessmentScreen';
 
 export default function StudentAssessmentPage() {
   const router = useRouter();

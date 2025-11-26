@@ -3,8 +3,8 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import SignupForm from '@/components/SignUpForm';
-import ConfirmSignUp from '@/components/ConfirmSignUp';
+import SignupForm from '@/components/student/SignUpForm';
+import ConfirmSignUp from '@/components/student/ConfirmSignUp';
 
 type AuthStage = 'SIGN_UP' | 'CONFIRM_SIGN_UP';
 

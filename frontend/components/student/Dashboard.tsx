@@ -1,9 +1,9 @@
 import React from 'react';
-import PersonalityCard from '@/components/PersonalityCard';
-import PublicVisibilityCard from '@/components/PublicVisibilityCard';
-import ConsultantCallCard from '@/components/ConsultantCallCard';
-import RoadmapsCard from '@/components/RoadmapsCard';
-import MoodCard from '@/components/MoodCard';
+import PersonalityCard from '@/components/student/PersonalityCard';
+import PublicVisibilityCard from '@/components/student/PublicVisibilityCard';
+import ConsultantCallCard from '@/components/student/ConsultantCallCard';
+import RoadmapsCard from '@/components/student/RoadmapsCard';
+import MoodCard from '@/components/student/MoodCard';
 
 const Dashboard: React.FC = () => {
     return (

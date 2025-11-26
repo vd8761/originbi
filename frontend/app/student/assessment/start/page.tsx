@@ -3,8 +3,8 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import AssessmentLayout from '@/components/AssessmentLayout';
-import AssessmentRunner from '@/components/AssessmentStarter';
+import AssessmentLayout from '@/components/student/AssessmentLayout';
+import AssessmentRunner from '@/components/student/AssessmentStarter';
 
 export default function AssessmentRunnerPage() {
   const router = useRouter();

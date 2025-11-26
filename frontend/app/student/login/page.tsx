@@ -2,7 +2,7 @@
 'use client';
 
 import React from 'react';
-import Login from '@/components/Login';
+import Login from '@/components/student/Login';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {

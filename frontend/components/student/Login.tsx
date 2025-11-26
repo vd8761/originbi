@@ -2,8 +2,8 @@
 
 import React from 'react';
 import Logo from '@/components/ui/Logo';
-import LoginForm from '@/components/LoginForm';
-import Testimonial from '@/components/Testimonial';
+import LoginForm from '@/components/student/LoginForm';
+import Testimonial from '@/components/student/Testimonial';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import { useTheme } from '@/contexts/ThemeContext';
 

@@ -6,7 +6,7 @@ import {
   LockIcon,
 } from "@/components/icons";
 
-import AssessmentModal from "@/components/AssessmentModal";
+import AssessmentModal from "@/components/student/AssessmentModal";
 
 // --- Interfaces ---
 export interface AssessmentData {
