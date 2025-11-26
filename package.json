@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "db:migrate": "ts-node ./database/tools/run-migrations.ts"
+  },
+  "dependencies": {
+    "@nestjs/typeorm": "^11.0.0",
+    "pg": "^8.16.3",
+    "typeorm": "^0.3.27"
+  }
+}
