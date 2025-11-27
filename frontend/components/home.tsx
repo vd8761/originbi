@@ -77,7 +77,7 @@ const PortalHome: React.FC<PortalHomeProps> = ({ onSelectPortal }) => {
 
             <div className="flex-grow flex flex-col justify-center items-center p-6 sm:p-10 relative z-10">
                 <div className="text-center mb-16 sm:mb-20 max-w-4xl mx-auto mt-20 sm:mt-0">
-                    <span className="inline-block py-1 px-4 rounded-full bg-brand-green/10 text-brand-green font-bold text-sm tracking-widest uppercase mb-6 animate-fade-in">
+                    <span className="hidden inline-block py-1 px-4 rounded-full bg-brand-green/10 text-brand-green font-bold text-sm tracking-widest uppercase mb-6 animate-fade-in">
                         Choose Your Portal
                     </span>
                     <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold text-brand-text-light-primary dark:text-white mb-8 tracking-tight leading-none animate-fade-in" style={{ animationDelay: '0.1s' }}>
