@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { ProfileIcon, JobsIcon, SettingsIcon } from './icons';
-import Logo from './ui/Logo';
+import Logo from '@/components/ui/Logo';
 
 interface PortalHomeProps {
     onSelectPortal: (portal: 'student' | 'corporate' | 'admin') => void;

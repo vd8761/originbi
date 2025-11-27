@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { ProfileIcon, JobsIcon, SettingsIcon } from './icons';
-import Logo from './ui/Logo';
+import Logo from '@/components/ui/Logo';
 
 interface PortalHomeProps {
     onSelectPortal: (portal: 'student' | 'corporate' | 'admin') => void;
@@ -21,14 +21,15 @@ const PortalCard: React.FC<{
     <button 
         onClick={onClick}
         className={`
-            group relative flex flex-col items-start text-left p-8 h-full
+            group relative flex flex-col items-start text-left p-6 sm:p-8 h-full
             bg-white dark:bg-[#13161B] 
             border border-gray-100 dark:border-white/5 
-            rounded-[2rem] 
+            rounded-[1.5rem] sm:rounded-[2rem] 
             transition-all duration-300 
             hover:-translate-y-2 hover:shadow-2xl ${shadowColor}
             animate-fade-in
             overflow-hidden
+            w-full
         `}
         style={{ animationDelay: delay }}
     >
@@ -39,13 +40,13 @@ const PortalCard: React.FC<{
         <div className={`absolute top-0 left-0 w-full h-1.5 transform origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-500 ${color.replace('text-', 'bg-')}`} />
 
         {/* Icon Header */}
-        <div className="flex justify-between w-full items-start mb-6">
+        <div className="flex justify-between w-full items-start mb-4 sm:mb-6">
             <div className={`
-                p-4 rounded-2xl bg-gray-50 dark:bg-white/5 
+                p-3 sm:p-4 rounded-2xl bg-gray-50 dark:bg-white/5 
                 group-hover:scale-110 transition-transform duration-300
                 ${color}
             `}>
-                <div className="w-8 h-8">
+                <div className="w-6 h-6 sm:w-8 sm:h-8">
                     {React.isValidElement(icon) ? React.cloneElement(icon as React.ReactElement<{ className?: string }>, { className: "w-full h-full fill-current" }) : icon}
                 </div>
             </div>
@@ -61,24 +62,24 @@ const PortalCard: React.FC<{
         </div>
 
         {/* Content */}
-        <div className="space-y-3 mb-8 flex-grow">
-            <span className={`text-xs font-bold tracking-wider uppercase opacity-80 ${color}`}>
+        <div className="space-y-2 sm:space-y-3 mb-6 sm:mb-8 flex-grow">
+            <span className={`text-[10px] sm:text-xs font-bold tracking-wider uppercase opacity-80 ${color}`}>
                 {subtitle}
             </span>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                 {title}
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
                 {description}
             </p>
         </div>
 
         {/* Footer / Badge */}
-        <div className="w-full pt-6 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
-            <span className="text-xs font-medium text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors">
+        <div className="w-full pt-4 sm:pt-6 border-t border-gray-100 dark:border-white/5 flex items-center justify-between mt-auto">
+            <span className="text-[10px] sm:text-xs font-medium text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors">
                 Access Required
             </span>
-            <span className={`text-xs font-bold ${color} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}>
+            <span className={`text-[10px] sm:text-xs font-bold ${color} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}>
                 Enter Now
             </span>
         </div>
@@ -87,36 +88,36 @@ const PortalCard: React.FC<{
 
 const PortalHome: React.FC<PortalHomeProps> = ({ onSelectPortal }) => {
     return (
-        <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0D10] flex flex-col font-sans selection:bg-brand-green selection:text-white">
+        <div className="min-h-[100dvh] bg-[#FAFAFA] dark:bg-[#0B0D10] flex flex-col font-sans selection:bg-brand-green selection:text-white">
             
             {/* Header */}
-            <div className="w-full max-w-7xl mx-auto p-6 sm:p-8 flex justify-between items-center">
+            <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 flex justify-between items-center shrink-0">
                <Logo />
-               <div className="hidden sm:block text-sm font-medium text-gray-500 dark:text-gray-400">
+               <div className="hidden sm:block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">
                    Secure Portal Access
                </div>
             </div>
 
             {/* Main Content */}
-            <div className="flex-grow flex flex-col justify-center items-center px-4 sm:px-6 py-12 relative">
+            <div className="flex-grow flex flex-col justify-center items-center px-4 sm:px-6 py-8 sm:py-12 relative">
                 
                 {/* Background Blobs */}
-                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand-green/5 rounded-full blur-[128px] pointer-events-none" />
-                <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-[128px] pointer-events-none" />
+                <div className="absolute top-1/4 left-1/4 w-64 sm:w-96 h-64 sm:h-96 bg-brand-green/5 rounded-full blur-[80px] sm:blur-[128px] pointer-events-none" />
+                <div className="absolute bottom-1/4 right-1/4 w-64 sm:w-96 h-64 sm:h-96 bg-blue-500/5 rounded-full blur-[80px] sm:blur-[128px] pointer-events-none" />
 
-                <div className="text-center max-w-2xl mx-auto mb-16 relative z-10">
-                    <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 dark:text-white mb-6 tracking-tight">
+                <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-16 relative z-10">
+                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-gray-900 dark:text-white mb-4 sm:mb-6 tracking-tight">
                         Choose your <span className="relative whitespace-nowrap">
                             <span className="relative z-10 text-brand-green">Workspace</span>
-                            <span className="absolute bottom-1 left-0 w-full h-3 bg-brand-green/10 -rotate-2 -z-0"></span>
+                            <span className="absolute bottom-1 left-0 w-full h-2 sm:h-3 bg-brand-green/10 -rotate-2 -z-0"></span>
                         </span>
                     </h1>
-                    <p className="text-lg text-gray-500 dark:text-gray-400 leading-relaxed">
+                    <p className="text-base sm:text-lg text-gray-500 dark:text-gray-400 leading-relaxed max-w-lg sm:max-w-2xl mx-auto">
                         Welcome to OriginBI. Select the portal that aligns with your role to access your personalized dashboard and tools.
                     </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-7xl mx-auto relative z-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 w-full max-w-7xl mx-auto relative z-10">
                     
                     <PortalCard 
                         title="Individual Portal" 
@@ -158,8 +159,8 @@ const PortalHome: React.FC<PortalHomeProps> = ({ onSelectPortal }) => {
             </div>
 
             {/* Footer */}
-            <div className="py-8 text-center">
-                <p className="text-xs text-gray-400 dark:text-gray-600">
+            <div className="py-6 sm:py-8 text-center shrink-0">
+                <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-600">
                     © 2025 Origin BI. All rights reserved. <span className="mx-2">•</span> <a href="#" className="hover:text-gray-600 dark:hover:text-gray-400 transition-colors">Privacy</a> <span className="mx-2">•</span> <a href="#" className="hover:text-gray-600 dark:hover:text-gray-400 transition-colors">Terms</a>
                 </p>
             </div>
