@@ -88,21 +88,12 @@ const LoginForm: React.FC<LoginFormProps> = ({
   const isEmailInvalid = touched.email && !!errors.email;
   const isPasswordInvalid = touched.password && !!errors.password;
   
-  // Theme styling based on portal mode
-  const focusColorClass = portalMode === 'corporate' ? 'focus:ring-blue-600 focus:border-blue-600' : 
-                          portalMode === 'admin' ? 'focus:ring-purple-600 focus:border-purple-600' : 
-                          'focus:ring-brand-green focus:border-brand-green';
-
-  const iconColorClass = portalMode === 'corporate' ? 'text-blue-600' : 
-                         portalMode === 'admin' ? 'text-purple-600' : 
-                         'text-brand-green';
-
-  const linkHoverClass = portalMode === 'corporate' ? 'hover:text-blue-600' : 
-                         portalMode === 'admin' ? 'hover:text-purple-400' : 
-                         'hover:text-brand-green';
+  const focusColorClass = 'focus:ring-brand-green focus:border-brand-green';
+  const iconColorClass = 'text-brand-green';
+  const linkHoverClass = 'hover:text-brand-green';
 
   return (
-    <form className="space-y-6 animate-fade-in" style={{ animationDelay: '100ms' }} onSubmit={handleSubmit} noValidate>
+    <form className="space-y-2.5 animate-fade-in" style={{ animationDelay: '100ms' }} onSubmit={handleSubmit} noValidate>
       
       {/* Email Field */}
       <div className="space-y-2">
@@ -168,20 +159,6 @@ const LoginForm: React.FC<LoginFormProps> = ({
       >
         Login
       </button>
-      
-      {/* Footer Links for Student */}
-      {portalMode === 'student' && (
-          <p className="text-center text-sm text-brand-text-light-secondary dark:text-gray-400 mt-2">
-              Don't have an account? <a href="#" className="text-brand-green hover:underline font-bold transition-colors">Sign Up</a>
-          </p>
-      )}
-
-      {/* Footer Links for Corporate */}
-      {portalMode === 'corporate' && (
-          <p className="text-center text-sm text-brand-text-light-secondary dark:text-gray-400 mt-2">
-              New Organization? <a href="#" className="text-blue-600 hover:underline font-bold transition-colors">Register Here</a>
-          </p>
-      )}
     </form>
   );
 };

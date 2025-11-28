@@ -2,7 +2,7 @@
 'use client';
 
 import React from 'react';
-import Login from '@/components/corporate/LoginForm';
+import Login from '@/components/corporate/CorporateLogin';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
@@ -12,7 +12,11 @@ export default function LoginPage() {
         router.push('/corporate/dashboard');
     };
 
+    const handleBack = () => {
+        router.back();
+    };
+
     return (
-        <Login onLoginSuccess={handleLoginSuccess} />
+        <Login onLoginSuccess={handleLoginSuccess} onBack={handleBack} />
     );
 }
