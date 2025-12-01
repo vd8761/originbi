@@ -1,6 +1,6 @@
 import React from 'react';
 import { RoadmapItem as RoadmapItemType } from '@/lib/types';
-import { RightArrowIcon } from '@/components/icons';
+import { CrossRightArrowIcon } from '@/components/icons';
 
 const RoadmapItem: React.FC<{ item: RoadmapItemType }> = ({ item }) => (
     <a
@@ -17,7 +17,7 @@ const RoadmapItem: React.FC<{ item: RoadmapItemType }> = ({ item }) => (
                 </p>
             </div>
             <div className="bg-brand-green text-white w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0">
-                <RightArrowIcon className="w-5 h-5" />
+                <CrossRightArrowIcon className="w-5 h-5" />
             </div>
         </div>
     </a>
