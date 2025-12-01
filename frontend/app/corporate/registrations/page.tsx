@@ -1,8 +1,8 @@
 "use client";
 
 import React from 'react';
-import Header from '@/components/admin/Header';
-import RegistrationManagement from '@/components/admin/RegistrationManagement';
+import Header from '@/components/corporate/Header';
+import RegistrationManagement from '@/components/corporate/RegistrationManagement';
 import { useRouter } from 'next/navigation';
 
 export default function RegistrationsPage() {

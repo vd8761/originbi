@@ -82,16 +82,12 @@ const CorporateLogin: React.FC<CorporateLoginProps> = ({
             &copy; 2025 Origin BI. All rights reserved.{" "}
             <span className="hidden sm:inline">
               <span className="mx-1 opacity-50">|</span>{" "}
-              <button
-                onClick={() => {
-                  onBack?.();
-                  // simple client-side redirect
-                  window.location.href = "/home";
-                }}
+              <a
+                href="/home"
                 className="hover:text-brand-green dark:hover:text-brand-green transition-colors"
               >
                 Back to Portal
-              </button>{" "}
+              </a>{" "}
               <span className="mx-1 opacity-50">|</span>{" "}
               <a
                 href="#"
