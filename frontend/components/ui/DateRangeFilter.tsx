@@ -37,14 +37,14 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({ selectedRange, onRang
         setIsOpen(false);
     };
 
-    // Determine if the selected range is NOT one of the standard presets (implies it's a formatted date string)
-    const isCustomDateString = !options.slice(0, 6).includes(selectedRange as DateRangeOption);
+    // Determine if we should show green text (if selected range is not one of the standard text presets, likely a date)
+    const isCustom = !options.slice(0, 6).includes(selectedRange as DateRangeOption);
 
     return (
         <div className="relative" ref={dropdownRef}>
             <button 
                 onClick={() => setIsOpen(!isOpen)}
-                className={`flex items-center gap-2 px-4 py-2.5 bg-brand-light-tertiary dark:bg-[#24272B] border border-transparent hover:border-brand-light-tertiary dark:hover:border-white/10 rounded-lg text-sm font-medium transition-all whitespace-nowrap group ${isCustomDateString ? 'text-brand-green' : 'text-brand-text-light-primary dark:text-white'}`}
+                className={`flex items-center gap-2 px-4 py-2.5 bg-brand-light-tertiary dark:bg-[#24272B] border border-transparent hover:border-brand-light-tertiary dark:hover:border-white/10 rounded-lg text-sm font-medium transition-all whitespace-nowrap group ${isCustom ? 'text-brand-green' : 'text-brand-text-light-primary dark:text-white'}`}
             >
                 <CalendarIcon className="w-4 h-4 text-brand-green" />
                 <span>{selectedRange}</span>
@@ -52,29 +52,22 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({ selectedRange, onRang
             </button>
 
             {isOpen && (
-                <div className="absolute top-full right-0 mt-2 w-48 bg-brand-light-secondary dark:bg-[#1A1D21] border border-brand-light-tertiary dark:border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
+                <div className="absolute top-full left-0 mt-2 w-48 bg-brand-light-secondary dark:bg-[#1A1D21] border border-brand-light-tertiary dark:border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
                     <div className="py-1">
-                        {options.map((option) => {
-                            // Calculate if this specific option should show as active/highlighted
-                            const isActive = 
-                                (selectedRange === option) || 
-                                (option === 'Custom Range' && isCustomDateString);
-
-                            return (
-                                <button
-                                    key={option}
-                                    onClick={() => handleSelect(option)}
-                                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between group ${
-                                        isActive
-                                            ? 'text-brand-green font-semibold bg-brand-green/5' 
-                                            : 'text-brand-text-light-primary dark:text-gray-300 hover:bg-brand-light-tertiary dark:hover:bg-white/5'
-                                    } ${option === 'Custom Range' ? 'text-brand-green font-medium' : ''}`}
-                                >
-                                    {option}
-                                    {isActive && <div className="w-1.5 h-1.5 rounded-full bg-brand-green"></div>}
-                                </button>
-                            );
-                        })}
+                        {options.map((option) => (
+                            <button
+                                key={option}
+                                onClick={() => handleSelect(option)}
+                                className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between group ${
+                                    selectedRange === option 
+                                        ? 'text-brand-green font-semibold bg-brand-green/5' 
+                                        : 'text-brand-text-light-primary dark:text-gray-300 hover:bg-brand-light-tertiary dark:hover:bg-white/5'
+                                } ${option === 'Custom Range' ? 'text-brand-green font-medium' : ''}`}
+                            >
+                                {option}
+                                {selectedRange === option && <div className="w-1.5 h-1.5 rounded-full bg-brand-green"></div>}
+                            </button>
+                        ))}
                     </div>
                 </div>
             )}

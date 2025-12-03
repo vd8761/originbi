@@ -26,9 +26,6 @@ interface NavItemProps {
 
 const NavItem: React.FC<NavItemProps> = ({ icon, label, active, isMobile, onClick }) => {
     const showDesktopText = 'hidden 2xl:inline'; 
-    
-    // Desktop: Gap-0 (center icon) -> Large Desktop: Gap-3 (Icon + Text)
-    // Mobile: Gap-3 (Icon + Text)
     const spacingClass = isMobile ? 'gap-3' : 'justify-center 2xl:justify-start gap-0 2xl:gap-3';
 
     return (
@@ -37,7 +34,6 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, active, isMobile, onClic
                 onClick={onClick}
                 className={`flex items-center ${spacingClass} rounded-lg transition-colors duration-200 w-full ${active ? 'bg-brand-green text-white px-3 py-2' : 'text-brand-text-light-secondary dark:text-brand-text-secondary hover:bg-brand-light-tertiary dark:hover:bg-brand-dark-tertiary hover:text-brand-text-light-primary dark:hover:text-white p-2 lg:px-3'}`}
             >
-                {/* Ensure icon inherits color with currentColor */}
                 <div className={`${active ? 'text-white' : 'text-current'}`}>
                     {icon}
                 </div>
@@ -74,9 +70,11 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
     const [isNotificationsOpen, setNotificationsOpen] = useState(false);
     const [language, setLanguage] = useState('ENG');
     const [hasNotification, setHasNotification] = useState(true);
+    
     const profileMenuRef = useRef<HTMLDivElement>(null);
     const langMenuRef = useRef<HTMLDivElement>(null);
     const notificationsMenuRef = useRef<HTMLDivElement>(null);
+    const mobileMenuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -89,12 +87,20 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
             if (notificationsMenuRef.current && !notificationsMenuRef.current.contains(event.target as Node)) {
                 setNotificationsOpen(false);
             }
+            // Close mobile menu if clicked outside (excluding the trigger button itself if possible, but basic check works)
+            if (isMobileMenuOpen && mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
+                // Check if the click wasn't on the menu button (which we handle via state toggle)
+                 const target = event.target as Element;
+                 if (!target.closest('#mobile-menu-btn')) {
+                     setMobileMenuOpen(false);
+                 }
+            }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, []);
+    }, [isMobileMenuOpen]);
     
     const handleLangChange = (lang: string) => {
         setLanguage(lang);
@@ -140,11 +146,9 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
         ? '/Origin-BI-white-logo.png'
         : '/Origin-BI-Logo-01.png';
 
-    // Desktop Nav Items based on Portal Mode
     const renderNavItems = (isMobile: boolean) => (
         <>
             {portalMode === 'admin' ? (
-                // Admin Nav
                 <>
                     <NavItem 
                         icon={<DashboardIcon />} 
@@ -157,7 +161,6 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
                     <NavItem icon={<SettingsIcon />} label="System Config" isMobile={isMobile} />
                 </>
             ) : portalMode === 'corporate' ? (
-                // Corporate Nav - Replaced Dashboard with relevant items or keep default
                 <>
                      <NavItem 
                         icon={<DashboardIcon />} 
@@ -177,7 +180,6 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
                     <NavItem icon={<OriginDataIcon className="w-4 h-4" />} label="Origin Data" isMobile={isMobile} />
                 </>
             ) : (
-                // Student Nav
                 <>
                     <NavItem 
                         icon={<DashboardIcon />} 
@@ -198,19 +200,16 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
                     <NavItem icon={<ProfileIcon />} label="Profile" isMobile={isMobile} />
                 </>
             )}
-
-            {/* Common Settings for non-admin, Admin has specific config */}
             {portalMode !== 'admin' && <NavItem icon={<SettingsIcon />} label="Settings" isMobile={isMobile} />}
         </>
     );
 
     return (
         <header className="bg-brand-light-secondary dark:bg-brand-dark-secondary px-4 sm:px-6 py-3 sm:py-3 flex items-center justify-between sticky top-0 z-50 border-b border-brand-light-tertiary dark:border-transparent shadow-sm dark:shadow-none">
-            {/* Left side: Logo + Nav */}
             <div className="flex items-center gap-3 md:gap-4 lg:gap-6">
-                 {/* Mobile Menu Button */}
                 {!hideNav && (
                     <button 
+                        id="mobile-menu-btn"
                         className="md:hidden text-brand-text-light-primary dark:text-white p-1"
                         onClick={() => setMobileMenuOpen(p => !p)}
                     >
@@ -219,7 +218,6 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
                 )}
                 <img src={logoSrc} alt="OriginBI Logo" className="h-6 sm:h-8 w-auto" />
                 
-                {/* Desktop Nav */}
                 {!hideNav && (
                     <nav className="hidden md:flex items-center space-x-1">
                         {renderNavItems(false)}
@@ -227,7 +225,6 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
                 )}
             </div>
 
-            {/* Right side: Controls */}
             <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
                 <div className="flex items-center gap-2 sm:gap-3">
                     <div className="hidden sm:block scale-90 sm:scale-100">
@@ -236,7 +233,6 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
                     
                     {!hideNav && (
                     <>
-                        {/* Language Selector - Hidden on Mobile */}
                         <div className="relative hidden sm:block" ref={langMenuRef}>
                             <button onClick={() => setLangOpen(p => !p)} className="bg-brand-light-tertiary dark:bg-brand-dark-tertiary text-brand-text-light-primary dark:text-white flex items-center justify-center space-x-2 px-3 sm:px-4 h-9 sm:h-10 rounded-full font-semibold text-xs sm:text-sm hover:opacity-90 transition-opacity">
                                 <span>{language}</span>
@@ -250,7 +246,6 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
                             )}
                         </div>
 
-                        {/* Notification Icon */}
                         <div className="relative" ref={notificationsMenuRef}>
                             <button onClick={handleNotificationClick} className="bg-brand-light-tertiary dark:bg-brand-dark-tertiary w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-brand-text-light-primary dark:text-white hover:opacity-80 transition-opacity">
                                 {hasNotification ? (
@@ -269,16 +264,10 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
                                             <NotificationItem key={index} {...item} />
                                         ))}
                                     </div>
-                                    <div className="p-2">
-                                        <a href="#" className="block w-full text-center text-sm font-semibold text-brand-green py-2 rounded-lg hover:bg-brand-dark-green/50 dark:hover:bg-brand-dark-tertiary/60 transition-colors">
-                                            View All
-                                        </a>
-                                    </div>
                                 </div>
                             )}
                         </div>
 
-                        {/* Corporate Credits Pill */}
                         {portalMode === 'corporate' && (
                             <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full border" style={{ backgroundColor: 'rgba(252, 210, 39, 0.4)', borderColor: '#F59E0B' }}>
                                 <CoinIcon className="w-5 h-5" />
@@ -291,11 +280,9 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
                 
                 <div className="w-px h-8 bg-gray-300 dark:bg-brand-dark-tertiary hidden lg:block"></div>
 
-                {/* Profile Dropdown */}
                 <div className="relative" ref={profileMenuRef}>
                      <button onClick={() => setProfileOpen(prev => !prev)} className="flex items-center gap-2 sm:space-x-3 focus:outline-none">
                         <img src="https://i.pravatar.cc/40?u=monishwar" alt="User Avatar" className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-brand-light-tertiary dark:border-transparent" />
-                        {/* Visible on XL screens (1280px and up) */}
                         <div className="text-left hidden xl:block">
                             <p className="font-semibold text-base leading-tight text-brand-text-light-primary dark:text-brand-text-primary">Monishwar Rajasekaran</p>
                             <p className="text-sm text-brand-text-light-secondary dark:text-brand-text-secondary leading-tight">MonishwarRaja@originbi.com</p>
@@ -305,12 +292,7 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
 
                     {isProfileOpen && (
                         <div className="absolute right-0 top-full mt-2 w-64 bg-brand-light-secondary dark:bg-brand-dark-secondary rounded-xl shadow-2xl z-50 border border-brand-light-tertiary dark:border-brand-dark-tertiary/50 overflow-hidden">
-                            <div className="p-4 border-b border-brand-light-tertiary dark:border-brand-dark-tertiary xl:hidden">
-                                <p className="font-semibold text-sm text-brand-text-light-primary dark:text-white truncate">Monishwar Rajasekaran</p>
-                                <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary truncate">MonishwarRaja@originbi.com</p>
-                            </div>
                             <div className="p-2">
-                                {/* Switch Portal Option */}
                                 <button 
                                     onClick={() => {
                                         if(onSwitchPortal) onSwitchPortal();
@@ -332,15 +314,20 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
                 </div>
             </div>
 
-             {/* Mobile Menu */}
+            {/* Mobile Menu with Ref for Click Outside */}
             {isMobileMenuOpen && !hideNav && (
-                <div id="mobile-menu" className="md:hidden absolute top-full left-0 w-full bg-brand-light-secondary dark:bg-brand-dark-secondary shadow-lg z-40 border-t border-brand-light-tertiary dark:border-brand-dark-tertiary animate-fade-in">
+                <div 
+                    id="mobile-menu" 
+                    ref={mobileMenuRef}
+                    className="md:hidden absolute top-full left-0 w-full bg-brand-light-secondary dark:bg-brand-dark-secondary shadow-lg z-40 border-t border-brand-light-tertiary dark:border-brand-dark-tertiary animate-fade-in"
+                >
                     <nav className="flex flex-col p-4 space-y-2">
                         {renderNavItems(true)}
                         
                         <div className="border-t border-brand-light-tertiary dark:border-brand-dark-tertiary my-2 pt-2">
                              <div className="flex justify-between items-center px-2 mb-4">
                                 <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary font-semibold">Appearance</p>
+                                {/* Theme Toggle now inside the mobile menu */}
                                 <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
                              </div>
                         </div>

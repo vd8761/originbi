@@ -8,6 +8,7 @@ import RegistrationTable from '@/components/ui/RegistrationTable';
 import { RegistrationUser } from '@/lib/types';
 import { registrationService } from '@/lib/services';
 
+
 // Debounce utility
 const useDebounce = (value: string, delay: number) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -36,7 +37,7 @@ const RegistrationManagement: React.FC = () => {
   // Pagination & Filter State
   const [currentPage, setCurrentPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
-  const [totalCount, setTotalCount] = useState(0); // Count for the *current* view for pagination
+  const [totalCount, setTotalCount] = useState(0); 
   const [showEntriesDropdown, setShowEntriesDropdown] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -78,7 +79,6 @@ const RegistrationManagement: React.FC = () => {
         limit: entriesPerPage,
         tab: activeTab,
         search: debouncedSearchTerm,
-        // In a real app, pass startDate/endDate here
       });
       
       setUsers(response.data);
@@ -126,8 +126,8 @@ const RegistrationManagement: React.FC = () => {
 
   const handleTabChange = (tab: 'registrations' | 'assigned') => {
       setActiveTab(tab);
-      setCurrentPage(1); // Reset page on tab switch
-      setSearchTerm(''); // Optional: Clear search on tab switch? Usually better UX to keep or clear. Clearing here.
+      setCurrentPage(1);
+      setSearchTerm('');
   };
 
   const handleExport = () => {
@@ -170,7 +170,7 @@ const RegistrationManagement: React.FC = () => {
 
           setStartDate(newStart);
           setEndDate(newEnd);
-          setCurrentPage(1); // Reset pagination on filter change
+          setCurrentPage(1);
       }
   };
 
@@ -225,7 +225,7 @@ const RegistrationManagement: React.FC = () => {
             onCancel={() => setView('list')} 
             onRegister={() => {
                 setView('list');
-                fetchData(); // Refresh list
+                fetchData();
             }}
           />
       );
@@ -233,7 +233,6 @@ const RegistrationManagement: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full w-full gap-6 font-sans">
-      {/* Modal Integration */}
       <DateRangePickerModal 
         isOpen={isDateModalOpen} 
         onClose={() => setIsDateModalOpen(false)}
@@ -245,7 +244,6 @@ const RegistrationManagement: React.FC = () => {
         }}
       />
 
-      {/* Breadcrumb & Header */}
       <div>
         <div className="flex items-center text-sm text-brand-text-light-secondary dark:text-brand-text-secondary mb-1">
           <span>Dashboard</span>
@@ -255,12 +253,11 @@ const RegistrationManagement: React.FC = () => {
         <h1 className="text-2xl sm:text-3xl font-bold text-brand-text-light-primary dark:text-white">Registrations & Assessment Management</h1>
       </div>
 
-      {/* Tabs & Top Controls */}
       <div className="flex flex-col xl:flex-row justify-between items-end xl:items-center border-b border-brand-light-tertiary dark:border-brand-dark-tertiary pb-0 gap-4 xl:gap-0">
-        <div className="flex items-center w-full xl:w-auto">
+        <div className="flex items-center w-full xl:w-auto overflow-x-auto scrollbar-hide">
             <button 
                 onClick={() => handleTabChange('registrations')}
-                className={`px-1 py-3 mr-8 text-sm sm:text-base font-semibold border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
+                className={`px-1 py-3 mr-8 text-sm sm:text-base font-semibold border-b-2 transition-colors whitespace-nowrap ${
                     activeTab === 'registrations' 
                     ? 'text-brand-green border-brand-green' 
                     : 'text-brand-text-light-secondary dark:text-brand-text-secondary border-transparent hover:text-brand-text-light-primary dark:hover:text-white'
@@ -270,7 +267,7 @@ const RegistrationManagement: React.FC = () => {
             </button>
             <button 
                 onClick={() => handleTabChange('assigned')}
-                className={`px-1 py-3 text-sm sm:text-base font-semibold border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
+                className={`px-1 py-3 text-sm sm:text-base font-semibold border-b-2 transition-colors whitespace-nowrap ${
                     activeTab === 'assigned' 
                     ? 'text-brand-green border-brand-green' 
                     : 'text-brand-text-light-secondary dark:text-brand-text-secondary border-transparent hover:text-brand-text-light-primary dark:hover:text-white'
@@ -280,8 +277,7 @@ const RegistrationManagement: React.FC = () => {
             </button>
         </div>
 
-        {/* Showing Entries Control */}
-        <div className="flex items-center gap-3 py-2">
+        <div className="flex items-center gap-3 py-2 w-full xl:w-auto justify-end">
             <span className="text-sm text-brand-text-light-secondary dark:text-brand-text-secondary hidden sm:inline">Showing</span>
             
             <div className="relative">
@@ -328,7 +324,6 @@ const RegistrationManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Controls / Toolbar */}
       <div className="flex flex-col xl:flex-row justify-between gap-4 items-start xl:items-center">
         <div className="relative w-full xl:w-96">
           <input 
@@ -344,7 +339,6 @@ const RegistrationManagement: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-          {/* Enhanced Modular Components */}
           <DateRangeFilter 
             selectedRange={dateRangeLabel} 
             onRangeSelect={handleDateRangeSelect} 
@@ -357,7 +351,7 @@ const RegistrationManagement: React.FC = () => {
             className="flex items-center gap-2 px-4 py-2.5 bg-brand-light-tertiary dark:bg-[#1A3A2C] border border-transparent dark:border-[#1A3A2C] rounded-lg text-sm font-medium text-brand-text-light-primary dark:text-white hover:opacity-90 transition-opacity"
           >
             <span>Bulk Registration</span>
-            <BulkUploadIcon className="w-4 h-4" />
+            <BulkUploadIcon className="w-4 h-4 dark:text-white text-brand-green" />
           </button>
 
           <button 
@@ -370,7 +364,6 @@ const RegistrationManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* New Dedicated Table Component */}
       <RegistrationTable 
         users={users} 
         loading={loading} 
@@ -378,7 +371,6 @@ const RegistrationManagement: React.FC = () => {
         onToggleStatus={handleToggleStatus} 
       />
 
-      {/* Footer / Pagination */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-xs sm:text-sm text-brand-text-light-secondary dark:text-brand-text-secondary pt-2">
         <div className="flex gap-4">
           <a href="#" className="hover:text-brand-green transition-colors underline">Privacy Policy</a>

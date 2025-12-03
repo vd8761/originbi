@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { ArrowLeftWithoutLineIcon, ArrowRightWithoutLineIcon} from '@/components/icons';
 
@@ -111,16 +110,16 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
                     onClick={() => !isFuture && handleDateClick(date)}
                     className={`
                         h-9 w-9 text-xs font-medium rounded-full flex items-center justify-center transition-all relative
-                        ${isFuture ? 'text-gray-700 cursor-not-allowed opacity-30' : ''}
+                        ${isFuture ? 'text-gray-400 dark:text-gray-700 cursor-not-allowed opacity-30' : ''}
                         
                         ${/* Selected State (Start or End) */ ''}
                         ${!isFuture && isSelected ? 'bg-brand-green text-white z-10 shadow-lg shadow-brand-green/30 font-bold' : ''}
                         
                         ${/* In Range State */ ''}
-                        ${!isFuture && isInRange ? 'bg-brand-green/20 text-brand-green rounded-none' : ''}
+                        ${!isFuture && isInRange ? 'bg-brand-green/20 text-brand-green dark:text-white rounded-none' : ''}
                         
                         ${/* Default State */ ''}
-                        ${!isFuture && !isSelected && !isInRange ? 'text-gray-300 hover:bg-white/10' : ''}
+                        ${!isFuture && !isSelected && !isInRange ? 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10' : ''}
                         
                         ${/* Today Highlight (Only if not selected) */ ''}
                         ${!isFuture && isToday && !isSelected && !isInRange ? 'border border-brand-green text-brand-green font-bold' : ''}
@@ -141,16 +140,16 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
                 <div className="flex justify-between items-center mb-6 px-2">
                     {/* Only show Left Arrow on Left Calendar */}
                     {baseDate.getTime() === currentMonthLeft.getTime() ? (
-                        <button className="text-gray-500 hover:text-white transition-colors p-1 flex items-center justify-center w-8 h-8 rounded-full hover:bg-white/10" onClick={() => handleMonthChange(-1)}>
+                        <button className="text-gray-500 hover:text-brand-text-light-primary dark:hover:text-white transition-colors p-1 flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 dark:hover:bg-white/10" onClick={() => handleMonthChange(-1)}>
                             <ArrowLeftWithoutLineIcon className="w-2.5 h-3" />
                         </button>
                     ) : <div className="w-8"></div>}
 
-                    <span className="text-sm font-bold text-white tracking-wide capitalize">{monthName}</span>
+                    <span className="text-sm font-bold text-brand-text-light-primary dark:text-white tracking-wide capitalize">{monthName}</span>
 
                     {/* Only show Right Arrow on Right Calendar */}
                     {baseDate.getTime() === currentMonthRight.getTime() ? (
-                        <button className="text-gray-500 hover:text-white transition-colors p-1 flex items-center justify-center w-8 h-8 rounded-full hover:bg-white/10" onClick={() => handleMonthChange(1)}>
+                        <button className="text-gray-500 hover:text-brand-text-light-primary dark:hover:text-white transition-colors p-1 flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 dark:hover:bg-white/10" onClick={() => handleMonthChange(1)}>
                             <ArrowRightWithoutLineIcon className="w-2.5 h-3" />
                         </button>
                     ) : <div className="w-8"></div>}
@@ -158,7 +157,7 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
                 
                 <div className="grid grid-cols-7 mb-3">
                     {weekDays.map(d => (
-                        <div key={d} className="h-8 w-8 flex items-center justify-center text-[10px] text-gray-500 font-semibold uppercase tracking-wider">
+                        <div key={d} className="h-8 w-8 flex items-center justify-center text-[10px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wider">
                             {d}
                         </div>
                     ))}
@@ -251,20 +250,20 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
-            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+            <div className="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm" onClick={onClose} />
             
-            <div className="relative bg-[#1A1D21] border border-white/10 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-fade-in flex flex-col">
-                {/* Header */}
-                <div className="flex justify-between items-center p-5 border-b border-white/5">
-                    <h2 className="text-lg font-bold text-white">Select Date Range</h2>
-                    <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors bg-white/5 hover:bg-white/10 p-1.5 rounded-full">
+            <div className="relative bg-white dark:bg-[#1A1D21] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden animate-fade-in flex flex-col">
+                {/* Header - Fixed */}
+                <div className="flex justify-between items-center p-5 border-b border-gray-200 dark:border-white/5 shrink-0">
+                    <h2 className="text-lg font-bold text-brand-text-light-primary dark:text-white">Select Date Range</h2>
+                    <button onClick={onClose} className="text-gray-500 hover:text-brand-text-light-primary dark:hover:text-white transition-colors bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 p-1.5 rounded-full">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 </div>
 
-                <div className="flex flex-col md:flex-row h-[520px] md:h-auto">
+                <div className="flex flex-col md:flex-row overflow-y-auto custom-scrollbar flex-1">
                     {/* Sidebar Presets */}
-                    <div className="w-full md:w-56 bg-[#15171A] border-r border-white/5 p-4 flex flex-col justify-between overflow-y-auto md:overflow-visible shrink-0">
+                    <div className="w-full md:w-56 bg-brand-light-secondary dark:bg-[#15171A] border-r border-gray-200 dark:border-white/5 p-4 flex flex-col justify-between shrink-0">
                         <div className="flex flex-col gap-1">
                             {textPresets.map(preset => (
                                 <button
@@ -272,8 +271,8 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
                                     onClick={() => handlePresetClick(preset)}
                                     className={`text-left px-4 py-3 rounded-lg text-sm font-medium transition-all ${
                                         activePreset === preset
-                                        ? 'bg-brand-light-tertiary dark:bg-[#24272B] text-brand-text-light-primary dark:text-white' 
-                                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                        ? 'bg-white dark:bg-[#24272B] text-brand-text-light-primary dark:text-white shadow-sm' 
+                                        : 'text-gray-500 dark:text-gray-400 hover:text-brand-text-light-primary dark:hover:text-white hover:bg-white dark:hover:bg-white/5'
                                     }`}
                                 >
                                     {preset}
@@ -282,7 +281,7 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
                         </div>
                         
                         {/* Custom Range Button at Bottom */}
-                        <div className="pt-4 border-t border-white/5 mt-2">
+                        <div className="pt-4 border-t border-gray-200 dark:border-white/5 mt-2">
                             <button
                                 onClick={() => setActivePreset('Custom Range')}
                                 className={`w-full text-center px-4 py-3 rounded-lg text-sm font-bold transition-all ${
@@ -297,7 +296,7 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
                     </div>
 
                     {/* Calendars Area */}
-                    <div className="flex-1 p-6 bg-[#1A1D21]">
+                    <div className="flex-1 p-6 bg-white dark:bg-[#1A1D21]">
                         <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
                             <div className="flex-1">
                                 {renderCalendar(currentMonthLeft)}
@@ -309,22 +308,21 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
                     </div>
                 </div>
 
-                {/* Footer */}
-                <div className="p-5 border-t border-white/5 bg-[#15171A] flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <div className="text-sm font-medium text-gray-400">
-                        Selected Range : <span className="text-white font-bold ml-2">{formatDate(startDate)} - {formatDate(endDate)}</span>
+                {/* Footer - Fixed */}
+                <div className="p-5 border-t border-gray-200 dark:border-white/5 bg-brand-light-secondary dark:bg-[#15171A] flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0">
+                    <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                        Selected Range : <span className="text-brand-text-light-primary dark:text-white font-bold ml-2">{formatDate(startDate)} - {formatDate(endDate)}</span>
                     </div>
                     <div className="flex gap-3 w-full sm:w-auto">
-                        <button onClick={onClose} className="flex-1 sm:flex-none px-6 py-2.5 rounded-full border border-white/10 text-white text-sm font-medium hover:bg-white/5 transition-colors">
+                        <button onClick={onClose} className="flex-1 sm:flex-none px-6 py-2.5 rounded-full border border-gray-300 dark:border-white/10 text-brand-text-light-primary dark:text-white text-sm font-medium hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
                             Clear
                         </button>
                         <button 
                             onClick={() => {
                                 if (startDate) {
                                     let finalStart = startDate;
-                                    let finalEnd = endDate || startDate; // Treat single selection as start=end
+                                    let finalEnd = endDate || startDate; 
                                     
-                                    // Validation: Swap if start > end
                                     if (finalEnd < finalStart) {
                                         const temp = finalStart;
                                         finalStart = finalEnd;
