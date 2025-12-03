@@ -203,7 +203,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
         Login
       </button>
 
-      <div className="text-center pt-2">
+      {/* <div className="text-center pt-2">
         <p className="text-sm text-brand-text-light-secondary dark:text-brand-text-secondary">
           Don't have an account?{" "}
           <a
@@ -213,7 +213,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
             Sign Up
           </a>
         </p>
-      </div>
+      </div> */}
     </form>
   );
 };
