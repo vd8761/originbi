@@ -1,4 +1,5 @@
 
+
 export interface RoadmapItem {
   title: string;
   description: string;
@@ -54,4 +55,16 @@ export interface CountryCode {
     code: string;
     dial_code: string;
     flag: string;
+}
+
+// --- Program Module Types ---
+export interface ProgramData {
+    id: string;
+    programCode: string;
+    programName: string;
+    status: boolean;
+    description: string;
+    assessmentTitle: string;
+    reportTitle: string;
+    isDemo: boolean;
 }

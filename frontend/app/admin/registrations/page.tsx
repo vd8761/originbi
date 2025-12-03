@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Header from '@/components/admin/Sidebar';
-import ProgramsManagement from '@/components/admin/ProgramsManagement';
+import RegistrationManagement from '@/components/admin/RegistrationManagement';
 import { useRouter } from 'next/navigation';
 
 export default function RegistrationsPage() {
@@ -13,16 +13,16 @@ export default function RegistrationsPage() {
         router.push('/admin/login');
     };
 
-    const handleNavigate = (view: 'dashboard' | 'programs') => {
+    const handleNavigate = (view: 'dashboard' | 'registrations') => {
         if (view === 'dashboard') router.push('/admin');
-        if (view === 'programs') router.push('/admin/programs');
+        if (view === 'registrations') router.push('/admin/registrations');
     };
 
     return (
         <div className="min-h-screen bg-transparent">
-            <Header onLogout={handleLogout} currentView={"programs" as any} portalMode="admin" onNavigate={handleNavigate as any} />
+            <Header onLogout={handleLogout} currentView="registrations" portalMode="admin" />
             <main className="p-6">
-                <ProgramsManagement />
+                <RegistrationManagement />
             </main>
         </div>
     );
