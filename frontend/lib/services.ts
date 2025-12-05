@@ -1,6 +1,6 @@
 
 
-import { RegistrationUser, Program, Department, ProgramData } from './types';
+import { RegistrationUser, Program, Department, ProgramData, CorporateRegistrationUser,CreateCorporateRegistrationDto } from './types';
 
 // Toggle this to true when backend is ready
 const USE_REAL_API = false;
@@ -76,6 +76,99 @@ const MOCK_QUESTIONS: Question[] = [
     ]
   },
   // ... other mock questions
+];
+
+const MOCK_CORPORATE_REGISTRATIONS: CorporateRegistrationUser[] = [
+  {
+    id: "c1",
+    name: "Arjun Menon",
+    avatar: "https://i.pravatar.cc/150?u=c1",
+    gender: "Male",
+    email: "arjun.menon@infotech.com",
+    countryCode: "+91",
+    mobile: "9876543210",
+    companyName: "Infotech Solutions",
+    jobTitle: "HR Manager",
+    employeeCode: "HR101",
+    linkedinUrl: "https://linkedin.com/in/arjunmenon",
+    sector: "IT_SOFTWARE",
+    credits: 120,
+    status: true,
+    notes: "Bengaluru, Chennai, Hyderabad",
+    createdAt: "2025-12-01T10:00:00.000Z",
+  },
+  {
+    id: "c2",
+    name: "Nisha Rao",
+    avatar: "https://i.pravatar.cc/150?u=c2",
+    gender: "Female",
+    email: "nisha.rao@healthplus.com",
+    countryCode: "+91",
+    mobile: "9812233445",
+    companyName: "HealthPlus Labs",
+    jobTitle: "Talent Acquisition Lead",
+    employeeCode: "TA204",
+    linkedinUrl: "",
+    sector: "IT_SOFTWARE",
+    credits: 80,
+    status: false,
+    notes: "Mumbai, Pune",
+    createdAt: "2025-11-28T09:30:00.000Z",
+  },
+  {
+    id: "c3",
+    name: "Vikram Sharma",
+    avatar: "https://i.pravatar.cc/150?u=c3",
+    gender: "Male",
+    email: "vikram.sharma@finexbank.com",
+    countryCode: "+91",
+    mobile: "9988776655",
+    companyName: "Finex Bank",
+    jobTitle: "L&D Head",
+    employeeCode: "FINX33",
+    linkedinUrl: "https://linkedin.com/in/vikramsharma",
+    sector: "IT_SOFTWARE",
+    credits: 150,
+    status: true,
+    notes: "Delhi NCR, Kolkata",
+    createdAt: "2025-11-20T08:15:00.000Z",
+  },
+  {
+    id: "c4",
+    name: "Priya Pillai",
+    avatar: "https://i.pravatar.cc/150?u=c4",
+    gender: "Female",
+    email: "priya.pillai@retailmart.in",
+    countryCode: "+91",
+    mobile: "9776655443",
+    companyName: "RetailMart India",
+    jobTitle: "Training Coordinator",
+    employeeCode: "RM562",
+    linkedinUrl: "",
+    sector: "IT_SOFTWARE",
+    credits: 50,
+    status: true,
+    notes: "Chennai, Kochi",
+    createdAt: "2025-10-10T11:00:00.000Z",
+  },
+  {
+    id: "c5",
+    name: "Suresh Kumar",
+    avatar: "https://i.pravatar.cc/150?u=c5",
+    gender: "Male",
+    email: "suresh.k@logitrans.com",
+    countryCode: "+91",
+    mobile: "9654321876",
+    companyName: "LogiTrans Global",
+    jobTitle: "Operations Manager",
+    employeeCode: "OPS456",
+    linkedinUrl: "",
+    sector: "IT_SOFTWARE",
+    credits: 40,
+    status: true,
+    notes: "Chennai, Bengaluru",
+    createdAt: "2025-09-05T13:45:00.000Z",
+  },
 ];
 
 // --- Helper for Authorized Requests (Mock Compatible) ---
@@ -426,4 +519,185 @@ export const reportService = {
     if (!res.ok) throw new Error('Failed to generate report');
     return res.blob();
   }
+};
+
+export const corporateRegistrationService = {
+  // List registrations with pagination + search
+  async getRegistrationsList(
+    page: number,
+    limit: number,
+    search: string
+  ): Promise<{ data: CorporateRegistrationUser[]; total: number }> {
+    if (!USE_REAL_API) {
+      await simulateDelay(500);
+
+      let data = [...MOCK_CORPORATE_REGISTRATIONS];
+
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        data = data.filter((u) => {
+          return (
+            u.name.toLowerCase().includes(q) ||
+            u.email.toLowerCase().includes(q) ||
+            u.mobile.includes(q) ||
+            u.companyName.toLowerCase().includes(q) ||
+            (u.jobTitle ? u.jobTitle.toLowerCase().includes(q) : false)
+          );
+        });
+      }
+
+      const total = data.length;
+      const start = (page - 1) * limit;
+      const paged = data.slice(start, start + limit);
+
+      return {
+        data: paged,
+        total,
+      };
+    }
+
+    // ---- REAL API MODE ----
+    const params = new URLSearchParams();
+    params.set("page", page.toString());
+    params.set("limit", limit.toString());
+    if (search.trim()) {
+      params.set("search", search.trim());
+    }
+
+    const res = await fetch(
+      `${API_URL}/admin/registrations?${params.toString()}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (!res.ok) {
+      throw new Error("Failed to fetch corporate registrations");
+    }
+
+    return res.json();
+  },
+
+  // Create new registration
+  async createRegistration(
+    payload: CreateCorporateRegistrationDto
+  ): Promise<any> {
+    if (!USE_REAL_API) {
+      await simulateDelay(600);
+
+      const newItem: CorporateRegistrationUser = {
+        id: Math.random().toString(36).substring(2, 9),
+        name: payload.name,
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
+          payload.name
+        )}&background=random`,
+        gender: payload.gender,
+        email: payload.email,
+        countryCode: payload.countryCode,
+        mobile: payload.mobile,
+        companyName: payload.companyName,
+        jobTitle: payload.jobTitle,
+        employeeCode: payload.employeeCode,
+        linkedinUrl: payload.linkedinUrl,
+        sector: payload.sector,
+        credits: payload.credits ?? 0,
+        status: payload.status,
+        notes: payload.notes,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Add to top
+      MOCK_CORPORATE_REGISTRATIONS.unshift(newItem);
+      return newItem;
+    }
+
+    // ---- REAL API MODE ----
+    const res = await fetch(`${API_URL}/admin/registrations`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to create corporate registration");
+    }
+
+    return res.json();
+  },
+
+  // Toggle active/inactive
+  async toggleStatus(id: string, status: boolean): Promise<void> {
+    if (!USE_REAL_API) {
+      await simulateDelay(300);
+      const item = MOCK_CORPORATE_REGISTRATIONS.find((u) => u.id === id);
+      if (item) item.status = status;
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/admin/registrations/${id}/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ status }),
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to update status");
+    }
+  },
+
+  // Optional: single registration details
+  async getRegistrationById(id: string): Promise<CorporateRegistrationUser> {
+    if (!USE_REAL_API) {
+      await simulateDelay(300);
+      const item = MOCK_CORPORATE_REGISTRATIONS.find((u) => u.id === id);
+      if (!item) {
+        throw new Error("Corporate registration not found");
+      }
+      return item;
+    }
+
+    const res = await fetch(`${API_URL}/admin/registrations/${id}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to fetch registration details");
+    }
+
+    return res.json();
+  },
+
+  // Optional: update credits after creation
+  async updateCredits(id: string, credits: number): Promise<void> {
+    if (!USE_REAL_API) {
+      await simulateDelay(300);
+      const item = MOCK_CORPORATE_REGISTRATIONS.find((u) => u.id === id);
+      if (item) item.credits = credits;
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/admin/registrations/${id}/credits`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ credits }),
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to update credits");
+    }
+  },
 };

@@ -27,7 +27,7 @@ const MobileInput: React.FC<MobileInputProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Default to US or first entry if provided code not found
+  // Default to IN or first entry if provided code not found
   const selectedCountry =
     COUNTRY_CODES.find((c) => c.dial_code === countryCode) ||
     COUNTRY_CODES.find((c) => c.code === "IN") ||
@@ -56,9 +56,9 @@ const MobileInput: React.FC<MobileInputProps> = ({
 
   const handlePhoneInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, "");
+    const max = selectedCountry.maxLength || 10;
 
-    // Strict length validation based on country rule
-    if (val.length <= selectedCountry.maxLength) {
+    if (val.length <= max) {
       onPhoneChange(val);
     }
   };
@@ -73,25 +73,36 @@ const MobileInput: React.FC<MobileInputProps> = ({
     );
   }, [searchTerm]);
 
+  const maxLen = selectedCountry.maxLength || 10;
+
   return (
-    // Dynamic Z-Index: Elevate this component when dropdown is open to prevent overlapping with next fields
+    // Dynamic Z-index to float above nearby fields when open
     <div
       className={`space-y-2 w-full ${
         isDropdownOpen ? "relative z-50" : "relative z-0"
       }`}
     >
       {label && (
-        <label className="text-xs text-brand-text-light-secondary dark:text-gray-400 font-semibold ml-1">
+        <label className="text-xs text-black/70 dark:text-white font-semibold ml-1">
           {label} {required && <span className="text-red-500">*</span>}
         </label>
       )}
+
       <div className="flex gap-3 h-[50px]">
-        {/* Country Dropdown Button - Width Reduced to 110px */}
+        {/* Country Dropdown */}
         <div className="relative w-[110px] shrink-0 h-full" ref={dropdownRef}>
           <button
             type="button"
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="w-full h-full flex items-center justify-between bg-brand-light-secondary dark:bg-[#24272B] border border-transparent rounded-xl px-2.5 text-sm text-brand-text-light-primary dark:text-white font-bold transition-all hover:bg-gray-100 dark:hover:bg-[#2D3136]"
+            onClick={() => setIsDropdownOpen((p) => !p)}
+            className="
+              w-full h-full flex items-center justify-between
+              bg-gray-50 dark:bg-white/10
+              border border-transparent
+              rounded-xl px-2.5 text-sm
+              text-black dark:text-white font-semibold
+              transition-all
+              hover:border-brand-green/50 hover:bg-gray-100 dark:hover:bg-white/15
+            "
           >
             <span className="flex items-center gap-2 truncate">
               <ReactCountryFlag
@@ -104,14 +115,13 @@ const MobileInput: React.FC<MobileInputProps> = ({
                   objectFit: "cover",
                 }}
               />
-
-              <span className="text-gray-500 dark:text-gray-400 font-normal text-xs">
+              <span className="text-black/60 dark:text-white/70 font-normal text-xs">
                 {selectedCountry.dial_code}
               </span>
             </span>
 
             <ChevronDownIcon
-              className={`w-3 h-3 text-gray-500 transition-transform shrink-0 ${
+              className={`w-3 h-3 text-gray-500 dark:text-gray-300 transition-transform shrink-0 ${
                 isDropdownOpen ? "rotate-180" : ""
               }`}
             />
@@ -127,7 +137,14 @@ const MobileInput: React.FC<MobileInputProps> = ({
                   placeholder="Search country..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-gray-50 dark:bg-[#1A1D21] text-brand-text-light-primary dark:text-white text-xs rounded-lg px-3 py-2 focus:outline-none border border-transparent focus:border-brand-green/50 placeholder-gray-400 dark:placeholder-gray-500"
+                  className="
+                    w-full bg-gray-50 dark:bg-[#1A1D21]
+                    text-black dark:text-white text-xs
+                    rounded-lg px-3 py-2
+                    focus:outline-none border border-transparent
+                    focus:border-brand-green/50
+                    placeholder-black/40 dark:placeholder-gray-500
+                  "
                 />
               </div>
 
@@ -145,7 +162,7 @@ const MobileInput: React.FC<MobileInputProps> = ({
                       className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${
                         countryCode === country.dial_code
                           ? "bg-brand-green/10 text-brand-green"
-                          : "text-brand-text-light-primary dark:text-gray-300"
+                          : "text-black dark:text-gray-200"
                       }`}
                     >
                       <img
@@ -174,27 +191,34 @@ const MobileInput: React.FC<MobileInputProps> = ({
           )}
         </div>
 
-        {/* Phone Input - Expands to fill space */}
+        {/* Phone Input */}
         <div className="relative flex-1 h-full">
           <input
             type="text"
             value={phoneNumber}
             onChange={handlePhoneInput}
             placeholder={
-              selectedCountry.maxLength > 0
-                ? "0".repeat(selectedCountry.maxLength)
-                : "Mobile Number"
+              maxLen > 0 ? "0".repeat(maxLen) : "Mobile Number"
             }
-            className={`w-full h-full bg-brand-light-secondary dark:bg-[#24272B] border border-transparent rounded-xl px-4 text-sm text-brand-text-light-primary dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:border-brand-green focus:outline-none transition-colors font-medium tracking-wide ${
-              error ? "border-red-500/50" : ""
-            }`}
+            className={`
+              w-full h-full
+              bg-gray-50 dark:bg-white/10
+              border border-transparent
+              rounded-xl px-4 text-sm
+              text-black dark:text-white
+              placeholder-black/40 dark:placeholder-white/60
+              focus:border-brand-green focus:outline-none
+              transition-colors tracking-wide
+              ${error ? "border-red-500/50" : ""}
+            `}
           />
           {/* Character Count Indicator */}
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 dark:text-gray-600 pointer-events-none">
-            {phoneNumber.length}/{selectedCountry.maxLength}
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 dark:text-gray-500 pointer-events-none">
+            {phoneNumber.length}/{maxLen}
           </div>
         </div>
       </div>
+
       {error && <p className="text-xs text-red-400 ml-1">{error}</p>}
     </div>
   );

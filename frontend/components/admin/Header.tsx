@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -9,10 +8,10 @@ import { useTheme } from '@/contexts/ThemeContext';
 
 interface HeaderProps {
     onLogout: () => void;
-    currentView?: 'dashboard' | 'assessment' | 'registrations';
-    portalMode?: 'student' | 'corporate' | 'admin';
+    currentView?: 'dashboard' | 'programs' | 'corporate' | 'registrations';
+    portalMode?: 'admin';
     onSwitchPortal?: () => void;
-    onNavigate?: (view: 'dashboard' | 'assessment' | 'registrations') => void;
+    onNavigate?: (view: 'dashboard' | 'programs' | 'corporate' | 'registrations') => void;
     hideNav?: boolean;
 }
 
@@ -47,7 +46,6 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, active, isMobile, onClic
         </div>
     );
 };
-
 
 const NotificationItem: React.FC<{ icon: React.ReactNode; title: string; time: string; isNew?: boolean }> = ({ icon, title, time, isNew }) => (
     <div className="flex items-start space-x-3 p-3 hover:bg-brand-light-tertiary dark:hover:bg-brand-dark-tertiary/60 transition-colors duration-200">
@@ -87,9 +85,7 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
             if (notificationsMenuRef.current && !notificationsMenuRef.current.contains(event.target as Node)) {
                 setNotificationsOpen(false);
             }
-            // Close mobile menu if clicked outside (excluding the trigger button itself if possible, but basic check works)
             if (isMobileMenuOpen && mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
-                // Check if the click wasn't on the menu button (which we handle via state toggle)
                  const target = event.target as Element;
                  if (!target.closest('#mobile-menu-btn')) {
                      setMobileMenuOpen(false);
@@ -114,7 +110,7 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
         }
     };
 
-    const handleNavClick = (view: 'dashboard' | 'assessment' | 'registrations') => {
+    const handleNavClick = (view: 'dashboard' | 'programs' | 'corporate' | 'registrations') => {
         if (onNavigate) {
             onNavigate(view);
         }
@@ -124,19 +120,19 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
     const notifications = [
         {
             icon: <RoadmapIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />,
-            title: 'New Roadmap Unlocked!',
+            title: 'New Program Available',
             time: '2 hours ago',
             isNew: true
         },
         {
             icon: <JobsIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />,
-            title: '3 new job matches for you',
+            title: 'Assessment Results Ready',
             time: 'Yesterday',
             isNew: true
         },
         {
             icon: <ProfileIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />,
-            title: 'Your profile is 85% complete',
+            title: 'Profile update required',
             time: '3 days ago',
             isNew: false
         }
@@ -148,59 +144,35 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
 
     const renderNavItems = (isMobile: boolean) => (
         <>
-            {portalMode === 'admin' ? (
-                <>
-                    <NavItem 
-                        icon={<DashboardIcon />} 
-                        label="Admin Dashboard" 
-                        active={currentView === 'dashboard'} 
-                        isMobile={isMobile}
-                        onClick={() => handleNavClick('dashboard')}
-                    />
-                    <NavItem icon={<ProfileIcon />} label="User Management" isMobile={isMobile} />
-                    <NavItem icon={<SettingsIcon />} label="System Config" isMobile={isMobile} />
-                </>
-            ) : portalMode === 'corporate' ? (
-                <>
-                     <NavItem 
-                        icon={<DashboardIcon />} 
-                        label="Dashboard" 
-                        active={currentView === 'dashboard'} 
-                        isMobile={isMobile}
-                        onClick={() => handleNavClick('dashboard')}
-                    />
-                    <NavItem 
-                        icon={<MyEmployeesIcon className="w-5 h-5" />} 
-                        label="My Employees" 
-                        active={currentView === 'registrations'} 
-                        isMobile={isMobile}
-                        onClick={() => handleNavClick('registrations')}
-                    />
-                    <NavItem icon={<JobsIcon />} label="Jobs" isMobile={isMobile} />
-                    <NavItem icon={<OriginDataIcon className="w-4 h-4" />} label="Origin Data" isMobile={isMobile} />
-                </>
-            ) : (
-                <>
-                    <NavItem 
-                        icon={<DashboardIcon />} 
-                        label="Dashboard" 
-                        active={currentView === 'dashboard'} 
-                        isMobile={isMobile}
-                        onClick={() => handleNavClick('dashboard')}
-                    />
-                    <NavItem 
-                        icon={<JobsIcon />} 
-                        label="Assessments" 
-                        active={currentView === 'assessment'} 
-                        isMobile={isMobile}
-                        onClick={() => handleNavClick('assessment')}
-                    />
-                    <NavItem icon={<RoadmapIcon />} label="Road Map" isMobile={isMobile} />
-                    <NavItem icon={<VideosIcon />} label="Videos" isMobile={isMobile} />
-                    <NavItem icon={<ProfileIcon />} label="Profile" isMobile={isMobile} />
-                </>
-            )}
-            {portalMode !== 'admin' && <NavItem icon={<SettingsIcon />} label="Settings" isMobile={isMobile} />}
+            <NavItem 
+                icon={<DashboardIcon />} 
+                label="Dashboard" 
+                active={currentView === 'dashboard'} 
+                isMobile={isMobile}
+                onClick={() => handleNavClick('dashboard')}
+            />
+            <NavItem 
+                icon={<RoadmapIcon />} 
+                label="Programs" 
+                active={currentView === 'programs'} 
+                isMobile={isMobile}
+                onClick={() => handleNavClick('programs')}
+            />
+            <NavItem 
+                icon={<OriginDataIcon className="w-5 h-5" />} 
+                label="Corporate Access" 
+                active={currentView === 'corporate'} 
+                isMobile={isMobile}
+                onClick={() => handleNavClick('corporate')}
+            />
+            <NavItem 
+                icon={<ProfileIcon />} 
+                label="Registrations" 
+                active={currentView === 'registrations'} 
+                isMobile={isMobile}
+                onClick={() => handleNavClick('registrations')}
+            />
+            <NavItem icon={<SettingsIcon />} label="Settings" isMobile={isMobile} />
         </>
     );
 
@@ -267,13 +239,6 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
                                 </div>
                             )}
                         </div>
-
-                        {portalMode === 'corporate' && (
-                            <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full border" style={{ backgroundColor: 'rgba(252, 210, 39, 0.4)', borderColor: '#F59E0B' }}>
-                                <CoinIcon className="w-5 h-5" />
-                                <span className="font-bold text-sm text-brand-text-light-primary dark:text-white">250</span>
-                            </div>
-                        )}
                     </>
                     )}
                 </div>
@@ -327,7 +292,6 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
                         <div className="border-t border-brand-light-tertiary dark:border-brand-dark-tertiary my-2 pt-2">
                              <div className="flex justify-between items-center px-2 mb-4">
                                 <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary font-semibold">Appearance</p>
-                                {/* Theme Toggle now inside the mobile menu */}
                                 <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
                              </div>
                         </div>
