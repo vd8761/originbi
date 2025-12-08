@@ -151,9 +151,9 @@ const AdminLogin: React.FC<AdminLoginProps> = ({
               <h2 className="text-3xl font-bold tracking-tight text-brand-text-light-primary dark:text-white">
                 Admin Login
               </h2>
-              <p className="text-brand-text-light-secondary dark:text-brand-text-secondary text-sm">
+              {/*<p className="text-brand-text-light-secondary dark:text-brand-text-secondary text-sm">
                 Restricted access. Please verify your credentials.
-              </p>
+              </p>*/}
             </div>
 
             {/* Login Form Component */}
