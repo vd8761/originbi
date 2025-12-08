@@ -1,6 +1,6 @@
 
 
-import { RegistrationUser, Program, Department, ProgramData, CorporateRegistrationUser,CreateCorporateRegistrationDto } from './types';
+import { RegistrationUser, Program, Department, CorporateRegistrationUser,CreateCorporateRegistrationDto } from './types';
 
 // Toggle this to true when backend is ready for EVERYTHING.
 // Programs will still use backend even if this is false.
