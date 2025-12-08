@@ -1,43 +1,42 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
+} from 'typeorm';
 
-@Entity('programs')
+@Entity({ name: 'programs' })
 export class Program {
   @PrimaryGeneratedColumn({ type: 'bigint' })
-  id: number;
+  id: string;
 
-  @Column({ type: 'varchar', length: 50, unique: true })
-  code: string; // e.g. SCHOOL_STUDENT, COLLEGE_STUDENT, EMPLOYEE
+  @Index({ unique: true })
+  @Column({ type: 'varchar', length: 50 })
+  code: string;
 
   @Column({ type: 'varchar', length: 255 })
-  name: string; // Display name
+  name: string;
 
   @Column({ type: 'text', nullable: true })
-  description?: string; // Long description for UI / admin
+  description?: string | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  assessment_title?: string; // Heading on assessment page
+  assessment_title?: string | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  report_title?: string; // Heading on generated report/PDF
+  report_title?: string | null;
 
   @Column({ type: 'boolean', default: false })
-  is_demo: boolean; // Default FALSE
+  is_demo: boolean;
 
   @Column({ type: 'boolean', default: true })
-  is_active: boolean; // Default TRUE
+  is_active: boolean;
 
-  @Column({
-    type: 'timestamptz',
-    name: 'created_at',
-    default: () => 'CURRENT_TIMESTAMP',
-  })
+  @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
 
-  @Column({
-    type: 'timestamptz',
-    name: 'updated_at',
-    default: () => 'CURRENT_TIMESTAMP',
-    onUpdate: 'CURRENT_TIMESTAMP',
-  })
+  @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date;
 }

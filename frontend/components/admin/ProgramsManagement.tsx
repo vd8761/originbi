@@ -10,7 +10,7 @@ import {
 import ProgramsTable from "@/components/admin/ProgramsTable";
 import AddProgramForm from "@/components/admin/AddProgramForm";
 import { ProgramData } from "@/lib/types";
-import { programService } from "@/lib/services";
+import { programService } from "@/lib/programService";
 
 // Debounce utility (same pattern as Corporate)
 const useDebounce = (value: string, delay: number) => {
@@ -24,7 +24,9 @@ const useDebounce = (value: string, delay: number) => {
 
 const ProgramsManagement: React.FC = () => {
   const [view, setView] = useState<"list" | "form">("list");
-  const [editingProgram, setEditingProgram] = useState<ProgramData | null>(null);
+  const [editingProgram, setEditingProgram] = useState<ProgramData | null>(
+    null
+  );
 
   // Data State
   const [programs, setPrograms] = useState<ProgramData[]>([]);
@@ -83,9 +85,7 @@ const ProgramsManagement: React.FC = () => {
     try {
       await programService.toggleStatus(id, !currentStatus);
       setPrograms((prev) =>
-        prev.map((p) =>
-          p.id === id ? { ...p, status: !currentStatus } : p
-        )
+        prev.map((p) => (p.id === id ? { ...p, status: !currentStatus } : p))
       );
     } catch (err) {
       console.error(err);
@@ -125,9 +125,7 @@ const ProgramsManagement: React.FC = () => {
           <span className="mx-2 text-gray-400 dark:text-gray-600">
             <ArrowRightWithoutLineIcon className="w-3 h-3 text-black dark:text-white" />
           </span>
-          <span className="text-brand-green font-semibold">
-            Programs
-          </span>
+          <span className="text-brand-green font-semibold">Programs</span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-semibold text-brand-text-light-primary dark:text-white">
           Programs Management

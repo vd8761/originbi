@@ -55,14 +55,6 @@ const MOCK_DEPARTMENTS: Department[] = [
     { id: '6', name: 'Business Administration' },
 ];
 
-const MOCK_PROGRAM_DATA: ProgramData[] = [
-    { id: '1', programCode: 'SCHOOL_STUDENT', programName: 'School Students', status: true, description: 'For students from class 6 to 12', assessmentTitle: 'School Gen Assessment', reportTitle: 'Student Growth Report', isDemo: false },
-    { id: '2', programCode: 'COLLEGE_STUDENT', programName: 'College Students', status: true, description: 'For undergrads and postgrads', assessmentTitle: 'Career Readiness', reportTitle: 'Employability Report', isDemo: false },
-    { id: '3', programCode: 'EMPLOYEE_PRO', programName: 'Professional Employee', status: true, description: 'Corporate training program', assessmentTitle: 'Pro Skills', reportTitle: 'Performance Analysis', isDemo: false },
-    { id: '4', programCode: 'CXO_LEADER', programName: 'CXO Leadership', status: false, description: 'Executive leadership assessment', assessmentTitle: 'Leadership DNA', reportTitle: 'Executive Summary', isDemo: false },
-    { id: '5', programCode: 'DEMO_TEST', programName: 'Demo Program', status: true, description: 'Trial program for new users', assessmentTitle: 'General Aptitude', reportTitle: 'Basic Report', isDemo: true },
-];
-
 const MOCK_QUESTIONS: Question[] = [
   {
     id: "1",
@@ -397,58 +389,6 @@ export const registrationService = {
 
       if (!res.ok) throw new Error('Bulk upload failed');
   }
-};
-
-// --- Program Service (New) ---
-export const programService = {
-    async getProgramsList(page: number, limit: number, search?: string): Promise<PaginatedResponse<ProgramData>> {
-        if (!USE_REAL_API) {
-            await simulateDelay(500);
-            let data = [...MOCK_PROGRAM_DATA];
-            if (search) {
-                const lower = search.toLowerCase();
-                data = data.filter(p => 
-                    p.programName.toLowerCase().includes(lower) || 
-                    p.programCode.toLowerCase().includes(lower)
-                );
-            }
-            const total = data.length;
-            const start = (page - 1) * limit;
-            return {
-                data: data.slice(start, start + limit),
-                total,
-                page,
-                limit
-            };
-        }
-        // Real API implementation
-        return { data: [], total: 0, page, limit }; 
-    },
-
-    async createProgram(data: Omit<ProgramData, 'id'>): Promise<void> {
-        if (!USE_REAL_API) {
-            await simulateDelay(800);
-            MOCK_PROGRAM_DATA.unshift({ ...data, id: Math.random().toString(36).substr(2, 9) });
-            return;
-        }
-    },
-
-    async toggleStatus(id: string, status: boolean): Promise<void> {
-         if (!USE_REAL_API) {
-            await simulateDelay(300);
-            const p = MOCK_PROGRAM_DATA.find(x => x.id === id);
-            if (p) p.status = status;
-            return;
-        }
-    },
-    
-    async deleteProgram(id: string): Promise<void> {
-        if (!USE_REAL_API) {
-            await simulateDelay(500);
-            const idx = MOCK_PROGRAM_DATA.findIndex(p => p.id === id);
-            if (idx > -1) MOCK_PROGRAM_DATA.splice(idx, 1);
-        }
-    }
 };
 
 // --- Exam Service ---

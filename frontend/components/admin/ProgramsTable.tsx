@@ -94,13 +94,6 @@ const ProgramsTable: React.FC<ProgramsTableProps> = ({
                                 <td className="p-4 text-right">
                                     <div className="flex items-center justify-end gap-2">
                                         <button 
-                                            onClick={() => {}} // Preview logic
-                                            className="p-2 text-gray-500 hover:text-brand-green hover:bg-brand-green/10 rounded-lg transition-colors"
-                                            title="Preview"
-                                        >
-                                            <EyeVisibleIcon className="w-4 h-4" />
-                                        </button>
-                                        <button 
                                             onClick={() => onEdit(program)}
                                             className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors"
                                             title="Edit"

@@ -1,22 +1,16 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: true });
+  const app = await NestFactory.create(AppModule);
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,                 // strips unknown properties
-      forbidNonWhitelisted: false,     // set true if you want Nest to throw on extra fields
-      transform: true,                 // auto-transform payloads to DTO classes
-      transformOptions: {
-        enableImplicitConversion: true // convert strings to numbers/booleans when possible
-      },
-    }),
-  );
+  app.enableCors({
+    origin: 'http://localhost:3000',
+    credentials: true,
+  });
 
-  await app.listen(4001);
-  console.log('Admin Service is running on port 4001');
+  const port = process.env.PORT || 4001;
+  await app.listen(port);
+  console.log(`Admin Service is running on port ${port}`);
 }
 bootstrap();

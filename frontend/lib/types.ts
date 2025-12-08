@@ -63,11 +63,13 @@ export interface ProgramData {
   id: string;
   programCode: string;
   programName: string;
-  status: boolean;
-  description: string;
-  assessmentTitle: string;
-  reportTitle: string;
+  description?: string;
+  assessmentTitle?: string;
+  reportTitle?: string;
   isDemo: boolean;
+  status: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CorporateRegistrationUser {

@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { ArrowRightWithoutLineIcon } from "@/components/icons";
 import { ProgramData } from "@/lib/types";
-import { programService } from "@/lib/services";
+import { programService } from "@/lib/programService";
 
 interface AddProgramFormProps {
   onCancel: () => void;
@@ -57,8 +57,11 @@ const AddProgramForm: React.FC<AddProgramFormProps> = ({
     if (!validate()) return;
     setIsLoading(true);
     try {
-      // Later you can handle update vs create based on initialData
-      await programService.createProgram(formData);
+      if (initialData?.id) {
+        await programService.updateProgram(initialData.id, formData);
+      } else {
+        await programService.createProgram(formData);
+      }
       onSuccess();
     } catch (err: any) {
       setError(err.message || "Failed to save program");
@@ -161,10 +164,8 @@ const AddProgramForm: React.FC<AddProgramFormProps> = ({
             <label className={baseLabelClasses}>Assessment Title</label>
             <input
               type="text"
-              value={formData.assessmentTitle}
-              onChange={(e) =>
-                handleChange("assessmentTitle", e.target.value)
-              }
+              value={formData.assessmentTitle ?? ""}
+              onChange={(e) => handleChange("assessmentTitle", e.target.value)}
               placeholder="Enter Assessment Title"
               className={baseInputClasses}
             />
@@ -175,7 +176,7 @@ const AddProgramForm: React.FC<AddProgramFormProps> = ({
             <label className={baseLabelClasses}>Report Title</label>
             <input
               type="text"
-              value={formData.reportTitle}
+              value={formData.reportTitle ?? ""}
               onChange={(e) => handleChange("reportTitle", e.target.value)}
               placeholder="Enter Report Title"
               className={baseInputClasses}
@@ -186,7 +187,7 @@ const AddProgramForm: React.FC<AddProgramFormProps> = ({
           <div className="space-y-2 md:col-span-2">
             <label className={baseLabelClasses}>Description</label>
             <textarea
-              value={formData.description}
+              value={formData.description ?? ""}
               onChange={(e) => handleChange("description", e.target.value)}
               placeholder="Short description for this program"
               className={baseTextAreaClasses}
@@ -205,7 +206,9 @@ const AddProgramForm: React.FC<AddProgramFormProps> = ({
                   type="button"
                   onClick={() => handleChange("status", true)}
                   className={`${toggleButtonBase} ${
-                    formData.status ? activeToggleClasses : inactiveToggleClasses
+                    formData.status
+                      ? activeToggleClasses
+                      : inactiveToggleClasses
                   }`}
                 >
                   Active
