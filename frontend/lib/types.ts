@@ -46,10 +46,10 @@ export interface Program {
   name: string; // e.g., "School Students", "College Students", "Employee"
   code: string;
 }
-
 export interface Department {
   id: string;
-  name: string; // e.g., "Computer Science", "Mechanical"
+  name: string;           // e.g., "Computer Science"
+  courseDuration?: number; // 1–4 years etc (from department_degrees)
 }
 
 export interface CountryCode {

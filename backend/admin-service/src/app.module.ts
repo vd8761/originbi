@@ -6,6 +6,7 @@ import { AdminUser } from '../../../database/entities/AdminUser';
 import { AdminModule } from './admin/admin.module';
 import { ProgramsModule } from './programs/programs.module';
 import { AdminLoginModule } from './adminlogin/adminlogin.module';
+import { DepartmentsModule } from './departments/departments.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { AdminLoginModule } from './adminlogin/adminlogin.module';
     AdminLoginModule,
     AdminModule,
     ProgramsModule,
+    DepartmentsModule,
   ],
 })
 export class AppModule {}
