@@ -39,13 +39,6 @@ export interface RegistrationUser {
   status: boolean;
 }
 
-// Dropdown Data Types
-export interface Program {
-    id: string;
-    name: string; // e.g., "School Students", "College Students", "Employee"
-    code: string;
-}
-
 export interface Department {
     id: string;
     name: string; // e.g., "Computer Science", "Mechanical"
@@ -57,14 +50,18 @@ export interface CountryCode {
     flag: string;
 }
 
-// --- Program Module Types ---
-export interface ProgramData {
-    id: string;
-    programCode: string;
-    programName: string;
-    status: boolean;
-    description: string;
-    assessmentTitle: string;
-    reportTitle: string;
-    isDemo: boolean;
+// Dropdown Data Types
+export interface Program {
+  id: string;
+  programCode: string;      // e.g. "SCHOOL_STUDENT"
+  programName: string;      // e.g. "School Students"
+  status: boolean;
+  description: string;
+  assessmentTitle: string;
+  reportTitle: string;
+  isDemo: boolean;
 }
+
+// --- Program Module Types ---
+// This keeps old code using ProgramData working
+export type ProgramData = Program;
