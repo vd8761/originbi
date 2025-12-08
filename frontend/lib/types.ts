@@ -1,11 +1,11 @@
-
+import type { SectorCode } from "@/lib/sectors";
 
 export interface RoadmapItem {
   title: string;
   description: string;
 }
 
-export type MoodTag = 'Feeling Happy' | 'Need Motivation' | 'Morning Boost';
+export type MoodTag = "Feeling Happy" | "Need Motivation" | "Morning Boost";
 
 export interface MoodItem {
   title: string;
@@ -16,10 +16,10 @@ export interface MoodItem {
 }
 
 export interface SessionItem {
-    title: string;
-    duration: string;
-    date: string;
-    time: string;
+  title: string;
+  duration: string;
+  date: string;
+  time: string;
 }
 
 export interface TestimonialData {
@@ -29,25 +29,26 @@ export interface TestimonialData {
   image: string;
 }
 
+// This looks fine – if you ever need "Other" gender here, add it.
 export interface RegistrationUser {
   id: string;
   name: string;
-  avatar: string;
-  gender: 'Male' | 'Female';
+  avatar: string;        // if sometimes missing, make this avatar?: string;
+  gender: "Male" | "Female";
   email: string;
   mobile: string;
   status: boolean;
 }
 
 export interface Department {
-    id: string;
-    name: string; // e.g., "Computer Science", "Mechanical"
+  id: string;
+  name: string; // e.g., "Computer Science", "Mechanical"
 }
 
 export interface CountryCode {
-    code: string;
-    dial_code: string;
-    flag: string;
+  code: string;
+  dial_code: string;
+  flag: string;
 }
 
 // Dropdown Data Types

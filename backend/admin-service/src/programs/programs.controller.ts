@@ -2,46 +2,61 @@ import {
   Controller,
   Get,
   Post,
-  Body,
-  Param,
   Put,
+  Patch,
   Delete,
-  ParseIntPipe,
+  Param,
+  Body,
+  Query,
 } from '@nestjs/common';
 import { ProgramsService } from './programs.service';
-import { CreateProgramDto } from './dto/create-program.dto';
-import { UpdateProgramDto } from './dto/update-program.dto';
+import { Program } from './entities/program.entity';
 
 @Controller('programs')
 export class ProgramsController {
-  constructor(private readonly service: ProgramsService) {}
+  constructor(private readonly programsService: ProgramsService) {}
 
-  @Post()
-  create(@Body() data: CreateProgramDto) {
-    return this.service.create(data);
-  }
-
+  // GET ALL (with pagination + search)
   @Get()
-  findAll() {
-    return this.service.findAll();
+  findAll(
+    @Query('page') page = '1',
+    @Query('limit') limit = '50',
+    @Query('search') search?: string,
+  ) {
+    return this.programsService.findAll(
+      parseInt(page, 10),
+      parseInt(limit, 10),
+      search,
+    );
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.service.findOne(id);
+  findOne(@Param('id') id: string): Promise<Program> {
+    return this.programsService.findOne(id);
   }
 
-  // ✅ Use PUT as the update route
+  @Post()
+  create(@Body() body: any): Promise<Program> {
+    return this.programsService.create(body);
+  }
+
   @Put(':id')
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() data: UpdateProgramDto,
-  ) {
-    return this.service.update(id, data);
+  update(@Param('id') id: string, @Body() body: any): Promise<Program> {
+    return this.programsService.update(id, body);
+  }
+
+  // ⭐ FIXED: Status Toggle API
+  @Patch(':id/status')
+  updateStatus(
+    @Param('id') id: string,
+    @Body('is_active') is_active: boolean,
+  ): Promise<Program> {
+    return this.programsService.updateStatus(id, is_active);
   }
 
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.service.remove(id);
+  async remove(@Param('id') id: string) {
+    await this.programsService.remove(id);
+    return { success: true };
   }
 }

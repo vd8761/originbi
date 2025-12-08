@@ -1,19 +1,14 @@
 "use client";
 
-import React from "react";
-import Header from "@/components/admin/Header";
-import RegistrationManagement from "@/components/admin/RegistrationManagement";
 import { useRouter } from "next/navigation";
+import Header from "@/components/admin/Header";
+import CorporateManagement from "@/components/admin/CorporateManagement";
 
-export default function RegistrationsPage() {
+export default function CorporatePage() {
   const router = useRouter();
 
   const handleNavigate = (
-    view:
-      | "dashboard"
-      | "programs"
-      | "corporate"
-      | "registrations"
+    view: "dashboard" | "programs" | "corporate" | "registrations"
   ) => {
     switch (view) {
       case "dashboard":
@@ -38,13 +33,13 @@ export default function RegistrationsPage() {
   return (
     <div className="min-h-screen bg-transparent">
       <Header
-        currentView="registrations"
+        currentView="corporate"
         portalMode="admin"
         onNavigate={handleNavigate}
         onLogout={handleLogout}
       />
       <main className="p-6">
-        <RegistrationManagement />
+        <CorporateManagement />
       </main>
     </div>
   );
