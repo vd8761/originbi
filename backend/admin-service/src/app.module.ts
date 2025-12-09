@@ -10,21 +10,24 @@ import { DepartmentsModule } from './departments/departments.module';
 
 @Module({
   imports: [
+    // Load .env (includes DATABASE_URL)
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
     }),
+
+    // Use Neon DATABASE_URL instead of separate host/user/pass
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT) || 5432,
-      username: process.env.DB_USER,
-      password: process.env.DB_PASS || '',
-      database: process.env.DB_NAME,
+      url: process.env.DATABASE_URL,   // <<--- Neon URL from .env
       entities: [AdminUser],
-      synchronize: false,
       autoLoadEntities: true,
+      synchronize: false,
+      ssl: {
+        rejectUnauthorized: false,     // required for Neon TLS
+      },
     }),
+
     AdminLoginModule,
     AdminModule,
     ProgramsModule,

@@ -5,7 +5,7 @@ import { BulkUploadIcon, ArrowRightWithoutLineIcon } from "@/components/icons";
 import CustomDatePicker from "@/components/ui/CustomDatePicker";
 import CustomSelect from "@/components/ui/CustomSelect";
 import MobileInput from "@/components/ui/MobileInput";
-import { registrationService, CreateRegistrationDto } from "@/lib/services";
+import { registrationService, CreateRegistrationDto } from "@/lib/registrationService";
 import { Program, Department } from "@/lib/types";
 import { BulkUploadModal } from "@/components/ui/BulkUploadModal";
 

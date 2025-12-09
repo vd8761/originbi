@@ -29,7 +29,7 @@ const useDebounce = (value: string, delay: number) => {
 };
 
 const RegistrationManagement: React.FC = () => {
-  const [view, setView] = useState<"list" | "add">("list");
+  const [view, setView] = useState<"list" | "add">("list"); 
   const [activeTab, setActiveTab] = useState<"registrations" | "assigned">(
     "registrations"
   );

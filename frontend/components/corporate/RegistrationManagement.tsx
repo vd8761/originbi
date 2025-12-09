@@ -16,7 +16,7 @@ import DateRangePickerModal from "@/components/ui/DateRangePickerModal";
 import ExcelExportButton from "@/components/ui/ExcelExportButton";
 import RegistrationTable from "@/components/ui/RegistrationTable";
 import { RegistrationUser } from "@/lib/types";
-import { registrationService } from "@/lib/services";
+import { registrationService } from "@/lib/registrationService";
 
 // Debounce utility
 const useDebounce = (value: string, delay: number) => {
