@@ -1,6 +1,7 @@
 // src/lib/registrationService.ts
 
 import { RegistrationUser, Program, Department } from "./types";
+import axios from 'axios';
 
 // All admin-side APIs (programs, departments, registrations) from NestJS admin-service
 const API_URL =
@@ -146,7 +147,7 @@ export const registrationService = {
   },
 
   // 🔹 CREATE registration (on Submit of AddRegistrationForm)
-  async createUser(data: CreateRegistrationDto): Promise<void> {
+  /*async createUser(data: CreateRegistrationDto): Promise<void> {
     const token = AuthService.getToken();
 
     const res = await fetch(`${API_URL}/registrations`, {
@@ -162,6 +163,19 @@ export const registrationService = {
       const err = await res.json().catch(() => null);
       throw new Error(err?.message || "Failed to create registration");
     }
+  },*/
+
+  async createUser(data: CreateRegistrationDto) {
+    const token = AuthService.getToken();
+
+    const res = await axios.post(`${API_URL}/registrations`, data, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+    });
+
+    return res.data;
   },
 
   // 🔹 Toggle status from list (if you use it)

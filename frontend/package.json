@@ -12,6 +12,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@neondatabase/serverless": "^1.0.2",
     "aws-amplify": "^6.15.8",
+    "axios": "^1.13.2",
     "flag-icons": "^7.5.0",
     "lucide-react": "^0.555.0",
     "next": "^14.2.3",
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.17",
+    "@types/axios": "^0.9.36",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

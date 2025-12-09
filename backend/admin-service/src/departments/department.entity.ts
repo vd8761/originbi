@@ -1,12 +1,12 @@
 // src/departments/department.entity.ts
 import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 
-@Entity('bi_departments')   // your table name
+@Entity({ name: 'departments' })
 export class Department {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn({ type: 'bigint' })
+  id: number;  // you can also type this as string if you prefer for bigint
 
-  @Column({ name: 'department_name' })
+  @Column({ name: 'name' })   // ✅ match DB column
   name: string;
 
   @Column({ name: 'short_name', nullable: true })
