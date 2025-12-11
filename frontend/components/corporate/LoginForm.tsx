@@ -80,7 +80,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
     setTouched({ email: true, password: true });
 
     if (!emailError && !passwordError) {
-      console.log('Form submitted successfully:', values);
+      //console.log('Form submitted successfully:', values);
       onLoginSuccess();
     }
   };

@@ -164,11 +164,11 @@ const RegistrationManagement: React.FC = () => {
   };
 
   const handleExport = () => {
-    console.log("Exporting data for range:", dateRangeLabel);
+    //console.log("Exporting data for range:", dateRangeLabel);
   };
 
   const handleBulkUpload = () => {
-    console.log("Bulk upload triggered");
+    //console.log("Bulk upload triggered");
   };
 
   const handleDateRangeSelect = (option: DateRangeOption) => {

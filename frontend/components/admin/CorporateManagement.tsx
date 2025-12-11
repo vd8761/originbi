@@ -76,7 +76,7 @@ const CorporateManagement: React.FC = () => {
 
   // Optional view details (future modal)
   const handleViewDetails = (id: string) => {
-    console.log("View corporate registration details for:", id);
+    //console.log("View corporate registration details for:", id);
   };
 
   const handlePageChange = (page: number) => {

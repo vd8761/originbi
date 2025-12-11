@@ -32,7 +32,7 @@ export default function RegistrationsPage() {
   };
 
   const handleLogout = () => {
-    router.push("/login");
+    router.push("/admin/login");
   };
 
   return (

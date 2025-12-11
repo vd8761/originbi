@@ -27,7 +27,7 @@ export default function CorporatePage() {
   };
 
   const handleLogout = () => {
-    router.push("/login");
+    router.push("/admin/login");
   };
 
   return (

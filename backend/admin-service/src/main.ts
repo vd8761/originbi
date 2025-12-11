@@ -15,6 +15,6 @@ async function bootstrap() {
 
   const port = process.env.PORT || 4001;
   await app.listen(port);
-  console.log(`Admin Service is running on port ${port}`);
+  //console.log(`Admin Service is running on port ${port}`);
 }
 bootstrap();
