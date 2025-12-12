@@ -23,9 +23,6 @@ export class User {
   @Column()
   role: string;
 
-  @Column({ name: 'full_name' })
-  fullName: string;
-
   @Column({ name: 'avatar_url', nullable: true })
   avatarUrl?: string;
 

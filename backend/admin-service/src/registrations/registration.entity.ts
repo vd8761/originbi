@@ -18,6 +18,8 @@ export type PaymentStatus =
   | 'FAILED'
   | 'REFUNDED';
 
+export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
+
 @Entity('registrations')
 export class Registration {
   @PrimaryGeneratedColumn({ type: 'bigint' })
@@ -31,6 +33,24 @@ export class Registration {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
+  // ---- New snapshot fields in registrations ----
+  @Column({ name: 'full_name', type: 'varchar', length: 255, nullable: true })
+  fullName: string | null;
+
+  @Column({
+    name: 'country_code',
+    type: 'varchar',
+    length: 10,
+    default: '+91',
+  })
+  countryCode: string;
+
+  @Column({ name: 'mobile_number', type: 'varchar', length: 20 })
+  mobileNumber: string;
+
+  @Column({ name: 'gender', type: 'varchar', length: 10, nullable: true })
+  gender: 'MALE' | 'FEMALE' | 'OTHER' | null;
+
   // ---- Source & Creator ----
   @Column({
     name: 'registration_source',
@@ -40,81 +60,37 @@ export class Registration {
   })
   registrationSource: RegistrationSource;
 
-  @Column({
-    name: 'created_by_user_id',
-    type: 'bigint',
-    nullable: true,
-  })
+  @Column({ name: 'created_by_user_id', type: 'bigint', nullable: true })
   createdByUserId: number | null;
 
   // ---- Organisation Links ----
-  @Column({
-    name: 'corporate_account_id',
-    type: 'bigint',
-    nullable: true,
-  })
+  @Column({ name: 'corporate_account_id', type: 'bigint', nullable: true })
   corporateAccountId: number | null;
 
-  @Column({
-    name: 'reseller_account_id',
-    type: 'bigint',
-    nullable: true,
-  })
+  @Column({ name: 'reseller_account_id', type: 'bigint', nullable: true })
   resellerAccountId: number | null;
 
-  // ---- Education Links ----
-  @Column({
-    name: 'school_level',
-    type: 'varchar',
-    length: 20,
-    nullable: true, // valid for UG, College, etc.
-  })
+  // ---- Education ----
+  @Column({ name: 'school_level', type: 'varchar', length: 20, nullable: true })
   schoolLevel: string | null;
 
-  @Column({
-    name: 'school_stream',
-    type: 'varchar',
-    length: 20,
-    nullable: true,
-  })
+  @Column({ name: 'school_stream', type: 'varchar', length: 20, nullable: true })
   schoolStream: string | null;
 
-  @Column({
-    name: 'department_degree_id',
-    type: 'bigint',
-    nullable: true,
-  })
+  @Column({ name: 'department_degree_id', type: 'bigint', nullable: true })
   departmentDegreeId: number | null;
 
-  @Column({
-    name: 'group_id',
-    type: 'bigint',
-    nullable: true,
-  })
+  @Column({ name: 'group_id', type: 'bigint', nullable: true })
   groupId: number | null;
 
   // ---- Payment ----
-  @Column({
-    name: 'payment_required',
-    type: 'boolean',
-    default: false,
-  })
+  @Column({ name: 'payment_required', type: 'boolean', default: false })
   paymentRequired: boolean;
 
-  @Column({
-    name: 'payment_provider',
-    type: 'varchar',
-    length: 20,
-    nullable: true,
-  })
+  @Column({ name: 'payment_provider', type: 'varchar', length: 20, nullable: true })
   paymentProvider: string | null;
 
-  @Column({
-    name: 'payment_reference',
-    type: 'varchar',
-    length: 100,
-    nullable: true,
-  })
+  @Column({ name: 'payment_reference', type: 'varchar', length: 100, nullable: true })
   paymentReference: string | null;
 
   @Column({
@@ -124,7 +100,7 @@ export class Registration {
     scale: 2,
     nullable: true,
   })
-  paymentAmount: string | null; // keep as string for numeric
+  paymentAmount: string | null;
 
   @Column({
     name: 'payment_status',
@@ -134,43 +110,22 @@ export class Registration {
   })
   paymentStatus: PaymentStatus;
 
-  @Column({
-    name: 'payment_created_at',
-    type: 'timestamptz',
-    nullable: true,
-  })
+  @Column({ name: 'payment_created_at', type: 'timestamptz', nullable: true })
   paymentCreatedAt: Date | null;
 
-  @Column({
-    name: 'paid_at',
-    type: 'timestamptz',
-    nullable: true,
-  })
+  @Column({ name: 'paid_at', type: 'timestamptz', nullable: true })
   paidAt: Date | null;
 
   // ---- Registration Status ----
-  @Column({
-    name: 'status',
-    type: 'varchar',
-    length: 20,
-    default: 'INCOMPLETE', // ✅ must match table CHECK constraint
-  })
+  @Column({ name: 'status', type: 'varchar', length: 20, default: 'INCOMPLETE' })
   status: RegistrationStatus;
 
   // ---- Metadata ----
-  @Column({
-    name: 'metadata',
-    type: 'jsonb',
-    default: () => `'{}'`,
-  })
+  @Column({ name: 'metadata', type: 'jsonb', default: () => `'{}'` })
   metadata: any;
 
   // ---- Soft Delete ----
-  @Column({
-    name: 'is_deleted',
-    type: 'boolean',
-    default: false,
-  })
+  @Column({ name: 'is_deleted', type: 'boolean', default: false })
   isDeleted: boolean;
 
   // ---- Timestamps ----

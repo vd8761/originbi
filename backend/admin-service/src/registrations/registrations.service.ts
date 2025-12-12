@@ -23,9 +23,12 @@ export class RegistrationsService {
   private authServiceBaseUrl =
     process.env.AUTH_SERVICE_URL || 'http://localhost:4002';
 
+  // ✅ For now, ADMIN is always user_id = 1
+  private readonly ADMIN_USER_ID = 1;
+
   constructor(
     @InjectRepository(User)
-    private readonly userRepo: Repository<User>, // (kept even if not used directly)
+    private readonly userRepo: Repository<User>,
 
     @InjectRepository(Registration)
     private readonly regRepo: Repository<Registration>,
@@ -38,16 +41,9 @@ export class RegistrationsService {
   // 🔹 Helper: Call auth-service to create a Cognito user
   // ---------------------------------------------------------
   private async createCognitoUser(email: string, password: string) {
-    console.log('[RegistrationsService] createCognitoUser email =', email);
-    console.log(
-      '[RegistrationsService] createCognitoUser password =',
-      '***hidden***',
-    );
-
     if (!email) {
       throw new BadRequestException('Email is required for Cognito user');
     }
-
     if (!password) {
       throw new BadRequestException('Password is required for Cognito user');
     }
@@ -59,12 +55,6 @@ export class RegistrationsService {
       );
 
       const res = await firstValueFrom(res$);
-
-      console.log(
-        '[RegistrationsService] auth-service /internal/cognito/users response =',
-        res.data,
-      );
-
       return res.data as { sub?: string };
     } catch (err: any) {
       const authErr = err?.response?.data || err?.message || err;
@@ -74,7 +64,6 @@ export class RegistrationsService {
         authErr,
       );
 
-      // return actual message from auth-service if present (helps debugging)
       throw new InternalServerErrorException(
         authErr?.message || 'Failed to create Cognito user via auth-service',
       );
@@ -82,13 +71,62 @@ export class RegistrationsService {
   }
 
   // ---------------------------------------------------------
+  // 🔹 Normalizers (to satisfy DB CHECK constraints)
+  // ---------------------------------------------------------
+  private normalizeGender(g?: string | null): 'MALE' | 'FEMALE' | 'OTHER' | null {
+    if (!g) return null;
+    const v = g.trim().toUpperCase();
+    if (v === 'MALE' || v === 'FEMALE' || v === 'OTHER') return v;
+    // frontend sends Male/Female/Other -> this converts to MALE/FEMALE/OTHER
+    return null;
+  }
+
+  private normalizeSchoolLevel(level?: string | null): 'SSLC' | 'HSC' | null {
+    if (!level) return null;
+    const v = level.trim().toUpperCase();
+    if (v === 'SSLC' || v === 'HSC') return v;
+    return null;
+  }
+
+  private normalizeSchoolStream(
+    stream?: string | null,
+  ): 'SCIENCE' | 'COMMERCE' | 'HUMANITIES' | null {
+    if (!stream) return null;
+    const v = stream.trim().toUpperCase();
+    if (v === 'SCIENCE' || v === 'COMMERCE' || v === 'HUMANITIES') return v;
+    return null;
+  }
+
+  private toBigIntOrNull(v?: string | null): number | null {
+    if (!v) return null;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    return n;
+  }
+
+  // ---------------------------------------------------------
   // 🔹 CREATE REGISTRATION (called by frontend)
   // ---------------------------------------------------------
-  async create(dto: CreateRegistrationDto, createdByUserId?: number | null) {
+  async create(dto: CreateRegistrationDto) {
     console.log('[RegistrationsService] create dto =', {
       ...dto,
-      password: dto.password ? '***hidden***' : undefined, // do not log password
+      password: dto.password ? '***hidden***' : undefined,
     });
+
+    // ✅ Force ADMIN source + createdByUserId = 1
+    const registrationSource: 'ADMIN' = 'ADMIN';
+    const createdByUserId = this.ADMIN_USER_ID;
+
+    // ✅ Ensure admin user exists (FK safety)
+    const adminUser = await this.userRepo.findOne({
+      where: { id: createdByUserId as any },
+    });
+
+    if (!adminUser) {
+      throw new InternalServerErrorException(
+        `Admin user with id=${createdByUserId} not found. Create it first or change ADMIN_USER_ID.`,
+      );
+    }
 
     // 1) Create Cognito user via auth-service
     const { sub } = await this.createCognitoUser(dto.email, dto.password);
@@ -99,50 +137,78 @@ export class RegistrationsService {
       );
     }
 
+    // Normalize values to match DB CHECK constraints
+    const gender = this.normalizeGender(dto.gender);
+    const schoolLevel = this.normalizeSchoolLevel(dto.schoolLevel);
+    const schoolStream = this.normalizeSchoolStream(dto.schoolStream);
+
+    // Your registrations column is department_degree_id
+    const departmentDegreeId = this.toBigIntOrNull(dto.departmentId);
+
+    // group_id not created yet -> keep NULL and store groupName only in metadata
+    const groupId: number | null = null;
+
     // 2) Wrap DB operations in a transaction
     return this.dataSource.transaction(async (manager) => {
-      // --- Create User row ---
+      // -------------------------
+      // Create User row
+      // (✅ remove fullName insertion here as you requested)
+      // -------------------------
       const user = manager.create(User, {
         email: dto.email,
-        fullName: dto.name,
-        mobileCountryCode: dto.countryCode,
         role: 'STUDENT',
         emailVerified: true,
         cognitoSub: sub,
         isActive: true,
         isBlocked: false,
+
+        // ✅ Store name/mobile/countryCode/gender in users.metadata
+        metadata: {
+          fullName: dto.name, // stored as metadata since users.full_name removed
+          countryCode: dto.countryCode ?? '+91',
+          mobile: dto.mobile,
+          gender: gender,
+        },
       });
+
       await manager.save(user);
 
-      // Decide registrationSource based on whether we have createdByUserId
-      // DB enum allowed: 'SELF' | 'ADMIN' | 'CORPORATE' | 'RESELLER'
-      const registrationSource =
-        createdByUserId && createdByUserId > 0 ? 'ADMIN' : 'SELF';
-
-      // For status, DB enum allowed: 'INCOMPLETE' | 'COMPLETED' | 'CANCELLED'
+      // -------------------------
+      // Create Registration row
+      // -------------------------
       const status: 'INCOMPLETE' | 'COMPLETED' | 'CANCELLED' = 'INCOMPLETE';
 
-      // --- Create Registration row ---
       const registration = manager.create(Registration, {
         userId: user.id,
         registrationSource,
-        createdByUserId: createdByUserId ?? null,
+        createdByUserId, // ✅ must be NOT NULL for ADMIN
         status,
-        // Store additional fields in metadata
+
+        // ✅ store in NEW registration columns
+        fullName: dto.name,
+        countryCode: dto.countryCode ?? '+91',
+        mobileNumber: dto.mobile,
+        gender: gender,
+
+        // ✅ store in respective columns
+        schoolLevel,
+        schoolStream,
+        departmentDegreeId,
+        groupId, // null for now
+
+        // ✅ keep remaining in metadata
         metadata: {
-          gender: dto.gender,
           programType: dto.programType,
-          groupName: dto.groupName,
+          groupName: dto.groupName ?? null, // ✅ only metadata for now
           sendEmail: dto.sendEmail,
-          schoolLevel: dto.schoolLevel,
-          schoolStream: dto.schoolStream,
-          currentYear: dto.currentYear,
-          departmentId: dto.departmentId,
-          mobile: dto.mobile,
+          currentYear: dto.currentYear ?? null,
           examStart: dto.examStart ?? null,
           examEnd: dto.examEnd ?? null,
+          // optional: keep raw departmentId also if you want debug
+          departmentId: dto.departmentId ?? null,
         },
       });
+
       await manager.save(registration);
 
       return {
@@ -164,9 +230,10 @@ export class RegistrationsService {
 
     if (search) {
       const s = `%${search.toLowerCase()}%`;
-      qb.andWhere('(LOWER(u.fullName) LIKE :s OR LOWER(u.email) LIKE :s)', {
-        s,
-      });
+      qb.andWhere(
+        '(LOWER(r.fullName) LIKE :s OR LOWER(u.email) LIKE :s)',
+        { s },
+      );
     }
 
     const total = await qb.getCount();
@@ -180,10 +247,13 @@ export class RegistrationsService {
     const data = rows.map((r) => ({
       id: r.id,
       userId: r.userId,
-      name: r.user?.fullName ?? null,
+      name: r.fullName ?? null,
       email: r.user?.email ?? null,
-      mobile: r.metadata?.mobile ?? null,
+      countryCode: r.countryCode ?? null,
+      mobile: r.mobileNumber ?? null,
+      gender: r.gender ?? null,
       programType: r.metadata?.programType ?? null,
+      groupName: r.metadata?.groupName ?? null,
       status: r.status,
       examStart: r.metadata?.examStart ?? null,
       examEnd: r.metadata?.examEnd ?? null,

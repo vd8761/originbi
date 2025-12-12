@@ -29,7 +29,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
   // --- State ---
   const [formData, setFormData] = useState<CreateRegistrationDto>({
     name: "",
-    gender: "Female",
+    gender: "FEMALE",
     email: "",
     countryCode: "+91",
     mobile: "",
@@ -292,7 +292,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                 Gender <span className="text-red-500">*</span>
               </label>
               <div className={toggleWrapperClasses}>
-                {["Male", "Female", "Other"].map((gender) => (
+                {["MALE", "FEMALE", "OTHERS"].map((gender) => (
                   <button
                     key={gender}
                     type="button"

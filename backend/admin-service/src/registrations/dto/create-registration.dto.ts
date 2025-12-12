@@ -1,40 +1,53 @@
 // backend/admin-service/src/registrations/dto/create-registration.dto.ts
+
 import {
   IsString,
   IsEmail,
   IsOptional,
   IsBoolean,
-  IsNotEmpty, MinLength, Matches
+  IsNotEmpty,
+  MinLength,
+  Matches,
+  IsIn,
 } from 'class-validator';
 
 export class CreateRegistrationDto {
   @IsString()
+  @IsNotEmpty()
   name: string;
 
   @IsEmail()
+  @IsNotEmpty()
   email: string;
 
+  // ✅ frontend will send MALE/FEMALE/OTHER now
+  @IsOptional()
   @IsString()
-  gender: string; // 'Male' | 'Female' | 'Other'
+  @IsIn(['MALE', 'FEMALE', 'OTHER'])
+  gender?: string;
+
+  @IsOptional()
+  @IsString()
+  countryCode?: string; // +91 default handled in service
 
   @IsString()
-  countryCode: string; // e.g. '+91'
-
-  @IsString()
+  @IsNotEmpty()
   mobile: string;
 
-  // Program ID from programs table (stringified)
+  // ✅ now optional (you said will store in another table later)
+  @IsOptional()
   @IsString()
-  programType: string;
+  programType?: string;
 
   @IsOptional()
   @IsString()
   groupName?: string;
 
+  @IsOptional()
   @IsBoolean()
-  sendEmail: boolean;
+  sendEmail?: boolean;
 
-  // These come as string (ISO or date-only) from frontend
+  // ✅ now optional
   @IsOptional()
   @IsString()
   examStart?: string;
@@ -43,25 +56,24 @@ export class CreateRegistrationDto {
   @IsString()
   examEnd?: string;
 
-  // SCHOOL-specific
+  // School
   @IsOptional()
   @IsString()
-  schoolLevel?: string; // 'SSLC' | 'HSC'
+  schoolLevel?: string;
 
   @IsOptional()
   @IsString()
-  schoolStream?: string; // 'Science' | 'Commerce' | 'Humanities'
+  schoolStream?: string;
 
-  // For HSC year (12) or college batch (2025)
   @IsOptional()
   @IsString()
   currentYear?: string;
 
-  // COLLEGE-specific (Department Degree ID)
   @IsOptional()
   @IsString()
   departmentId?: string;
 
+  // ✅ password required (Cognito)
   @IsNotEmpty()
   @IsString()
   @MinLength(8)
@@ -72,5 +84,4 @@ export class CreateRegistrationDto {
     message: 'Password must contain at least one special character',
   })
   password: string;
-
 }

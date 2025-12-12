@@ -7,12 +7,12 @@ export class RegistrationsController {
   constructor(private readonly registrationsService: RegistrationsService) {}
 
   @Post()
-  async create(@Body() dto: CreateRegistrationDto, @Req() req: any) {
-    const adminId = null; // later: req.user.id
-    return this.registrationsService.create(dto, adminId);
+  async create(@Body() dto: CreateRegistrationDto) {
+    // ✅ adminId handled inside service (fixed to 1)
+    return this.registrationsService.create(dto);
   }
 
-  // 🔹 NEW: list registrations for the table
+  // 🔹 List registrations
   @Get()
   async list(
     @Query('page') page = '1',
