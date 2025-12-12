@@ -4,28 +4,31 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-
 import { verifyCognitoIdToken } from './verify-id-token';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class CognitoAdminGuard implements CanActivate {
+  constructor(private readonly config: ConfigService) {}
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
 
     const auth = request.headers['authorization'];
-    if (!auth) throw new UnauthorizedException('MISSING_TOKEN');
+    if (!auth || !auth.startsWith('Bearer ')) {
+      throw new UnauthorizedException('MISSING_TOKEN');
+    }
 
-    const token = auth.replace('Bearer ', '');
+    const token = auth.replace('Bearer ', '').trim();
 
     try {
-      const payload = await verifyCognitoIdToken(token);
+      const payload = await verifyCognitoIdToken(token, this.config);
 
-      // You can enforce ADMIN role like this:
       if (payload['custom:role'] !== 'ADMIN') {
         throw new UnauthorizedException('NOT_ADMIN');
       }
 
-      request.user = payload; // attach user
+      request.user = payload;
       return true;
     } catch (err) {
       console.error('Token verify failed:', err);
