@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import ReactCountryFlag from "react-country-flag";
 import { ChevronDownIcon } from "@/components/icons";
-import { COUNTRY_CODES } from "@/lib/CountryCodes";
+import { COUNTRY_CODES } from "@/lib/countryCodes";
 
 interface MobileInputProps {
   countryCode: string;

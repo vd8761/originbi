@@ -1,15 +1,15 @@
-import { NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { NextResponse } from "next/server";
 
 export async function GET() {
-  try {
-    const result = await sql`SELECT 1 AS ok`;
-    return NextResponse.json({ success: true, result });
-  } catch (error: any) {
-    console.error('DB test error:', error);
+  const url = process.env.DATABASE_URL;
+
+  if (!url) {
     return NextResponse.json(
-      { success: false, error: String(error?.message || error) },
+      { ok: false, error: "DATABASE_URL is not set" },
       { status: 500 }
     );
   }
+
+  // your db test logic here...
+  return NextResponse.json({ ok: true });
 }

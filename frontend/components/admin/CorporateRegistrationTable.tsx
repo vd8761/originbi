@@ -2,7 +2,7 @@ import React from "react";
 import { CorporateRegistrationUser } from "@/lib/types";
 import ToggleSwitch from "@/components/ui/ToggleSwitch";
 import { EyeVisibleIcon } from "@/components/icons";
-import { COUNTRY_CODES } from "@/lib/CountryCodes";
+import { COUNTRY_CODES } from "@/lib/countryCodes";
 
 interface RegistrationTableProps {
   users: CorporateRegistrationUser[];

@@ -36,8 +36,7 @@ export interface CreateRegistrationDto {
   schoolStream?: string;
   currentYear?: string;
   departmentId?: string;
-  password: string; 
-
+  password?: string;
 }
 
 const AuthService = {
