@@ -11,25 +11,32 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CognitoService = void 0;
 const common_1 = require("@nestjs/common");
+const config_1 = require("@nestjs/config");
 const client_cognito_identity_provider_1 = require("@aws-sdk/client-cognito-identity-provider");
 let CognitoService = class CognitoService {
-    constructor() {
-        const region = process.env.COGNITO_REGION;
-        this.userPoolId = process.env.COGNITO_USER_POOL_ID;
-        if (!this.userPoolId) {
+    constructor(config) {
+        this.config = config;
+        const region = this.config.get('COGNITO_REGION');
+        this.userPoolId = this.config.get('COGNITO_USER_POOL_ID');
+        const accessKeyId = this.config.get('AWS_ACCESS_KEY_ID');
+        const secretAccessKey = this.config.get('AWS_SECRET_ACCESS_KEY');
+        if (!this.userPoolId)
             throw new Error('COGNITO_USER_POOL_ID is not set');
-        }
-        if (!region) {
+        if (!region)
             throw new Error('COGNITO_REGION is not set');
+        if (!accessKeyId || !secretAccessKey) {
+            throw new Error('AWS credentials missing. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY in auth-service env file.');
         }
-        this.cognitoClient = new client_cognito_identity_provider_1.CognitoIdentityProviderClient({ region });
+        this.cognitoClient = new client_cognito_identity_provider_1.CognitoIdentityProviderClient({
+            region,
+            credentials: {
+                accessKeyId,
+                secretAccessKey,
+            },
+        });
     }
     async createUserWithPermanentPassword(email, password, groupName = 'STUDENT') {
         var _a, _b, _c, _d, _e, _f;
-        console.log('[CognitoService] createUserWithPermanentPassword called:', {
-            email,
-            groupName,
-        });
         try {
             let username = email;
             let userSub = null;
@@ -50,15 +57,9 @@ let CognitoService = class CognitoService {
             }
             catch (err) {
                 if ((err === null || err === void 0 ? void 0 : err.name) === 'UsernameExistsException') {
-                    console.warn('[CognitoService] User already exists. Will set password and group.');
                     username = email;
                 }
                 else {
-                    console.error('[CognitoService] AdminCreateUser error:', {
-                        name: err === null || err === void 0 ? void 0 : err.name,
-                        message: err === null || err === void 0 ? void 0 : err.message,
-                        $metadata: err === null || err === void 0 ? void 0 : err.$metadata,
-                    });
                     throw err;
                 }
             }
@@ -85,25 +86,14 @@ let CognitoService = class CognitoService {
                         ((_f = (_e = getUserRes.UserAttributes) === null || _e === void 0 ? void 0 : _e.find((a) => a.Name === 'sub')) === null || _f === void 0 ? void 0 : _f.Value) ||
                             null;
                 }
-                catch (e) {
-                    console.warn('[CognitoService] AdminGetUser failed:', {
-                        name: e === null || e === void 0 ? void 0 : e.name,
-                        message: e === null || e === void 0 ? void 0 : e.message,
-                        $metadata: e === null || e === void 0 ? void 0 : e.$metadata,
-                    });
-                }
+                catch (_g) { }
             }
-            return {
-                sub: userSub !== null && userSub !== void 0 ? userSub : username,
-                email,
-                group: groupName,
-            };
+            return { sub: userSub !== null && userSub !== void 0 ? userSub : username, email, group: groupName };
         }
         catch (error) {
             console.error('[CognitoService] AWS error details:', {
                 name: error === null || error === void 0 ? void 0 : error.name,
                 message: error === null || error === void 0 ? void 0 : error.message,
-                $metadata: error === null || error === void 0 ? void 0 : error.$metadata,
             });
             throw new common_1.InternalServerErrorException(`Cognito error: ${(error === null || error === void 0 ? void 0 : error.name) || 'Unknown'} - ${(error === null || error === void 0 ? void 0 : error.message) || 'No message'}`);
         }
@@ -112,6 +102,6 @@ let CognitoService = class CognitoService {
 exports.CognitoService = CognitoService;
 exports.CognitoService = CognitoService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [])
+    __metadata("design:paramtypes", [config_1.ConfigService])
 ], CognitoService);
 //# sourceMappingURL=cognito.service.js.map

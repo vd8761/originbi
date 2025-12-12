@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { BulkUploadIcon, ArrowRightWithoutLineIcon } from "@/components/icons";
+import {
+  BulkUploadIcon,
+  ArrowRightWithoutLineIcon,
+  EyeVisibleIcon,
+  EyeOffIcon,
+} from "@/components/icons";
 import CustomDatePicker from "@/components/ui/CustomDatePicker";
 import CustomSelect from "@/components/ui/CustomSelect";
 import MobileInput from "@/components/ui/MobileInput";
@@ -37,7 +42,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     schoolStream: "",
     currentYear: "",
     departmentId: "",
-    password: ""
+    password: "",
   });
 
   const [programs, setPrograms] = useState<Program[]>([]);
@@ -136,13 +141,14 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
       const pwd = formData.password;
 
       if (pwd.length < 8) errors.password = "Minimum 8 characters";
-      else if (!/[A-Z]/.test(pwd)) errors.password = "Must contain 1 uppercase letter";
-      else if (!/[a-z]/.test(pwd)) errors.password = "Must contain 1 lowercase letter";
+      else if (!/[A-Z]/.test(pwd))
+        errors.password = "Must contain 1 uppercase letter";
+      else if (!/[a-z]/.test(pwd))
+        errors.password = "Must contain 1 lowercase letter";
       else if (!/[0-9]/.test(pwd)) errors.password = "Must contain 1 number";
       else if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pwd))
         errors.password = "Must contain 1 special character";
     }
-
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -171,6 +177,17 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     value: d.id,
     label: d.name,
   }));
+
+  const generatePassword = () => {
+    const chars =
+      "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%^&*";
+    let pwd = "";
+    for (let i = 0; i < 10; i++) {
+      pwd += chars[Math.floor(Math.random() * chars.length)];
+    }
+    handleInputChange("password", pwd);
+    setShowPassword(true);
+  };
 
   // === Shared style tokens (MATCH corporate form) ===
   const baseInputClasses =
@@ -328,93 +345,48 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                 error={formErrors.mobile}
               />
             </div>
+            {/* Password + Generate + Eye Icon */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className={baseLabelClasses}>
+                  Password <span className="text-red-500">*</span>
+                </label>
 
-            {/* Password */}
-            <div className="space-y-2 z-0 relative">
-              <label className={baseLabelClasses}>
-                Password <span className="text-red-500">*</span>
-              </label>
+                <button
+                  type="button"
+                  onClick={generatePassword}
+                  className="text-[11px] font-medium cursor-pointer text-brand-green hover:text-brand-green/80"
+                >
+                  Generate Password
+                </button>
+              </div>
 
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
                   value={formData.password}
-                  onChange={(e) => handleInputChange("password", e.target.value)}
-                  placeholder="Enter a strong password"
+                  onChange={(e) =>
+                    handleInputChange("password", e.target.value)
+                  }
+                  placeholder="Set login password"
                   className={`${baseInputClasses} pr-12 ${
                     formErrors.password ? "border-red-500/50" : ""
                   }`}
                 />
 
-                {/* Show / Hide Icon */}
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-gray-700 dark:text-white/60 dark:hover:text-white"
-                  tabIndex={-1}
+                  className="absolute inset-y-0 right-3 flex items-center"
                 >
                   {showPassword ? (
-                    // Eye Off icon
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13.875 18.825A10.05 10.05 0 0112 19c-5.523 0-10-4.477-10-10 0-1.17.201-2.292.571-3.333M6.223 6.223A9.97 9.97 0 0112 5c5.523 0 10 4.477 10 10 0 1.17-.201 2.292-.571 3.333M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                      <line
-                        x1="3"
-                        y1="3"
-                        x2="21"
-                        y2="21"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      />
-                    </svg>
+                    <EyeVisibleIcon className="w-4 h-4 text-brand-green" />
                   ) : (
-                    // Eye icon
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                      />
-                    </svg>
+                    <EyeOffIcon className="w-4 h-4 text-brand-green" />
                   )}
                 </button>
               </div>
-
-              {formErrors.password && (
-                <p className="text-xs text-red-500 ml-1 mt-1">
-                  {formErrors.password}
-                </p>
-              )}
-
-              <p className="text-[11px] text-black/50 dark:text-white/60 ml-1">
-                Use 8+ characters with uppercase, lowercase, number, and special character.
-              </p>
             </div>
-
-            
           </div>
         </div>
 

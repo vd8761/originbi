@@ -6,19 +6,22 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CognitoModule = void 0;
+exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
-const cognito_controller_1 = require("./cognito.controller");
-const cognito_service_1 = require("./cognito.service");
-let CognitoModule = class CognitoModule {
+const cognito_module_1 = require("./cognito/cognito.module");
+let AppModule = class AppModule {
 };
-exports.CognitoModule = CognitoModule;
-exports.CognitoModule = CognitoModule = __decorate([
+exports.AppModule = AppModule;
+exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
-        imports: [config_1.ConfigModule],
-        controllers: [cognito_controller_1.CognitoController],
-        providers: [cognito_service_1.CognitoService],
+        imports: [
+            config_1.ConfigModule.forRoot({
+                isGlobal: true,
+                envFilePath: process.env.NODE_ENV === 'production' ? '.env.production' : '.env.local',
+            }),
+            cognito_module_1.CognitoModule,
+        ],
     })
-], CognitoModule);
-//# sourceMappingURL=cognito.module.js.map
+], AppModule);
+//# sourceMappingURL=app.module.js.map

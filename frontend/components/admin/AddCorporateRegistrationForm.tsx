@@ -417,9 +417,9 @@ const AddCorporateRegistrationForm: React.FC<
                 className="absolute inset-y-0 right-3 flex items-center"
               >
                 {showPassword ? (
-                  <EyeOffIcon className="w-4 h-4 text-brand-green" />
-                ) : (
                   <EyeVisibleIcon className="w-4 h-4 text-brand-green" />
+                ) : (
+                  <EyeOffIcon className="w-4 h-4 text-brand-green" />
                 )}
               </button>
             </div>
