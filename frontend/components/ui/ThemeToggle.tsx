@@ -8,7 +8,7 @@ interface ThemeToggleProps {
   toggleTheme: () => void;
 }
 
-const ThemeToggle: React.FC<ThemeToggleProps> = ({ theme, toggleTheme }) => {
+const ThemeToggle: React.FC<ThemeToggleProps> = ({ toggleTheme }) => {
   return (
     <button
       onClick={toggleTheme}
@@ -23,15 +23,10 @@ const ThemeToggle: React.FC<ThemeToggleProps> = ({ theme, toggleTheme }) => {
 
       {/* Switch thumb */}
       <div
-        className={`absolute top-1 left-1 flex items-center justify-center w-8 h-8 bg-brand-green rounded-full transform transition-transform duration-300 ease-in-out ${
-          theme === 'dark' ? 'translate-x-10' : 'translate-x-0'
-        }`}
+        className="absolute top-1 left-1 flex items-center justify-center w-8 h-8 bg-brand-green rounded-full transform transition-transform duration-300 ease-in-out translate-x-0 dark:translate-x-10"
       >
-        {theme === 'dark' ? (
-          <DarkModeIcon className="w-5 h-5 text-white" />
-        ) : (
-          <LightModeIcon className="w-5 h-5 text-white" />
-        )}
+        <DarkModeIcon className="w-5 h-5 text-white hidden dark:block" />
+        <LightModeIcon className="w-5 h-5 text-white block dark:hidden" />
       </div>
     </button>
   );

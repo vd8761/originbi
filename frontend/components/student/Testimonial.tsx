@@ -54,7 +54,7 @@ const Testimonial: React.FC = () => {
   }, [currentIndex, nextTestimonial]);
 
   return (
-    <div className="relative w-full h-full bg-brand-dark-secondary rounded-3xl overflow-hidden p-8 md:p-12 flex flex-col justify-end">
+    <div className="relative w-full h-full bg-brand-dark-secondary rounded-3xl overflow-hidden p-6 md:p-8 lg:p-[5%] flex flex-col justify-end">
       <div className="absolute inset-0 z-0">
         <img
           key={currentIndex}
@@ -67,15 +67,15 @@ const Testimonial: React.FC = () => {
       </div>
 
       <div className="relative z-20 space-y-4 text-white">
-        <div className="space-y-4">
-          <QuoteIcon className="w-5 h-5 text-brand-green" />
-          <p className="text-lg sm:text-xl md:text-2xl lg:text-[24px] font-normal leading-tight">
+        <div className="space-y-3 md:space-y-4">
+          <QuoteIcon className="w-5 h-5 md:w-6 md:h-6 text-brand-green" />
+          <p className="text-lg md:text-xl lg:text-2xl xl:text-3xl font-normal leading-snug md:leading-tight">
             {current.quote}
           </p>
         </div>
         <div>
-          <p className="text-base sm:text-lg md:text-xl font-semibold">{current.name},</p>
-          <p className="text-sm sm:text-base md:text-lg text-gray-300">{current.title}</p>
+          <p className="text-base md:text-lg font-semibold">{current.name},</p>
+          <p className="text-sm md:text-base text-gray-300">{current.title}</p>
         </div>
 
         <div className="flex items-center justify-between">
@@ -87,9 +87,8 @@ const Testimonial: React.FC = () => {
                 role="button"
                 tabIndex={0}
                 onClick={() => setCurrentIndex(index)}
-                className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
-                  index === currentIndex ? 'bg-brand-green w-8' : 'bg-gray-500 w-4'
-                }`}
+                className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${index === currentIndex ? 'bg-brand-green w-8' : 'bg-gray-500 w-4'
+                  }`}
               />
             ))}
           </div>
@@ -97,14 +96,14 @@ const Testimonial: React.FC = () => {
             <button
               onClick={prevTestimonial}
               aria-label="Previous testimonial"
-              className="bg-white/10 hover:bg-white/20 dark:bg-brand-dark-tertiary/50 dark:hover:bg-brand-dark-tertiary text-white rounded-full p-3 transition-colors"
+              className="bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white rounded-full p-3 transition-all transform hover:scale-105"
             >
               <ArrowLeftIcon className="w-5 h-5" />
             </button>
             <button
               onClick={nextTestimonial}
               aria-label="Next testimonial"
-              className="bg-brand-green hover:bg-brand-green/90 text-white rounded-full p-3 transition-colors"
+              className="bg-brand-green hover:bg-brand-green/90 text-white rounded-full p-3 transition-all transform hover:scale-105 shadow-lg shadow-brand-green/30"
             >
               <ArrowRightIcon className="w-5 h-5" />
             </button>

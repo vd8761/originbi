@@ -6,26 +6,26 @@ interface PortalHomeProps {
     onSelectPortal: (portal: 'student' | 'corporate' | 'admin') => void;
 }
 
-const PortalCard: React.FC<{ 
-    title: string; 
+const PortalCard: React.FC<{
+    title: string;
     subtitle: string;
-    description: string; 
-    icon: React.ReactNode; 
+    description: string;
+    icon: React.ReactNode;
     onClick: () => void;
     accentColor: string;
     delay?: string;
 }> = ({ title, subtitle, description, icon, onClick, accentColor, delay }) => (
-    <button 
+    <button
         onClick={onClick}
         className={`relative group flex flex-col h-full overflow-hidden rounded-[2rem] p-1 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl animate-fade-in ${delay}`}
     >
         {/* Border Gradient & Glow */}
         <div className={`absolute inset-0 bg-gradient-to-br ${accentColor} opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl`} />
         <div className={`absolute inset-0 bg-gradient-to-br ${accentColor} opacity-0 group-hover:opacity-20 transition-opacity duration-500`} />
-        
+
         {/* Card Content */}
         <div className="relative flex flex-col h-full bg-brand-light-primary dark:bg-[#13161B] rounded-[1.8rem] p-8 sm:p-10 border border-brand-light-tertiary dark:border-white/5 h-full z-10 overflow-hidden">
-            
+
             {/* Background Decor */}
             <div className={`absolute -top-20 -right-20 w-64 h-64 bg-gradient-to-br ${accentColor} opacity-[0.03] group-hover:opacity-[0.08] rounded-full blur-3xl transition-opacity duration-500`} />
 
@@ -35,7 +35,7 @@ const PortalCard: React.FC<{
                     {icon}
                 </div>
             </div>
-            
+
             <div className="text-left flex-grow">
                 <h3 className="text-3xl font-bold text-brand-text-light-primary dark:text-white mb-2 leading-tight">
                     {title}
@@ -47,7 +47,7 @@ const PortalCard: React.FC<{
                     {description}
                 </p>
             </div>
-            
+
             <div className="mt-10 flex items-center text-sm font-bold tracking-wide uppercase group/btn">
                 <span className={`flex items-center justify-center px-6 py-3 rounded-full text-white bg-gradient-to-r ${accentColor} shadow-md group-hover/btn:shadow-lg group-hover/btn:brightness-110 transition-all duration-300`}>
                     Get Started
@@ -61,12 +61,12 @@ const PortalCard: React.FC<{
 const PortalHome: React.FC<PortalHomeProps> = ({ onSelectPortal }) => {
     return (
         <div className="min-h-screen bg-brand-light-secondary dark:bg-[#0B0D10] flex flex-col relative overflow-hidden">
-            
+
             {/* Navigation / Header Area */}
             <div className="absolute top-0 left-0 w-full p-6 z-50 flex justify-between items-center">
-               <div className="scale-110 origin-top-left">
-                   <Logo />
-               </div>
+                <div className="scale-110 origin-top-left">
+                    <Logo />
+                </div>
             </div>
 
             {/* Background Decoration */}
@@ -89,10 +89,10 @@ const PortalHome: React.FC<PortalHomeProps> = ({ onSelectPortal }) => {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full max-w-7xl mx-auto items-stretch">
-                    
+
                     {/* Individual Portal */}
-                    <PortalCard 
-                        title="Individual Portal" 
+                    <PortalCard
+                        title="Individual Portal"
                         subtitle="For Students, Employees & Leaders"
                         description="Unlock your potential. Access personalized assessments, view your career roadmap, and track your growth journey."
                         icon={<ProfileIcon className="w-8 h-8" />}
@@ -100,10 +100,10 @@ const PortalHome: React.FC<PortalHomeProps> = ({ onSelectPortal }) => {
                         onClick={() => onSelectPortal('student')}
                         delay="animation-delay-300"
                     />
-                    
+
                     {/* Corporate Portal */}
-                    <PortalCard 
-                        title="Corporate Portal" 
+                    <PortalCard
+                        title="Corporate Portal"
                         subtitle="For Organizations & Recruiters"
                         description="Streamline talent management. Register employees, assign assessments in bulk, and view comprehensive analytics."
                         icon={<JobsIcon className="w-8 h-8" />}
@@ -113,8 +113,8 @@ const PortalHome: React.FC<PortalHomeProps> = ({ onSelectPortal }) => {
                     />
 
                     {/* Admin Portal */}
-                    <PortalCard 
-                        title="Admin Portal" 
+                    <PortalCard
+                        title="Admin Portal"
                         subtitle="For System Administrators"
                         description="Platform control center. Manage users, configure system settings, and oversee global platform operations."
                         icon={<SettingsIcon className="w-8 h-8" />}
@@ -124,7 +124,7 @@ const PortalHome: React.FC<PortalHomeProps> = ({ onSelectPortal }) => {
                     />
                 </div>
             </div>
-            
+
             <div className="p-6 text-center text-sm text-brand-text-light-secondary dark:text-gray-600 font-medium">
                 &copy; 2025 Origin BI. All rights reserved.
             </div>
