@@ -4,6 +4,7 @@ import React, {
   createContext,
   useState,
   useEffect,
+  useLayoutEffect,
   useContext,
   ReactNode,
 } from "react";
@@ -13,6 +14,7 @@ type Theme = "dark" | "light";
 interface ThemeContextType {
   theme: Theme;
   toggleTheme: () => void;
+  isInitialized: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -20,19 +22,28 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>("light");
+  const [mounted, setMounted] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  useEffect(() => {
-    // On mount, set theme based on saved preference or default to dark
+  useLayoutEffect(() => {
+    // Check localStorage immediately to prevent flash
     const savedTheme = localStorage.getItem("theme") as Theme | null;
     if (savedTheme) {
       setTheme(savedTheme);
+      if (savedTheme === "dark") document.documentElement.classList.add("dark");
+      else document.documentElement.classList.remove("dark");
     } else {
-      setTheme("dark");
+      setTheme("light");
+      document.documentElement.classList.remove("dark");
     }
+    setMounted(true);
+    setIsInitialized(true);
   }, []);
 
   useEffect(() => {
+    if (!mounted) return;
+
     if (theme === "dark") {
       document.documentElement.classList.add("dark");
       localStorage.setItem("theme", "dark");
@@ -40,14 +51,14 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({
       document.documentElement.classList.remove("dark");
       localStorage.setItem("theme", "light");
     }
-  }, [theme]);
+  }, [theme, mounted]);
 
   const toggleTheme = () => {
     setTheme((prevTheme) => (prevTheme === "dark" ? "light" : "dark"));
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, isInitialized }}>
       {children}
     </ThemeContext.Provider>
   );
