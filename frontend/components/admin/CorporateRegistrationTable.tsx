@@ -103,11 +103,10 @@ const CorporateRegistrationTable: React.FC<RegistrationTableProps> = ({
             users.map((user, index) => (
               <tr
                 key={user.id || index}
-                className={`hover:bg-brand-light-secondary dark:hover:bg-brand-dark-secondary/50 transition-colors ${
-                  index % 2 === 0
-                    ? "bg-brand-light-primary dark:bg-[#1A1D21]"
-                    : "bg-brand-light-secondary/30 dark:bg-[#1e2126]"
-                }`}
+                className={`hover:bg-brand-light-secondary dark:hover:bg-brand-dark-secondary/50 transition-colors ${index % 2 === 0
+                  ? "bg-brand-light-primary dark:bg-[#1A1D21]"
+                  : "bg-brand-light-secondary/30 dark:bg-[#1e2126]"
+                  }`}
               >
                 <td className="p-4">
                   <div className="flex items-center gap-3">

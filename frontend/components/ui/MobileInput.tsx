@@ -78,9 +78,8 @@ const MobileInput: React.FC<MobileInputProps> = ({
   return (
     // Dynamic Z-index to float above nearby fields when open
     <div
-      className={`space-y-2 w-full ${
-        isDropdownOpen ? "relative z-50" : "relative z-0"
-      }`}
+      className={`space-y-2 w-full ${isDropdownOpen ? "relative z-50" : "relative z-0"
+        }`}
     >
       {label && (
         <label className="text-xs text-black/70 dark:text-white font-semibold ml-1">
@@ -121,9 +120,8 @@ const MobileInput: React.FC<MobileInputProps> = ({
             </span>
 
             <ChevronDownIcon
-              className={`w-3 h-3 text-gray-500 dark:text-gray-300 transition-transform shrink-0 ${
-                isDropdownOpen ? "rotate-180" : ""
-              }`}
+              className={`w-3 h-3 text-gray-500 dark:text-gray-300 transition-transform shrink-0 ${isDropdownOpen ? "rotate-180" : ""
+                }`}
             />
           </button>
 
@@ -159,11 +157,10 @@ const MobileInput: React.FC<MobileInputProps> = ({
                         onCountryChange(country.dial_code);
                         setIsDropdownOpen(false);
                       }}
-                      className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${
-                        countryCode === country.dial_code
-                          ? "bg-brand-green/10 text-brand-green"
-                          : "text-black dark:text-gray-200"
-                      }`}
+                      className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${countryCode === country.dial_code
+                        ? "bg-brand-green/10 text-brand-green"
+                        : "text-black dark:text-gray-200"
+                        }`}
                     >
                       <img
                         src={`https://flagcdn.com/w40/${country.code.toLowerCase()}.png`}
