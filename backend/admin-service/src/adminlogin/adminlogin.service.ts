@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AdminUser } from '../../../../database/entities/AdminUser';
-
-
+import { AdminUser } from '../entities/AdminUser';
 @Injectable()
 export class AdminLoginService {
   constructor(
