@@ -1,4 +1,12 @@
-export const getWelcomeEmailTemplate = (name: string, to: string, pass: string, frontendUrl: string, startDateTime?: Date | string, assessmentTitle?: string) => `
+export const getWelcomeEmailTemplate = (
+    name: string,
+    to: string,
+    pass: string,
+    frontendUrl: string,
+    assets: { popper: string, pattern: string, footer: string },
+    startDateTime?: Date | string,
+    assessmentTitle?: string
+) => `
 <!DOCTYPE html>
 <html>
 <head>
@@ -6,247 +14,118 @@ export const getWelcomeEmailTemplate = (name: string, to: string, pass: string, 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Welcome to OriginBI</title>
   <style>
-    @import url('https://db.onlinewebfonts.com/c/a5dba0b16bff4acae22426705d079a08?family=Haskoy');
-
     body { 
       margin: 0; 
       padding: 0; 
-      background-color: #f1f3f7; 
-      font-family: 'Haskoy', sans-serif;
-      -webkit-font-smoothing: antialiased;
+      background-color: #E9ECEF; 
+      font-family: Tahoma, Verdana, Segoe, sans-serif;
     }
+    .wrapper { width: 100%; table-layout: fixed; background-color: #E9ECEF; }
+    .main-table { width: 100%; max-width: 600px; margin: 0 auto; background-color: #E9ECEF; border-spacing: 0; color: #000000; font-family: Tahoma, sans-serif; }
     
-    .wrapper {
-      width: 100%;
-      table-layout: fixed;
-      background-color: #f1f3f7;
-      padding-bottom: 40px;
-    }
-    
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-      background-color: #ffffff;
-      /* Confetti Background - Placeholder URL */
-      background-image: url('https://originbi-assets.s3.ap-south-1.amazonaws.com/email-confetti-bg-top.png'); 
-      background-size: 100% auto;
-      background-repeat: no-repeat;
-      background-position: top center;
-    }
-
-    .main-table {
-      width: 100%;
-      border-spacing: 0;
-      color: #1e293b;
-    }
-
-    /* Header Section with Confetti */
-    .header-section {
-      text-align: left;
-      padding: 60px 40px 20px 40px;
-      background-color: transparent;
-    }
-
-    .header-title {
-      font-size: 28px;
-      font-weight: 700;
-      color: #000000;
-      margin: 0;
-      line-height: 1.2;
-    }
-
-    /* Green Line Separator */
-    .separator-line {
-      height: 4px;
-      background-color: #2ed573;
-      width: 100%;
-      margin-top: 20px;
-      margin-bottom: 40px;
-    }
-
-    /* Content Area */
-    .content-section {
-      padding: 0 40px;
-    }
-
-    .greeting {
-      font-size: 18px;
-      color: #000000;
-      margin-bottom: 16px;
-    }
-
-    .greeting strong {
-      color: #1a237e;
-    }
-
-    .intro-text {
-      font-size: 16px;
-      line-height: 1.6;
-      color: #333333;
-      margin-bottom: 24px;
-    }
-
-    .login-heading {
-      color: #2ed573;
-      font-size: 16px;
-      font-weight: 500;
-      margin-bottom: 16px;
-    }
-
-    /* Credentials Grid */
-    .credentials-table {
-      width: 100%;
-      margin-bottom: 24px;
-    }
-    
-    .cred-label {
-      font-size: 15px;
-      color: #666666;
-      padding: 6px 0;
-      width: 40%;
-    }
-    
-    .cred-value {
-      font-size: 15px;
-      color: #000000;
-      font-weight: 500;
-      padding: 6px 0;
-    }
-
-    /* Button */
-    .btn-primary {
-      display: inline-block;
-      background-color: #1a237e;
-      color: #ffffff;
-      padding: 14px 28px;
-      border-radius: 4px; 
-      text-decoration: none;
-      font-size: 16px;
-      font-weight: 500;
-      margin-top: 10px;
-      margin-bottom: 30px;
-    }
-
-    .footer-note {
-      font-size: 15px;
-      line-height: 1.6;
-      color: #333333;
-      margin-bottom: 30px;
-    }
-    
-    .sign-off {
-      font-size: 16px;
-      color: #333333;
-      margin-bottom: 50px;
-    }
-    
-    .sign-off strong {
-      display: block;
-      color: #000000;
-      font-weight: 700;
-    }
-
-    /* Footer / Bottom Pattern */
-    .bottom-pattern {
-      height: 100px;
-      background-color: #e8ecf2;
-      background-image: url('https://originbi-assets.s3.ap-south-1.amazonaws.com/email-footer-pattern.png');
-      background-size: cover;
-      padding: 20px 40px;
-      text-align: left;
-    }
-
-    .copyright {
-      font-size: 12px;
-      color: #64748b;
-      margin-bottom: 8px;
-    }
-
-    .footer-links a {
-      color: #1a237e;
-      text-decoration: none;
-      font-size: 12px;
-      font-weight: 500;
-    }
-
+    /* Responsive */
     @media screen and (max-width: 600px) {
-      .header-section { padding: 40px 20px 20px 20px; }
-      .content-section { padding: 0 20px; }
-      .bottom-pattern { padding: 20px; }
-      .header-title { font-size: 24px; }
-      .cred-label, .cred-value { font-size: 14px; }
+      .header-title { font-size: 24px !important; padding: 40px 20px 20px 20px !important; }
+      .content-padding { padding: 20px !important; }
     }
   </style>
 </head>
-<body>
-  <div class="wrapper">
-    <div class="container">
-      <table class="main-table">
-        <tr>
-          <td class="header-section">
-            <h1 class="header-title">Thank you for Registering</h1>
-            <div class="separator-line"></div>
-          </td>
-        </tr>
-        <tr>
-          <td class="content-section">
-            <div class="greeting">Dear <strong>${name}</strong>,</div>
-            
-            <div class="intro-text">
-              Thank you for registering with OriginBI! We're excited to welcome you and inform you that an online assessment has been scheduled for you.
-            </div>
+<body style="margin: 0; padding: 0; background-color: #E9ECEF; font-family: Tahoma, Arial, sans-serif;">
+  <center class="wrapper">
+    <table class="main-table" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="max-width: 600px; width: 100%;">
+      
+      <!-- HEADER ROW with Confetti Image (Foreground) -->
+      <tr>
+        <td style="padding: 0;">
+           <table width="100%" cellpadding="0" cellspacing="0" border="0">
+             <tr>
+               <td style="padding: 60px 0 20px 20px; vertical-align: bottom;" class="header-title">
+                 <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #000000; text-align: left;">Thank you for Registering</h1>
+               </td>
+               <td style="width: 150px; padding: 20px 20px 0 0; vertical-align: top; text-align: right;">
+                  <img src="${assets.popper}" alt="Confetti" width="120" style="display: block; border: 0;" />
+               </td>
+             </tr>
+           </table>
+        </td>
+      </tr>
+      
+      <!-- CONTENT ROW -->
+      <tr>
+        <td style="padding: 0 20px;">
+          <!-- Card Table -->
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" background="${assets.pattern}" style="background-color: #ffffff; border-top: 4px solid #1ED36A; background-image: url('${assets.pattern}'); background-repeat: no-repeat; background-position: top center; background-size: cover;">
+            <tr>
+              <td class="content-padding" style="padding: 40px;">
+                <!-- Hidden image hack to prevent attachment chip in Gmail -->
+                <img src="${assets.pattern}" alt="" width="0" height="0" style="display:none; visibility:hidden;" />
+                
+                <div style="font-size: 16px; color: #000000; margin-bottom: 20px; font-weight: 400;">Dear <strong style="font-weight: 700;">${name}</strong>,</div>
+                
+                <div style="font-size: 14px; line-height: 1.5; color: #000000; margin-bottom: 24px;">
+                  Thank you for registering with OriginBI! We're excited to welcome you and inform you that an online assessment has been scheduled for you.
+                </div>
 
-            <div class="login-heading">Here are your login details:</div>
+                <div style="color: #1ED36A; font-size: 14px; margin-bottom: 16px;">Here are your login details:</div>
 
-            <table class="credentials-table">
-              <tr>
-                <td class="cred-label">Assessment Title</td>
-                <td class="cred-value">${assessmentTitle || 'Role Match Explorer'}</td>
-              </tr>
-              <tr>
-                <td class="cred-label">Start Date and Time</td>
-                <td class="cred-value">${startDateTime
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 24px;">
+                  <tr>
+                    <td style="font-size: 14px; color: #707070; padding: 5px 0; width: 40%;">Assessment Title</td>
+                    <td style="font-size: 14px; color: #000000; padding: 5px 0;">${assessmentTitle || 'Role Match Explorer'}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size: 14px; color: #707070; padding: 5px 0;">Start Date and Time</td>
+                    <td style="font-size: 14px; color: #000000; padding: 5px 0;">${startDateTime
         ? new Date(startDateTime).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
         : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     }</td>
-              </tr>
-              <tr>
-                <td class="cred-label">Username</td>
-                <td class="cred-value">${to}</td>
-              </tr>
-              <tr>
-                <td class="cred-label">Password</td>
-                <td class="cred-value">${pass}</td>
-              </tr>
-            </table>
+                  </tr>
+                  <tr>
+                    <td style="font-size: 14px; color: #707070; padding: 5px 0;">Username</td>
+                    <td style="font-size: 14px; color: #000000; padding: 5px 0;">${to}</td>
+                  </tr>
+                  <tr>
+                     <td style="font-size: 14px; color: #707070; padding: 5px 0;">Mobile Number</td>
+                     <td style="font-size: 14px; color: #000000; padding: 5px 0;">asd5f465</td> 
+                  </tr>
+                </table>
 
-            <div class="intro-text">
-              Please log in at least 15 minutes before the scheduled time to ensure everything works smoothly. The assessment is timed, so manage your time effectively to complete all the questions.
-            </div>
+                <div style="font-size: 14px; line-height: 1.5; color: #000000; margin-bottom: 24px;">
+                  Please log in at least 15 minutes before the scheduled time to ensure everything works smoothly. The assessment is timed, so manage your time effectively to complete all the questions.
+                </div>
 
-            <a href="${frontendUrl}/login" class="btn-primary">Start your assessment</a>
+                <div style="margin-top: 10px; margin-bottom: 30px;">
+                  <a href="${frontendUrl}/students" style="display: inline-block; background-color: #150089; color: #ffffff; padding: 14px 28px; border-radius: 4px; text-decoration: none; font-size: 14px;">Start your assessment</a>
+                </div>
 
-            <div class="footer-note">
-              If you need any assistance, our team is here to help. Welcome aboard!
-            </div>
+                <div style="font-size: 14px; line-height: 1.5; color: #000000; margin-bottom: 30px;">
+                  If you need any assistance, our team is here to help. Welcome aboard!
+                </div>
 
-            <div class="sign-off">
-              Best regards,<br>
-              <strong>Origin BI Team</strong>
-            </div>
-          </td>
-        </tr>
-        <tr>
-          <td class="bottom-pattern">
-             <div class="copyright">&copy; ${new Date().getFullYear()} Origin BI | All Rights Reserved</div>
-             <div class="footer-links">
-               <a href="#">Privacy Policy</a> | <a href="#">Terms & Conditions</a>
-             </div>
-          </td>
-        </tr>
-      </table>
-    </div>
-  </div>
+                <div style="font-size: 14px; color: #000000; margin-bottom: 10px;">
+                  Best regards,<br>
+                  <strong style="font-weight: 700;">Origin BI Team</strong>
+                </div>
+
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <!-- FOOTER ROW -->
+      <tr>
+        <td style="text-align: left; padding: 30px 20px 0 20px;">
+           <div style="font-size: 12px; color: #808080; margin-bottom: 10px;">&copy; 2024-${new Date().getFullYear()}. Origin BI | All Rights Reserved</div>
+           <div style="font-size: 12px;">
+             <a href="#" style="color: #150089; text-decoration: none;">Privacy Policy</a> <span style="color: #000000;">|</span> <a href="#" style="color: #150089; text-decoration: none;">Terms & Conditions</a>
+           </div>
+           <!-- Footer Image -->
+           <img src="${assets.footer}" alt="" draggable="false" style="width: 100%; height: auto; display: block; margin-top: 20px; border: 0; pointer-events: none; user-select: none;" />
+        </td>
+      </tr>
+    </table>
+  </center>
 </body>
 </html>
 `;

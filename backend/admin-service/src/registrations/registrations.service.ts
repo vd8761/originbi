@@ -22,6 +22,8 @@ import { getWelcomeEmailTemplate } from '../mail/templates/welcome.template';
 
 import * as nodemailer from 'nodemailer';
 import { SES } from 'aws-sdk';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class RegistrationsService {
@@ -323,13 +325,38 @@ export class RegistrationsService {
     const transporter = nodemailer.createTransport({ SES: ses });
     const ccEmail = process.env.EMAIL_CC || '';
 
+    const fromName = process.env.EMAIL_SEND_FROM_NAME || 'Origin BI Mind Works';
+    const fromEmail = process.env.EMAIL_FROM || 'no-reply@originbi.com';
+    const fromAddress = `"${fromName}" <${fromEmail}>`;
+
     const mailOptions = {
-      from: process.env.EMAIL_FROM || 'no-reply@originbi.com',
+      from: fromAddress,
       to,
       cc: ccEmail, // Add CC if configured
       subject: 'Welcome to OriginBI - Your Assessment is Ready!',
-      html: getWelcomeEmailTemplate(name, to, pass, process.env.FRONTEND_URL || 'http://localhost:3000', startDateTime, assessmentTitle),
+      html: '',
     };
+
+    // Use hosted assets for consistent rendering without attachments
+    // In production, BACKEND_URL must be set to the public domain
+    const baseUrl = process.env.BACKEND_URL || 'http://localhost:4001';
+
+    const assets = {
+      popper: `${baseUrl}/test/assets/Popper.png`,
+      pattern: `${baseUrl}/test/assets/Pattern_mask.png`,
+      footer: `${baseUrl}/test/assets/Email_Vector.png`,
+    };
+
+    mailOptions.html = getWelcomeEmailTemplate(
+      name,
+      to,
+      pass,
+      process.env.FRONTEND_URL || 'http://localhost:3000',
+      assets,
+      startDateTime,
+      assessmentTitle
+    );
+
     return transporter.sendMail(mailOptions);
   }
 }
