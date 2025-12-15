@@ -68,7 +68,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
     }
   };
 
-    const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
     const emailError = validateEmail(values.email);
@@ -248,8 +248,8 @@ const LoginForm: React.FC<LoginFormProps> = ({
           {portalMode === 'corporate'
             ? 'Work Email'
             : portalMode === 'admin'
-            ? 'Admin ID / Email'
-            : 'Email ID'}
+              ? 'Admin ID / Email'
+              : 'Email ID'}
         </label>
         <input
           type="email"
@@ -258,11 +258,10 @@ const LoginForm: React.FC<LoginFormProps> = ({
           value={values.email}
           onChange={handleChange}
           onBlur={handleBlur}
-          className={`bg-white dark:bg-[#24272B] border text-brand-text-light-primary dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm rounded-full block w-full p-4 transition-all duration-300 outline-none ${
-            isEmailInvalid
-              ? 'border-red-500 focus:ring-1 focus:ring-red-500'
-              : `border-gray-200 dark:border-white/10 ${focusColorClass} focus:ring-1 focus:ring-opacity-50`
-          }`}
+          className={`bg-white dark:bg-[#24272B] border text-brand-text-light-primary dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm rounded-full block w-full p-4 transition-all duration-300 outline-none ${isEmailInvalid
+            ? 'border-red-500 focus:ring-1 focus:ring-red-500'
+            : `border-gray-200 dark:border-white/10 ${focusColorClass} focus:ring-1 focus:ring-opacity-50`
+            }`}
           placeholder={
             portalMode === 'corporate'
               ? 'name@company.com'
@@ -293,11 +292,10 @@ const LoginForm: React.FC<LoginFormProps> = ({
             onChange={handleChange}
             onBlur={handleBlur}
             placeholder="Enter your password"
-            className={`bg-white dark:bg-[#24272B] border text-brand-text-light-primary dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm rounded-full block w-full p-4 pr-12 transition-all duration-300 outline-none ${
-              isPasswordInvalid
-                ? 'border-red-500 focus:ring-1 focus:ring-red-500'
-                : `border-gray-200 dark:border-white/10 ${focusColorClass} focus:ring-1 focus:ring-opacity-50`
-            }`}
+            className={`bg-white dark:bg-[#24272B] border text-brand-text-light-primary dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm rounded-full block w-full p-4 pr-12 transition-all duration-300 outline-none ${isPasswordInvalid
+              ? 'border-red-500 focus:ring-1 focus:ring-red-500'
+              : `border-gray-200 dark:border-white/10 ${focusColorClass} focus:ring-1 focus:ring-opacity-50`
+              }`}
             required
             aria-invalid={isPasswordInvalid}
           />

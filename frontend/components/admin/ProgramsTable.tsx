@@ -1,15 +1,15 @@
 
 import React from 'react';
-import { ProgramData } from '@/lib/types';
+import { Program } from '@/lib/types';
 import ToggleSwitch from '@/components/ui/ToggleSwitch';
-import { EditIcon, DeleteIcon, EyeVisibleIcon } from '@/components/icons';
+import { EditIcon, DeleteIcon } from '@/components/icons';
 
 interface ProgramsTableProps {
-    programs: ProgramData[];
+    programs: Program[];
     loading: boolean;
     error: string | null;
     onToggleStatus: (id: string, currentStatus: boolean) => void;
-    onEdit: (program: ProgramData) => void;
+    onEdit: (program: Program) => void;
     onDelete: (id: string) => void;
 }
 
@@ -47,7 +47,7 @@ const ProgramsTable: React.FC<ProgramsTableProps> = ({
                         <th className="p-4 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider">
                             Assessment Title
                         </th>
-                         <th className="p-4 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider">
+                        <th className="p-4 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider">
                             Report Title
                         </th>
                         <th className="p-4 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider text-center">
@@ -63,16 +63,16 @@ const ProgramsTable: React.FC<ProgramsTableProps> = ({
                         programs.map((program, index) => (
                             <tr key={program.id} className={`hover:bg-brand-light-secondary dark:hover:bg-brand-dark-secondary/50 transition-colors ${index % 2 === 0 ? 'bg-brand-light-primary dark:bg-[#1A1D21]' : 'bg-brand-light-secondary/30 dark:bg-[#1e2126]'}`}>
                                 <td className="p-4 text-sm text-brand-text-light-primary dark:text-white font-mono">
-                                    {program.programCode}
+                                    {program.code}
                                 </td>
                                 <td className="p-4 text-sm text-brand-text-light-primary dark:text-white font-medium">
-                                    {program.programName}
+                                    {program.name}
                                 </td>
                                 <td className="p-4 text-sm text-brand-text-light-secondary dark:text-brand-text-secondary max-w-xs truncate" title={program.description}>
                                     {program.description || '-'}
                                 </td>
                                 <td className="p-4 text-center">
-                                    {program.isDemo ? (
+                                    {program.is_demo ? (
                                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
                                             Yes
                                         </span>
@@ -83,24 +83,24 @@ const ProgramsTable: React.FC<ProgramsTableProps> = ({
                                     )}
                                 </td>
                                 <td className="p-4 text-sm text-brand-text-light-primary dark:text-white">
-                                    {program.assessmentTitle}
+                                    {program.assessment_title}
                                 </td>
                                 <td className="p-4 text-sm text-brand-text-light-primary dark:text-white">
-                                    {program.reportTitle}
+                                    {program.report_title}
                                 </td>
                                 <td className="p-4 flex justify-center">
-                                    <ToggleSwitch isOn={program.status} onToggle={() => onToggleStatus(program.id, program.status)} />
+                                    <ToggleSwitch isOn={program.is_active} onToggle={() => onToggleStatus(program.id, program.is_active)} />
                                 </td>
                                 <td className="p-4 text-right">
                                     <div className="flex items-center justify-end gap-2">
-                                        <button 
+                                        <button
                                             onClick={() => onEdit(program)}
                                             className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors"
                                             title="Edit"
                                         >
                                             <EditIcon className="w-4 h-4" />
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={() => onDelete(program.id)}
                                             className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
                                             title="Delete"

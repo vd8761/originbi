@@ -8,15 +8,15 @@ import {
   ArrowLeftWithoutLineIcon,
   ArrowRightWithoutLineIcon,
 } from "@/components/icons";
-import AddRegistrationForm from "@/components/admin/AddRegistrationForm";
+import AddRegistrationForm from "@/components/corporate/AddRegistrationForm"; // Fixed import
 import DateRangeFilter, {
   DateRangeOption,
 } from "@/components/ui/DateRangeFilter";
 import DateRangePickerModal from "@/components/ui/DateRangePickerModal";
 import ExcelExportButton from "@/components/ui/ExcelExportButton";
 import RegistrationTable from "@/components/ui/RegistrationTable";
-import { RegistrationUser } from "@/lib/types";
-import { registrationService } from "@/lib/registrationService";
+import { Registration } from "@/lib/types";
+import { registrationService } from "@/lib/services"; // Correct service import path
 
 // Debounce utility
 const useDebounce = (value: string, delay: number) => {
@@ -35,7 +35,7 @@ const RegistrationManagement: React.FC = () => {
   );
 
   // Data State
-  const [users, setUsers] = useState<RegistrationUser[]>([]);
+  const [users, setUsers] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,23 +67,12 @@ const RegistrationManagement: React.FC = () => {
   useEffect(() => {
     const fetchInitialCounts = async () => {
       try {
-        const [regRes, assignRes] = await Promise.all([
-          registrationService.getUsers({
-            page: 1,
-            limit: 1,
-            tab: "registrations",
-            search: "",
-          }),
-          registrationService.getUsers({
-            page: 1,
-            limit: 1,
-            tab: "assigned",
-            search: "",
-          }),
+        const [regRes] = await Promise.all([
+          registrationService.getRegistrations(1, 1, ""),
         ]);
         setTabCounts({
           registrations: regRes.total,
-          assigned: assignRes.total,
+          assigned: 0, // Placeholder
         });
       } catch (e) {
         console.error("Failed to fetch initial tab counts", e);
@@ -97,21 +86,35 @@ const RegistrationManagement: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await registrationService.getUsers({
-        page: currentPage,
-        limit: entriesPerPage,
-        tab: activeTab,
-        search: debouncedSearchTerm,
-        // if your API supports it, you can later add: startDate, endDate
-      });
+      // Format dates (Local YYYY-MM-DD)
+      const formatDate = (d: Date | null) => {
+        if (!d) return undefined;
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
+      const response = await registrationService.getRegistrations(
+        currentPage,
+        entriesPerPage,
+        debouncedSearchTerm,
+        {
+          start_date: formatDate(startDate),
+          end_date: formatDate(endDate),
+          // TODO: Implement tab logic if needed
+        }
+      );
 
       setUsers(response.data);
       setTotalCount(response.total);
 
-      setTabCounts((prev) => ({
-        ...prev,
-        [activeTab]: response.total,
-      }));
+      if (activeTab === "registrations") {
+        setTabCounts((prev) => ({
+          ...prev,
+          registrations: response.total,
+        }));
+      }
     } catch (err) {
       console.error(err);
       setError("Unable to fetch data. Please try again.");
@@ -134,22 +137,6 @@ const RegistrationManagement: React.FC = () => {
   }, [fetchData]);
 
   // Handlers
-  const handleToggleStatus = async (id: string, currentStatus: boolean) => {
-    // Optimistic Update
-    setUsers((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, status: !u.status } : u))
-    );
-    try {
-      await registrationService.toggleStatus(id, !currentStatus);
-    } catch (err) {
-      // Revert on failure
-      setUsers((prev) =>
-        prev.map((u) => (u.id === id ? { ...u, status: currentStatus } : u))
-      );
-      console.error("Failed to toggle status");
-    }
-  };
-
   const handlePageChange = (page: number) => {
     const totalPages = Math.ceil(totalCount / entriesPerPage) || 1;
     if (page >= 1 && page <= totalPages) {
@@ -307,11 +294,10 @@ const RegistrationManagement: React.FC = () => {
         <div className="flex items-center w-full xl:w-auto overflow-x-auto scrollbar-hide">
           <button
             onClick={() => handleTabChange("registrations")}
-            className={`px-1 py-3 mr-8 text-sm sm:text-base font-semibold border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === "registrations"
-                ? "text-brand-green border-brand-green"
-                : "text-brand-text-light-secondary dark:text-brand-text-secondary border-transparent hover:text-brand-text-light-primary dark:hover:text-white"
-            }`}
+            className={`px-1 py-3 mr-8 text-sm sm:text-base font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === "registrations"
+              ? "text-brand-green border-brand-green"
+              : "text-brand-text-light-secondary dark:text-brand-text-secondary border-transparent hover:text-brand-text-light-primary dark:hover:text-white"
+              }`}
           >
             Registrations (
             {tabCounts.registrations !== null
@@ -321,11 +307,10 @@ const RegistrationManagement: React.FC = () => {
           </button>
           <button
             onClick={() => handleTabChange("assigned")}
-            className={`px-1 py-3 text-sm sm:text-base font-semibold border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === "assigned"
-                ? "text-brand-green border-brand-green"
-                : "text-brand-text-light-secondary dark:text-brand-text-secondary border-transparent hover:text-brand-text-light-primary dark:hover:text-white"
-            }`}
+            className={`px-1 py-3 text-sm sm:text-base font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === "assigned"
+              ? "text-brand-green border-brand-green"
+              : "text-brand-text-light-secondary dark:text-brand-text-secondary border-transparent hover:text-brand-text-light-primary dark:hover:text-white"
+              }`}
           >
             Assign Assessment (
             {tabCounts.assigned !== null ? tabCounts.assigned : "..."}
@@ -452,7 +437,6 @@ const RegistrationManagement: React.FC = () => {
         users={users}
         loading={loading}
         error={error}
-        onToggleStatus={handleToggleStatus}
       />
 
       {/* Bottom pagination + footer */}
@@ -489,13 +473,12 @@ const RegistrationManagement: React.FC = () => {
                 typeof page === "number" ? handlePageChange(page) : null
               }
               disabled={typeof page !== "number"}
-              className={`min-w-[32px] h-8 px-1 rounded-md font-medium text-sm flex items-center justify-center transition-colors border ${
-                currentPage === page
-                  ? "bg-brand-green border-brand-green text-white shadow-lg shadow-brand-green/20"
-                  : typeof page === "number"
+              className={`min-w-[32px] h-8 px-1 rounded-md font-medium text-sm flex items-center justify-center transition-colors border ${currentPage === page
+                ? "bg-brand-green border-brand-green text-white shadow-lg shadow-brand-green/20"
+                : typeof page === "number"
                   ? "bg-transparent border-brand-light-tertiary dark:border-brand-dark-tertiary text-brand-text-light-primary dark:text-gray-400 hover:border-brand-text-light-secondary dark:hover:border-gray-500"
                   : "border-transparent text-gray-500 cursor-default"
-              }`}
+                }`}
             >
               {page}
             </button>

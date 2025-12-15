@@ -1,45 +1,11 @@
-import { ProgramData } from "@/lib/types";
+import { Program, PaginatedResponse } from "@/lib/types";
 import { AuthService } from "@/lib/services";
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  total: number;
-  page: number;
-  limit: number;
-}
 
 const API_URL =
   process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "http://localhost:4001";
 
 // ------------------------------
-// Mapping helpers
-// ------------------------------
-
-const mapFromApi = (raw: any): ProgramData => ({
-  id: String(raw.id),
-  programCode: raw.code,
-  programName: raw.name,
-  description: raw.description ?? "",
-  assessmentTitle: raw.assessmentTitle ?? raw.assessment_title ?? "",
-  reportTitle: raw.reportTitle ?? raw.report_title ?? "",
-  isDemo: raw.isDemo ?? raw.is_demo ?? false,
-  status: raw.isActive ?? raw.is_active ?? false,
-  createdAt: raw.createdAt ?? raw.created_at,
-  updatedAt: raw.updatedAt ?? raw.updated_at,
-});
-
-const mapToApi = (data: Omit<ProgramData, "id">) => ({
-  code: data.programCode,
-  name: data.programName,
-  description: data.description,
-  assessment_title: data.assessmentTitle,
-  report_title: data.reportTitle,
-  is_demo: data.isDemo,
-  is_active: data.status,
-});
-
-// ------------------------------
-// Program Service
+// Program Service (Updated)
 // ------------------------------
 
 export const programService = {
@@ -47,7 +13,7 @@ export const programService = {
     page: number,
     limit: number,
     search?: string
-  ): Promise<PaginatedResponse<ProgramData>> {
+  ): Promise<PaginatedResponse<Program>> {
     const params = new URLSearchParams();
     params.set("page", String(page));
     params.set("limit", String(limit));
@@ -55,7 +21,7 @@ export const programService = {
 
     const token = AuthService.getToken();
 
-    const res = await fetch(`${API_URL}/programs?${params.toString()}`, {
+    const res = await fetch(`${API_URL}/admin/programs?${params.toString()}`, {
       headers: {
         "Content-Type": "application/json",
         Authorization: token ? `Bearer ${token}` : "",
@@ -69,29 +35,29 @@ export const programService = {
 
     const body = await res.json();
 
+    // Handle NestJS typical response or direct array
     if (Array.isArray(body)) {
-      const data = body.map(mapFromApi);
-      return { data, total: data.length, page, limit };
+      return { data: body, total: body.length, page, limit };
     }
 
     return {
-      data: (body.data || []).map(mapFromApi),
+      data: body.data || [],
       total: body.total ?? (body.data || []).length,
       page: body.page ?? page,
       limit: body.limit ?? limit,
     };
   },
 
-  async createProgram(data: Omit<ProgramData, "id">): Promise<ProgramData> {
+  async createProgram(data: Omit<Program, "id" | "created_at" | "updated_at">): Promise<Program> {
     const token = AuthService.getToken();
 
-    const res = await fetch(`${API_URL}/programs`, {
+    const res = await fetch(`${API_URL}/admin/programs`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: token ? `Bearer ${token}` : "",
       },
-      body: JSON.stringify(mapToApi(data)),
+      body: JSON.stringify(data),
     });
 
     if (!res.ok) {
@@ -99,22 +65,22 @@ export const programService = {
       throw new Error(err?.message || "Failed to create program");
     }
 
-    return mapFromApi(await res.json());
+    return res.json();
   },
 
   async updateProgram(
     id: string,
-    data: Omit<ProgramData, "id">
+    data: Partial<Program>
   ): Promise<void> {
     const token = AuthService.getToken();
 
-    const res = await fetch(`${API_URL}/programs/${id}`, {
+    const res = await fetch(`${API_URL}/admin/programs/${id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
         Authorization: token ? `Bearer ${token}` : "",
       },
-      body: JSON.stringify(mapToApi(data)),
+      body: JSON.stringify(data),
     });
 
     if (!res.ok) {
@@ -126,7 +92,7 @@ export const programService = {
   async toggleStatus(id: string, status: boolean): Promise<void> {
     const token = AuthService.getToken();
 
-    const res = await fetch(`${API_URL}/programs/${id}/status`, {
+    const res = await fetch(`${API_URL}/admin/programs/${id}/status`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -143,7 +109,7 @@ export const programService = {
   async deleteProgram(id: string): Promise<void> {
     const token = AuthService.getToken();
 
-    const res = await fetch(`${API_URL}/programs/${id}`, {
+    const res = await fetch(`${API_URL}/admin/programs/${id}`, {
       method: "DELETE",
       headers: {
         Authorization: token ? `Bearer ${token}` : "",

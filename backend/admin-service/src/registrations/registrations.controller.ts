@@ -1,15 +1,26 @@
-import { Body, Controller, Post, Req, Get, Query } from '@nestjs/common';
+import { Body, Controller, Post, Get, Query, Param } from '@nestjs/common';
 import { RegistrationsService } from './registrations.service';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 
-@Controller('registrations')
+@Controller('admin/registrations')
 export class RegistrationsController {
-  constructor(private readonly registrationsService: RegistrationsService) {}
+  constructor(private readonly registrationsService: RegistrationsService) { }
 
   @Post()
   async create(@Body() dto: CreateRegistrationDto) {
     // ✅ adminId handled inside service (fixed to 1)
     return this.registrationsService.create(dto);
+  }
+
+  @Post('test-email')
+  async sendTestEmail(@Body('email') email: string) {
+    // Send a dummy welcome email to the provided address
+    await this.registrationsService['sendWelcomeEmail'](
+      email,
+      'Test User',
+      'TestPassword123!',
+    );
+    return { success: true, message: 'Test email sent' };
   }
 
   // 🔹 List registrations
@@ -24,4 +35,5 @@ export class RegistrationsController {
     const limitNum = Number(limit) || 10;
     return this.registrationsService.findAll(pageNum, limitNum, tab, search);
   }
+
 }

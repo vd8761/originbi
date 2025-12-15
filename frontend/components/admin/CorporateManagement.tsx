@@ -9,7 +9,7 @@ import {
 } from "@/components/icons";
 import CorporateRegistrationTable from "@/components/admin/CorporateRegistrationTable";
 import AddCorporateRegistrationForm from "@/components/admin/AddCorporateRegistrationForm";
-import { CorporateRegistrationUser } from "@/lib/types";
+import { CorporateAccount } from "@/lib/types";
 import { corporateRegistrationService } from "@/lib/services";
 
 // Debounce utility (same as Programs)
@@ -26,7 +26,10 @@ const CorporateManagement: React.FC = () => {
   const [view, setView] = useState<"list" | "form">("list");
 
   // Data state
-  const [users, setUsers] = useState<CorporateRegistrationUser[]>([]);
+  // We use CorporateAccount but assume it might have extra fields like full_name from the join if the backend supports it.
+  // Ideally we should import ExtendedCorporateAccount or similar if shared.
+  // For now let's just use CorporateAccount[] and any extra fields for display will be handled by the table if proper casting is done.
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,7 +70,7 @@ const CorporateManagement: React.FC = () => {
     try {
       await corporateRegistrationService.toggleStatus(id, !currentStatus);
       setUsers((prev) =>
-        prev.map((u) => (u.id === id ? { ...u, status: !currentStatus } : u))
+        prev.map((u) => (u.id === id ? { ...u, is_active: !currentStatus } : u))
       );
     } catch (err) {
       console.error(err);

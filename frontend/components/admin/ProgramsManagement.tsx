@@ -9,8 +9,8 @@ import {
 } from "@/components/icons";
 import ProgramsTable from "@/components/admin/ProgramsTable";
 import AddProgramForm from "@/components/admin/AddProgramForm";
-import { ProgramData } from "@/lib/types";
-import { programService } from "@/lib/programService";
+import { Program } from "@/lib/types";
+import { programService } from "@/lib/services";
 
 // Debounce utility (same pattern as Corporate)
 const useDebounce = (value: string, delay: number) => {
@@ -24,20 +24,21 @@ const useDebounce = (value: string, delay: number) => {
 
 const ProgramsManagement: React.FC = () => {
   const [view, setView] = useState<"list" | "form">("list");
-  const [editingProgram, setEditingProgram] = useState<ProgramData | null>(
+  const [editingProgram, setEditingProgram] = useState<Program | null>(
     null
   );
 
   // Data State
-  const [programs, setPrograms] = useState<ProgramData[]>([]);
+  const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Pagination & Filter
   const [currentPage, setCurrentPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [showEntriesDropdown, setShowEntriesDropdown] = useState(false);
+
+  // Pagination & Filter
   const [searchTerm, setSearchTerm] = useState("");
 
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
@@ -53,7 +54,7 @@ const ProgramsManagement: React.FC = () => {
       );
       setPrograms(response.data);
       setTotalCount(response.total);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       setError("Failed to load programs.");
     } finally {
@@ -65,30 +66,34 @@ const ProgramsManagement: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
-  const handleEdit = (program: ProgramData) => {
+  const handleEdit = (program: Program) => {
     setEditingProgram(program);
     setView("form");
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this program?")) {
-      try {
-        await programService.deleteProgram(id);
-        fetchData();
-      } catch (err) {
-        console.error(err);
-      }
+    if (!window.confirm("Are you sure you want to delete this program?")) return;
+    try {
+      await programService.deleteProgram(id);
+      fetchData();
+    } catch (err) {
+      console.error("Failed to delete program");
     }
   };
 
   const handleToggleStatus = async (id: string, currentStatus: boolean) => {
+    // Optimistic
+    setPrograms((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, is_active: !currentStatus } : p))
+    );
     try {
       await programService.toggleStatus(id, !currentStatus);
-      setPrograms((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, status: !currentStatus } : p))
-      );
     } catch (err) {
-      console.error(err);
+      // Revert
+      setPrograms((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, is_active: currentStatus } : p))
+      );
+      console.error("Failed to update status");
     }
   };
 

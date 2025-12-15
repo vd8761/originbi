@@ -1,48 +1,8 @@
 // lib/sectors.ts
 
-// Canonical codes you store in DB / API
-export type SectorCode =
-  | "IT_SOFTWARE"
-  | "MANUFACTURING"
-  | "HEALTHCARE_HOSPITALS"
-  | "BANKING_FINANCIAL"
-  | "EDUCATION_TRAINING"
-  | "RETAIL_ECOM"
-  | "AUTOMOTIVE"
-  | "CONSTRUCTION_INFRA"
-  | "TELECOM"
-  | "HOSPITALITY_TOURISM"
-  | "LOGISTICS_SUPPLY_CHAIN"
-  | "AGRI_AGRIBUSINESS"
-  | "PHARMA_BIOTECH"
-  | "MEDIA_ENTERTAINMENT"
-  | "GOVT_PUBLIC"
-  | "ENERGY_UTILITIES"
-  | "AEROSPACE_DEFENCE"
-  | "INSURANCE"
-  | "CONSULTING_PROF_SERVICES"
-  | "REAL_ESTATE"
-  | "FMCG"
-  | "CHEMICALS_PETROCHEM"
-  | "NONPROFIT_NGO"
-  | "LEGAL"
-  | "SPORTS_RECREATION"
-  | "MINING_METALS"
-  | "MARITIME_SHIPPING"
-  | "ELECTRONICS_SEMI"
-  | "ENVIRONMENTAL"
-  | "ANIMATION_VFX_GAMING"
-  | "TEXTILES_APPAREL"
-  | "FOOD_PROCESSING"
-  | "LUXURY_PREMIUM"
-  | "PRINTING_PACKAGING"
-  | "EVENT_MANAGEMENT"
-  | "BEAUTY_WELLNESS"
-  | "SECURITY_SERVICES"
-  | "RESEARCH_DEVELOPMENT"
-  | "TRANSPORTATION"
-  | "FISHERIES_AQUA"
-  | "OTHER";
+import { SectorCode } from "./types";
+
+export type { SectorCode };
 
 // UI options – friendly labels
 export const SECTOR_OPTIONS: { value: SectorCode; label: string }[] = [

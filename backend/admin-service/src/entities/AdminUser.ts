@@ -20,6 +20,6 @@ export class AdminUser {
   @Column({ name: 'is_blocked', default: false })
   isBlocked: boolean;
 
-  @Column({ name: 'full_name', nullable: true })
-  fullName?: string;
+  // @Column({ name: 'full_name', nullable: true })
+  // fullName?: string;
 }

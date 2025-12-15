@@ -5,7 +5,8 @@ import { BulkUploadIcon, ArrowRightWithoutLineIcon } from "@/components/icons";
 import CustomDatePicker from "@/components/ui/CustomDatePicker";
 import CustomSelect from "@/components/ui/CustomSelect";
 import MobileInput from "@/components/ui/MobileInput";
-import { registrationService, CreateRegistrationDto } from "@/lib/registrationService";
+import { registrationService } from "@/lib/services";
+import { CreateRegistrationDto } from "@/lib/services/registration.service";
 import { Program, Department } from "@/lib/types";
 import { BulkUploadModal } from "@/components/ui/BulkUploadModal";
 
@@ -20,20 +21,20 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
 }) => {
   // --- State ---
   const [formData, setFormData] = useState<CreateRegistrationDto>({
-    name: "",
+    full_name: "",
     gender: "Female",
     email: "",
-    countryCode: "+91",
-    mobile: "",
-    programType: "",
-    groupName: "",
-    sendEmail: false,
-    examStart: "",
-    examEnd: "",
-    schoolLevel: "",
-    schoolStream: "",
-    currentYear: "",
-    departmentId: "",
+    country_code: "+91",
+    mobile_number: "",
+    program_id: "",
+    group_name: "",
+    send_email: false,
+    exam_start: "",
+    exam_end: "",
+    school_level: undefined,
+    school_stream: undefined,
+    current_year: "",
+    department_degree_id: "",
   });
 
   const [programs, setPrograms] = useState<Program[]>([]);
@@ -90,28 +91,28 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
   const validateForm = () => {
     const errors: Record<string, string> = {};
 
-    if (!formData.name.trim()) errors.name = "Required";
+    if (!formData.full_name.trim()) errors.full_name = "Required";
     if (!formData.email.trim()) errors.email = "Required";
-    if (!formData.mobile.trim()) errors.mobile = "Required";
-    if (!formData.programType) errors.programType = "Required";
-    if (!formData.examStart || !formData.examEnd)
-      errors.examStart = "Required";
+    if (!formData.mobile_number.trim()) errors.mobile_number = "Required";
+    if (!formData.program_id) errors.program_id = "Required";
+    if (!formData.exam_start || !formData.exam_end)
+      errors.exam_start = "Required";
 
     const selectedProgram = programs.find(
-      (p) => p.id === formData.programType
+      (p) => p.id === formData.program_id
     );
 
     if (selectedProgram?.code === "SCHOOL") {
-      if (!formData.schoolLevel) errors.schoolLevel = "Required";
-      if (formData.schoolLevel === "HSC") {
-        if (!formData.schoolStream) errors.schoolStream = "Required";
-        if (!formData.currentYear) errors.currentYear = "Required";
+      if (!formData.school_level) errors.school_level = "Required";
+      if (formData.school_level === "HSC") {
+        if (!formData.school_stream) errors.school_stream = "Required";
+        if (!formData.current_year) errors.current_year = "Required";
       }
     }
 
     if (selectedProgram?.code === "COLLEGE") {
-      if (!formData.departmentId) errors.departmentId = "Required";
-      if (!formData.currentYear) errors.currentYear = "Required";
+      if (!formData.department_degree_id) errors.department_degree_id = "Required";
+      if (!formData.current_year) errors.current_year = "Required";
     }
 
     setFormErrors(errors);
@@ -125,7 +126,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     }
     setIsLoading(true);
     try {
-      await registrationService.createUser(formData);
+      await registrationService.createRegistration(formData);
       onRegister();
     } catch (err: any) {
       setError(err.message || "Failed to create registration.");
@@ -135,7 +136,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
   };
 
   const currentProgramCode = programs.find(
-    (p) => p.id === formData.programType
+    (p) => p.id === formData.program_id
   )?.code;
 
   const programOptions = programs.map((p) => ({ value: p.id, label: p.name }));
@@ -233,12 +234,11 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
               </label>
               <input
                 type="text"
-                value={formData.name}
-                onChange={(e) => handleInputChange("name", e.target.value)}
+                value={formData.full_name}
+                onChange={(e) => handleInputChange("full_name", e.target.value)}
                 placeholder="Example Name"
-                className={`${baseInputClasses} ${
-                  formErrors.name ? "border-red-500/50" : ""
-                }`}
+                className={`${baseInputClasses} ${formErrors.full_name ? "border-red-500/50" : ""
+                  }`}
               />
             </div>
 
@@ -253,11 +253,10 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                     key={gender}
                     type="button"
                     onClick={() => handleInputChange("gender", gender)}
-                    className={`${toggleButtonBase} ${
-                      formData.gender === gender
-                        ? activeToggleClasses
-                        : inactiveToggleClasses
-                    }`}
+                    className={`${toggleButtonBase} ${formData.gender === gender
+                      ? activeToggleClasses
+                      : inactiveToggleClasses
+                      }`}
                   >
                     {gender}
                   </button>
@@ -275,30 +274,28 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                 value={formData.email}
                 onChange={(e) => handleInputChange("email", e.target.value)}
                 placeholder="example@gmail.com"
-                className={`${baseInputClasses} ${
-                  formErrors.email ? "border-red-500/50" : ""
-                }`}
+                className={`${baseInputClasses} ${formErrors.email ? "border-red-500/50" : ""
+                  }`}
               />
             </div>
 
             {/* Mobile Input - High Z-Index on Interaction */}
             <div
-              className={`space-y-2 relative ${
-                activeField === "mobile" ? "z-50" : "z-0"
-              }`}
+              className={`space-y-2 relative ${activeField === "mobile" ? "z-50" : "z-0"
+                }`}
               onMouseEnter={() => setActiveField("mobile")}
               onMouseLeave={() => setActiveField(null)}
             >
               <MobileInput
-                countryCode={formData.countryCode}
-                phoneNumber={formData.mobile}
+                countryCode={formData.country_code}
+                phoneNumber={formData.mobile_number}
                 onCountryChange={(code) =>
-                  handleInputChange("countryCode", code)
+                  handleInputChange("country_code", code)
                 }
-                onPhoneChange={(num) => handleInputChange("mobile", num)}
+                onPhoneChange={(num) => handleInputChange("mobile_number", num)}
                 label="Mobile Number (without +91)"
                 required
-                error={formErrors.mobile}
+                error={formErrors.mobile_number}
               />
             </div>
           </div>
@@ -311,9 +308,8 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
             {/* Program Type */}
             <div
-              className={`relative ${
-                activeField === "program" ? "z-50" : "z-auto"
-              }`}
+              className={`relative ${activeField === "program" ? "z-50" : "z-auto"
+                }`}
               onMouseEnter={() => setActiveField("program")}
               onMouseLeave={() => setActiveField(null)}
             >
@@ -321,19 +317,19 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                 label="Program Type"
                 required
                 options={programOptions}
-                value={formData.programType}
+                value={formData.program_id}
                 onChange={(val) => {
-                  handleInputChange("programType", val);
-                  handleInputChange("schoolLevel", "");
-                  handleInputChange("schoolStream", "");
-                  handleInputChange("currentYear", "");
-                  handleInputChange("departmentId", "");
+                  handleInputChange("program_id", val);
+                  handleInputChange("school_level", "");
+                  handleInputChange("school_stream", "");
+                  handleInputChange("current_year", "");
+                  handleInputChange("department_degree_id", "");
                 }}
                 placeholder="Choose Program Type"
               />
-              {formErrors.programType && (
+              {formErrors.program_id && (
                 <p className="text-xs text-red-500 ml-1 mt-1">
-                  {formErrors.programType}
+                  {formErrors.program_id}
                 </p>
               )}
             </div>
@@ -341,9 +337,8 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
             {/* School Level (for SCHOOL) */}
             {currentProgramCode === "SCHOOL" && (
               <div
-                className={`relative animate-fade-in ${
-                  activeField === "schoolLevel" ? "z-50" : "z-auto"
-                }`}
+                className={`relative animate-fade-in ${activeField === "schoolLevel" ? "z-50" : "z-auto"
+                  }`}
                 onMouseEnter={() => setActiveField("schoolLevel")}
                 onMouseLeave={() => setActiveField(null)}
               >
@@ -351,13 +346,13 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                   label="School Level"
                   required
                   options={schoolLevels}
-                  value={formData.schoolLevel || ""}
-                  onChange={(val) => handleInputChange("schoolLevel", val)}
+                  value={formData.school_level || ""}
+                  onChange={(val) => handleInputChange("school_level", val)}
                   placeholder="Select Level"
                 />
-                {formErrors.schoolLevel && (
+                {formErrors.school_level && (
                   <p className="text-xs text-red-500 ml-1 mt-1">
-                    {formErrors.schoolLevel}
+                    {formErrors.school_level}
                   </p>
                 )}
               </div>
@@ -365,11 +360,10 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
 
             {/* Stream (for SCHOOL + HSC) */}
             {currentProgramCode === "SCHOOL" &&
-              formData.schoolLevel === "HSC" && (
+              formData.school_level === "HSC" && (
                 <div
-                  className={`relative animate-fade-in ${
-                    activeField === "stream" ? "z-50" : "z-auto"
-                  }`}
+                  className={`relative animate-fade-in ${activeField === "stream" ? "z-50" : "z-auto"
+                    }`}
                   onMouseEnter={() => setActiveField("stream")}
                   onMouseLeave={() => setActiveField(null)}
                 >
@@ -377,15 +371,15 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                     label="Stream"
                     required
                     options={schoolStreams}
-                    value={formData.schoolStream || ""}
+                    value={formData.school_stream || ""}
                     onChange={(val) =>
-                      handleInputChange("schoolStream", val)
+                      handleInputChange("school_stream", val)
                     }
                     placeholder="Select Stream"
                   />
-                  {formErrors.schoolStream && (
+                  {formErrors.school_stream && (
                     <p className="text-xs text-red-500 ml-1 mt-1">
-                      {formErrors.schoolStream}
+                      {formErrors.school_stream}
                     </p>
                   )}
                 </div>
@@ -394,9 +388,8 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
             {/* Department (for COLLEGE) */}
             {currentProgramCode === "COLLEGE" && (
               <div
-                className={`relative animate-fade-in ${
-                  activeField === "dept" ? "z-50" : "z-auto"
-                }`}
+                className={`relative animate-fade-in ${activeField === "dept" ? "z-50" : "z-auto"
+                  }`}
                 onMouseEnter={() => setActiveField("dept")}
                 onMouseLeave={() => setActiveField(null)}
               >
@@ -404,13 +397,13 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                   label="Department"
                   required
                   options={departmentOptions}
-                  value={formData.departmentId || ""}
-                  onChange={(val) => handleInputChange("departmentId", val)}
+                  value={formData.department_degree_id || ""}
+                  onChange={(val) => handleInputChange("department_degree_id", val)}
                   placeholder="Select Department"
                 />
-                {formErrors.departmentId && (
+                {formErrors.department_degree_id && (
                   <p className="text-xs text-red-500 ml-1 mt-1">
-                    {formErrors.departmentId}
+                    {formErrors.department_degree_id}
                   </p>
                 )}
               </div>
@@ -418,43 +411,42 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
 
             {/* Current Year – for (SCHOOL + HSC) or COLLEGE */}
             {((currentProgramCode === "SCHOOL" &&
-              formData.schoolLevel === "HSC") ||
+              formData.school_level === "HSC") ||
               currentProgramCode === "COLLEGE") && (
-              <div className="space-y-2 animate-fade-in relative z-0">
-                <label className={baseLabelClasses}>
-                  Current Year <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  maxLength={currentProgramCode === "SCHOOL" ? 2 : 4}
-                  value={formData.currentYear || ""}
-                  onChange={(e) =>
-                    handleInputChange(
-                      "currentYear",
-                      e.target.value.replace(/\D/g, "")
-                    )
-                  }
-                  placeholder={currentProgramCode === "SCHOOL" ? "12" : "2025"}
-                  className={`${baseInputClasses} ${
-                    formErrors.currentYear ? "border-red-500/50" : ""
-                  }`}
-                />
-                {formErrors.currentYear && (
-                  <p className="text-xs text-red-500 ml-1 mt-1">
-                    {formErrors.currentYear}
-                  </p>
-                )}
-              </div>
-            )}
+                <div className="space-y-2 animate-fade-in relative z-0">
+                  <label className={baseLabelClasses}>
+                    Current Year <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={currentProgramCode === "SCHOOL" ? 2 : 4}
+                    value={formData.current_year || ""}
+                    onChange={(e) =>
+                      handleInputChange(
+                        "current_year",
+                        e.target.value.replace(/\D/g, "")
+                      )
+                    }
+                    placeholder={currentProgramCode === "SCHOOL" ? "12" : "2025"}
+                    className={`${baseInputClasses} ${formErrors.current_year ? "border-red-500/50" : ""
+                      }`}
+                  />
+                  {formErrors.current_year && (
+                    <p className="text-xs text-red-500 ml-1 mt-1">
+                      {formErrors.current_year}
+                    </p>
+                  )}
+                </div>
+              )}
 
             {/* Group Name */}
             <div className="space-y-2 relative z-0">
               <label className={baseLabelClasses}>Group Name</label>
               <input
                 type="text"
-                value={formData.groupName}
+                value={formData.group_name}
                 onChange={(e) =>
-                  handleInputChange("groupName", e.target.value)
+                  handleInputChange("group_name", e.target.value)
                 }
                 placeholder="Enter the Group Name"
                 className={baseInputClasses}
@@ -470,23 +462,21 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
               <div className={toggleWrapperClasses}>
                 <button
                   type="button"
-                  onClick={() => handleInputChange("sendEmail", true)}
-                  className={`${toggleButtonBase} ${
-                    formData.sendEmail
-                      ? activeToggleClasses
-                      : inactiveToggleClasses
-                  }`}
+                  onClick={() => handleInputChange("send_email", true)}
+                  className={`${toggleButtonBase} ${formData.send_email
+                    ? activeToggleClasses
+                    : inactiveToggleClasses
+                    }`}
                 >
                   Yes
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleInputChange("sendEmail", false)}
-                  className={`${toggleButtonBase} ${
-                    !formData.sendEmail
-                      ? activeToggleClasses
-                      : inactiveToggleClasses
-                  }`}
+                  onClick={() => handleInputChange("send_email", false)}
+                  className={`${toggleButtonBase} ${!formData.send_email
+                    ? activeToggleClasses
+                    : inactiveToggleClasses
+                    }`}
                 >
                   No
                 </button>
@@ -495,9 +485,8 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
 
             {/* Schedule Exam */}
             <div
-              className={`space-y-2 relative lg:col-span-2 ${
-                activeField === "exam" ? "z-50" : "z-auto"
-              }`}
+              className={`space-y-2 relative lg:col-span-2 ${activeField === "exam" ? "z-50" : "z-auto"
+                }`}
               onMouseEnter={() => setActiveField("exam")}
               onMouseLeave={() => setActiveField(null)}
             >
@@ -506,18 +495,18 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
               </label>
               <CustomDatePicker
                 value={
-                  formData.examStart
-                    ? { start: formData.examStart, end: formData.examEnd || "" }
+                  formData.exam_start
+                    ? { start: formData.exam_start, end: formData.exam_end || "" }
                     : undefined
                 }
                 onChange={(start, end) => {
-                  handleInputChange("examStart", start);
-                  handleInputChange("examEnd", end);
+                  handleInputChange("exam_start", start);
+                  handleInputChange("exam_end", end);
                 }}
               />
-              {formErrors.examStart && (
+              {formErrors.exam_start && (
                 <p className="text-xs text-red-500 ml-1 mt-1">
-                  {formErrors.examStart}
+                  {formErrors.exam_start}
                 </p>
               )}
             </div>

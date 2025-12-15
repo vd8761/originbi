@@ -7,6 +7,8 @@ import { ProgramsModule } from './programs/programs.module';
 import { AdminLoginModule } from './adminlogin/adminlogin.module';
 import { DepartmentsModule } from './departments/departments.module';
 import { RegistrationsModule } from './registrations/registrations.module';
+import { GroupsModule } from './groups/groups.module';
+import { AssessmentModule } from './assessment/assessment.module';
 
 @Module({
   imports: [
@@ -53,6 +55,8 @@ import { RegistrationsModule } from './registrations/registrations.module';
     ProgramsModule,
     DepartmentsModule,
     RegistrationsModule,
+    GroupsModule,
+    AssessmentModule,
   ],
 })
-export class AppModule {}
+export class AppModule { }

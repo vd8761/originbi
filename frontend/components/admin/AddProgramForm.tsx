@@ -2,13 +2,13 @@
 
 import React, { useState } from "react";
 import { ArrowRightWithoutLineIcon } from "@/components/icons";
-import { ProgramData } from "@/lib/types";
-import { programService } from "@/lib/programService";
+import { Program } from "@/lib/types";
+import { programService } from "@/lib/services";
 
 interface AddProgramFormProps {
   onCancel: () => void;
   onSuccess: () => void;
-  initialData?: ProgramData | null; // For editing
+  initialData?: Program | null; // For editing
 }
 
 const AddProgramForm: React.FC<AddProgramFormProps> = ({
@@ -16,23 +16,23 @@ const AddProgramForm: React.FC<AddProgramFormProps> = ({
   onSuccess,
   initialData,
 }) => {
-  const [formData, setFormData] = useState<Omit<ProgramData, "id">>({
-    programCode: initialData?.programCode || "",
-    programName: initialData?.programName || "",
-    status: initialData?.status ?? true,
+  const [formData, setFormData] = useState<Omit<Program, "id" | "created_at" | "updated_at">>({
+    code: initialData?.code || "",
+    name: initialData?.name || "",
+    is_active: initialData?.is_active ?? true,
     description: initialData?.description || "",
-    assessmentTitle: initialData?.assessmentTitle || "",
-    reportTitle: initialData?.reportTitle || "",
-    isDemo: initialData?.isDemo || false,
+    assessment_title: initialData?.assessment_title || "",
+    report_title: initialData?.report_title || "",
+    is_demo: initialData?.is_demo || false,
   });
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  const handleChange = <K extends keyof Omit<ProgramData, "id">>(
+  const handleChange = <K extends keyof Omit<Program, "id" | "created_at" | "updated_at">>(
     field: K,
-    value: Omit<ProgramData, "id">[K]
+    value: Omit<Program, "id" | "created_at" | "updated_at">[K]
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (formErrors[field as string]) {
@@ -47,8 +47,8 @@ const AddProgramForm: React.FC<AddProgramFormProps> = ({
 
   const validate = () => {
     const errors: Record<string, string> = {};
-    if (!formData.programCode.trim()) errors.programCode = "Required";
-    if (!formData.programName.trim()) errors.programName = "Required";
+    if (!formData.code.trim()) errors.code = "Required";
+    if (!formData.name.trim()) errors.name = "Required";
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -134,12 +134,11 @@ const AddProgramForm: React.FC<AddProgramFormProps> = ({
             </label>
             <input
               type="text"
-              value={formData.programCode}
-              onChange={(e) => handleChange("programCode", e.target.value)}
+              value={formData.code}
+              onChange={(e) => handleChange("code", e.target.value)}
               placeholder="e.g. SCHOOL_STUDENT"
-              className={`${baseInputClasses} ${
-                formErrors.programCode ? "border-red-500/50" : ""
-              }`}
+              className={`${baseInputClasses} ${formErrors.code ? "border-red-500/50" : ""
+                }`}
             />
           </div>
 
@@ -150,12 +149,11 @@ const AddProgramForm: React.FC<AddProgramFormProps> = ({
             </label>
             <input
               type="text"
-              value={formData.programName}
-              onChange={(e) => handleChange("programName", e.target.value)}
+              value={formData.name}
+              onChange={(e) => handleChange("name", e.target.value)}
               placeholder="Enter Program Name"
-              className={`${baseInputClasses} ${
-                formErrors.programName ? "border-red-500/50" : ""
-              }`}
+              className={`${baseInputClasses} ${formErrors.name ? "border-red-500/50" : ""
+                }`}
             />
           </div>
 
@@ -164,8 +162,8 @@ const AddProgramForm: React.FC<AddProgramFormProps> = ({
             <label className={baseLabelClasses}>Assessment Title</label>
             <input
               type="text"
-              value={formData.assessmentTitle ?? ""}
-              onChange={(e) => handleChange("assessmentTitle", e.target.value)}
+              value={formData.assessment_title ?? ""}
+              onChange={(e) => handleChange("assessment_title", e.target.value)}
               placeholder="Enter Assessment Title"
               className={baseInputClasses}
             />
@@ -176,8 +174,8 @@ const AddProgramForm: React.FC<AddProgramFormProps> = ({
             <label className={baseLabelClasses}>Report Title</label>
             <input
               type="text"
-              value={formData.reportTitle ?? ""}
-              onChange={(e) => handleChange("reportTitle", e.target.value)}
+              value={formData.report_title ?? ""}
+              onChange={(e) => handleChange("report_title", e.target.value)}
               placeholder="Enter Report Title"
               className={baseInputClasses}
             />
@@ -203,24 +201,22 @@ const AddProgramForm: React.FC<AddProgramFormProps> = ({
               </label>
               <div className={toggleWrapperClasses}>
                 <button
-                  type="button"
-                  onClick={() => handleChange("status", true)}
-                  className={`${toggleButtonBase} ${
-                    formData.status
-                      ? activeToggleClasses
-                      : inactiveToggleClasses
-                  }`}
+                  type="button" // Use is_active
+                  onClick={() => handleChange("is_active", true)}
+                  className={`${toggleButtonBase} ${formData.is_active
+                    ? activeToggleClasses
+                    : inactiveToggleClasses
+                    }`}
                 >
                   Active
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleChange("status", false)}
-                  className={`${toggleButtonBase} ${
-                    !formData.status
-                      ? activeToggleClasses
-                      : inactiveToggleClasses
-                  }`}
+                  onClick={() => handleChange("is_active", false)}
+                  className={`${toggleButtonBase} ${!formData.is_active
+                    ? activeToggleClasses
+                    : inactiveToggleClasses
+                    }`}
                 >
                   Inactive
                 </button>
@@ -233,23 +229,21 @@ const AddProgramForm: React.FC<AddProgramFormProps> = ({
               <div className={toggleWrapperClasses}>
                 <button
                   type="button"
-                  onClick={() => handleChange("isDemo", true)}
-                  className={`${toggleButtonBase} ${
-                    formData.isDemo
-                      ? activeToggleClasses
-                      : inactiveToggleClasses
-                  }`}
+                  onClick={() => handleChange("is_demo", true)}
+                  className={`${toggleButtonBase} ${formData.is_demo
+                    ? activeToggleClasses
+                    : inactiveToggleClasses
+                    }`}
                 >
                   Yes
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleChange("isDemo", false)}
-                  className={`${toggleButtonBase} ${
-                    !formData.isDemo
-                      ? activeToggleClasses
-                      : inactiveToggleClasses
-                  }`}
+                  onClick={() => handleChange("is_demo", false)}
+                  className={`${toggleButtonBase} ${!formData.is_demo
+                    ? activeToggleClasses
+                    : inactiveToggleClasses
+                    }`}
                 >
                   No
                 </button>

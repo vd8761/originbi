@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
-import { BulkUploadIcon,ExcelIcon } from '@/components/icons';
-import { registrationService } from '@/lib/registrationService';
+import { BulkUploadIcon, ExcelIcon } from '@/components/icons';
+import { registrationService } from '@/lib/services';
 
 interface BulkUploadModalProps {
     isOpen: boolean;
@@ -63,15 +63,15 @@ const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ isOpen, onClose, onSu
                         <ExcelIcon className="w-4 h-4" /> Download Template
                     </a>
 
-                    <div 
+                    <div
                         className="border-2 border-dashed border-white/10 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer hover:border-brand-green/50 hover:bg-white/5 transition-all"
                         onClick={() => fileInputRef.current?.click()}
                     >
-                        <input 
-                            type="file" 
-                            ref={fileInputRef} 
-                            className="hidden" 
-                            accept=".csv, .xlsx, .xls" 
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            className="hidden"
+                            accept=".csv, .xlsx, .xls"
                             onChange={handleFileChange}
                         />
                         {file ? (
@@ -95,8 +95,8 @@ const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ isOpen, onClose, onSu
                     <button onClick={onClose} className="px-5 py-2.5 rounded-lg border border-white/10 text-white text-sm hover:bg-white/5 transition-colors">
                         Cancel
                     </button>
-                    <button 
-                        onClick={handleUpload} 
+                    <button
+                        onClick={handleUpload}
                         disabled={isUploading || !file}
                         className="px-5 py-2.5 rounded-lg bg-brand-green text-white text-sm font-bold hover:bg-brand-green/90 transition-colors disabled:opacity-50 flex items-center gap-2"
                     >

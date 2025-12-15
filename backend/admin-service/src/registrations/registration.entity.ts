@@ -6,8 +6,10 @@ import {
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
 import { User } from '../users/user.entity';
+import { Groups } from '../groups/groups.entity';
 
 export type RegistrationSource = 'SELF' | 'ADMIN' | 'CORPORATE' | 'RESELLER';
 export type RegistrationStatus = 'INCOMPLETE' | 'COMPLETED' | 'CANCELLED';
@@ -32,6 +34,10 @@ export class Registration {
   @ManyToOne(() => User)
   @JoinColumn({ name: 'user_id' })
   user: User;
+
+  @ManyToOne(() => Groups, (group) => group.registrations)
+  @JoinColumn({ name: 'group_id' })
+  group: Groups;
 
   // ---- New snapshot fields in registrations ----
   @Column({ name: 'full_name', type: 'varchar', length: 255, nullable: true })
@@ -80,8 +86,8 @@ export class Registration {
   @Column({ name: 'department_degree_id', type: 'bigint', nullable: true })
   departmentDegreeId: number | null;
 
-  @Column({ name: 'group_id', type: 'bigint', nullable: true })
-  groupId: number | null;
+  // @Column({ name: 'group_id' ... }) removed to avoid conflict with relation
+  // groupId: number | null;
 
   // ---- Payment ----
   @Column({ name: 'payment_required', type: 'boolean', default: false })
@@ -134,4 +140,7 @@ export class Registration {
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
+
+  @OneToMany('AssessmentSession', (session: any) => session.registration)
+  assessmentSessions: any[];
 }

@@ -37,7 +37,7 @@ const AddCorporateRegistrationForm: React.FC<
     password: "",
     credits: undefined,
     status: true,
-    notes: "",
+    businessLocations: "", // Was 'notes'
     sendEmail: false,
   });
 
@@ -45,41 +45,14 @@ const AddCorporateRegistrationForm: React.FC<
   const [error, setError] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  // New states
-  const [showPassword, setShowPassword] = useState(false);
-  const [isSectorOpen, setIsSectorOpen] = useState(false);
-  const [sectorSearch, setSectorSearch] = useState("");
-
-  // Ref for click-outside on sector dropdown
-  const sectorDropdownRef = useRef<HTMLDivElement | null>(null);
-
-  // Close sector dropdown on outside click
-  useEffect(() => {
-    if (!isSectorOpen) return;
-
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (
-        sectorDropdownRef.current &&
-        !sectorDropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsSectorOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-    };
-  }, [isSectorOpen]);
+  // ... (keeping lines 49-93 unchanged) ...
 
   const handleInputChange = <K extends keyof CreateCorporateRegistrationDto>(
     field: K,
     value: CreateCorporateRegistrationDto[K]
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    // ... validation logic ...
     if (formErrors[field as string]) {
       setFormErrors((prev) => {
         const copy = { ...prev };
@@ -90,6 +63,7 @@ const AddCorporateRegistrationForm: React.FC<
     setError(null);
   };
 
+  // Update validation
   const validateForm = () => {
     const errors: Record<string, string> = {};
 
@@ -99,10 +73,23 @@ const AddCorporateRegistrationForm: React.FC<
     if (!formData.companyName.trim()) errors.companyName = "Required";
     if (!formData.password.trim()) errors.password = "Required";
     if (!formData.sector) errors.sector = "Required";
+    if (!formData.businessLocations.trim()) errors.businessLocations = "Required"; // Validating locations
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
+
+  // ... (Lines 107-153) ...
+
+  // To save space in replacement I'll target specific blocks if possible, 
+  // but since I'm replacing internal state I need to be careful.
+  // Actually, I can just replace the initialization and the textarea block.
+
+  // Let's replace the whole top part and the textarea part separately? No, `replace_file_content` is one contiguous block. 
+  // I will just replace the textarea part first, and then the state part? No, I must do it in order or one big block.
+  // I will do one big block for the state and validation, and another for the JSX if needed.
+  // Actually, I can use `multi_replace_file_content`.
+
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
@@ -208,9 +195,8 @@ const AddCorporateRegistrationForm: React.FC<
               value={formData.name}
               onChange={(e) => handleInputChange("name", e.target.value)}
               placeholder="Contact Person Name"
-              className={`${baseInputClasses} ${
-                formErrors.name ? "border-red-500/50" : ""
-              }`}
+              className={`${baseInputClasses} ${formErrors.name ? "border-red-500/50" : ""
+                }`}
             />
           </div>
 
@@ -228,11 +214,10 @@ const AddCorporateRegistrationForm: React.FC<
                       g as "Male" | "Female" | "Other"
                     )
                   }
-                  className={`${toggleButtonBase} ${
-                    formData.gender === g
+                  className={`${toggleButtonBase} ${formData.gender === g
                       ? activeToggleClasses
                       : inactiveToggleClasses
-                  }`}
+                    }`}
                 >
                   {g}
                 </button>
@@ -250,9 +235,8 @@ const AddCorporateRegistrationForm: React.FC<
               value={formData.email}
               onChange={(e) => handleInputChange("email", e.target.value)}
               placeholder="contact@company.com"
-              className={`${baseInputClasses} ${
-                formErrors.email ? "border-red-500/50" : ""
-              }`}
+              className={`${baseInputClasses} ${formErrors.email ? "border-red-500/50" : ""
+                }`}
             />
           </div>
 
@@ -279,9 +263,8 @@ const AddCorporateRegistrationForm: React.FC<
               value={formData.companyName}
               onChange={(e) => handleInputChange("companyName", e.target.value)}
               placeholder="Company / Organization"
-              className={`${baseInputClasses} ${
-                formErrors.companyName ? "border-red-500/50" : ""
-              }`}
+              className={`${baseInputClasses} ${formErrors.companyName ? "border-red-500/50" : ""
+                }`}
             />
           </div>
 
@@ -320,9 +303,8 @@ const AddCorporateRegistrationForm: React.FC<
               <button
                 type="button"
                 onClick={() => setIsSectorOpen((prev) => !prev)}
-                className={`${baseInputClasses} flex items-center justify-between !h-[50px] ${
-                  formErrors.sector ? "border-red-500/50" : ""
-                }`}
+                className={`${baseInputClasses} flex items-center justify-between !h-[50px] ${formErrors.sector ? "border-red-500/50" : ""
+                  }`}
               >
                 <span className="truncate text-left">
                   {getSectorLabel(formData.sector as SectorCode)}
@@ -349,11 +331,10 @@ const AddCorporateRegistrationForm: React.FC<
                           setIsSectorOpen(false);
                           setSectorSearch("");
                         }}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-gray-100 dark:hover:bg-white/10 ${
-                          formData.sector === opt.value
+                        className={`w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-gray-100 dark:hover:bg-white/10 ${formData.sector === opt.value
                             ? "bg-gray-100 dark:bg-white/10 font-semibold"
                             : ""
-                        }`}
+                          }`}
                       >
                         {opt.label}
                       </button>
@@ -406,9 +387,8 @@ const AddCorporateRegistrationForm: React.FC<
                 value={formData.password}
                 onChange={(e) => handleInputChange("password", e.target.value)}
                 placeholder="Set login password"
-                className={`${baseInputClasses} pr-12 ${
-                  formErrors.password ? "border-red-500/50" : ""
-                }`}
+                className={`${baseInputClasses} pr-12 ${formErrors.password ? "border-red-500/50" : ""
+                  }`}
               />
 
               <button
@@ -450,18 +430,16 @@ const AddCorporateRegistrationForm: React.FC<
               <button
                 type="button"
                 onClick={() => handleInputChange("status", true)}
-                className={`${toggleButtonBase} ${
-                  formData.status ? activeToggleClasses : inactiveToggleClasses
-                }`}
+                className={`${toggleButtonBase} ${formData.status ? activeToggleClasses : inactiveToggleClasses
+                  }`}
               >
                 Active
               </button>
               <button
                 type="button"
                 onClick={() => handleInputChange("status", false)}
-                className={`${toggleButtonBase} ${
-                  !formData.status ? activeToggleClasses : inactiveToggleClasses
-                }`}
+                className={`${toggleButtonBase} ${!formData.status ? activeToggleClasses : inactiveToggleClasses
+                  }`}
               >
                 Inactive
               </button>

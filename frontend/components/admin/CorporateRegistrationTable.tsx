@@ -1,11 +1,26 @@
 import React from "react";
-import { CorporateRegistrationUser } from "@/lib/types";
+import { CorporateAccount } from "@/lib/types";
 import ToggleSwitch from "@/components/ui/ToggleSwitch";
 import { EyeVisibleIcon } from "@/components/icons";
 import { COUNTRY_CODES } from "@/lib/countryCodes";
 
+// Extend CorporateAccount to include user details if they are separate in types.ts
+// But typically for table display we might need a joined type.
+// For now, let's assume CorporateAccount returned by service includes joined user fields like 'full_name', 'email'.
+// Checking types.ts: CorporateAccount has user_id. Doesn't seem to have full_name.
+// If the service returns a joined object, we should define an ExtendedCorporateAccount interface or similar.
+// Or just use 'any' temporarily if tight on time, but better to allow extra props.
+interface ExtendedCorporateAccount extends CorporateAccount {
+  full_name?: string; // from joined User
+  email?: string;     // from joined User
+  // gender is already in CorporateAccount as 'Gender | undefined'
+  // If we want to override or re-declare, it must match.
+  // Actually, if it's already there, we don't need to re-declare unless we want to broaden it, which is not allowed in extension.
+  // So I will remove it if it's just repeating.
+}
+
 interface RegistrationTableProps {
-  users: CorporateRegistrationUser[];
+  users: ExtendedCorporateAccount[];
   loading: boolean;
   error: string | null;
   onToggleStatus: (id: string, currentStatus: boolean) => void;
@@ -112,16 +127,15 @@ const CorporateRegistrationTable: React.FC<RegistrationTableProps> = ({
                   <div className="flex items-center gap-3">
                     <img
                       src={
-                        user.avatar ||
                         `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                          user.name
+                          user.full_name || 'User'
                         )}&background=random`
                       }
                       alt=""
                       className="w-8 h-8 rounded-full object-cover border border-brand-light-tertiary dark:border-brand-dark-tertiary"
                     />
                     <span className="text-sm font-medium text-brand-text-light-primary dark:text-white">
-                      {user.name}
+                      {user.full_name || 'N/A'}
                     </span>
                   </div>
                 </td>
@@ -129,12 +143,12 @@ const CorporateRegistrationTable: React.FC<RegistrationTableProps> = ({
                   {user.gender}
                 </td>
                 <td className="p-4 text-sm text-brand-text-light-primary dark:text-white">
-                  {user.email}
+                  {user.email || 'N/A'}
                 </td>
                 <td className="p-4 text-sm text-brand-text-light-primary dark:text-white">
                   <div className="flex items-center gap-2">
                     {(() => {
-                      const info = getCountryInfo(user.countryCode);
+                      const info = getCountryInfo(user.country_code);
 
                       return (
                         <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-light-secondary dark:bg-[#24272B] border border-brand-light-tertiary/60 dark:border-brand-dark-tertiary/60">
@@ -154,26 +168,26 @@ const CorporateRegistrationTable: React.FC<RegistrationTableProps> = ({
 
                           {/* Dial code */}
                           <span className="text-[14px] text-gray-600 dark:text-gray-300">
-                            {info?.dial_code ?? user.countryCode}
+                            {info?.dial_code ?? user.country_code}
                           </span>
                         </div>
                       );
                     })()}
 
                     {/* Phone number */}
-                    <span>{user.mobile}</span>
+                    <span>{user.mobile_number}</span>
                   </div>
                 </td>
                 <td className="p-4 text-sm text-brand-text-light-primary dark:text-white">
-                  {user.companyName || "-"}
+                  {user.company_name || "-"}
                 </td>
                 <td className="p-4 text-sm text-brand-text-light-primary dark:text-white">
-                  {user.jobTitle || "-"}
+                  {user.job_title || "-"}
                 </td>
                 <td className="p-4 flex justify-center">
                   <ToggleSwitch
-                    isOn={user.status}
-                    onToggle={() => onToggleStatus(user.id, user.status)}
+                    isOn={user.is_active}
+                    onToggle={() => onToggleStatus(user.id, user.is_active)}
                   />
                 </td>
                 <td className="p-4 text-right">

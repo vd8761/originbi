@@ -2,9 +2,9 @@
 import { Controller, Get } from '@nestjs/common';
 import { DepartmentsService } from './departments.service';
 
-@Controller('departments')
+@Controller('admin/departments')
 export class DepartmentsController {
-  constructor(private readonly departmentsService: DepartmentsService) {}
+  constructor(private readonly departmentsService: DepartmentsService) { }
 
   @Get()
   async getAll() {

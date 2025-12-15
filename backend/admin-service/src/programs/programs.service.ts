@@ -8,26 +8,31 @@ export class ProgramsService {
   constructor(
     @InjectRepository(Program)
     private readonly programRepo: Repository<Program>,
-  ) {}
+  ) { }
 
   async findAll(page = 1, limit = 50, search?: string) {
-    const skip = (page - 1) * limit;
+    try {
+      const skip = (page - 1) * limit;
 
-    const where = search
-      ? [
+      const where = search
+        ? [
           { name: ILike(`%${search}%`) },
           { code: ILike(`%${search}%`) },
         ]
-      : undefined;
+        : undefined;
 
-    const [data, total] = await this.programRepo.findAndCount({
-      where,
-      order: { created_at: 'DESC' },
-      skip,
-      take: limit,
-    });
+      const [data, total] = await this.programRepo.findAndCount({
+        where,
+        order: { created_at: 'DESC' },
+        skip,
+        take: limit,
+      });
 
-    return { data, total, page, limit };
+      return { data, total, page, limit };
+    } catch (error) {
+      console.error('ProgramsService.findAll Error:', error);
+      throw error;
+    }
   }
 
   async findOne(id: string): Promise<Program> {

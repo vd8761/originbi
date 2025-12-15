@@ -12,9 +12,9 @@ import {
 import { ProgramsService } from './programs.service';
 import { Program } from './entities/program.entity';
 
-@Controller('programs')
+@Controller('admin/programs')
 export class ProgramsController {
-  constructor(private readonly programsService: ProgramsService) {}
+  constructor(private readonly programsService: ProgramsService) { }
 
   // GET ALL (with pagination + search)
   @Get()
