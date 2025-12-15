@@ -62,15 +62,14 @@ export class RegistrationsService {
     } catch (err: any) {
       const authErr = err?.response?.data || err?.message || err;
 
-      // If user already exists, we might want to recover?
-      // For now, assuming auth-service throws 400 if exists.
-      // We can check error message if needed, but robust way is to just let it fail 
-      // OR if we want to support retry, we'd need a way to fetch existing SUB.
-      // Assuming retry logic isn't strictly required by auth-service API yet, or auth-service handles idempotency.
-
       this.logger.error('Error creating Cognito user:', authErr);
+
+      const msg = (typeof authErr === 'object' && authErr !== null)
+        ? (authErr.message || JSON.stringify(authErr))
+        : String(authErr);
+
       throw new InternalServerErrorException(
-        authErr?.message || 'Failed to create Cognito user',
+        `Failed to create Cognito user: ${msg}`,
       );
     }
   }
