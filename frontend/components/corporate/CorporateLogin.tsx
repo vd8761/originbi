@@ -104,7 +104,7 @@ const CorporateLogin: React.FC<CorporateLoginProps> = ({
               </a>
             </span>
           </p>
-          
+
         </div>
       </div>
 
@@ -131,7 +131,7 @@ const CorporateLogin: React.FC<CorporateLoginProps> = ({
                 Corporate Login
               </h2>
               <p className="text-brand-text-light-secondary dark:text-brand-text-secondary text-sm">
-                Enter your credentials to access the admin portal.
+                Enter your credentials to access the corporate portal.
               </p>
             </div>
 

@@ -24,9 +24,23 @@ class CreateCognitoUserDto {
   groupName?: string;
 }
 
+class LoginDto {
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+
+  @IsOptional()
+  @IsString()
+  group?: string;
+}
+
 @Controller('internal/cognito')
 export class CognitoController {
-  constructor(private readonly cognitoService: CognitoService) {}
+  constructor(private readonly cognitoService: CognitoService) { }
 
   /**
    * Create user in Cognito with permanent password.
@@ -54,5 +68,18 @@ export class CognitoController {
 
     console.log('[auth-service] Cognito result =', result);
     return result;
+  }
+  /**
+   * Login user
+   * POST /internal/cognito/login
+   */
+  @Post('login')
+  async login(@Body() body: LoginDto) {
+    console.log('[auth-service] /internal/cognito/login body =', {
+      email: body.email,
+      group: body.group,
+    });
+
+    return this.cognitoService.login(body.email, body.password, body.group);
   }
 }

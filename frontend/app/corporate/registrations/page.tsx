@@ -17,7 +17,7 @@ export default function RegistrationsPage() {
     view: "dashboard" | "assessment" | "registrations"
   ) => {
     if (view === "dashboard") router.push("/corporate/dashboard");
-    if (view === "registrations") router.push("/corporate/employees");
+    if (view === "registrations") router.push("/corporate/registrations");
     // "assessment" is not used for corporate now, so we can safely ignore it
   };
 

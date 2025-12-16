@@ -9,7 +9,7 @@ export default function LoginPage() {
     const router = useRouter();
 
     const handleLoginSuccess = () => {
-        router.push('/student/assessment');
+        router.push('/student/dashboard');
     };
 
     return (
