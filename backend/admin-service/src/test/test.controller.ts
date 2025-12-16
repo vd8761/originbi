@@ -91,7 +91,7 @@ export class TestController {
             region: process.env.AWS_REGION,
         });
 
-        const transporter = nodemailer.createTransport({ SES: ses });
+        const transporter = nodemailer.createTransport({ SES: ses } as any);
 
         const fromName = process.env.EMAIL_SEND_FROM_NAME || 'Origin BI';
         const fromEmail = process.env.EMAIL_FROM || 'no-reply@originbi.com';
