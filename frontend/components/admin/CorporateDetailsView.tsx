@@ -1,7 +1,7 @@
 import React from 'react';
 import { CorporateAccount } from '@/lib/types';
 
-interface ExtendedCorporateAccount extends CorporateAccount {
+interface ExtendedCorporateAccount extends Omit<CorporateAccount, 'is_blocked'> {
     full_name?: string;
     email?: string;
     is_blocked?: boolean;
@@ -32,8 +32,8 @@ const CorporateDetailsView: React.FC<CorporateDetailsViewProps> = ({ data, onBac
                 </div>
                 <div className="flex gap-2">
                     <span className={`px-4 py-1.5 rounded-full text-xs font-semibold ${data.is_active
-                            ? 'bg-green-500/10 text-green-500 border border-green-500/20'
-                            : 'bg-red-500/10 text-red-500 border border-red-500/20'
+                        ? 'bg-green-500/10 text-green-500 border border-green-500/20'
+                        : 'bg-red-500/10 text-red-500 border border-red-500/20'
                         }`}>
                         {data.is_active ? 'ACTIVE' : 'INACTIVE'}
                     </span>
