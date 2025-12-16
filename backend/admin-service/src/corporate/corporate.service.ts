@@ -13,6 +13,7 @@ import { User } from '../users/user.entity';
 import { CorporateAccount } from './entities/corporate-account.entity';
 import { CorporateCreditLedger } from './entities/corporate-credit-ledger.entity';
 import { CreateCorporateRegistrationDto } from './dto/create-corporate-registration.dto';
+import { getCorporateWelcomeEmailTemplate } from '../mail/templates/corporate-welcome.template';
 
 @Injectable()
 export class CorporateService {
@@ -409,7 +410,7 @@ export class CorporateService {
             // Send Email
             if (dto.sendEmail) {
                 try {
-                    await this.sendWelcomeEmail(email, dto.name, dto.password);
+                    await this.sendWelcomeEmail(email, dto.name, dto.password, dto.companyName, dto.mobile);
                 } catch (e) {
                     this.logger.error(`Failed to send email to ${email}`, e);
                     // Do not fail transaction for email failure? 
@@ -428,12 +429,9 @@ export class CorporateService {
     // ---------------------------------------------------------
     // Helper: Send Welcome Email
     // ---------------------------------------------------------
-    private async sendWelcomeEmail(to: string, name: string, pass: string) {
-        // Reuse similar logic from registrations service or inject mail service if available
-        // Since mail logic is embedded in RegistrationsService, we duplicate or move to shared.
-        // For speed, duplicating the transport setup here as requested.
-
-        const SES = require('aws-sdk/clients/ses'); // Lazy load if needed or import at top
+    private async sendWelcomeEmail(to: string, name: string, pass: string, companyName: string, mobile: string) {
+        // Dynamic imports for now to avoid refactoring the whole file imports
+        const SES = require('aws-sdk/clients/ses');
         const nodemailer = require('nodemailer');
 
         const ses = new SES({
@@ -444,29 +442,28 @@ export class CorporateService {
 
         const transporter = nodemailer.createTransport({ SES: ses } as any);
         const ccEmail = process.env.EMAIL_CC || '';
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const backendUrl = process.env.BACKEND_URL || 'http://localhost:4001';
+
+        const fromName = process.env.EMAIL_SEND_FROM_NAME || 'Origin BI (Corporate)';
+        const fromEmail = process.env.EMAIL_FROM || 'no-reply@originbi.com';
+        const fromAddress = `"${fromName}" <${fromEmail}>`;
+
+        const assets = {
+            popper: `${backendUrl}/test/assets/Popper.png`,
+            pattern: `${backendUrl}/test/assets/Pattern_mask.png`,
+            footer: `${backendUrl}/test/assets/Email_Vector.png`,
+            logo: `${backendUrl}/test/assets/logo.png`,
+        };
+
+        const html = getCorporateWelcomeEmailTemplate(name, to, pass, companyName, mobile, frontendUrl, assets);
 
         const mailOptions = {
-            from: process.env.EMAIL_FROM || 'no-reply@originbi.com',
+            from: fromAddress,
             to,
             cc: ccEmail,
             subject: 'Welcome to OriginBI - Corporate Account Created',
-            html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-              <h2 style="color: #4CAF50;">Welcome to OriginBI!</h2>
-              <p>Dear <strong>${name}</strong>,</p>
-              <p>Your corporate account has been successfully created.</p>
-              
-              <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                <p style="margin: 5px 0;"><strong>Username / Email:</strong> ${to}</p>
-                <p style="margin: 5px 0;"><strong>Password:</strong> ${pass}</p>
-              </div>
-    
-              <p>Please click the button below to login:</p>
-              <p style="text-align: center;">
-                <a href="http://localhost:3000/login" style="display: inline-block; padding: 12px 24px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Login to Dashboard</a>
-              </p>
-            </div>
-          `,
+            html: html,
         };
         return transporter.sendMail(mailOptions);
     }

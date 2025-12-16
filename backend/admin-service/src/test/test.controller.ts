@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Res, Param } from '@nestjs/common';
 import { Response } from 'express';
 import { getWelcomeEmailTemplate } from '../mail/templates/welcome.template';
+import { getCorporateWelcomeEmailTemplate } from '../mail/templates/corporate-welcome.template';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as nodemailer from 'nodemailer';
@@ -43,6 +44,34 @@ export class TestController {
         res.send(html);
     }
 
+
+    @Get('preview-corporate-email')
+    previewCorporateEmail(@Res() res: Response) {
+        const baseUrl = process.env.BACKEND_URL || 'http://localhost:4001';
+
+        // Mock assets for preview - assuming they work via relative path or need full URL
+        // Currently test controller uses base64 for previewEmail but URLs for sendTestEmail
+        // Let's use URLs here to test the prod-like rendering
+        const assets = {
+            popper: `${baseUrl}/test/assets/Popper.png`,
+            pattern: `${baseUrl}/test/assets/Pattern_mask.png`,
+            footer: `${baseUrl}/test/assets/Email_Vector.png`,
+            logo: `${baseUrl}/test/assets/logo.png`,
+        };
+
+        const html = getCorporateWelcomeEmailTemplate(
+            'Bharathiraja Thangappalam',
+            'name@gmail.com', // email
+            'asd5f465', // password
+            'Touchmark Descience Pvt.Ltd', // companyName
+            '999999999', // mobile
+            'http://localhost:3000',
+            assets
+        );
+
+        res.setHeader('Content-Type', 'text/html');
+        res.send(html);
+    }
 
     @Get('assets/:filename')
     serveAsset(@Param('filename') filename: string, @Res() res: Response) {
@@ -106,5 +135,53 @@ export class TestController {
         });
 
         return { success: true, message: `Email sent to ${email} using hosted images` };
+    }
+
+    @Post('send-corporate-email')
+    async sendCorporateTestEmail(@Body() body: { email: string }) {
+        const email = body.email || 'test@example.com';
+        const baseUrl = process.env.BACKEND_URL || 'http://localhost:4001';
+
+        const assets = {
+            popper: `${baseUrl}/test/assets/Popper.png`,
+            pattern: `${baseUrl}/test/assets/Pattern_mask.png`,
+            footer: `${baseUrl}/test/assets/Email_Vector.png`,
+            logo: `${baseUrl}/test/assets/logo.png`,
+        };
+
+        const html = getCorporateWelcomeEmailTemplate(
+            'Bharathiraja Thangappalam',
+            email,
+            'asd5f465',
+            'Touchmark Descience Pvt.Ltd',
+            '999999999',
+            process.env.FRONTEND_URL || 'http://localhost:3000',
+            assets
+        );
+
+        const ses = new SES({
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+            region: process.env.AWS_REGION,
+        });
+
+        const transporter = nodemailer.createTransport({ SES: ses } as any);
+
+        const fromName = process.env.EMAIL_SEND_FROM_NAME || 'Origin BI (Corporate)';
+        const fromEmail = process.env.EMAIL_FROM || 'no-reply@originbi.com';
+        const fromAddress = `"${fromName}" <${fromEmail}>`;
+
+        await transporter.sendMail({
+            from: fromAddress,
+            to: email,
+            cc: process.env.EMAIL_CC,
+            subject: 'Test Corporate Welcome Email',
+            html: html,
+        });
+
+        return {
+            success: true,
+            message: `Corporate email sent to ${email} (CC: ${process.env.EMAIL_CC || 'None'})`
+        };
     }
 }

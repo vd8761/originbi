@@ -13,10 +13,7 @@ import { COUNTRY_CODES } from "@/lib/countryCodes";
 interface ExtendedCorporateAccount extends CorporateAccount {
   full_name?: string; // from joined User
   email?: string;     // from joined User
-  // gender is already in CorporateAccount as 'Gender | undefined'
-  // If we want to override or re-declare, it must match.
-  // Actually, if it's already there, we don't need to re-declare unless we want to broaden it, which is not allowed in extension.
-  // So I will remove it if it's just repeating.
+  // Removed is_blocked because CorporateAccount defines it as 'boolean' data type which cannot be overridden with 'boolean | undefined'
 }
 
 interface RegistrationTableProps {
