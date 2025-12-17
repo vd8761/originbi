@@ -29,7 +29,14 @@ const LoginForm: React.FC<LoginFormProps> = ({
   };
 
   const validateEmail = (email: string) => {
-    if (!email) return 'Email ID is required.';
+    if (!email) {
+      return portalMode === 'admin' ? 'Username is required.' : 'Email ID is required.';
+    }
+    // Admin login allows usernames that are not emails
+    if (portalMode === 'admin') {
+      return '';
+    }
+    // Student/Corporate must be valid email
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return 'Please enter a valid email address.';
     }
@@ -239,7 +246,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
       onSubmit={handleSubmit}
       noValidate
     >
-      {/* Email Field */}
+      {/* Email / Username Field */}
       <div className="space-y-2">
         <label
           htmlFor="email"
@@ -248,11 +255,11 @@ const LoginForm: React.FC<LoginFormProps> = ({
           {portalMode === 'corporate'
             ? 'Work Email'
             : portalMode === 'admin'
-              ? 'Admin ID / Email'
+              ? 'UsernameOrEmail'
               : 'Email ID'}
         </label>
         <input
-          type="email"
+          type={portalMode === 'admin' ? 'text' : 'email'}
           name="email"
           id="email"
           value={values.email}
@@ -265,7 +272,9 @@ const LoginForm: React.FC<LoginFormProps> = ({
           placeholder={
             portalMode === 'corporate'
               ? 'name@company.com'
-              : 'Example@gmail.com'
+              : portalMode === 'admin'
+                ? 'Enter Username or Email'
+                : 'Example@gmail.com'
           }
           required
           aria-invalid={isEmailInvalid}
@@ -315,6 +324,17 @@ const LoginForm: React.FC<LoginFormProps> = ({
         {isPasswordInvalid && (
           <p className="ml-1 text-xs text-red-500">{errors.password}</p>
         )}
+      </div>
+
+      {/* Forgot Password Link */}
+      <div className="flex justify-end pt-1">
+        <a
+          href={portalMode === 'admin' ? '/admin/forgot-password' : '#'}
+          className={`text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-brand-green transition-colors ${portalMode !== 'admin' ? 'cursor-not-allowed opacity-50' : ''}`}
+          onClick={portalMode !== 'admin' ? (e) => e.preventDefault() : undefined}
+        >
+          Forgot Password?
+        </a>
       </div>
 
       {/* Login Button */}
