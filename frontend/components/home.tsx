@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ProfileIcon, JobsIcon, SettingsIcon } from './icons';
 import Logo from './ui/Logo';
 
@@ -6,53 +6,79 @@ interface PortalHomeProps {
     onSelectPortal: (portal: 'student' | 'corporate' | 'admin') => void;
 }
 
+// Internal component for text rotation
+const TextRotator: React.FC = () => {
+    const words = ["Students", "Organizations", "Professionals", "You"];
+    const [index, setIndex] = useState(0);
+    const [fade, setFade] = useState(true);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setFade(false); // Start fade out
+            setTimeout(() => {
+                setIndex((prev) => (prev + 1) % words.length);
+                setFade(true); // Start fade in
+            }, 500); // Wait for fade out to finish
+        }, 3000); // Change every 3 seconds
+
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <span className={`inline-block transition-all duration-500 transform ${fade ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'} text-transparent bg-clip-text bg-gradient-to-r from-brand-green to-emerald-500`}>
+            {words[index]}
+        </span>
+    );
+};
+
+// Compact Portal Card optimized for "Gateway" feel
 const PortalCard: React.FC<{
     title: string;
-    subtitle: string;
     description: string;
     icon: React.ReactNode;
     onClick: () => void;
     accentColor: string;
     delay?: string;
-}> = ({ title, subtitle, description, icon, onClick, accentColor, delay }) => (
+    isActive?: boolean;
+}> = ({ title, description, icon, onClick, accentColor, delay, isActive }) => (
     <button
         onClick={onClick}
-        className={`relative group flex flex-col h-full overflow-hidden rounded-[2rem] p-1 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl animate-fade-in ${delay}`}
+        className={`group relative cursor-pointer flex flex-row md:flex-col items-center md:items-start text-left w-full h-full min-h-[100px] md:min-h-[160px] rounded-2xl md:rounded-3xl p-4 md:p-7 transition-all duration-500 transform hover:-translate-y-1 md:hover:-translate-y-2 hover:shadow-xl focus:outline-none ring-2 ring-transparent focus:ring-brand-green/30 ${delay} animate-fade-in-up`}
     >
-        {/* Border Gradient & Glow */}
-        <div className={`absolute inset-0 bg-gradient-to-br ${accentColor} opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl`} />
-        <div className={`absolute inset-0 bg-gradient-to-br ${accentColor} opacity-0 group-hover:opacity-20 transition-opacity duration-500`} />
+        {/* Card Background & Border - Dark Mode Enhanced */}
+        <div className="absolute inset-0 bg-white dark:bg-[#181B21] rounded-2xl md:rounded-3xl border border-gray-100 dark:border-white/10 shadow-sm group-hover:shadow-lg group-hover:border-transparent transition-all duration-300" />
 
-        {/* Card Content */}
-        <div className="relative flex flex-col h-full bg-brand-light-primary dark:bg-[#13161B] rounded-[1.8rem] p-8 sm:p-10 border border-brand-light-tertiary dark:border-white/5 h-full z-10 overflow-hidden">
+        {/* Gradient Hover Effect */}
+        <div className={`absolute inset-0 rounded-2xl md:rounded-3xl bg-gradient-to-br ${accentColor} opacity-0 group-hover:opacity-[0.04] transition-opacity duration-300`} />
 
-            {/* Background Decor */}
-            <div className={`absolute -top-20 -right-20 w-64 h-64 bg-gradient-to-br ${accentColor} opacity-[0.03] group-hover:opacity-[0.08] rounded-full blur-3xl transition-opacity duration-500`} />
-
+        {/* Content */}
+        <div className="relative z-10 flex flex-row md:flex-col items-center md:items-start w-full h-full">
             {/* Icon */}
-            <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mb-8 text-white shadow-lg bg-gradient-to-br ${accentColor} transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-500`}>
-                <div className="scale-150">
-                    {icon}
-                </div>
+            <div className={`flex-shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center text-white shadow-md bg-gradient-to-br ${accentColor} group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 mr-4 md:mr-0 md:mb-5`}>
+                {icon}
             </div>
 
-            <div className="text-left flex-grow">
-                <h3 className="text-3xl font-bold text-brand-text-light-primary dark:text-white mb-2 leading-tight">
-                    {title}
-                </h3>
-                <p className={`text-sm font-bold uppercase tracking-wider mb-4 bg-clip-text text-transparent bg-gradient-to-r ${accentColor}`}>
-                    {subtitle}
-                </p>
-                <p className="text-brand-text-light-secondary dark:text-gray-400 leading-relaxed text-base">
+            {/* Text Content */}
+            <div className="flex-grow">
+                <div className="flex justify-between items-center w-full">
+                    <h3 className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white leading-tight">
+                        {title}
+                    </h3>
+
+                    {/* Mobile Arrow (Visible inline) */}
+                    <div className="md:hidden opacity-0 group-hover:opacity-100 transition-all duration-300 text-gray-400">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
+                    </div>
+                </div>
+
+                <p className="text-xs md:text-[15px] text-gray-500 dark:text-gray-400 leading-relaxed font-medium mt-1 md:mt-2 line-clamp-2 md:line-clamp-none">
                     {description}
                 </p>
             </div>
 
-            <div className="mt-10 flex items-center text-sm font-bold tracking-wide uppercase group/btn">
-                <span className={`flex items-center justify-center px-6 py-3 rounded-full text-white bg-gradient-to-r ${accentColor} shadow-md group-hover/btn:shadow-lg group-hover/btn:brightness-110 transition-all duration-300`}>
-                    Get Started
-                    <svg className="w-4 h-4 ml-2 transform group-hover/btn:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                </span>
+            {/* Desktop Arrow (Absolute top right) */}
+            <div className="hidden md:block absolute top-0 right-0 opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all duration-500 ease-out text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
             </div>
         </div>
     </button>
@@ -60,74 +86,116 @@ const PortalCard: React.FC<{
 
 const PortalHome: React.FC<PortalHomeProps> = ({ onSelectPortal }) => {
     return (
-        <div className="min-h-screen bg-brand-light-secondary dark:bg-[#0B0D10] flex flex-col relative overflow-hidden">
+        // Ensured min-h-[100dvh] and overflow-auto to prevent stuck scrolling issues experienced later
+        <div className="min-h-[100dvh] w-full bg-[#FAFAFA] dark:bg-[#090A0C] flex flex-col relative overflow-hidden font-sans selection:bg-brand-green/20">
 
-            {/* Navigation / Header Area */}
-            <div className="absolute top-0 left-0 w-full p-6 z-50 flex justify-between items-center">
-                <div className="scale-110 origin-top-left">
+            {/* Animated Wave Background */}
+            <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden flex flex-col justify-end">
+                <svg className="w-full h-[50vh] min-h-[400px] text-brand-green/5 dark:text-brand-green/5 transition-colors duration-500" viewBox="0 0 1440 320" preserveAspectRatio="none">
+                    <defs>
+                        <linearGradient id="wave-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stopColor="currentColor" stopOpacity="0.2" />
+                            <stop offset="100%" stopColor="currentColor" stopOpacity="0.8" />
+                        </linearGradient>
+                    </defs>
+                    <path fill="url(#wave-gradient)" fillOpacity="1" d="M0,224L48,213.3C96,203,192,181,288,192C384,203,480,245,576,245.3C672,245,768,203,864,186.7C960,171,1056,181,1152,197.3C1248,213,1344,235,1392,245.3L1440,256L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z">
+                        <animate attributeName="d" dur="20s" repeatCount="indefinite"
+                            values="
+                            M0,224L48,213.3C96,203,192,181,288,192C384,203,480,245,576,245.3C672,245,768,203,864,186.7C960,171,1056,181,1152,197.3C1248,213,1344,235,1392,245.3L1440,256L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z;
+                            M0,192L48,202.7C96,213,192,235,288,229.3C384,224,480,192,576,176C672,160,768,160,864,176C960,192,1056,224,1152,229.3C1248,235,1344,213,1392,202.7L1440,192L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z;
+                            M0,224L48,213.3C96,203,192,181,288,192C384,203,480,245,576,245.3C672,245,768,203,864,186.7C960,171,1056,181,1152,197.3C1248,213,1344,235,1392,245.3L1440,256L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z
+                            "
+                        />
+                    </path>
+                </svg>
+            </div>
+
+            {/* Background Grid Mesh - Subtler */}
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.02)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
+
+            {/* Gradient Blobs - Ambient Lighting */}
+            <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+                <div className="absolute top-[-20%] left-[20%] w-[60%] h-[60%] bg-brand-green/5 dark:bg-brand-green/10 rounded-full blur-[120px] animate-pulse-slow" />
+                <div className="absolute bottom-[-20%] right-[20%] w-[60%] h-[60%] bg-blue-500/5 dark:bg-blue-600/10 rounded-full blur-[120px] animate-pulse-slow" style={{ animationDelay: '3s' }} />
+            </div>
+
+            {/* Top Bar */}
+            <header className="absolute top-0 left-0 w-full p-6 z-50 flex justify-between items-center pointer-events-none">
+                <div className="pointer-events-auto transition-transform hover:scale-105 duration-300 origin-top-left scale-90 md:scale-100">
                     <Logo />
                 </div>
-            </div>
+            </header>
 
-            {/* Background Decoration */}
-            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-                <div className="absolute top-[-20%] left-[20%] w-[60%] h-[60%] bg-brand-green/10 rounded-full blur-[150px] animate-blob" />
-                <div className="absolute bottom-[-20%] right-[10%] w-[50%] h-[50%] bg-blue-600/10 rounded-full blur-[150px] animate-blob" style={{ animationDelay: '4s' }} />
-            </div>
+            {/* Main Content Centered Viewport - Optimized for No-Scroll */}
+            <main className="flex-grow flex flex-col justify-center items-center w-full px-4 sm:px-6 z-10 pt-20 pb-4 md:py-0">
 
-            <div className="flex-grow flex flex-col justify-center items-center p-6 sm:p-10 relative z-10">
-                <div className="text-center mb-16 sm:mb-20 max-w-4xl mx-auto mt-20 sm:mt-0">
-                    <span className="hidden inline-block py-1 px-4 rounded-full bg-brand-green/10 text-brand-green font-bold text-sm tracking-widest uppercase mb-6 animate-fade-in">
-                        Choose Your Portal
-                    </span>
-                    <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold text-brand-text-light-primary dark:text-white mb-8 tracking-tight leading-none animate-fade-in" style={{ animationDelay: '0.1s' }}>
-                        Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-green to-emerald-400">OriginBI</span>
-                    </h1>
-                    <p className="text-xl text-brand-text-light-secondary dark:text-gray-400 max-w-2xl mx-auto leading-relaxed animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                        Empowering careers and organizations through intelligent assessments. Select your role to access your personalized dashboard.
-                    </p>
+                <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center h-full">
+
+                    {/* Dynamic Header - Reduced Margins for compactness */}
+                    <div className="text-center mb-6 md:mb-14 animate-fade-in-up">
+                        {/* Wording Polish 1: Gradient Pill */}
+                        <div className="inline-flex items-center gap-2 px-3 py-1 md:px-4 md:py-1.5 rounded-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 shadow-sm mb-4 md:mb-6 transition-transform hover:scale-105 cursor-default">
+                            <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-brand-green animate-pulse"></span>
+                            <span className="text-[9px] md:text-xs font-bold uppercase tracking-widest text-gray-600 dark:text-gray-300">
+                                Beyond Intelligence
+                            </span>
+                        </div>
+
+                        {/* Dynamic Text Rotation */}
+                        <h1 className="text-3xl sm:text-4xl md:text-6xl font-black text-gray-900 dark:text-white tracking-tight mb-3 md:mb-4 leading-tight drop-shadow-sm">
+                            Build the future for <br className="md:hidden" /> <TextRotator />
+                        </h1>
+
+                        <p className="text-sm md:text-lg text-gray-500 dark:text-gray-400 max-w-xl mx-auto font-medium px-4">
+                            The intelligent assessment platform designed to unlock potential. Choose your portal to begin.
+                        </p>
+                    </div>
+
+                    {/* Cards Row - Functional & Balanced */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6 w-full place-items-stretch text-left">
+
+                        <div className="w-full h-full" style={{ animationDelay: '100ms' }}>
+                            <PortalCard
+                                title="Individual"
+                                description="Access personalized assessments and track your career growth."
+                                icon={<ProfileIcon className="w-6 h-6 lg:w-7 lg:h-7" />}
+                                accentColor="from-brand-green to-emerald-500"
+                                onClick={() => onSelectPortal('student')}
+                                delay="animation-delay-100"
+                            />
+                        </div>
+
+                        <div className="w-full h-full" style={{ animationDelay: '200ms' }}>
+                            <PortalCard
+                                title="Corporate"
+                                description="Manage talent, recruit top candidates, and view analytics."
+                                icon={<JobsIcon className="w-6 h-6 lg:w-7 lg:h-7" />}
+                                accentColor="from-blue-500 to-indigo-600"
+                                onClick={() => onSelectPortal('corporate')}
+                                delay="animation-delay-200"
+                            />
+                        </div>
+
+                        <div className="w-full h-full" style={{ animationDelay: '300ms' }}>
+                            <PortalCard
+                                title="Administrator"
+                                description="Platform control center, user management, and configuration."
+                                icon={<SettingsIcon className="w-6 h-6 lg:w-7 lg:h-7" />}
+                                accentColor="from-purple-500 to-pink-600"
+                                onClick={() => onSelectPortal('admin')}
+                                delay="animation-delay-300"
+                            />
+                        </div>
+
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full max-w-7xl mx-auto items-stretch">
+            </main>
 
-                    {/* Individual Portal */}
-                    <PortalCard
-                        title="Individual Portal"
-                        subtitle="For Students, Employees & Leaders"
-                        description="Unlock your potential. Access personalized assessments, view your career roadmap, and track your growth journey."
-                        icon={<ProfileIcon className="w-8 h-8" />}
-                        accentColor="from-brand-green to-emerald-600"
-                        onClick={() => onSelectPortal('student')}
-                        delay="animation-delay-300"
-                    />
-
-                    {/* Corporate Portal */}
-                    <PortalCard
-                        title="Corporate Portal"
-                        subtitle="For Organizations & Recruiters"
-                        description="Streamline talent management. Register employees, assign assessments in bulk, and view comprehensive analytics."
-                        icon={<JobsIcon className="w-8 h-8" />}
-                        accentColor="from-blue-500 to-indigo-600"
-                        onClick={() => onSelectPortal('corporate')}
-                        delay="animation-delay-400"
-                    />
-
-                    {/* Admin Portal */}
-                    <PortalCard
-                        title="Admin Portal"
-                        subtitle="For System Administrators"
-                        description="Platform control center. Manage users, configure system settings, and oversee global platform operations."
-                        icon={<SettingsIcon className="w-8 h-8" />}
-                        accentColor="from-purple-500 to-pink-600"
-                        onClick={() => onSelectPortal('admin')}
-                        delay="animation-delay-500"
-                    />
-                </div>
-            </div>
-
-            <div className="p-6 text-center text-sm text-brand-text-light-secondary dark:text-gray-600 font-medium">
-                &copy; 2025 Origin BI. All rights reserved.
-            </div>
+            {/* Minimal Background Footer */}
+            <footer className="absolute bottom-4 left-0 w-full text-center p-2 text-[10px] md:text-xs font-semibold text-gray-300 dark:text-gray-600 z-10 pointer-events-none tracking-widest uppercase opacity-70">
+                &copy; {new Date().getFullYear()} Origin BI
+            </footer>
         </div>
     );
 };
