@@ -31,15 +31,27 @@ const ForgotPasswordForm: React.FC = () => {
 
         try {
             setIsSubmitting(true);
+
+            // 1. Check Admin Eligibility via Backend (DB Check)
+            const adminServiceUrl = process.env.NEXT_PUBLIC_ADMIN_SERVICE_URL || 'http://localhost:4001';
+            const checkRes = await fetch(`${adminServiceUrl}/forgot-password/admin/check`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+            });
+
+            if (!checkRes.ok) {
+                const data = await checkRes.json().catch(() => ({}));
+                // Use backend error message if available, else generic
+                throw new Error(data.message || 'Access Denied: This email is not authorized for Admin Password Reset.');
+            }
+
+            // 2. Trigger Reset via Cognito (Amplify)
             const output = await resetPassword({ username: email });
             const { nextStep } = output;
 
             if (nextStep.resetPasswordStep === 'CONFIRM_RESET_PASSWORD_WITH_CODE') {
                 setSuccessMessage('Password reset code has been sent to your registered email.');
-                // Optionally redirect to reset page after a delay or let user click a link
-                // For now, per requirements, we show success message.
-                // We could also auto-redirect: 
-                // window.location.href = `/admin/reset-password?email=${encodeURIComponent(email)}`;
             } else {
                 setSuccessMessage('Password reset initiated. Please check your email.');
             }
