@@ -119,20 +119,23 @@ const PortalHome: React.FC<PortalHomeProps> = ({ onSelectPortal }) => {
                 <div className="absolute bottom-[-20%] right-[20%] w-[60%] h-[60%] bg-blue-500/5 dark:bg-blue-600/10 rounded-full blur-[120px] animate-pulse-slow" style={{ animationDelay: '3s' }} />
             </div>
 
-            {/* Top Bar */}
-            <header className="absolute top-0 left-0 w-full p-6 z-50 flex justify-between items-center pointer-events-none">
-                <div className="pointer-events-auto transition-transform hover:scale-105 duration-300 origin-top-left scale-90 md:scale-100">
-                    <Logo />
-                </div>
-            </header>
+            {/* Top Bar Removed - Logo moved to center */}
 
             {/* Main Content Centered Viewport - Optimized for No-Scroll */}
-            <main className="flex-grow flex flex-col justify-center items-center w-full px-4 sm:px-6 z-10 pt-20 pb-4 md:py-0">
+            <main className="flex-grow flex flex-col justify-center items-center w-full px-4 sm:px-6 z-10 pt-6 pb-4 md:py-0">
 
                 <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center h-full">
 
                     {/* Dynamic Header - Reduced Margins for compactness */}
-                    <div className="text-center mb-6 md:mb-14 animate-fade-in-up">
+                    <div className="text-center mb-6 md:mb-10 animate-fade-in-up">
+
+                        {/* Central Logo Placement */}
+                        <div className="flex justify-center mb-5 md:mb-8 transition-transform hover:scale-105 duration-300">
+                            <div className="scale-90 md:scale-100 origin-center">
+                                <Logo />
+                            </div>
+                        </div>
+
                         {/* Wording Polish 1: Gradient Pill */}
                         <div className="inline-flex items-center gap-2 px-3 py-1 md:px-4 md:py-1.5 rounded-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 shadow-sm mb-4 md:mb-6 transition-transform hover:scale-105 cursor-default">
                             <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-brand-green animate-pulse"></span>
