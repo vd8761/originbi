@@ -18,7 +18,7 @@ const ThemeToggle: React.FC<ThemeToggleProps> = ({ toggleTheme }) => {
       {/* Background icons */}
       <div className="flex justify-between w-full px-3 text-gray-500 dark:text-gray-400">
         <LightModeIcon className="w-5 h-5" />
-        <DarkModeIcon className="w-5 h-5" />
+        <DarkModeIcon className="w-5 h-5 text-[#150089] dark:text-gray-400" />
       </div>
 
       {/* Switch thumb */}

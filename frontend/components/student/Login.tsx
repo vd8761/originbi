@@ -15,53 +15,44 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const { theme, toggleTheme, isInitialized } = useTheme();
 
   return (
-    <div className="w-full bg-brand-light-primary dark:bg-brand-dark-primary min-h-[100dvh] grid grid-cols-1 lg:grid-cols-2 overflow-x-hidden">
+    <div className="w-full bg-brand-light-primary dark:bg-brand-dark-primary h-[100dvh] grid grid-cols-1 lg:grid-cols-2 overflow-hidden">
       {/* Left Column: Grid Layout [Header, Content, Footer] */}
-      <div className="order-1 grid grid-rows-[auto_1fr_auto] p-[clamp(1rem,2vw,2rem)] relative">
-        {/* Row 1: Header */}
-        <header className="w-full max-w-[480px] justify-self-center flex items-center justify-between z-10 h-16">
-          <div className="w-[clamp(110px,15vw,150px)]">
-            <Logo />
+      <div className="order-1 flex flex-col justify-between gap-[clamp(24px,2vw,40px)] p-[clamp(16px,1.5vw,32px)] relative overflow-y-auto lg:overflow-hidden h-full">
+        {/* Background Gradients (Subtle) */}
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-brand-green/5 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/5 rounded-full blur-[80px] pointer-events-none" />
+        {/* Row 1: Header (Aligned with Form) */}
+        <header className="w-full max-w-[480px] xl:max-w-[540px] self-center flex items-center justify-between z-10 shrink-0 mb-8 lg:mb-0">
+          <div className="w-[clamp(120px,12vw,160px)]">
+            <Logo className="w-full h-auto object-contain" />
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-4">
-              <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
-            </div>
-          </div>
+          <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
         </header>
 
-        {/* Row 2: Main Content (Centered) */}
-        <div className="w-full max-w-[480px] justify-self-center self-center flex flex-col justify-center space-y-[clamp(1rem,2.5vw,2.5rem)]">
-          <div className="text-left space-y-[clamp(0.5rem,0.8vw,0.75rem)]">
-            <h1 className="font-semibold text-brand-text-light-primary dark:text-brand-text-primary tracking-tight leading-[1.1]"
-              style={{ fontSize: 'clamp(2rem, 3.5vw, 3.25rem)' }}>
+        {/* Row 2: Main Content (Mobile: Top Adjusted / Desktop: Centered) */}
+        <div className="w-full max-w-[480px] xl:max-w-[540px] self-center flex flex-col justify-center mt-[clamp(24px,2vw,40px)] lg:mt-0 lg:my-auto">
+
+          <div className="text-left w-full mb-[clamp(24px,2.5vw,48px)]">
+            <h1 className="font-sans font-semibold text-brand-text-light-primary dark:text-brand-text-primary tracking-[0%] leading-none mb-2 text-[clamp(24px,2.5vw,48px)]">
               Login to your account
             </h1>
-            <p className="text-brand-text-light-secondary dark:text-brand-text-secondary"
-              style={{ fontSize: 'clamp(0.95rem, 1.2vw, 1.25rem)' }}>
+            <p className="font-sans font-normal text-brand-text-light-secondary dark:text-brand-text-white text-[clamp(14px,1.05vw,20px)] leading-none tracking-[0px]">
               Discover, connect, and grow with OriginBI
             </p>
+            {/* Divider Line */}
+            <div className="w-full h-px bg-brand-light-tertiary dark:bg-white/10 mt-[clamp(24px,2.08vw,40px)]" />
           </div>
+
           <LoginForm onLoginSuccess={onLoginSuccess} />
         </div>
 
-        {/* Row 3: Footer */}
-        <footer className="w-full max-w-[480px] justify-self-center flex flex-col sm:flex-row items-center justify-between text-[clamp(0.7rem,1vw,0.875rem)] text-brand-text-light-secondary dark:text-brand-text-secondary gap-4">
+        <footer className="w-full max-w-[480px] xl:max-w-[540px] self-center flex flex-col-reverse sm:flex-row items-center justify-between text-[clamp(12px,0.73vw,14px)] font-medium leading-none tracking-[0px] text-brand-green gap-4 mt-auto lg:mt-0 shrink-0">
           <div className="flex items-center gap-4">
-            <a
-              href="#"
-              className="hover:text-brand-green dark:hover:text-brand-green transition-colors border-r border-brand-light-tertiary dark:border-brand-dark-tertiary pr-4 leading-none"
-            >
-              Privacy Policy
-            </a>
-            <a
-              href="#"
-              className="hover:text-brand-green dark:hover:text-brand-green transition-colors leading-none"
-            >
-              Terms & Conditions
-            </a>
+            <a href="#" className="hover:text-brand-green/80 transition-colors text-right underline decoration-solid decoration-0 underline-offset-2">Privacy Policy</a>
+            <span className="border-r border-brand-light-tertiary dark:border-white/20 h-3 hidden sm:block"></span>
+            <a href="#" className="hover:text-brand-green/80 transition-colors text-right underline decoration-solid decoration-0 underline-offset-2">Terms & Conditions</a>
           </div>
-          <span className="opacity-80">&copy; OriginBI 2025</span>
+          <span className="opacity-100 text-brand-text-light-secondary dark:text-white">&copy; OriginBI 2025</span>
         </footer>
       </div>
 
