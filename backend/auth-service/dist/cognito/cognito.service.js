@@ -18,6 +18,7 @@ let CognitoService = class CognitoService {
         this.config = config;
         const region = this.config.get('COGNITO_REGION');
         this.userPoolId = this.config.get('COGNITO_USER_POOL_ID');
+        this.clientId = this.config.get('COGNITO_CLIENT_ID');
         const accessKeyId = this.config.get('AWS_ACCESS_KEY_ID');
         const secretAccessKey = this.config.get('AWS_SECRET_ACCESS_KEY');
         if (!this.userPoolId)
@@ -96,6 +97,60 @@ let CognitoService = class CognitoService {
                 message: error === null || error === void 0 ? void 0 : error.message,
             });
             throw new common_1.InternalServerErrorException(`Cognito error: ${(error === null || error === void 0 ? void 0 : error.name) || 'Unknown'} - ${(error === null || error === void 0 ? void 0 : error.message) || 'No message'}`);
+        }
+    }
+    async login(email, password, requiredGroup) {
+        var _a, _b, _c, _d, _e, _f;
+        try {
+            const command = new client_cognito_identity_provider_1.AdminInitiateAuthCommand({
+                UserPoolId: this.userPoolId,
+                ClientId: this.clientId,
+                AuthFlow: 'ADMIN_NO_SRP_AUTH',
+                AuthParameters: {
+                    USERNAME: email,
+                    PASSWORD: password,
+                },
+            });
+            const response = await this.cognitoClient.send(command);
+            if (requiredGroup) {
+                const groupsCommand = new client_cognito_identity_provider_1.AdminListGroupsForUserCommand({
+                    UserPoolId: this.userPoolId,
+                    Username: email,
+                });
+                const groupsRes = await this.cognitoClient.send(groupsCommand);
+                const groups = ((_a = groupsRes.Groups) === null || _a === void 0 ? void 0 : _a.map((g) => g.GroupName)) || [];
+                if (!groups.includes(requiredGroup)) {
+                    throw new common_1.InternalServerErrorException(`Access denied. User is not part of group '${requiredGroup}'.`);
+                }
+            }
+            return {
+                accessToken: (_b = response.AuthenticationResult) === null || _b === void 0 ? void 0 : _b.AccessToken,
+                idToken: (_c = response.AuthenticationResult) === null || _c === void 0 ? void 0 : _c.IdToken,
+                refreshToken: (_d = response.AuthenticationResult) === null || _d === void 0 ? void 0 : _d.RefreshToken,
+                expiresIn: (_e = response.AuthenticationResult) === null || _e === void 0 ? void 0 : _e.ExpiresIn,
+                tokenType: (_f = response.AuthenticationResult) === null || _f === void 0 ? void 0 : _f.TokenType,
+            };
+        }
+        catch (error) {
+            console.error('[CognitoService] Login error details:', {
+                name: error === null || error === void 0 ? void 0 : error.name,
+                message: error === null || error === void 0 ? void 0 : error.message,
+            });
+            throw new common_1.InternalServerErrorException(`Login failed: ${(error === null || error === void 0 ? void 0 : error.message) || 'Unknown error'}`);
+        }
+    }
+    async forgotPassword(email) {
+        try {
+            const command = new client_cognito_identity_provider_1.ForgotPasswordCommand({
+                ClientId: this.clientId,
+                Username: email,
+            });
+            const response = await this.cognitoClient.send(command);
+            return response;
+        }
+        catch (error) {
+            console.error('[CognitoService] ForgotPassword error:', error);
+            throw new common_1.InternalServerErrorException(`Forgot Password failed: ${(error === null || error === void 0 ? void 0 : error.message) || 'Unknown error'}`);
         }
     }
 };

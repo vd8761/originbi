@@ -82,4 +82,10 @@ export class CognitoController {
 
     return this.cognitoService.login(body.email, body.password, body.group);
   }
+
+  @Post('forgot-password')
+  async forgotPassword(@Body('email') email: string) {
+    if (!email) throw new BadRequestException('Email is required');
+    return this.cognitoService.forgotPassword(email);
+  }
 }

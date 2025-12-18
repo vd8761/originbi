@@ -9,4 +9,8 @@ export declare class CorporateDashboardController {
         studentsRegistered: number;
         isActive: boolean;
     }>;
+    initiateReset(email: string): Promise<{
+        success: boolean;
+        message: string;
+    }>;
 }

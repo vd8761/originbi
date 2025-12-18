@@ -10,6 +10,7 @@ import { RegistrationsModule } from './registrations/registrations.module';
 import { GroupsModule } from './groups/groups.module';
 import { AssessmentModule } from './assessment/assessment.module';
 import { CorporateModule } from './corporate/corporate.module';
+import { ForgotPasswordModule } from './forgotpassword/forgotpassword.module';
 import { TestController } from './test/test.controller';
 
 @Module({
@@ -60,6 +61,7 @@ import { TestController } from './test/test.controller';
     GroupsModule,
     AssessmentModule,
     CorporateModule,
+    ForgotPasswordModule,
   ],
   controllers: [TestController],
 })

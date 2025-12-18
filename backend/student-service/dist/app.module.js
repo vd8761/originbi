@@ -11,6 +11,7 @@ const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const typeorm_1 = require("@nestjs/typeorm");
 const student_module_1 = require("./student/student.module");
+const forgotpassword_module_1 = require("./forgotpassword/forgotpassword.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -32,10 +33,11 @@ exports.AppModule = AppModule = __decorate([
                     password: config.get('DB_PASS'),
                     database: config.get('DB_NAME'),
                     autoLoadEntities: true,
-                    synchronize: false,
+                    synchronize: true,
                 }),
             }),
             student_module_1.StudentModule,
+            forgotpassword_module_1.ForgotPasswordModule,
         ],
     })
 ], AppModule);

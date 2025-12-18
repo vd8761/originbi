@@ -25,6 +25,12 @@ let CorporateDashboardController = class CorporateDashboardController {
         }
         return this.dashboardService.getStats(email);
     }
+    async initiateReset(email) {
+        if (!email) {
+            throw new common_1.BadRequestException('Email is required');
+        }
+        return this.dashboardService.initiateCorporateReset(email);
+    }
 };
 exports.CorporateDashboardController = CorporateDashboardController;
 __decorate([
@@ -34,6 +40,13 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], CorporateDashboardController.prototype, "getDashboardStats", null);
+__decorate([
+    (0, common_1.Post)('forgot-password/initiate'),
+    __param(0, (0, common_1.Body)('email')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], CorporateDashboardController.prototype, "initiateReset", null);
 exports.CorporateDashboardController = CorporateDashboardController = __decorate([
     (0, common_1.Controller)('dashboard'),
     __metadata("design:paramtypes", [corporate_dashboard_service_1.CorporateDashboardService])
