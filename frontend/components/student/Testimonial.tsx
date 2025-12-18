@@ -55,27 +55,33 @@ const Testimonial: React.FC = () => {
 
   return (
     <div className="relative w-full h-full bg-brand-dark-secondary rounded-3xl overflow-hidden p-6 md:p-8 lg:p-[5%] flex flex-col justify-end">
+      {/* Origin Fav Icon Overlay */}
+      <img
+        src="/Origin_Fav_Icon.svg"
+        alt="Origin BI Icon"
+        className="absolute top-8 left-8 w-8 h-8 md:w-10 md:h-10 z-30 select-none"
+      />
       <div className="absolute inset-0 z-0">
         <img
           key={currentIndex}
           src={`${current.image}?id=${currentIndex}`}
           alt={`Testimonial background for ${current.name}`}
-          className="absolute inset-0 w-full h-full object-cover object-center animate-fade-in"
+          className="absolute inset-0 w-full h-full object-cover object-top animate-fade-in"
           loading={currentIndex === 0 ? 'eager' : 'lazy'}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent"></div>
       </div>
 
       <div className="relative z-20 space-y-4 text-white">
         <div className="space-y-3 md:space-y-4">
           <QuoteIcon className="w-5 h-5 md:w-6 md:h-6 text-brand-green" />
-          <p className="text-lg md:text-xl lg:text-2xl xl:text-3xl font-normal leading-snug md:leading-tight">
+          <p className="font-sans text-[clamp(18px,1.67vw,32px)] font-normal leading-[1.2] tracking-[0%]">
             {current.quote}
           </p>
         </div>
         <div>
-          <p className="text-base md:text-lg font-semibold">{current.name},</p>
-          <p className="text-sm md:text-base text-gray-300">{current.title}</p>
+          <p className="font-sans text-[clamp(16px,1.25vw,24px)] font-semibold leading-none tracking-[0%] mb-1">{current.name},</p>
+          <p className="font-sans text-[clamp(14px,1.05vw,20px)] font-normal leading-none tracking-[0%] text-white">{current.title}</p>
         </div>
 
         <div className="flex items-center justify-between">

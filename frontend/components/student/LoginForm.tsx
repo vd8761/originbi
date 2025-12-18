@@ -163,7 +163,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
   const isPasswordInvalid = touched.password && !!errors.password;
 
   return (
-    <form className="flex flex-col gap-[clamp(1rem,1.5vw,1.5rem)]" onSubmit={handleSubmit} noValidate>
+    <form className="flex flex-col gap-[clamp(24px,1.67vw,32px)]" onSubmit={handleSubmit} noValidate>
 
       {generalError && (
         <div className="p-3 bg-red-100 text-red-700 text-sm rounded-lg border border-red-200">
@@ -174,7 +174,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
       <div>
         <label
           htmlFor="email"
-          className="block text-sm font-medium text-brand-text-light-secondary dark:text-brand-text-secondary mb-2"
+          className="block font-sans text-[14px] font-semibold text-brand-text-light-secondary dark:text-white mb-2 leading-none tracking-[0px]"
         >
           Email ID
         </label>
@@ -185,11 +185,11 @@ const LoginForm: React.FC<LoginFormProps> = ({
           value={values.email}
           onChange={handleChange}
           onBlur={handleBlur}
-          className={`bg-brand-light-secondary dark:bg-brand-dark-tertiary border text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary text-[clamp(0.875rem,1vw,1rem)] rounded-full block w-full transition-colors duration-300 ${isEmailInvalid
+          className={`bg-brand-light-secondary dark:bg-brand-dark-tertiary border text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] font-normal leading-none tracking-[0px] rounded-full block w-full transition-colors duration-300 ${isEmailInvalid
             ? "border-red-500 focus:ring-red-500 focus:border-red-500"
             : "border-brand-light-tertiary dark:border-brand-dark-tertiary focus:ring-brand-green focus:border-brand-green"
             }`}
-          style={{ padding: 'clamp(0.875rem, 1.1vw, 1.125rem)' }}
+          style={{ padding: 'clamp(14px,1vw,20px)' }}
           placeholder="Example@gmail.com"
           required
           disabled={isSubmitting}
@@ -203,7 +203,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
       <div>
         <label
           htmlFor="password"
-          className="block text-sm font-medium text-brand-text-light-secondary dark:text-brand-text-secondary mb-2"
+          className="block font-sans text-[14px] font-semibold text-brand-text-light-secondary dark:text-white mb-2 leading-none tracking-[0px]"
         >
           Password
         </label>
@@ -216,11 +216,11 @@ const LoginForm: React.FC<LoginFormProps> = ({
             onChange={handleChange}
             onBlur={handleBlur}
             placeholder="Enter your password"
-            className={`bg-brand-light-secondary dark:bg-brand-dark-tertiary border text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary text-[clamp(0.875rem,1vw,1rem)] rounded-full block w-full pr-12 transition-colors duration-300 ${isPasswordInvalid
+            className={`bg-brand-light-secondary dark:bg-brand-dark-tertiary border text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] font-normal leading-none tracking-[0px] rounded-full block w-full pr-12 transition-colors duration-300 ${isPasswordInvalid
               ? "border-red-500 focus:ring-red-500 focus:border-red-500"
               : "border-brand-light-tertiary dark:border-brand-dark-tertiary focus:ring-brand-green focus:border-brand-green"
               }`}
-            style={{ padding: 'clamp(0.875rem, 1.1vw, 1.125rem)' }}
+            style={{ padding: 'clamp(14px,1vw,20px)' }}
             required
             disabled={isSubmitting}
             aria-invalid={isPasswordInvalid}
@@ -241,22 +241,23 @@ const LoginForm: React.FC<LoginFormProps> = ({
         {isPasswordInvalid && (
           <p className="mt-2 text-sm text-red-500">{errors.password}</p>
         )}
-      </div>
 
-      <div className="flex justify-end -mt-2">
-        <a
-          href="/forgot-password"
-          className="text-sm text-brand-text-light-secondary dark:text-brand-text-secondary hover:text-brand-green transition-colors font-medium"
-        >
-          Forgot Password?
-        </a>
+        {/* Forgot Password - Inside Block for tighter grouping */}
+        <div className="flex justify-end mt-3">
+          <a
+            href="/forgot-password"
+            className="text-sm text-brand-text-light-secondary dark:text-brand-text-secondary hover:text-brand-green transition-colors font-medium"
+          >
+            Forgot Password?
+          </a>
+        </div>
       </div>
 
       <button
         type="submit"
         disabled={isSubmitting}
-        style={{ padding: 'clamp(0.875rem, 1.1vw, 1.125rem)' }}
-        className="w-full text-white bg-brand-green cursor-pointer hover:bg-brand-green/90 focus:ring-4 focus:outline-none focus:ring-brand-green/30 font-medium rounded-full text-[clamp(1.125rem,1.3vw,1.375rem)] text-center transition-colors duration-300 disabled:bg-brand-green/50 disabled:cursor-not-allowed flex justify-center items-center"
+        style={{ padding: 'clamp(14px,1vw,20px)' }}
+        className="w-full text-white bg-brand-green cursor-pointer hover:bg-brand-green/90 focus:ring-4 focus:outline-none focus:ring-brand-green/30 font-sans font-semibold rounded-full text-[16px] leading-none tracking-[0px] text-center transition-colors duration-300 disabled:bg-brand-green/50 disabled:cursor-not-allowed flex justify-center items-center"
       >
         {isSubmitting ? (
           <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
