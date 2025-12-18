@@ -1,6 +1,8 @@
 import {
     Controller,
     Get,
+    Post,
+    Body,
     Query,
     BadRequestException,
 } from '@nestjs/common';
@@ -16,5 +18,13 @@ export class CorporateDashboardController {
             throw new BadRequestException('Email is required');
         }
         return this.dashboardService.getStats(email);
+    }
+
+    @Post('forgot-password/initiate')
+    async initiateReset(@Body('email') email: string) {
+        if (!email) {
+            throw new BadRequestException('Email is required');
+        }
+        return this.dashboardService.initiateCorporateReset(email);
     }
 }

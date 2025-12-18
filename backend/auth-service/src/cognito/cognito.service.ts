@@ -6,9 +6,9 @@ import {
   AdminSetUserPasswordCommand,
   AdminAddUserToGroupCommand,
   AdminGetUserCommand,
-  AdminGetUserCommand,
   AdminInitiateAuthCommand,
   AdminListGroupsForUserCommand,
+  ForgotPasswordCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 
 
@@ -180,6 +180,25 @@ export class CognitoService {
 
       throw new InternalServerErrorException(
         `Login failed: ${error?.message || 'Unknown error'}`,
+      );
+    }
+  }
+  /**
+   * Initiate Forgot Password Flow
+   */
+  async forgotPassword(email: string) {
+    try {
+      const command = new ForgotPasswordCommand({
+        ClientId: this.clientId,
+        Username: email,
+      });
+
+      const response = await this.cognitoClient.send(command);
+      return response;
+    } catch (error: any) {
+      console.error('[CognitoService] ForgotPassword error:', error);
+      throw new InternalServerErrorException(
+        `Forgot Password failed: ${error?.message || 'Unknown error'}`,
       );
     }
   }

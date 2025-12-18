@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, FormEvent, FocusEvent } from 'react';
+import Link from 'next/link';
 import { EyeIcon, EyeOffIcon } from '@/components/icons';
 import { signIn, fetchAuthSession, signOut } from 'aws-amplify/auth';
 import { configureAmplify } from '@/lib/aws-amplify-config.js';
@@ -269,23 +270,22 @@ const LoginForm: React.FC<LoginFormProps> = ({
         )}
       </div>
 
-      {/* Forgot Password Link (Hidden for Admin) */}
-      {portalMode !== 'admin' && (
-        <div className="flex justify-end pt-1">
-          <a
-            href="#"
-            className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-brand-green transition-colors"
-          >
-            Forgot Password?
-          </a>
-        </div>
-      )}
+      {/* Forgot Password Link */}
+      <div className="flex justify-end pt-1">
+        <Link
+          href="/corporate/forgot-password"
+          className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-brand-green transition-colors"
+        >
+          Forgot Password?
+        </Link>
+      </div>
 
       {/* Login Button */}
       <button
         type="submit"
         disabled={isSubmitting}
-        className={`w-full text-white font-bold rounded-full text-base px-5 py-4 text-center transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform active:scale-[0.99] flex justify-center items-center ${buttonClass}`}
+        className={`w-full text-white font-bold rounded-full text-base px-5 py-4 text-center transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform active:scale-[0.99] ${buttonClass}`}
+        aria-busy={isSubmitting}
       >
         {isSubmitting ? (
           <svg
