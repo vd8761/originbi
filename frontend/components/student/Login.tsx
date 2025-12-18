@@ -17,20 +17,20 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   return (
     <div className="w-full bg-brand-light-primary dark:bg-brand-dark-primary h-[100dvh] grid grid-cols-1 lg:grid-cols-2 overflow-hidden">
       {/* Left Column: Grid Layout [Header, Content, Footer] */}
-      <div className="order-1 flex flex-col justify-between gap-[clamp(24px,2vw,40px)] p-[clamp(16px,1.5vw,32px)] relative overflow-y-auto lg:overflow-hidden h-full">
+      <div className="order-1 flex flex-col justify-between gap-[clamp(24px,2.4vw,40px)] p-[clamp(16px,2.5vw,48px)] relative overflow-y-auto lg:overflow-hidden h-full">
         {/* Background Gradients (Subtle) */}
         <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-brand-green/5 rounded-full blur-[100px] pointer-events-none" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/5 rounded-full blur-[80px] pointer-events-none" />
         {/* Row 1: Header (Aligned with Form) */}
-        <header className="w-full max-w-[480px] xl:max-w-[540px] self-center flex items-center justify-between z-10 shrink-0 mb-8 lg:mb-0">
-          <div className="w-[clamp(120px,12vw,160px)]">
+        <header className="w-full max-w-[clamp(360px,30vw,580px)] self-center flex items-center justify-between z-10 shrink-0 mb-8 lg:mb-0">
+          <div className="w-[clamp(100px,7.3vw,140px)]">
             <Logo className="w-full h-auto object-contain" />
           </div>
           <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
         </header>
 
         {/* Row 2: Main Content (Mobile: Top Adjusted / Desktop: Centered) */}
-        <div className="w-full max-w-[480px] xl:max-w-[540px] self-center flex flex-col justify-center mt-[clamp(24px,2vw,40px)] lg:mt-0 lg:my-auto">
+        <div className="w-full max-w-[clamp(360px,30vw,580px)] self-center flex flex-col justify-center mt-[clamp(24px,2vw,40px)] lg:mt-0 lg:my-auto">
 
           <div className="text-left w-full mb-[clamp(24px,2.5vw,48px)]">
             <h1 className="font-sans font-semibold text-brand-text-light-primary dark:text-brand-text-primary tracking-[0%] leading-none mb-2 text-[clamp(24px,2.5vw,48px)]">
@@ -46,7 +46,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           <LoginForm onLoginSuccess={onLoginSuccess} />
         </div>
 
-        <footer className="w-full max-w-[480px] xl:max-w-[540px] self-center flex flex-col-reverse sm:flex-row items-center justify-between text-[clamp(12px,0.73vw,14px)] font-medium leading-none tracking-[0px] text-brand-green gap-4 mt-auto lg:mt-0 shrink-0">
+        <footer className="w-full max-w-[clamp(360px,30vw,580px)] self-center flex flex-col-reverse sm:flex-row items-center justify-between text-[clamp(12px,0.73vw,14px)] font-medium leading-none tracking-[0px] text-brand-green gap-4 mt-auto lg:mt-0 shrink-0">
           <div className="flex items-center gap-4">
             <a href="#" className="hover:text-brand-green/80 transition-colors text-right underline decoration-solid decoration-0 underline-offset-2">Privacy Policy</a>
             <span className="border-r border-brand-light-tertiary dark:border-white/20 h-3 hidden sm:block"></span>
@@ -57,7 +57,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       </div>
 
       {/* Right Column: Testimonial/Hero Image */}
-      <div className="order-2 hidden lg:flex h-full p-[clamp(1rem,1.5vw,2rem)] items-center justify-center">
+      <div className="order-2 hidden lg:flex h-full p-[clamp(16px,2vw,40px)] items-center justify-center">
         <div className="w-full h-full rounded-[clamp(1.5rem,2.5vw,2.5rem)] overflow-hidden relative shadow-2xl">
           <Testimonial />
         </div>
