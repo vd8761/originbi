@@ -11,13 +11,19 @@ export class ForgotPasswordController {
         if (!email) {
             throw new BadRequestException('Email is required');
         }
-
         const isEligible = await this.forgotPasswordService.checkAdminEligibility(email);
-
         if (!isEligible) {
             throw new ForbiddenException('Access Denied. This email is not authorized for Admin Password Reset.');
         }
-
         return { valid: true, message: 'User authorized for password reset.' };
+    }
+
+    @Post('admin/initiate')
+    @HttpCode(HttpStatus.OK)
+    async initiateAdminReset(@Body('email') email: string) {
+        if (!email) {
+            throw new BadRequestException('Email is required');
+        }
+        return this.forgotPasswordService.initiateAdminReset(email);
     }
 }

@@ -9,17 +9,22 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CorporateDashboardModule = void 0;
 const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
+const axios_1 = require("@nestjs/axios");
 const corporate_dashboard_controller_1 = require("./corporate-dashboard.controller");
 const corporate_dashboard_service_1 = require("./corporate-dashboard.service");
 const corporate_account_entity_1 = require("../entities/corporate-account.entity");
 const user_entity_1 = require("../entities/user.entity");
 const corporate_credit_ledger_entity_1 = require("../entities/corporate-credit-ledger.entity");
+const user_action_log_entity_1 = require("../entities/user-action-log.entity");
 let CorporateDashboardModule = class CorporateDashboardModule {
 };
 exports.CorporateDashboardModule = CorporateDashboardModule;
 exports.CorporateDashboardModule = CorporateDashboardModule = __decorate([
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([corporate_account_entity_1.CorporateAccount, user_entity_1.User, corporate_credit_ledger_entity_1.CorporateCreditLedger])],
+        imports: [
+            typeorm_1.TypeOrmModule.forFeature([corporate_account_entity_1.CorporateAccount, user_entity_1.User, corporate_credit_ledger_entity_1.CorporateCreditLedger, user_action_log_entity_1.UserActionLog]),
+            axios_1.HttpModule,
+        ],
         controllers: [corporate_dashboard_controller_1.CorporateDashboardController],
         providers: [corporate_dashboard_service_1.CorporateDashboardService],
     })

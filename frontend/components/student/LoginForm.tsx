@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, FormEvent, FocusEvent } from 'react';
+import Link from 'next/link';
 import { EyeIcon, EyeOffIcon } from '@/components/icons';
 import { signIn, fetchAuthSession, signOut } from 'aws-amplify/auth';
 import { configureAmplify } from '@/lib/aws-amplify-config.js';
@@ -244,12 +245,12 @@ const LoginForm: React.FC<LoginFormProps> = ({
 
         {/* Forgot Password - Inside Block for tighter grouping */}
         <div className="flex justify-end mt-3">
-          <a
-            href="/forgot-password"
+          <Link
+            href="/student/forgot-password"
             className="text-sm text-brand-text-light-secondary dark:text-brand-text-secondary hover:text-brand-green transition-colors font-medium"
           >
             Forgot Password?
-          </a>
+          </Link>
         </div>
       </div>
 
@@ -258,6 +259,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
         disabled={isSubmitting}
         style={{ padding: 'clamp(14px,1vw,20px)' }}
         className="w-full text-white bg-brand-green cursor-pointer hover:bg-brand-green/90 focus:ring-4 focus:outline-none focus:ring-brand-green/30 font-sans font-semibold rounded-full text-[16px] leading-none tracking-[0px] text-center transition-colors duration-300 disabled:bg-brand-green/50 disabled:cursor-not-allowed flex justify-center items-center"
+        aria-busy={isSubmitting}
       >
         {isSubmitting ? (
           <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

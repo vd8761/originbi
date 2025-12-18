@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { StudentModule } from './student/student.module';
+import { ForgotPasswordModule } from './forgotpassword/forgotpassword.module';
 
 @Module({
     imports: [
@@ -20,10 +21,11 @@ import { StudentModule } from './student/student.module';
                 password: config.get<string>('DB_PASS'),
                 database: config.get<string>('DB_NAME'),
                 autoLoadEntities: true,
-                synchronize: false,
+                synchronize: true, // Temporary dev mode
             }),
         }),
         StudentModule,
+        ForgotPasswordModule,
     ],
 })
 export class AppModule { }
