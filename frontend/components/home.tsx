@@ -124,44 +124,44 @@ const PortalHome: React.FC<PortalHomeProps> = ({ onSelectPortal }) => {
             {/* Main Content Centered Viewport - Optimized for No-Scroll */}
             <main className="flex-grow flex flex-col justify-center items-center w-full px-4 sm:px-6 z-10 pt-4 pb-2 md:py-0">
 
-                <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center h-full">
+                <div className="w-full max-w-6xl xl:max-w-7xl mx-auto flex flex-col items-center justify-center h-full">
 
                     {/* Dynamic Header - Reduced Margins for compactness */}
-                    <div className="text-center mb-4 md:mb-6 animate-fade-in-up">
+                    <div className="text-center mb-4 md:mb-6 xl:mb-10 animate-fade-in-up">
 
                         {/* Central Logo Placement */}
-                        <div className="flex justify-center mb-4 md:mb-6 transition-transform hover:scale-105 duration-300">
-                            <div className="scale-75 md:scale-90 origin-center">
+                        <div className="flex justify-center mb-4 md:mb-6 xl:mb-8 transition-transform hover:scale-105 duration-300">
+                            <div className="scale-75 md:scale-90 xl:scale-110 origin-center">
                                 <Logo />
                             </div>
                         </div>
 
                         {/* Wording Polish 1: Gradient Pill */}
-                        <div className="inline-flex items-center gap-2 px-3 py-1 md:px-4 md:py-1 rounded-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 shadow-sm mb-3 md:mb-4 transition-transform hover:scale-105 cursor-default scale-90 md:scale-100">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 md:px-4 md:py-1 rounded-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 shadow-sm mb-3 md:mb-4 xl:mb-6 transition-transform hover:scale-105 cursor-default scale-90 md:scale-100 xl:scale-110">
                             <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-brand-green animate-pulse"></span>
-                            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-gray-600 dark:text-gray-300">
+                            <span className="text-[9px] md:text-[10px] xl:text-xs font-bold uppercase tracking-widest text-gray-600 dark:text-gray-300">
                                 Beyond Intelligence
                             </span>
                         </div>
 
                         {/* Dynamic Text Rotation */}
-                        <h1 className="text-3xl sm:text-4xl md:text-[clamp(32px,3.5vw,56px)] font-black text-gray-900 dark:text-white tracking-tight mb-2 md:mb-3 leading-tight drop-shadow-sm">
+                        <h1 className="text-3xl sm:text-4xl md:text-[clamp(32px,3.5vw,72px)] font-black text-gray-900 dark:text-white tracking-tight mb-2 md:mb-3 xl:mb-5 leading-tight drop-shadow-sm">
                             Build the future for <br className="md:hidden" /> <TextRotator />
                         </h1>
 
-                        <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 max-w-xl mx-auto font-medium px-4">
+                        <p className="text-sm md:text-base xl:text-xl text-gray-500 dark:text-gray-400 max-w-xl xl:max-w-2xl mx-auto font-medium px-4">
                             The intelligent assessment platform designed to unlock potential. Choose your portal to begin.
                         </p>
                     </div>
 
                     {/* Cards Row - Functional & Balanced */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 lg:gap-5 w-full place-items-stretch text-left">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 lg:gap-5 xl:gap-8 w-full place-items-stretch text-left">
 
                         <div className="w-full h-full" style={{ animationDelay: '100ms' }}>
                             <PortalCard
                                 title="Individual"
                                 description="Access personalized assessments and track your career growth."
-                                icon={<ProfileIcon className="w-5 h-5 lg:w-6 lg:h-6" />}
+                                icon={<ProfileIcon className="w-5 h-5 lg:w-6 lg:h-6 xl:w-8 xl:h-8" />}
                                 accentColor="from-brand-green to-emerald-500"
                                 onClick={() => onSelectPortal('student')}
                                 delay="animation-delay-100"
@@ -172,7 +172,7 @@ const PortalHome: React.FC<PortalHomeProps> = ({ onSelectPortal }) => {
                             <PortalCard
                                 title="Corporate"
                                 description="Manage talent, recruit top candidates, and view analytics."
-                                icon={<JobsIcon className="w-5 h-5 lg:w-6 lg:h-6" />}
+                                icon={<JobsIcon className="w-5 h-5 lg:w-6 lg:h-6 xl:w-8 xl:h-8" />}
                                 accentColor="from-blue-500 to-indigo-600"
                                 onClick={() => onSelectPortal('corporate')}
                                 delay="animation-delay-200"
@@ -183,16 +183,14 @@ const PortalHome: React.FC<PortalHomeProps> = ({ onSelectPortal }) => {
                             <PortalCard
                                 title="Administrator"
                                 description="Platform control center, user management, and configuration."
-                                icon={<DashboardIcon className="w-5 h-5 lg:w-6 lg:h-6" />}
+                                icon={<DashboardIcon className="w-5 h-5 lg:w-6 lg:h-6 xl:w-8 xl:h-8" />}
                                 accentColor="from-purple-500 to-pink-600"
                                 onClick={() => onSelectPortal('admin')}
                                 delay="animation-delay-300"
                             />
                         </div>
-
                     </div>
                 </div>
-
             </main>
 
             {/* Minimal Background Footer */}
