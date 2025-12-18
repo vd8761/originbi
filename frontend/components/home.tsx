@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ProfileIcon, JobsIcon, SettingsIcon } from './icons';
+import { ProfileIcon, JobsIcon, DashboardIcon } from './icons';
 import Logo from './ui/Logo';
 
 interface PortalHomeProps {
@@ -43,7 +43,7 @@ const PortalCard: React.FC<{
 }> = ({ title, description, icon, onClick, accentColor, delay, isActive }) => (
     <button
         onClick={onClick}
-        className={`group relative cursor-pointer flex flex-row md:flex-col items-center md:items-start text-left w-full h-full min-h-[100px] md:min-h-[160px] rounded-2xl md:rounded-3xl p-4 md:p-7 transition-all duration-500 transform hover:-translate-y-1 md:hover:-translate-y-2 hover:shadow-xl focus:outline-none ring-2 ring-transparent focus:ring-brand-green/30 ${delay} animate-fade-in-up`}
+        className={`group relative cursor-pointer flex flex-row md:flex-col items-center md:items-start text-left w-full h-full min-h-[90px] md:min-h-[140px] rounded-2xl md:rounded-3xl p-4 md:p-6 transition-all duration-500 transform hover:-translate-y-1 md:hover:-translate-y-2 hover:shadow-xl focus:outline-none ring-2 ring-transparent focus:ring-brand-green/30 ${delay} animate-fade-in-up`}
     >
         {/* Card Background & Border - Dark Mode Enhanced */}
         <div className="absolute inset-0 bg-white dark:bg-[#181B21] rounded-2xl md:rounded-3xl border border-gray-100 dark:border-white/10 shadow-sm group-hover:shadow-lg group-hover:border-transparent transition-all duration-300" />
@@ -54,14 +54,14 @@ const PortalCard: React.FC<{
         {/* Content */}
         <div className="relative z-10 flex flex-row md:flex-col items-center md:items-start w-full h-full">
             {/* Icon */}
-            <div className={`flex-shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center text-white shadow-md bg-gradient-to-br ${accentColor} group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 mr-4 md:mr-0 md:mb-5`}>
+            <div className={`flex-shrink-0 w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center text-white shadow-md bg-gradient-to-br ${accentColor} group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 mr-4 md:mr-0 md:mb-4`}>
                 {icon}
             </div>
 
             {/* Text Content */}
             <div className="flex-grow">
                 <div className="flex justify-between items-center w-full">
-                    <h3 className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white leading-tight">
+                    <h3 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white leading-tight">
                         {title}
                     </h3>
 
@@ -71,7 +71,7 @@ const PortalCard: React.FC<{
                     </div>
                 </div>
 
-                <p className="text-xs md:text-[15px] text-gray-500 dark:text-gray-400 leading-relaxed font-medium mt-1 md:mt-2 line-clamp-2 md:line-clamp-none">
+                <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-medium mt-1 line-clamp-2 md:line-clamp-none">
                     {description}
                 </p>
             </div>
@@ -86,8 +86,8 @@ const PortalCard: React.FC<{
 
 const PortalHome: React.FC<PortalHomeProps> = ({ onSelectPortal }) => {
     return (
-        // Ensured min-h-[100dvh] and overflow-auto to prevent stuck scrolling issues experienced later
-        <div className="min-h-[100dvh] w-full bg-[#FAFAFA] dark:bg-[#090A0C] flex flex-col relative overflow-hidden font-sans selection:bg-brand-green/20">
+        // Ensured overflow-hidden on desktop for "No Scroll" feel, auto on mobile if needed
+        <div className="h-[100dvh] w-full bg-[#FAFAFA] dark:bg-[#090A0C] flex flex-col relative overflow-y-auto md:overflow-hidden font-sans selection:bg-brand-green/20">
 
             {/* Animated Wave Background */}
             <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden flex flex-col justify-end">
@@ -122,46 +122,46 @@ const PortalHome: React.FC<PortalHomeProps> = ({ onSelectPortal }) => {
             {/* Top Bar Removed - Logo moved to center */}
 
             {/* Main Content Centered Viewport - Optimized for No-Scroll */}
-            <main className="flex-grow flex flex-col justify-center items-center w-full px-4 sm:px-6 z-10 pt-6 pb-4 md:py-0">
+            <main className="flex-grow flex flex-col justify-center items-center w-full px-4 sm:px-6 z-10 pt-4 pb-2 md:py-0">
 
                 <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center h-full">
 
                     {/* Dynamic Header - Reduced Margins for compactness */}
-                    <div className="text-center mb-6 md:mb-10 animate-fade-in-up">
+                    <div className="text-center mb-4 md:mb-6 animate-fade-in-up">
 
                         {/* Central Logo Placement */}
-                        <div className="flex justify-center mb-5 md:mb-8 transition-transform hover:scale-105 duration-300">
-                            <div className="scale-90 md:scale-100 origin-center">
+                        <div className="flex justify-center mb-4 md:mb-6 transition-transform hover:scale-105 duration-300">
+                            <div className="scale-75 md:scale-90 origin-center">
                                 <Logo />
                             </div>
                         </div>
 
                         {/* Wording Polish 1: Gradient Pill */}
-                        <div className="inline-flex items-center gap-2 px-3 py-1 md:px-4 md:py-1.5 rounded-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 shadow-sm mb-4 md:mb-6 transition-transform hover:scale-105 cursor-default">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 md:px-4 md:py-1 rounded-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 shadow-sm mb-3 md:mb-4 transition-transform hover:scale-105 cursor-default scale-90 md:scale-100">
                             <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-brand-green animate-pulse"></span>
-                            <span className="text-[9px] md:text-xs font-bold uppercase tracking-widest text-gray-600 dark:text-gray-300">
+                            <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-gray-600 dark:text-gray-300">
                                 Beyond Intelligence
                             </span>
                         </div>
 
                         {/* Dynamic Text Rotation */}
-                        <h1 className="text-3xl sm:text-4xl md:text-6xl font-black text-gray-900 dark:text-white tracking-tight mb-3 md:mb-4 leading-tight drop-shadow-sm">
+                        <h1 className="text-3xl sm:text-4xl md:text-[clamp(32px,3.5vw,56px)] font-black text-gray-900 dark:text-white tracking-tight mb-2 md:mb-3 leading-tight drop-shadow-sm">
                             Build the future for <br className="md:hidden" /> <TextRotator />
                         </h1>
 
-                        <p className="text-sm md:text-lg text-gray-500 dark:text-gray-400 max-w-xl mx-auto font-medium px-4">
+                        <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 max-w-xl mx-auto font-medium px-4">
                             The intelligent assessment platform designed to unlock potential. Choose your portal to begin.
                         </p>
                     </div>
 
                     {/* Cards Row - Functional & Balanced */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6 w-full place-items-stretch text-left">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 lg:gap-5 w-full place-items-stretch text-left">
 
                         <div className="w-full h-full" style={{ animationDelay: '100ms' }}>
                             <PortalCard
                                 title="Individual"
                                 description="Access personalized assessments and track your career growth."
-                                icon={<ProfileIcon className="w-6 h-6 lg:w-7 lg:h-7" />}
+                                icon={<ProfileIcon className="w-5 h-5 lg:w-6 lg:h-6" />}
                                 accentColor="from-brand-green to-emerald-500"
                                 onClick={() => onSelectPortal('student')}
                                 delay="animation-delay-100"
@@ -172,7 +172,7 @@ const PortalHome: React.FC<PortalHomeProps> = ({ onSelectPortal }) => {
                             <PortalCard
                                 title="Corporate"
                                 description="Manage talent, recruit top candidates, and view analytics."
-                                icon={<JobsIcon className="w-6 h-6 lg:w-7 lg:h-7" />}
+                                icon={<JobsIcon className="w-5 h-5 lg:w-6 lg:h-6" />}
                                 accentColor="from-blue-500 to-indigo-600"
                                 onClick={() => onSelectPortal('corporate')}
                                 delay="animation-delay-200"
@@ -183,7 +183,7 @@ const PortalHome: React.FC<PortalHomeProps> = ({ onSelectPortal }) => {
                             <PortalCard
                                 title="Administrator"
                                 description="Platform control center, user management, and configuration."
-                                icon={<SettingsIcon className="w-6 h-6 lg:w-7 lg:h-7" />}
+                                icon={<DashboardIcon className="w-5 h-5 lg:w-6 lg:h-6" />}
                                 accentColor="from-purple-500 to-pink-600"
                                 onClick={() => onSelectPortal('admin')}
                                 delay="animation-delay-300"
@@ -196,7 +196,7 @@ const PortalHome: React.FC<PortalHomeProps> = ({ onSelectPortal }) => {
             </main>
 
             {/* Minimal Background Footer */}
-            <footer className="absolute bottom-4 left-0 w-full text-center p-2 text-[10px] md:text-xs font-semibold text-gray-300 dark:text-gray-600 z-10 pointer-events-none tracking-widest uppercase opacity-70">
+            <footer className="w-full text-center py-3 mt-auto shrink-0 text-[10px] md:text-[10px] font-semibold text-gray-300 dark:text-gray-600 z-10 pointer-events-none tracking-widest uppercase opacity-70">
                 &copy; {new Date().getFullYear()} Origin BI
             </footer>
         </div>
