@@ -102,14 +102,14 @@ const Testimonial: React.FC = () => {
             <button
               onClick={prevTestimonial}
               aria-label="Previous testimonial"
-              className="bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white rounded-full p-3 transition-all transform hover:scale-105"
+              className="bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white rounded-full p-2 transition-all transform hover:scale-105"
             >
               <ArrowLeftIcon className="w-5 h-5" />
             </button>
             <button
               onClick={nextTestimonial}
               aria-label="Next testimonial"
-              className="bg-brand-green hover:bg-brand-green/90 text-white rounded-full p-3 transition-all transform hover:scale-105 shadow-lg shadow-brand-green/30"
+              className="bg-brand-green hover:bg-brand-green/90 text-white rounded-full p-2 transition-all transform hover:scale-105 shadow-lg shadow-brand-green/30"
             >
               <ArrowRightIcon className="w-5 h-5" />
             </button>
