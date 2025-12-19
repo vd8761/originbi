@@ -81,31 +81,45 @@ const Testimonial: React.FC = () => {
           }
         `}</style>
 
-        <div className="mt-auto space-y-3 md:space-y-4 animate-fade-in">
-          <QuoteIcon className="w-[clamp(16px,1.5vw,24px)] h-[clamp(16px,1.5vw,24px)] text-brand-green" />
+        <div className="mt-auto space-y-3 md:space-y-4">
+          <div className="animate-fade-in space-y-3 md:space-y-4">
+            <QuoteIcon className="w-[clamp(16px,1.5vw,24px)] h-[clamp(16px,1.5vw,24px)] text-brand-green" />
 
-          <p className="font-sans text-[clamp(16px,1.5vw,28px)] font-normal leading-[1.2] tracking-[0%] text-white">
-            {current.quote}
-          </p>
+            <p className="font-sans text-[clamp(16px,1.5vw,28px)] font-normal leading-[1.2] tracking-[0%] text-white">
+              {current.quote}
+            </p>
+          </div>
 
-          <div className="flex items-end justify-between pt-2">
-            <div>
-              <p className="font-sans text-[clamp(16px,1.25vw,24px)] font-bold leading-none tracking-[0%] mb-1 text-white">{current.name},</p>
-              <p className="font-sans text-[clamp(14px,1.05vw,20px)] font-normal leading-none tracking-[0%] text-white/80">{current.title}</p>
+          <div className="flex items-end justify-between gap-4">
+            <div className="animate-fade-in">
+              <h4 className="font-sans text-[clamp(14px,1.2vw,20px)] font-semibold text-white leading-tight">
+                {current.name}
+              </h4>
+              <p className="font-sans text-[clamp(12px,1vw,16px)] font-normal text-gray-400 leading-tight">
+                {current.title}
+              </p>
             </div>
 
-            <div className="flex space-x-3">
+            <div className="flex gap-3 shrink-0">
               <button
                 onClick={prevTestimonial}
+                disabled={currentIndex === 0}
                 aria-label="Previous testimonial"
-                className="bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white rounded-full p-[clamp(8px,0.6vw,12px)] transition-all transform hover:scale-105"
+                className={`rounded-full p-[clamp(8px,0.6vw,12px)] transition-all transform hover:scale-105 ${currentIndex === 0
+                  ? 'bg-white/10 text-white/50 cursor-not-allowed'
+                  : 'bg-brand-green text-white hover:bg-brand-green/90 shadow-lg shadow-brand-green/30'
+                  }`}
               >
                 <ArrowLeftIcon className="w-[clamp(14px,1vw,20px)] h-[clamp(14px,1vw,20px)]" />
               </button>
               <button
                 onClick={nextTestimonial}
+                disabled={currentIndex === testimonials.length - 1}
                 aria-label="Next testimonial"
-                className="bg-brand-green hover:bg-brand-green/90 text-white rounded-full p-[clamp(8px,0.6vw,12px)] transition-all transform hover:scale-105 shadow-lg shadow-brand-green/30"
+                className={`rounded-full p-[clamp(8px,0.6vw,12px)] transition-all transform hover:scale-105 ${currentIndex === testimonials.length - 1
+                  ? 'bg-white/10 text-white/50 cursor-not-allowed'
+                  : 'bg-brand-green text-white hover:bg-brand-green/90 shadow-lg shadow-brand-green/30'
+                  }`}
               >
                 <ArrowRightIcon className="w-[clamp(14px,1vw,20px)] h-[clamp(14px,1vw,20px)]" />
               </button>
@@ -118,11 +132,16 @@ const Testimonial: React.FC = () => {
             <div
               key={index}
               onClick={() => setCurrentIndex(index)}
-              className="h-[3px] rounded-full flex-1 bg-white overflow-hidden cursor-pointer hover:bg-gray-200 transition-colors"
+              className="h-1 flex-1 bg-white rounded-full overflow-hidden cursor-pointer hover:bg-white/90 transition-colors"
             >
-              {index === currentIndex && (
-                <div className="h-full bg-brand-green animate-fill" />
-              )}
+              <div
+                className={`h-full bg-brand-green rounded-full transition-all duration-300 ${index < currentIndex
+                  ? 'w-full'
+                  : index === currentIndex
+                    ? 'animate-fill'
+                    : 'w-0'
+                  }`}
+              />
             </div>
           ))}
         </div>
