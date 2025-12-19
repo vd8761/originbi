@@ -23,7 +23,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       <div className="absolute inset-0 bg-[url('/Background_Dark_Theme.svg')] bg-cover bg-center bg-no-repeat opacity-100 pointer-events-none hidden dark:block z-0" />
 
       {/* Left Column: Grid Layout [Header, Content, Footer] */}
-      <div className="order-1 lg:col-span-5 flex flex-col justify-between gap-[clamp(16px,2vw,32px)] py-[clamp(16px,2vw,32px)] relative overflow-y-auto lg:overflow-hidden h-full z-10">
+      <div className="order-1 lg:col-span-5 flex flex-col justify-between gap-[clamp(16px,2vw,32px)] py-[clamp(16px,2vw,32px)] relative overflow-y-auto lg:overflow-hidden h-full z-10 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
         {/* Background Gradients (Subtle) */}
         <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-brand-green/5 rounded-full blur-[100px] pointer-events-none mix-blend-multiply dark:mix-blend-normal" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/5 rounded-full blur-[80px] pointer-events-none mix-blend-multiply dark:mix-blend-normal" />
