@@ -60,6 +60,24 @@ export class CorporateController {
         return this.corporateService.updateCredits(+id, credits);
     }
 
+    @Post(':id/top-up')
+    async topUpCredits(
+        @Param('id') id: string,
+        @Body('amount') amount: number,
+        @Body('reason') reason?: string
+    ) {
+        return this.corporateService.topUpCredits(+id, amount, reason);
+    }
+
+    @Get(':id/ledger')
+    async getLedger(
+        @Param('id') id: string,
+        @Query('page') page = '1',
+        @Query('limit') limit = '10'
+    ) {
+        return this.corporateService.getLedger(+id, +page, +limit);
+    }
+
     @Delete(':id')
     async remove(@Param('id') id: string) {
         return this.corporateService.remove(+id);

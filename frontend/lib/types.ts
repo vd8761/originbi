@@ -139,6 +139,16 @@ export interface CorporateAccount {
   updated_at: string;
 }
 
+export interface CorporateCreditLedger {
+  id: string;
+  corporate_account_id: string;
+  credit_delta: number;
+  ledger_type?: 'CREDIT' | 'DEBIT';
+  reason?: string;
+  created_by_user_id?: string;
+  created_at: string;
+}
+
 export interface ResellerAccount {
   id: string;
   user_id: string;

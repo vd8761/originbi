@@ -274,6 +274,7 @@ export class CorporateService {
             const ledger = manager.create(CorporateCreditLedger, {
                 corporateAccountId: account.id,
                 creditDelta: diff,
+                ledgerType: diff > 0 ? 'CREDIT' : 'DEBIT',
                 reason: 'Manual update by admin',
                 createdByUserId: this.ADMIN_USER_ID,
             });
@@ -281,6 +282,74 @@ export class CorporateService {
 
             return { success: true, newBalance: credits };
         });
+    }
+
+    // ----------------------------------------------------------------
+    // TOP UP CREDITS
+    // ----------------------------------------------------------------
+    async topUpCredits(id: number, amount: number, reason?: string) {
+        const account = await this.corporateRepo.findOne({ where: { id } });
+        if (!account) throw new BadRequestException('Account not found');
+
+        if (!amount || isNaN(amount)) throw new BadRequestException('Invalid amount');
+
+        return this.dataSource.transaction(async (manager) => {
+            // Ensure numbers
+            const currentAvailable = Number(account.availableCredits);
+            const currentTotal = Number(account.totalCredits);
+            const delta = Number(amount);
+
+            account.availableCredits = currentAvailable + delta;
+            account.totalCredits = currentTotal + delta;
+
+            await manager.save(account);
+
+            const ledger = manager.create(CorporateCreditLedger, {
+                corporateAccountId: account.id,
+                creditDelta: delta,
+                ledgerType: 'CREDIT',
+                reason: reason || 'Top-up by Admin',
+                createdByUserId: this.ADMIN_USER_ID,
+            });
+            await manager.save(ledger);
+
+            return { success: true, newAvailable: account.availableCredits, newTotal: account.totalCredits };
+        });
+    }
+
+    // ----------------------------------------------------------------
+    // GET LEDGER
+    // ----------------------------------------------------------------
+    // ----------------------------------------------------------------
+    // GET LEDGER (Paginated & Mapped)
+    // ----------------------------------------------------------------
+    async getLedger(id: number, page: number = 1, limit: number = 10) {
+        const [rows, total] = await this.ledgerRepo.findAndCount({
+            where: { corporateAccountId: id },
+            order: { createdAt: 'DESC' },
+            skip: (page - 1) * limit,
+            take: limit,
+            relations: ['createdByUser'] // Optional if we want to show who created it
+        });
+
+        // Map to snake_case for frontend consistency
+        const mappedRows = rows.map(row => ({
+            id: row.id.toString(),
+            corporate_account_id: row.corporateAccountId.toString(),
+            credit_delta: row.creditDelta,
+            ledger_type: row.ledgerType,
+            reason: row.reason,
+            created_by_user_id: row.createdByUserId?.toString(),
+            created_at: row.createdAt.toISOString(),
+            created_by_name: row.createdByUser?.metadata?.fullName // Optional extra
+        }));
+
+        return {
+            data: mappedRows,
+            total,
+            page,
+            limit
+        };
     }
 
     // ----------------------------------------------------------------
@@ -401,6 +470,7 @@ export class CorporateService {
                 const ledger = manager.create(CorporateCreditLedger, {
                     corporateAccountId: corporateAccount.id,
                     creditDelta: initialCredits,
+                    ledgerType: 'CREDIT',
                     reason: 'Initial allocation during registration',
                     createdByUserId: this.ADMIN_USER_ID,
                 });

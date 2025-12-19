@@ -118,6 +118,43 @@ export const corporateRegistrationService = {
             throw new Error("Failed to update credits");
         }
     },
+
+    // Top up credits
+    async topUpCredits(id: string, amount: number, reason?: string): Promise<{ success: boolean; newAvailable: number; newTotal: number }> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/admin/corporate-accounts/${id}/top-up`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: token ? `Bearer ${token}` : "",
+            },
+            body: JSON.stringify({ amount, reason }),
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.message || "Failed to top up credits");
+        }
+        return res.json();
+    },
+
+    // Get Ledger
+    async getLedger(id: string, page = 1, limit = 10): Promise<{ data: import("../types").CorporateCreditLedger[], total: number }> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/admin/corporate-accounts/${id}/ledger?page=${page}&limit=${limit}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: token ? `Bearer ${token}` : "",
+            },
+            cache: "no-store",
+        });
+
+        if (!res.ok) {
+            throw new Error("Failed to fetch credit ledger");
+        }
+        return res.json();
+    },
     // Delete
     async deleteRegistration(id: string): Promise<void> {
         const token = AuthService.getToken();

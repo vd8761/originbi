@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
   PlusIcon,
   ChevronDownIcon,
@@ -64,8 +65,10 @@ const CorporateManagement: React.FC = () => {
   }, [currentPage, entriesPerPage, debouncedSearchTerm]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (view === 'list') {
+      fetchData();
+    }
+  }, [view, fetchData]);
 
   // Toggle active / inactive
   const handleToggleStatus = async (id: string, currentStatus: boolean) => {
@@ -150,7 +153,9 @@ const CorporateManagement: React.FC = () => {
       {/* Header / breadcrumb */}
       <div>
         <div className="flex items-center text-xs text-black dark:text-white mb-1.5 font-normal flex-wrap">
-          <span>Dashboard</span>
+          <Link href="/admin/dashboard" className="hover:underline hover:text-brand-green transition-colors">
+            Dashboard
+          </Link>
           <span className="mx-2 text-gray-400 dark:text-gray-600">
             <ArrowRightWithoutLineIcon className="w-3 h-3 text-black dark:text-white" />
           </span>

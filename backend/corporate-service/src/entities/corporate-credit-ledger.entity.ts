@@ -24,6 +24,9 @@ export class CorporateCreditLedger {
     @Column({ name: 'credit_delta' })
     creditDelta: number;
 
+    @Column({ name: 'ledger_type', type: 'varchar', length: 10, nullable: true })
+    ledgerType: string;
+
     @Column({ type: 'text', nullable: true })
     reason?: string;
 
