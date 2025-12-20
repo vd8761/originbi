@@ -214,6 +214,10 @@ const LoginForm: React.FC<LoginFormProps> = ({
       //console.log('Backend /me response:', data);
 
       localStorage.setItem('originbi_id_token', idTokenJwt);
+      localStorage.setItem('user', JSON.stringify({
+        name: data.metadata?.fullName || 'User',
+        email: data.email
+      }));
 
       onLoginSuccess();
     } catch (err: unknown) {
