@@ -35,7 +35,9 @@ export class CorporateService {
 
         private readonly dataSource: DataSource,
         private readonly http: HttpService,
-    ) { }
+    ) {
+        this.authServiceBaseUrl = this.configService.get<string>('AUTH_SERVICE_URL') || 'http://localhost:4002';
+    }
 
     // ----------------------------------------------------------------
     // Helper: Create Cognito User (Shared logic with Registrations)
