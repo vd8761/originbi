@@ -426,73 +426,78 @@ export class CorporateService {
         }
 
         // 3. Transaction
-        return this.dataSource.transaction(async (manager) => {
-            // A. Create User Record
-            const user = manager.create(User, {
-                email: email,
-                role: 'CORPORATE',
-                emailVerified: true,
-                cognitoSub: sub,
-                isActive: dto.status ?? true,
-                isBlocked: false,
-                metadata: {
-                    fullName: dto.name,
-                    countryCode: dto.countryCode,
-                    mobile: dto.mobile,
-                    gender: dto.gender,
-                },
-            });
-            await manager.save(user);
-
-            // B. Create Corporate Account
-            const initialCredits = dto.credits ? dto.credits : 0;
-
-            const corporateAccount = manager.create(CorporateAccount, {
-                userId: user.id,
-                companyName: dto.companyName,
-                sectorCode: dto.sector,
-                businessLocations: dto.businessLocations,
-                jobTitle: dto.jobTitle,
-                employeeRefId: dto.employeeCode,
-                linkedinUrl: dto.linkedinUrl,
-                countryCode: dto.countryCode,
-                mobileNumber: dto.mobile,
-                gender: dto.gender,
-                totalCredits: initialCredits,
-                availableCredits: initialCredits,
-                isActive: dto.status ?? true,
-            });
-            await manager.save(corporateAccount);
-
-            // C. Credit Ledger (if credits > 0)
-            if (initialCredits > 0) {
-                const ledger = manager.create(CorporateCreditLedger, {
-                    corporateAccountId: corporateAccount.id,
-                    creditDelta: initialCredits,
-                    ledgerType: 'CREDIT',
-                    reason: 'Initial allocation during registration',
-                    createdByUserId: this.ADMIN_USER_ID,
+        try {
+            return await this.dataSource.transaction(async (manager) => {
+                // ... same transaction logic ... 
+                // A. Create User Record
+                const user = manager.create(User, {
+                    email: email,
+                    role: 'CORPORATE',
+                    emailVerified: true,
+                    cognitoSub: sub,
+                    isActive: dto.status ?? true,
+                    isBlocked: false,
+                    metadata: {
+                        fullName: dto.name,
+                        countryCode: dto.countryCode,
+                        mobile: dto.mobile,
+                        gender: dto.gender,
+                    },
                 });
-                await manager.save(ledger);
-            }
+                await manager.save(user);
 
-            // Send Email
-            if (dto.sendEmail) {
-                try {
-                    await this.sendWelcomeEmail(email, dto.name, dto.password, dto.companyName, dto.mobile);
-                } catch (e) {
-                    this.logger.error(`Failed to send email to ${email}`, e);
-                    // Do not fail transaction for email failure? 
-                    // Usually best effort.
+                // B. Create Corporate Account
+                const initialCredits = dto.credits ? dto.credits : 0;
+
+                const corporateAccount = manager.create(CorporateAccount, {
+                    userId: user.id,
+                    companyName: dto.companyName,
+                    sectorCode: dto.sector,
+                    businessLocations: dto.businessLocations,
+                    jobTitle: dto.jobTitle,
+                    employeeRefId: dto.employeeCode,
+                    linkedinUrl: dto.linkedinUrl,
+                    countryCode: dto.countryCode,
+                    mobileNumber: dto.mobile,
+                    gender: dto.gender,
+                    totalCredits: initialCredits,
+                    availableCredits: initialCredits,
+                    isActive: dto.status ?? true,
+                });
+                await manager.save(corporateAccount);
+
+                // C. Credit Ledger (if credits > 0)
+                if (initialCredits > 0) {
+                    const ledger = manager.create(CorporateCreditLedger, {
+                        corporateAccountId: corporateAccount.id,
+                        creditDelta: initialCredits,
+                        ledgerType: 'CREDIT',
+                        reason: 'Initial allocation during registration',
+                        createdByUserId: this.ADMIN_USER_ID,
+                    });
+                    await manager.save(ledger);
                 }
-            }
 
-            return {
-                corporateAccountId: corporateAccount.id,
-                userId: user.id,
-                email: user.email,
-            };
-        });
+                // Send Email
+                if (dto.sendEmail) {
+                    try {
+                        await this.sendWelcomeEmail(email, dto.name, dto.password, dto.companyName, dto.mobile);
+                    } catch (e) {
+                        this.logger.error(`Failed to send email to ${email}`, e);
+                    }
+                }
+
+                return {
+                    corporateAccountId: corporateAccount.id,
+                    userId: user.id,
+                    email: user.email,
+                };
+            });
+        } catch (dbError: any) {
+            this.logger.error(`Database Transaction Failed in Corporate Create: ${dbError.message}`, dbError.stack);
+            // Re-throw so the controller still returns error, but now we have logs
+            throw new InternalServerErrorException(`Database Transaction Failed: ${dbError.message}`);
+        }
     }
 
     // ---------------------------------------------------------
