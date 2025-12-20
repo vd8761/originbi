@@ -211,12 +211,16 @@ const LoginForm: React.FC<LoginFormProps> = ({
       }
 
       const data = await res.json();
-      //console.log('Backend /me response:', data);
+      // console.log('Backend /me response:', data);
+
+      // Extract user object from response (response format: { message: string, user: UserEntity })
+      const backendUser = data.user || {};
+      const metadata = backendUser.metadata || {};
 
       localStorage.setItem('originbi_id_token', idTokenJwt);
       localStorage.setItem('user', JSON.stringify({
-        name: data.metadata?.fullName || 'User',
-        email: data.email
+        name: metadata.fullName || backendUser.email?.split('@')[0] || 'User',
+        email: backendUser.email || ''
       }));
 
       onLoginSuccess();

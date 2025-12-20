@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CorporateDashboardController = void 0;
 const common_1 = require("@nestjs/common");
 const corporate_dashboard_service_1 = require("./corporate-dashboard.service");
+const register_corporate_dto_1 = require("./dto/register-corporate.dto");
 let CorporateDashboardController = class CorporateDashboardController {
     constructor(dashboardService) {
         this.dashboardService = dashboardService;
@@ -64,6 +65,9 @@ let CorporateDashboardController = class CorporateDashboardController {
     }
     async recordPaymentFailure(orderId, description) {
         return this.dashboardService.recordPaymentFailure(orderId, description);
+    }
+    async registerCorporate(dto) {
+        return this.dashboardService.registerCorporate(dto);
     }
 };
 exports.CorporateDashboardController = CorporateDashboardController;
@@ -132,6 +136,13 @@ __decorate([
     __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", Promise)
 ], CorporateDashboardController.prototype, "recordPaymentFailure", null);
+__decorate([
+    (0, common_1.Post)('register-corporate'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [register_corporate_dto_1.RegisterCorporateDto]),
+    __metadata("design:returntype", Promise)
+], CorporateDashboardController.prototype, "registerCorporate", null);
 exports.CorporateDashboardController = CorporateDashboardController = __decorate([
     (0, common_1.Controller)('dashboard'),
     __metadata("design:paramtypes", [corporate_dashboard_service_1.CorporateDashboardService])

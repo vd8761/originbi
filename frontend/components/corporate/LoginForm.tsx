@@ -6,7 +6,7 @@ import { EyeIcon, EyeOffIcon } from '@/components/icons';
 import { signIn, fetchAuthSession, signOut } from 'aws-amplify/auth';
 import { configureAmplify } from '@/lib/aws-amplify-config.js';
 
-configureAmplify(); // ensure Amplify is configured
+configureAmplify();
 
 interface LoginFormProps {
   onLoginSuccess: () => void;
@@ -16,7 +16,7 @@ interface LoginFormProps {
 
 const LoginForm: React.FC<LoginFormProps> = ({
   onLoginSuccess,
-  buttonClass = 'bg-brand-green hover:bg-brand-green/90 focus:ring-brand-green/30',
+  buttonClass,
   portalMode = 'corporate',
 }) => {
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -40,7 +40,6 @@ const LoginForm: React.FC<LoginFormProps> = ({
 
   const validatePassword = (password: string) => {
     if (!password) return 'Password is required.';
-    // if (password.length < 8) return 'Password must be at least 8 characters long.'; 
     return '';
   };
 
@@ -63,8 +62,10 @@ const LoginForm: React.FC<LoginFormProps> = ({
     const { name, value } = e.target;
     setTouched((prev) => ({ ...prev, [name]: true }));
 
-    if (name === 'email') {
+    if (name === 'email' && value) {
       setErrors((prev) => ({ ...prev, email: validateEmail(value) }));
+    } else if (name === 'email' && !value) {
+      setErrors((prev) => ({ ...prev, email: '' }));
     }
     if (name === 'password') {
       setErrors((prev) => ({ ...prev, password: validatePassword(value) }));
@@ -86,14 +87,12 @@ const LoginForm: React.FC<LoginFormProps> = ({
       setIsSubmitting(true);
       setGeneralError('');
 
-      // 🧹 0️⃣ Ensure no old session is hanging around
       try {
         await signOut();
       } catch {
-        // ignore signOut errors
+        // ignore
       }
 
-      // 1️⃣ Sign in with Cognito
       const signInResult = await signIn({
         username: values.email,
         password: values.password,
@@ -104,7 +103,6 @@ const LoginForm: React.FC<LoginFormProps> = ({
         return;
       }
 
-      // 2️⃣ Get tokens & groups
       const session = await fetchAuthSession();
       const { tokens } = session;
 
@@ -113,57 +111,36 @@ const LoginForm: React.FC<LoginFormProps> = ({
         return;
       }
 
-      const idTokenJwt = tokens.idToken.toString(); // Renamed from idTokenJwt to avoid confusion with idToken variable below
-      if (!idTokenJwt) {
-        setGeneralError('Could not read login token. Please try again.');
-        return;
-      }
-
-      const idGroups =
-        (tokens.idToken?.payload['cognito:groups'] as string[] | undefined) || [];
-      const accessGroups =
-        (tokens.accessToken?.payload['cognito:groups'] as string[] | undefined) ||
-        [];
-
+      const idTokenJwt = tokens.idToken.toString();
+      const idGroups = (tokens.idToken?.payload['cognito:groups'] as string[] | undefined) || [];
+      const accessGroups = (tokens.accessToken?.payload['cognito:groups'] as string[] | undefined) || [];
       const groups = [...new Set([...idGroups, ...accessGroups])];
 
-      // 3️⃣ Required group based on portal
-      let requiredGroup = '';
+      let requiredGroup = 'CORPORATE';
       if (portalMode === 'admin') requiredGroup = 'ADMIN';
-      if (portalMode === 'student') requiredGroup = 'STUDENT';
-      if (portalMode === 'corporate') requiredGroup = 'CORPORATE';
 
-      // 4️⃣ Client-side group restriction
-      if (requiredGroup && !groups.includes(requiredGroup)) {
+      if (!groups.includes(requiredGroup)) {
         await signOut();
-        setGeneralError('You are not allowed to access this portal with these credentials.');
+        setGeneralError(`You are not allowed to access this portal.`);
         return;
       }
 
       const accessToken = tokens.accessToken.toString();
       const idToken = tokens.idToken.toString();
 
-      // Store basic info matching CorporateDashboard requirements
       sessionStorage.setItem('accessToken', accessToken);
       sessionStorage.setItem('idToken', idToken);
       sessionStorage.setItem('userEmail', values.email);
-
-      // Also keep this for consistency with other parts if needed
       localStorage.setItem('originbi_id_token', idTokenJwt);
 
-      // 5️⃣ Call backend to verify token + role?
-      // For Corporate, we skip explicit backend verification for now or we could add it later.
-      // The previous implementation utilized onLoginSuccess immediately.
       onLoginSuccess();
 
     } catch (err: unknown) {
       console.error('Cognito signIn error:', err);
-
       const message =
         err && typeof err === 'object' && 'message' in err
           ? String((err as any).message)
           : 'Login failed. Please check your credentials.';
-
       setGeneralError(message);
     } finally {
       setIsSubmitting(false);
@@ -173,34 +150,24 @@ const LoginForm: React.FC<LoginFormProps> = ({
   const isEmailInvalid = touched.email && !!errors.email;
   const isPasswordInvalid = touched.password && !!errors.password;
 
-  const focusColorClass = 'focus:ring-brand-green focus:border-brand-green';
-  const iconColorClass = 'text-brand-green';
-
   return (
-    <form
-      className="space-y-6 animate-fade-in"
-      style={{ animationDelay: '100ms' }}
-      onSubmit={handleSubmit}
-      noValidate
-    >
-      {/* General Error Message */}
+    <form className="flex flex-col gap-[clamp(16px,2.5vw,48px)] animate-fade-in" style={{ animationDelay: '100ms' }} onSubmit={handleSubmit} noValidate>
+
       {generalError && (
-        <div className="p-3 bg-red-100 text-red-700 text-sm rounded-lg border border-red-200">
-          {generalError}
+        <div className="flex items-center gap-2 px-1 animate-fade-in text-red-500 dark:text-red-400">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          <span className="text-sm font-medium">{generalError}</span>
         </div>
       )}
 
-      {/* Email Field */}
-      <div className="space-y-2">
+      <div>
         <label
           htmlFor="email"
-          className="block text-sm font-medium text-brand-text-light-secondary dark:text-gray-400 ml-1"
+          className="block font-sans text-[clamp(14px,0.9vw,18px)] font-semibold text-brand-text-light-secondary dark:text-white mb-2 leading-none tracking-[0px]"
         >
-          {portalMode === 'corporate'
-            ? 'Work Email'
-            : portalMode === 'admin'
-              ? 'Admin ID / Email'
-              : 'Email ID'}
+          {portalMode === 'corporate' ? 'Work Email' : 'Email ID'}
         </label>
         <input
           type="email"
@@ -209,45 +176,47 @@ const LoginForm: React.FC<LoginFormProps> = ({
           value={values.email}
           onChange={handleChange}
           onBlur={handleBlur}
-          className={`bg-white dark:bg-[#24272B] border text-brand-text-light-primary dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm rounded-full block w-full p-4 transition-all duration-300 outline-none ${isEmailInvalid
-            ? 'border-red-500 focus:ring-1 focus:ring-red-500'
-            : `border-gray-200 dark:border-white/10 ${focusColorClass} focus:ring-1 focus:ring-opacity-50`
+          className={`bg-brand-light-secondary dark:bg-brand-dark-tertiary border text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] font-normal leading-none tracking-[0px] rounded-full block w-full transition-colors duration-300 ${isEmailInvalid
+            ? "border-red-500 focus:ring-red-500 focus:border-red-500"
+            : "border-brand-light-tertiary dark:border-brand-dark-tertiary focus:ring-brand-green focus:border-brand-green"
             }`}
-          placeholder={
-            portalMode === 'corporate'
-              ? 'name@company.com'
-              : 'Example@gmail.com'
-          }
+          style={{ padding: 'clamp(14px,1vw,20px)' }}
+          placeholder={portalMode === 'corporate' ? 'name@company.com' : 'example@domain.com'}
           required
           disabled={isSubmitting}
           aria-invalid={isEmailInvalid}
         />
         {isEmailInvalid && (
-          <p className="ml-1 text-xs text-red-500">{errors.email}</p>
+          <div className="flex items-center gap-2 px-1 animate-fade-in text-red-500 dark:text-red-400 mt-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm font-medium">{errors.email}</span>
+          </div>
         )}
       </div>
 
-      {/* Password Field */}
-      <div className="space-y-2">
+      <div>
         <label
           htmlFor="password"
-          className="block text-sm font-medium text-brand-text-light-secondary dark:text-gray-400 ml-1"
+          className="block font-sans text-[clamp(14px,0.9vw,18px)] font-semibold text-brand-text-light-secondary dark:text-white mb-2 leading-none tracking-[0px]"
         >
           Password
         </label>
         <div className="relative">
           <input
-            type={passwordVisible ? 'text' : 'password'}
+            type={passwordVisible ? "text" : "password"}
             name="password"
             id="password"
             value={values.password}
             onChange={handleChange}
             onBlur={handleBlur}
             placeholder="Enter your password"
-            className={`bg-white dark:bg-[#24272B] border text-brand-text-light-primary dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm rounded-full block w-full p-4 pr-12 transition-all duration-300 outline-none ${isPasswordInvalid
-              ? 'border-red-500 focus:ring-1 focus:ring-red-500'
-              : `border-gray-200 dark:border-white/10 ${focusColorClass} focus:ring-1 focus:ring-opacity-50`
+            className={`bg-brand-light-secondary dark:bg-brand-dark-tertiary border text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] font-normal leading-none tracking-[0px] rounded-full block w-full pr-16 transition-colors duration-300 ${isPasswordInvalid
+              ? "border-red-500 focus:ring-red-500 focus:border-red-500"
+              : "border-brand-light-tertiary dark:border-brand-dark-tertiary focus:ring-brand-green focus:border-brand-green"
               }`}
+            style={{ padding: 'clamp(14px,1vw,20px)', paddingRight: '4rem' }}
             required
             disabled={isSubmitting}
             aria-invalid={isPasswordInvalid}
@@ -255,36 +224,41 @@ const LoginForm: React.FC<LoginFormProps> = ({
           <button
             type="button"
             onClick={togglePasswordVisibility}
-            className="absolute inset-y-0 right-0 flex items-center pr-4 transition-colors duration-200"
-            aria-label={passwordVisible ? 'Hide password' : 'Show password'}
+            className="absolute inset-y-0 right-0 cursor-pointer flex items-center pr-4 text-brand-text-light-secondary hover:text-brand-text-light-primary dark:text-brand-text-secondary dark:hover:text-white transition-colors duration-300"
+            aria-label={passwordVisible ? "Hide password" : "Show password"}
           >
             {passwordVisible ? (
-              <EyeIcon className={`h-5 w-5 ${iconColorClass}`} />
+              <EyeIcon className="h-5 w-5 text-brand-green" />
             ) : (
-              <EyeOffIcon className={`h-5 w-5 ${iconColorClass}`} />
+              <EyeOffIcon className="h-5 w-5 text-brand-green" />
             )}
           </button>
         </div>
         {isPasswordInvalid && (
-          <p className="ml-1 text-xs text-red-500">{errors.password}</p>
+          <div className="flex items-center gap-2 px-1 animate-fade-in text-red-500 dark:text-red-400 mt-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm font-medium">{errors.password}</span>
+          </div>
         )}
+
+        {/* Forgot Password Link */}
+        <div className="flex justify-end mt-3">
+          <Link
+            href="/corporate/forgot-password"
+            className="text-sm text-brand-text-light-secondary dark:text-brand-text-secondary hover:text-brand-green transition-colors font-medium"
+          >
+            Forgot Password?
+          </Link>
+        </div>
       </div>
 
-      {/* Forgot Password Link */}
-      <div className="flex justify-end pt-1">
-        <Link
-          href="/corporate/forgot-password"
-          className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-brand-green transition-colors"
-        >
-          Forgot Password?
-        </Link>
-      </div>
-
-      {/* Login Button */}
       <button
         type="submit"
         disabled={isSubmitting}
-        className={`w-full text-white font-bold rounded-full text-base px-5 py-4 text-center transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform active:scale-[0.99] ${buttonClass}`}
+        style={{ padding: 'clamp(14px,1vw,20px)' }}
+        className={`w-full text-white bg-brand-green hover:bg-brand-green/90 focus:ring-4 focus:outline-none focus:ring-brand-green/30 font-sans font-semibold rounded-full text-[clamp(16px,1vw,20px)] leading-none tracking-[0px] text-center transition-colors duration-300 disabled:bg-brand-green/50 disabled:cursor-not-allowed flex justify-center items-center shadow-lg hover:shadow-xl transform active:scale-[0.99] ${buttonClass}`}
         aria-busy={isSubmitting}
       >
         {isSubmitting ? (
@@ -312,6 +286,19 @@ const LoginForm: React.FC<LoginFormProps> = ({
           'Login'
         )}
       </button>
+
+      {/* Registration Link (Only for Corporate Login Page) */}
+      <div className="text-center">
+        <p className="text-center text-sm text-brand-text-light-secondary dark:text-brand-text-secondary">
+          Join Us?{" "}
+          <Link
+            href="/corporate/register"
+            className="text-brand-green font-medium hover:text-brand-green/80 transition-colors"
+          >
+            Register your organization
+          </Link>
+        </p>
+      </div>
     </form>
   );
 };

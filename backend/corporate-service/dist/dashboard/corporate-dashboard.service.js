@@ -25,14 +25,19 @@ const corporate_account_entity_1 = require("../entities/corporate-account.entity
 const corporate_credit_ledger_entity_1 = require("../entities/corporate-credit-ledger.entity");
 const user_action_log_entity_1 = require("../entities/user-action-log.entity");
 let CorporateDashboardService = class CorporateDashboardService {
-    constructor(userRepo, corporateRepo, actionLogRepository, ledgerRepo, httpService, configService) {
+    constructor(userRepo, corporateRepo, actionLogRepository, ledgerRepo, httpService, configService, dataSource) {
         this.userRepo = userRepo;
         this.corporateRepo = corporateRepo;
         this.actionLogRepository = actionLogRepository;
         this.ledgerRepo = ledgerRepo;
         this.httpService = httpService;
         this.configService = configService;
+        this.dataSource = dataSource;
         this.authServiceUrl = this.configService.get('AUTH_SERVICE_URL') || 'http://localhost:4002';
+        if (this.authServiceUrl.includes('4003')) {
+            console.warn(`[CorporateDashboardService] AUTH_SERVICE_URL misconfigured to ${this.authServiceUrl}. Forcing http://localhost:4002`);
+            this.authServiceUrl = 'http://localhost:4002';
+        }
         this.perCreditCost = parseFloat(this.configService.get('PER_CREDIT_COST') || '200');
         const keyId = this.configService.get('RAZORPAY_KEY_ID');
         const keySecret = this.configService.get('RAZORPAY_KEY_SECRET');
@@ -112,6 +117,159 @@ let CorporateDashboardService = class CorporateDashboardService {
             await this.actionLogRepository.save(newLog);
         }
         return { success: true, message: 'Password reset initiated. Check your email.' };
+    }
+    async createCognitoUser(email, password, groupName) {
+        var _a, _b, _c;
+        console.log(`[CorporateDashboardService] createCognitoUser calling Auth Service at: ${this.authServiceUrl}`);
+        try {
+            const baseUrl = this.authServiceUrl.replace(/\/$/, '');
+            const url = `${baseUrl}/internal/cognito/users`;
+            const res$ = this.httpService.post(url, { email, password, groupName });
+            const res = await (0, rxjs_1.firstValueFrom)(res$);
+            return res.data;
+        }
+        catch (err) {
+            console.error('Error creating Cognito user:', err);
+            const status = (_a = err.response) === null || _a === void 0 ? void 0 : _a.status;
+            const msg = ((_c = (_b = err.response) === null || _b === void 0 ? void 0 : _b.data) === null || _c === void 0 ? void 0 : _c.message) || err.message;
+            if (status && status >= 400 && status < 500) {
+                throw new common_1.BadRequestException(`Auth Service: ${msg}`);
+            }
+            throw new common_1.InternalServerErrorException(`Auth Service Failed: ${msg}`);
+        }
+    }
+    async registerCorporate(dto) {
+        const email = dto.email.trim();
+        const existingUser = await this.userRepo.findOne({ where: { email: email } });
+        if (existingUser) {
+            throw new common_1.BadRequestException(`Email '${email}' is already registered`);
+        }
+        const existingMobile = await this.corporateRepo.findOne({
+            where: { mobileNumber: dto.mobile, countryCode: dto.countryCode }
+        });
+        if (existingMobile) {
+            throw new common_1.BadRequestException('Mobile number already exists for a corporate account');
+        }
+        let sub;
+        try {
+            const cognitoRes = await this.createCognitoUser(email, dto.password, 'CORPORATE');
+            sub = cognitoRes.sub;
+        }
+        catch (e) {
+            throw e;
+        }
+        try {
+            const result = await this.dataSource.transaction(async (manager) => {
+                const user = manager.create(user_entity_1.User, {
+                    email: email,
+                    role: 'CORPORATE',
+                    emailVerified: true,
+                    cognitoSub: sub,
+                    isActive: false,
+                    isBlocked: false,
+                    metadata: {
+                        fullName: dto.name,
+                        countryCode: dto.countryCode,
+                        mobile: dto.mobile,
+                        gender: dto.gender,
+                    },
+                });
+                await manager.save(user);
+                const corporateAccount = manager.create(corporate_account_entity_1.CorporateAccount, {
+                    userId: user.id,
+                    fullName: dto.name,
+                    companyName: dto.companyName,
+                    sectorCode: dto.sector,
+                    businessLocations: dto.businessLocations,
+                    jobTitle: dto.jobTitle,
+                    employeeRefId: dto.employeeCode,
+                    linkedinUrl: dto.linkedinUrl,
+                    countryCode: dto.countryCode,
+                    mobileNumber: dto.mobile,
+                    gender: dto.gender,
+                    totalCredits: 0,
+                    availableCredits: 0,
+                    isActive: false,
+                });
+                await manager.save(corporateAccount);
+                return { success: true, message: 'Registration successful. Account pending approval.' };
+            });
+            this.sendRegistrationSuccessEmail(email, {
+                name: dto.name,
+                companyName: dto.companyName,
+                email: email,
+                mobile: dto.mobile,
+                password: dto.password,
+                loginUrl: this.configService.get('FRONTEND_URL') || 'http://localhost:3000'
+            }).catch(emailErr => console.error("Failed to send registration email:", emailErr));
+            return result;
+        }
+        catch (dbError) {
+            console.error(`Database Transaction Failed in Public Register: ${dbError.message}`, dbError.stack);
+            if (dbError.code === '23505') {
+                throw new common_1.BadRequestException('Duplicate entry detected (Email or Mobile).');
+            }
+            throw new common_1.InternalServerErrorException(`Database Transaction Failed: ${dbError.message}`);
+        }
+    }
+    async sendRegistrationSuccessEmail(toAddress, data) {
+        const { SESClient, SendEmailCommand } = require("@aws-sdk/client-ses");
+        const fs = require('fs');
+        const path = require('path');
+        const sesClient = new SESClient({
+            region: this.configService.get('AWS_REGION'),
+            credentials: {
+                accessKeyId: this.configService.get('AWS_ACCESS_KEY_ID'),
+                secretAccessKey: this.configService.get('AWS_SECRET_ACCESS_KEY'),
+            },
+        });
+        const templatePath = path.join(__dirname, '..', 'mail', 'templates', 'registration-success.html');
+        let htmlContent = fs.readFileSync(templatePath, 'utf8');
+        const assets = {
+            logo: "https://originbi.com/wp-content/uploads/2023/11/Origin-BI-Logo-01.png",
+            popper: "https://originbi-assets.s3.ap-south-1.amazonaws.com/email-assets/celebration-popper.png",
+            pattern: "https://originbi-assets.s3.ap-south-1.amazonaws.com/email-assets/pattern-bg.png",
+            footer: "https://originbi-assets.s3.ap-south-1.amazonaws.com/email-assets/email-footer.png"
+        };
+        htmlContent = htmlContent.replace('{{name}}', data.name);
+        htmlContent = htmlContent.replace('{{companyName}}', data.companyName);
+        htmlContent = htmlContent.replace('{{email}}', data.email);
+        htmlContent = htmlContent.replace('{{mobile}}', data.mobile);
+        htmlContent = htmlContent.replace('{{password}}', data.password);
+        htmlContent = htmlContent.replace('{{loginUrl}}', `${data.loginUrl}/corporate/login`);
+        htmlContent = htmlContent.replace('{{year}}', new Date().getFullYear().toString());
+        htmlContent = htmlContent.replace('{{logo}}', assets.logo);
+        htmlContent = htmlContent.replace('{{popper}}', "https://img.icons8.com/emoji/96/party-popper.png");
+        htmlContent = htmlContent.replace('{{pattern}}', "");
+        htmlContent = htmlContent.replace('{{footer}}', "");
+        const params = {
+            Source: this.configService.get('EMAIL_FROM'),
+            Destination: {
+                ToAddresses: [toAddress],
+                CcAddresses: this.configService.get('EMAIL_CC') ? [this.configService.get('EMAIL_CC')] : [],
+            },
+            Message: {
+                Subject: {
+                    Data: "Welcome to Origin BI - Registration Received",
+                    Charset: "UTF-8",
+                },
+                Body: {
+                    Html: {
+                        Data: htmlContent,
+                        Charset: "UTF-8",
+                    },
+                },
+            },
+        };
+        try {
+            const command = new SendEmailCommand(params);
+            await sesClient.send(command);
+            const cc = this.configService.get('EMAIL_CC') || 'None';
+            console.log(`Registration email sent to ${toAddress}, CC: ${cc}`);
+        }
+        catch (error) {
+            console.error("Error sending registration SES email:", error);
+        }
     }
     async getProfile(email) {
         const user = await this.userRepo.findOne({ where: { email } });
@@ -282,7 +440,7 @@ let CorporateDashboardService = class CorporateDashboardService {
                 secretAccessKey: this.configService.get('AWS_SECRET_ACCESS_KEY'),
             },
         });
-        const templatePath = path.join(__dirname, '..', 'mail', 'payment-success.html');
+        const templatePath = path.join(__dirname, '..', 'mail', 'templates', 'payment-success.html');
         let htmlContent = fs.readFileSync(templatePath, 'utf8');
         htmlContent = htmlContent.replace('{{paymentId}}', data.paymentId);
         htmlContent = htmlContent.replace('{{amount}}', data.amount);
@@ -402,6 +560,7 @@ exports.CorporateDashboardService = CorporateDashboardService = __decorate([
         typeorm_2.Repository,
         typeorm_2.Repository,
         axios_1.HttpService,
-        config_1.ConfigService])
+        config_1.ConfigService,
+        typeorm_2.DataSource])
 ], CorporateDashboardService);
 //# sourceMappingURL=corporate-dashboard.service.js.map

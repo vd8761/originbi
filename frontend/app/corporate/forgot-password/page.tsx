@@ -1,10 +1,6 @@
 import React from 'react';
-import ForgotPasswordForm from '../../../components/corporate/ForgotPasswordForm';
+import ForgotPassword from '../../../components/corporate/ForgotPassword';
 
 export default function CorporateForgotPasswordPage() {
-    return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-[#121417]">
-            <ForgotPasswordForm />
-        </div>
-    );
+    return <ForgotPassword />;
 }

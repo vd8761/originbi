@@ -279,10 +279,10 @@ const Header: React.FC<HeaderProps> = ({ onLogout, currentView, onNavigate, hide
                             {user ? getInitials(user.name) : 'A'}
                         </div>
                         <div className="text-left hidden xl:block">
-                            <p className="font-semibold text-base leading-tight text-brand-text-light-primary dark:text-brand-text-primary">
+                            <p className="font-semibold text-base leading-tight text-brand-text-light-primary dark:text-brand-text-primary truncate max-w-[150px]" title={user ? user.name : 'Admin User'}>
                                 {user ? user.name : 'Admin User'}
                             </p>
-                            <p className="text-sm text-brand-text-light-secondary dark:text-brand-text-secondary leading-tight">
+                            <p className="text-sm text-brand-text-light-secondary dark:text-brand-text-secondary leading-tight truncate max-w-[150px]" title={user ? user.email : 'admin@originbi.com'}>
                                 {user ? user.email : 'admin@originbi.com'}
                             </p>
                         </div>

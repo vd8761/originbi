@@ -1,9 +1,9 @@
 import React from "react";
 import Logo from "@/components/ui/Logo";
 import LoginForm from "@/components/corporate/LoginForm";
+import CorporateTestimonial from "@/components/corporate/CorporateTestimonial";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import { useTheme } from "@/contexts/ThemeContext";
-import { QuoteIcon } from "@/components/icons";
 
 interface CorporateLoginProps {
   onLoginSuccess: () => void;
@@ -18,139 +18,65 @@ const CorporateLogin: React.FC<CorporateLoginProps> = ({
   const { theme, toggleTheme } = useTheme();
 
   return (
-    // Main Container: Uses h-[100dvh] to ensure it fits exactly on mobile viewports without browser bar interference
-    <div className="flex h-[100dvh] w-full bg-brand-light-primary dark:bg-brand-dark-primary font-sans transition-colors duration-300 overflow-hidden">
-      {/* 
-        -------------------------------------------
-        LEFT PANEL - Brand Showcase 
-        (Visible on Large Screens lg+)
-        -------------------------------------------
-      */}
-      <div className="hidden lg:flex lg:w-[55%] xl:w-[55%] relative flex-col justify-between p-12 text-white bg-[#022c22]">
-        {/* Background Image & Overlay */}
-        <div className="absolute inset-0 z-0 select-none pointer-events-none">
-          <img
-            src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"
-            alt="Corporate Architecture"
-            className="w-full h-full object-cover opacity-30"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#022c22] via-[#064e3b]/80 to-[#022c22]/60 mix-blend-multiply" />
-          <div className="absolute inset-0 bg-gradient-to-br from-transparent to-black/40" />
-        </div>
+    <div className="relative w-full min-h-[100dvh] overflow-hidden bg-[#FAFAFA] dark:bg-brand-dark-primary transition-colors duration-300">
+      {/* GLOBAL BACKGROUND LAYERS (Full Screen) */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        {/* Light Theme Background */}
+        <div className="absolute inset-0 bg-[url('/Background_Light_Theme.svg')] bg-cover bg-center bg-no-repeat opacity-100 dark:hidden" />
+        {/* Dark Theme Background */}
+        <div className="absolute inset-0 bg-[url('/Background_Dark_Theme.svg')] bg-cover bg-center bg-no-repeat opacity-100 hidden dark:block" />
 
-        {/* Content Layer */}
-        <div className="relative z-10 flex flex-col h-full justify-between">
-          <div className="max-w-2xl mt-6">
-            <h1 className="text-4xl xl:text-5xl font-bold leading-tight mb-4 tracking-tight">
-              Transform Your Workforce With{" "}
-              <span className="text-brand-green">Intelligent Insights.</span>
-            </h1>
-            <p className="text-lg text-green-100/90 leading-relaxed font-light border-l-2 border-brand-green pl-6">
-              Access comprehensive analytics, manage recruitment pipelines, and
-              unlock the potential of your organization.
-            </p>
-          </div>
-
-          {/* Testimonial */}
-          <div className="bg-white/5 backdrop-blur-md border border-white/10 p-5 rounded-2xl max-w-xl">
-            <div className="flex gap-4 items-start">
-              <QuoteIcon className="w-6 h-6 text-brand-green shrink-0" />
-              <div>
-                <p className="text-base font-medium italic text-white/90 font-normal mb-3 leading-relaxed">
-                  "OriginBI has completely revolutionized our hiring process.
-                  We're finding better candidates faster."
-                </p>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-brand-green flex items-center justify-center font-semibold text-brand-text-primary text-xs">
-                    ER
-                  </div>
-                  <div>
-                    <div className="font-semibold text-brand-text-primary text-sm">
-                      Elena Rodriguez
-                    </div>
-                    <div className="text-[10px] text-green-200 uppercase tracking-wider">
-                      VP of People, TechFlow
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 3. Footer: Fixed Height - Always visible */}
-          <p className="text-center text-xs text-brand-text-light-secondary dark:text-brand-text-secondary">
-            &copy; 2025 Origin BI. All rights reserved.{" "}
-            <span className="hidden sm:inline">
-              <span className="mx-1 opacity-50">|</span>{" "}
-              <a
-                href="/home"
-                className="hover:text-brand-green dark:hover:text-brand-green transition-colors"
-              >
-                Back to Portal
-              </a>{" "}
-              <span className="mx-1 opacity-50">|</span>{" "}
-              <a
-                href="#"
-                className="hover:text-brand-green dark:hover:text-brand-green transition-colors"
-              >
-                Privacy
-              </a>{" "}
-              <span className="mx-1 opacity-50">|</span>{" "}
-              <a
-                href="#"
-                className="hover:text-brand-green dark:hover:text-brand-green transition-colors"
-              >
-                Help
-              </a>
-            </span>
-          </p>
-
-        </div>
+        {/* Gradients */}
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-brand-green/5 rounded-full blur-[100px] mix-blend-multiply dark:mix-blend-normal" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/5 rounded-full blur-[80px] mix-blend-multiply dark:mix-blend-normal" />
       </div>
 
-      {/* 
-        -------------------------------------------
-        RIGHT PANEL - Login Form
-        Structure: Header (Fixed) -> Main (Flex-1) -> Footer (Fixed)
-        This ensures the footer stays at bottom and form stays centered without scrolling on most screens.
-        -------------------------------------------
-      */}
-      <div className="w-full lg:w-[45%] xl:w-[45%] flex flex-col h-full relative bg-brand-light-primary dark:bg-brand-dark-primary transition-colors duration-300">
-        {/* 1. Header: Fixed Height - Always visible */}
-        <div className="w-full flex justify-between items-center px-8 py-6 flex-shrink-0 z-20">
-          <Logo />
-          <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
+      {/* CONTENT CONTAINER (Centered / Max Width) */}
+      <div className="relative z-10 w-full max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-12 lg:h-screen min-h-[100dvh] px-[clamp(24px,8.33vw,160px)]">
+        {/* Left Column: Grid Layout [Header, Content, Footer] */}
+        <div className="order-1 lg:col-span-5 flex flex-col justify-start gap-4 lg:h-full h-auto py-[clamp(16px,2vw,32px)] px-1 relative lg:overflow-y-auto z-10 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+          {/* Header */}
+          <header className="w-full max-w-[clamp(360px,30vw,640px)] self-start flex items-center justify-between shrink-0 mb-8">
+            <div className="w-[clamp(100px,7vw,130px)]">
+              <Logo className="w-full h-auto object-contain" />
+            </div>
+            <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
+          </header>
+
+          {/* Main Content */}
+          <div className="w-full max-w-[clamp(360px,30vw,640px)] self-start flex flex-col justify-center my-auto">
+            <div className="text-left w-full mb-[clamp(16px,2vw,32px)]">
+              <h1 className="font-sans font-semibold text-brand-text-light-primary dark:text-brand-text-primary tracking-[0%] leading-none mb-2 text-[clamp(24px,2.5vw,40px)]">
+                Corporate Login
+              </h1>
+              <p className="font-sans text-brand-text-light-secondary dark:text-brand-text-secondary font-normal tracking-[0%] leading-none text-[clamp(13px,1vw,16px)]">
+                Transform Your Workforce With Intelligent Insights.
+              </p>
+              <div className="w-full h-px bg-brand-light-tertiary dark:bg-white/10 mt-[clamp(20px,2vw,40px)]" />
+            </div>
+            <LoginForm onLoginSuccess={onLoginSuccess} portalMode="corporate" />
+          </div>
+
+          {/* Footer */}
+          <footer className="w-full max-w-[clamp(360px,30vw,640px)] self-start flex flex-col-reverse sm:flex-row items-center justify-between text-[clamp(11px,0.8vw,14px)] font-medium leading-none tracking-[0px] text-brand-green gap-4 mt-auto shrink-0">
+            <div className="flex items-center gap-4">
+              <a href="#" className="hover:text-brand-green/80 transition-colors text-right underline decoration-solid decoration-0 underline-offset-2">Privacy Policy</a>
+              <span className="border-r border-brand-light-tertiary dark:border-white/20 h-3 hidden sm:block"></span>
+              <a href="#" className="hover:text-brand-green/80 transition-colors text-right underline decoration-solid decoration-0 underline-offset-2">Terms & Conditions</a>
+            </div>
+            <span className="opacity-100 text-brand-text-light-secondary dark:text-white">&copy; OriginBI 2025</span>
+          </footer>
         </div>
 
-        {/* 2. Main Content: Flex-1 fills available space */}
-        <div className="flex-1 flex flex-col justify-center items-center w-full px-8 overflow-y-auto scrollbar-hide">
-          <div className="w-full max-w-md space-y-6">
-            {/* Title Section */}
-            <div className="space-y-1 text-center lg:text-left">
-              <h2 className="text-2xl lg:text-3xl font-bold tracking-tight text-brand-text-light-primary dark:text-white">
-                Corporate Login
-              </h2>
-              <p className="text-brand-text-light-secondary dark:text-brand-text-secondary text-sm">
-                Enter your credentials to access the corporate portal.
-              </p>
-            </div>
-
-            {/* Login Form Component */}
-            <LoginForm onLoginSuccess={onLoginSuccess} portalMode="corporate" />
-
-            {/* Registration Link */}
-            <div className="border-brand-light-tertiary dark:border-brand-dark-tertiary  text-center">
-              <p className="text-center text-sm text-brand-text-light-secondary dark:text-brand-text-secondary">
-                Join Us?{" "}
-                <a
-                  href="#"
-                  className="text-brand-green font-medium hover:text-brand-green/80 transition-colors"
-                >
-                  Register your organization
-                </a>
-              </p>
-            </div>
+        {/* Right Column: Testimonial/Hero Image */}
+        <div className="order-2 lg:col-span-7 hidden lg:flex h-full p-[clamp(16px,2vw,32px)] items-center justify-center">
+          <div className="w-full h-full rounded-[clamp(1.5rem,2.5vw,2.5rem)] overflow-hidden relative shadow-2xl">
+            <CorporateTestimonial />
           </div>
+        </div>
+
+        <div className="order-2 lg:hidden hidden">
+          {/* Mobile Testimonial Placeholder */}
         </div>
       </div>
     </div>

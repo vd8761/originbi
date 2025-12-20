@@ -1,4 +1,5 @@
 import { CorporateDashboardService } from './corporate-dashboard.service';
+import { RegisterCorporateDto } from './dto/register-corporate.dto';
 export declare class CorporateDashboardController {
     private readonly dashboardService;
     constructor(dashboardService: CorporateDashboardService);
@@ -90,5 +91,9 @@ export declare class CorporateDashboardController {
     }>;
     recordPaymentFailure(orderId: string, description: string): Promise<{
         success: boolean;
+    }>;
+    registerCorporate(dto: RegisterCorporateDto): Promise<{
+        success: boolean;
+        message: string;
     }>;
 }

@@ -59,94 +59,85 @@ const ForgotPasswordForm: React.FC = () => {
     };
 
     return (
-        <div className="w-full max-w-md mx-auto p-8 bg-white dark:bg-[#1E2124] rounded-2xl shadow-xl flex flex-col items-center">
-            {/* Origin BI Logo */}
-            <div className="mb-8">
-                <Logo className="h-10 w-auto" />
+        <form onSubmit={handleSubmit} className="w-full space-y-6" noValidate>
+            {/* Email Field */}
+            <div>
+                <label
+                    htmlFor="email"
+                    className="block font-sans text-[clamp(14px,0.9vw,18px)] font-semibold text-brand-text-light-secondary dark:text-white mb-2 leading-none tracking-[0px]"
+                >
+                    Email Address
+                </label>
+                <input
+                    type="email"
+                    id="email"
+                    value={email}
+                    autoFocus
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={`bg-brand-light-secondary dark:bg-brand-dark-tertiary border text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] font-normal leading-none tracking-[0px] rounded-full block w-full transition-colors duration-300 ${error && error.includes('Email')
+                        ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                        : 'border-brand-light-tertiary dark:border-brand-dark-tertiary focus:ring-brand-green focus:border-brand-green'
+                        }`}
+                    style={{ padding: 'clamp(14px,1vw,20px)' }}
+                    placeholder="name@company.com"
+                    required
+                    disabled={isSubmitting || !!successMessage}
+                />
             </div>
 
-            <h2 className="text-2xl font-bold text-center mb-2 text-brand-text-primary dark:text-white">
-                Forgot Password
-            </h2>
-            <p className="text-center text-sm text-gray-500 dark:text-gray-400 mb-8 max-w-[280px]">
-                Enter your registered email address to receive a password reset code.
-            </p>
-
-            <form onSubmit={handleSubmit} className="w-full space-y-6" noValidate>
-                {/* Email Field */}
-                <div className="space-y-2">
-                    <label
-                        htmlFor="email"
-                        className="block text-sm font-medium text-brand-text-light-secondary dark:text-gray-400 ml-1"
-                    >
-                        Email Address
-                    </label>
-                    <input
-                        type="email"
-                        id="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className={`bg-white dark:bg-[#24272B] border text-brand-text-light-primary dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm rounded-full block w-full p-4 transition-all duration-300 outline-none
-                            ${error && error.includes('Email')
-                                ? 'border-red-500 focus:ring-1 focus:ring-red-500'
-                                : 'border-gray-200 dark:border-white/10 focus:ring-brand-green focus:border-brand-green focus:ring-1 focus:ring-opacity-50'
-                            }`}
-                        placeholder="your@email.com"
-                        required
-                        disabled={isSubmitting || !!successMessage}
-                    />
+            {/* Error Message */}
+            {error && (
+                <div className="flex items-center gap-2 px-1 animate-fade-in text-red-500 dark:text-red-400 mt-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-sm font-medium">{error}</span>
                 </div>
+            )}
 
-                {/* Error Message */}
-                {error && (
-                    <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-sm rounded-lg border border-red-200 dark:border-red-800">
-                        {error}
+            {/* Success Message */}
+            {successMessage && (
+                <div className="space-y-6 text-center animate-fade-in">
+                    <div className="p-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-sm rounded-lg border border-green-200 dark:border-green-800">
+                        {successMessage}
                     </div>
-                )}
-
-                {/* Success Message */}
-                {successMessage && (
-                    <div className="space-y-6 text-center animate-fade-in">
-                        <div className="p-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-sm rounded-lg border border-green-200 dark:border-green-800">
-                            {successMessage}
-                        </div>
-                        <Link
-                            href={`/corporate/reset-password?email=${encodeURIComponent(email)}`}
-                            className="inline-flex items-center text-brand-green font-semibold hover:underline group"
-                        >
-                            Proceed to Reset Password
-                            <svg className="w-4 h-4 ml-2 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
-                            </svg>
-                        </Link>
-                    </div>
-                )}
-
-                {!successMessage && (
-                    <button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="w-full text-white bg-brand-green hover:bg-brand-green/90 focus:ring-brand-green/30 font-bold rounded-full text-base px-5 py-4 text-center transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform active:scale-[0.99] flex justify-center items-center"
-                    >
-                        {isSubmitting ? (
-                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                        ) : 'Send Reset Code'}
-                    </button>
-                )}
-
-                <div className="text-center">
                     <Link
-                        href="/corporate/login"
-                        className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-brand-green transition-colors"
+                        href={`/corporate/reset-password?email=${encodeURIComponent(email)}`}
+                        className="inline-flex items-center text-brand-green font-semibold hover:underline group"
                     >
-                        Back to Login
+                        Proceed to Reset Password
+                        <svg className="w-4 h-4 ml-2 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                        </svg>
                     </Link>
                 </div>
-            </form>
-        </div>
+            )}
+
+            {!successMessage && (
+                <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    style={{ padding: 'clamp(14px,1vw,20px)' }}
+                    className="w-full text-white bg-brand-green hover:bg-brand-green/90 focus:ring-4 focus:outline-none focus:ring-brand-green/30 font-sans font-semibold rounded-full text-[clamp(16px,1vw,20px)] leading-none tracking-[0px] text-center transition-colors duration-300 disabled:bg-brand-green/50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform active:scale-[0.99] flex justify-center items-center"
+                >
+                    {isSubmitting ? (
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    ) : 'Send Reset Code'}
+                </button>
+            )}
+
+            <div className="text-center">
+                <Link
+                    href="/corporate/login"
+                    className="text-sm font-medium text-brand-text-light-secondary dark:text-brand-text-secondary hover:text-brand-green transition-colors"
+                >
+                    Back to Login
+                </Link>
+            </div>
+        </form>
     );
 };
 

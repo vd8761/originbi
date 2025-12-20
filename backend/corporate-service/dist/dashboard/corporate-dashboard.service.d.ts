@@ -1,6 +1,7 @@
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
+import { RegisterCorporateDto } from './dto/register-corporate.dto';
 import { User } from '../entities/user.entity';
 import { CorporateAccount } from '../entities/corporate-account.entity';
 import { CorporateCreditLedger } from '../entities/corporate-credit-ledger.entity';
@@ -12,10 +13,11 @@ export declare class CorporateDashboardService {
     private readonly ledgerRepo;
     private httpService;
     private configService;
+    private readonly dataSource;
     private authServiceUrl;
     private razorpay;
     private perCreditCost;
-    constructor(userRepo: Repository<User>, corporateRepo: Repository<CorporateAccount>, actionLogRepository: Repository<UserActionLog>, ledgerRepo: Repository<CorporateCreditLedger>, httpService: HttpService, configService: ConfigService);
+    constructor(userRepo: Repository<User>, corporateRepo: Repository<CorporateAccount>, actionLogRepository: Repository<UserActionLog>, ledgerRepo: Repository<CorporateCreditLedger>, httpService: HttpService, configService: ConfigService, dataSource: DataSource);
     getStats(email: string): Promise<{
         companyName: string;
         availableCredits: number;
@@ -27,6 +29,12 @@ export declare class CorporateDashboardService {
         success: boolean;
         message: string;
     }>;
+    private createCognitoUser;
+    registerCorporate(dto: RegisterCorporateDto): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    private sendRegistrationSuccessEmail;
     getProfile(email: string): Promise<{
         id: number;
         company_name: string;

@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { RegisterCorporateDto } from './dto/register-corporate.dto';
 import Razorpay = require('razorpay');
 
 import { User } from '../entities/user.entity';
@@ -28,8 +29,16 @@ export class CorporateDashboardService {
         private readonly ledgerRepo: Repository<CorporateCreditLedger>,
         private httpService: HttpService,
         private configService: ConfigService,
+        private readonly dataSource: DataSource,
     ) {
         this.authServiceUrl = this.configService.get<string>('AUTH_SERVICE_URL') || 'http://localhost:4002';
+
+        // Safety check: specific fix for local dev misconfiguration
+        if (this.authServiceUrl.includes('4003')) {
+            console.warn(`[CorporateDashboardService] AUTH_SERVICE_URL misconfigured to ${this.authServiceUrl}. Forcing http://localhost:4002`);
+            this.authServiceUrl = 'http://localhost:4002';
+        }
+
         this.perCreditCost = parseFloat(this.configService.get<string>('PER_CREDIT_COST') || '200');
 
         const keyId = this.configService.get<string>('RAZORPAY_KEY_ID');
@@ -130,6 +139,183 @@ export class CorporateDashboardService {
         }
 
         return { success: true, message: 'Password reset initiated. Check your email.' };
+    }
+
+    // Helper: Create Cognito User
+    private async createCognitoUser(email: string, password: string, groupName: string) {
+        console.log(`[CorporateDashboardService] createCognitoUser calling Auth Service at: ${this.authServiceUrl}`);
+        try {
+            const baseUrl = this.authServiceUrl.replace(/\/$/, '');
+            const url = `${baseUrl}/internal/cognito/users`;
+            const res$ = this.httpService.post(url, { email, password, groupName });
+            const res = await firstValueFrom(res$);
+            return res.data as { sub?: string };
+        } catch (err: any) {
+            console.error('Error creating Cognito user:', err);
+            const status = err.response?.status;
+            const msg = err.response?.data?.message || err.message;
+
+            if (status && status >= 400 && status < 500) {
+                throw new BadRequestException(`Auth Service: ${msg}`);
+            }
+            throw new InternalServerErrorException(`Auth Service Failed: ${msg}`);
+        }
+    }
+
+    async registerCorporate(dto: RegisterCorporateDto) {
+        const email = dto.email.trim();
+        const existingUser = await this.userRepo.findOne({ where: { email: email } });
+        if (existingUser) {
+            throw new BadRequestException(`Email '${email}' is already registered`);
+        }
+
+        const existingMobile = await this.corporateRepo.findOne({
+            where: { mobileNumber: dto.mobile, countryCode: dto.countryCode }
+        });
+        if (existingMobile) {
+            throw new BadRequestException('Mobile number already exists for a corporate account');
+        }
+
+        let sub: string;
+        try {
+            const cognitoRes = await this.createCognitoUser(email, dto.password, 'CORPORATE');
+            sub = cognitoRes.sub!;
+        } catch (e) {
+            throw e;
+        }
+
+        try {
+            const result = await this.dataSource.transaction(async (manager) => {
+                const user = manager.create(User, {
+                    email: email,
+                    role: 'CORPORATE',
+                    emailVerified: true,
+                    cognitoSub: sub,
+                    isActive: false, // Inactive by default for public registration
+                    isBlocked: false,
+                    metadata: {
+                        fullName: dto.name,
+                        countryCode: dto.countryCode,
+                        mobile: dto.mobile,
+                        gender: dto.gender,
+                    },
+                });
+                await manager.save(user);
+
+                const corporateAccount = manager.create(CorporateAccount, {
+                    userId: user.id,
+                    fullName: dto.name,
+                    companyName: dto.companyName,
+                    sectorCode: dto.sector,
+                    businessLocations: dto.businessLocations,
+                    jobTitle: dto.jobTitle,
+                    employeeRefId: dto.employeeCode,
+                    linkedinUrl: dto.linkedinUrl,
+                    countryCode: dto.countryCode,
+                    mobileNumber: dto.mobile,
+                    gender: dto.gender,
+                    totalCredits: 0, // No credits for self-registration
+                    availableCredits: 0,
+                    isActive: false, // Inactive
+                });
+                await manager.save(corporateAccount);
+
+                return { success: true, message: 'Registration successful. Account pending approval.' };
+            });
+
+            // Send Confirmation Email after successful transaction
+            this.sendRegistrationSuccessEmail(email, {
+                name: dto.name,
+                companyName: dto.companyName,
+                email: email,
+                mobile: dto.mobile,
+                password: dto.password,
+                loginUrl: this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000'
+            }).catch(emailErr => console.error("Failed to send registration email:", emailErr));
+
+            return result;
+
+        } catch (dbError: any) {
+            console.error(`Database Transaction Failed in Public Register: ${dbError.message}`, dbError.stack);
+            // Handle Unique Constraint Violations (Postgres code 23505)
+            if (dbError.code === '23505') {
+                throw new BadRequestException('Duplicate entry detected (Email or Mobile).');
+            }
+            throw new InternalServerErrorException(`Database Transaction Failed: ${dbError.message}`);
+        }
+    }
+
+    private async sendRegistrationSuccessEmail(toAddress: string, data: any) {
+        const { SESClient, SendEmailCommand } = require("@aws-sdk/client-ses");
+        const fs = require('fs');
+        const path = require('path');
+
+        const sesClient = new SESClient({
+            region: this.configService.get<string>('AWS_REGION'),
+            credentials: {
+                accessKeyId: this.configService.get<string>('AWS_ACCESS_KEY_ID'),
+                secretAccessKey: this.configService.get<string>('AWS_SECRET_ACCESS_KEY'),
+            },
+        });
+
+        const templatePath = path.join(__dirname, '..', 'mail', 'templates', 'registration-success.html');
+        let htmlContent = fs.readFileSync(templatePath, 'utf8');
+
+        // Assets (Using public URLs or placeholders similar to Admin Service)
+        const assets = {
+            logo: "https://originbi.com/wp-content/uploads/2023/11/Origin-BI-Logo-01.png", // Public Logo
+            popper: "https://originbi-assets.s3.ap-south-1.amazonaws.com/email-assets/celebration-popper.png", // Assuming S3 or use a public one
+            pattern: "https://originbi-assets.s3.ap-south-1.amazonaws.com/email-assets/pattern-bg.png",
+            footer: "https://originbi-assets.s3.ap-south-1.amazonaws.com/email-assets/email-footer.png"
+        };
+        // Fallback for demo if S3 links fail (Optional, but using what seems likely valid or public)
+
+        htmlContent = htmlContent.replace('{{name}}', data.name);
+        htmlContent = htmlContent.replace('{{companyName}}', data.companyName);
+        htmlContent = htmlContent.replace('{{email}}', data.email);
+        htmlContent = htmlContent.replace('{{mobile}}', data.mobile);
+        htmlContent = htmlContent.replace('{{password}}', data.password);
+        htmlContent = htmlContent.replace('{{loginUrl}}', `${data.loginUrl}/corporate/login`);
+        htmlContent = htmlContent.replace('{{year}}', new Date().getFullYear().toString());
+
+        // Asset replacements
+        htmlContent = htmlContent.replace('{{logo}}', assets.logo);
+        // If specific assets aren't real, these might break images. 
+        // Let's use the ones likely used in the project or generic ones for now if I can't confirm.
+        // I will use placeholders for now to ensure layout works.
+        htmlContent = htmlContent.replace('{{popper}}', "https://img.icons8.com/emoji/96/party-popper.png");
+        htmlContent = htmlContent.replace('{{pattern}}', "");
+        htmlContent = htmlContent.replace('{{footer}}', "");
+
+        const params = {
+            Source: this.configService.get<string>('EMAIL_FROM'),
+            Destination: {
+                ToAddresses: [toAddress],
+                CcAddresses: this.configService.get<string>('EMAIL_CC') ? [this.configService.get<string>('EMAIL_CC')] : [],
+            },
+            Message: {
+                Subject: {
+                    Data: "Welcome to Origin BI - Registration Received",
+                    Charset: "UTF-8",
+                },
+                Body: {
+                    Html: {
+                        Data: htmlContent,
+                        Charset: "UTF-8",
+                    },
+                },
+            },
+        };
+
+        try {
+            const command = new SendEmailCommand(params);
+            await sesClient.send(command);
+            const cc = this.configService.get<string>('EMAIL_CC') || 'None';
+            console.log(`Registration email sent to ${toAddress}, CC: ${cc}`);
+        } catch (error) {
+            console.error("Error sending registration SES email:", error);
+            // Don't throw, just log
+        }
     }
 
     async getProfile(email: string) {
@@ -354,7 +540,7 @@ export class CorporateDashboardService {
             },
         });
 
-        const templatePath = path.join(__dirname, '..', 'mail', 'payment-success.html');
+        const templatePath = path.join(__dirname, '..', 'mail', 'templates', 'payment-success.html');
         let htmlContent = fs.readFileSync(templatePath, 'utf8');
 
         htmlContent = htmlContent.replace('{{paymentId}}', data.paymentId);
