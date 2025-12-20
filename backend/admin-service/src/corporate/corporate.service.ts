@@ -451,6 +451,7 @@ export class CorporateService {
 
                 const corporateAccount = manager.create(CorporateAccount, {
                     userId: user.id,
+                    fullName: dto.name, // ✅ Fix: Populate full_name
                     companyName: dto.companyName,
                     sectorCode: dto.sector,
                     businessLocations: dto.businessLocations,
