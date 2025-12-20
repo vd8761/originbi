@@ -13,16 +13,19 @@ import { CorporateDashboardModule } from './dashboard/corporate-dashboard.module
             imports: [ConfigModule],
             inject: [ConfigService],
             useFactory: (config: ConfigService) => {
-                const databaseUrl = config.get<string>('DATABASE_URL');
-                if (databaseUrl) {
+                const isProd = config.get<string>('NODE_ENV') === 'production';
+
+                if (isProd) {
+                    const databaseUrl = config.get<string>('DATABASE_URL');
                     return {
                         type: 'postgres',
                         url: databaseUrl,
                         autoLoadEntities: true,
                         synchronize: false,
-                        ssl: { rejectUnauthorized: false }, // Often required for cloud DBs like Neon
+                        ssl: { rejectUnauthorized: false },
                     };
                 }
+
                 return {
                     type: 'postgres',
                     host: config.get<string>('DB_HOST'),
@@ -32,6 +35,7 @@ import { CorporateDashboardModule } from './dashboard/corporate-dashboard.module
                     database: config.get<string>('DB_NAME'),
                     autoLoadEntities: true,
                     synchronize: false,
+                    ssl: false,
                 };
             },
         }),

@@ -14,8 +14,10 @@ import { ForgotPasswordModule } from './forgotpassword/forgotpassword.module';
             imports: [ConfigModule],
             inject: [ConfigService],
             useFactory: (config: ConfigService) => {
-                const databaseUrl = config.get<string>('DATABASE_URL');
-                if (databaseUrl) {
+                const isProd = config.get<string>('NODE_ENV') === 'production';
+
+                if (isProd) {
+                    const databaseUrl = config.get<string>('DATABASE_URL');
                     return {
                         type: 'postgres',
                         url: databaseUrl,
@@ -24,6 +26,7 @@ import { ForgotPasswordModule } from './forgotpassword/forgotpassword.module';
                         ssl: { rejectUnauthorized: false },
                     };
                 }
+
                 return {
                     type: 'postgres',
                     host: config.get<string>('DB_HOST'),
@@ -33,6 +36,7 @@ import { ForgotPasswordModule } from './forgotpassword/forgotpassword.module';
                     database: config.get<string>('DB_NAME'),
                     autoLoadEntities: true,
                     synchronize: false,
+                    ssl: false,
                 };
             },
         }),
