@@ -18,8 +18,8 @@ async function bootstrap() {
     credentials: true,
   });
 
-  const port = process.env.AUTH_PORT || 4002;
-  await app.listen(port);
+  const port = process.env.PORT || 4002;
+  await app.listen(port, '0.0.0.0');
   console.log(`[auth-service] running on http://localhost:${port}`);
 }
 bootstrap();
