@@ -247,8 +247,9 @@ export class CorporateDashboardService {
 
     private async sendRegistrationSuccessEmail(toAddress: string, data: any) {
         const { SESClient, SendEmailCommand } = require("@aws-sdk/client-ses");
-        const fs = require('fs');
-        const path = require('path');
+        // Imported locally to avoid top-level issues if file structure changes, though standard import is better. 
+        // For now, let's keep it clean.
+        const { getRegistrationSuccessEmailTemplate } = require('../mail/templates/registration-success.template');
 
         const sesClient = new SESClient({
             region: this.configService.get<string>('AWS_REGION'),
@@ -258,9 +259,6 @@ export class CorporateDashboardService {
             },
         });
 
-        const templatePath = path.join(__dirname, '..', 'mail', 'templates', 'registration-success.html');
-        let htmlContent = fs.readFileSync(templatePath, 'utf8');
-
         // Assets (Using public URLs or placeholders similar to Admin Service)
         const assets = {
             logo: "https://originbi.com/wp-content/uploads/2023/11/Origin-BI-Logo-01.png", // Public Logo
@@ -268,24 +266,17 @@ export class CorporateDashboardService {
             pattern: "https://originbi-assets.s3.ap-south-1.amazonaws.com/email-assets/pattern-bg.png",
             footer: "https://originbi-assets.s3.ap-south-1.amazonaws.com/email-assets/email-footer.png"
         };
-        // Fallback for demo if S3 links fail (Optional, but using what seems likely valid or public)
 
-        htmlContent = htmlContent.replace('{{name}}', data.name);
-        htmlContent = htmlContent.replace('{{companyName}}', data.companyName);
-        htmlContent = htmlContent.replace('{{email}}', data.email);
-        htmlContent = htmlContent.replace('{{mobile}}', data.mobile);
-        htmlContent = htmlContent.replace('{{password}}', data.password);
-        htmlContent = htmlContent.replace('{{loginUrl}}', `${data.loginUrl}/corporate/login`);
-        htmlContent = htmlContent.replace('{{year}}', new Date().getFullYear().toString());
-
-        // Asset replacements
-        htmlContent = htmlContent.replace('{{logo}}', assets.logo);
-        // If specific assets aren't real, these might break images. 
-        // Let's use the ones likely used in the project or generic ones for now if I can't confirm.
-        // I will use placeholders for now to ensure layout works.
-        htmlContent = htmlContent.replace('{{popper}}', "https://img.icons8.com/emoji/96/party-popper.png");
-        htmlContent = htmlContent.replace('{{pattern}}', "");
-        htmlContent = htmlContent.replace('{{footer}}', "");
+        // Use the TS template function
+        const htmlContent = getRegistrationSuccessEmailTemplate(
+            data.name,
+            data.companyName,
+            data.email,
+            data.mobile,
+            data.password,
+            `${data.loginUrl}/corporate/login`, // Ensure full login URL path
+            assets
+        );
 
         const params = {
             Source: this.configService.get<string>('EMAIL_FROM'),
@@ -478,7 +469,13 @@ export class CorporateDashboardService {
                 const user = await this.userRepo.findOne({ where: { id: createdByUserId } });
                 const emailToSend = user ? user.email : email;
 
+                // Get updated corporate account to ensure we have the name
+                const updatedCorporate = await queryRunner.manager.findOne(CorporateAccount, {
+                    where: { id: corporateAccountId },
+                });
+
                 await this.sendPaymentSuccessEmail(emailToSend, {
+                    name: updatedCorporate?.fullName || 'Valued Customer',
                     paymentId: razorpay_payment_id,
                     amount: totalAmount.toFixed(2),
                     credits: creditDelta,
@@ -529,8 +526,7 @@ export class CorporateDashboardService {
 
     private async sendPaymentSuccessEmail(toAddress: string, data: any) {
         const { SESClient, SendEmailCommand } = require("@aws-sdk/client-ses");
-        const fs = require('fs');
-        const path = require('path');
+        const { getPaymentSuccessEmailTemplate } = require('../mail/templates/payment-success.template');
 
         const sesClient = new SESClient({
             region: this.configService.get<string>('AWS_REGION'),
@@ -540,21 +536,29 @@ export class CorporateDashboardService {
             },
         });
 
-        const templatePath = path.join(__dirname, '..', 'mail', 'templates', 'payment-success.html');
-        let htmlContent = fs.readFileSync(templatePath, 'utf8');
+        // Assets (Using public URLs or placeholders similar to Admin Service)
+        const assets = {
+            logo: "https://originbi.com/wp-content/uploads/2023/11/Origin-BI-Logo-01.png",
+            popper: "https://originbi-assets.s3.ap-south-1.amazonaws.com/email-assets/celebration-popper.png",
+            pattern: "https://originbi-assets.s3.ap-south-1.amazonaws.com/email-assets/pattern-bg.png",
+            footer: "https://originbi-assets.s3.ap-south-1.amazonaws.com/email-assets/email-footer.png"
+        };
 
-        htmlContent = htmlContent.replace('{{paymentId}}', data.paymentId);
-        htmlContent = htmlContent.replace('{{amount}}', data.amount);
-        htmlContent = htmlContent.replace('{{credits}}', data.credits);
-        htmlContent = htmlContent.replace('{{date}}', data.date);
-        htmlContent = htmlContent.replace('{{dashboardUrl}}', `${data.dashboardUrl}/corporate/dashboard`);
-        htmlContent = htmlContent.replace('{{year}}', new Date().getFullYear().toString());
+        const htmlContent = getPaymentSuccessEmailTemplate(
+            data.name,
+            data.paymentId,
+            data.amount,
+            data.credits,
+            data.date,
+            `${data.dashboardUrl}/corporate/dashboard`,
+            assets
+        );
 
         const params = {
             Source: this.configService.get<string>('EMAIL_FROM'),
             Destination: {
                 ToAddresses: [toAddress],
-                CcAddresses: [this.configService.get<string>('EMAIL_CC')],
+                CcAddresses: this.configService.get<string>('EMAIL_CC') ? [this.configService.get<string>('EMAIL_CC')] : [],
             },
             Message: {
                 Subject: {
@@ -570,8 +574,13 @@ export class CorporateDashboardService {
             },
         };
 
-        const command = new SendEmailCommand(params);
-        await sesClient.send(command);
+        try {
+            const command = new SendEmailCommand(params);
+            await sesClient.send(command);
+            console.log(`Payment success email sent to ${toAddress}`);
+        } catch (error) {
+            console.error("Failed to send payment success email:", error);
+        }
     }
 
     async getLedger(email: string, page: number = 1, limit: number = 10, search?: string) {
