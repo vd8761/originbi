@@ -16,6 +16,7 @@
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.948.0",
     "@nestjs/common": "^11.1.9",
+    "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.9",
     "@nestjs/platform-express": "^11.1.9",
     "class-transformer": "^0.5.1",
