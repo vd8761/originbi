@@ -19,6 +19,7 @@ const typeorm_2 = require("typeorm");
 const config_1 = require("@nestjs/config");
 const axios_1 = require("@nestjs/axios");
 const rxjs_1 = require("rxjs");
+const Razorpay = require("razorpay");
 const user_entity_1 = require("../entities/user.entity");
 const corporate_account_entity_1 = require("../entities/corporate-account.entity");
 const corporate_credit_ledger_entity_1 = require("../entities/corporate-credit-ledger.entity");
@@ -33,11 +34,14 @@ let CorporateDashboardService = class CorporateDashboardService {
         this.configService = configService;
         this.authServiceUrl = this.configService.get('AUTH_SERVICE_URL') || 'http://localhost:4002';
         this.perCreditCost = parseFloat(this.configService.get('PER_CREDIT_COST') || '200');
-        const Razorpay = require('razorpay');
-        this.razorpay = new Razorpay({
-            key_id: this.configService.get('RAZORPAY_KEY_ID'),
-            key_secret: this.configService.get('RAZORPAY_KEY_SECRET'),
-        });
+        const keyId = this.configService.get('RAZORPAY_KEY_ID');
+        const keySecret = this.configService.get('RAZORPAY_KEY_SECRET');
+        if (keyId && keySecret) {
+            this.razorpay = new Razorpay({
+                key_id: keyId,
+                key_secret: keySecret,
+            });
+        }
     }
     async getStats(email) {
         const user = await this.userRepo.findOne({ where: { email } });
