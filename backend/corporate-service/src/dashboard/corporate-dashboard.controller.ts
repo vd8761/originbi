@@ -7,6 +7,7 @@ import {
     BadRequestException,
 } from '@nestjs/common';
 import { CorporateDashboardService } from './corporate-dashboard.service';
+import { RegisterCorporateDto } from './dto/register-corporate.dto';
 
 @Controller('dashboard')
 export class CorporateDashboardController {
@@ -79,5 +80,10 @@ export class CorporateDashboardController {
     @Post('record-payment-failure')
     async recordPaymentFailure(@Body('orderId') orderId: string, @Body('description') description: string) {
         return this.dashboardService.recordPaymentFailure(orderId, description);
+    }
+
+    @Post('register-corporate')
+    async registerCorporate(@Body() dto: RegisterCorporateDto) {
+        return this.dashboardService.registerCorporate(dto);
     }
 }

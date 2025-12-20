@@ -291,12 +291,12 @@ const LoginForm: React.FC<LoginFormProps> = ({
       <div className="text-center">
         <p className="text-center text-sm text-brand-text-light-secondary dark:text-brand-text-secondary">
           Join Us?{" "}
-          <a
-            href="#"
+          <Link
+            href="/corporate/register"
             className="text-brand-green font-medium hover:text-brand-green/80 transition-colors"
           >
             Register your organization
-          </a>
+          </Link>
         </p>
       </div>
     </form>

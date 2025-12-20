@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { RegisterCorporateDto } from './dto/register-corporate.dto';
 import Razorpay = require('razorpay');
 
 import { User } from '../entities/user.entity';
@@ -28,6 +29,7 @@ export class CorporateDashboardService {
         private readonly ledgerRepo: Repository<CorporateCreditLedger>,
         private httpService: HttpService,
         private configService: ConfigService,
+        private readonly dataSource: DataSource,
     ) {
         this.authServiceUrl = this.configService.get<string>('AUTH_SERVICE_URL') || 'http://localhost:4002';
         this.perCreditCost = parseFloat(this.configService.get<string>('PER_CREDIT_COST') || '200');
@@ -130,6 +132,88 @@ export class CorporateDashboardService {
         }
 
         return { success: true, message: 'Password reset initiated. Check your email.' };
+    }
+
+    // Helper: Create Cognito User
+    private async createCognitoUser(email: string, password: string, groupName: string) {
+        try {
+            const url = `${this.authServiceUrl}/internal/cognito/users`;
+            const res$ = this.httpService.post(url, { email, password, groupName });
+            const res = await firstValueFrom(res$);
+            return res.data as { sub?: string };
+        } catch (err: any) {
+            const authErr = err?.response?.data || err?.message || err;
+            console.error('Error creating Cognito user:', authErr);
+            throw new InternalServerErrorException(
+                authErr?.message || 'Failed to create Cognito user'
+            );
+        }
+    }
+
+    async registerCorporate(dto: RegisterCorporateDto) {
+        const email = dto.email.trim();
+        const existingUser = await this.userRepo.findOne({ where: { email: email } });
+        if (existingUser) {
+            throw new BadRequestException(`Email '${email}' is already registered`);
+        }
+
+        const existingMobile = await this.corporateRepo.findOne({
+            where: { mobileNumber: dto.mobile, countryCode: dto.countryCode }
+        });
+        if (existingMobile) {
+            throw new BadRequestException('Mobile number already exists for a corporate account');
+        }
+
+        let sub: string;
+        try {
+            const cognitoRes = await this.createCognitoUser(email, dto.password, 'CORPORATE');
+            sub = cognitoRes.sub!;
+        } catch (e) {
+            throw e;
+        }
+
+        try {
+            return await this.dataSource.transaction(async (manager) => {
+                const user = manager.create(User, {
+                    email: email,
+                    role: 'CORPORATE',
+                    emailVerified: true,
+                    cognitoSub: sub,
+                    isActive: false, // Inactive by default for public registration
+                    isBlocked: false,
+                    metadata: {
+                        fullName: dto.name,
+                        countryCode: dto.countryCode,
+                        mobile: dto.mobile,
+                        gender: dto.gender,
+                    },
+                });
+                await manager.save(user);
+
+                const corporateAccount = manager.create(CorporateAccount, {
+                    userId: user.id,
+                    fullName: dto.name,
+                    companyName: dto.companyName,
+                    sectorCode: dto.sector,
+                    businessLocations: dto.businessLocations,
+                    jobTitle: dto.jobTitle,
+                    employeeRefId: dto.employeeCode,
+                    linkedinUrl: dto.linkedinUrl,
+                    countryCode: dto.countryCode,
+                    mobileNumber: dto.mobile,
+                    gender: dto.gender,
+                    totalCredits: 0, // No credits for self-registration
+                    availableCredits: 0,
+                    isActive: false, // Inactive
+                });
+                await manager.save(corporateAccount);
+
+                return { success: true, message: 'Registration successful. Account pending approval.' };
+            });
+        } catch (dbError: any) {
+            console.error(`Database Transaction Failed in Public Register: ${dbError.message}`, dbError.stack);
+            throw new InternalServerErrorException(`Database Transaction Failed: ${dbError.message}`);
+        }
     }
 
     async getProfile(email: string) {
@@ -354,7 +438,7 @@ export class CorporateDashboardService {
             },
         });
 
-        const templatePath = path.join(__dirname, '..', 'mail', 'templates', '');
+        const templatePath = path.join(__dirname, '..', 'mail', 'templates', 'payment-success.html');
         let htmlContent = fs.readFileSync(templatePath, 'utf8');
 
         htmlContent = htmlContent.replace('{{paymentId}}', data.paymentId);
