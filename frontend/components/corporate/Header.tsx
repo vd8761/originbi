@@ -55,8 +55,8 @@ const NavItem: React.FC<NavItemProps> = ({
       <button
         onClick={onClick}
         className={`flex items-center ${spacingClass} rounded-lg transition-colors duration-200 w-full ${active
-            ? "bg-brand-green text-white px-3 py-2"
-            : "text-brand-text-light-secondary dark:text-brand-text-secondary hover:bg-brand-light-tertiary dark:hover:bg-brand-dark-tertiary hover:text-brand-text-light-primary dark:hover:text-white p-2 lg:px-3"
+          ? "bg-brand-green text-white px-3 py-2"
+          : "text-brand-text-light-secondary dark:text-brand-text-secondary hover:bg-brand-light-tertiary dark:hover:bg-brand-dark-tertiary hover:text-brand-text-light-primary dark:hover:text-white p-2 lg:px-3"
           }`}
       >
         <div className={`${active ? "text-white" : "text-current"}`}>
@@ -396,8 +396,8 @@ const Header: React.FC<HeaderProps> = ({
                   }}
                 >
                   <CoinIcon className="w-5 h-5" />
-                  <span className="font-bold text-sm text-brand-text-light-primary dark:text-white">
-                    {corporateData?.available_credits ?? 250}
+                  <span className="font-bold text-sm text-brand-text-light-primary dark:text-white min-w-[20px] text-center">
+                    {corporateData ? corporateData.available_credits : <span className="animate-pulse">...</span>}
                   </span>
                 </div>
               )}
