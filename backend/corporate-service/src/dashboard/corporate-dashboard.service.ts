@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import Razorpay = require('razorpay');
+
 import { User } from '../entities/user.entity';
 import { CorporateAccount } from '../entities/corporate-account.entity';
 import { CorporateCreditLedger } from '../entities/corporate-credit-ledger.entity';
@@ -30,11 +32,15 @@ export class CorporateDashboardService {
         this.authServiceUrl = this.configService.get<string>('AUTH_SERVICE_URL') || 'http://localhost:4002';
         this.perCreditCost = parseFloat(this.configService.get<string>('PER_CREDIT_COST') || '200');
 
-        const Razorpay = require('razorpay');
-        this.razorpay = new Razorpay({
-            key_id: this.configService.get<string>('RAZORPAY_KEY_ID'),
-            key_secret: this.configService.get<string>('RAZORPAY_KEY_SECRET'),
-        });
+        const keyId = this.configService.get<string>('RAZORPAY_KEY_ID');
+        const keySecret = this.configService.get<string>('RAZORPAY_KEY_SECRET');
+
+        if (keyId && keySecret) {
+            this.razorpay = new Razorpay({
+                key_id: keyId,
+                key_secret: keySecret,
+            });
+        }
     }
 
     async getStats(email: string) {
@@ -125,6 +131,7 @@ export class CorporateDashboardService {
 
         return { success: true, message: 'Password reset initiated. Check your email.' };
     }
+
     async getProfile(email: string) {
         const user = await this.userRepo.findOne({ where: { email } });
         if (!user) {
@@ -133,7 +140,7 @@ export class CorporateDashboardService {
 
         const corporate = await this.corporateRepo.findOne({
             where: { userId: user.id },
-            relations: ['user'], // Load user relation if needed, though we have 'user' already
+            relations: ['user'],
         });
 
         if (!corporate) {
@@ -142,12 +149,6 @@ export class CorporateDashboardService {
 
         return {
             ...corporate,
-            // Map snake_case to what frontend expects if needed, or just return entity
-            // The frontend CorporateDetailsView expects fields like full_name, etc.
-            // My entity uses camelCase properties mapped to snake_case columns.
-            // I should return an object that matches the frontend interface ExtendedCorporateAccount
-            // Frontend keys: full_name, email, job_title, etc.
-            // Entity keys: fullName, email (from user), jobTitle...
             id: corporate.id,
             company_name: corporate.companyName,
             sector_code: corporate.sectorCode,
@@ -195,9 +196,6 @@ export class CorporateDashboardService {
 
         try {
             const order = await this.razorpay.orders.create(options);
-            // NOTE: We do NOT create a ledger entry here anymore. 
-            // It will be created on success or failure confirmation.
-
             return {
                 orderId: order.id,
                 amount: totalAmount * 100,
@@ -228,7 +226,7 @@ export class CorporateDashboardService {
             throw new BadRequestException('Payment verification failed');
         }
 
-        // 2. Fetch Order Details from Razorpay to get Metadata (Notes)
+        // 2. Fetch Order Details from Razorpay
         let order;
         try {
             order = await this.razorpay.orders.fetch(razorpay_order_id);
@@ -291,9 +289,6 @@ export class CorporateDashboardService {
 
             // --- Send Success Email ---
             try {
-                // Fetch user email details 
-                // We can use the 'email' arg passed to this function as it comes from the auth context/session usually
-                // Or fetch from DB using createdByUserId
                 const user = await this.userRepo.findOne({ where: { id: createdByUserId } });
                 const emailToSend = user ? user.email : email;
 
@@ -318,18 +313,17 @@ export class CorporateDashboardService {
     }
 
     async recordPaymentFailure(razorpayOrderId: string, errorDescription: string) {
-        // Fetch Order to get details
         let order;
         try {
             order = await this.razorpay.orders.fetch(razorpayOrderId);
         } catch (e) {
             console.error("Failed to fetch order for failure recording", e);
-            return; // Can't record if we don't know who it is
+            return;
         }
 
         const notes = order.notes;
         const existing = await this.ledgerRepo.findOne({ where: { razorpayOrderId: razorpayOrderId } });
-        if (existing) return; // Already recorded
+        if (existing) return;
 
         const ledgerEntry = this.ledgerRepo.create({
             corporateAccountId: Number(notes.corporateAccountId),
@@ -363,7 +357,6 @@ export class CorporateDashboardService {
         const templatePath = path.join(__dirname, '..', 'mail', 'payment-success.html');
         let htmlContent = fs.readFileSync(templatePath, 'utf8');
 
-        // Replace placeholders
         htmlContent = htmlContent.replace('{{paymentId}}', data.paymentId);
         htmlContent = htmlContent.replace('{{amount}}', data.amount);
         htmlContent = htmlContent.replace('{{credits}}', data.credits);
@@ -411,7 +404,6 @@ export class CorporateDashboardService {
                 { corporateAccountId: corporate.id, ledgerType: ILike(`%${search}%`) },
                 { corporateAccountId: corporate.id, paymentStatus: ILike(`%${search}%`) },
                 { corporateAccountId: corporate.id, razorpayPaymentId: ILike(`%${search}%`) },
-                // Date searching
                 {
                     corporateAccountId: corporate.id,
                     createdAt: Raw(alias => `TO_CHAR(${alias}, 'MM/DD/YYYY') ILIKE '%${search}%'`)
@@ -430,7 +422,6 @@ export class CorporateDashboardService {
             take: limit,
         });
 
-        // Map items to snake_case for frontend
         const mappedItems = items.map(item => ({
             id: item.id,
             corporate_account_id: item.corporateAccountId,
@@ -439,7 +430,6 @@ export class CorporateDashboardService {
             reason: item.reason,
             created_by_user_id: item.createdByUserId,
             created_at: item.createdAt,
-            // Add new payment fields
             per_credit_cost: item.perCreditCost,
             total_amount: item.totalAmount,
             payment_status: item.paymentStatus,
@@ -461,20 +451,17 @@ export class CorporateDashboardService {
         const corporate = await this.corporateRepo.findOne({ where: { userId: user.id } });
         if (!corporate) throw new NotFoundException('Corporate account not found');
 
-        // Update corporate credits
         corporate.availableCredits += amount;
         corporate.totalCredits += amount;
         await this.corporateRepo.save(corporate);
 
-        // Add ledger entry
         const ledger = this.ledgerRepo.create({
             corporateAccountId: corporate.id,
-            creditDelta: amount,  // Positive for top up
+            creditDelta: amount,
             ledgerType: 'CREDIT',
             reason: reason || 'Top-up',
             createdByUserId: corporate.userId,
-            // Admin top-up usually has no payment cost associated in this flow, or 0
-            paymentStatus: 'NA', // Not Applicable
+            paymentStatus: 'NA',
             totalAmount: 0,
         });
         await this.ledgerRepo.save(ledger);
