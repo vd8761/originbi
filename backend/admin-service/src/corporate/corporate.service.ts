@@ -4,6 +4,7 @@ import {
     BadRequestException,
     Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
@@ -18,15 +19,11 @@ import { getCorporateWelcomeEmailTemplate } from '../mail/templates/corporate-we
 @Injectable()
 export class CorporateService {
     private readonly logger = new Logger(CorporateService.name);
-    private authServiceBaseUrl =
-        process.env.AUTH_SERVICE_URL || 'http://localhost:4002';
-
-    // Hardcoded Admin ID for 'created_by' fields if needed, 
-    // or we could extract from request context if we had that passed down.
-    // For now, using 1 as system admin.
+    private authServiceBaseUrl: string;
     private readonly ADMIN_USER_ID = 1;
 
     constructor(
+        private readonly configService: ConfigService,
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
 
@@ -395,7 +392,7 @@ export class CorporateService {
         const existingUser = await this.userRepo.findOne({ where: { email: email } });
         if (existingUser) {
             this.logger.warn(`Failed to create corporate user: Email '${email}' already exists. UserID: ${existingUser.id}`);
-            throw new BadRequestException(`Email '${email}' is already registered (UserID: ${existingUser.id})`);
+            throw new BadRequestException(`Email '${email}' is already registered`); //(UserID: ${existingUser.id})
         }
 
         // Check Mobile uniqueness in Corporate Account
