@@ -33,6 +33,7 @@ exports.AppModule = AppModule = __decorate([
                             url: databaseUrl,
                             autoLoadEntities: true,
                             synchronize: false,
+                            ssl: { rejectUnauthorized: false },
                         };
                     }
                     return {

@@ -24,16 +24,28 @@ exports.AppModule = AppModule = __decorate([
             typeorm_1.TypeOrmModule.forRootAsync({
                 imports: [config_1.ConfigModule],
                 inject: [config_1.ConfigService],
-                useFactory: (config) => ({
-                    type: 'postgres',
-                    host: config.get('DB_HOST'),
-                    port: Number(config.get('DB_PORT') || 5432),
-                    username: config.get('DB_USER'),
-                    password: config.get('DB_PASS'),
-                    database: config.get('DB_NAME'),
-                    autoLoadEntities: true,
-                    synchronize: false,
-                }),
+                useFactory: (config) => {
+                    const databaseUrl = config.get('DATABASE_URL');
+                    if (databaseUrl) {
+                        return {
+                            type: 'postgres',
+                            url: databaseUrl,
+                            autoLoadEntities: true,
+                            synchronize: false,
+                            ssl: { rejectUnauthorized: false },
+                        };
+                    }
+                    return {
+                        type: 'postgres',
+                        host: config.get('DB_HOST'),
+                        port: Number(config.get('DB_PORT') || 5432),
+                        username: config.get('DB_USER'),
+                        password: config.get('DB_PASS'),
+                        database: config.get('DB_NAME'),
+                        autoLoadEntities: true,
+                        synchronize: false,
+                    };
+                },
             }),
             corporate_dashboard_module_1.CorporateDashboardModule,
         ],
