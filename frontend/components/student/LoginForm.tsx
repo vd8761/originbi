@@ -62,8 +62,11 @@ const LoginForm: React.FC<LoginFormProps> = ({
     const { name, value } = e.target;
     setTouched((prev) => ({ ...prev, [name]: true }));
 
-    if (name === 'email') {
+    if (name === 'email' && value) {
       setErrors((prev) => ({ ...prev, email: validateEmail(value) }));
+    } else if (name === 'email' && !value) {
+      // Clear error if empty on blur to avoid premature "Required" message
+      setErrors((prev) => ({ ...prev, email: '' }));
     }
     if (name === 'password') {
       setErrors((prev) => ({ ...prev, password: validatePassword(value) }));
@@ -164,7 +167,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
   const isPasswordInvalid = touched.password && !!errors.password;
 
   return (
-    <form className="flex flex-col gap-[clamp(24px,2.5vw,48px)]" onSubmit={handleSubmit} noValidate>
+    <form className="flex flex-col gap-[clamp(16px,2.5vw,48px)]" onSubmit={handleSubmit} noValidate>
 
       {generalError && (
         <div className="flex items-center gap-2 px-1 animate-fade-in text-red-500 dark:text-red-400">
@@ -226,11 +229,11 @@ const LoginForm: React.FC<LoginFormProps> = ({
             onChange={handleChange}
             onBlur={handleBlur}
             placeholder="Enter your password"
-            className={`bg-brand-light-secondary dark:bg-brand-dark-tertiary border text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] font-normal leading-none tracking-[0px] rounded-full block w-full pr-12 transition-colors duration-300 ${isPasswordInvalid
+            className={`bg-brand-light-secondary dark:bg-brand-dark-tertiary border text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] font-normal leading-none tracking-[0px] rounded-full block w-full pr-16 transition-colors duration-300 ${isPasswordInvalid
               ? "border-red-500 focus:ring-red-500 focus:border-red-500"
               : "border-brand-light-tertiary dark:border-brand-dark-tertiary focus:ring-brand-green focus:border-brand-green"
               }`}
-            style={{ padding: 'clamp(14px,1vw,20px)' }}
+            style={{ padding: 'clamp(14px,1vw,20px)', paddingRight: '4rem' }}
             required
             disabled={isSubmitting}
             aria-invalid={isPasswordInvalid}

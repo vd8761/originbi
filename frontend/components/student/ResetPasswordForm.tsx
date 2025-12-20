@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, FormEvent, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { confirmResetPassword } from 'aws-amplify/auth';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -92,33 +93,63 @@ const ResetPasswordForm: React.FC = () => {
     }, [successMessage, router]);
 
     // 3️⃣ Password Reset Success Screen
-    if (successMessage) {
-
-        return (
-            <div className="w-full max-w-md mx-auto p-10 bg-white dark:bg-[#1E2124] rounded-2xl shadow-xl text-center space-y-8 animate-fade-in flex flex-col items-center">
-                <Logo className="h-10 w-auto mb-2" />
-
-                <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center animate-bounce-short">
-                    <svg className="w-10 h-10 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
-                    </svg>
+    // 3️⃣ Password Reset Success Screen - Full Screen Portal Overlay
+    // Use Portal to escape parent stacking contexts and ensure true full-screen coverage
+    if (successMessage && typeof document !== 'undefined') {
+        return createPortal(
+            <div className="fixed inset-0 z-[9999] w-full h-full bg-[#FAFAFA] dark:bg-[#090A0C] flex items-center justify-center p-4 animate-fade-in overflow-hidden">
+                {/* 1. Immersive Background */}
+                <div className="absolute inset-0 pointer-events-none z-0">
+                    <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.02)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_0%,#000_70%,transparent_100%)]" />
+                    <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-brand-green/5 dark:bg-brand-green/10 rounded-full blur-[100px] mix-blend-multiply dark:mix-blend-screen animate-pulse-slow" />
+                    <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-500/5 dark:bg-blue-600/10 rounded-full blur-[100px] mix-blend-multiply dark:mix-blend-screen animate-pulse-slow font-sans" style={{ animationDelay: '2s' }} />
                 </div>
 
-                <div className="space-y-3">
-                    <h2 className="text-2xl font-bold text-brand-text-primary dark:text-white">Password Reset Successful</h2>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed px-4">
-                        {successMessage}
-                    </p>
-                    <p className="text-xs text-gray-400">Redirecting to login in 5 seconds...</p>
-                </div>
+                {/* 2. Main Content Card - The "Premium" Container */}
+                <div className="relative z-10 w-full max-w-[440px] bg-white/80 dark:bg-[#1A1D21]/90 backdrop-blur-xl border border-white/20 dark:border-white/5 rounded-3xl shadow-2xl p-8 md:p-10 flex flex-col items-center text-center space-y-8 transform transition-all duration-500 hover:scale-[1.02]">
 
-                <Link
-                    href="/student/login"
-                    className="w-full text-white bg-brand-green hover:bg-brand-green/90 font-bold rounded-full text-base px-5 py-4 transition-all duration-300 shadow-lg transform hover:scale-[1.02] active:scale-[0.98] text-center"
-                >
-                    Go to Login
-                </Link>
-            </div>
+                    {/* Logo - Compact & Centered */}
+                    <div className="transform transition-transform hover:scale-105 duration-500">
+                        <Logo className="h-10 md:h-12 w-auto" />
+                    </div>
+
+                    {/* Success Icon - Contained & Glowing */}
+                    <div className="relative group">
+                        <div className="absolute inset-0 bg-brand-green/20 rounded-full blur-xl animate-pulse-slow group-hover:bg-brand-green/30 transition-all duration-500"></div>
+                        <div className="relative w-24 h-24 bg-white dark:bg-[#24272B] rounded-full flex items-center justify-center shadow-lg ring-4 ring-brand-green/10 dark:ring-brand-green/5 group-hover:ring-brand-green/20 transition-all duration-500">
+                            <svg className="w-10 h-10 text-brand-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                        </div>
+                    </div>
+
+                    {/* Typography - High Contrast */}
+                    <div className="space-y-3 w-full">
+                        <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+                            Success!
+                        </h2>
+                        <p className="text-gray-600 dark:text-gray-300 text-base leading-relaxed font-medium">
+                            {successMessage}
+                        </p>
+                    </div>
+
+                    {/* Action Area */}
+                    <div className="w-full space-y-5">
+                        <Link
+                            href="/student/login"
+                            className="w-full flex items-center justify-center py-4 px-6 text-white bg-brand-green hover:bg-brand-green/90 focus:ring-4 focus:outline-none focus:ring-brand-green/30 font-bold rounded-xl text-lg transition-all duration-300 shadow-lg hover:shadow-brand-green/25 hover:-translate-y-0.5"
+                        >
+                            Go to Login
+                        </Link>
+
+                        <div className="flex items-center justify-center gap-2 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                            <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse"></span>
+                            Redirecting in 5s
+                        </div>
+                    </div>
+                </div>
+            </div>,
+            document.body
         );
     }
 
@@ -129,7 +160,7 @@ const ResetPasswordForm: React.FC = () => {
                 {/* Email Display (Static Text) */}
                 <div className="space-y-1">
                     <label className="block font-sans text-[clamp(14px,0.9vw,18px)] font-semibold text-brand-text-light-secondary dark:text-white mb-2 leading-none tracking-[0px]">
-                        Email Address
+                        Email ID
                     </label>
                     <div className="text-base font-semibold text-brand-text-light-primary dark:text-brand-text-secondary px-1 tracking-wide truncate">
                         {email}
@@ -220,9 +251,9 @@ const ResetPasswordForm: React.FC = () => {
                                     setError('');
                                 }
                             }}
-                            className="bg-brand-light-secondary dark:bg-brand-dark-tertiary border border-brand-light-tertiary dark:border-brand-dark-tertiary text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] font-normal leading-none tracking-[0px] rounded-full block w-full pr-12 transition-colors duration-300 focus:ring-brand-green focus:border-brand-green"
-                            style={{ padding: 'clamp(14px,1vw,20px)' }}
-                            placeholder="Min 8 chars, Upper, Lower, Number, Symbol"
+                            className="bg-brand-light-secondary dark:bg-brand-dark-tertiary border border-brand-light-tertiary dark:border-brand-dark-tertiary text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] font-normal leading-none tracking-[0px] rounded-full block w-full pr-16 transition-colors duration-300 focus:ring-brand-green focus:border-brand-green"
+                            style={{ padding: 'clamp(14px,1vw,20px)', paddingRight: '4rem' }}
+                            placeholder="Min 8 chars, Upper, Lower, #, Symbol"
                             required
                             disabled={isSubmitting}
                         />
@@ -261,8 +292,8 @@ const ResetPasswordForm: React.FC = () => {
                                     setError(pwdError);
                                 }
                             }}
-                            className="bg-brand-light-secondary dark:bg-brand-dark-tertiary border border-brand-light-tertiary dark:border-brand-dark-tertiary text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] font-normal leading-none tracking-[0px] rounded-full block w-full pr-12 transition-colors duration-300 focus:ring-brand-green focus:border-brand-green"
-                            style={{ padding: 'clamp(14px,1vw,20px)' }}
+                            className="bg-brand-light-secondary dark:bg-brand-dark-tertiary border border-brand-light-tertiary dark:border-brand-dark-tertiary text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] font-normal leading-none tracking-[0px] rounded-full block w-full pr-16 transition-colors duration-300 focus:ring-brand-green focus:border-brand-green"
+                            style={{ padding: 'clamp(14px,1vw,20px)', paddingRight: '4rem' }}
                             placeholder="Repeat new password"
                             required
                             disabled={isSubmitting}

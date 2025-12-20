@@ -64,7 +64,7 @@ const ForgotPasswordForm: React.FC = () => {
                     htmlFor="email"
                     className="block font-sans text-[clamp(14px,0.9vw,18px)] font-semibold text-brand-text-light-secondary dark:text-white mb-2 leading-none tracking-[0px]"
                 >
-                    Email Address
+                    Email ID
                 </label>
                 <input
                     type="email"

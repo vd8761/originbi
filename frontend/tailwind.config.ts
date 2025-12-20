@@ -33,12 +33,24 @@ const config: Config = {
       },
       animation: {
         "fade-in": "fade-in 0.8s ease-in-out forwards",
-        blob: "blob 7s infinite"
+        blob: "blob 7s infinite",
+        "pulse-slow": "pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "ping-slow": "ping 3s cubic-bezier(0, 0, 0.2, 1) infinite",
+        "progress-bar": "progress 5s linear forwards",
+        "spin-slow": "spin 15s linear infinite",
+        "spin-slow-reverse": "spin-reverse 15s linear infinite"
       },
       keyframes: {
         "fade-in": {
           "0%": { opacity: "0.5", transform: "scale(1.05)" },
           "100%": { opacity: "1", transform: "scale(1)" }
+        },
+        "progress": {
+          "0%": { width: "0%" },
+          "100%": { width: "100%" }
+        },
+        "spin-reverse": {
+          "to": { transform: "rotate(-360deg)" }
         },
         blob: {
           "0%": {
