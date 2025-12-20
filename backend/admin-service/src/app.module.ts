@@ -34,7 +34,7 @@ import { TestController } from './test/test.controller';
             type: 'postgres',
             url,
             autoLoadEntities: true,
-            synchronize: true, // TODO: Set to false once schema is stable
+            synchronize: false,
             ssl: { rejectUnauthorized: false },
           };
         }
