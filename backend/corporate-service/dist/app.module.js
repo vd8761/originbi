@@ -25,8 +25,9 @@ exports.AppModule = AppModule = __decorate([
                 imports: [config_1.ConfigModule],
                 inject: [config_1.ConfigService],
                 useFactory: (config) => {
-                    const databaseUrl = config.get('DATABASE_URL');
-                    if (databaseUrl) {
+                    const isProd = config.get('NODE_ENV') === 'production';
+                    if (isProd) {
+                        const databaseUrl = config.get('DATABASE_URL');
                         return {
                             type: 'postgres',
                             url: databaseUrl,
@@ -44,6 +45,7 @@ exports.AppModule = AppModule = __decorate([
                         database: config.get('DB_NAME'),
                         autoLoadEntities: true,
                         synchronize: false,
+                        ssl: false,
                     };
                 },
             }),
