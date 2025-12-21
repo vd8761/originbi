@@ -15,7 +15,7 @@ export class CognitoAdminGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context
       .switchToHttp()
-      .getRequest<Request & { user?: any }>();
+      .getRequest<Request & { user?: Record<string, any> }>();
     const auth = request.headers.authorization;
 
     if (!auth || typeof auth !== 'string' || !auth.startsWith('Bearer ')) {

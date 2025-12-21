@@ -27,7 +27,7 @@ export class AssessmentSession {
   @Column({ name: 'registration_id', type: 'bigint' })
   registrationId: number;
 
-  @ManyToOne(() => Registration, (reg) => reg.assessmentSessions)
+  @ManyToOne(() => Registration, (reg: Registration) => reg.assessmentSessions)
   @JoinColumn({ name: 'registration_id' })
   registration: Registration;
 

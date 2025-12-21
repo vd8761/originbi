@@ -18,7 +18,9 @@ export class AdminLoginGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const req: Request & { user?: any } = context.switchToHttp().getRequest();
+    const req: Request & { user?: Record<string, any> } = context
+      .switchToHttp()
+      .getRequest();
 
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
