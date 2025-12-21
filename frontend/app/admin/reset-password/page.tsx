@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import ResetPasswordForm from '@/components/admin/ResetPasswordForm';
 import AdminAuthLayout from '@/components/admin/AdminAuthLayout';
 
@@ -15,7 +15,9 @@ export default function AdminResetPasswordPage() {
                 <p className="text-gray-500 dark:text-gray-400 text-sm">Choose a new password to secure your account.</p>
             </div>
 
-            <ResetPasswordForm />
+            <Suspense fallback={<div className="w-full text-center p-4 text-brand-green animate-pulse text-sm font-mono">Initializing Secure Channel...</div>}>
+                <ResetPasswordForm />
+            </Suspense>
         </AdminAuthLayout>
     );
 }
