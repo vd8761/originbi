@@ -245,59 +245,55 @@ const LoginForm: React.FC<LoginFormProps> = ({
   const isEmailInvalid = touched.email && !!errors.email;
   const isPasswordInvalid = touched.password && !!errors.password;
 
-  const focusColorClass = 'focus:ring-brand-green focus:border-brand-green';
-  const iconColorClass = 'text-brand-green';
-
   return (
     <form
-      className="space-y-6 animate-fade-in"
+      className="flex flex-col gap-5 animate-fade-in w-full"
       style={{ animationDelay: '100ms' }}
       onSubmit={handleSubmit}
       noValidate
     >
       {/* Email / Username Field */}
-      <div className="space-y-2">
+      <div className="group">
         <label
           htmlFor="email"
-          className="block text-sm font-medium text-brand-text-light-secondary dark:text-gray-400 ml-1"
+          className="block font-sans text-sm font-semibold text-brand-text-light-secondary dark:text-gray-300 mb-2 pl-2"
         >
-          {portalMode === 'corporate'
-            ? 'Work Email'
-            : portalMode === 'admin'
-              ? 'UsernameOrEmail'
-              : 'Email ID'}
+          Email ID
         </label>
-        <input
-          type={portalMode === 'admin' ? 'text' : 'email'}
-          name="email"
-          id="email"
-          value={values.email}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          className={`bg-white dark:bg-[#24272B] border text-brand-text-light-primary dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm rounded-full block w-full p-4 transition-all duration-300 outline-none ${isEmailInvalid
-            ? 'border-red-500 focus:ring-1 focus:ring-red-500'
-            : `border-gray-200 dark:border-white/10 ${focusColorClass} focus:ring-1 focus:ring-opacity-50`
-            }`}
-          placeholder={
-            portalMode === 'corporate'
-              ? 'name@company.com'
-              : portalMode === 'admin'
-                ? 'Enter Username or Email'
-                : 'Example@gmail.com'
-          }
-          required
-          aria-invalid={isEmailInvalid}
-        />
+        <div className="relative">
+          <input
+            type={portalMode === 'admin' ? 'text' : 'email'}
+            name="email"
+            id="email"
+            value={values.email}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            className={`bg-brand-light-secondary dark:bg-[#1E2124] border text-brand-text-light-primary dark:text-white placeholder:text-gray-400 font-sans text-sm rounded-full block w-full px-5 py-3.5 transition-all duration-300 outline-none focus:ring-2 ${isEmailInvalid
+                ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50'
+                : 'border-transparent focus:border-brand-green focus:ring-brand-green/50 hover:bg-brand-light-tertiary dark:hover:bg-[#25282C]'
+              }`}
+            placeholder={
+              portalMode === 'corporate'
+                ? 'name@company.com'
+                : 'Enter your email id'
+            }
+            required
+            aria-invalid={isEmailInvalid}
+          />
+        </div>
         {isEmailInvalid && (
-          <p className="ml-1 text-xs text-red-500">{errors.email}</p>
+          <div className="flex items-center gap-2 mt-2 text-red-500 text-xs pl-3 font-medium">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span>{errors.email}</span>
+          </div>
         )}
       </div>
 
       {/* Password Field */}
-      <div className="space-y-2">
+      <div className="group">
         <label
           htmlFor="password"
-          className="block text-sm font-medium text-brand-text-light-secondary dark:text-gray-400 ml-1"
+          className="block font-sans text-sm font-semibold text-brand-text-light-secondary dark:text-gray-300 mb-2 pl-2"
         >
           Password
         </label>
@@ -310,9 +306,9 @@ const LoginForm: React.FC<LoginFormProps> = ({
             onChange={handleChange}
             onBlur={handleBlur}
             placeholder="Enter your password"
-            className={`bg-white dark:bg-[#24272B] border text-brand-text-light-primary dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm rounded-full block w-full p-4 pr-12 transition-all duration-300 outline-none ${isPasswordInvalid
-              ? 'border-red-500 focus:ring-1 focus:ring-red-500'
-              : `border-gray-200 dark:border-white/10 ${focusColorClass} focus:ring-1 focus:ring-opacity-50`
+            className={`bg-brand-light-secondary dark:bg-[#1E2124] border text-brand-text-light-primary dark:text-white placeholder:text-gray-400 font-sans text-sm rounded-full block w-full px-5 py-3.5 pr-12 transition-all duration-300 outline-none focus:ring-2 ${isPasswordInvalid
+                ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50'
+                : 'border-transparent focus:border-brand-green focus:ring-brand-green/50 hover:bg-brand-light-tertiary dark:hover:bg-[#25282C]'
               }`}
             required
             aria-invalid={isPasswordInvalid}
@@ -320,39 +316,45 @@ const LoginForm: React.FC<LoginFormProps> = ({
           <button
             type="button"
             onClick={togglePasswordVisibility}
-            className="absolute inset-y-0 right-0 flex items-center pr-4 transition-colors duration-200"
+            className="absolute inset-y-0 right-0 cursor-pointer flex items-center pr-4 text-brand-green hover:text-brand-green/80 transition-colors duration-300"
             aria-label={passwordVisible ? 'Hide password' : 'Show password'}
           >
             {passwordVisible ? (
-              <EyeIcon className={`h-5 w-5 ${iconColorClass}`} />
+              <EyeIcon className="h-5 w-5" />
             ) : (
-              <EyeOffIcon className={`h-5 w-5 ${iconColorClass}`} />
+              <EyeOffIcon className="h-5 w-5" />
             )}
           </button>
         </div>
         {isPasswordInvalid && (
-          <p className="ml-1 text-xs text-red-500">{errors.password}</p>
+          <div className="flex items-center gap-2 mt-2 text-red-500 text-xs pl-3 font-medium">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span>{errors.password}</span>
+          </div>
         )}
-      </div>
 
-      {/* Forgot Password Link */}
-      <div className="flex justify-end pt-1">
-        <Link
-          href="/admin/forgot-password"
-          className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-brand-green transition-colors"
-        >
-          Forgot Password?
-        </Link>
+        {/* Forgot Password Link */}
+        <div className="flex justify-end mt-2 pr-1">
+          <Link
+            href="/admin/forgot-password"
+            className="text-xs font-semibold text-brand-green hover:text-brand-green/80 transition-colors hover:underline decoration-brand-green/30 underline-offset-4"
+          >
+            Forgot Password?
+          </Link>
+        </div>
       </div>
 
       {/* Login Button */}
       <button
         type="submit"
         disabled={isSubmitting}
-        className={`w-full text-white font-bold rounded-full text-base px-5 py-4 text-center transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform active:scale-[0.99] ${buttonClass}`}
+        className={`w-full cursor-pointer rounded-full text-sm font-bold tracking-wide transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center h-12 shadow-[0_4px_14px_0_rgba(34,197,94,0.39)] hover:shadow-[0_6px_20px_rgba(34,197,94,0.23)] hover:-translate-y-0.5 active:translate-y-0 ${buttonClass}`}
         aria-busy={isSubmitting}
       >
-        {isSubmitting ? 'Logging in…' : 'Login'}
+        <span className="flex items-center gap-2">
+          {isSubmitting ? 'Authenticating...' : 'LOGIN TO CONSOLE'}
+          {!isSubmitting && <span className="text-lg">›</span>}
+        </span>
       </button>
     </form>
   );

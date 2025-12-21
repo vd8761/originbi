@@ -1,46 +1,21 @@
 'use client';
 
-import React, { Suspense } from 'react';
+import React from 'react';
 import ResetPasswordForm from '@/components/admin/ResetPasswordForm';
-import Logo from '@/components/ui/Logo';
-import ThemeToggle from '@/components/ui/ThemeToggle';
-import { useTheme } from '@/contexts/ThemeContext';
+import AdminAuthLayout from '@/components/admin/AdminAuthLayout';
 
 export default function AdminResetPasswordPage() {
-    const { theme, toggleTheme } = useTheme();
-
     return (
-        <div className="flex h-[100dvh] w-full bg-brand-light-primary dark:bg-brand-dark-primary font-sans transition-colors duration-300 overflow-hidden relative">
-            {/* Background Image for style */}
-            <div className="absolute inset-0 z-0 pointer-events-none hidden lg:block">
-                <img
-                    src="https://images.unsplash.com/photo-1563986768609-322da13575f3?q=80&w=1470&auto=format&fit=crop"
-                    alt="Background"
-                    className="w-full h-full object-cover opacity-5 dark:opacity-10 blur-sm"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-brand-light-primary dark:from-brand-dark-primary via-transparent to-transparent" />
+        <AdminAuthLayout
+            heroTitle={<>Security Protocol<br /><span className="text-brand-green">Credentials Management</span></>}
+            heroSubtitle="Complete the security protocol by updating your access credentials. Ensure strong password hygiene for system integrity."
+        >
+            <div className="mb-6">
+                <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-2">Reset Password</h2>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">Choose a new password to secure your account.</p>
             </div>
 
-            <div className="relative z-10 w-full flex flex-col items-center justify-center h-full px-4 sm:px-6 lg:px-8">
-                {/* Header Actions */}
-                <div className="absolute top-6 right-6 lg:top-8 lg:right-12">
-                    <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
-                </div>
-
-                <div className="mb-8 scale-110">
-                    <Logo />
-                </div>
-
-                <div className="w-full max-w-md">
-                    <Suspense fallback={<div className="text-center text-white">Loading form...</div>}>
-                        <ResetPasswordForm />
-                    </Suspense>
-                </div>
-
-                <div className="mt-8 text-center text-xs text-gray-500">
-                    &copy; 2025 Origin BI. Secure Admin Portal.
-                </div>
-            </div>
-        </div>
+            <ResetPasswordForm />
+        </AdminAuthLayout>
     );
 }

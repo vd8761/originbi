@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, FormEvent, useEffect } from 'react';
+import React, { useState, FormEvent, useEffect, useRef } from 'react';
 import { confirmResetPassword } from 'aws-amplify/auth';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -23,6 +23,9 @@ const ResetPasswordForm: React.FC = () => {
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
 
+    // Refs for OTP inputs
+    const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
     useEffect(() => {
         const emailParam = searchParams.get('email');
         if (emailParam) {
@@ -32,12 +35,50 @@ const ResetPasswordForm: React.FC = () => {
 
     const validatePassword = (pwd: string) => {
         if (pwd.length < 8) return 'Password must be at least 8 characters long.';
-        if (!/[A-Z]/.test(pwd)) return 'Password must contain at least one uppercase letter.';
-        if (!/[a-z]/.test(pwd)) return 'Password must contain at least one lowercase letter.';
-        if (!/[0-9]/.test(pwd)) return 'Password must contain at least one number.';
-        if (!/[\W_]/.test(pwd)) return 'Password must contain at least one special character.';
+        if (!/[A-Z]/.test(pwd)) return 'Password must contain at least one uppercase letter (A-Z).';
+        if (!/[a-z]/.test(pwd)) return 'Password must contain at least one lowercase letter (a-z).';
+        if (!/[0-9]/.test(pwd)) return 'Password must contain at least one number (0-9).';
+        if (!/[\W_]/.test(pwd)) return 'Password must contain at least one special character (!@#$).';
         return '';
     };
+
+    // OTP Handlers
+    const handleOtpChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+        const value = e.target.value;
+        if (isNaN(Number(value))) return;
+
+        const otpArray = otp.split('');
+        while (otpArray.length < 6) otpArray.push('');
+
+        // Take the last character entered
+        otpArray[index] = value.substring(value.length - 1);
+        const newOtp = otpArray.join('').slice(0, 6);
+        setOtp(newOtp);
+
+        // Auto-focus next input
+        if (value && index < 5 && otpInputRefs.current[index + 1]) {
+            otpInputRefs.current[index + 1]?.focus();
+        }
+    };
+
+    const handleOtpKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+        if (e.key === 'Backspace' && !otp[index] && index > 0 && otpInputRefs.current[index - 1]) {
+            // Move back on backspace if current is empty
+            otpInputRefs.current[index - 1]?.focus();
+        }
+    };
+
+    const handleOtpPaste = (e: React.ClipboardEvent) => {
+        e.preventDefault();
+        const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+        setOtp(pastedData);
+        // Focus the input corresponding to the length of pasted data
+        if (pastedData.length > 0) {
+            const focusIndex = Math.min(pastedData.length, 5);
+            otpInputRefs.current[focusIndex]?.focus();
+        }
+    };
+
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -48,8 +89,8 @@ const ResetPasswordForm: React.FC = () => {
             setError('Email address is required.');
             return;
         }
-        if (!otp) {
-            setError('Verification Code (OTP) is required.');
+        if (otp.length !== 6) {
+            setError('Please enter the full 6-digit Verification Code.');
             return;
         }
 
@@ -74,91 +115,100 @@ const ResetPasswordForm: React.FC = () => {
             setSuccessMessage('Your password has been updated successfully. You can now log in using your new password.');
         } catch (err: any) {
             console.error('Reset password error:', err);
-            // Handle specific Cognito error messages generically if needed
             setError(err.message || 'Unable to reset password. Please try again later.');
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    const iconColorClass = 'text-brand-green';
-
-    // 3️⃣ Password Reset Success Screen
+    // 3️⃣ Password Reset Success Screen (Cyber Portal Overlay)
     if (successMessage) {
         return (
-            <div className="w-full max-w-md mx-auto p-10 bg-white dark:bg-[#1E2124] rounded-2xl shadow-xl text-center space-y-8 animate-fade-in flex flex-col items-center">
-                <Logo className="h-10 w-auto mb-2" />
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-100/80 dark:bg-black/80 backdrop-blur-xl animate-fade-in p-4 transition-all duration-500">
+                {/* Floating Card */}
+                <div className="w-full max-w-sm bg-white/95 dark:bg-[#050505]/90 backdrop-blur-md p-10 rounded-[32px] shadow-2xl dark:shadow-[0_0_50px_rgba(34,197,94,0.1)] border border-brand-green/20 ring-1 ring-black/5 dark:ring-white/5 flex flex-col items-center text-center space-y-8 transform hover:scale-[1.01] transition-transform duration-500 relative overflow-hidden">
 
-                <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center animate-bounce-short">
-                    <svg className="w-10 h-10 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
-                    </svg>
+                    {/* Animated grid effect */}
+                    <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-5 dark:opacity-10" />
+                    <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-brand-green to-transparent animate-pulse-slow" />
+
+                    <div className="relative z-10">
+                        <div className="absolute inset-0 bg-brand-green blur-3xl opacity-20 rounded-full animate-pulse"></div>
+                        <div className="w-24 h-24 bg-gradient-to-br from-brand-green/10 to-transparent rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(34,197,94,0.3)] border border-brand-green/40 relative">
+                            <svg className="w-10 h-10 text-brand-green drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3 relative z-10">
+                        <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-widest uppercase font-mono">
+                            Success
+                        </h2>
+                        <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed px-2 font-mono">
+                            {successMessage}
+                        </p>
+                    </div>
+
+                    <Link
+                        href="/admin/login"
+                        className="relative z-10 w-full group overflow-hidden text-black bg-brand-green font-bold rounded-lg text-base px-5 py-4 shadow-[0_0_20px_rgba(34,197,94,0.4)] transition-all duration-300 hover:shadow-[0_0_30px_rgba(34,197,94,0.6)] flex justify-center items-center gap-2 uppercase tracking-wider"
+                    >
+                        <span className="relative z-10 flex items-center gap-2">
+                            Return to Login
+                            <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                        </span>
+                    </Link>
                 </div>
-
-                <div className="space-y-3">
-                    <h2 className="text-2xl font-bold text-brand-text-primary dark:text-white">Password Reset Successful</h2>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed px-4">
-                        {successMessage}
-                    </p>
-                </div>
-
-                <Link
-                    href="/admin/login"
-                    className="w-full text-white bg-brand-green hover:bg-brand-green/90 font-bold rounded-full text-base px-5 py-4 transition-all duration-300 shadow-lg transform hover:scale-[1.02] active:scale-[0.98] text-center"
-                >
-                    Go to Login
-                </Link>
             </div>
         );
     }
 
-    // 2️⃣ Reset Password Screen
+    // 2️⃣ Reset Password Screen (Form Only - Clean Pill Style)
     return (
-        <div className="w-full max-w-md mx-auto p-8 bg-white dark:bg-[#1E2124] rounded-2xl shadow-xl flex flex-col items-center">
-            <Logo className="h-10 w-auto mb-8" />
-
-            <h2 className="text-2xl font-bold text-center mb-2 text-brand-text-primary dark:text-white">
-                Reset Password
-            </h2>
-            <p className="text-center text-sm text-gray-500 dark:text-gray-400 mb-8 max-w-[280px]">
-                Enter the code sent to your email and choose a new password.
-            </p>
-
-            <form onSubmit={handleSubmit} className="w-full space-y-5" noValidate>
-                {/* Email Field (ReadOnly for context) */}
-                <div className="space-y-2">
-                    <label className="block text-sm font-medium text-brand-text-light-secondary dark:text-gray-400 ml-1">
-                        Email Address
+        <div className="w-full animate-fade-in" style={{ animationDelay: '100ms' }}>
+            <form onSubmit={handleSubmit} className="w-full flex flex-col gap-5" noValidate>
+                {/* Email Field (ReadOnly) */}
+                <div className="group opacity-60 pointer-events-none">
+                    <label className="block font-sans text-sm font-semibold text-brand-text-light-secondary dark:text-gray-300 mb-2 pl-2">
+                        Target Account
                     </label>
-                    <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="bg-gray-50 dark:bg-[#24272B] border border-gray-200 dark:border-white/10 text-brand-text-light-primary dark:text-white text-sm rounded-full block w-full p-4 outline-none focus:ring-1 focus:ring-brand-green opacity-70 cursor-not-allowed"
-                        placeholder="your@email.com"
-                        readOnly
-                    />
+                    <div className="relative">
+                        <input
+                            type="email"
+                            value={email}
+                            readOnly
+                            className="bg-brand-light-secondary dark:bg-[#1E2124] border border-transparent text-gray-500 dark:text-gray-400 font-sans text-sm rounded-full block w-full px-5 py-3.5 outline-none"
+                        />
+                    </div>
                 </div>
 
-                {/* OTP Field */}
-                <div className="space-y-2">
-                    <label className="block text-sm font-medium text-brand-text-light-secondary dark:text-gray-400 ml-1">
-                        Verification Code (OTP)
+                {/* OTP Field - 6 Digit Grid */}
+                <div className="group">
+                    <label className="block font-sans text-sm font-semibold text-brand-text-light-secondary dark:text-gray-300 mb-2 pl-2">
+                        Security Token (OTP)
                     </label>
-                    <input
-                        type="text"
-                        value={otp}
-                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        className="bg-white dark:bg-[#24272B] border border-gray-200 dark:border-white/10 text-brand-text-light-primary dark:text-white text-sm rounded-full block w-full p-4 outline-none focus:ring-1 focus:ring-brand-green focus:border-brand-green text-center tracking-widest font-bold"
-                        placeholder="------"
-                        required
-                        disabled={isSubmitting}
-                    />
+                    <div className="flex gap-2 justify-between">
+                        {[0, 1, 2, 3, 4, 5].map((index) => (
+                            <input
+                                key={index}
+                                ref={(el: HTMLInputElement | null) => { otpInputRefs.current[index] = el; }} // Note: void return
+                                type="text"
+                                maxLength={1}
+                                value={otp[index] || ''}
+                                onChange={(e) => handleOtpChange(e, index)}
+                                onKeyDown={(e) => handleOtpKeyDown(e, index)}
+                                onPaste={handleOtpPaste}
+                                className="w-full aspect-square bg-brand-light-secondary dark:bg-[#1E2124] border border-transparent text-brand-text-light-primary dark:text-white font-mono text-xl text-center rounded-2xl outline-none focus:border-brand-green focus:ring-2 focus:ring-brand-green/50 hover:bg-brand-light-tertiary dark:hover:bg-[#25282C] transition-all"
+                                placeholder="•"
+                            />
+                        ))}
+                    </div>
                 </div>
 
                 {/* New Password Field */}
-                <div className="space-y-2">
-                    <label className="block text-sm font-medium text-brand-text-light-secondary dark:text-gray-400 ml-1">
+                <div className="group">
+                    <label className="block font-sans text-sm font-semibold text-brand-text-light-secondary dark:text-gray-300 mb-2 pl-2">
                         New Password
                     </label>
                     <div className="relative">
@@ -166,7 +216,7 @@ const ResetPasswordForm: React.FC = () => {
                             type={passwordVisible ? 'text' : 'password'}
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
-                            className="bg-white dark:bg-[#24272B] border border-gray-200 dark:border-white/10 text-brand-text-light-primary dark:text-white text-sm rounded-full block w-full p-4 pr-12 outline-none focus:ring-1 focus:ring-brand-green focus:border-brand-green"
+                            className="bg-brand-light-secondary dark:bg-[#1E2124] border border-transparent text-brand-text-light-primary dark:text-white placeholder:text-gray-400 font-sans text-sm rounded-full block w-full px-5 py-3.5 pr-12 transition-all duration-300 outline-none focus:border-brand-green focus:ring-2 focus:ring-brand-green/50 hover:bg-brand-light-tertiary dark:hover:bg-[#25282C]"
                             placeholder="Min 8 chars, mixed case"
                             required
                             disabled={isSubmitting}
@@ -174,29 +224,29 @@ const ResetPasswordForm: React.FC = () => {
                         <button
                             type="button"
                             onClick={() => setPasswordVisible(!passwordVisible)}
-                            className="absolute inset-y-0 right-0 flex items-center pr-4"
+                            className="absolute inset-y-0 right-0 cursor-pointer flex items-center pr-4 text-brand-green hover:text-brand-green/80 transition-colors duration-300"
                             tabIndex={-1}
                         >
                             {passwordVisible ? (
-                                <EyeIcon className={`h-5 w-5 ${iconColorClass}`} />
+                                <EyeIcon className="h-5 w-5" />
                             ) : (
-                                <EyeOffIcon className={`h-5 w-5 ${iconColorClass}`} />
+                                <EyeOffIcon className="h-5 w-5" />
                             )}
                         </button>
                     </div>
                 </div>
 
                 {/* Confirm Password Field */}
-                <div className="space-y-2">
-                    <label className="block text-sm font-medium text-brand-text-light-secondary dark:text-gray-400 ml-1">
-                        Confirm New Password
+                <div className="group">
+                    <label className="block font-sans text-sm font-semibold text-brand-text-light-secondary dark:text-gray-300 mb-2 pl-2">
+                        Confirm Password
                     </label>
                     <div className="relative">
                         <input
                             type={confirmPasswordVisible ? 'text' : 'password'}
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="bg-white dark:bg-[#24272B] border border-gray-200 dark:border-white/10 text-brand-text-light-primary dark:text-white text-sm rounded-full block w-full p-4 pr-12 outline-none focus:ring-1 focus:ring-brand-green focus:border-brand-green"
+                            className="bg-brand-light-secondary dark:bg-[#1E2124] border border-transparent text-brand-text-light-primary dark:text-white placeholder:text-gray-400 font-sans text-sm rounded-full block w-full px-5 py-3.5 pr-12 transition-all duration-300 outline-none focus:border-brand-green focus:ring-2 focus:ring-brand-green/50 hover:bg-brand-light-tertiary dark:hover:bg-[#25282C]"
                             placeholder="Repeat new password"
                             required
                             disabled={isSubmitting}
@@ -204,13 +254,13 @@ const ResetPasswordForm: React.FC = () => {
                         <button
                             type="button"
                             onClick={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
-                            className="absolute inset-y-0 right-0 flex items-center pr-4"
+                            className="absolute inset-y-0 right-0 cursor-pointer flex items-center pr-4 text-brand-green hover:text-brand-green/80 transition-colors duration-300"
                             tabIndex={-1}
                         >
                             {confirmPasswordVisible ? (
-                                <EyeIcon className={`h-5 w-5 ${iconColorClass}`} />
+                                <EyeIcon className="h-5 w-5" />
                             ) : (
-                                <EyeOffIcon className={`h-5 w-5 ${iconColorClass}`} />
+                                <EyeOffIcon className="h-5 w-5" />
                             )}
                         </button>
                     </div>
@@ -218,8 +268,9 @@ const ResetPasswordForm: React.FC = () => {
 
                 {/* Error Message */}
                 {error && (
-                    <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-sm rounded-lg border border-red-200 dark:border-red-800 animate-shake">
-                        {error}
+                    <div className="flex items-center gap-2 mt-2 text-red-500 text-xs pl-3 font-medium">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span>{error}</span>
                     </div>
                 )}
 
@@ -227,22 +278,20 @@ const ResetPasswordForm: React.FC = () => {
                 <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full text-white bg-brand-green hover:bg-brand-green/90 focus:ring-brand-green/30 font-bold rounded-full text-base px-5 py-4 text-center transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform active:scale-[0.99] flex justify-center items-center"
+                    className="w-full bg-brand-green hover:bg-brand-green/90 text-black font-bold h-12 shadow-[0_4px_14px_0_rgba(34,197,94,0.39)] hover:shadow-[0_6px_20px_rgba(34,197,94,0.23)] border-none rounded-full text-sm tracking-wide transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center relative overflow-hidden group hover:-translate-y-0.5 active:translate-y-0"
                 >
-                    {isSubmitting ? (
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                    ) : 'Reset Password'}
+                    <span className="flex items-center gap-2">
+                        {isSubmitting ? 'Processing...' : 'Reset Password'}
+                        {!isSubmitting && <span className="text-xl">›</span>}
+                    </span>
                 </button>
 
                 <div className="text-center pt-2">
                     <Link
                         href="/admin/login"
-                        className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-brand-green transition-colors"
+                        className="text-xs font-semibold text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
                     >
-                        Back to Login
+                        Cancel Process
                     </Link>
                 </div>
             </form>
