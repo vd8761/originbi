@@ -1,0 +1,79 @@
+name: Deployment Checks
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  backend-checks:
+    name: Check Backend (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [admin-service, auth-service, corporate-service, student-service]
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'backend/${{ matrix.service }}/package-lock.json'
+
+      - name: Install Dependencies
+        working-directory: ./backend/${{ matrix.service }}
+        run: npm ci
+
+      - name: Lint
+        working-directory: ./backend/${{ matrix.service }}
+        run: npm run lint --if-present
+
+      - name: Build
+        working-directory: ./backend/${{ matrix.service }}
+        run: npm run build --if-present
+
+      - name: Unit Tests
+        working-directory: ./backend/${{ matrix.service }}
+        run: npm run test --if-present
+
+  frontend-check:
+    name: Check Frontend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Install Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: ./frontend
+        run: npm run lint --if-present
+
+      - name: 'notify vercel'
+        uses: 'vercel/repository-dispatch/actions/status@v1'
+        with:
+          name: 'Vercel - originbi: lint'
+
+      - name: Build
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: 'notify vercel build'
+        uses: 'vercel/repository-dispatch/actions/status@v1'
+        with:
+          name: 'Vercel - originbi: build'
