@@ -16,9 +16,7 @@ const AdminAuthLayout: React.FC<AdminAuthLayoutProps> = ({ children, heroTitle, 
 
     return (
         <div className="h-screen w-full flex items-center justify-center p-0 lg:p-8 bg-[#E3E8EF] dark:bg-[#0F1115] transition-colors duration-500 overflow-hidden">
-            <div className="absolute top-4 right-4 z-50 lg:hidden">
-                <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
-            </div>
+
 
             {/* Main Card Container - Full Screen on Mobile, Card on Desktop */}
             <div className="w-full max-w-[1920px] h-full bg-white dark:bg-[#15171A] rounded-none lg:rounded-[3rem] shadow-none flex flex-col lg:flex-row overflow-hidden border-none lg:border border-white/20 dark:border-gray-800 transition-all duration-300">

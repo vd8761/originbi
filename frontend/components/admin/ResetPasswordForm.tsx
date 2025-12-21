@@ -170,7 +170,7 @@ const ResetPasswordForm: React.FC = () => {
             <form onSubmit={handleSubmit} className="w-full flex flex-col gap-5" noValidate>
                 {/* Email Field (ReadOnly) */}
                 <div className="group opacity-60 pointer-events-none">
-                    <label className="block font-sans text-sm font-semibold text-brand-text-light-secondary dark:text-gray-300 mb-2 pl-2">
+                    <label className="block font-sans text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 pl-2">
                         Target Account
                     </label>
                     <div className="relative">
@@ -178,14 +178,14 @@ const ResetPasswordForm: React.FC = () => {
                             type="email"
                             value={email}
                             readOnly
-                            className="bg-brand-light-secondary dark:bg-[#1E2124] border border-transparent text-gray-500 dark:text-gray-400 font-sans text-sm rounded-full block w-full px-5 py-3.5 outline-none"
+                            className="bg-gray-50 dark:bg-[#1E2124] border border-gray-200 dark:border-transparent text-gray-500 dark:text-gray-400 font-sans text-sm rounded-full block w-full px-5 py-3.5 outline-none"
                         />
                     </div>
                 </div>
 
                 {/* OTP Field - 6 Digit Grid */}
                 <div className="group">
-                    <label className="block font-sans text-sm font-semibold text-brand-text-light-secondary dark:text-gray-300 mb-2 pl-2">
+                    <label className="block font-sans text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 pl-2">
                         Security Token (OTP)
                     </label>
                     <div className="flex gap-2 justify-between">
@@ -199,7 +199,7 @@ const ResetPasswordForm: React.FC = () => {
                                 onChange={(e) => handleOtpChange(e, index)}
                                 onKeyDown={(e) => handleOtpKeyDown(e, index)}
                                 onPaste={handleOtpPaste}
-                                className="w-full aspect-square bg-brand-light-secondary dark:bg-[#1E2124] border border-transparent text-brand-text-light-primary dark:text-white font-mono text-xl text-center rounded-2xl outline-none focus:border-brand-green focus:ring-2 focus:ring-brand-green/50 hover:bg-brand-light-tertiary dark:hover:bg-[#25282C] transition-all"
+                                className="w-full aspect-square bg-gray-50 dark:bg-[#1E2124] border border-gray-200 dark:border-transparent text-brand-text-light-primary dark:text-white font-mono text-xl text-center rounded-2xl outline-none focus:border-brand-green focus:ring-2 focus:ring-brand-green/50 hover:bg-gray-100 dark:hover:bg-[#25282C] transition-all"
                                 placeholder="•"
                             />
                         ))}
@@ -208,7 +208,7 @@ const ResetPasswordForm: React.FC = () => {
 
                 {/* New Password Field */}
                 <div className="group">
-                    <label className="block font-sans text-sm font-semibold text-brand-text-light-secondary dark:text-gray-300 mb-2 pl-2">
+                    <label className="block font-sans text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 pl-2">
                         New Password
                     </label>
                     <div className="relative">
@@ -216,7 +216,7 @@ const ResetPasswordForm: React.FC = () => {
                             type={passwordVisible ? 'text' : 'password'}
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
-                            className="bg-brand-light-secondary dark:bg-[#1E2124] border border-transparent text-brand-text-light-primary dark:text-white placeholder:text-gray-400 font-sans text-sm rounded-full block w-full px-5 py-3.5 pr-12 transition-all duration-300 outline-none focus:border-brand-green focus:ring-2 focus:ring-brand-green/50 hover:bg-brand-light-tertiary dark:hover:bg-[#25282C]"
+                            className="bg-gray-50 dark:bg-[#1E2124] border border-gray-200 dark:border-transparent text-brand-text-light-primary dark:text-white placeholder:text-gray-400 font-sans text-sm rounded-full block w-full px-5 py-3.5 pr-12 transition-all duration-300 outline-none focus:border-brand-green focus:ring-2 focus:ring-brand-green/50 hover:bg-gray-100 dark:hover:bg-[#25282C]"
                             placeholder="Min 8 chars, mixed case"
                             required
                             disabled={isSubmitting}
@@ -234,11 +234,28 @@ const ResetPasswordForm: React.FC = () => {
                             )}
                         </button>
                     </div>
+
+                    {/* Live Password Requirements Checklist */}
+                    <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 px-2">
+                        {[
+                            { label: "Min 8 chars", met: newPassword.length >= 8 },
+                            { label: "Upper & Lower case", met: /[A-Z]/.test(newPassword) && /[a-z]/.test(newPassword) },
+                            { label: "Number (0-9)", met: /[0-9]/.test(newPassword) },
+                            { label: "Special Char (!@#)", met: /[\W_]/.test(newPassword) }
+                        ].map((req, idx) => (
+                            <div key={idx} className={`flex items-center text-[10px] font-medium transition-colors duration-300 ${req.met ? 'text-brand-green' : 'text-gray-400'}`}>
+                                <svg className={`w-3 h-3 mr-1.5 shrink-0 ${req.met ? 'opacity-100' : 'opacity-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                                </svg>
+                                <span className={req.met ? '' : 'ml-4.5' /* Indent to align with text if no checkmark */}>{req.label}</span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
 
                 {/* Confirm Password Field */}
                 <div className="group">
-                    <label className="block font-sans text-sm font-semibold text-brand-text-light-secondary dark:text-gray-300 mb-2 pl-2">
+                    <label className="block font-sans text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 pl-2">
                         Confirm Password
                     </label>
                     <div className="relative">
@@ -246,7 +263,7 @@ const ResetPasswordForm: React.FC = () => {
                             type={confirmPasswordVisible ? 'text' : 'password'}
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="bg-brand-light-secondary dark:bg-[#1E2124] border border-transparent text-brand-text-light-primary dark:text-white placeholder:text-gray-400 font-sans text-sm rounded-full block w-full px-5 py-3.5 pr-12 transition-all duration-300 outline-none focus:border-brand-green focus:ring-2 focus:ring-brand-green/50 hover:bg-brand-light-tertiary dark:hover:bg-[#25282C]"
+                            className="bg-gray-50 dark:bg-[#1E2124] border border-gray-200 dark:border-transparent text-brand-text-light-primary dark:text-white placeholder:text-gray-400 font-sans text-sm rounded-full block w-full px-5 py-3.5 pr-12 transition-all duration-300 outline-none focus:border-brand-green focus:ring-2 focus:ring-brand-green/50 hover:bg-gray-100 dark:hover:bg-[#25282C]"
                             placeholder="Repeat new password"
                             required
                             disabled={isSubmitting}

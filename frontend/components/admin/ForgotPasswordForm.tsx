@@ -63,7 +63,7 @@ const ForgotPasswordForm: React.FC = () => {
                 <div className="group">
                     <label
                         htmlFor="email"
-                        className="block font-sans text-sm font-semibold text-brand-text-light-secondary dark:text-gray-300 mb-2 pl-2"
+                        className="block font-sans text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 pl-2"
                     >
                         Registered Email Address
                     </label>
@@ -73,7 +73,10 @@ const ForgotPasswordForm: React.FC = () => {
                             id="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className={`bg-brand-light-secondary dark:bg-[#1E2124] border border-transparent text-brand-text-light-primary dark:text-white placeholder:text-gray-400 font-sans text-sm rounded-full block w-full px-5 py-3.5 transition-all duration-300 outline-none focus:ring-2 focus:ring-brand-green/30 focus:border-brand-green ${error ? 'border-red-500 focus:ring-red-500/30' : 'hover:bg-brand-light-tertiary dark:hover:bg-[#25282C]'}`}
+                            className={`bg-gray-50 dark:bg-[#1E2124] border text-brand-text-light-primary dark:text-white placeholder:text-gray-400 font-sans text-sm rounded-full block w-full px-5 py-3.5 transition-all duration-300 outline-none focus:ring-2 ${error
+                                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50'
+                                    : 'border-gray-200 dark:border-transparent focus:border-brand-green focus:ring-brand-green/50 hover:bg-gray-100 dark:hover:bg-[#25282C]'
+                                }`}
                             placeholder="user@originbi.com"
                             required
                             disabled={isSubmitting || !!successMessage}
@@ -108,7 +111,7 @@ const ForgotPasswordForm: React.FC = () => {
                     <button
                         type="submit"
                         disabled={isSubmitting}
-                        className="w-full bg-brand-green hover:bg-brand-green/90 text-black font-bold h-12 shadow-[0_4px_14px_0_rgba(34,197,94,0.39)] hover:shadow-[0_6px_20px_rgba(34,197,94,0.23)] border-none rounded-full text-sm tracking-wide transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center relative overflow-hidden group"
+                        className="w-full bg-brand-green hover:bg-brand-green/90 text-black font-bold h-12 shadow-[0_4px_14px_0_rgba(34,197,94,0.39)] hover:shadow-[0_6px_20px_rgba(34,197,94,0.23)] border-none rounded-full text-sm tracking-wide transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center relative overflow-hidden group hover:-translate-y-0.5 active:translate-y-0"
                     >
                         <span className="flex items-center gap-2">
                             {isSubmitting ? 'Transmitting...' : 'Send Recovery Code'}
