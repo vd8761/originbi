@@ -258,30 +258,31 @@ const ProgramsManagement: React.FC = () => {
             <button
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className="w-8 h-8 rounded-full bg-white dark:bg-[#FFFFFF1F] flex items-center justify-center text-[#19211C] dark:text-white hover:bg-gray-50 hover:border-gray-200 border border-transparent dark:border-[#FFFFFF1F] transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="p-2 flex items-center justify-center text-[#19211C] dark:text-gray-400 hover:text-brand-green dark:hover:text-brand-green transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
             >
-              <ArrowLeftWithoutLineIcon className="w-3 h-3" />
+              <ArrowLeftWithoutLineIcon className="w-4 h-4" />
             </button>
 
-            {/* Simple Pagination Numbers (for now, simplistic logic like Registration) */}
+            {/* Simple Pagination Numbers */}
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              // A simplified version of pagination logic or reuse the complex one if preferred.
-              // For brevity, let's use a simpler range or just show First/Last/Current
-              // Reusing logic from RegistrationManagement would be ideal but complex to inline.
-              // Let's implement a basic window around current page.
               let page = i + 1;
               if (totalPages > 5 && currentPage > 3) {
-                page = currentPage - 2 + i;
+                // Shift window if strictly necessary, but for now simple logic
+                // Adjust start index to center current page if possible
+                let start = Math.max(1, currentPage - 2);
+                if (start + 4 > totalPages) start = Math.max(1, totalPages - 4);
+                page = start + i;
               }
+
               if (page > totalPages) return null;
 
               return (
                 <button
                   key={page}
                   onClick={() => handlePageChange(page)}
-                  className={`min-w-[32px] h-8 px-1 rounded-md font-medium text-sm flex items-center justify-center transition-colors border cursor-pointer ${currentPage === page
-                    ? "bg-brand-green border-brand-green text-white shadow-lg shadow-brand-green/20"
-                    : "bg-transparent border-brand-light-tertiary dark:border-brand-dark-tertiary text-brand-text-light-primary dark:text-gray-400 hover:border-brand-text-light-secondary dark:hover:border-gray-500"
+                  className={`min-w-[32px] h-8 px-1 rounded-md font-medium text-sm flex items-center justify-center transition-all border cursor-pointer ${currentPage === page
+                      ? "bg-brand-green border-brand-green text-white shadow-md shadow-brand-green/20"
+                      : "bg-transparent border-brand-light-tertiary dark:border-white/10 text-brand-text-light-primary dark:text-gray-400 hover:border-brand-text-light-secondary dark:hover:border-gray-500 hover:bg-black/5 dark:hover:bg-white/5"
                     }`}
                 >
                   {page}
@@ -292,9 +293,9 @@ const ProgramsManagement: React.FC = () => {
             <button
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="w-8 h-8 rounded-full bg-brand-green flex items-center justify-center text-white shadow-lg shadow-brand-green/20 transition-colors hover:bg-brand-green/90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="p-2 flex items-center justify-center text-[#19211C] dark:text-gray-400 hover:text-brand-green dark:hover:text-brand-green transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
             >
-              <ArrowRightWithoutLineIcon className="w-3 h-3" />
+              <ArrowRightWithoutLineIcon className="w-4 h-4" />
             </button>
           </div>
         </div>

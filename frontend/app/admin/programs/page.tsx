@@ -13,7 +13,7 @@ export default function RegistrationsPage() {
     router.push('/admin/login');
   };
 
-const handleNavigate = (
+  const handleNavigate = (
     view: 'dashboard' | 'programs' | 'corporate' | 'registrations'
   ) => {
     switch (view) {
@@ -41,7 +41,7 @@ const handleNavigate = (
           portalMode="admin"
           onNavigate={handleNavigate as any}
         />
-        <main className="p-6">
+        <main className="">
           <ProgramsManagement />
         </main>
       </div>
