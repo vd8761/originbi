@@ -1,43 +1,15 @@
 "use client";
 
 import React from "react";
-import Header from "@/components/corporate/Header";
 import ComingSoon from "@/components/ui/ComingSoon";
-import { useRouter } from "next/navigation";
 
 export default function JobsPage() {
-    const router = useRouter();
-
-    const handleLogout = () => {
-        router.push("/corporate/login");
-        sessionStorage.clear();
-    };
-
-    const handleNavigate = (
-        view: "dashboard" | "assessment" | "registrations" | "jobs" | "origindata" | "settings"
-    ) => {
-        if (view === "dashboard") router.push("/corporate/dashboard");
-        if (view === "registrations") router.push("/corporate/registrations");
-        if (view === "jobs") router.push("/corporate/jobs");
-        if (view === "origindata") router.push("/corporate/origindata");
-        if (view === "settings") router.push("/corporate/settings");
-    };
-
     return (
-        <div className="min-h-screen bg-transparent">
-            <Header
-                onLogout={handleLogout}
-                currentView="jobs"
-                portalMode="corporate"
-                onNavigate={handleNavigate}
-                onSwitchPortal={() => router.push('/corporate/profile')}
+        <div className="h-full">
+            <ComingSoon
+                title="Jobs Portal"
+                description="Our advanced job matching algorithm is currently being fine-tuned efficiently matching your candidates to the best opportunities."
             />
-            <main className="p-6">
-                <ComingSoon
-                    title="Jobs Portal"
-                    description="Our advanced job matching algorithm is currently being fine-tuned efficiently matching your candidates to the best opportunities."
-                />
-            </main>
         </div>
     );
 }

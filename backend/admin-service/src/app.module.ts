@@ -12,6 +12,7 @@ import { AssessmentModule } from './assessment/assessment.module';
 import { CorporateModule } from './corporate/corporate.module';
 import { ForgotPasswordModule } from './forgotpassword/forgotpassword.module';
 import { TestController } from './test/test.controller';
+import { MailAssetsController } from './mail/mail-assets.controller';
 
 @Module({
   imports: [
@@ -70,6 +71,6 @@ import { TestController } from './test/test.controller';
     CorporateModule,
     ForgotPasswordModule,
   ],
-  controllers: [TestController],
+  controllers: [TestController, MailAssetsController],
 })
-export class AppModule {}
+export class AppModule { }

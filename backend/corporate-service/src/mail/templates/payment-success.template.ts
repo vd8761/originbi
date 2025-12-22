@@ -1,15 +1,15 @@
 export const getPaymentSuccessEmailTemplate = (
-  name: string,
-  paymentId: string,
-  amount: string,
-  credits: string,
-  date: string,
-  dashboardUrl: string,
-  assets: { footer: string; popper: string; pattern: string; logo: string },
+    name: string,
+    paymentId: string,
+    amount: string,
+    credits: string,
+    date: string,
+    dashboardUrl: string,
+    assets: { footer: string; popper: string; pattern: string; logo: string },
 ) => {
-  const currentYear = new Date().getFullYear();
+    const currentYear = new Date().getFullYear();
 
-  return `
+    return `
 <!DOCTYPE html>
 <html>
 <head>

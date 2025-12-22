@@ -49,7 +49,7 @@ const CorporateRegistrationTable: React.FC<RegistrationTableProps> = ({
 }) => {
   return (
     <div className="w-[calc(100%+2px)] -ml-px h-full flex flex-col rounded-xl border border-brand-light-tertiary dark:border-white/10 bg-white dark:bg-[#19211C]/90 backdrop-blur-sm shadow-xl relative transition-all duration-300 overflow-hidden">
-      {loading && (
+      {loading && users.length > 0 && (
         <div className="absolute inset-0 bg-white/50 dark:bg-black/50 z-10 flex items-center justify-center backdrop-blur-sm rounded-xl">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-green"></div>
         </div>
@@ -112,7 +112,46 @@ const CorporateRegistrationTable: React.FC<RegistrationTableProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-brand-light-tertiary dark:divide-brand-dark-tertiary">
-            {users.length > 0 ? (
+            {loading && users.length === 0 ? (
+              // Skeleton Rows
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i} className="animate-pulse bg-white dark:bg-transparent border-b border-brand-light-tertiary dark:border-white/5">
+                  <td className="p-4 align-middle">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+                      <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    </div>
+                  </td>
+                  <td className="p-4 align-middle">
+                    <div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  </td>
+                  <td className="p-4 align-middle">
+                    <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  </td>
+                  <td className="p-4 align-middle">
+                    <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  </td>
+                  <td className="p-4 align-middle">
+                    <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  </td>
+                  <td className="p-4 align-middle">
+                    <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  </td>
+                  <td className="p-4 text-center align-middle">
+                    <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto"></div>
+                  </td>
+                  <td className="p-4 text-center align-middle">
+                    <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto"></div>
+                  </td>
+                  <td className="p-4 text-right align-middle">
+                    <div className="flex items-center justify-end gap-3">
+                      <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : users.length > 0 ? (
               users.map((user, index) => (
                 <tr
                   key={user.id || index}
@@ -221,7 +260,7 @@ const CorporateRegistrationTable: React.FC<RegistrationTableProps> = ({
                   colSpan={9}
                   className="p-8 text-center text-brand-text-light-secondary dark:text-gray-500"
                 >
-                  {loading ? "Loading..." : "No records found."}
+                  No records found.
                   {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
                 </td>
               </tr>

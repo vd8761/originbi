@@ -1,6 +1,6 @@
 "use client";
-
 import React, { useState, useRef, useEffect } from "react";
+import { useRouter, usePathname } from 'next/navigation';
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import {
     NotificationWithDotIcon,
@@ -197,9 +197,24 @@ const Header: React.FC<HeaderProps> = ({
         return () => { document.removeEventListener("mousedown", handleClickOutside); };
     }, [isMobileMenuOpen]);
 
+    const pathname = usePathname();
+    const activeView = (() => {
+        if (pathname.includes('/dashboard')) return 'dashboard';
+        if (pathname.includes('/programs')) return 'programs';
+        if (pathname.includes('/corporate')) return 'corporate';
+        if (pathname.includes('/registrations')) return 'registrations';
+        return currentView;
+    })();
+
     const handleLangChange = (lang: string) => { setLanguage(lang); setLangOpen(false); };
     const handleNotificationClick = () => { setNotificationsOpen((p) => !p); if (hasNotification) setHasNotification(false); };
-    const handleNavClick = (view: any) => { onNavigate?.(view); setMobileMenuOpen(false); };
+    const handleNavClick = (view: any) => {
+        onNavigate?.(view);
+        setMobileMenuOpen(false);
+        // If onNavigate isn't provided (e.g. in layout), we might need to router.push here?
+        // But the parent is passing a handleNavigate that does router.push.
+        // We will adapt the parent layout to pass a default handler or handle it here.
+    };
 
     const notifications = [
         { icon: <RoadmapIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />, title: "New Roadmap Unlocked!", time: "2 hours ago", isNew: true },
@@ -214,28 +229,28 @@ const Header: React.FC<HeaderProps> = ({
                     <NavItem
                         icon={<DashboardIcon />}
                         label="Dashboard"
-                        active={currentView === 'dashboard'}
+                        active={activeView === 'dashboard'}
                         isMobile={isMobile}
                         onClick={() => handleNavClick('dashboard')}
                     />
                     <NavItem
                         icon={<RoadmapIcon />}
                         label="Programs"
-                        active={currentView === 'programs'}
+                        active={activeView === 'programs'}
                         isMobile={isMobile}
                         onClick={() => handleNavClick('programs')}
                     />
                     <NavItem
                         icon={<OriginDataIcon className="w-4 h-4" />}
                         label="Corporate Access"
-                        active={currentView === 'corporate'}
+                        active={activeView === 'corporate'}
                         isMobile={isMobile}
                         onClick={() => handleNavClick('corporate')}
                     />
                     <NavItem
                         icon={<ProfileIcon />}
                         label="Registrations"
-                        active={currentView === 'registrations'}
+                        active={activeView === 'registrations'}
                         isMobile={isMobile}
                         onClick={() => handleNavClick('registrations')}
                     />
@@ -302,18 +317,24 @@ const Header: React.FC<HeaderProps> = ({
                         <>
                             {/* 2. Language: h-8 (Laptop) / h-9 (2XL) */}
                             <div className="relative hidden sm:block" ref={langMenuRef}>
-                                <button
-                                    onClick={() => setLangOpen((p) => !p)}
-                                    className="bg-white border border-brand-green text-[#19211C] hover:bg-green-50 dark:bg-brand-dark-tertiary dark:border-transparent dark:text-white dark:hover:bg-gray-800 flex items-center justify-center space-x-1.5 px-3 h-8 2xl:h-9 rounded-full font-semibold text-xs 2xl:text-sm transition-all cursor-pointer"
-                                >
-                                    <span>{language}</span>
-                                    <ChevronDownIcon className="w-3 h-3" />
-                                </button>
-                                {isLangOpen && (
-                                    <div className="absolute right-0 top-full mt-2 w-32 bg-white dark:bg-brand-dark-tertiary rounded-lg shadow-xl py-1 ring-1 ring-black ring-opacity-5 z-50 border border-gray-100 dark:border-transparent">
-                                        <button onClick={() => handleLangChange("ENG")} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-brand-text-primary hover:bg-gray-50 dark:hover:bg-brand-dark-secondary/60">English</button>
-                                        <button onClick={() => handleLangChange("TAM")} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-brand-text-primary hover:bg-gray-50 dark:hover:bg-brand-dark-secondary/60">Tamil</button>
-                                    </div>
+                                {!corporateData ? (
+                                    <div className="h-8 2xl:h-9 w-[4.5rem] bg-gray-200 dark:bg-gray-700/50 rounded-full animate-pulse border border-transparent" />
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={() => setLangOpen((p) => !p)}
+                                            className="bg-white border border-brand-green text-[#19211C] hover:bg-green-50 dark:bg-brand-dark-tertiary dark:border-transparent dark:text-white dark:hover:bg-gray-800 flex items-center justify-center space-x-1.5 px-3 h-8 2xl:h-9 rounded-full font-semibold text-xs 2xl:text-sm transition-all cursor-pointer"
+                                        >
+                                            <span>{language}</span>
+                                            <ChevronDownIcon className="w-3 h-3" />
+                                        </button>
+                                        {isLangOpen && (
+                                            <div className="absolute right-0 top-full mt-2 w-32 bg-white dark:bg-brand-dark-tertiary rounded-lg shadow-xl py-1 ring-1 ring-black ring-opacity-5 z-50 border border-gray-100 dark:border-transparent">
+                                                <button onClick={() => handleLangChange("ENG")} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-brand-text-primary hover:bg-gray-50 dark:hover:bg-brand-dark-secondary/60">English</button>
+                                                <button onClick={() => handleLangChange("TAM")} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-brand-text-primary hover:bg-gray-50 dark:hover:bg-brand-dark-secondary/60">Tamil</button>
+                                            </div>
+                                        )}
+                                    </>
                                 )}
                             </div>
 

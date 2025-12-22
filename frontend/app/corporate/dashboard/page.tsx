@@ -1,53 +1,12 @@
 "use client";
 
 import React from "react";
-import { useRouter } from "next/navigation";
-
-import Header from "@/components/corporate/Header";
 import CorporateDashboard from "@/components/corporate/CorporateDashboard";
 
 export default function CorporateDashboardPage() {
-  const router = useRouter();
-
-  const handleLogout = () => {
-    // After logout, go back to corporate login
-    router.push("/corporate/login");
-    sessionStorage.clear();
-  };
-
-  const handleNavigate = (
-    view: "dashboard" | "assessment" | "registrations" | "jobs" | "origindata" | "settings"
-  ) => {
-    if (view === "dashboard") {
-      router.push("/corporate/dashboard");
-    }
-    if (view === "registrations") {
-      router.push("/corporate/registrations");
-    }
-    if (view === "jobs") {
-      router.push("/corporate/jobs");
-    }
-    if (view === "origindata") {
-      router.push("/corporate/origindata");
-    }
-    if (view === "settings") {
-      router.push("/corporate/settings");
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-transparent">
-      <Header
-        onLogout={handleLogout}
-        currentView="dashboard"
-        portalMode="corporate"
-        onNavigate={handleNavigate}
-        onSwitchPortal={() => router.push('/corporate/profile')}
-      />
-
-      <main className="p-6">
-        <CorporateDashboard />
-      </main>
+    <div className="h-full">
+      <CorporateDashboard />
     </div>
   );
 }

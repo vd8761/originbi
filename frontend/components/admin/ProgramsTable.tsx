@@ -22,7 +22,7 @@ const ProgramsTable: React.FC<ProgramsTableProps> = ({
 }) => {
     return (
         <div className="w-[calc(100%+2px)] -ml-px h-full flex flex-col rounded-xl border border-brand-light-tertiary dark:border-white/10 bg-white dark:bg-[#19211C]/90 backdrop-blur-sm shadow-xl relative transition-all duration-300 overflow-hidden">
-            {loading && (
+            {loading && programs.length > 0 && (
                 <div className="absolute inset-0 bg-white/50 dark:bg-black/50 z-30 flex items-center justify-center backdrop-blur-sm rounded-xl">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-green"></div>
                 </div>
@@ -35,7 +35,9 @@ const ProgramsTable: React.FC<ProgramsTableProps> = ({
                             <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group">
                                 <div className="flex items-center gap-1">
                                     Name
-                                    <SortIcon sort={null} />
+                                    <div className="flex flex-col">
+                                        <SortIcon sort={null} />
+                                    </div>
                                 </div>
                             </th>
                             <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer text-center group">
@@ -68,7 +70,34 @@ const ProgramsTable: React.FC<ProgramsTableProps> = ({
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-brand-light-tertiary dark:divide-brand-dark-tertiary">
-                        {programs.length > 0 ? (
+                        {loading && programs.length === 0 ? (
+                            // Skeleton Rows
+                            Array.from({ length: 5 }).map((_, i) => (
+                                <tr key={i} className="animate-pulse bg-white dark:bg-transparent border-b border-brand-light-tertiary dark:border-white/5">
+                                    <td className="p-4 align-middle">
+                                        <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                                    </td>
+                                    <td className="p-4 align-middle text-center">
+                                        <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto"></div>
+                                    </td>
+                                    <td className="p-4 align-middle hidden md:table-cell">
+                                        <div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                                    </td>
+                                    <td className="p-4 align-middle hidden md:table-cell">
+                                        <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                                    </td>
+                                    <td className="p-4 align-middle text-center">
+                                        <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto"></div>
+                                    </td>
+                                    <td className="p-4 align-middle text-right">
+                                        <div className="flex items-center justify-end gap-2">
+                                            <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                                            <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))
+                        ) : programs.length > 0 ? (
                             programs.map((program) => (
                                 <tr key={program.id} className="bg-white dark:bg-transparent border-b border-brand-light-tertiary dark:border-white/5 hover:bg-brand-light-secondary dark:hover:bg-white/5 transition-colors">
                                     <td className="p-4 text-sm text-brand-text-light-primary dark:text-white font-medium align-middle">
@@ -115,7 +144,7 @@ const ProgramsTable: React.FC<ProgramsTableProps> = ({
                         ) : (
                             <tr>
                                 <td colSpan={6} className="p-8 text-center text-brand-text-light-secondary dark:text-gray-500">
-                                    {loading ? 'Loading...' : 'No programs found.'}
+                                    No programs found.
                                     {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
                                 </td>
                             </tr>

@@ -64,6 +64,7 @@ export class CorporateService {
             const authErr = err?.response?.data || err?.message || err;
             this.logger.error('Error creating Cognito user:', authErr);
 
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             const errorMessage = typeof authErr === 'string'
                 ? authErr
                 : (authErr?.message || JSON.stringify(authErr) || 'Failed to create Cognito user');
@@ -627,10 +628,10 @@ export class CorporateService {
         const fromAddress = `"${fromName}" <${fromEmail}>`;
 
         const assets = {
-            popper: `${backendUrl}/test/assets/Popper.png`,
-            pattern: `${backendUrl}/test/assets/Pattern_mask.png`,
-            footer: `${backendUrl}/test/assets/Email_Vector.png`,
-            logo: `${backendUrl}/test/assets/logo.png`,
+            popper: `${backendUrl}/assets/Popper.png`,
+            pattern: `${backendUrl}/assets/Pattern_mask.png`,
+            footer: `${backendUrl}/assets/Email_Vector.png`,
+            logo: `${backendUrl}/assets/logo.png`,
         };
 
         const html = getCorporateWelcomeEmailTemplate(
@@ -639,7 +640,7 @@ export class CorporateService {
             pass,
             companyName,
             mobile,
-            frontendUrl,
+            `${frontendUrl}/corporate`, // Results in /corporate/login in the template
             assets,
         );
 
