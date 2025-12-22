@@ -1,8 +1,7 @@
-
 import React from 'react';
 import { Program } from '@/lib/types';
 import ToggleSwitch from '@/components/ui/ToggleSwitch';
-import { EditIcon, DeleteIcon } from '@/components/icons';
+import { EditIcon, DeleteIcon, SortIcon } from '@/components/icons';
 
 interface ProgramsTableProps {
     programs: Program[];
@@ -22,7 +21,7 @@ const ProgramsTable: React.FC<ProgramsTableProps> = ({
     onDelete
 }) => {
     return (
-        <div className="w-full h-full flex flex-col rounded-xl border border-brand-light-tertiary dark:border-white/10 bg-white dark:bg-[#121418]/80 backdrop-blur-sm shadow-xl relative transition-all duration-300 overflow-hidden">
+        <div className="w-[calc(100%+2px)] -ml-px h-full flex flex-col rounded-xl border border-brand-light-tertiary dark:border-white/10 bg-white dark:bg-[#19211C]/90 backdrop-blur-sm shadow-xl relative transition-all duration-300 overflow-hidden">
             {loading && (
                 <div className="absolute inset-0 bg-white/50 dark:bg-black/50 z-30 flex items-center justify-center backdrop-blur-sm rounded-xl">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-green"></div>
@@ -31,48 +30,71 @@ const ProgramsTable: React.FC<ProgramsTableProps> = ({
 
             <div className="flex-1 overflow-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
                 <table className="w-full border-collapse relative">
-                    <thead className="sticky top-0 z-20 bg-brand-light-secondary dark:bg-[#FFFFFF1F] shadow-sm">
+                    <thead className="sticky top-0 z-20 bg-[#19211C]/4 dark:bg-[#FFFFFF1F] shadow-sm">
                         <tr className="text-left">
-                            <th className="p-4 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider">
-                                Code
+                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group">
+                                <div className="flex items-center gap-1">
+                                    Code
+                                    <div className="flex flex-col">
+                                        <SortIcon sort="asc" />
+                                    </div>
+                                </div>
                             </th>
-                            <th className="p-4 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider">
-                                Name
+                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group">
+                                <div className="flex items-center gap-1">
+                                    Name
+                                    <SortIcon sort={null} />
+                                </div>
                             </th>
-                            <th className="p-4 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider">
-                                Description
+                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group">
+                                <div className="flex items-center gap-1">
+                                    Description
+                                    <SortIcon sort={null} />
+                                </div>
                             </th>
-                            <th className="p-4 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider text-center">
-                                Demo?
+                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer text-center group">
+                                <div className="flex items-center gap-1 justify-center">
+                                    Demo?
+                                    <SortIcon sort={null} />
+                                </div>
                             </th>
-                            <th className="p-4 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider">
-                                Assessment Title
+                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hidden md:table-cell">
+                                <div className="flex items-center gap-1">
+                                    Assessment Title
+                                    <SortIcon sort={null} />
+                                </div>
                             </th>
-                            <th className="p-4 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider">
-                                Report Title
+                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hidden md:table-cell">
+                                <div className="flex items-center gap-1">
+                                    Report Title
+                                    <SortIcon sort={null} />
+                                </div>
                             </th>
-                            <th className="p-4 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider text-center">
-                                Status
+                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer text-center group">
+                                <div className="flex items-center gap-1 justify-center">
+                                    Status
+                                    <SortIcon sort={null} />
+                                </div>
                             </th>
-                            <th className="p-4 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider text-right">
+                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider text-right">
                                 Action
                             </th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-brand-light-tertiary dark:divide-brand-dark-tertiary">
                         {programs.length > 0 ? (
-                            programs.map((program, index) => (
-                                <tr key={program.id} className="border-b border-brand-light-tertiary dark:border-white/5 hover:bg-brand-light-secondary dark:hover:bg-white/5 transition-colors">
-                                    <td className="p-4 text-sm text-brand-text-light-primary dark:text-white font-mono whitespace-nowrap">
+                            programs.map((program) => (
+                                <tr key={program.id} className="bg-white dark:bg-transparent border-b border-brand-light-tertiary dark:border-white/5 hover:bg-brand-light-secondary dark:hover:bg-white/5 transition-colors">
+                                    <td className="p-4 text-sm text-brand-text-light-primary dark:text-white font-mono whitespace-nowrap align-middle">
                                         {program.code}
                                     </td>
-                                    <td className="p-4 text-sm text-brand-text-light-primary dark:text-white font-medium">
+                                    <td className="p-4 text-sm text-brand-text-light-primary dark:text-white font-medium align-middle">
                                         {program.name}
                                     </td>
-                                    <td className="p-4 text-sm text-brand-text-light-secondary dark:text-brand-text-secondary max-w-xs truncate" title={program.description}>
+                                    <td className="p-4 text-sm text-brand-text-light-secondary dark:text-brand-text-secondary max-w-xs truncate align-middle" title={program.description}>
                                         {program.description || '-'}
                                     </td>
-                                    <td className="p-4 text-center">
+                                    <td className="p-4 text-center align-middle">
                                         {program.is_demo ? (
                                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
                                                 Yes
@@ -83,27 +105,27 @@ const ProgramsTable: React.FC<ProgramsTableProps> = ({
                                             </span>
                                         )}
                                     </td>
-                                    <td className="p-4 text-sm text-brand-text-light-primary dark:text-white">
+                                    <td className="p-4 text-sm text-brand-text-light-primary dark:text-white hidden md:table-cell align-middle">
                                         {program.assessment_title}
                                     </td>
-                                    <td className="p-4 text-sm text-brand-text-light-primary dark:text-white">
+                                    <td className="p-4 text-sm text-brand-text-light-primary dark:text-white hidden md:table-cell align-middle">
                                         {program.report_title}
                                     </td>
-                                    <td className="p-4 flex justify-center">
+                                    <td className="p-4 flex justify-center align-middle">
                                         <ToggleSwitch isOn={program.is_active} onToggle={() => onToggleStatus(program.id, program.is_active)} />
                                     </td>
-                                    <td className="p-4 text-right">
+                                    <td className="p-4 text-right align-middle">
                                         <div className="flex items-center justify-end gap-2">
                                             <button
                                                 onClick={() => onEdit(program)}
-                                                className="p-2 text-gray-500 hover:text-brand-green hover:bg-brand-green/10 rounded-lg transition-colors"
+                                                className="p-2 text-gray-500 hover:text-brand-green hover:bg-brand-green/10 rounded-lg transition-colors cursor-pointer"
                                                 title="Edit"
                                             >
                                                 <EditIcon className="w-4 h-4" />
                                             </button>
                                             <button
                                                 onClick={() => onDelete(program.id)}
-                                                className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                                                className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
                                                 title="Delete"
                                             >
                                                 <DeleteIcon className="w-4 h-4" />
