@@ -12,12 +12,16 @@ export const programService = {
   async getProgramsList(
     page: number,
     limit: number,
-    search?: string
+    search?: string,
+    sortBy?: string,
+    sortOrder?: "ASC" | "DESC"
   ): Promise<PaginatedResponse<Program>> {
     const params = new URLSearchParams();
     params.set("page", String(page));
     params.set("limit", String(limit));
     if (search && search.trim()) params.set("search", search.trim());
+    if (sortBy) params.set("sortBy", sortBy);
+    if (sortOrder) params.set("sortOrder", sortOrder);
 
     const token = AuthService.getToken();
 

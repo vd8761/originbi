@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   BulkUploadIcon,
   PlusIcon,
   ChevronDownIcon,
   ArrowLeftWithoutLineIcon,
   ArrowRightWithoutLineIcon,
+  FilterFunnelIcon,
 } from "@/components/icons";
 import AddRegistrationForm from "@/components/admin/AddRegistrationForm";
 import DateRangeFilter, {
@@ -15,8 +16,10 @@ import DateRangeFilter, {
 import DateRangePickerModal from "@/components/ui/DateRangePickerModal";
 import ExcelExportButton from "@/components/ui/ExcelExportButton";
 import RegistrationTable from "@/components/ui/RegistrationTable";
+import AssessmentSessionsTable from "@/components/admin/AssessmentSessionsTable"; // Import
 import { Registration } from "@/lib/types";
-import { registrationService } from "@/lib/services";
+import { registrationService } from "@/lib/services/registration.service";
+import { assessmentService, AssessmentSession } from "@/lib/services/assessment.service";
 
 // Debounce utility
 const useDebounce = (value: string, delay: number) => {
@@ -36,6 +39,7 @@ const RegistrationManagement: React.FC = () => {
 
   // Data State
   const [users, setUsers] = useState<Registration[]>([]);
+  const [sessions, setSessions] = useState<AssessmentSession[]>([]); // New State
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,18 +65,41 @@ const RegistrationManagement: React.FC = () => {
   const [endDate, setEndDate] = useState<Date | null>(new Date());
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
 
+  // Sorting
+  const [sortColumn, setSortColumn] = useState<string>("created_at");
+  const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">("DESC");
+
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+        setShowStatusDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
   // Initial Fetch for Tab Counts (Background)
   useEffect(() => {
     const fetchInitialCounts = async () => {
       try {
-        const [regRes] = await Promise.all([
+        const [regRes, sessRes] = await Promise.all([
           registrationService.getRegistrations(1, 1, ""),
+          assessmentService.getSessions(1, 1, ""),
         ]);
         setTabCounts({
           registrations: regRes.total,
-          assigned: 0, // Placeholder
+          assigned: sessRes.total,
         });
       } catch (e) {
         console.error("Failed to fetch initial tab counts", e);
@@ -95,30 +122,49 @@ const RegistrationManagement: React.FC = () => {
         return `${year}-${month}-${day}`;
       };
 
-      const response = await registrationService.getRegistrations(
-        currentPage,
-        entriesPerPage,
-        debouncedSearchTerm,
-        {
-          start_date: formatDate(startDate),
-          end_date: formatDate(endDate),
-          // TODO: Implement tab logic if needed
+      if (activeTab === 'registrations') {
+        const response = await registrationService.getRegistrations(
+          currentPage,
+          entriesPerPage,
+          debouncedSearchTerm,
+          {
+            start_date: formatDate(startDate),
+            end_date: formatDate(endDate),
+          },
+          sortColumn,
+          sortOrder
+        );
+        setUsers(response.data);
+        setTotalCount(response.total);
+        if (tabCounts.registrations !== response.total) { // Update if changed (optional)
+          setTabCounts(prev => ({ ...prev, registrations: response.total }));
         }
-      );
-
-      setUsers(response.data);
-      setTotalCount(response.total);
-
-      if (activeTab === "registrations") {
-        setTabCounts((prev) => ({
-          ...prev,
-          registrations: response.total,
-        }));
+      } else {
+        // ASSESSMENTS TAB
+        const response = await assessmentService.getSessions(
+          currentPage,
+          entriesPerPage,
+          debouncedSearchTerm,
+          sortColumn,
+          sortOrder,
+          {
+            start_date: formatDate(startDate),
+            end_date: formatDate(endDate),
+            status: statusFilter || undefined,
+          }
+        );
+        setSessions(response.data);
+        setTotalCount(response.total);
+        if (tabCounts.assigned !== response.total) {
+          setTabCounts(prev => ({ ...prev, assigned: response.total }));
+        }
       }
+
     } catch (err) {
       console.error(err);
       setError("Unable to fetch data. Please try again.");
       setUsers([]);
+      setSessions([]);
       setTotalCount(0);
     } finally {
       setLoading(false);
@@ -130,7 +176,20 @@ const RegistrationManagement: React.FC = () => {
     debouncedSearchTerm,
     startDate,
     endDate,
+    sortColumn,
+    sortOrder,
+    tabCounts
   ]);
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortOrder(sortOrder === "ASC" ? "DESC" : "ASC");
+    } else {
+      setSortColumn(column);
+      setSortOrder("ASC");
+    }
+    setCurrentPage(1); // Reset page on sort
+  };
 
   useEffect(() => {
     fetchData();
@@ -160,8 +219,83 @@ const RegistrationManagement: React.FC = () => {
     setSearchTerm("");
   };
 
-  const handleExport = () => {
-    //console.log("Exporting data for range:", dateRangeLabel);
+  const handleExport = async () => {
+    try {
+      if (activeTab === 'registrations') {
+        // Fetch all registrations with current filters
+        const response = await registrationService.getRegistrations(
+          1,
+          10000, // Large limit for export
+          debouncedSearchTerm,
+          {
+            start_date: startDate ? startDate.toISOString().split('T')[0] : undefined,
+            end_date: endDate ? endDate.toISOString().split('T')[0] : undefined,
+          },
+          sortColumn,
+          sortOrder
+        );
+
+        const headers = ["Name", "Gender", "Email", "Mobile", "Status", "Registered At"];
+        const rows = response.data.map(u => [
+          u.full_name,
+          u.gender,
+          u.email,
+          `${u.country_code} ${u.mobile_number}`,
+          u.status,
+          u.created_at ? new Date(u.created_at).toLocaleDateString() : ''
+        ]);
+
+        downloadCSV(headers, rows, `registrations_export_${new Date().toISOString().split('T')[0]}.csv`);
+
+      } else {
+        // Fetch all sessions with current filters
+        const response = await assessmentService.getSessions(
+          1,
+          10000,
+          debouncedSearchTerm,
+          sortColumn,
+          sortOrder,
+          {
+            start_date: startDate ? startDate.toISOString().split('T')[0] : undefined,
+            end_date: endDate ? endDate.toISOString().split('T')[0] : undefined,
+            status: statusFilter || undefined,
+          }
+        );
+
+        const headers = ["User Email", "Program", "Assessment Title", "Valid From", "Valid To", "Status", "Created At"];
+        const rows = response.data.map(s => [
+          s.user?.email || 'N/A',
+          s.program?.name || 'N/A',
+          s.program?.assessment_title || 'N/A',
+          s.validFrom ? new Date(s.validFrom).toLocaleDateString() : '',
+          s.validTo ? new Date(s.validTo).toLocaleDateString() : '',
+          s.status,
+          s.createdAt ? new Date(s.createdAt).toLocaleDateString() : ''
+        ]);
+
+        downloadCSV(headers, rows, `assigned_assessments_export_${new Date().toISOString().split('T')[0]}.csv`);
+        // I should probably fix `fetchData` to pass `statusFilter` first!
+        // The user previously said "Integrate Status Filter" as a next step.
+        // So I should fix `fetchData` AND `handleExport` to include `statusFilter`.
+
+        // Let's check `fetchData` implementation now.
+      }
+    } catch (error) {
+      console.error("Export failed", error);
+    }
+  };
+
+  const downloadCSV = (headers: string[], rows: (string | number | null | undefined)[][], filename: string) => {
+    const csvContent = "data:text/csv;charset=utf-8,"
+      + headers.join(",") + "\n"
+      + rows.map(e => e.map(c => `"${c || ''}"`).join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleBulkUpload = () => {
@@ -177,7 +311,10 @@ const RegistrationManagement: React.FC = () => {
       let newStart: Date | null = now;
       let newEnd: Date | null = now;
 
-      if (option === "Yesterday") {
+      if (option === 'All') {
+        newStart = null;
+        newEnd = null;
+      } else if (option === "Yesterday") {
         const yesterday = new Date(now);
         yesterday.setDate(now.getDate() - 1);
         newStart = yesterday;
@@ -422,21 +559,74 @@ const RegistrationManagement: React.FC = () => {
             onRangeSelect={handleDateRangeSelect}
           />
 
+          {/* Status Filter */}
+          {activeTab === 'assigned' && (
+            <div className="relative" ref={statusDropdownRef}>
+              <button
+                onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                className={`flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-white/30 transition-all shadow-sm cursor-pointer text-[#19211C] dark:text-white`}
+              >
+                <FilterFunnelIcon className="w-4 h-4" />
+                <span>
+                  {statusFilter
+                    ? statusFilter
+                      .toLowerCase()
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (c) => c.toUpperCase())
+                    : "All"}
+                </span>
+                <ChevronDownIcon className="w-3 h-3 text-gray-500 dark:text-white" />
+              </button>
+              {showStatusDropdown && (
+                <div className="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-[#303438] border border-gray-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden py-1">
+                  {[
+                    { label: 'All', value: null },
+                    { label: 'Not Started', value: 'NOT_STARTED' },
+                    { label: 'In Progress', value: 'IN_PROGRESS' },
+                    { label: 'Completed', value: 'COMPLETED' },
+                    { label: 'Partially Completed', value: 'PARTIALLY_COMPLETED' },
+                    { label: 'Expired', value: 'EXPIRED' },
+                  ].map((option) => (
+                    <button
+                      key={option.label}
+                      onClick={() => { setStatusFilter(option.value); setShowStatusDropdown(false); }}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors
+                        ${statusFilter === option.value
+                          ? 'text-brand-green bg-gray-50 dark:bg-white/5'
+                          : 'text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/5'
+                        }`}
+                    >
+                      <span>{option.label}</span>
+                      {statusFilter === option.value && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-brand-green shadow-[0_0_8px_rgba(32,210,125,0.6)]"></div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <ExcelExportButton onClick={handleExport} />
 
-          <button
-            onClick={handleBulkUpload}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] rounded-lg text-sm font-medium text-brand-text-light-primary dark:text-white hover:bg-gray-50 dark:hover:bg-white/30 transition-all shadow-sm cursor-pointer"
-          >
-            <span>Bulk Registration</span>
-            <BulkUploadIcon className="w-[18px] h-[18px] text-[#150089] dark:text-white" />
-          </button>
+          {activeTab === 'registrations' && (
+            <button
+              onClick={handleBulkUpload}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] rounded-lg text-sm font-medium text-brand-text-light-primary dark:text-white hover:bg-gray-50 dark:hover:bg-white/30 transition-all shadow-sm cursor-pointer"
+            >
+              <span>Bulk Registration</span>
+              <BulkUploadIcon className="w-[18px] h-[18px] text-[#150089] dark:text-white" />
+            </button>
+          )}
 
           <button
-            onClick={() => setView("add")}
+            onClick={() => {
+              if (activeTab === 'registrations') setView("add");
+              // else setView("assign"); // TODO: Implement Assign View
+            }}
             className="flex items-center gap-2 px-4 py-2.5 bg-brand-green border border-transparent rounded-lg text-sm font-medium text-white hover:bg-brand-green/90 transition-all shadow-lg shadow-brand-green/20 cursor-pointer"
           >
-            <span>Add New</span>
+            <span>{activeTab === 'registrations' ? 'Add New' : 'Assign New exam'}</span>
             <PlusIcon className="w-4 h-4 text-white" />
           </button>
         </div>
@@ -444,12 +634,26 @@ const RegistrationManagement: React.FC = () => {
 
       {/* Table Area - flex-1 ensures it fills available vertical space */}
       <div className="flex-1 min-h-[300px] relative flex flex-col">
-        <RegistrationTable
-          users={users}
-          loading={loading}
-          error={error}
-          onToggleStatus={handleToggleStatus}
-        />
+        {activeTab === 'registrations' ? (
+          <RegistrationTable
+            users={users}
+            loading={loading}
+            error={error}
+            onToggleStatus={handleToggleStatus}
+            sortColumn={sortColumn}
+            sortOrder={sortOrder}
+            onSort={handleSort}
+          />
+        ) : (
+          <AssessmentSessionsTable
+            sessions={sessions}
+            loading={loading}
+            error={error}
+            sortColumn={sortColumn}
+            sortOrder={sortOrder}
+            onSort={handleSort}
+          />
+        )}
 
 
       </div>

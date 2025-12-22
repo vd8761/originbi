@@ -24,6 +24,9 @@ interface RegistrationTableProps {
   onViewDetails?: (id: string) => void;
   onEdit?: (id: string) => void;
   onToggleBlock?: (id: string, currentBlock: boolean) => void;
+  onSort?: (column: string) => void;
+  sortColumn?: string;
+  sortOrder?: "ASC" | "DESC";
 }
 
 const getCountryInfo = (dial: string | undefined) => {
@@ -46,6 +49,9 @@ const CorporateRegistrationTable: React.FC<RegistrationTableProps> = ({
   onViewDetails,
   onEdit,
   onToggleBlock,
+  onSort,
+  sortColumn,
+  sortOrder,
 }) => {
   return (
     <div className="w-[calc(100%+2px)] -ml-px h-full flex flex-col rounded-xl border border-brand-light-tertiary dark:border-white/10 bg-white dark:bg-[#19211C]/90 backdrop-blur-sm shadow-xl relative transition-all duration-300 overflow-hidden">
@@ -59,51 +65,78 @@ const CorporateRegistrationTable: React.FC<RegistrationTableProps> = ({
         <table className="w-full border-collapse relative">
           <thead className="sticky top-0 z-20 bg-[#19211C]/4 dark:bg-[#FFFFFF1F] shadow-sm">
             <tr className="text-left">
-              <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group">
+              <th
+                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                onClick={() => onSort?.('user.full_name')}
+              >
                 <div className="flex items-center gap-1">
                   Name
                   <div className="flex flex-col">
-                    <SortIcon sort="asc" />
+                    <SortIcon sort={sortColumn === 'user.full_name' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                   </div>
                 </div>
               </th>
-              <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group">
+              <th
+                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                onClick={() => onSort?.('user.gender')}
+              >
                 <div className="flex items-center gap-1">
                   Gender
-                  <SortIcon sort={null} />
+                  <SortIcon sort={sortColumn === 'user.gender' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                 </div>
               </th>
-              <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group">
+              <th
+                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                onClick={() => onSort?.('user.email')}
+              >
                 <div className="flex items-center gap-1">
                   Email
-                  <SortIcon sort={null} />
+                  <SortIcon sort={sortColumn === 'user.email' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                 </div>
               </th>
-              <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group">
+              <th
+                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                onClick={() => onSort?.('user.mobile_number')}
+              >
                 <div className="flex items-center gap-1">
                   Mobile
-                  <SortIcon sort={null} />
+                  <SortIcon sort={sortColumn === 'user.mobile_number' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                 </div>
               </th>
-              <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group">
+              <th
+                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                onClick={() => onSort?.('company_name')}
+              >
                 <div className="flex items-center gap-1">
                   Company
-                  <SortIcon sort={null} />
+                  <SortIcon sort={sortColumn === 'company_name' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                 </div>
               </th>
-              <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group">
-                Job Title
+              <th
+                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                onClick={() => onSort?.('job_title')}
+              >
+                <div className="flex items-center gap-1">
+                  Job Title
+                  <SortIcon sort={sortColumn === 'job_title' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
+                </div>
               </th>
-              <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer text-center group">
+              <th
+                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer text-center group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                onClick={() => onSort?.('is_active')}
+              >
                 <div className="flex items-center gap-1 justify-center">
                   Status
-                  <SortIcon sort={null} />
+                  <SortIcon sort={sortColumn === 'is_active' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                 </div>
               </th>
-              <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer text-center group">
+              <th
+                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer text-center group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                onClick={() => onSort?.('is_blocked')}
+              >
                 <div className="flex items-center gap-1 justify-center">
                   BANNED
-                  <SortIcon sort={null} />
+                  <SortIcon sort={sortColumn === 'is_blocked' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                 </div>
               </th>
               <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider text-right">

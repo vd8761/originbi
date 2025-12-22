@@ -45,7 +45,7 @@ export class RegistrationsService {
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
-  ) {}
+  ) { }
 
   // ---------------------------------------------------------
   // Helper: Call auth-service to create a Cognito user
@@ -284,7 +284,16 @@ export class RegistrationsService {
   // LIST REGISTRATIONS
   // ---------------------------------------------------------
   /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
-  async findAll(page: number, limit: number, tab?: string, search?: string) {
+  async findAll(
+    page: number,
+    limit: number,
+    tab?: string,
+    search?: string,
+    sortBy?: string,
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
+    startDate?: string,
+    endDate?: string,
+  ) {
     try {
       const qb = this.regRepo
         .createQueryBuilder('r')
@@ -299,9 +308,42 @@ export class RegistrationsService {
         });
       }
 
+      if (startDate) {
+        qb.andWhere('r.createdAt >= :startDate', { startDate: `${startDate} 00:00:00` });
+      }
+      if (endDate) {
+        qb.andWhere('r.createdAt <= :endDate', { endDate: `${endDate} 23:59:59` });
+      }
+
+      // Sorting Logic
+      if (sortBy) {
+        let sortCol = '';
+        switch (sortBy) {
+          case 'name':
+            sortCol = 'r.fullName';
+            break;
+          case 'email':
+            sortCol = 'u.email';
+            break;
+          case 'status':
+            sortCol = 'r.status';
+            break;
+          case 'gender':
+            sortCol = "u.metadata->>'gender'";
+            break;
+          case 'mobile_number':
+            sortCol = "u.metadata->>'mobile'";
+            break;
+          default:
+            sortCol = 'r.createdAt';
+        }
+        qb.orderBy(sortCol, sortOrder);
+      } else {
+        qb.orderBy('r.createdAt', 'DESC');
+      }
+
       const total = await qb.getCount();
       const rows = await qb
-        .orderBy('r.createdAt', 'DESC')
         .skip((page - 1) * limit)
         .take(limit)
         .getMany();

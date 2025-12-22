@@ -11,6 +11,9 @@ interface RegistrationTableProps {
     error: string | null;
     onToggleStatus?: (id: string, currentStatus: boolean) => void;
     onViewDetails?: (id: string) => void;
+    onSort?: (column: string) => void;
+    sortColumn?: string;
+    sortOrder?: "ASC" | "DESC";
 }
 
 const RegistrationTable: React.FC<RegistrationTableProps> = ({
@@ -18,7 +21,10 @@ const RegistrationTable: React.FC<RegistrationTableProps> = ({
     loading,
     error,
     onViewDetails,
-    onToggleStatus
+    onToggleStatus,
+    onSort,
+    sortColumn,
+    sortOrder
 }) => {
 
     // Generate a unique but consistent color based on the name
@@ -50,46 +56,57 @@ const RegistrationTable: React.FC<RegistrationTableProps> = ({
 
     return (
         <div className="w-[calc(100%+2px)] -ml-px h-full flex flex-col rounded-xl border border-brand-light-tertiary dark:border-white/10 bg-white dark:bg-[#19211C]/90 backdrop-blur-sm shadow-xl relative transition-all duration-300 overflow-hidden">
-            {loading && (
-                <div className="absolute inset-0 bg-white/50 dark:bg-black/50 z-30 flex items-center justify-center backdrop-blur-sm rounded-xl">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-green"></div>
-                </div>
-            )}
+            {/* Loading overlay removed */}
 
             <div className="flex-1 overflow-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
                 <table className="w-full border-collapse relative">
                     <thead className="sticky top-0 z-20 bg-[#19211C]/4 dark:bg-[#FFFFFF1F] shadow-sm">
                         <tr className="text-left">
-                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group">
+                            <th
+                                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                onClick={() => onSort?.('name')}
+                            >
                                 <div className="flex items-center gap-1">
                                     Name
                                     <div className="flex flex-col">
-                                        <SortIcon sort="asc" />
+                                        <SortIcon sort={sortColumn === 'name' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                                     </div>
                                 </div>
                             </th>
-                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer">
+                            <th
+                                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                onClick={() => onSort?.('gender')}
+                            >
                                 <div className="flex items-center gap-1">
                                     Gender
-                                    <SortIcon sort={null} />
+                                    <SortIcon sort={sortColumn === 'gender' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                                 </div>
                             </th>
-                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer">
+                            <th
+                                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                onClick={() => onSort?.('email')}
+                            >
                                 <div className="flex items-center gap-1">
                                     Email
-                                    <SortIcon sort={null} />
+                                    <SortIcon sort={sortColumn === 'email' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                                 </div>
                             </th>
-                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer">
+                            <th
+                                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                onClick={() => onSort?.('mobile_number')}
+                            >
                                 <div className="flex items-center gap-1">
                                     Mobile
-                                    <SortIcon sort={null} />
+                                    <SortIcon sort={sortColumn === 'mobile_number' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                                 </div>
                             </th>
-                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer text-center">
+                            <th
+                                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer text-center group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                onClick={() => onSort?.('status')}
+                            >
                                 <div className="flex items-center gap-1 justify-center">
                                     Status
-                                    <SortIcon sort={null} />
+                                    <SortIcon sort={sortColumn === 'status' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                                 </div>
                             </th>
                             <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider text-center">
@@ -98,7 +115,18 @@ const RegistrationTable: React.FC<RegistrationTableProps> = ({
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-brand-light-tertiary dark:divide-brand-dark-tertiary">
-                        {users.length > 0 ? (
+                        {loading ? (
+                            Array.from({ length: 10 }).map((_, index) => (
+                                <tr key={index} className="bg-white dark:bg-transparent border-b border-brand-light-tertiary dark:border-white/5 animate-pulse">
+                                    <td className="p-4"><div className="flex items-center gap-3"><div className="w-9 h-9 bg-gray-200 dark:bg-gray-700 rounded-full"></div><div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div></div></td>
+                                    <td className="p-4"><div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
+                                    <td className="p-4"><div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
+                                    <td className="p-4"><div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
+                                    <td className="p-4 text-center"><div className="h-6 w-12 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto"></div></td>
+                                    <td className="p-4 text-center"><div className="h-6 w-6 bg-gray-200 dark:bg-gray-700 rounded mx-auto"></div></td>
+                                </tr>
+                            ))
+                        ) : users.length > 0 ? (
                             users.map((user, index) => (
                                 <tr key={user.id || index} className="bg-white dark:bg-transparent border-b border-brand-light-tertiary dark:border-white/5 hover:bg-brand-light-secondary dark:hover:bg-white/5 transition-colors">
                                     <td className="p-4 align-middle">

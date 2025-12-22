@@ -75,12 +75,37 @@ export class CorporateService {
     // ----------------------------------------------------------------
     // FIND ALL (List)
     // ----------------------------------------------------------------
-    async findAll(page: number, limit: number, search?: string) {
+    async findAll(
+        page: number,
+        limit: number,
+        search?: string,
+        sortBy?: string,
+        sortOrder: 'ASC' | 'DESC' = 'DESC'
+    ) {
         try {
             const qb = this.corporateRepo
                 .createQueryBuilder('c')
-                .leftJoinAndSelect('c.user', 'u')
-                .orderBy('c.createdAt', 'DESC');
+                .leftJoinAndSelect('c.user', 'u');
+
+            // Sorting Logic
+            if (sortBy) {
+                let sortCol = '';
+                // Map frontend keys to backend entities
+                switch (sortBy) {
+                    case 'company_name': sortCol = 'c.companyName'; break;
+                    case 'job_title': sortCol = 'c.jobTitle'; break;
+                    case 'is_active': sortCol = 'c.isActive'; break;
+                    case 'is_blocked': sortCol = 'c.isBlocked'; break;
+                    case 'user.email': sortCol = 'u.email'; break;
+                    case 'user.mobile_number': sortCol = 'c.mobileNumber'; break;
+                    case 'user.gender': sortCol = 'u.gender'; break;
+                    // For things we can't easily sort (like metadata json), we skip or fallback
+                    default: sortCol = 'c.createdAt'; // Fallback
+                }
+                qb.orderBy(sortCol, sortOrder);
+            } else {
+                qb.orderBy('c.createdAt', 'DESC');
+            }
 
             if (search) {
                 const s = `%${search.toLowerCase()}%`;

@@ -44,6 +44,10 @@ const CorporateManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
+  // Sorting
+  const [sortColumn, setSortColumn] = useState<string>("created_at");
+  const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">("DESC");
+
   // Fetch data
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -52,17 +56,29 @@ const CorporateManagement: React.FC = () => {
       const response = await corporateRegistrationService.getRegistrationsList(
         currentPage,
         entriesPerPage,
-        debouncedSearchTerm
+        debouncedSearchTerm,
+        sortColumn,
+        sortOrder
       );
       setUsers(response.data);
       setTotalCount(response.total);
     } catch (err) {
       console.error(err);
-      setError("Failed to load corporate registrations.");
+      setError("Failed to fetch corporate data.");
     } finally {
       setLoading(false);
     }
-  }, [currentPage, entriesPerPage, debouncedSearchTerm]);
+  }, [currentPage, entriesPerPage, debouncedSearchTerm, sortColumn, sortOrder]);
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortOrder(sortOrder === "ASC" ? "DESC" : "ASC");
+    } else {
+      setSortColumn(column);
+      setSortOrder("ASC");
+    }
+  };
+
 
   useEffect(() => {
     if (view === 'list') {
@@ -260,6 +276,9 @@ const CorporateManagement: React.FC = () => {
           onViewDetails={handleViewDetails}
           onEdit={handleEdit}
           onToggleBlock={handleToggleBlock}
+          sortColumn={sortColumn}
+          sortOrder={sortOrder}
+          onSort={handleSort}
         />
       </div>
 

@@ -50,7 +50,9 @@ export const registrationService = {
       program_id?: string;
       start_date?: string;
       end_date?: string;
-    }
+    },
+    sortBy?: string,
+    sortOrder?: "ASC" | "DESC"
   ): Promise<PaginatedResponse<Registration>> {
     const params = new URLSearchParams();
     params.set("page", page.toString());
@@ -60,6 +62,8 @@ export const registrationService = {
     if (filters?.program_id) params.set("program_id", filters.program_id);
     if (filters?.start_date) params.set("start_date", filters.start_date);
     if (filters?.end_date) params.set("end_date", filters.end_date);
+    if (sortBy) params.set("sortBy", sortBy);
+    if (sortOrder) params.set("sortOrder", sortOrder);
 
     const token = AuthService.getToken();
 

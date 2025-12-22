@@ -10,6 +10,9 @@ interface ProgramsTableProps {
     onToggleStatus: (id: string, currentStatus: boolean) => void;
     onEdit: (program: Program) => void;
     onDelete: (id: string) => void;
+    onSort?: (column: string) => void;
+    sortColumn?: string;
+    sortOrder?: "ASC" | "DESC";
 }
 
 const ProgramsTable: React.FC<ProgramsTableProps> = ({
@@ -18,7 +21,10 @@ const ProgramsTable: React.FC<ProgramsTableProps> = ({
     error,
     onToggleStatus,
     onEdit,
-    onDelete
+    onDelete,
+    onSort,
+    sortColumn,
+    sortOrder
 }) => {
     return (
         <div className="w-[calc(100%+2px)] -ml-px h-full flex flex-col rounded-xl border border-brand-light-tertiary dark:border-white/10 bg-white dark:bg-[#19211C]/90 backdrop-blur-sm shadow-xl relative transition-all duration-300 overflow-hidden">
@@ -32,36 +38,51 @@ const ProgramsTable: React.FC<ProgramsTableProps> = ({
                 <table className="w-full border-collapse relative">
                     <thead className="sticky top-0 z-20 bg-[#19211C]/4 dark:bg-[#FFFFFF1F] shadow-sm">
                         <tr className="text-left">
-                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group">
+                            <th
+                                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                onClick={() => onSort?.('name')}
+                            >
                                 <div className="flex items-center gap-1">
                                     Name
                                     <div className="flex flex-col">
-                                        <SortIcon sort={null} />
+                                        <SortIcon sort={sortColumn === 'name' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                                     </div>
                                 </div>
                             </th>
-                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer text-center group">
+                            <th
+                                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer text-center group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                onClick={() => onSort?.('is_demo')}
+                            >
                                 <div className="flex items-center gap-1 justify-center">
                                     Demo?
-                                    <SortIcon sort={null} />
+                                    <SortIcon sort={sortColumn === 'is_demo' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                                 </div>
                             </th>
-                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hidden md:table-cell">
+                            <th
+                                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hidden md:table-cell hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                onClick={() => onSort?.('assessment_title')}
+                            >
                                 <div className="flex items-center gap-1">
                                     Assessment Title
-                                    <SortIcon sort={null} />
+                                    <SortIcon sort={sortColumn === 'assessment_title' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                                 </div>
                             </th>
-                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hidden md:table-cell">
+                            <th
+                                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hidden md:table-cell hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                onClick={() => onSort?.('report_title')}
+                            >
                                 <div className="flex items-center gap-1">
                                     Report Title
-                                    <SortIcon sort={null} />
+                                    <SortIcon sort={sortColumn === 'report_title' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                                 </div>
                             </th>
-                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer text-center group">
+                            <th
+                                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer text-center group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                onClick={() => onSort?.('is_active')}
+                            >
                                 <div className="flex items-center gap-1 justify-center">
                                     Status
-                                    <SortIcon sort={null} />
+                                    <SortIcon sort={sortColumn === 'is_active' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                                 </div>
                             </th>
                             <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider text-right">
