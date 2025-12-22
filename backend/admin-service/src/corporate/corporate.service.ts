@@ -64,10 +64,9 @@ export class CorporateService {
             const authErr = err?.response?.data || err?.message || err;
             this.logger.error('Error creating Cognito user:', authErr);
 
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             const errorMessage = typeof authErr === 'string'
                 ? authErr
-                : (authErr?.message || JSON.stringify(authErr) || 'Failed to create Cognito user');
+                : ((authErr as { message?: string })?.message || JSON.stringify(authErr) || 'Failed to create Cognito user');
 
             throw new InternalServerErrorException(errorMessage);
         }
