@@ -6,7 +6,7 @@ export default function AdminLayout({
     children: React.ReactNode;
 }) {
     return (
-        <div className="relative min-h-screen w-full bg-[#FAFAFA] dark:bg-[#090A0C] bg-[url('/Admin_Background_Theme.svg')] bg-cover bg-fixed bg-center bg-no-repeat font-sans selection:bg-brand-green/20 overflow-x-hidden lg:[zoom:0.85] xl:[zoom:0.9] 2xl:[zoom:1.0]">
+        <div className="relative min-h-screen w-full bg-cover bg-fixed bg-center bg-no-repeat font-sans selection:bg-brand-green/20 overflow-x-hidden lg:[zoom:0.85] xl:[zoom:0.9] 2xl:[zoom:1.0]">
 
             {/* --- BACKGROUND ELEMENTS --- */}
             {/* Previous animated wave and blobs removed to prioritize the requested Theme SVG */}

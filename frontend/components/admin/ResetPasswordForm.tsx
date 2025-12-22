@@ -121,45 +121,38 @@ const ResetPasswordForm: React.FC = () => {
         }
     };
 
-    // 3️⃣ Password Reset Success Screen (Cyber Portal Overlay)
+    // 3️⃣ Password Reset Success Screen (Integrated Layout)
     if (successMessage) {
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-100/80 dark:bg-black/80 backdrop-blur-xl animate-fade-in p-4 transition-all duration-500">
-                {/* Floating Card */}
-                <div className="w-full max-w-sm bg-white/95 dark:bg-[#050505]/90 backdrop-blur-md p-10 rounded-[32px] shadow-2xl dark:shadow-[0_0_50px_rgba(34,197,94,0.1)] border border-brand-green/20 ring-1 ring-black/5 dark:ring-white/5 flex flex-col items-center text-center space-y-8 transform hover:scale-[1.01] transition-transform duration-500 relative overflow-hidden">
-
-                    {/* Animated grid effect */}
-                    <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-5 dark:opacity-10" />
-                    <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-brand-green to-transparent animate-pulse-slow" />
-
-                    <div className="relative z-10">
-                        <div className="absolute inset-0 bg-brand-green blur-3xl opacity-20 rounded-full animate-pulse"></div>
-                        <div className="w-24 h-24 bg-gradient-to-br from-brand-green/10 to-transparent rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(34,197,94,0.3)] border border-brand-green/40 relative">
-                            <svg className="w-10 h-10 text-brand-green drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
-                            </svg>
-                        </div>
+            <div className="w-full flex flex-col items-center text-center animate-fade-in space-y-8 py-8">
+                {/* Success Icon */}
+                <div className="relative">
+                    <div className="absolute inset-0 bg-brand-green blur-3xl opacity-20 rounded-full animate-pulse"></div>
+                    <div className="w-24 h-24 bg-gradient-to-br from-brand-green/10 to-transparent rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(34,197,94,0.3)] border border-brand-green/40 relative">
+                        <svg className="w-10 h-10 text-brand-green drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+                        </svg>
                     </div>
-
-                    <div className="space-y-3 relative z-10">
-                        <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-widest uppercase font-mono">
-                            Success
-                        </h2>
-                        <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed px-2 font-mono">
-                            {successMessage}
-                        </p>
-                    </div>
-
-                    <Link
-                        href="/admin/login"
-                        className="relative z-10 w-full group overflow-hidden text-black bg-brand-green font-bold rounded-lg text-base px-5 py-4 shadow-[0_0_20px_rgba(34,197,94,0.4)] transition-all duration-300 hover:shadow-[0_0_30px_rgba(34,197,94,0.6)] flex justify-center items-center gap-2 uppercase tracking-wider"
-                    >
-                        <span className="relative z-10 flex items-center gap-2">
-                            Return to Login
-                            <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                        </span>
-                    </Link>
                 </div>
+
+                <div className="space-y-3 relative z-10 max-w-sm">
+                    <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-widest uppercase font-mono">
+                        Success
+                    </h2>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed font-mono">
+                        {successMessage}
+                    </p>
+                </div>
+
+                <Link
+                    href="/admin/login"
+                    className="relative z-10 w-full max-w-xs group overflow-hidden text-black bg-brand-green font-bold rounded-lg text-base px-5 py-4 shadow-[0_0_20px_rgba(34,197,94,0.4)] transition-all duration-300 hover:shadow-[0_0_30px_rgba(34,197,94,0.6)] flex justify-center items-center gap-2 uppercase tracking-wider"
+                >
+                    <span className="relative z-10 flex items-center gap-2">
+                        Return to Login
+                        <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    </span>
+                </Link>
             </div>
         );
     }

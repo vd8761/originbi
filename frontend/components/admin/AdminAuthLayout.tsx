@@ -15,11 +15,10 @@ const AdminAuthLayout: React.FC<AdminAuthLayoutProps> = ({ children, heroTitle, 
     const { theme, toggleTheme } = useTheme();
 
     return (
-        <div className="h-screen w-full flex items-center justify-center p-0 lg:p-8 bg-[#E3E8EF] dark:bg-[#0F1115] transition-colors duration-500 overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 lg:p-10 bg-transparent transition-all duration-300">
 
-
-            {/* Main Card Container - Full Screen on Mobile, Card on Desktop */}
-            <div className="w-full max-w-[1920px] h-full bg-white dark:bg-[#15171A] rounded-none lg:rounded-[3rem] shadow-none flex flex-col lg:flex-row overflow-hidden border-none lg:border border-white/20 dark:border-gray-800 transition-all duration-300">
+            {/* Main Card Container - Fills the available space inside padding */}
+            <div className="w-full h-full bg-white dark:bg-[#15171A] rounded-[2rem] shadow-none flex flex-col lg:flex-row overflow-hidden border-none relative">
 
                 {/* Left Panel - Hero Section - With Premium Background Image */}
                 <div className="relative hidden lg:flex lg:w-1/2 xl:w-7/12 bg-black overflow-hidden group">
@@ -85,7 +84,7 @@ const AdminAuthLayout: React.FC<AdminAuthLayoutProps> = ({ children, heroTitle, 
                                     <span className="hidden sm:block w-px h-3 bg-gray-300 dark:bg-gray-700"></span>
                                     <a href="#" className="hover:text-brand-green transition-colors">Terms & Conditions</a>
                                 </div>
-                                <span className="">© 2025 Origin BI</span>
+                                <span className="text-brand-text-light-secondary dark:text-white">© 2025 Origin BI</span>
                             </div>
                         </div>
                     </div>
