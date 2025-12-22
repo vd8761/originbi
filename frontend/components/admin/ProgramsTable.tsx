@@ -34,21 +34,7 @@ const ProgramsTable: React.FC<ProgramsTableProps> = ({
                         <tr className="text-left">
                             <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group">
                                 <div className="flex items-center gap-1">
-                                    College Code
-                                    <div className="flex flex-col">
-                                        <SortIcon sort="asc" />
-                                    </div>
-                                </div>
-                            </th>
-                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group">
-                                <div className="flex items-center gap-1">
                                     Name
-                                    <SortIcon sort={null} />
-                                </div>
-                            </th>
-                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group">
-                                <div className="flex items-center gap-1">
-                                    Description
                                     <SortIcon sort={null} />
                                 </div>
                             </th>
@@ -85,14 +71,8 @@ const ProgramsTable: React.FC<ProgramsTableProps> = ({
                         {programs.length > 0 ? (
                             programs.map((program) => (
                                 <tr key={program.id} className="bg-white dark:bg-transparent border-b border-brand-light-tertiary dark:border-white/5 hover:bg-brand-light-secondary dark:hover:bg-white/5 transition-colors">
-                                    <td className="p-4 text-sm text-brand-text-light-primary dark:text-white font-mono whitespace-nowrap align-middle">
-                                        {program.code}
-                                    </td>
                                     <td className="p-4 text-sm text-brand-text-light-primary dark:text-white font-medium align-middle">
                                         {program.name}
-                                    </td>
-                                    <td className="p-4 text-sm text-brand-text-light-secondary dark:text-brand-text-secondary max-w-xs truncate align-middle" title={program.description}>
-                                        {program.description || '-'}
                                     </td>
                                     <td className="p-4 text-center align-middle">
                                         {program.is_demo ? (
@@ -121,14 +101,14 @@ const ProgramsTable: React.FC<ProgramsTableProps> = ({
                                                 className="p-2 text-brand-green hover:bg-brand-green/10 rounded-lg transition-colors cursor-pointer"
                                                 title="Edit"
                                             >
-                                                <EditIcon className="w-4 h-4" />
+                                                <EditIcon className="w-5 h-5" />
                                             </button>
                                             <button
                                                 onClick={() => onDelete(program.id)}
                                                 className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
                                                 title="Delete"
                                             >
-                                                <DeleteIcon className="w-4 h-4" />
+                                                <DeleteIcon className="w-5 h-5" />
                                             </button>
                                         </div>
                                     </td>
@@ -136,7 +116,7 @@ const ProgramsTable: React.FC<ProgramsTableProps> = ({
                             ))
                         ) : (
                             <tr>
-                                <td colSpan={8} className="p-8 text-center text-brand-text-light-secondary dark:text-gray-500">
+                                <td colSpan={6} className="p-8 text-center text-brand-text-light-secondary dark:text-gray-500">
                                     {loading ? 'Loading...' : 'No programs found.'}
                                     {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
                                 </td>
