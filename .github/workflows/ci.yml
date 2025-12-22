@@ -7,6 +7,11 @@ on:
     branches: [ main, master, develop ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  statuses: write
+  checks: write
+
 jobs:
   backend-checks:
     name: Check Backend (${{ matrix.service }})
