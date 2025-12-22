@@ -14,7 +14,7 @@ import { Program } from './entities/program.entity';
 
 @Controller('admin/programs')
 export class ProgramsController {
-  constructor(private readonly programsService: ProgramsService) {}
+  constructor(private readonly programsService: ProgramsService) { }
 
   // GET ALL (with pagination + search)
   @Get()
@@ -23,6 +23,8 @@ export class ProgramsController {
     @Query('limit') limit = '50',
     @Query('search') search?: string,
     @Query('is_active') is_active?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
     const isActiveBool =
       is_active === 'true' ? true : is_active === 'false' ? false : undefined;
@@ -31,6 +33,8 @@ export class ProgramsController {
       parseInt(limit, 10),
       search,
       isActiveBool,
+      sortBy,
+      sortOrder,
     );
   }
 

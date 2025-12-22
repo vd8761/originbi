@@ -41,6 +41,10 @@ const ProgramsManagement: React.FC = () => {
   // Pagination & Filter
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Sorting
+  const [sortColumn, setSortColumn] = useState<string>("created_at");
+  const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">("DESC");
+
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
   const fetchData = useCallback(async () => {
@@ -50,7 +54,9 @@ const ProgramsManagement: React.FC = () => {
       const response = await programService.getProgramsList(
         currentPage,
         entriesPerPage,
-        debouncedSearchTerm
+        debouncedSearchTerm,
+        sortColumn,
+        sortOrder
       );
       setPrograms(response.data);
       setTotalCount(response.total);
@@ -60,7 +66,16 @@ const ProgramsManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, entriesPerPage, debouncedSearchTerm]);
+  }, [currentPage, entriesPerPage, debouncedSearchTerm, sortColumn, sortOrder]);
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortOrder(sortOrder === "ASC" ? "DESC" : "ASC");
+    } else {
+      setSortColumn(column);
+      setSortOrder("ASC");
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -230,6 +245,9 @@ const ProgramsManagement: React.FC = () => {
           onToggleStatus={handleToggleStatus}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          sortColumn={sortColumn}
+          sortOrder={sortOrder}
+          onSort={handleSort}
         />
       </div>
 

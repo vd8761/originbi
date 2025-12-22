@@ -9,9 +9,16 @@ export class ProgramsService {
   constructor(
     @InjectRepository(Program)
     private readonly programRepo: Repository<Program>,
-  ) {}
+  ) { }
 
-  async findAll(page = 1, limit = 50, search?: string, isActive?: boolean) {
+  async findAll(
+    page = 1,
+    limit = 50,
+    search?: string,
+    isActive?: boolean,
+    sortBy?: string,
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
+  ) {
     try {
       const skip = (page - 1) * limit;
 
@@ -34,9 +41,16 @@ export class ProgramsService {
         ];
       }
 
+      const order: any = {};
+      if (sortBy) {
+        order[sortBy] = sortOrder;
+      } else {
+        order.created_at = 'DESC';
+      }
+
       const [data, total] = await this.programRepo.findAndCount({
         where,
-        order: { created_at: 'DESC' },
+        order,
         skip,
         take: limit,
       });

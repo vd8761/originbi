@@ -12,7 +12,7 @@ import { CreateRegistrationDto } from './dto/create-registration.dto';
 
 @Controller('admin/registrations')
 export class RegistrationsController {
-  constructor(private readonly registrationsService: RegistrationsService) {}
+  constructor(private readonly registrationsService: RegistrationsService) { }
 
   @Post()
   async create(@Body() dto: CreateRegistrationDto) {
@@ -38,10 +38,23 @@ export class RegistrationsController {
     @Query('limit') limit = '10',
     @Query('tab') tab?: string,
     @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
     const pageNum = Number(page) || 1;
     const limitNum = Number(limit) || 10;
-    return this.registrationsService.findAll(pageNum, limitNum, tab, search);
+    return this.registrationsService.findAll(
+      pageNum,
+      limitNum,
+      tab,
+      search,
+      sortBy,
+      sortOrder,
+      startDate,
+      endDate,
+    );
   }
 
   @Patch(':id/status')

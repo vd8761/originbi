@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { CalendarIcon, ChevronDownIcon } from '@/components/icons';
 
-export type DateRangeOption = 'Today' | 'Yesterday' | 'Last 7 Days' | 'Last 30 Days' | 'This Month' | 'Last Month' | 'Custom Range';
+export type DateRangeOption = 'All' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'Last 30 Days' | 'This Month' | 'Last Month' | 'Custom Range';
 
 interface DateRangeFilterProps {
     selectedRange: DateRangeOption | string;
@@ -13,6 +13,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({ selectedRange, onRang
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     const options: DateRangeOption[] = [
+        'All',
         'Today',
         'Yesterday',
         'Last 7 Days',
