@@ -10,6 +10,12 @@ import {
 } from 'typeorm';
 import { User } from './student.entity';
 
+export enum UserRole {
+  ADMIN = 'ADMIN',
+  STUDENT = 'STUDENT',
+  CORPORATE = 'CORPORATE',
+}
+
 export enum ActionType {
   RESET_PASSWORD = 'RESET_PASSWORD',
   EMAIL_SENT = 'EMAIL_SENT',
@@ -27,6 +33,13 @@ export class UserActionLog {
 
   @Column({ name: 'user_id', type: 'integer' }) // User ID is integer
   userId: number;
+
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    nullable: true,
+  })
+  role: UserRole;
 
   @Column({
     name: 'action_type',

@@ -16,7 +16,7 @@ import DateRangePickerModal from "@/components/ui/DateRangePickerModal";
 import ExcelExportButton from "@/components/ui/ExcelExportButton";
 import RegistrationTable from "@/components/ui/RegistrationTable";
 import { Registration } from "@/lib/types";
-import { registrationService } from "@/lib/services"; // Correct service import path
+import { corporateRegistrationService } from "@/lib/services/corporate-registration.service";
 
 // Debounce utility
 const useDebounce = (value: string, delay: number) => {
@@ -68,7 +68,7 @@ const RegistrationManagement: React.FC = () => {
     const fetchInitialCounts = async () => {
       try {
         const [regRes] = await Promise.all([
-          registrationService.getRegistrations(1, 1, ""),
+          corporateRegistrationService.getMyEmployees(1, 1, ""),
         ]);
         setTabCounts({
           registrations: regRes.total,
@@ -95,15 +95,10 @@ const RegistrationManagement: React.FC = () => {
         return `${year}-${month}-${day}`;
       };
 
-      const response = await registrationService.getRegistrations(
+      const response = await corporateRegistrationService.getMyEmployees(
         currentPage,
         entriesPerPage,
-        debouncedSearchTerm,
-        {
-          start_date: formatDate(startDate),
-          end_date: formatDate(endDate),
-          // TODO: Implement tab logic if needed
-        }
+        debouncedSearchTerm
       );
 
       setUsers(response.data);

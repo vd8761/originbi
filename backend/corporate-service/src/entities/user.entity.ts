@@ -17,8 +17,8 @@ export class User {
   @Column({ nullable: true })
   email: string;
 
-  @Column({ name: 'full_name', nullable: true })
-  fullName: string;
+  // @Column({ name: 'full_name', nullable: true })
+  // fullName: string; // Removed as per DB change
 
   @Column({ name: 'email_verified', default: false })
   emailVerified: boolean;

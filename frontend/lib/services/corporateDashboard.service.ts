@@ -23,6 +23,23 @@ export const corporateDashboardService = {
         return res.json();
     },
 
+    async getStats(email: string): Promise<any> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/dashboard/stats?email=${encodeURIComponent(email)}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        });
+
+        if (!res.ok) {
+            throw new Error("Failed to fetch dashboard stats");
+        }
+
+        return res.json();
+    },
+
     async getLedger(email: string, page = 1, limit = 10, search = ''): Promise<{ data: any[], total: number }> {
         const token = AuthService.getToken();
         const res = await fetch(

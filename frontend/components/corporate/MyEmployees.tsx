@@ -8,6 +8,7 @@ import {
     ArrowLeftWithoutLineIcon,
     ArrowRightWithoutLineIcon,
 } from "@/components/icons";
+import AddRegistrationForm from "./AddRegistrationForm";
 import { corporateDashboardService } from "@/lib/services";
 import { Registration } from "@/lib/types";
 import RegistrationTable from "@/components/ui/RegistrationTable";
@@ -26,6 +27,7 @@ const useDebounce = (value: string, delay: number) => {
 };
 
 const MyEmployees: React.FC = () => {
+    const [view, setView] = useState<"list" | "add">("list");
     // Data State
     const [users, setUsers] = useState<Registration[]>([]);
     const [loading, setLoading] = useState(true);
@@ -92,7 +94,8 @@ const MyEmployees: React.FC = () => {
                 is_deleted: r.isDeleted,
                 created_at: r.createdAt,
                 updated_at: r.updatedAt,
-                corporate_account_id: r.corporateAccountId
+                corporate_account_id: r.corporateAccountId,
+                gender: r.gender, // Ensure gender is mapped
             }));
 
             setUsers(mappedRegistrations);
@@ -179,6 +182,18 @@ const MyEmployees: React.FC = () => {
         }
         return pageNumbers;
     };
+
+    if (view === "add") {
+        return (
+            <AddRegistrationForm
+                onCancel={() => setView("list")}
+                onRegister={() => {
+                    setView("list");
+                    fetchData();
+                }}
+            />
+        );
+    }
 
     return (
         <div className="flex flex-col h-full w-full gap-6 font-sans">
@@ -316,6 +331,7 @@ const MyEmployees: React.FC = () => {
                     </button>
 
                     <button
+                        onClick={() => setView("add")}
                         className="flex items-center gap-2 px-4 py-2.5 bg-brand-green border border-transparent rounded-lg text-sm font-medium text-white hover:bg-brand-green/90 transition-all shadow-lg shadow-brand-green/20 cursor-pointer"
                     >
                         <span>Add New</span>

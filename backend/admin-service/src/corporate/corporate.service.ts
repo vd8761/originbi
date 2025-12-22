@@ -110,7 +110,13 @@ export class CorporateService {
             if (search) {
                 const s = `%${search.toLowerCase()}%`;
                 qb.andWhere(
-                    '(LOWER(c.companyName) LIKE :s OR LOWER(c.mobileNumber) LIKE :s OR LOWER(u.email) LIKE :s OR LOWER(c.sectorCode) LIKE :s)',
+                    `(
+                        LOWER(c.companyName) LIKE :s 
+                        OR LOWER(c.mobileNumber) LIKE :s 
+                        OR LOWER(u.email) LIKE :s 
+                        OR LOWER(c.sectorCode) LIKE :s
+                        OR LOWER(u.metadata->>'fullName') LIKE :s
+                    )`,
                     { s },
                 );
             }
@@ -634,14 +640,16 @@ export class CorporateService {
     ) {
         // Imports moved to top
 
+        // Use legacy SES (SDK v2) for Nodemailer v6
         const ses = new SES({
             accessKeyId: process.env.AWS_ACCESS_KEY_ID,
             secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
             region: process.env.AWS_REGION,
         });
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        const transporter = nodemailer.createTransport({ SES: ses } as any);
+        const transporter = nodemailer.createTransport({
+            SES: ses, // Uppercase SES for Nodemailer v6
+        } as any);
         const ccEmail = process.env.EMAIL_CC || '';
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
         const backendUrl = process.env.BACKEND_URL || 'http://localhost:4001';

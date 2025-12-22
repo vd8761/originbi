@@ -15,7 +15,7 @@ export class AdminLoginGuard implements CanActivate {
   constructor(
     private readonly adminLoginService: AdminLoginService,
     private readonly config: ConfigService,
-  ) {}
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req: Request & { user?: Record<string, any> } = context
@@ -30,16 +30,24 @@ export class AdminLoginGuard implements CanActivate {
     const token = authHeader.split(' ')[1];
 
     // 1) Verify Cognito token
-    let payload: { sub: string; email?: string; [key: string]: any };
+    let payload: { sub: string; email?: string;[key: string]: any };
     try {
       payload = await verifyCognitoIdToken(token, this.config);
     } catch {
       throw new UnauthorizedException('Invalid or expired Cognito token');
     }
 
-    // 2) Load user from DB
-    const user = await this.adminLoginService.findByCognitoSub(payload.sub);
-    if (!user) throw new UnauthorizedException('User not found in system');
+    // 2) Load user from DB (syncing sub if needed)
+    console.log(`[AdminLoginGuard] Resolving user: sub=${payload.sub}, email=${payload.email}`);
+    const user = await this.adminLoginService.resolveUser(
+      payload.sub,
+      payload.email,
+    );
+    if (!user) {
+      console.error(`[AdminLoginGuard] User not found for sub=${payload.sub} / email=${payload.email}`);
+      throw new UnauthorizedException('User not found in system');
+    }
+    console.log(`[AdminLoginGuard] User found: id=${user.id}, role=${user.role}`);
 
     // 3) Check status + role
     if (!user.isActive || user.isBlocked) {

@@ -27,7 +27,6 @@ export default function CorporateProfilePage() {
                 setLoading(false);
             }
         };
-
         fetchProfile();
     }, [router]);
 
