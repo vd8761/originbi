@@ -59,7 +59,7 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
 
   const [startTime, setStartTime] = useState(() => {
     const now = new Date();
-    let hours = now.getHours();
+    const hours = now.getHours();
     const minutes = now.getMinutes();
     const roundedMinutes = Math.round(minutes / 5) * 5;
 
@@ -73,7 +73,7 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
   const [endTime, setEndTime] = useState(() => {
     const now = new Date();
     now.setHours(now.getHours() + 1);
-    let hours = now.getHours();
+    const hours = now.getHours();
     const minutes = now.getMinutes();
     const roundedMinutes = Math.round(minutes / 5) * 5;
 

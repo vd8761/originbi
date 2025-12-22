@@ -3,9 +3,9 @@ export const getWelcomeEmailTemplate = (
   to: string,
   pass: string,
   frontendUrl: string,
-  assets: { popper: string, pattern: string, footer: string },
+  assets: { popper: string; pattern: string; footer: string },
   startDateTime?: Date | string,
-  assessmentTitle?: string
+  assessmentTitle?: string,
 ) => `
 <!DOCTYPE html>
 <html>
@@ -75,10 +75,23 @@ export const getWelcomeEmailTemplate = (
                   </tr>
                   <tr>
                     <td style="font-size: 14px; color: #707070; padding: 5px 0;">Start Date and Time</td>
-                    <td style="font-size: 14px; color: #000000; padding: 5px 0;">${startDateTime
-    ? new Date(startDateTime).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-    : new Date().toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-  }</td>
+                    <td style="font-size: 14px; color: #000000; padding: 5px 0;">${
+                      startDateTime
+                        ? new Date(startDateTime).toLocaleString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : new Date().toLocaleString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                    }</td>
                   </tr>
                   <tr>
                     <td style="font-size: 14px; color: #707070; padding: 5px 0;">Username</td>

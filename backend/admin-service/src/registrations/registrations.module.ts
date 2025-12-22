@@ -19,4 +19,4 @@ import { AssessmentModule } from '../assessment/assessment.module';
   providers: [RegistrationsService],
   controllers: [RegistrationsController],
 })
-export class RegistrationsModule { }
+export class RegistrationsModule {}

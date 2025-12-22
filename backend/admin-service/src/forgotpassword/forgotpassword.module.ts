@@ -7,12 +7,9 @@ import { ForgotPasswordController } from './forgotpassword.controller';
 import { ForgotPasswordService } from './forgotpassword.service';
 
 @Module({
-    imports: [
-        TypeOrmModule.forFeature([User, UserActionLog]),
-        HttpModule,
-    ],
-    controllers: [ForgotPasswordController],
-    providers: [ForgotPasswordService],
-    exports: [ForgotPasswordService],
+  imports: [TypeOrmModule.forFeature([User, UserActionLog]), HttpModule],
+  controllers: [ForgotPasswordController],
+  providers: [ForgotPasswordService],
+  exports: [ForgotPasswordService],
 })
-export class ForgotPasswordModule { }
+export class ForgotPasswordModule {}

@@ -8,7 +8,7 @@ import { AdminLoginGuard } from './adminlogin.guard';
 
 @Module({
   imports: [
-    ConfigModule,                 // ✅ needed for ConfigService in guard
+    ConfigModule, // ✅ needed for ConfigService in guard
     TypeOrmModule.forFeature([AdminUser]),
   ],
   providers: [AdminLoginService, AdminLoginGuard],

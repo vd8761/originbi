@@ -8,12 +8,12 @@ import { UserActionLog } from '../entities/student-action-log.entity';
 import { ConfigModule } from '@nestjs/config';
 
 @Module({
-    imports: [
-        TypeOrmModule.forFeature([User, UserActionLog]),
-        HttpModule,
-        ConfigModule,
-    ],
-    controllers: [ForgotPasswordController],
-    providers: [ForgotPasswordService],
+  imports: [
+    TypeOrmModule.forFeature([User, UserActionLog]),
+    HttpModule,
+    ConfigModule,
+  ],
+  controllers: [ForgotPasswordController],
+  providers: [ForgotPasswordService],
 })
-export class ForgotPasswordModule { }
+export class ForgotPasswordModule {}

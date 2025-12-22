@@ -3,15 +3,18 @@ import { StudentService } from './student.service';
 
 @Controller('student')
 export class StudentController {
-    constructor(private readonly studentService: StudentService) { }
+  constructor(private readonly studentService: StudentService) {}
 
-    @Get('profile')
-    getProfile() {
-        return this.studentService.getProfile();
-    }
+  @Get('profile')
+  getProfile() {
+    return this.studentService.getProfile();
+  }
 
-    @Post('seed')
-    seedStudent(@Body() body: { email: string; fullName: string }) {
-        return this.studentService.createTestStudent(body.email || 'monish@touchmarkdes.com', body.fullName || 'Monish Test');
-    }
+  @Post('seed')
+  seedStudent(@Body() body: { email: string; fullName: string }) {
+    return this.studentService.createTestStudent(
+      body.email || 'monish@touchmarkdes.com',
+      body.fullName || 'Monish Test',
+    );
+  }
 }

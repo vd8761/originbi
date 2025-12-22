@@ -148,7 +148,7 @@ const Header: React.FC<HeaderProps> = ({
                         ...parsed
                     });
                 }
-            } catch (e) { }
+            } catch (e) { /* empty */ }
 
             import('@/lib/services').then(({ corporateDashboardService }) => {
                 const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
@@ -177,7 +177,7 @@ const Header: React.FC<HeaderProps> = ({
                             full_name: parsed.name || parsed.fullName || parsed.username || 'Admin User',
                             email: parsed.email || 'admin@originbi.com'
                         });
-                    } catch (e) { }
+                    } catch (e) { /* empty */ }
                 }
             }
         }

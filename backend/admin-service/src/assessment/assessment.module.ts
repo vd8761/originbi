@@ -11,19 +11,19 @@ import { AssessmentLevel } from './assessment_level.entity';
 import { AssessmentGenerationService } from './assessment-generation.service';
 
 @Module({
-    imports: [
-        TypeOrmModule.forFeature([
-            AssessmentSession,
-            AssessmentAttempt,
-            AssessmentAnswer,
-            AssessmentQuestion,
-            AssessmentQuestionOption,
-            OpenQuestion,
-            OpenQuestionOption,
-            AssessmentLevel,
-        ]),
-    ],
-    providers: [AssessmentGenerationService],
-    exports: [TypeOrmModule, AssessmentGenerationService],
+  imports: [
+    TypeOrmModule.forFeature([
+      AssessmentSession,
+      AssessmentAttempt,
+      AssessmentAnswer,
+      AssessmentQuestion,
+      AssessmentQuestionOption,
+      OpenQuestion,
+      OpenQuestionOption,
+      AssessmentLevel,
+    ]),
+  ],
+  providers: [AssessmentGenerationService],
+  exports: [TypeOrmModule, AssessmentGenerationService],
 })
-export class AssessmentModule { }
+export class AssessmentModule {}

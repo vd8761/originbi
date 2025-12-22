@@ -1,15 +1,15 @@
 export const getRegistrationSuccessEmailTemplate = (
-    name: string,
-    companyName: string,
-    email: string,
-    mobile: string,
-    pass: string,
-    loginUrl: string,
-    assets: { footer: string; popper: string; pattern: string; logo: string }
+  name: string,
+  companyName: string,
+  email: string,
+  mobile: string,
+  pass: string,
+  loginUrl: string,
+  assets: { footer: string; popper: string; pattern: string; logo: string },
 ) => {
-    const currentYear = new Date().getFullYear();
+  const currentYear = new Date().getFullYear();
 
-    return `
+  return `
 <!DOCTYPE html>
 <html>
 <head>

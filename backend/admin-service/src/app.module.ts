@@ -17,18 +17,25 @@ import { TestController } from './test/test.controller';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: process.env.NODE_ENV === 'production' ? '.env.production' : '.env.local',
+      envFilePath:
+        process.env.NODE_ENV === 'production'
+          ? '.env.production'
+          : '.env.local',
     }),
 
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule], // ✅ important
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const isProd = (config.get<string>('NODE_ENV') || 'development') === 'production';
+        const isProd =
+          (config.get<string>('NODE_ENV') || 'development') === 'production';
 
         if (isProd) {
           const url = config.get<string>('DATABASE_URL');
-          if (!url) throw new Error('DATABASE_URL is missing in production environment');
+          if (!url)
+            throw new Error(
+              'DATABASE_URL is missing in production environment',
+            );
 
           return {
             type: 'postgres',
@@ -65,4 +72,4 @@ import { TestController } from './test/test.controller';
   ],
   controllers: [TestController],
 })
-export class AppModule { }
+export class AppModule {}

@@ -9,7 +9,6 @@ import { Repository, DataSource } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 
-
 import { User } from '../users/user.entity';
 import { Registration } from './registration.entity';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
@@ -23,7 +22,6 @@ import { getWelcomeEmailTemplate } from '../mail/templates/welcome.template';
 
 import * as nodemailer from 'nodemailer';
 import { SES } from 'aws-sdk';
-import * as fs from 'fs';
 import * as path from 'path';
 
 @Injectable()
@@ -47,7 +45,7 @@ export class RegistrationsService {
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
-  ) { }
+  ) {}
 
   // ---------------------------------------------------------
   // Helper: Call auth-service to create a Cognito user
@@ -61,45 +59,56 @@ export class RegistrationsService {
       const res = await firstValueFrom(res$);
       return res.data as { sub?: string };
     } catch (err: any) {
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
       const authErr = err?.response?.data || err?.message || err;
 
       this.logger.error('Error creating Cognito user:', authErr);
 
-      const msg = (typeof authErr === 'object' && authErr !== null)
-        ? (authErr.message || JSON.stringify(authErr))
-        : String(authErr);
+      const msg =
+        typeof authErr === 'object' && authErr !== null
+          ? authErr.message || JSON.stringify(authErr)
+          : String(authErr);
 
       throw new InternalServerErrorException(
         `Failed to create Cognito user: ${msg}`,
       );
+      /* eslint-enable */
     }
   }
 
   // ---------------------------------------------------------
   // Normalizers
   // ---------------------------------------------------------
-  private normalizeGender(g?: string | null): 'MALE' | 'FEMALE' | 'OTHER' | null {
+  private normalizeGender(
+    g?: string | null,
+  ): 'MALE' | 'FEMALE' | 'OTHER' | null {
     if (!g) return null;
     const v = g.trim().toUpperCase();
-    return (['MALE', 'FEMALE', 'OTHER'].includes(v)) ? v as any : null;
+    return ['MALE', 'FEMALE', 'OTHER'].includes(v)
+      ? (v as 'MALE' | 'FEMALE' | 'OTHER')
+      : null;
   }
 
   private normalizeSchoolLevel(level?: string | null): 'SSLC' | 'HSC' | null {
     if (!level) return null;
     const v = level.trim().toUpperCase();
-    return (['SSLC', 'HSC'].includes(v)) ? v as any : null;
+    return ['SSLC', 'HSC'].includes(v) ? (v as 'SSLC' | 'HSC') : null;
   }
 
-  private normalizeSchoolStream(stream?: string | null): 'SCIENCE' | 'COMMERCE' | 'HUMANITIES' | null {
+  private normalizeSchoolStream(
+    stream?: string | null,
+  ): 'SCIENCE' | 'COMMERCE' | 'HUMANITIES' | null {
     if (!stream) return null;
     const v = stream.trim().toUpperCase();
-    return (['SCIENCE', 'COMMERCE', 'HUMANITIES'].includes(v)) ? v as any : null;
+    return ['SCIENCE', 'COMMERCE', 'HUMANITIES'].includes(v)
+      ? (v as 'SCIENCE' | 'COMMERCE' | 'HUMANITIES')
+      : null;
   }
 
   private toBigIntOrNull(v?: string | null): number | null {
     if (!v) return null;
     const n = Number(v);
-    return (Number.isFinite(n) && n > 0) ? n : null;
+    return Number.isFinite(n) && n > 0 ? n : null;
   }
 
   // ---------------------------------------------------------
@@ -109,7 +118,9 @@ export class RegistrationsService {
     this.logger.log(`Creating registration for ${dto.email}`);
 
     // 1. Basic Validation
-    const existingUser = await this.userRepo.findOne({ where: { email: dto.email } });
+    const existingUser = await this.userRepo.findOne({
+      where: { email: dto.email },
+    });
     if (existingUser) {
       throw new BadRequestException('Email already registered locally');
     }
@@ -118,15 +129,8 @@ export class RegistrationsService {
     // We do this BEFORE transaction because if it fails, we don't want to burn DB IDs.
     // If it succeeds but DB Transaction fails, we will have an orphan Cognito user.
     // Retry logic should ideally fetch existing Cognito user if error says "exists".
-    let sub: string;
-    try {
-      const cognitoRes = await this.createCognitoUser(dto.email, dto.password);
-      sub = cognitoRes.sub!;
-    } catch (e: any) {
-      // If error message indicates "User already exists", we should probably handle it?
-      // For now, rethrow.
-      throw e;
-    }
+    const cognitoRes = await this.createCognitoUser(dto.email, dto.password);
+    const sub = cognitoRes.sub!;
 
     // 3. Prepare Data
     const gender = this.normalizeGender(dto.gender);
@@ -156,7 +160,10 @@ export class RegistrationsService {
       // B. Get or Create Group
       let groupId: number | null = null;
       if (dto.groupName) {
-        const group = await this.groupsService.findOrCreate(dto.groupName, manager);
+        const group = await this.groupsService.findOrCreate(
+          dto.groupName,
+          manager,
+        );
         groupId = group.id;
       }
 
@@ -188,14 +195,20 @@ export class RegistrationsService {
 
       // D. Create Assessment Session
       // Fetch a valid Program (e.g., first active one or matching type if we had logic)
-      const defaultProgram = await manager.getRepository(Program).findOne({ where: { is_active: true } });
+      const defaultProgram = await manager
+        .getRepository(Program)
+        .findOne({ where: { is_active: true } });
       if (!defaultProgram) {
-        throw new BadRequestException('No active Program found in the system. Please create a Program first.');
+        throw new BadRequestException(
+          'No active Program found in the system. Please create a Program first.',
+        );
       }
       const programId = Number(defaultProgram.id);
 
       const validFrom = dto.examStart ? new Date(dto.examStart) : new Date();
-      const validTo = dto.examEnd ? new Date(dto.examEnd) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // +7 days default
+      const validTo = dto.examEnd
+        ? new Date(dto.examEnd)
+        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // +7 days default
 
       const session = manager.create(AssessmentSession, {
         userId: user.id,
@@ -214,8 +227,8 @@ export class RegistrationsService {
       const levels = await manager.getRepository(AssessmentLevel).find({
         where: {
           programId: programId, // Filter by the program we selected!
-          isMandatory: true
-        }
+          isMandatory: true,
+        },
       });
 
       for (const level of levels) {
@@ -234,7 +247,7 @@ export class RegistrationsService {
           // Need to update generation service to populate all new required fields (user_id, reg_id, etc)
           await this.assessmentGenService.generateLevel1Questions(
             attempt, // Pass full attempt object to get context
-            manager
+            manager,
           );
         }
       }
@@ -251,7 +264,7 @@ export class RegistrationsService {
             dto.name,
             dto.password,
             validFrom,
-            defaultProgram.assessment_title || defaultProgram.name
+            defaultProgram.assessment_title || defaultProgram.name,
           );
         } catch (emailErr) {
           this.logger.error('Failed to send welcome email', emailErr);
@@ -270,6 +283,7 @@ export class RegistrationsService {
   // ---------------------------------------------------------
   // LIST REGISTRATIONS
   // ---------------------------------------------------------
+  /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
   async findAll(page: number, limit: number, tab?: string, search?: string) {
     try {
       const qb = this.regRepo
@@ -280,7 +294,9 @@ export class RegistrationsService {
 
       if (search) {
         const s = `%${search.toLowerCase()}%`;
-        qb.andWhere('(LOWER(r.fullName) LIKE :s OR LOWER(u.email) LIKE :s)', { s });
+        qb.andWhere('(LOWER(r.fullName) LIKE :s OR LOWER(u.email) LIKE :s)', {
+          s,
+        });
       }
 
       const total = await qb.getCount();
@@ -308,19 +324,29 @@ export class RegistrationsService {
 
       return { data, total, page, limit };
     } catch (error) {
-      this.logger.error(`findAll Registrations Error: ${error.message}`, error.stack);
-      throw new InternalServerErrorException(`Failed to fetch registrations: ${error.message}`);
+      this.logger.error(
+        `findAll Registrations Error: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException(
+        `Failed to fetch registrations: ${error.message}`,
+      );
     }
   }
+  /* eslint-enable */
 
   // ---------------------------------------------------------
   // UPDATE STATUS
   // ---------------------------------------------------------
   async updateStatus(id: string, status: string) {
-    const reg = await this.regRepo.findOne({ where: { id: BigInt(id) as any } });
+    const reg = await this.regRepo.findOne({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      where: { id: BigInt(id) as any },
+    });
     if (!reg) {
       throw new BadRequestException('Registration not found');
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     reg.status = status as any;
     // If we need to sync with User.isActive, do it here.
     // e.g. if status === 'CANCELLED', user.isActive = false.
@@ -330,12 +356,19 @@ export class RegistrationsService {
   // ---------------------------------------------------------
   // Helper: Send Welcome Email
   // ---------------------------------------------------------
-  private async sendWelcomeEmail(to: string, name: string, pass: string, startDateTime?: Date | string, assessmentTitle?: string) {
+  private async sendWelcomeEmail(
+    to: string,
+    name: string,
+    pass: string,
+    startDateTime?: Date | string,
+    assessmentTitle?: string,
+  ) {
     const ses = new SES({
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
       region: process.env.AWS_REGION,
     });
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const transporter = nodemailer.createTransport({ SES: ses } as any);
     const ccEmail = process.env.EMAIL_CC || '';
 
@@ -384,12 +417,12 @@ export class RegistrationsService {
       process.env.FRONTEND_URL || 'http://localhost:3000',
       assets,
       startDateTime,
-      assessmentTitle
+      assessmentTitle,
     );
 
     // Add attachments to mailOptions
     Object.assign(mailOptions, { attachments });
 
-    return transporter.sendMail(mailOptions);
+    return await transporter.sendMail(mailOptions);
   }
 }

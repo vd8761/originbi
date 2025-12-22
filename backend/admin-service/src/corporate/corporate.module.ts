@@ -9,16 +9,12 @@ import { CorporateCreditLedger } from './entities/corporate-credit-ledger.entity
 import { User } from '../users/user.entity';
 
 @Module({
-    imports: [
-        TypeOrmModule.forFeature([
-            CorporateAccount,
-            CorporateCreditLedger,
-            User,
-        ]),
-        HttpModule,
-    ],
-    controllers: [CorporateController],
-    providers: [CorporateService],
-    exports: [CorporateService],
+  imports: [
+    TypeOrmModule.forFeature([CorporateAccount, CorporateCreditLedger, User]),
+    HttpModule,
+  ],
+  controllers: [CorporateController],
+  providers: [CorporateService],
+  exports: [CorporateService],
 })
-export class CorporateModule { }
+export class CorporateModule {}

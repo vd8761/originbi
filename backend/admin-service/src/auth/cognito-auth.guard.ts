@@ -6,16 +6,19 @@ import {
 } from '@nestjs/common';
 import { verifyCognitoIdToken } from './verify-id-token';
 import { ConfigService } from '@nestjs/config';
+import { Request } from 'express';
 
 @Injectable()
 export class CognitoAdminGuard implements CanActivate {
   constructor(private readonly config: ConfigService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
+    const request = context
+      .switchToHttp()
+      .getRequest<Request & { user?: Record<string, any> }>();
+    const auth = request.headers.authorization;
 
-    const auth = request.headers['authorization'];
-    if (!auth || !auth.startsWith('Bearer ')) {
+    if (!auth || typeof auth !== 'string' || !auth.startsWith('Bearer ')) {
       throw new UnauthorizedException('MISSING_TOKEN');
     }
 

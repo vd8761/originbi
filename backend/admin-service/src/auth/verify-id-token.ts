@@ -8,7 +8,9 @@ function getVerifier(config: ConfigService) {
   const clientId = config.get<string>('COGNITO_CLIENT_ID');
 
   if (!userPoolId || !clientId) {
-    throw new Error('Missing env vars: COGNITO_USER_POOL_ID / COGNITO_CLIENT_ID');
+    throw new Error(
+      'Missing env vars: COGNITO_USER_POOL_ID / COGNITO_CLIENT_ID',
+    );
   }
 
   if (!verifier) {
@@ -22,7 +24,10 @@ function getVerifier(config: ConfigService) {
   return verifier;
 }
 
-export async function verifyCognitoIdToken(token: string, config: ConfigService) {
+export async function verifyCognitoIdToken(
+  token: string,
+  config: ConfigService,
+) {
   try {
     const payload = await getVerifier(config).verify(token);
     return payload as { sub: string; email?: string; [key: string]: any };

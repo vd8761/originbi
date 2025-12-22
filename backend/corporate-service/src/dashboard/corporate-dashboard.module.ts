@@ -10,11 +10,17 @@ import { UserActionLog } from '../entities/user-action-log.entity';
 import { Registration } from '../entities/registration.entity';
 
 @Module({
-    imports: [
-        TypeOrmModule.forFeature([CorporateAccount, User, CorporateCreditLedger, UserActionLog, Registration]),
-        HttpModule,
-    ],
-    controllers: [CorporateDashboardController],
-    providers: [CorporateDashboardService],
+  imports: [
+    TypeOrmModule.forFeature([
+      CorporateAccount,
+      User,
+      CorporateCreditLedger,
+      UserActionLog,
+      Registration,
+    ]),
+    HttpModule,
+  ],
+  controllers: [CorporateDashboardController],
+  providers: [CorporateDashboardService],
 })
-export class CorporateDashboardModule { }
+export class CorporateDashboardModule {}

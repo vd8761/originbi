@@ -3,12 +3,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike } from 'typeorm';
 import { Program } from './entities/program.entity';
 
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
 @Injectable()
 export class ProgramsService {
   constructor(
     @InjectRepository(Program)
     private readonly programRepo: Repository<Program>,
-  ) { }
+  ) {}
 
   async findAll(page = 1, limit = 50, search?: string, isActive?: boolean) {
     try {
@@ -22,8 +23,14 @@ export class ProgramsService {
 
       if (search) {
         where = [
-          { name: ILike(`%${search}%`), ...(isActive !== undefined ? { is_active: isActive } : {}) },
-          { code: ILike(`%${search}%`), ...(isActive !== undefined ? { is_active: isActive } : {}) },
+          {
+            name: ILike(`%${search}%`),
+            ...(isActive !== undefined ? { is_active: isActive } : {}),
+          },
+          {
+            code: ILike(`%${search}%`),
+            ...(isActive !== undefined ? { is_active: isActive } : {}),
+          },
         ];
       }
 

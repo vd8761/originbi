@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { User } from '../users/user.entity';
 import { Groups } from '../groups/groups.entity';
+import { AssessmentSession } from '../assessment/assessment_session.entity';
 
 export type RegistrationSource = 'SELF' | 'ADMIN' | 'CORPORATE' | 'RESELLER';
 export type RegistrationStatus = 'INCOMPLETE' | 'COMPLETED' | 'CANCELLED';
@@ -80,7 +81,12 @@ export class Registration {
   @Column({ name: 'school_level', type: 'varchar', length: 20, nullable: true })
   schoolLevel: string | null;
 
-  @Column({ name: 'school_stream', type: 'varchar', length: 20, nullable: true })
+  @Column({
+    name: 'school_stream',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
   schoolStream: string | null;
 
   @Column({ name: 'department_degree_id', type: 'bigint', nullable: true })
@@ -93,10 +99,20 @@ export class Registration {
   @Column({ name: 'payment_required', type: 'boolean', default: false })
   paymentRequired: boolean;
 
-  @Column({ name: 'payment_provider', type: 'varchar', length: 20, nullable: true })
+  @Column({
+    name: 'payment_provider',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
   paymentProvider: string | null;
 
-  @Column({ name: 'payment_reference', type: 'varchar', length: 100, nullable: true })
+  @Column({
+    name: 'payment_reference',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   paymentReference: string | null;
 
   @Column({
@@ -123,7 +139,12 @@ export class Registration {
   paidAt: Date | null;
 
   // ---- Registration Status ----
-  @Column({ name: 'status', type: 'varchar', length: 20, default: 'INCOMPLETE' })
+  @Column({
+    name: 'status',
+    type: 'varchar',
+    length: 20,
+    default: 'INCOMPLETE',
+  })
   status: RegistrationStatus;
 
   // ---- Metadata ----
@@ -141,6 +162,6 @@ export class Registration {
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 
-  @OneToMany('AssessmentSession', (session: any) => session.registration)
-  assessmentSessions: any[];
+  @OneToMany(() => AssessmentSession, (session) => session.registration)
+  assessmentSessions: AssessmentSession[];
 }

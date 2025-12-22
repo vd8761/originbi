@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AdminController } from './admin.controller';
+import { AdminLoginGuard } from '../adminlogin/adminlogin.guard';
 
 describe('AdminController', () => {
   let controller: AdminController;
@@ -7,7 +8,10 @@ describe('AdminController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AdminController],
-    }).compile();
+    })
+      .overrideGuard(AdminLoginGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<AdminController>(AdminController);
   });

@@ -13,5 +13,3 @@ export class AdminLoginService {
     return this.usersRepo.findOne({ where: { cognitoSub: sub } });
   }
 }
-
-

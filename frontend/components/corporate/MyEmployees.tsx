@@ -49,7 +49,7 @@ const MyEmployees: React.FC = () => {
                     setCorporateEmail(parsed.email);
                     return;
                 }
-            } catch (e) { }
+            } catch (e) { /* empty */ }
         }
         setCorporateEmail(email);
     }, []);

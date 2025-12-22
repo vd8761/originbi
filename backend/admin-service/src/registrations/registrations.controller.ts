@@ -1,10 +1,18 @@
-import { Body, Controller, Post, Get, Patch, Query, Param } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Query,
+  Param,
+} from '@nestjs/common';
 import { RegistrationsService } from './registrations.service';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 
 @Controller('admin/registrations')
 export class RegistrationsController {
-  constructor(private readonly registrationsService: RegistrationsService) { }
+  constructor(private readonly registrationsService: RegistrationsService) {}
 
   @Post()
   async create(@Body() dto: CreateRegistrationDto) {

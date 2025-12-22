@@ -5,7 +5,7 @@ export const getCorporateWelcomeEmailTemplate = (
   companyName: string,
   mobile: string,
   frontendUrl: string,
-  assets: { footer: string; popper: string; pattern: string; logo: string }
+  assets: { footer: string; popper: string; pattern: string; logo: string },
 ) => {
   return `
 <!DOCTYPE html>

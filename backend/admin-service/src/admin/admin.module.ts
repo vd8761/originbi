@@ -3,7 +3,7 @@ import { AdminController } from './admin.controller';
 import { AdminLoginModule } from '../adminlogin/adminlogin.module';
 
 @Module({
-  imports: [AdminLoginModule],   // 👈 IMPORTANT
+  imports: [AdminLoginModule], // 👈 IMPORTANT
   controllers: [AdminController],
 })
 export class AdminModule {}
