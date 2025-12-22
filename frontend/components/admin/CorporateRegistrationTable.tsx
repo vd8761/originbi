@@ -179,13 +179,13 @@ const CorporateRegistrationTable: React.FC<RegistrationTableProps> = ({
                   <td className="p-4 text-sm text-brand-text-light-primary dark:text-white align-middle">
                     {user.job_title || "-"}
                   </td>
-                  <td className="p-4 flex justify-center align-middle">
+                  <td className="pt-1 text-center align-middle">
                     <ToggleSwitch
                       isOn={!!user.is_active}
                       onToggle={() => onToggleStatus(user.id, !!user.is_active)}
                     />
                   </td>
-                  <td className="p-4 flex justify-center align-middle">
+                  <td className="pt-1 text-center align-middle">
                     <ToggleSwitch
                       isOn={!!user.is_blocked}
                       onToggle={() => onToggleBlock?.(user.id, !!user.is_blocked)}

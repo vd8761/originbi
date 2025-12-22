@@ -34,7 +34,7 @@ const ProgramsTable: React.FC<ProgramsTableProps> = ({
                         <tr className="text-left">
                             <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group">
                                 <div className="flex items-center gap-1">
-                                    Code
+                                    College Code
                                     <div className="flex flex-col">
                                         <SortIcon sort="asc" />
                                     </div>
@@ -111,7 +111,7 @@ const ProgramsTable: React.FC<ProgramsTableProps> = ({
                                     <td className="p-4 text-sm text-brand-text-light-primary dark:text-white hidden md:table-cell align-middle">
                                         {program.report_title}
                                     </td>
-                                    <td className="p-4 flex justify-center align-middle">
+                                    <td className="pt-1 text-center align-middle">
                                         <ToggleSwitch isOn={program.is_active} onToggle={() => onToggleStatus(program.id, program.is_active)} />
                                     </td>
                                     <td className="p-4 text-right align-middle">
