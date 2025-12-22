@@ -44,7 +44,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({ selectedRange, onRang
         <div className="relative" ref={dropdownRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className={`flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] hover:bg-gray-50 dark:hover:bg-white/30 rounded-lg text-sm font-medium transition-all whitespace-nowrap group shadow-sm ${isCustom ? 'text-brand-green' : 'text-[#19211C] dark:text-white'}`}
+                className={`flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] hover:bg-gray-50 dark:hover:bg-white/30 rounded-lg text-sm font-medium transition-all whitespace-nowrap group shadow-sm cursor-pointer ${isCustom ? 'text-brand-green' : 'text-[#19211C] dark:text-white'}`}
             >
                 <CalendarIcon className="w-4 h-4 text-brand-green" />
                 <span>{selectedRange}</span>

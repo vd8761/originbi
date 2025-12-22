@@ -426,7 +426,7 @@ const RegistrationManagement: React.FC = () => {
 
           <button
             onClick={handleBulkUpload}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] rounded-lg text-sm font-medium text-brand-text-light-primary dark:text-white hover:bg-gray-50 dark:hover:bg-white/30 transition-all shadow-sm"
+            className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] rounded-lg text-sm font-medium text-brand-text-light-primary dark:text-white hover:bg-gray-50 dark:hover:bg-white/30 transition-all shadow-sm cursor-pointer"
           >
             <span>Bulk Registration</span>
             <BulkUploadIcon className="w-[18px] h-[18px] text-[#150089] dark:text-white" />
@@ -434,7 +434,7 @@ const RegistrationManagement: React.FC = () => {
 
           <button
             onClick={() => setView("add")}
-            className="flex items-center gap-2 px-4 py-2.5 bg-brand-green border border-transparent rounded-lg text-sm font-medium text-white hover:bg-brand-green/90 transition-all shadow-lg shadow-brand-green/20"
+            className="flex items-center gap-2 px-4 py-2.5 bg-brand-green border border-transparent rounded-lg text-sm font-medium text-white hover:bg-brand-green/90 transition-all shadow-lg shadow-brand-green/20 cursor-pointer"
           >
             <span>Add New</span>
             <PlusIcon className="w-4 h-4 text-white" />

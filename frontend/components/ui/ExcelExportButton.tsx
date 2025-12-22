@@ -16,7 +16,7 @@ const ExcelExportButton: React.FC<ExcelExportButtonProps> = ({
     <button
       onClick={onClick}
       disabled={isLoading}
-      className={`flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] rounded-lg text-sm font-medium text-brand-text-light-primary dark:text-white hover:bg-gray-50 dark:hover:bg-white/30 transition-all shadow-sm disabled:opacity-50 ${className}`}
+      className={`flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] rounded-lg text-sm font-medium text-brand-text-light-primary dark:text-white hover:bg-gray-50 dark:hover:bg-white/30 transition-all shadow-sm disabled:opacity-50 cursor-pointer ${className}`}
     >
       <span>{isLoading ? "Exporting..." : "Excel Export"}</span>
       <div className="flex items-center justify-center">
