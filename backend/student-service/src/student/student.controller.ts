@@ -3,7 +3,7 @@ import { StudentService } from './student.service';
 
 @Controller('student')
 export class StudentController {
-  constructor(private readonly studentService: StudentService) {}
+  constructor(private readonly studentService: StudentService) { }
 
   @Get('profile')
   getProfile() {
@@ -16,5 +16,10 @@ export class StudentController {
       body.email || 'monish@touchmarkdes.com',
       body.fullName || 'Monish Test',
     );
+  }
+
+  @Post('assessment-status')
+  async getAssessmentStatus(@Body() body: { userId: number }) {
+    return this.studentService.checkAssessmentStatus(body.userId);
   }
 }
