@@ -4,11 +4,12 @@ import { HttpModule } from '@nestjs/axios';
 import { StudentController } from './student.controller';
 import { StudentService } from './student.service';
 import { User } from '../entities/student.entity';
+import { AssessmentSession } from '../entities/assessment_session.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User]), HttpModule],
+  imports: [TypeOrmModule.forFeature([User, AssessmentSession]), HttpModule],
   controllers: [StudentController],
   providers: [StudentService],
   exports: [StudentService],
 })
-export class StudentModule {}
+export class StudentModule { }
