@@ -11,7 +11,7 @@ import { RegisterCorporateDto } from './dto/register-corporate.dto';
 
 @Controller('dashboard')
 export class CorporateDashboardController {
-  constructor(private readonly dashboardService: CorporateDashboardService) {}
+  constructor(private readonly dashboardService: CorporateDashboardService) { }
 
   @Get('stats')
   async getDashboardStats(@Query('email') email: string) {

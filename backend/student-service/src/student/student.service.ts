@@ -8,7 +8,7 @@ export class StudentService {
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
-  ) {}
+  ) { }
 
   getProfile() {
     return { message: 'Hello Student!' };
@@ -17,7 +17,10 @@ export class StudentService {
   async createTestStudent(email: string, fullName: string) {
     let user = await this.userRepo.findOne({ where: { email } });
     if (!user) {
-      user = this.userRepo.create({ email, fullName });
+      user = this.userRepo.create({
+        email,
+        metadata: { fullName }
+      });
       await this.userRepo.save(user);
       return { message: 'Test user created successfully', user };
     }

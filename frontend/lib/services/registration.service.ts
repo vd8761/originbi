@@ -13,6 +13,9 @@ import {
 const API_URL =
   process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "http://localhost:4000";
 
+const CORPORATE_API_URL =
+  process.env.NEXT_PUBLIC_CORPORATE_API_BASE_URL || "http://localhost:4003";
+
 // DTO for creating a new registration (from frontend form)
 export interface CreateRegistrationDto {
   full_name: string;
@@ -218,5 +221,6 @@ export const registrationService = {
     }
 
     return res.json();
-  }
+  },
+
 };

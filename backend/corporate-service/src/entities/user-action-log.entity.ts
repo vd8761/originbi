@@ -40,6 +40,7 @@ export class UserActionLog {
   @Column({
     type: 'enum',
     enum: UserRole,
+    nullable: true,
   })
   role: UserRole;
 

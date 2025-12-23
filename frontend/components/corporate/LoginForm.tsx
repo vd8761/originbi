@@ -133,6 +133,31 @@ const LoginForm: React.FC<LoginFormProps> = ({
       sessionStorage.setItem('userEmail', values.email);
       localStorage.setItem('originbi_id_token', idTokenJwt);
 
+      // --- Fetch and Store User Profile ---
+      try {
+        const CORPORATE_API = process.env.NEXT_PUBLIC_CORPORATE_API_BASE_URL || "http://localhost:4003";
+        const profileRes = await fetch(`${CORPORATE_API}/dashboard/profile?email=${encodeURIComponent(values.email)}`, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+
+        if (profileRes.ok) {
+          const profile = await profileRes.json();
+          // Construct user object as expected by other services
+          const userForStorage = {
+            id: profile.userId || profile.user_id, // Ensure we get the User ID
+            email: profile.email,
+            name: profile.full_name,
+            corporateId: profile.id,
+            role: 'CORPORATE'
+          };
+          localStorage.setItem('user', JSON.stringify(userForStorage));
+        } else {
+          console.error("Failed to fetch corporate profile during login");
+        }
+      } catch (profileErr) {
+        console.error("Error fetching corporate profile:", profileErr);
+      }
+
       onLoginSuccess();
 
     } catch (err: unknown) {

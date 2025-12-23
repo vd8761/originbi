@@ -3,6 +3,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CorporateDashboardModule } from './dashboard/corporate-dashboard.module';
 import { MailAssetsController } from './mail/mail-assets.controller';
+import { CorporateRegistrationsModule } from './registrations/corporate-registrations.module';
+import { AssessmentModule } from './assessment/assessment.module';
 
 @Module({
     imports: [
@@ -41,6 +43,8 @@ import { MailAssetsController } from './mail/mail-assets.controller';
             },
         }),
         CorporateDashboardModule,
+        CorporateRegistrationsModule,
+        AssessmentModule,
     ],
     controllers: [MailAssetsController],
 })
