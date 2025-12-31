@@ -18,23 +18,27 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, currentView
 
     useEffect(() => {
         const checkStatus = async () => {
-            const storedUser = localStorage.getItem('user');
-            if (storedUser) {
-                try {
-                    const user = JSON.parse(storedUser);
-                    if (user && user.id) {
-                        const status = await studentService.getAssessmentStatus(user.id);
+            // 1. Check Session Storage Flag (Fastest)
+            if (sessionStorage.getItem('isAssessmentMode') === 'true') {
+                if (currentView !== 'assessment') {
+                    router.push('/student/assessment');
+                    return;
+                }
+            }
 
-                        // Condition: If not completed, force assessment screen
-                        if (!status.isCompleted && currentView !== 'assessment') {
+            // 2. Validate with Backend (Robust)
+            const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
+            if (email) {
+                try {
+                    const status = await studentService.checkLoginStatus(email);
+
+                    if (status?.isAssessmentMode) {
+                        sessionStorage.setItem('isAssessmentMode', 'true');
+                        if (currentView !== 'assessment') {
                             router.push('/student/assessment');
                         }
-                        // Condition: If completed, and trying to view assessment, maybe allow viewing results? 
-                        // Prompt says: "Redirect to the dashboard on after the all the exam levels has been completed"
-                        // It implies the transition happens upon completion. Re-visiting assessment might be allowed (results).
-                        // But explicitly: "Even if it is not started show assesment level screen only."
-                        // So if NOT started/completed, force assessment.
-                        // If Completed, Dashboard is allowed.
+                    } else {
+                        sessionStorage.removeItem('isAssessmentMode');
                     }
                 } catch (e) {
                     console.error("Error checking assessment status", e);
@@ -46,13 +50,26 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, currentView
         checkStatus();
     }, [currentView, router]);
 
+    if (checkingStatus) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-white dark:bg-brand-dark-primary">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-green"></div>
+            </div>
+        );
+    }
+
     return (
-        <div className="bg-brand-light-primary dark:bg-brand-dark-primary h-screen flex flex-col overflow-hidden">
-            <div className="shrink-0 z-50">
+        <div className="bg-[url('/Background_Light_Theme.svg')] bg-cover bg-center bg-no-repeat bg-fixed dark:bg-none dark:bg-brand-dark-primary min-h-screen flex flex-col font-sans selection:bg-brand-green/20">
+            {/* Header is Fixed inside the component */}
+            <div className="z-50">
                 <Header onLogout={onLogout} currentView={currentView} onNavigate={onNavigate} hideNav={hideNav} />
             </div>
-            <main className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-hide relative">
-                {children ? children : <Dashboard />}
+
+            {/* Content Area with Top Padding for Fixed Header */}
+            <main className="flex-1 pt-[72px] sm:pt-[80px] lg:pt-[88px] relative">
+                <div className="w-full h-full px-4 py-4 sm:px-6 sm:py-6 lg:px-[1.666vw] lg:py-[1.666vw] max-w-[2000px] mx-auto">
+                    {children ? children : <Dashboard />}
+                </div>
             </main>
         </div>
     );

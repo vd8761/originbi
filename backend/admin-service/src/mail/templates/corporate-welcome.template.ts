@@ -4,6 +4,7 @@ export const getCorporateWelcomeEmailTemplate = (
   pass: string,
   companyName: string,
   mobile: string,
+  countryCode: string,
   frontendUrl: string,
   assets: { footer: string; popper: string; pattern: string; logo: string },
 ) => {
@@ -86,7 +87,7 @@ export const getCorporateWelcomeEmailTemplate = (
                               </tr>
                               <tr>
                                 <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Mobile Number</td>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${mobile}</td>
+                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${countryCode} ${mobile}</td>
                               </tr>
                               <tr>
                                 <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Password</td>
@@ -122,7 +123,6 @@ export const getCorporateWelcomeEmailTemplate = (
                           </td>
                         </tr>
                       </table>
-
                     </td>
                  </tr>
               </table>
@@ -133,7 +133,7 @@ export const getCorporateWelcomeEmailTemplate = (
            <tr>
             <td style="padding: 30px 20px 0 20px; background-color: #0F005E;">
               <p style="margin: 0 0 5px; font-family: Tahoma; font-weight: 400; font-size: 12px; line-height: 100%; letter-spacing: 0%; color: #E9ECEF;">
-                © 2024-2025. Origin BI | All Rights Reserved
+                © ${new Date().getFullYear()}. Origin BI | All Rights Reserved
               </p>
               <p style="margin: 0 0 20px; font-family: Tahoma; font-weight: 400; font-size: 12px; line-height: 100%; letter-spacing: 0%; color: #1ED36A;">
                 <a href="#" style="color: #1ED36A; text-decoration: none;">Privacy Policy</a> <span style="color: #E9ECEF;">|</span> <a href="#" style="color: #1ED36A; text-decoration: none;">Terms & Conditions</a>

@@ -172,7 +172,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
 
       // 5️⃣ Call backend to verify token + role
       const apiBase =
-        process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4001';
+        process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4000';
 
       let backendUrl = `${apiBase}/admin/me`;
       if (portalMode === 'student') {
@@ -269,8 +269,8 @@ const LoginForm: React.FC<LoginFormProps> = ({
             onChange={handleChange}
             onBlur={handleBlur}
             className={`bg-gray-50 dark:bg-[#1E2124] border text-brand-text-light-primary dark:text-white placeholder:text-gray-400 font-sans text-sm rounded-full block w-full px-5 py-3.5 transition-all duration-300 outline-none focus:ring-2 ${isEmailInvalid
-                ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50'
-                : 'border-gray-200 dark:border-transparent focus:border-brand-green focus:ring-brand-green/50 hover:bg-gray-100 dark:hover:bg-[#25282C]'
+              ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50'
+              : 'border-gray-200 dark:border-transparent focus:border-brand-green focus:ring-brand-green/50 hover:bg-gray-100 dark:hover:bg-[#25282C]'
               }`}
             placeholder={
               portalMode === 'corporate'
@@ -307,8 +307,8 @@ const LoginForm: React.FC<LoginFormProps> = ({
             onBlur={handleBlur}
             placeholder="Enter your password"
             className={`bg-gray-50 dark:bg-[#1E2124] border text-brand-text-light-primary dark:text-white placeholder:text-gray-400 font-sans text-sm rounded-full block w-full px-5 py-3.5 pr-12 transition-all duration-300 outline-none focus:ring-2 ${isPasswordInvalid
-                ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50'
-                : 'border-gray-200 dark:border-transparent focus:border-brand-green focus:ring-brand-green/50 hover:bg-gray-100 dark:hover:bg-[#25282C]'
+              ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50'
+              : 'border-gray-200 dark:border-transparent focus:border-brand-green focus:ring-brand-green/50 hover:bg-gray-100 dark:hover:bg-[#25282C]'
               }`}
             required
             aria-invalid={isPasswordInvalid}

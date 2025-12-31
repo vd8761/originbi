@@ -11,10 +11,9 @@ export class AssessmentLevel {
   @PrimaryGeneratedColumn({ type: 'int' })
   id: number;
 
-  @Column({ name: 'program_id', type: 'bigint' })
-  programId: number;
 
-  @Column({ name: 'level_number', type: 'smallint' })
+
+  @Column({ name: 'level_number', type: 'smallint', unique: true })
   levelNumber: number;
 
   @Column({ name: 'name', type: 'varchar', length: 255 })

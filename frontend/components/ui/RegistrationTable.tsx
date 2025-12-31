@@ -63,7 +63,7 @@ const RegistrationTable: React.FC<RegistrationTableProps> = ({
                     <thead className="sticky top-0 z-20 bg-[#19211C]/4 dark:bg-[#FFFFFF1F] shadow-sm">
                         <tr className="text-left">
                             <th
-                                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                className="w-[25%] p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                                 onClick={() => onSort?.('name')}
                             >
                                 <div className="flex items-center gap-1">
@@ -74,7 +74,7 @@ const RegistrationTable: React.FC<RegistrationTableProps> = ({
                                 </div>
                             </th>
                             <th
-                                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                className="w-[10%] p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                                 onClick={() => onSort?.('gender')}
                             >
                                 <div className="flex items-center gap-1">
@@ -83,7 +83,7 @@ const RegistrationTable: React.FC<RegistrationTableProps> = ({
                                 </div>
                             </th>
                             <th
-                                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                className="w-[25%] p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                                 onClick={() => onSort?.('email')}
                             >
                                 <div className="flex items-center gap-1">
@@ -92,7 +92,7 @@ const RegistrationTable: React.FC<RegistrationTableProps> = ({
                                 </div>
                             </th>
                             <th
-                                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                className="w-[20%] p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                                 onClick={() => onSort?.('mobile_number')}
                             >
                                 <div className="flex items-center gap-1">
@@ -101,7 +101,7 @@ const RegistrationTable: React.FC<RegistrationTableProps> = ({
                                 </div>
                             </th>
                             <th
-                                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer text-center group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                className="w-[10%] p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer text-center group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                                 onClick={() => onSort?.('status')}
                             >
                                 <div className="flex items-center gap-1 justify-center">
@@ -109,7 +109,7 @@ const RegistrationTable: React.FC<RegistrationTableProps> = ({
                                     <SortIcon sort={sortColumn === 'status' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                                 </div>
                             </th>
-                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider text-center">
+                            <th className="w-[10%] p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider text-center">
                                 Action
                             </th>
                         </tr>

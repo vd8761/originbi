@@ -5,103 +5,47 @@ import { CheckCircleIcon, StepperUpArrowIcon, StepperDownArrowIcon, StepperPendi
 
 // --- Interfaces & Mock Data ---
 
+interface APIOption {
+  id: string;
+  option_text: string;
+  is_correct?: boolean;
+}
+
+interface APIQuestion {
+  id: string;
+  question: string;
+  options?: APIOption[];
+  images?: { image_url: string }[];
+}
+
+interface APIAssessmentAnswer {
+  id: string; // The answer record ID (used as question context in frontend loop)
+  main_question?: APIQuestion;
+  open_question?: APIQuestion;
+  // We will map main_question or open_question to the frontend Question model
+}
+
 interface Option {
   id: string;
   text: string;
 }
 
 interface Question {
-  id: number;
-  preamble?: string;
+  id: string; // Changed from number to string to match UUID
+  preamble?: string; // Backend might not have preamble in basic struct, leaving optional
   text: string;
   options: Option[];
+  assessmentAnswerId: string; // To link back to the answer record for submission
 }
 
 interface AssessmentRunnerProps {
   onBack: () => void;
   onGoToDashboard?: () => void;
+  attemptId?: string; // Optional for now
 }
 
-const questions: Question[] = [
-  {
-    id: 1,
-    preamble: "You walk into a lab and see a glowing blue liquid.",
-    text: "What do you do?",
-    options: [
-      { id: "a", text: "Ask the scientist what it is" },
-      { id: "b", text: "Watch from distance" },
-      { id: "c", text: "Take notes – could be useful later" },
-      { id: "d", text: "Wonder if it's safe to touch" },
-    ],
-  },
-  {
-    id: 2,
-    preamble:
-      "You want to finish a task early, but your team prefers last-minute work.",
-    text: "How do you deal with it?",
-    options: [
-      { id: "a", text: "Take notes - could be useful later" },
-      { id: "b", text: "Ask the scientist what it is" },
-      { id: "c", text: "Watch from distance" },
-      { id: "d", text: "Wonder if it's safe to touch" },
-    ],
-  },
-  {
-    id: 3,
-    preamble: "Your project deadline is moved up by two weeks suddenly.",
-    text: "What is your immediate reaction?",
-    options: [
-      { id: "a", text: "Panic initially, then plan" },
-      { id: "b", text: "Immediately rally the team" },
-      { id: "c", text: "Negotiate for more resources" },
-      { id: "d", text: "Work extra hours silently" },
-    ],
-  },
-  {
-    id: 4,
-    preamble: "A team member disagrees with your proposal in a meeting.",
-    text: "How do you respond?",
-    options: [
-      { id: "a", text: "Defend your idea aggressively" },
-      { id: "b", text: "Ask them to explain their view" },
-      { id: "c", text: "Suggest discussing it offline" },
-      { id: "d", text: "Ignore the comment" },
-    ],
-  },
-  {
-    id: 5,
-    preamble: "You spot a significant error in a report sent to the client.",
-    text: "What is your next step?",
-    options: [
-      { id: "a", text: "Inform the client immediately" },
-      { id: "b", text: "Fix it quietly if possible" },
-      { id: "c", text: "Blame the person responsible" },
-      { id: "d", text: "Wait for them to notice" },
-    ],
-  },
-  {
-    id: 6,
-    preamble: "You are asked to lead a new initiative with unclear goals.",
-    text: "How do you proceed?",
-    options: [
-      { id: "a", text: "Ask for clarification first" },
-      { id: "b", text: "Start with what you know" },
-      { id: "c", text: "Decline until goals are set" },
-      { id: "d", text: "Create your own goals" },
-    ],
-  },
-  {
-    id: 7,
-    preamble: "A colleague takes credit for your work.",
-    text: "How do you handle this?",
-    options: [
-      { id: "a", text: "Confront them publicly" },
-      { id: "b", text: "Speak to them privately" },
-      { id: "c", text: "Inform the manager" },
-      { id: "d", text: "Let it go this time" },
-    ],
-  },
-];
+// State management is now inside the component
+
 
 // --- Success Modal Component ---
 const SuccessModal: React.FC<{
@@ -109,9 +53,9 @@ const SuccessModal: React.FC<{
   onDashboard: () => void;
 }> = ({ onBack, onDashboard }) => (
   <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 animate-fade-in">
-    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-    <div className="relative bg-brand-light-primary dark:bg-brand-dark-secondary rounded-3xl p-8 max-w-md w-full shadow-2xl border border-brand-light-tertiary dark:border-white/10 text-center flex flex-col items-center">
-      <div className="w-20 h-20 bg-brand-green/20 rounded-full flex items-center justify-center mb-6">
+    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" />
+    <div className="relative bg-white dark:bg-[#1A1D21] rounded-3xl p-8 max-w-md w-full shadow-2xl border border-brand-light-tertiary dark:border-white/10 text-center flex flex-col items-center">
+      <div className="w-20 h-20 bg-brand-green/10 rounded-full flex items-center justify-center mb-6 border border-brand-green/20">
         <div className="w-12 h-12 bg-brand-green rounded-full flex items-center justify-center shadow-lg shadow-brand-green/30">
           <CheckIcon className="w-6 h-6 text-white" />
         </div>
@@ -120,7 +64,7 @@ const SuccessModal: React.FC<{
       <h2 className="text-2xl font-bold text-brand-text-light-primary dark:text-white mb-2">
         Assessment Completed!
       </h2>
-      <p className="text-brand-text-light-secondary dark:text-brand-text-secondary mb-8">
+      <p className="text-brand-text-light-secondary dark:text-gray-400 mb-8 text-sm">
         Great job! You've successfully completed the assessment. Your results
         are being processed.
       </p>
@@ -134,7 +78,7 @@ const SuccessModal: React.FC<{
         </button>
         <button
           onClick={onBack}
-          className="w-full py-3.5 rounded-full border border-brand-light-tertiary dark:border-white/20 text-brand-text-light-primary dark:text-white font-bold text-sm hover:bg-brand-light-tertiary dark:hover:bg-white/5 transition-colors"
+          className="w-full py-3.5 rounded-full border border-brand-light-tertiary dark:border-white/20 text-brand-text-light-primary dark:text-white font-bold text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
         >
           Back to Assessments
         </button>
@@ -151,7 +95,6 @@ const VerticalStepper: React.FC<{
 }> = ({ currentStep, totalSteps }) => {
   const windowSize = 6;
 
-  // Sliding Window Logic
   let start = currentStep - 1;
   let end = start + windowSize - 1;
 
@@ -171,9 +114,6 @@ const VerticalStepper: React.FC<{
     for (let i = start; i <= end; i++) {
       const isActive = i === currentStep;
       const isCompleted = i < currentStep;
-
-      // Line logic: Connect i to i+1.
-      // Color is green if this step (i) is completed.
       const isLineActive = isCompleted;
 
       steps.push(
@@ -181,36 +121,32 @@ const VerticalStepper: React.FC<{
           key={i}
           className="flex flex-col items-center relative shrink-0 z-10"
         >
-          {/* Step Circle */}
           <div
             className={`
-              rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 relative
-              w-10 h-10 text-xs sm:text-sm
-              ${
-                isCompleted
-                  ? "bg-[#1ED36A] text-white"
-                  : isActive
-                  ? "" // Active uses the SVG Icon directly
-                  : "bg-brand-light-tertiary dark:bg-[#24272B] text-brand-text-light-secondary dark:text-[#718096]"
+              rounded-full flex items-center justify-center font-semibold transition-all duration-300 relative
+              w-[clamp(32px,2.4vw,44px)] h-[clamp(32px,2.4vw,44px)]
+              text-[clamp(11px,1.1vw,15px)]
+              ${isCompleted
+                ? "bg-[#1ED36A] text-white"
+                : isActive
+                  ? ""
+                  : "bg-white dark:bg-[#24272B] border border-brand-light-tertiary dark:border-white/10 text-brand-text-light-secondary dark:text-[#718096]"
               } 
             `}
           >
             {isActive ? (
-              <StepperPendingDotIcon className="w-10 h-10" />
+              <StepperPendingDotIcon className="w-full h-full" />
             ) : (
               <span>{i}</span>
             )}
           </div>
 
-          {/* Connection Line (Draws DOWN from current step to next) */}
-          {/* Only render if not the last item in the WINDOW */}
           {i < end && (
             <div
-              className={`w-[2px] h-6 sm:h-8 my-1 rounded-full relative -z-10 transition-colors duration-500 ${
-                isLineActive
-                  ? "bg-[#1ED36A]"
-                  : "bg-brand-light-tertiary dark:bg-[#303438]"
-              }`}
+              className={`w-[1.5px] h-[clamp(12px,1.5vw,30px)] my-1 rounded-full relative -z-10 transition-colors duration-500 ${isLineActive
+                ? "bg-[#1ED36A]"
+                : "bg-brand-light-tertiary dark:bg-[#303438]"
+                }`}
             />
           )}
         </div>
@@ -219,44 +155,32 @@ const VerticalStepper: React.FC<{
     return steps;
   };
 
-  // Logic for lines connecting to arrows
-  const isTopLineActive = true; // Always green from top
+  const isTopLineActive = true;
   const isBottomLineActive = end < currentStep;
 
   return (
-    <div className="flex flex-col items-center w-16 h-full justify-center py-4 shrink-0 select-none relative z-0">
-      {/* Up Arrow Button */}
-      <button className="flex items-center justify-center hover:opacity-80 transition-opacity z-20 mb-1 group">
-        <div className="w-10 h-10 rounded-full bg-[#E8F5E9] dark:bg-[#1A3A2C] border border-[#1ED36A] flex items-center justify-center group-hover:bg-[#1ED36A] transition-colors">
-          <StepperUpArrowIcon className="w-[14px] h-[7px] text-[#1ED36A] group-hover:text-white transition-colors" />
+    <div className="flex flex-col items-center h-full justify-start shrink-0 select-none relative z-0 pt-2">
+      <button className="flex items-center justify-center hover:opacity-80 transition-opacity z-20 group cursor-pointer">
+        <div className="w-[clamp(32px,2.4vw,44px)] h-[clamp(32px,2.4vw,44px)] rounded-full bg-white dark:bg-[#1A3A2C] border border-[#1ED36A] flex items-center justify-center group-hover:bg-[#1ED36A] transition-colors">
+          <StepperUpArrowIcon className="w-[35%] h-[20%] dark:text-[#FFFFFF] text-[#1ED36A] group-hover:text-white transition-colors" />
         </div>
       </button>
 
-      {/* Connection Line from Up Arrow to First Visible Step */}
       <div
-        className={`w-[2px] h-6 sm:h-8 my-1 rounded-full transition-colors duration-500 ${
-          isTopLineActive
-            ? "bg-[#1ED36A]"
-            : "bg-brand-light-tertiary dark:bg-[#303438]"
-        }`}
+        className={`w-[1.5px] h-[clamp(12px,1.5vw,30px)] my-1 rounded-full transition-colors duration-500 ${isTopLineActive ? "bg-[#1ED36A]" : "bg-brand-light-tertiary dark:bg-[#303438]"
+          }`}
       />
 
-      {/* Stepper Steps Container */}
       <div className="flex flex-col items-center">{renderSteps()}</div>
 
-      {/* Connection Line from Last Visible Step to Down Arrow */}
       <div
-        className={`w-[2px] h-6 sm:h-8 my-1 rounded-full transition-colors duration-500 ${
-          isBottomLineActive
-            ? "bg-[#1ED36A]"
-            : "bg-brand-light-tertiary dark:bg-[#303438]"
-        }`}
+        className={`w-[1.5px] h-[clamp(12px,1.5vw,30px)] my-1 rounded-full transition-colors duration-500 ${isBottomLineActive ? "bg-[#1ED36A]" : "bg-brand-light-tertiary dark:bg-[#303438]"
+          }`}
       />
 
-      {/* Down Arrow Button */}
-      <button className="flex items-center justify-center hover:opacity-80 transition-opacity z-20 mt-1 group">
-        <div className="w-10 h-10 rounded-full bg-[#E8F5E9] dark:bg-[#1A3A2C] border border-[#1ED36A] flex items-center justify-center group-hover:bg-[#1ED36A] transition-colors">
-          <StepperDownArrowIcon className="w-[14px] h-[8px] text-[#1ED36A] group-hover:text-white transition-colors" />
+      <button className="flex items-center justify-center hover:opacity-80 transition-opacity z-20 group cursor-pointer">
+        <div className="w-[clamp(32px,2.4vw,44px)] h-[clamp(32px,2.4vw,44px)] rounded-full bg-white dark:bg-[#1A3A2C] border border-[#1ED36A] flex items-center justify-center group-hover:bg-[#1ED36A] transition-colors">
+          <StepperDownArrowIcon className="w-[35%] h-[22%] dark:text-[#FFFFFF] text-[#1ED36A] group-hover:text-white transition-colors" />
         </div>
       </button>
     </div>
@@ -274,102 +198,252 @@ const CircularProgress: React.FC<{
   total,
   className = "w-16 h-16 lg:w-[105px] lg:h-[105px]",
 }) => {
-  const percentage = Math.round((current / total) * 100);
+    const percentage = Math.round((current / total) * 100);
+    const size = 120;
+    const stroke = 6;
+    const center = size / 2;
+    const radius = (size - stroke) / 2;
+    const circumference = radius * 2 * Math.PI;
+    const strokeDashoffset = circumference - (percentage / 100) * circumference;
 
-  // Use a 100x100 coordinate system for consistent scaling
-  const size = 120;
-  const stroke = 6;
-  const center = size / 2;
-  // Calculate radius to fit within the viewbox with padding
-  const radius = (size - stroke) / 2;
-  const circumference = radius * 2 * Math.PI;
-
-  const strokeDashoffset = circumference - (percentage / 100) * circumference;
-
-  return (
-    <div
-      className={`relative flex items-center justify-center bg-brand-light-secondary dark:bg-[#1A1D21] rounded-full shadow-xl border-brand-light-tertiary dark:border-[#24272B] ${className}`}
-    >
-      <svg
-        viewBox={`0 0 ${size} ${size}`}
-        className="w-full h-full transform -rotate-90"
+    return (
+      <div
+        className={`relative flex items-center justify-center rounded-full ${className}`}
       >
-        {/* Background Track */}
-        <circle
-          className="stroke-brand-light-tertiary dark:stroke-[#303438]"
-          strokeWidth={stroke}
-          fill="transparent"
-          r={radius}
-          cx={center}
-          cy={center}
-        />
-        {/* Progress Indicator */}
-        <circle
-          stroke="#1ED36A"
-          strokeWidth={stroke}
-          strokeDasharray={circumference + " " + circumference}
-          style={{
-            strokeDashoffset,
-            transition: "stroke-dashoffset 0.5s ease-in-out",
-          }}
-          strokeLinecap="round"
-          fill="transparent"
-          r={radius}
-          cx={center}
-          cy={center}
-        />
-      </svg>
-      <div className="absolute flex flex-col items-center justify-center leading-none">
-        <span className="text-sm lg:text-2xl font-bold text-brand-text-light-primary dark:text-white mb-0.5">
-          {percentage}%
-        </span>
-        <span className="text-[10px] lg:text-sm text-brand-text-light-secondary dark:text-[#A0AEC0] font-semibold tracking-wide">
-          {current}/{total}
-        </span>
+        <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full transform -rotate-90">
+          <circle
+            className="stroke-white/10 dark:stroke-white-[0.12]"
+            style={{
+              stroke: 'rgba(255, 255, 255, 0.12)',
+              fill: 'rgba(255, 255, 255, 0.05)'
+            }}
+            strokeWidth={stroke}
+            r={radius}
+            cx={center}
+            cy={center}
+          />
+          <circle
+            stroke="#1ED36A"
+            strokeWidth={stroke}
+            strokeDasharray={circumference + " " + circumference}
+            style={{
+              strokeDashoffset,
+              transition: "stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
+            }}
+            strokeLinecap="butt"
+            fill="transparent"
+            r={radius}
+            cx={center}
+            cy={center}
+          />
+        </svg>
+        <div className="absolute flex flex-col items-center justify-center text-right py-1">
+          <span
+            className="text-[clamp(16px,2.2vmin,28px)] font-semibold text-white tracking-tight"
+            style={{
+              fontFamily: "'Haskoy', 'Inter', sans-serif",
+              fontWeight: 600,
+              lineHeight: '1.1'
+            }}
+          >
+            {percentage}%
+          </span>
+          <span
+            className="text-[clamp(9px,1.1vmin,13px)] text-white/70 font-normal mt-[clamp(2px,0.4vmin,6px)]"
+            style={{
+              fontFamily: "'Haskoy', 'Inter', sans-serif",
+              fontWeight: 400,
+              lineHeight: '1'
+            }}
+          >
+            {current}/{total}
+          </span>
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
+
+// --- AssessmentRunner Component ---
 
 // --- AssessmentRunner Component ---
 
 const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
   onBack,
   onGoToDashboard,
+  attemptId = "dummy-attempt-id", // Default for dev
 }) => {
-  const [currentQIndex, setCurrentQIndex] = useState(0); // start from Q1
+  // State
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [currentQIndex, setCurrentQIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [changeCount, setChangeCount] = useState(0); // Track answer changes
 
-  const currentQuestion = questions[currentQIndex % questions.length];
-  const totalQuestions = 75;
+  // Refs for logic
+  const startTimeRef = React.useRef<number>(Date.now());
+  const initialLoadRef = React.useRef(false);
+
+  // Fetch Questions
+  React.useEffect(() => {
+    if (initialLoadRef.current) return;
+    initialLoadRef.current = true;
+
+    const fetchQuestions = async () => {
+      console.log(`[AssessmentRunner] Fetching questions for attempt: ${attemptId} from http://localhost:4005/api/v1/exam/start`);
+      // Update logic to try finding a non-dummy ID if possible or just proceed
+      try {
+        const response = await fetch("http://localhost:4005/api/v1/exam/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            student_id: "dummy-student-id", // Ideally from auth context
+            exam_id: attemptId,
+          }),
+        });
+
+        console.log(`[AssessmentRunner] Response status: ${response.status}`);
+
+        if (!response.ok) {
+          const body = await response.text();
+          console.error(`[AssessmentRunner] Error body: ${body}`);
+          throw new Error(`Failed to load assessment. Status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const apiAnswers: APIAssessmentAnswer[] = data.data || [];
+
+        console.log(`[AssessmentRunner] Loaded ${apiAnswers.length} questions`);
+
+        if (apiAnswers.length === 0) {
+          throw new Error("No questions returned from the server.");
+        }
+
+        // Map API response to UI Question format
+        const mappedQuestions: Question[] = apiAnswers.map((ans) => {
+          const qData = ans.main_question || ans.open_question;
+          // Handle case where question might be missing (shouldn't happen in valid data)
+          if (!qData) {
+            return { id: ans.id, text: "Error loading question", options: [], assessmentAnswerId: ans.id };
+          }
+          return {
+            id: qData.id,
+            text: qData.question,
+            options: qData.options?.map((opt) => ({
+              id: opt.id,
+              text: opt.option_text,
+            })) || [],
+            assessmentAnswerId: ans.id, // Important: use the Answer Record ID for submission context
+            preamble: undefined, // Backend doesn't support preamble yet
+          };
+        });
+
+        setQuestions(mappedQuestions);
+        setLoading(false);
+        startTimeRef.current = Date.now(); // Reset timer for first question
+      } catch (err: any) {
+        console.error("[AssessmentRunner] error:", err);
+        setError(err.message || "Something went wrong");
+        setLoading(false);
+      }
+    };
+
+    fetchQuestions();
+  }, [attemptId]);
+
+  const currentQuestion = questions[currentQIndex];
+  const totalQuestions = questions.length;
   const currentNumber = currentQIndex + 1;
 
+  // Handle Option Select
   const handleOptionSelect = (id: string) => {
+    if (selectedOption && selectedOption !== id) {
+      setChangeCount((prev) => prev + 1);
+    }
     setSelectedOption(id);
   };
 
-  const handleNext = () => {
-    if (currentNumber < totalQuestions) {
-      setCurrentQIndex((prev) => prev + 1);
-      setSelectedOption(null);
-    } else {
-      setIsCompleted(true);
+  // Submit Answer & Next
+  const handleNext = async () => {
+    if (!currentQuestion || !selectedOption) return;
+
+    const timeSpent = Math.floor((Date.now() - startTimeRef.current) / 1000);
+
+    // Prepare payload
+    const payload = {
+      attempt_id: attemptId,
+      question_id: currentQuestion.assessmentAnswerId, // Using the answer record ID
+      selected_option: selectedOption,
+      time_taken: timeSpent,
+      answer_change_count: changeCount,
+      // Add other flags here if available in frontend state (distraction, attention, etc)
+    };
+
+    try {
+      // Fire and forget, or await? User said "answer text also want to store".
+      // Usually better to await to ensure data integrity, but for smooth UI maybe non-blocking?
+      // Let's await to be safe.
+      await fetch("http://localhost:4005/api/v1/exam/answer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (currentNumber < totalQuestions) {
+        setCurrentQIndex((prev) => prev + 1);
+        setSelectedOption(null);
+        setChangeCount(0); // Reset for next question
+        startTimeRef.current = Date.now(); // Reset timer
+      } else {
+        setIsCompleted(true);
+      }
+    } catch (err) {
+      console.error("Failed to submit answer:", err);
+      // Determine UX: Block user or retry? For now, alert or just log.
+      alert("Failed to save answer. Please try again.");
     }
   };
 
   const handlePrevious = () => {
     if (currentNumber > 1) {
       setCurrentQIndex((prev) => prev - 1);
-      setSelectedOption(null);
+      setSelectedOption(null); // Assuming we don't restore previous state for now (user didn't ask for review mode)
+      setChangeCount(0);
+      startTimeRef.current = Date.now();
     } else {
       onBack();
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <div className="text-xl font-semibold text-brand-green mb-2">Loading assessment...</div>
+        <div className="text-sm text-gray-500">Attempt ID: {attemptId}</div>
+      </div>
+    );
+  }
+
+  if (error || !currentQuestion) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <div className="text-xl font-semibold text-red-500">Error loading assessment</div>
+        <div className="p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 rounded-lg max-w-lg">
+          <p className="text-gray-700 dark:text-red-200 mb-2 font-mono text-sm">{error}</p>
+          <p className="text-xs text-gray-500">Attempt ID: {attemptId}</p>
+        </div>
+        <div className="flex gap-4">
+          <button onClick={() => window.location.reload()} className="px-6 py-2 bg-brand-green text-white rounded-full hover:bg-brand-green/90">Retry</button>
+          <button onClick={onBack} className="px-6 py-2 border border-brand-light-tertiary text-gray-600 rounded-full hover:bg-gray-100">Back</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    // Main Container
-    <div className="flex justify-center bg-transparent w-full h-full overflow-hidden">
+    <div className="flex justify-center bg-transparent w-full h-full max-w-[2000px] mx-auto px-4 lg:px-[4%] 2xl:px-[5%]">
       {isCompleted && (
         <SuccessModal
           onBack={onBack}
@@ -377,50 +451,46 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
         />
       )}
 
-      <div className="flex flex-col lg:flex-row w-full h-full max-w-[1450px] gap-4 lg:gap-10 xl:gap-16">
-        {/* Left Sidebar - Vertical Stepper */}
-        <div className="hidden lg:flex flex-col items-center w-16 xl:w-24 shrink-0 h-full justify-center pt-4">
+      {/* Grid Layout - 12 Columns according to design grid */}
+      <div className="w-full h-full grid grid-cols-12 gap-0">
+
+        {/* Column 1: Vertical Stepper */}
+        <div className="hidden lg:flex col-span-1 justify-center border-brand-light-tertiary/20 dark:border-white/5 h-full pt-2 lg:pt-4 pb-10">
           <VerticalStepper
             currentStep={currentNumber}
             totalSteps={totalQuestions}
           />
         </div>
 
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col relative min-w-0 h-full">
-          {/* Top Progress Indicator (Desktop) */}
-          <div className="absolute top-2 right-0 lg:right-10 hidden lg:block z-20">
-            <CircularProgress current={currentNumber} total={totalQuestions} />
+        {/* Columns 2-11: Main Content */}
+        <div className="col-span-12 lg:col-span-10 relative h-full flex flex-col px-4 lg:px-[clamp(20px,3vw,60px)]">
+
+          {/* Progress for Mobile */}
+          <div className="lg:hidden flex justify-end mb-1 pr-1 pt-4">
+            <CircularProgress current={currentNumber} total={totalQuestions} className="w-[clamp(70px,7vw,90px)] h-[clamp(70px,7vw,90px)]" />
           </div>
 
-          {/* Mobile/Tablet Progress */}
-          <div className="lg:hidden flex justify-end mb-1 mt-1 pr-1">
-            <CircularProgress
-              current={currentNumber}
-              total={totalQuestions}
-              className="w-14 h-14"
-            />
-          </div>
+          {/* Content Area - Fluid Scaling */}
+          <div className="flex-grow flex flex-col justify-start w-full pt-[clamp(10px,2vw,30px)]">
+            <div className="flex flex-col w-full">
 
-          {/* Question Scrollable Container */}
-          <div className="flex-grow flex flex-col w-full max-w-5xl lg:pr-10 overflow-y-auto scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-            {/* Inner wrapper */}
-            <div className="flex flex-col justify-center min-h-full py-4 sm:py-6 my-auto">
-              {/* Text Section */}
-              <div className="mb-5 sm:mb-8 lg:mb-10 animate-fade-in">
-                {currentQuestion.preamble && (
-                  <p className="text-sm sm:text-base lg:text-xl text-brand-text-light-secondary dark:text-[#A0AEC0] mb-2 sm:mb-3 font-normal leading-relaxed">
-                    {currentQuestion.preamble}
-                  </p>
-                )}
-                <h1 className="text-xl sm:text-2xl lg:text-[34px] xl:text-[38px] font-semibold text-brand-text-light-primary dark:text-white leading-snug">
-                  {currentQuestion.text}
-                </h1>
+              {/* Text Section - Aligned with designs */}
+              <div className="mb-4 lg:mb-6 animate-fade-in relative flex flex-row justify-between items-start gap-4">
+                <div className="flex-grow">
+                  {currentQuestion.preamble && (
+                    <p className="text-[clamp(14px,1.2vw,22px)] text-gray-700 dark:text-white mb-1 lg:mb-2 font-normal leading-relaxed">
+                      {currentQuestion.preamble}
+                    </p>
+                  )}
+                  <h1 className="text-[clamp(18px,2vw,32px)] font-semibold text-brand-text-light-primary dark:text-white leading-tight">
+                    {currentQuestion.text}
+                  </h1>
+                </div>
               </div>
 
-              {/* Options List */}
+              {/* Options Section */}
               <div
-                className="space-y-2 sm:space-y-3 lg:space-y-4 animate-fade-in"
+                className="space-y-[clamp(8px,1vw,16px)] animate-fade-in w-full"
                 style={{ animationDelay: "100ms" }}
               >
                 {currentQuestion.options.map((option) => {
@@ -430,28 +500,26 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
                       key={option.id}
                       onClick={() => handleOptionSelect(option.id)}
                       className={`
-                                            w-full p-3 sm:p-4 lg:p-5 rounded-xl text-left flex items-center gap-3 sm:gap-4 lg:gap-6 transition-all duration-200 border group relative overflow-hidden
-                                            ${
-                                              isSelected
-                                                ? "bg-[#1ED36A] border-[#1ED36A] shadow-[0_4px_20px_rgba(30,211,106,0.3)]"
-                                                : "bg-brand-light-secondary dark:bg-[#24272B] border-transparent hover:bg-brand-light-tertiary dark:hover:bg-[#2D3136]"
-                                            }
-                                        `}
+                        w-full p-[clamp(10px,1.2vw,18px)] rounded-xl lg:rounded-2xl text-left flex items-center gap-[clamp(10px,1.5vw,24px)] transition-all duration-200 border group relative overflow-hidden cursor-pointer
+                        ${isSelected
+                          ? "bg-[#1ED36A] border-[#1ED36A] shadow-[0_4px_16px_rgba(30,211,106,0.2)]"
+                          : "bg-white dark:bg-[#24272B] border-brand-light-tertiary dark:border-white/5 hover:bg-gray-50 dark:hover:bg-[#2D3136]"
+                        }
+                      `}
                     >
                       <div className="flex-shrink-0 z-10">
                         {isSelected ? (
-                          <CheckCircleIcon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7" />
+                          <CheckCircleIcon className="w-[clamp(18px,1.8vw,28px)] h-[clamp(18px,1.8vw,28px)] text-white" />
                         ) : (
-                          <div className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 rounded-full border-[1.5px] border-brand-light-tertiary dark:border-[#3E4247] bg-brand-light-primary dark:bg-[#303438] group-hover:border-[#555] transition-colors" />
+                          <div className="w-[clamp(18px,1.8vw,28px)] h-[clamp(18px,1.8vw,28px)] rounded-full border-[1.5px] border-gray-300 dark:border-[#3E4247] bg-transparent group-hover:border-[#555] transition-colors" />
                         )}
                       </div>
 
                       <span
-                        className={`text-sm sm:text-base lg:text-lg xl:text-xl font-medium z-10 ${
-                          isSelected
-                            ? "text-white"
-                            : "text-brand-text-light-primary dark:text-[#E2E8F0]"
-                        }`}
+                        className={`text-[clamp(13px,1.1vw,18px)] font-normal z-10 ${isSelected
+                          ? "text-white"
+                          : "text-brand-text-light-primary dark:text-gray-100"
+                          }`}
                       >
                         {option.text}
                       </span>
@@ -462,11 +530,11 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
             </div>
           </div>
 
-          {/* Footer Navigation */}
-          <div className="w-full max-w-5xl flex justify-between items-center mt-auto pt-3 pb-1 shrink-0 lg:pr-10">
+          {/* Navigation Actions */}
+          <div className="w-full flex justify-between items-center mt-auto pt-6 pb-6 lg:pb-10 shrink-0">
             <button
               onClick={handlePrevious}
-              className="px-5 py-2 sm:px-6 sm:py-2.5 lg:px-8 lg:py-3 rounded-full border border-brand-light-tertiary dark:border-[#303438] text-brand-text-light-secondary dark:text-white transition-colors hover:bg-brand-light-tertiary dark:hover:bg-[#24272B] text-xs sm:text-sm lg:text-base font-medium"
+              className="px-[clamp(20px,2vw,32px)] py-[clamp(6px,0.8vw,12px)] rounded-full border border-brand-light-tertiary dark:border-[#303438] text-brand-text-light-secondary dark:text-white transition-colors hover:bg-gray-100 dark:hover:bg-[#24272B] text-[clamp(11px,0.9vw,15px)] font-medium cursor-pointer"
             >
               {currentNumber === 1 ? "Back" : "Previous"}
             </button>
@@ -475,13 +543,12 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
               onClick={handleNext}
               disabled={!selectedOption}
               className={`
-                            px-6 py-2 sm:px-8 sm:py-2.5 lg:px-10 lg:py-3 rounded-full text-white transition-all shadow-lg text-xs sm:text-sm lg:text-base font-medium
-                            ${
-                              selectedOption
-                                ? "bg-[#1ED36A] hover:bg-[#1ED36A]/90 shadow-[#1ED36A]/20 cursor-pointer transform hover:-translate-y-0.5"
-                                : "bg-brand-dark-tertiary dark:bg-[#303438] text-[#718096] cursor-not-allowed"
-                            }
-                        `}
+                px-[clamp(24px,2.5vw,40px)] py-[clamp(6px,0.8vw,12px)] rounded-full text-white transition-all shadow-lg text-[clamp(11px,0.9vw,15px)] font-medium
+                ${selectedOption
+                  ? "bg-[#1ED36A] hover:bg-[#1ED36A]/90 shadow-[#1ED36A]/20 cursor-pointer transform hover:-translate-y-0.5"
+                  : "bg-gray-300 dark:bg-[#303438] text-gray-500 dark:text-[#718096] cursor-not-allowed"
+                }
+              `}
             >
               {currentNumber === totalQuestions
                 ? "Finish Assessment"
@@ -489,6 +556,16 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Column 12: Progress Circle (Aligned with Header Row) */}
+        <div className="hidden lg:flex col-span-1 justify-end items-start pt-0 pr-2 lg:pr-4">
+          <CircularProgress
+            current={currentNumber}
+            total={totalQuestions}
+            className="w-[clamp(110px,11vw,150px)] h-[clamp(110px,11vw,150px)]"
+          />
+        </div>
+
       </div>
     </div>
   );

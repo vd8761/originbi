@@ -9,15 +9,15 @@
   --color-brand-dark-primary: #1A1D21;
   --color-brand-dark-secondary: #24272B;
   --color-brand-dark-tertiary: #303438;
-  
+
   --color-brand-light-primary: #FFFFFF;
   --color-brand-light-secondary: #F7FAFC;
   --color-brand-light-tertiary: #E2E8F0;
-  
+
   --color-brand-green: #1ED36A;
   --color-brand-dark-green: #1A3A2C;
   --color-brand-red: #C63232;
-  
+
   --color-brand-text-primary: #FFFFFF;
   --color-brand-text-secondary: #A0AEC0;
   --color-brand-text-light-primary: #2D3748;
@@ -28,10 +28,17 @@
 
   /* Animations */
   --animate-fade-in: fade-in 0.8s ease-in-out forwards;
-  
+
   @keyframes fade-in {
-    0% { opacity: 0.5; transform: scale(1.05); }
-    100% { opacity: 1; transform: scale(1); }
+    0% {
+      opacity: 0.5;
+      transform: scale(1.05);
+    }
+
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 
   /* Background Images */
@@ -112,37 +119,79 @@ body {
 }
 
 /* --- FONT SIZE VW CLASSES (Based on 1920px width) --- */
-/* Add these new classes to your global CSS file */
-.text-48vw { font-size: 2.5vw; }
-.text-24vw { font-size: 1.25vw; }
-.text-18vw { font-size: 0.9375vw; }
-.text-16vw { font-size: 0.833vw; }
-.text-14vw { font-size: 0.729vw; }
-/* Optional: If toggle text needs scaling */
-.text-10vw {
-  font-size: 0.52vw; /* Corresponds to 10px at 1920px */
+/* Uses max() to ensure text doesn't become illegible on smaller screens (e.g. 1280px) */
+.text-48vw {
+  font-size: 2.5vw;
 }
+
+.text-32vw {
+  font-size: 1.666vw;
+}
+
+.text-24vw {
+  font-size: 1.25vw;
+}
+
+.text-20vw {
+  font-size: 1.04vw;
+}
+
+.text-18vw {
+  font-size: 0.9375vw;
+}
+
+.text-16vw {
+  font-size: 0.833vw;
+}
+
+.text-14vw {
+  font-size: 0.729vw;
+}
+
+.text-12vw {
+  font-size: 0.625vw;
+}
+
+/* ~12px */
+.text-10vw {
+  font-size: 0.52vw;
+}
+
+/* ~10px */
 
 /* --- TOGGLE DIMENSION VW CLASSES (Based on 1920px width) --- */
 .h-24vw {
-  height: 1.25vw; /* Track Height (~24px) */
+  height: 1.25vw;
+  /* Track Height (~24px) */
 }
+
 .w-48vw {
-  width: 2.5vw; /* Track Width (~48px) */
+  width: 2.5vw;
+  /* Track Width (~48px) */
 }
+
 .w-16vw {
-  width: 0.833vw; /* Thumb Width/Height (~16px) */
+  width: 0.833vw;
+  /* Thumb Width/Height (~16px) */
 }
+
 .h-16vw {
-  height: 0.833vw; /* Thumb Width/Height (~16px) */
+  height: 0.833vw;
+  /* Thumb Width/Height (~16px) */
 }
 
 /* --- TOGGLE TRANSLATION VW CLASSES --- */
 .translate-x-32vw {
-    /* Calculated ON position (Track width - Thumb width - margin) / 1920 * 100 */
-    transform: translateX(1.66vw); 
+  /* Calculated ON position (Track width - Thumb width - margin) / 1920 * 100 */
+  transform: translateX(1.66vw);
 }
+
 .translate-x-4vw {
-    /* Small starting margin for the OFF position */
-    transform: translateX(0.2vw); 
+  /* Small starting margin for the OFF position */
+  transform: translateX(0.2vw);
+}
+
+/* Stable Scrollbar Gutter to prevent layout Jumps */
+html {
+  scrollbar-gutter: stable;
 }

@@ -18,11 +18,10 @@ import { AssessmentAttempt } from '../assessment/assessment_attempt.entity';
 import { AssessmentLevel } from '../assessment/assessment_level.entity';
 import { GroupsService } from '../groups/groups.service';
 import { AssessmentGenerationService } from '../assessment/assessment-generation.service';
-import { getWelcomeEmailTemplate } from '../mail/templates/welcome.template';
+import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
 
 import * as nodemailer from 'nodemailer';
 import { SES } from 'aws-sdk';
-import * as path from 'path';
 
 @Injectable()
 export class RegistrationsService {
@@ -226,7 +225,6 @@ export class RegistrationsService {
       // Check based on new schema: Filter by programId and isMandatory
       const levels = await manager.getRepository(AssessmentLevel).find({
         where: {
-          programId: programId, // Filter by the program we selected!
           isMandatory: true,
         },
       });
@@ -426,33 +424,18 @@ export class RegistrationsService {
       html: '',
     };
 
-    // Use local assets with CID for robust delivery
-    const assetPath = path.join(process.cwd(), 'src/mail/assets');
-    const attachments = [
-      {
-        filename: 'Popper.png',
-        path: path.join(assetPath, 'Popper.png'),
-        cid: 'popper',
-      },
-      {
-        filename: 'Pattern_mask.png',
-        path: path.join(assetPath, 'Pattern_mask.png'),
-        cid: 'pattern',
-      },
-      {
-        filename: 'Email_Vector.png',
-        path: path.join(assetPath, 'Email_Vector.png'),
-        cid: 'footer',
-      },
-    ];
+    // Use full URLs for assets ("from application itself")
+    // Controller is at /assets/:filename in admin-service (Port 4000)
+    const apiUrl = process.env.API_URL || 'http://localhost:4000';
 
     const assets = {
-      popper: 'cid:popper',
-      pattern: 'cid:pattern',
-      footer: 'cid:footer',
+      popper: `${apiUrl}/assets/Popper.png`,
+      pattern: `${apiUrl}/assets/Pattern_mask.png`,
+      footer: `${apiUrl}/assets/Email_Vector.png`,
+      logo: `${apiUrl}/assets/logo.png`,
     };
 
-    mailOptions.html = getWelcomeEmailTemplate(
+    mailOptions.html = getStudentWelcomeEmailTemplate(
       name,
       to,
       pass,
@@ -462,9 +445,7 @@ export class RegistrationsService {
       assessmentTitle,
     );
 
-    // Add attachments to mailOptions
-    Object.assign(mailOptions, { attachments });
-
+    // Attachments removed in favor of hosted images
     return await transporter.sendMail(mailOptions);
   }
 }

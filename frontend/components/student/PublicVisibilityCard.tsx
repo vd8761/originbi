@@ -19,15 +19,14 @@ const VisibilityItem: React.FC<VisibilityItemProps> = ({
     isLast,
 }) => (
     <div
-        className={`flex justify-between items-center py-3 ${
-            !isLast ? 'border-b border-brand-light-tertiary dark:border-white/10' : ''
-        }`}
+        className={`flex justify-between items-center py-3 lg:py-[0.833vw] ${!isLast ? 'border-b border-brand-light-tertiary dark:border-white/10' : ''
+            }`}
     >
-        <div>
-            <h4 className="font-semibold text-brand-text-light-primary dark:text-brand-text-primary">
+        <div className="pr-4">
+            <h4 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-sm lg:text-[0.833vw] leading-tight">
                 {title}
             </h4>
-            <p className="text-sm text-brand-text-light-secondary dark:text-brand-text-secondary">
+            <p className="font-regular font-sans text-[#19211C]/60 dark:text-brand-text-secondary mt-0.5 text-xs lg:text-[0.729vw] leading-tight">
                 {subtitle}
             </p>
         </div>
@@ -50,19 +49,19 @@ const PublicVisibilityCard: React.FC = () => {
     };
 
     return (
-        <div className="bg-brand-light-secondary dark:bg-brand-dark-secondary rounded-2xl h-full flex flex-col">
-            <div className="px-6 pt-6 pb-4">
-                <h3 className="text-lg font-bold text-brand-text-light-primary dark:text-brand-text-primary mb-1">
+        <div className="bg-white/20 border border-[#19211C]/12 dark:bg-brand-dark-secondary dark:border-transparent rounded-2xl h-full flex flex-col backdrop-blur-sm">
+            <div className="px-6 pt-6 pb-2 lg:px-[1.25vw] lg:pt-[1.25vw] lg:pb-[0.4vw]">
+                <h3 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-lg lg:text-[1.25vw] mb-2 leading-tight">
                     Public Visibility
                 </h3>
-                <p className="text-sm text-brand-text-light-secondary dark:text-brand-text-secondary">
+                <p className="font-regular font-sans text-[#19211C]/60 dark:text-brand-text-secondary text-xs lg:text-[0.729vw] leading-relaxed">
                     Control what recruiters see on your profile to highlight your strengths and attract
                     the right opportunities.
                 </p>
             </div>
-            <hr className="border-brand-light-tertiary dark:border-white/10" />
-            <div className="px-6 pt-4 pb-6 flex-grow">
-                <div className="space-y-2">
+
+            <div className="px-6 pt-2 pb-6 lg:px-[1.25vw] lg:pt-[0.41vw] lg:pb-[1.25vw] flex-grow">
+                <div className="space-y-1">
                     <VisibilityItem
                         title="Name & Contact Info"
                         subtitle="Your basic professional details"

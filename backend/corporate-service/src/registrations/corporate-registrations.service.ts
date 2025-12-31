@@ -281,29 +281,15 @@ export class CorporateRegistrationsService {
             ses: { ses, aws }, // Use lowercase 'ses' as per nodemailer v7 docs for @aws-sdk/client-ses
         } as any);
 
-        const assetPath = path.join(process.cwd(), 'src/mail/assets');
-        const attachments = [
-            {
-                filename: 'Popper.png',
-                path: path.join(assetPath, 'Popper.png'),
-                cid: 'popper',
-            },
-            {
-                filename: 'Pattern_mask.png',
-                path: path.join(assetPath, 'Pattern_mask.png'),
-                cid: 'pattern',
-            },
-            {
-                filename: 'Email_Vector.png',
-                path: path.join(assetPath, 'Email_Vector.png'),
-                cid: 'footer',
-            },
-        ];
+        // Use full URLs for assets ("from application itself")
+        // Static assets served at /email-assets in corporate-service (Port 4003)
+        const apiUrl = process.env.API_URL || 'http://localhost:4003';
 
         const assets = {
-            popper: 'cid:popper',
-            pattern: 'cid:pattern',
-            footer: 'cid:footer',
+            popper: `${apiUrl}/email-assets/Popper.png`,
+            pattern: `${apiUrl}/email-assets/Pattern_mask.png`,
+            footer: `${apiUrl}/email-assets/Email_Vector.png`,
+            logo: `${apiUrl}/email-assets/logo.png`,
         };
 
         const html = getWelcomeEmailTemplate(
@@ -321,7 +307,7 @@ export class CorporateRegistrationsService {
             to,
             subject: 'Welcome to OriginBI - Assessment Invitation',
             html,
-            attachments
+            // Attachments removed in favor of hosted images
         });
     }
 }

@@ -1,9 +1,9 @@
-export const getWelcomeEmailTemplate = (
+export const getStudentWelcomeEmailTemplate = (
   name: string,
   to: string,
   pass: string,
   frontendUrl: string,
-  assets: { popper: string; pattern: string; footer: string },
+  assets: { popper: string; pattern: string; footer: string; logo: string },
   startDateTime?: Date | string,
   assessmentTitle?: string,
 ) => `
@@ -35,16 +35,24 @@ export const getWelcomeEmailTemplate = (
     <table class="main-table" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="max-width: 600px; width: 100%;">
       
       <!-- HEADER ROW with Confetti Image (Foreground) -->
+      <!-- HEADER ROW with Logo and Confetti -->
       <tr>
         <td style="padding: 0;">
            <table width="100%" cellpadding="0" cellspacing="0" border="0">
              <tr>
-               <td style="padding: 60px 0 20px 20px; vertical-align: bottom;" class="header-title">
-                 <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #000000; text-align: left;">Thank you for Registering</h1>
+               <!-- Logo Area -->
+               <td style="padding: 40px 0 0 40px; vertical-align: top;">
+                  <img src="${assets.logo}" alt="Origin BI" width="150" style="display: block; border: 0;" />
                </td>
+               <!-- Confetti Image -->
                <td style="width: 150px; padding: 20px 20px 0 0; vertical-align: top; text-align: right;">
                   <img src="${assets.popper}" alt="Confetti" width="120" style="display: block; border: 0;" />
                </td>
+             </tr>
+             <tr>
+                <td colspan="2" style="padding: 10px 0 20px 40px;">
+                    <h1 style="font-family: Tahoma; font-weight: 700; font-size: 28px; line-height: 100%; letter-spacing: 0%; color: #000000; margin: 0;">Thank you for Registering</h1>
+                </td>
              </tr>
            </table>
         </td>
@@ -75,23 +83,22 @@ export const getWelcomeEmailTemplate = (
                   </tr>
                   <tr>
                     <td style="font-size: 14px; color: #707070; padding: 5px 0;">Start Date and Time</td>
-                    <td style="font-size: 14px; color: #000000; padding: 5px 0;">${
-                      startDateTime
-                        ? new Date(startDateTime).toLocaleString('en-GB', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
-                        : new Date().toLocaleString('en-GB', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
-                    }</td>
+                    <td style="font-size: 14px; color: #000000; padding: 5px 0;">${startDateTime
+    ? new Date(startDateTime).toLocaleString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+    : new Date().toLocaleString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }</td>
                   </tr>
                   <tr>
                     <td style="font-size: 14px; color: #707070; padding: 5px 0;">Username</td>
