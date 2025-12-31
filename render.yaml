@@ -4,7 +4,7 @@ services:
     env: docker
     region: singapore # Change based on your preference
     plan: free # or starter/standard
-    rootDir: backend/exam-engine # CRITICAL: Specify the subdirectory
+    rootDir: backend/exam-engine # Points to the Go service directory
     envVars:
       - key: PORT
         value: 10000 
