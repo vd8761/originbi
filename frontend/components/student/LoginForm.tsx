@@ -2,6 +2,7 @@
 
 import React, { useState, FormEvent, FocusEvent } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { EyeIcon, EyeOffIcon } from '@/components/icons';
 import { signIn, fetchAuthSession, signOut } from 'aws-amplify/auth';
 import { configureAmplify } from '@/lib/aws-amplify-config.js';
@@ -19,6 +20,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
   buttonClass = 'bg-brand-green hover:bg-brand-green/90 focus:ring-brand-green/30',
   portalMode = 'student',
 }) => {
+  const router = useRouter();
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [values, setValues] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({ email: '', password: '' });
@@ -148,6 +150,29 @@ const LoginForm: React.FC<LoginFormProps> = ({
       sessionStorage.setItem('userEmail', values.email);
       // Legacy support if needed
       localStorage.setItem('originbi_id_token', idTokenJwt);
+
+      // 6️⃣ Check Assessment Status and Redirect
+      try {
+        const response = await fetch('http://localhost:4003/student/login-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: values.email })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.isAssessmentMode && data.redirectUrl) {
+            // Set flag for Layout to hide menus
+            sessionStorage.setItem('isAssessmentMode', 'true');
+            router.push(data.redirectUrl);
+            return; // Early exit, do not call default success
+          } else {
+            sessionStorage.removeItem('isAssessmentMode');
+          }
+        }
+      } catch (statusError) {
+        console.error('Failed to check login status', statusError);
+      }
 
       onLoginSuccess();
 

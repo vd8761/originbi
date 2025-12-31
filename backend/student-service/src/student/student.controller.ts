@@ -1,13 +1,13 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
 import { StudentService } from './student.service';
 
 @Controller('student')
 export class StudentController {
   constructor(private readonly studentService: StudentService) { }
 
-  @Get('profile')
-  getProfile() {
-    return this.studentService.getProfile();
+  @Post('profile')
+  async getProfile(@Body() body: { email: string }) {
+    return this.studentService.getProfile(body.email);
   }
 
   @Post('seed')
@@ -21,5 +21,15 @@ export class StudentController {
   @Post('assessment-status')
   async getAssessmentStatus(@Body() body: { userId: number }) {
     return this.studentService.checkAssessmentStatus(body.userId);
+  }
+
+  @Post('login-status')
+  async checkLoginRedirect(@Body() body: { email: string }) {
+    return this.studentService.checkLoginStatus(body.email);
+  }
+
+  @Post('progress')
+  async getAssessmentProgress(@Body() body: { email: string }) {
+    return this.studentService.getAssessmentProgress(body.email);
   }
 }

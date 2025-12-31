@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Res, Param } from '@nestjs/common';
 import { Response } from 'express';
-import { getWelcomeEmailTemplate } from '../mail/templates/welcome.template';
+import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
 import { getCorporateWelcomeEmailTemplate } from '../mail/templates/corporate-welcome.template';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -29,9 +29,10 @@ export class TestController {
             popper: readAsset('Popper.svg'),
             pattern: readAsset('Pattern_mask.svg'),
             footer: readAsset('Email_Vector.svg'),
+            logo: readAsset('logo.png'),
         };
 
-        const html = getWelcomeEmailTemplate(
+        const html = getStudentWelcomeEmailTemplate(
             'Ariyappan',
             'test@example.com',
             'password123',
@@ -46,7 +47,7 @@ export class TestController {
 
     @Get('preview-corporate-email')
     previewCorporateEmail(@Res() res: Response) {
-        const baseUrl = process.env.BACKEND_URL || 'http://localhost:4001';
+        const baseUrl = process.env.BACKEND_URL || 'http://localhost:4000';
 
         // Mock assets for preview - assuming they work via relative path or need full URL
         // Currently test controller uses base64 for previewEmail but URLs for sendTestEmail
@@ -64,6 +65,7 @@ export class TestController {
             'asd5f465', // password
             'Touchmark Descience Pvt.Ltd', // companyName
             '999999999', // mobile
+            '+91', // countryCode
             'http://localhost:3000/corporate',
             assets,
         );
@@ -95,15 +97,16 @@ export class TestController {
         // Construct public URLs for the assets
         // NOTE: In production, 'localhost:4001' must be replaced with the actual public domain/IP
         // For this test context, we assume the user can access localhost or we use the configured headers
-        const baseUrl = process.env.BACKEND_URL || 'http://localhost:4001';
+        const baseUrl = process.env.BACKEND_URL || 'http://localhost:4000';
 
         const assets = {
             popper: `${baseUrl}/assets/Popper.png`,
             pattern: `${baseUrl}/assets/Pattern_mask.png`,
             footer: `${baseUrl}/assets/Email_Vector.png`,
+            logo: `${baseUrl}/assets/logo.png`,
         };
 
-        const html = getWelcomeEmailTemplate(
+        const html = getStudentWelcomeEmailTemplate(
             'Ariyappan',
             email,
             'password123',
@@ -158,6 +161,7 @@ export class TestController {
             'asd5f465',
             'Touchmark Descience Pvt.Ltd',
             '999999999',
+            '+91',
             `${process.env.FRONTEND_URL || 'http://localhost:3000'}/corporate`,
             assets,
         );

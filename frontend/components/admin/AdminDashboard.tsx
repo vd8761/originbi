@@ -22,11 +22,10 @@ const StatCard: React.FC<StatCardProps> = ({
         {value}
       </div>
       <div
-        className={`text-xs font-bold px-2 py-1 rounded-full ${
-          isPositive
-            ? "bg-green-500/10 text-green-500"
-            : "bg-red-500/10 text-red-500"
-        }`}
+        className={`text-xs font-bold px-2 py-1 rounded-full ${isPositive
+          ? "bg-green-500/10 text-green-500"
+          : "bg-red-500/10 text-red-500"
+          }`}
       >
         {change}
       </div>

@@ -1,13 +1,15 @@
 // app/student/assessment/runner/page.tsx
 'use client';
 
-import React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import AssessmentLayout from '@/components/student/AssessmentLayout';
 import AssessmentRunner from '@/components/student/AssessmentStarter';
+import { Suspense } from 'react';
 
-export default function AssessmentRunnerPage() {
+function AssessmentRunnerContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const attemptId = searchParams.get('attempt_id') || undefined;
 
   const handleLogout = () => {
     router.push('/student/login');
@@ -22,11 +24,20 @@ export default function AssessmentRunnerPage() {
   };
 
   return (
-    <AssessmentLayout onLogout={handleLogout}>
+    <AssessmentLayout onLogout={handleLogout} hideNav={true}>
       <AssessmentRunner
         onBack={handleBackToAssessments}
         onGoToDashboard={handleGoToDashboard}
+        attemptId={attemptId}
       />
     </AssessmentLayout>
+  );
+}
+
+export default function AssessmentRunnerPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AssessmentRunnerContent />
+    </Suspense>
   );
 }

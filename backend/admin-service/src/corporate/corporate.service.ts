@@ -603,6 +603,7 @@ export class CorporateService {
                             dto.password,
                             dto.companyName,
                             dto.mobile,
+                            dto.countryCode,
                         );
                     } catch (e) {
                         this.logger.error(`Failed to send email to ${email}`, e);
@@ -637,6 +638,7 @@ export class CorporateService {
         pass: string,
         companyName: string,
         mobile: string,
+        countryCode: string,
     ) {
         // Imports moved to top
 
@@ -647,12 +649,13 @@ export class CorporateService {
             region: process.env.AWS_REGION,
         });
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const transporter = nodemailer.createTransport({
             SES: ses, // Uppercase SES for Nodemailer v6
         } as any);
         const ccEmail = process.env.EMAIL_CC || '';
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-        const backendUrl = process.env.BACKEND_URL || 'http://localhost:4001';
+        const backendUrl = process.env.BACKEND_URL || 'http://localhost:4000';
 
         const fromName =
             process.env.EMAIL_SEND_FROM_NAME || 'Origin BI (Corporate)';
@@ -672,6 +675,7 @@ export class CorporateService {
             pass,
             companyName,
             mobile,
+            countryCode,
             `${frontendUrl}/corporate`, // Results in /corporate/login in the template
             assets,
         );

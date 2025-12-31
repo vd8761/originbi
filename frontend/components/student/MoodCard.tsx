@@ -1,32 +1,40 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MoodItem as MoodItemType, MoodTag } from '@/lib/types';
 import { ClockIcon } from '@/components/icons';
 
 const getTagClasses = (tag: MoodTag | string): string => {
     switch (tag) {
         case 'Feeling Happy':
-            return 'bg-brand-green/20 text-brand-green';
+            return 'bg-brand-green text-white border-none';
         case 'Need Motivation':
-            return 'bg-green-500/20 text-green-400';
+            return 'bg-brand-green text-white border-none';
         case 'Morning Boost':
-            return 'bg-blue-500/20 text-blue-400';
+            return 'bg-brand-green text-white border-none';
         default:
             return 'bg-gray-500/20 text-gray-400';
     }
 };
 
-const MoodItem: React.FC<{ item: MoodItemType }> = ({ item }) => (
-    <div className="flex items-center space-x-4 bg-brand-light-secondary dark:bg-brand-dark-tertiary p-3 rounded-xl hover:bg-brand-light-tertiary/60 dark:hover:bg-brand-dark-tertiary/60 transition-colors duration-200 cursor-pointer">
-        <div className="relative flex-shrink-0">
+const MoodItem: React.FC<{
+    item: MoodItemType;
+    isActive: boolean;
+    onClick: () => void;
+}> = ({ item, isActive, onClick }) => (
+    <div
+        onClick={onClick}
+        className="flex items-center space-x-4 lg:space-x-[0.833vw] p-4 lg:p-[0.833vw] rounded-xl transition-all duration-200 cursor-pointer group bg-[#19211C]/5 dark:bg-white/5 hover:bg-[#19211C]/10 dark:hover:bg-white/10"
+    >
+        <div className="relative flex-shrink-0 w-32 h-20 lg:w-[6.66vw] lg:h-[4.16vw] overflow-hidden rounded-lg">
             <img
                 src={item.imageUrl}
                 alt={item.title}
-                className="w-20 h-20 rounded-lg object-cover"
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
-            <div className="absolute inset-0 flex items-center justify-center rounded-lg">
-                <div className="w-8 h-8 rounded-full bg-brand-green/90 backdrop-blur-sm flex items-center justify-center">
+            {/* Small Play Overlay - Always Visible */}
+            <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-100 transition-opacity duration-200">
+                <div className="w-8 h-8 lg:w-[1.66vw] lg:h-[1.66vw] rounded-full bg-brand-green/90 backdrop-blur-sm flex items-center justify-center shadow-lg">
                     <svg
-                        className="w-4 h-4 text-white"
+                        className="w-4 h-4 lg:w-[0.833vw] lg:h-[0.833vw] text-white ml-0.5"
                         fill="currentColor"
                         viewBox="0 0 20 20"
                     >
@@ -35,24 +43,24 @@ const MoodItem: React.FC<{ item: MoodItemType }> = ({ item }) => (
                 </div>
             </div>
         </div>
-        <div className="flex-grow">
-            <h4 className="font-semibold text-base text-brand-text-light-primary dark:text-brand-text-primary">
+        <div className="flex-grow min-w-0">
+            <h4 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-base lg:text-[1.04vw] truncate">
                 {item.title}
             </h4>
-            <p className="text-sm text-brand-text-light-secondary dark:text-brand-text-secondary mt-1">
+            <p className="font-regular font-sans text-[#19211C]/60 dark:text-brand-text-secondary mt-1 lg:mt-[0.2vw] text-xs lg:text-[0.729vw] line-clamp-2">
                 {item.description}
             </p>
-            <div className="flex items-center space-x-4 mt-2">
+            <div className="flex items-center space-x-4 lg:space-x-[0.833vw] mt-2 lg:mt-[0.41vw]">
                 <span
-                    className={`text-xs px-3 py-1 font-semibold rounded-md ${getTagClasses(
+                    className={`text-[10px] lg:text-[0.729vw] px-3 py-1 lg:px-[0.625vw] lg:py-[0.2vw] font-medium rounded-md ${getTagClasses(
                         item.tag
                     )}`}
                 >
                     {item.tag}
                 </span>
-                <div className="flex items-center space-x-1.5">
-                    <ClockIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />
-                    <span className="text-sm text-brand-text-light-secondary dark:text-brand-text-secondary">
+                <div className="flex items-center space-x-1.5 lg:space-x-[0.31vw]">
+                    <ClockIcon className="w-4 h-4 lg:w-[0.833vw] lg:h-[0.833vw] text-[#19211C]/60 dark:text-brand-text-secondary" />
+                    <span className="text-xs lg:text-[0.729vw] text-[#19211C]/60 dark:text-brand-text-secondary">
                         {item.duration}
                     </span>
                 </div>
@@ -62,69 +70,81 @@ const MoodItem: React.FC<{ item: MoodItemType }> = ({ item }) => (
 );
 
 const MoodCard: React.FC = () => {
+    const [activeIndex, setActiveIndex] = useState(0);
     const moodItems: MoodItemType[] = [
         {
             title: 'Smile Reset in 60 Seconds',
             description:
-                'Curated to lift your energy and brighten your day. Curated to lift your energy.',
+                'Curated to lift your energy and brighten your day.',
             tag: 'Feeling Happy',
             duration: '5:45 min',
-            imageUrl: 'https://i.imgur.com/8QRLT1E.png',
+            imageUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
         },
         {
             title: 'Bright Start: 3 Mini Habits',
             description:
-                'Curated to lift your energy and brighten your day. Curated to lift your energy.',
+                'Curated to lift your energy and brighten your day.',
             tag: 'Need Motivation',
             duration: '5:45 min',
-            imageUrl: 'https://i.imgur.com/Y08fJ5j.png',
+            imageUrl: 'https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
         },
         {
             title: 'Morning Positivity Boost',
             description:
-                'Curated to lift your energy and brighten your day. Curated to lift your energy.',
+                'Curated to lift your energy and brighten your day.',
             tag: 'Morning Boost',
             duration: '5:45 min',
-            imageUrl: 'https://i.imgur.com/G4hG3mB.png',
+            imageUrl: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
         },
     ];
 
     return (
-        <div className="bg-brand-light-secondary dark:bg-brand-dark-secondary rounded-2xl h-full flex flex-col">
-            <div className="px-6 pt-6 pb-4 flex justify-between items-center">
-                <h3 className="text-lg font-bold text-brand-text-light-primary dark:text-brand-text-primary">
-                    What&apos;s Your Mood?
-                </h3>
-                <a
-                    href="#"
-                    className="text-sm text-brand-green font-semibold hover:underline"
-                >
-                    View All
-                </a>
-            </div>
-            <hr className="border-brand-light-tertiary dark:border-white/10" />
-            <div className="p-6 flex-grow">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center h-full">
-                    <div className="lg:col-span-4 relative w-full h-full flex items-center justify-center rounded-2xl overflow-hidden min-h-[300px]">
-                        <div className="absolute w-[250px] h-[400px] bg-brand-green/90 rounded-[100px] blur-3xl -rotate-45" />
-                        <img
-                            src="https://i.imgur.com/eLS0e1d.png"
-                            alt="Mood video"
-                            className="relative z-10 w-full h-auto max-w-[250px]"
-                        />
-                        <div className="absolute z-20 bg-brand-green shadow-2xl shadow-brand-green/30 w-24 h-24 rounded-full flex items-center justify-center top-1/2 left-4 -translate-y-1/2">
+        <div className="bg-white/20 border border-[#19211C]/12 dark:bg-brand-dark-secondary dark:border-transparent rounded-2xl h-full flex flex-col backdrop-blur-sm p-6 lg:p-[1.25vw]">
+            <div className="grid grid-cols-1 lg:grid-cols-8 gap-6 lg:gap-[1.25vw] h-full">
+                {/* Left Side - Image (3 columns) */}
+                <div className="lg:col-span-3 relative w-full h-full min-h-[240px] lg:min-h-0 rounded-2xl overflow-hidden group">
+                    <img
+                        src="/Videos_Banner_img.png"
+                        alt="Mood video"
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+
+                    {/* Big Play Button */}
+                    <div className="absolute inset-0 flex items-center justify-center z-10">
+                        <button className="w-16 h-16 lg:w-[3.5vw] lg:h-[3.5vw] bg-brand-green rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(30,211,106,0.5)] transition-transform duration-300 hover:scale-110 active:scale-95 group-hover:shadow-[0_0_60px_rgba(30,211,106,0.7)]">
                             <svg
-                                className="w-10 h-10 text-white ml-2"
+                                className="w-6 h-6 lg:w-[1.25vw] lg:h-[1.25vw] text-white ml-1"
                                 fill="currentColor"
                                 viewBox="0 0 20 20"
                             >
                                 <path d="M6.3 3.31C5.33 2.72 4 3.42 4 4.54v10.92c0 1.12 1.33 1.82 2.3 1.23l9.36-5.46c.97-.57.97-1.9 0-2.46L6.3 3.31z" />
                             </svg>
-                        </div>
+                        </button>
                     </div>
-                    <div className="lg:col-span-8 space-y-3">
+                </div>
+
+                {/* Right Side - Header + List (5 columns) */}
+                <div className="lg:col-span-5 flex flex-col h-full">
+                    <div className="flex justify-between items-center mb-4 lg:mb-[0.833vw] flex-shrink-0">
+                        <h3 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-lg lg:text-[1.25vw]">
+                            What&apos;s Your Mood?
+                        </h3>
+                        <a
+                            href="#"
+                            className="font-medium font-sans text-brand-green text-xs lg:text-[0.833vw] hover:underline"
+                        >
+                            View All
+                        </a>
+                    </div>
+
+                    <div className="flex flex-col flex-grow justify-center gap-4 lg:gap-[0.833vw]">
                         {moodItems.map((item, index) => (
-                            <MoodItem key={index} item={item} />
+                            <MoodItem
+                                key={index}
+                                item={item}
+                                isActive={index === activeIndex}
+                                onClick={() => setActiveIndex(index)}
+                            />
                         ))}
                     </div>
                 </div>

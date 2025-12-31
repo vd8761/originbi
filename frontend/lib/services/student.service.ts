@@ -21,4 +21,53 @@ export const studentService = {
             return { isCompleted: false, status: 'ERROR' };
         }
     },
+
+    async getProfile(email: string) {
+        try {
+            const res = await fetch(`${API_URL}/student/profile`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email }),
+            });
+
+            if (!res.ok) {
+                return null;
+            }
+
+            return await res.json();
+        } catch (error) {
+            console.error("Failed to fetch profile", error);
+            return null;
+        }
+    },
+
+    async checkLoginStatus(email: string) {
+        try {
+            const res = await fetch(`${API_URL}/student/login-status`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email }),
+            });
+            if (!res.ok) return null;
+            return await res.json();
+        } catch (error) {
+            console.error("Check login status failed", error);
+            return null;
+        }
+    },
+
+    async getAssessmentProgress(email: string) {
+        try {
+            const res = await fetch(`${API_URL}/student/progress`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email }),
+            });
+            if (!res.ok) return [];
+            return await res.json();
+        } catch (error) {
+            console.error("Fetch progress failed", error);
+            return [];
+        }
+    }
 };
