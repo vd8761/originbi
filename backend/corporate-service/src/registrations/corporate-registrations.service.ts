@@ -207,16 +207,16 @@ export class CorporateRegistrationsService {
             await manager.save(session);
 
             // F. Create Attempt (Level 1)
+            // F. Create Attempt (Level 1)
             const levels = await manager.getRepository(AssessmentLevel).find({
                 where: {
-                    programId: Number(program.id),
                     levelNumber: 1
                 }
             });
 
             if (levels.length === 0) {
                 const mandatory = await manager.getRepository(AssessmentLevel).find({
-                    where: { programId: Number(program.id), isMandatory: true }
+                    where: { isMandatory: true }
                 });
                 if (mandatory.length > 0) levels.push(mandatory[0]);
             }

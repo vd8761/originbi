@@ -11,14 +11,11 @@ export class AssessmentLevel {
     @PrimaryGeneratedColumn({ type: 'int' })
     id: number;
 
-    @Column({ name: 'program_id', type: 'bigint' })
-    programId: number;
+    @Column({ name: 'name', type: 'varchar', length: 255 })
+    name: string;
 
     @Column({ name: 'level_number', type: 'smallint' })
     levelNumber: number;
-
-    @Column({ name: 'name', type: 'varchar', length: 255 })
-    name: string;
 
     @Column({ name: 'description', type: 'text', nullable: true })
     description: string | null;

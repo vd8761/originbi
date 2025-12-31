@@ -862,8 +862,8 @@ export class CorporateDashboardService {
             .getManyAndCount();
 
         return {
-            data,
-            total,
+            data: data || [],
+            total: total || 0,
             page,
             limit,
         };
