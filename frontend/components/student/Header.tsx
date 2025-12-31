@@ -106,7 +106,7 @@ const NotificationItem: React.FC<{
     </div>
 );
 
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage, Language } from "@/contexts/LanguageContext";
 
 const Header: React.FC<HeaderProps> = ({
     onLogout,
@@ -178,7 +178,7 @@ const Header: React.FC<HeaderProps> = ({
         return () => { document.removeEventListener("mousedown", handleClickOutside); };
     }, [isMobileMenuOpen]);
 
-    const handleLangChange = (lang: string) => { setLanguage(lang); setLangOpen(false); };
+    const handleLangChange = (lang: Language) => { setLanguage(lang); setLangOpen(false); };
     const handleNotificationClick = () => { setNotificationsOpen((p) => !p); if (hasNotification) setHasNotification(false); };
 
     const handleNavClick = (view: "dashboard" | "assessment") => {
