@@ -193,16 +193,46 @@ export class RegistrationsService {
       await manager.save(registration);
 
       // D. Create Assessment Session
-      // Fetch a valid Program (e.g., first active one or matching type if we had logic)
-      const defaultProgram = await manager
-        .getRepository(Program)
-        .findOne({ where: { is_active: true } });
-      if (!defaultProgram) {
-        throw new BadRequestException(
-          'No active Program found in the system. Please create a Program first.',
-        );
+      // D. Create Assessment Session
+      let programId: number;
+      let programTitle: string;
+
+      if (dto.programType) {
+        // Strict lookup for selected program
+        const selectedProgram = await manager
+          .getRepository(Program)
+          .findOne({ where: { id: dto.programType } });
+
+        if (!selectedProgram) {
+          throw new BadRequestException(
+            `Selected Program (ID: ${dto.programType}) not found.`,
+          );
+        }
+        if (!selectedProgram.is_active) {
+          throw new BadRequestException(
+            `Selected Program '${selectedProgram.name}' is not active.`,
+          );
+        }
+
+        programId = Number(selectedProgram.id);
+        programTitle =
+          selectedProgram.assessment_title || selectedProgram.name;
+      } else {
+        // Fallback: Pick any active program (Legacy / Default)
+        const defaultProgram = await manager
+          .getRepository(Program)
+          .findOne({ where: { is_active: true } });
+
+        if (!defaultProgram) {
+          throw new BadRequestException(
+            'No active Program found in the system. Please create a Program first.',
+          );
+        }
+
+        programId = Number(defaultProgram.id);
+        programTitle =
+          defaultProgram.assessment_title || defaultProgram.name;
       }
-      const programId = Number(defaultProgram.id);
 
       const validFrom = dto.examStart ? new Date(dto.examStart) : new Date();
       const validTo = dto.examEnd
@@ -262,7 +292,7 @@ export class RegistrationsService {
             dto.name,
             dto.password,
             validFrom,
-            defaultProgram.assessment_title || defaultProgram.name,
+            programTitle,
           );
         } catch (emailErr) {
           this.logger.error('Failed to send welcome email', emailErr);
