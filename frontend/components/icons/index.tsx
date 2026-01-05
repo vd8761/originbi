@@ -956,3 +956,45 @@ export const SortIcon: React.FC<{
     />
   </svg>
 );
+export const FileUploadPlaceholderIcon: React.FC<{ className?: string }> = ({
+    className = "w-16 h-16",
+}) => (
+    <svg
+        className={className}
+        viewBox="0 0 54 64"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+    >
+        <path
+            d="M33.75 0H6.75C3.0105 0 0 3.0105 0 6.75V57.25C0 60.9895 3.0105 64 6.75 64H47.25C50.9895 64 54 60.9895 54 57.25V20.25L33.75 0ZM43.875 51.75H10.125V47.25H43.875V51.75ZM43.875 40.5H10.125V36H43.875V40.5ZM30.375 23.625V4.875L49.125 23.625H30.375Z"
+            fill="#1ED36A"
+        />
+        <circle cx="42" cy="42" r="10" fill="#1ED36A" stroke="#15171A" strokeWidth="3" />
+        <path
+            d="M42 36L42 48M37 41L42 36L47 41"
+            stroke="white"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+    </svg>
+);
+
+export const DownloadIcon: React.FC<{ className?: string }> = ({
+    className = "w-4 h-4",
+}) => (
+    <svg
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+    >
+        <path
+            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+    </svg>
+);

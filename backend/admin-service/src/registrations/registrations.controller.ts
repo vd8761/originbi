@@ -6,13 +6,55 @@ import {
   Patch,
   Query,
   Param,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { RegistrationsService } from './registrations.service';
+import { BulkRegistrationsService } from './bulk-registrations.service';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
+
+import { GroupsService } from '../groups/groups.service';
 
 @Controller('admin/registrations')
 export class RegistrationsController {
-  constructor(private readonly registrationsService: RegistrationsService) { }
+  constructor(
+    private readonly registrationsService: RegistrationsService,
+    private readonly bulkRegistrationsService: BulkRegistrationsService,
+    private readonly groupsService: GroupsService,
+  ) { }
+
+  @Get('groups')
+  async getGroups() {
+    return this.groupsService.findAll();
+  }
+
+  @Post('bulk/preview')
+  @UseInterceptors(FileInterceptor('file'))
+  async bulkPreview(@UploadedFile() file: any) {
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+    // Hardcoded adminId = 1 as per existing pattern
+    const adminId = 1;
+    return this.bulkRegistrationsService.preview(file.buffer, file.originalname, adminId);
+  }
+
+  @Post('bulk/execute')
+  async bulkExecute(@Body() body: { import_id: string; overrides?: any[] }) {
+    return this.bulkRegistrationsService.execute(body);
+  }
+
+  @Get('bulk-jobs/:id')
+  async getBulkJobStatus(@Param('id') id: string) {
+    return this.bulkRegistrationsService.getJobStatus(id);
+  }
+
+  @Get('bulk-jobs/:id/rows')
+  async getBulkJobRows(@Param('id') id: string) {
+    return this.bulkRegistrationsService.getJobRows(id);
+  }
 
   @Post()
   async create(@Body() dto: CreateRegistrationDto) {

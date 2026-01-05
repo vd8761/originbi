@@ -183,13 +183,13 @@ export const registrationService = {
     }
   },
 
-  // 🔹 BULK UPLOAD
-  async bulkUpload(file: File): Promise<any> {
+  // 🔹 BULK PREVIEW
+  async bulkPreview(file: File): Promise<any> {
     const token = AuthService.getToken();
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await fetch(`${API_URL}/admin/registrations/bulk-upload`, {
+    const res = await fetch(`${API_URL}/admin/registrations/bulk/preview`, {
       method: "POST",
       headers: {
         Authorization: token ? `Bearer ${token}` : "",
@@ -199,9 +199,78 @@ export const registrationService = {
 
     if (!res.ok) {
       const err = await res.json().catch(() => null);
-      throw new Error(err?.message || "Failed to upload file");
+      throw new Error(err?.message || "Failed to preview file");
     }
 
+    return res.json();
+  },
+
+  // 🔹 BULK EXECUTE
+  async bulkExecute(importId: string, overrides: any[] = []): Promise<any> {
+    const token = AuthService.getToken();
+    const res = await fetch(`${API_URL}/admin/registrations/bulk/execute`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+      body: JSON.stringify({ import_id: importId, overrides }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      throw new Error(err?.message || "Failed to execute bulk job");
+    }
+
+    return res.json();
+  },
+
+  // 🔹 GET BULK JOB STATUS
+  async getBulkJobStatus(jobId: string): Promise<any> {
+    const token = AuthService.getToken();
+    const res = await fetch(`${API_URL}/admin/registrations/bulk-jobs/${jobId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+    });
+
+    if (!res.ok) {
+      // Silent fail or throw?
+      throw new Error("Failed to fetch job status");
+    }
+    return res.json();
+  },
+
+  // 🔹 GET BULK JOB ROWS
+  async getBulkJobRows(jobId: string): Promise<any[]> {
+    const token = AuthService.getToken();
+    const res = await fetch(`${API_URL}/admin/registrations/bulk-jobs/${jobId}/rows`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to fetch job rows");
+    }
+    return res.json();
+  },
+
+  // 🔹 GET GROUPS
+  async getGroups(): Promise<any[]> {
+    const token = AuthService.getToken();
+    const res = await fetch(`${API_URL}/admin/registrations/groups`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : "",
+      }
+    });
+    if (!res.ok) return [];
     return res.json();
   },
 

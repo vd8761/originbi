@@ -10,6 +10,7 @@ import {
   FilterFunnelIcon,
 } from "@/components/icons";
 import AddRegistrationForm from "@/components/admin/AddRegistrationForm";
+import BulkUploadRegistration from "@/components/admin/BulkUploadRegistration"; // Import
 import DateRangeFilter, {
   DateRangeOption,
 } from "@/components/ui/DateRangeFilter";
@@ -32,7 +33,7 @@ const useDebounce = (value: string, delay: number) => {
 };
 
 const RegistrationManagement: React.FC = () => {
-  const [view, setView] = useState<"list" | "add">("list");
+  const [view, setView] = useState<"list" | "add" | "bulk">("list");
   const [activeTab, setActiveTab] = useState<"registrations" | "assigned">(
     "registrations"
   );
@@ -299,7 +300,7 @@ const RegistrationManagement: React.FC = () => {
   };
 
   const handleBulkUpload = () => {
-    //console.log("Bulk upload triggered");
+    setView("bulk");
   };
 
   const handleDateRangeSelect = (option: DateRangeOption) => {
@@ -406,6 +407,10 @@ const RegistrationManagement: React.FC = () => {
         }}
       />
     );
+  }
+
+  if (view === "bulk") {
+    return <BulkUploadRegistration onCancel={() => setView("list")} />;
   }
 
   return (

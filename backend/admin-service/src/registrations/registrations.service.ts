@@ -309,6 +309,123 @@ export class RegistrationsService {
   }
 
   // ---------------------------------------------------------
+  // CREATE FOR EXISTING USER (Assessment Only)
+  // ---------------------------------------------------------
+  async createForExistingUser(user: User, dto: CreateRegistrationDto) {
+    this.logger.log(`Creating assessment for existing user ${user.email}`);
+
+    // 1. Prepare Data
+    const gender = this.normalizeGender(dto.gender);
+    const schoolLevel = this.normalizeSchoolLevel(dto.schoolLevel);
+    const schoolStream = this.normalizeSchoolStream(dto.schoolStream);
+    const departmentDegreeId = this.toBigIntOrNull(dto.departmentId);
+
+    // 2. Transaction
+    return this.dataSource.transaction(async (manager) => {
+      // A. Get or Create Group
+      let groupId: number | null = null;
+      if (dto.groupName) {
+        const group = await this.groupsService.findOrCreate(
+          dto.groupName,
+          manager,
+        );
+        groupId = group.id;
+      }
+
+      // B. Create Registration
+      const registration = manager.create(Registration, {
+        userId: user.id,
+        registrationSource: 'ADMIN',
+        createdByUserId: this.ADMIN_USER_ID,
+        status: 'INCOMPLETE',
+        fullName: dto.name,
+        countryCode: dto.countryCode ?? '+91',
+        mobileNumber: dto.mobile,
+        gender: gender,
+        schoolLevel,
+        schoolStream,
+        departmentDegreeId,
+        group: groupId ? { id: groupId } : undefined,
+        metadata: {
+          programType: dto.programType,
+          groupName: dto.groupName,
+          sendEmail: dto.sendEmail,
+          currentYear: dto.currentYear,
+          examStart: dto.examStart,
+          examEnd: dto.examEnd,
+          departmentId: dto.departmentId ?? null,
+        },
+      });
+      await manager.save(registration);
+
+      // C. Create Assessment Session & Attempts
+      let programId: number;
+
+      if (dto.programType) {
+        const selectedProgram = await manager
+          .getRepository(Program)
+          .findOne({ where: { id: dto.programType } });
+
+        if (!selectedProgram) throw new BadRequestException(`Program ${dto.programType} not found`);
+        if (!selectedProgram.is_active) throw new BadRequestException(`Program inactive`);
+
+        programId = Number(selectedProgram.id);
+      } else {
+        const defaultProgram = await manager
+          .getRepository(Program)
+          .findOne({ where: { is_active: true } });
+        if (!defaultProgram) throw new BadRequestException('No active Program');
+        programId = Number(defaultProgram.id);
+      }
+
+      const validFrom = dto.examStart ? new Date(dto.examStart) : new Date();
+      const validTo = dto.examEnd ? new Date(dto.examEnd) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      const session = manager.create(AssessmentSession, {
+        userId: user.id,
+        registrationId: registration.id,
+        programId: programId,
+        groupId: groupId ?? null,
+        status: 'NOT_STARTED',
+        validFrom,
+        validTo,
+        metadata: {},
+      });
+      await manager.save(session);
+
+      const levels = await manager.getRepository(AssessmentLevel).find({
+        where: { isMandatory: true },
+      });
+
+      for (const level of levels) {
+        const attempt = manager.create(AssessmentAttempt, {
+          userId: user.id,
+          registrationId: registration.id,
+          programId: programId,
+          assessmentSessionId: session.id,
+          assessmentLevelId: level.id,
+          status: 'NOT_STARTED',
+        });
+        await manager.save(attempt);
+
+        if (level.name.includes('Level 1') || level.id === 1) {
+          await this.assessmentGenService.generateLevel1Questions(attempt, manager);
+        }
+      }
+
+      registration.status = 'COMPLETED';
+      await manager.save(registration);
+
+      return {
+        registrationId: registration.id,
+        userId: user.id,
+        email: user.email,
+        wasExisting: true
+      };
+    });
+  }
+
+  // ---------------------------------------------------------
   // LIST REGISTRATIONS
   // ---------------------------------------------------------
   /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
