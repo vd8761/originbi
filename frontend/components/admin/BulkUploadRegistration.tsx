@@ -4,7 +4,11 @@ import { BulkUploadDropzone } from "./bulk/BulkUploadDropzone";
 import { BulkReviewTable } from "./bulk/BulkReviewTable";
 import { BulkSuccessSummary } from "./bulk/BulkSuccessSummary";
 
-const BulkUploadRegistration: React.FC = () => {
+interface BulkUploadRegistrationProps {
+    onCancel: () => void;
+}
+
+const BulkUploadRegistration: React.FC<BulkUploadRegistrationProps> = ({ onCancel }) => {
     const [view, setView] = useState<'upload' | 'review' | 'processing' | 'success'>('upload');
     const [importId, setImportId] = useState<string | null>(null);
     const [fileName, setFileName] = useState<string | null>(null);
@@ -122,7 +126,7 @@ const BulkUploadRegistration: React.FC = () => {
         <div className="p-6 bg-[#0B0D0F] min-h-screen">
             <div className="mb-8">
                 <nav className="text-sm text-gray-500 mb-2">
-                    Dashboard &gt; My Employees &gt; <span className="text-[#1ED36A]">Bulk Upload</span>
+                    Dashboard &gt; <button onClick={onCancel} className="hover:text-white transition-colors">My Employees</button> &gt; <span className="text-[#1ED36A]">Bulk Upload</span>
                     {view === 'review' && " > Review Bulk Upload"}
                 </nav>
                 <h1 className="text-3xl font-bold text-white mb-2">Bulk Upload Registration {view === 'review' ? '– Review & Confirm' : ''}</h1>
