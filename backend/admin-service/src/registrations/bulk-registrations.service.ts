@@ -358,51 +358,68 @@ export class BulkRegistrationsService {
         }
     }
 
+    private getValue(row: unknown, keys: string[]): string | undefined {
+        if (!row || typeof row !== 'object' || row === null) return undefined;
+        for (const key of keys) {
+            const val = (row as Record<string, unknown>)[key];
+            if (val !== undefined && val !== null && String(val).trim() !== '') {
+                return String(val).trim();
+            }
+        }
+        return undefined;
+    }
+
     private mapRowToDto(
-        rawData: any,
+        rawData: unknown,
         groupName: string,
         programMap: Map<string, Program>,
         deptMap: Map<string, Department>,
         degreeMap: Map<string, any>
     ) {
-        let pCode = rawData['ProgramId'] || rawData['program_code'];
-        // Resolve Program ID (DTO expects ID, not Code)
+        let pCode = this.getValue(rawData, ['ProgramId', 'program_code']);
         let pId: any = null;
-        const pObj = programMap.get(this.normalizeString(pCode));
-        if (pObj) pId = pObj.id; // Correct: DTO expects ID
+        if (pCode) {
+            const pObj = programMap.get(this.normalizeString(pCode));
+            if (pObj) pId = pObj.id;
+        }
 
-        let dId = rawData['DepartmentId'] || rawData['department_degree'] || rawData['department'];
-        const dObj = deptMap.get(this.normalizeString(dId));
-        if (dObj) dId = dObj.id;
+        let dId = this.getValue(rawData, ['DepartmentId', 'department_degree', 'department']);
+        if (dId) {
+            const dObj = deptMap.get(this.normalizeString(dId));
+            if (dObj) dId = dObj.id;
+        }
+
+        let degId = this.getValue(rawData, ['DegreeId', 'degree_name', 'degree', 'Degree']);
+        if (degId && degreeMap.size > 0) {
+            const found = degreeMap.get(this.normalizeString(degId));
+            if (found) degId = found.id;
+        }
 
         const isCollege = pCode && pCode.toUpperCase().includes('COLLEGE');
         const isSchool = pCode && pCode.toUpperCase().includes('SCHOOL');
 
-        // Construct DTO
         return {
-            name: rawData['FullName'] || rawData['Name'] || rawData['full_name'], // DTO uses 'name'
-            email: rawData['Email'] || rawData['email'],
-            mobile: rawData['Mobile'] || rawData['mobile'] || rawData['mobile_number'],
-            countryCode: rawData['CountryCode'] || rawData['country_code'] || '+91',
-            gender: (rawData['Gender'] || rawData['gender'] || 'FEMALE').toUpperCase(),
+            name: this.getValue(rawData, ['FullName', 'Name', 'full_name']) || '',
+            email: this.getValue(rawData, ['Email', 'email']) || '',
+            mobile: this.getValue(rawData, ['Mobile', 'mobile', 'mobile_number']) || '',
+            countryCode: this.getValue(rawData, ['CountryCode', 'country_code']) || '+91',
+            gender: (this.getValue(rawData, ['Gender', 'gender']) || 'FEMALE').toUpperCase(),
 
-            programType: pId, // Pass ID
+            programType: pId,
             groupName: groupName,
 
-            schoolLevel: isSchool ? (rawData['SchoolLevel'] || rawData['school_level']) : undefined,
-            schoolStream: isSchool ? (rawData['SchoolStream'] || rawData['school_stream']) : undefined,
+            schoolLevel: isSchool ? this.getValue(rawData, ['SchoolLevel', 'school_level']) : undefined,
+            schoolStream: isSchool ? this.getValue(rawData, ['SchoolStream', 'school_stream']) : undefined,
 
-            departmentId: isCollege ? dId : undefined, // DTO uses departmentId
-            currentYear: isCollege ? (rawData['CurrentYear'] || rawData['current_year']) : undefined,
+            departmentId: isCollege ? dId : undefined,
+            degreeId: isCollege ? degId : undefined,
+            currentYear: isCollege ? this.getValue(rawData, ['current_year', 'CurrentYear', 'Year', 'year']) : undefined,
 
-            examStart: rawData['ExamStart'] || rawData['exam_start_date'],
-            examEnd: rawData['ExamEnd'] || rawData['exam_end_date'],
-
-            password: rawData['Password'] || rawData['password'] || 'Welcome@123',
-            sendEmail: rawData['SendEmail'] || rawData['send_email'] === 'TRUE',
-
-            // Pass raw program code in metadata context if needed, but DTO standard is ID
-        } as any;
+            password: 'Welcome@123',
+            sendEmail: true,
+            examStart: this.getValue(rawData, ['ExamStart', 'exam_start_date', 'valid_from']),
+            examEnd: this.getValue(rawData, ['ExamEnd', 'exam_end_date', 'valid_to']),
+        };
     }
 
     private processRow(

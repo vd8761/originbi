@@ -17,6 +17,23 @@ import { CreateRegistrationDto } from './dto/create-registration.dto';
 
 import { GroupsService } from '../groups/groups.service';
 
+// Local interface for Multer file
+interface MulterFile {
+  buffer: Buffer;
+  originalname: string;
+}
+
+// Type guard
+function isMulterFile(obj: unknown): obj is MulterFile {
+  if (!obj || typeof obj !== 'object') return false;
+  return (
+    'buffer' in obj &&
+    Buffer.isBuffer((obj as any).buffer) &&
+    'originalname' in obj &&
+    typeof (obj as any).originalname === 'string'
+  );
+}
+
 @Controller('admin/registrations')
 export class RegistrationsController {
   constructor(
@@ -32,8 +49,8 @@ export class RegistrationsController {
 
   @Post('bulk/preview')
   @UseInterceptors(FileInterceptor('file'))
-  async bulkPreview(@UploadedFile() file: Express.Multer.File) {
-    if (!file || !file.buffer) {
+  async bulkPreview(@UploadedFile() file: unknown) {
+    if (!isMulterFile(file)) {
       throw new BadRequestException('File is required');
     }
     // Hardcoded adminId = 1 as per existing pattern
