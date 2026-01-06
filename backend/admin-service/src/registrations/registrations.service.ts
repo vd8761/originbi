@@ -415,7 +415,7 @@ export class RegistrationsService {
         await manager.save(attempt);
 
         if (level.name.includes('Level 1') || level.id === 1) {
-          await this.assessmentGenService.generateLevel1Questions(attempt, manager);
+          await this.assessmentGenService.generateQuestions(attempt, manager);
         }
       }
 
