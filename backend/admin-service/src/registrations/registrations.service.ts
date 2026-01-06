@@ -114,6 +114,7 @@ export class RegistrationsService {
   // CREATE REGISTRATION
   // ---------------------------------------------------------
   async create(dto: CreateRegistrationDto) {
+    dto.email = dto.email.toLowerCase();
     this.logger.log(`Creating registration for ${dto.email}`);
 
     // 1. Basic Validation
@@ -279,11 +280,13 @@ export class RegistrationsService {
         });
         await manager.save(attempt);
 
-        // F. Generate Questions for this Level
-        await this.assessmentGenService.generateQuestions(
-          attempt,
-          manager,
-        );
+        // F. Generate Questions for this Level (Only Level 1)
+        if (level.levelNumber === 1 || level.name.includes('Level 1')) {
+          await this.assessmentGenService.generateQuestions(
+            attempt,
+            manager,
+          );
+        }
       }
 
       // G. Update Registration to COMPLETED
@@ -414,7 +417,7 @@ export class RegistrationsService {
         });
         await manager.save(attempt);
 
-        if (level.name.includes('Level 1') || level.id === 1) {
+        if (level.levelNumber === 1 || level.name.includes('Level 1')) {
           await this.assessmentGenService.generateQuestions(attempt, manager);
         }
       }
