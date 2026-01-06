@@ -151,9 +151,9 @@ const LoginForm: React.FC<LoginFormProps> = ({
       // Legacy support if needed
       localStorage.setItem('originbi_id_token', idTokenJwt);
 
-      // 6️⃣ Check Assessment Status and Redirect
+      const studentApiUrl = process.env.NEXT_PUBLIC_STUDENT_API_URL || 'http://localhost:4004';
       try {
-        const response = await fetch('http://localhost:4003/student/login-status', {
+        const response = await fetch(`${studentApiUrl}/student/login-status`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: values.email })
