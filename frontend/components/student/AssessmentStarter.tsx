@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { CheckCircleIcon, StepperUpArrowIcon, StepperDownArrowIcon, StepperPendingDotIcon, CheckIcon } from '@/components/icons';
+import { CheckCircleIcon, StepperUpArrowIcon, StepperDownArrowIcon, StepperPendingDotIcon } from '@/components/icons';
 import { useLanguage } from "@/contexts/LanguageContext";
+import { studentService } from "@/lib/services/student.service";
 
 // --- Interfaces ---
 
 interface APIOption {
-  id: string;
+  id: string; // or number, handled as string
   option_text: string; // fallback
   option_text_en?: string;
   option_text_ta?: string;
@@ -15,7 +16,7 @@ interface APIOption {
 }
 
 interface APIQuestion {
-  id: string;
+  id: string; // or number, handled as string
   question: string; // fallback
   question_text_en?: string;
   question_text_ta?: string;
@@ -29,6 +30,9 @@ interface APIAssessmentAnswer {
   id: string;
   main_question?: APIQuestion;
   open_question?: APIQuestion;
+  main_option_id?: number | string; // From Backend
+  open_option_id?: number | string; // From Backend
+  status?: string;
 }
 
 interface Option {
@@ -63,7 +67,7 @@ const SuccessModal: React.FC<{
     <div className="relative bg-white dark:bg-[#1A1D21] rounded-3xl p-8 max-w-md w-full shadow-2xl border border-brand-light-tertiary dark:border-white/10 text-center flex flex-col items-center">
       <div className="w-20 h-20 bg-brand-green/10 rounded-full flex items-center justify-center mb-6 border border-brand-green/20">
         <div className="w-12 h-12 bg-brand-green rounded-full flex items-center justify-center shadow-lg shadow-brand-green/30">
-          <CheckIcon className="w-6 h-6 text-white" />
+          <CheckCircleIcon className="w-6 h-6 text-white" />
         </div>
       </div>
 
@@ -100,17 +104,13 @@ const VerticalStepper: React.FC<{
 }> = ({ currentStep, totalSteps }) => {
   const windowSize = 6;
 
-  let start = currentStep - 1;
+  let start = currentStep - 4;
+  if (start < 1) start = 1;
   let end = start + windowSize - 1;
 
   if (end > totalSteps) {
     end = totalSteps;
-    start = end - windowSize + 1;
-  }
-
-  if (start < 1) {
-    start = 1;
-    end = Math.min(start + windowSize - 1, totalSteps);
+    start = Math.max(1, end - windowSize + 1);
   }
 
   const renderSteps = () => {
@@ -121,6 +121,12 @@ const VerticalStepper: React.FC<{
       const isCompleted = i < currentStep;
       const isLineActive = isCompleted;
 
+      // Previously requested "Tick symbol" is removed. 
+      // Logic: 
+      // Completed: Green Background, White Text (Number)
+      // Active: White Background, Green Border, Green Text (Number)
+      // Upcoming: Default (Grey Text)
+
       steps.push(
         <div
           key={i}
@@ -128,25 +134,25 @@ const VerticalStepper: React.FC<{
         >
           <div
             className={`
-              rounded-full flex items-center justify-center font-semibold transition-all duration-300 relative
-              w-[clamp(32px,2.4vw,44px)] h-[clamp(32px,2.4vw,44px)]
-              text-[clamp(11px,1.1vw,15px)]
-              ${isCompleted
-                ? "bg-[#1ED36A] text-white"
-                : isActive
-                  ? ""
-                  : "bg-white dark:bg-[#24272B] border border-brand-light-tertiary dark:border-white/10 text-brand-text-light-secondary dark:text-[#718096]"
+                rounded-full flex items-center justify-center font-semibold transition-all duration-300 relative
+                w-[clamp(32px,2.4vw,44px)] h-[clamp(32px,2.4vw,44px)]
+                text-[clamp(11px,1.1vw,15px)]
+                ${isCompleted
+                ? "bg-[#1ED36A] text-white border border-[#1ED36A]" // Completed
+                : "bg-white dark:bg-[#24272B] border border-brand-light-tertiary dark:border-white/10 text-brand-text-light-secondary dark:text-[#718096]" // Active & Upcoming (Container Style)
               } 
-            `}
+              `}
           >
+            {/* Render Content */}
             {isActive ? (
-              <StepperPendingDotIcon className="w-full h-full" />
+              <div className="w-2.5 h-2.5 rounded-full bg-[#1ED36A] shadow-[0_0_10px_1px_rgba(30,211,106,0.8)]" />
             ) : (
-              <span>{i}</span>
+              <span className="relative z-10">{i}</span>
             )}
           </div>
 
-          {i < end && (
+          {/* Line connecting to next step */}
+          {i !== end && (
             <div
               className={`w-[1.5px] h-[clamp(12px,1.5vw,30px)] my-1 rounded-full relative -z-10 transition-colors duration-500 ${isLineActive
                 ? "bg-[#1ED36A]"
@@ -160,8 +166,8 @@ const VerticalStepper: React.FC<{
     return steps;
   };
 
-  const isTopLineActive = true;
-  const isBottomLineActive = end < currentStep;
+  const isTopLineActive = start > 1;
+  const isBottomLineActive = end < totalSteps;
 
   return (
     <div className="flex flex-col items-center h-full justify-start shrink-0 select-none relative z-0 pt-2">
@@ -200,9 +206,13 @@ const CircularProgress: React.FC<{
 }> = ({
   current,
   total,
-  className = "w-16 h-16 lg:w-[105px] lg:h-[105px]",
+  className = "w-20 h-20 lg:w-[135px] lg:h-[135px]",
 }) => {
-    const percentage = Math.round((current / total) * 100);
+    // Calculate percentage based on COMPLETED questions (current - 1)
+    const completedCount = current > 0 ? current - 1 : 0;
+    const percentage = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+
+    // UI Display
     const size = 120;
     const stroke = 6;
     const center = size / 2;
@@ -215,17 +225,19 @@ const CircularProgress: React.FC<{
         className={`relative flex items-center justify-center rounded-full ${className}`}
       >
         <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full transform -rotate-90">
+          {/* Background Circle */}
           <circle
-            className="stroke-white/10 dark:stroke-white-[0.12]"
+            className="stroke-gray-200 dark:stroke-white/10"
             style={{
-              stroke: 'rgba(255, 255, 255, 0.12)',
-              fill: 'rgba(255, 255, 255, 0.05)'
+              stroke: '',
+              fill: 'transparent'
             }}
             strokeWidth={stroke}
             r={radius}
             cx={center}
             cy={center}
           />
+          {/* Progress Circle */}
           <circle
             stroke="#1ED36A"
             strokeWidth={stroke}
@@ -243,7 +255,7 @@ const CircularProgress: React.FC<{
         </svg>
         <div className="absolute flex flex-col items-center justify-center text-right py-1">
           <span
-            className="text-[clamp(16px,2.2vmin,28px)] font-semibold text-white tracking-tight"
+            className="text-[clamp(20px,2.5vmin,32px)] font-semibold text-brand-text-light-primary dark:text-white tracking-tight"
             style={{
               fontFamily: "'Haskoy', 'Inter', sans-serif",
               fontWeight: 600,
@@ -253,7 +265,7 @@ const CircularProgress: React.FC<{
             {percentage}%
           </span>
           <span
-            className="text-[clamp(9px,1.1vmin,13px)] text-white/70 font-normal mt-[clamp(2px,0.4vmin,6px)]"
+            className="text-[clamp(11px,1.2vmin,15px)] text-brand-text-light-secondary dark:text-white/70 font-normal mt-[clamp(2px,0.4vmin,6px)]"
             style={{
               fontFamily: "'Haskoy', 'Inter', sans-serif",
               fontWeight: 400,
@@ -271,7 +283,7 @@ const CircularProgress: React.FC<{
 const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
   onBack,
   onGoToDashboard,
-  attemptId = "dummy-attempt-id",
+  attemptId = "123",
 }) => {
   // State
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -279,7 +291,9 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const [currentQIndex, setCurrentQIndex] = useState(0);
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({}); // Persistent Answers Map
+  const [selectedOption, setSelectedOption] = useState<string | null>(null); // Current selected
+
   const [isCompleted, setIsCompleted] = useState(false);
   const [changeCount, setChangeCount] = useState(0);
 
@@ -290,6 +304,22 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
   const startTimeRef = useRef<number>(Date.now());
   const initialLoadRef = useRef(false);
 
+  // Sync selectedOption when Question Index or Answers change
+  useEffect(() => {
+    if (questions.length > 0) {
+      const currentQ = questions[currentQIndex];
+      if (currentQ) {
+        // Retrieve saved answer
+        const savedAnswer = answers[String(currentQ.id)];
+        if (savedAnswer) {
+          setSelectedOption(savedAnswer);
+        } else {
+          setSelectedOption(null);
+        }
+      }
+    }
+  }, [currentQIndex, questions, answers]);
+
   // Fetch Questions
   useEffect(() => {
     if (initialLoadRef.current) return;
@@ -297,18 +327,37 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
 
     const fetchQuestions = async () => {
       console.log(`[AssessmentRunner] Fetching questions for attempt: ${attemptId}`);
+
       try {
+        // 1. Get User Email
+        const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
+        if (!email) {
+          throw new Error("User not logged in (email missing)");
+        }
+
+        // 2. Fetch Profile to get numeric Student ID
+        const profile = await studentService.getProfile(email);
+        if (!profile || !profile.id) {
+          throw new Error("Failed to fetch user profile or ID invalid");
+        }
+
+        const studentId = Number(profile.id);
+        const examId = Number(attemptId) || 0;
+
+        const payload = {
+          student_id: studentId, // Real User ID
+          exam_id: examId,
+        };
+
         const response = await fetch("http://localhost:4005/api/v1/exam/start", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            student_id: "dummy-student-id",
-            exam_id: attemptId,
-          }),
+          body: JSON.stringify(payload),
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to load assessment. Status: ${response.status}`);
+          const errData = await response.json();
+          throw new Error(errData.message || `Failed to load assessment. Status: ${response.status}`);
         }
 
         const data = await response.json();
@@ -318,10 +367,13 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
           throw new Error("No questions returned from the server.");
         }
 
+        // Initialize Answers Map from API Data
+        const initialAnswers: Record<string, string> = {};
+
         // Map API response to UI Question format
         const mappedQuestions: Question[] = apiAnswers.map((ans) => {
           const qData = ans.main_question || ans.open_question;
-          // Handle case where question might be missing
+
           if (!qData) {
             return {
               id: ans.id,
@@ -330,14 +382,24 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
               assessmentAnswerId: ans.id
             };
           }
+
+          const qId = String(qData.id);
+
+          // Check if already answered in DB
+          if (ans.main_option_id) {
+            initialAnswers[qId] = String(ans.main_option_id);
+          } else if (ans.open_option_id) {
+            initialAnswers[qId] = String(ans.open_option_id);
+          }
+
           return {
-            id: qData.id,
+            id: qId,
             textEn: qData.question_text_en || qData.question,
             textTa: qData.question_text_ta,
             contextTextEn: qData.context_text_en,
             contextTextTa: qData.context_text_ta,
             options: qData.options?.map((opt) => ({
-              id: opt.id,
+              id: String(opt.id),
               textEn: opt.option_text_en || opt.option_text,
               textTa: opt.option_text_ta,
             })) || [],
@@ -345,8 +407,34 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
           };
         });
 
+        setAnswers(initialAnswers);
         setQuestions(mappedQuestions);
+
+        // Find first unanswered question ROBUSTLY
+        console.log("Answers Data for Resume:", apiAnswers);
+
+        const firstUnansweredIndex = mappedQuestions.findIndex((_, index) => {
+          const ans = apiAnswers[index];
+          if (!ans) return true;
+
+          // Check Status (Case Insensitive)
+          const statusUpper = ans.status ? String(ans.status).toUpperCase() : '';
+          const isConfirmedAnswered = statusUpper === 'ANSWERED';
+
+          // Check Option Presence (Fallback)
+          const hasOption = !!ans.main_option_id || !!ans.open_option_id;
+
+          // If EITHER is true, it is answered. We return true if NOT answered.
+          return !(isConfirmedAnswered || hasOption);
+        });
+
+        // If -1 (all answered), set to length (fully complete). Else index.
+        const resumeIndex = firstUnansweredIndex >= 0 ? firstUnansweredIndex : mappedQuestions.length;
+        console.log("Calculated Resume Index:", resumeIndex);
+
+        setCurrentQIndex(resumeIndex);
         setLoading(false);
+
         startTimeRef.current = Date.now();
       } catch (err: any) {
         console.error("[AssessmentRunner] error:", err);
@@ -375,6 +463,13 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
     if (selectedOption && selectedOption !== id) {
       setChangeCount((prev) => prev + 1);
     }
+    // Update Persistent State
+    if (currentQuestion) {
+      setAnswers(prev => ({
+        ...prev,
+        [String(currentQuestion.id)]: id
+      }));
+    }
     setSelectedOption(id);
   };
 
@@ -385,9 +480,9 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
     const timeSpent = Math.floor((Date.now() - startTimeRef.current) / 1000);
 
     const payload = {
-      attempt_id: attemptId,
-      question_id: currentQuestion.id,
-      selected_option: selectedOption,
+      attempt_id: Number(attemptId),
+      question_id: Number(currentQuestion.id),
+      selected_option: Number(selectedOption),
       time_taken: timeSpent,
       answer_change_count: changeCount,
     };
@@ -401,7 +496,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
 
       if (currentNumber < totalQuestions) {
         setCurrentQIndex((prev) => prev + 1);
-        setSelectedOption(null);
+        // setSelectedOption handled by useEffect
         setChangeCount(0);
         startTimeRef.current = Date.now();
       } else {
@@ -415,7 +510,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
   const handlePrevious = () => {
     if (currentNumber > 1) {
       setCurrentQIndex((prev) => prev - 1);
-      setSelectedOption(null);
+      // setSelectedOption handled by useEffect
       setChangeCount(0);
       startTimeRef.current = Date.now();
     } else {
@@ -458,7 +553,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
       )}
 
       {/* Grid Layout - 12 Columns according to design grid */}
-      <div className="w-full h-full grid grid-cols-12 gap-0">
+      <div className="w-full h-full grid grid-cols-12">
 
         {/* Column 1: Vertical Stepper */}
         <div className="hidden lg:flex col-span-1 justify-center border-brand-light-tertiary/20 dark:border-white/5 h-full pt-2 lg:pt-4 pb-10">
@@ -539,6 +634,8 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
                 })}
               </div>
             </div>
+
+            {/* Note: I'm relying on the tool to match the context properly. The closing tags above are for context. */}
           </div>
 
           {/* Navigation Actions */}
@@ -573,7 +670,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
           <CircularProgress
             current={currentNumber}
             total={totalQuestions}
-            className="w-[clamp(110px,11vw,150px)] h-[clamp(110px,11vw,150px)]"
+            className="w-[clamp(120px,12vw,140px)] h-[clamp(120px,12vw,140px)]"
           />
         </div>
 

@@ -191,7 +191,3 @@ body {
   transform: translateX(0.2vw);
 }
 
-/* Stable Scrollbar Gutter to prevent layout Jumps */
-html {
-  scrollbar-gutter: stable;
-}

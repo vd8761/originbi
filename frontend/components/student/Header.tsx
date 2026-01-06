@@ -266,7 +266,7 @@ const Header: React.FC<HeaderProps> = ({
                     <div className="relative hidden sm:block" ref={langMenuRef}>
                         <button
                             onClick={() => setLangOpen((p) => !p)}
-                            className="bg-white border border-brand-green text-[#19211C] hover:bg-green-50 dark:bg-brand-dark-tertiary dark:border-transparent dark:text-white dark:hover:bg-gray-800 flex items-center justify-center space-x-1.5 px-3 h-8 2xl:h-9 rounded-full font-semibold text-xs 2xl:text-sm transition-all cursor-pointer"
+                            className="bg-white border border-brand-green text-[#19211C] hover:bg-gray-50 dark:bg-brand-green/10 dark:border-brand-green dark:text-white dark:hover:bg-brand-green/20 flex items-center justify-center space-x-1.5 px-3 h-8 2xl:h-9 rounded-full font-semibold text-xs 2xl:text-sm transition-all cursor-pointer"
                         >
                             <span>{language}</span>
                             <ChevronDownIcon className="w-3 h-3" />
@@ -283,7 +283,7 @@ const Header: React.FC<HeaderProps> = ({
                     <div className="relative" ref={notificationsMenuRef}>
                         <button
                             onClick={handleNotificationClick}
-                            className="bg-white border border-gray-200 text-[#150089] hover:bg-gray-50 hover:border-gray-300 dark:bg-brand-dark-tertiary dark:border-transparent dark:text-white dark:hover:bg-gray-800 w-8 h-8 2xl:w-9 2xl:h-9 rounded-full flex items-center justify-center transition-all relative cursor-pointer"
+                            className="bg-white border border-gray-200 shadow-sm text-[#150089] hover:bg-gray-50 hover:border-gray-300 dark:bg-white/5 dark:border-white/5 dark:shadow-none dark:text-white dark:hover:bg-white/10 w-8 h-8 2xl:w-9 2xl:h-9 rounded-full flex items-center justify-center transition-all relative cursor-pointer"
                         >
                             <NotificationIcon className="w-4 h-4 2xl:w-5 2xl:h-5 fill-current" />
                             {hasNotification && (

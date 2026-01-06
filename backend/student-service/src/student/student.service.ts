@@ -6,6 +6,7 @@ import { User } from '../entities/student.entity';
 import { AssessmentSession } from '../entities/assessment_session.entity';
 import { AssessmentAttempt } from '../entities/assessment_attempt.entity';
 import { AssessmentLevel } from '../entities/assessment_level.entity';
+import { AssessmentAnswer } from '../entities/assessment_answer.entity';
 
 @Injectable()
 export class StudentService {
@@ -20,6 +21,8 @@ export class StudentService {
     private readonly attemptRepo: Repository<AssessmentAttempt>,
     @InjectRepository(AssessmentLevel)
     private readonly levelRepo: Repository<AssessmentLevel>,
+    @InjectRepository(AssessmentAnswer)
+    private readonly answerRepo: Repository<AssessmentAnswer>,
   ) { }
 
   async checkAssessmentStatus(userId: number) {
@@ -138,12 +141,64 @@ export class StudentService {
 
     attempts.sort((a, b) => (a.assessmentLevel?.levelNumber || 0) - (b.assessmentLevel?.levelNumber || 0));
 
-    return attempts.map(attempt => ({
-      id: attempt.id,
-      stepName: attempt.assessmentLevel?.name || `Level ${attempt.assessmentLevel?.levelNumber}`,
-      description: attempt.assessmentLevel?.description || '',
-      status: attempt.status,
-      levelNumber: attempt.assessmentLevel?.levelNumber
-    }));
+    const progressData: any[] = [];
+    let previousAttempt: AssessmentAttempt | null = null;
+
+    for (const attempt of attempts) {
+      const answeredCount = await this.answerRepo.count({
+        where: { assessmentAttemptId: attempt.id, status: 'ANSWERED' }
+      });
+      const totalCount = await this.answerRepo.count({
+        where: { assessmentAttemptId: attempt.id }
+      });
+
+      const level = attempt.assessmentLevel;
+      let status = attempt.status;
+      let unlockTime: Date | null = null;
+
+      // Unlock Logic for Level 2+
+      if (level && level.levelNumber > 1) {
+        if (!previousAttempt || previousAttempt.status !== 'COMPLETED') {
+          // Locked if previous is not completed
+          status = 'LOCKED';
+        } else {
+          // Check Time Lock
+          const completionDate = previousAttempt.completedAt || previousAttempt.updatedAt;
+
+          if (level.unlockAfterHours > 0 && completionDate) {
+            const unlockDate = new Date(completionDate);
+            unlockDate.setHours(unlockDate.getHours() + level.unlockAfterHours);
+
+            if (new Date() < unlockDate) {
+              status = 'LOCKED';
+              unlockTime = unlockDate;
+            }
+          }
+        }
+      }
+
+      // If attempt already started/completed, ignore lock
+      if (attempt.status === 'IN_PROGRESS' || attempt.status === 'COMPLETED') {
+        status = attempt.status;
+        unlockTime = null;
+      }
+
+      progressData.push({
+        id: attempt.id,
+        stepName: level?.name || `Level ${level?.levelNumber}`,
+        description: level?.description || '',
+        status: status,
+        levelNumber: level?.levelNumber,
+        completedQuestions: answeredCount,
+        totalQuestions: totalCount > 0 ? totalCount : 60,
+        unlockTime: unlockTime,
+        dateCompleted: attempt.completedAt || attempt.updatedAt,
+        attemptId: attempt.id // Ensure attemptId is passed
+      });
+
+      previousAttempt = attempt;
+    }
+
+    return progressData;
   }
 }

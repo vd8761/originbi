@@ -28,6 +28,12 @@ export class AssessmentLevel {
     @Column({ name: 'unlock_after_hours', type: 'int', default: 0 })
     unlockAfterHours: number;
 
+    @Column({ name: 'start_within_hours', type: 'int', default: 72 })
+    startWithinHours: number;
+
+    @Column({ name: 'duration_minutes', type: 'int', default: 40 })
+    durationMinutes: number;
+
     @Column({ name: 'max_score', type: 'int', nullable: true })
     maxScore: number | null;
 
