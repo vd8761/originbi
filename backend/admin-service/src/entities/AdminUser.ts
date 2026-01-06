@@ -5,7 +5,7 @@ export class AdminUser {
   @PrimaryGeneratedColumn('increment')
   id: number;
 
-  @Column({ name: 'cognito_sub', unique: true })
+  @Column({ name: 'cognito_sub', nullable: true })
   cognitoSub: string;
 
   @Column()
