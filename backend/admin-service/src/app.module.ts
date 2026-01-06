@@ -44,7 +44,7 @@ import { MailAssetsController } from './mail/mail-assets.controller';
             type: 'postgres',
             url,
             autoLoadEntities: true,
-            synchronize: false,
+            synchronize: config.get<string>('DB_SYNC') === 'true',
             ssl: { rejectUnauthorized: false },
           };
         }
@@ -57,7 +57,7 @@ import { MailAssetsController } from './mail/mail-assets.controller';
           password: config.get<string>('DB_PASS') || '',
           database: config.get<string>('DB_NAME'),
           autoLoadEntities: true,
-          synchronize: false,
+          synchronize: config.get<string>('DB_SYNC') === 'true',
           ssl: false,
         };
       },
