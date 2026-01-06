@@ -63,7 +63,10 @@ export const studentService = {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email }),
             });
-            if (!res.ok) return [];
+            if (!res.ok) {
+                console.error(`[StudentService] getAssessmentProgress failed: ${res.status} ${res.statusText}`);
+                return [];
+            }
             return await res.json();
         } catch (error) {
             console.error("Fetch progress failed", error);

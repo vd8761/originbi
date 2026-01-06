@@ -26,6 +26,7 @@ const translations = {
     noAssessments: "Mathippeedugal Illai."
   }
 };
+
 import { studentService } from "@/lib/services/student.service";
 import { Spinner } from "@/components/icons";
 import AssessmentModal from "@/components/student/AssessmentModal";

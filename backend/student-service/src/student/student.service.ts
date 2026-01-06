@@ -1,6 +1,6 @@
 import { Injectable, ConsoleLogger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, ILike } from 'typeorm';
 import { User } from '../entities/student.entity';
 
 import { AssessmentSession } from '../entities/assessment_session.entity';
@@ -57,7 +57,9 @@ export class StudentService {
   async checkLoginStatus(email: string) {
     this.logger.log(`Debugging Login Status for: ${email}`);
 
-    const user = await this.userRepo.findOne({ where: { email } });
+    // Robust case-insensitive lookup
+    const user = await this.userRepo.findOne({ where: { email: ILike(email) } });
+
     if (!user) {
       this.logger.warn(`User not found for email: ${email}`);
       return {
@@ -111,12 +113,12 @@ export class StudentService {
   }
 
   async getProfile(email: string) {
-    const user = await this.userRepo.findOne({ where: { email } });
+    const user = await this.userRepo.findOne({ where: { email: ILike(email) } });
     return user;
   }
 
   async createTestStudent(email: string, fullName: string) {
-    let user = await this.userRepo.findOne({ where: { email } });
+    let user = await this.userRepo.findOne({ where: { email: ILike(email) } });
     if (!user) {
       user = this.userRepo.create({
         email,
@@ -129,8 +131,16 @@ export class StudentService {
   }
 
   async getAssessmentProgress(email: string): Promise<AssessmentProgressItem[]> {
-    const user = await this.userRepo.findOne({ where: { email } });
-    if (!user) return [];
+    this.logger.log(`[getAssessmentProgress] Fetching progress for: ${email}`);
+
+    // Use ILike for case-insensitive match
+    const user = await this.userRepo.findOne({ where: { email: ILike(email) } });
+
+    if (!user) {
+      this.logger.warn(`[getAssessmentProgress] User not found for email: ${email}`);
+      return [];
+    }
+    this.logger.log(`[getAssessmentProgress] User found: ${user.id}`);
 
     const incompleteStatuses = ['NOT_STARTED', 'IN_PROGRESS', 'EXPIRED', 'CANCELLED'];
     let session = await this.sessionRepo.findOne({
@@ -139,18 +149,25 @@ export class StudentService {
     });
 
     if (!session) {
+      this.logger.log(`[getAssessmentProgress] No incomplete session, checking for any session...`);
       session = await this.sessionRepo.findOne({
         where: { userId: user.id },
         order: { createdAt: 'DESC' }
       });
     }
 
-    if (!session) return [];
+    if (!session) {
+      this.logger.warn(`[getAssessmentProgress] No session found for User ${user.id}`);
+      return [];
+    }
+    this.logger.log(`[getAssessmentProgress] Session found: ${session.id} [${session.status}]`);
 
     const attempts = await this.attemptRepo.find({
       where: { assessmentSessionId: session.id },
       relations: ['assessmentLevel']
     });
+
+    this.logger.log(`[getAssessmentProgress] Attempts found: ${attempts.length}`);
 
     attempts.sort((a, b) => (a.assessmentLevel?.levelNumber || 0) - (b.assessmentLevel?.levelNumber || 0));
 
@@ -214,4 +231,6 @@ export class StudentService {
 
     return progressData;
   }
+
+
 }

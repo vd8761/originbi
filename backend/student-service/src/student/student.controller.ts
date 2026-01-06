@@ -32,4 +32,5 @@ export class StudentController {
   async getAssessmentProgress(@Body() body: { email: string }) {
     return this.studentService.getAssessmentProgress(body.email);
   }
+
 }
