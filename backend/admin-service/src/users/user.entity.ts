@@ -47,6 +47,9 @@ export class User {
   @Column({ name: 'is_blocked', default: false })
   isBlocked: boolean;
 
+  @Column({ name: 'corporate_id', nullable: true })
+  corporateId: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
