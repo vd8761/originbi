@@ -1,5 +1,5 @@
 
-const API_URL = "http://localhost:4004";
+const API_URL = process.env.NEXT_PUBLIC_STUDENT_API_URL || "http://localhost:4004";
 
 export const studentService = {
     async getAssessmentStatus(userId: number) {
