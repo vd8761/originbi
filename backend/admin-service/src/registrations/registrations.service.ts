@@ -54,6 +54,7 @@ export class RegistrationsService {
       const res$ = this.http.post(
         `${this.authServiceBaseUrl}/internal/cognito/users`,
         { email, password },
+        { proxy: false },
       );
       const res = await firstValueFrom(res$);
       return res.data as { sub?: string };
@@ -69,7 +70,7 @@ export class RegistrationsService {
           : String(authErr);
 
       throw new InternalServerErrorException(
-        `Failed to create Cognito user: ${msg}`,
+        `Failed to create Cognito user at ${this.authServiceBaseUrl} (Proxy: ${process.env.http_proxy || 'none'}): ${msg}`,
       );
       /* eslint-enable */
     }
