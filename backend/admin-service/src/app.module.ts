@@ -46,6 +46,7 @@ import { MailAssetsController } from './mail/mail-assets.controller';
             autoLoadEntities: true,
             synchronize: config.get<string>('DB_SYNC') === 'true',
             ssl: { rejectUnauthorized: false },
+            schema: 'public',
           };
         }
 
@@ -59,6 +60,7 @@ import { MailAssetsController } from './mail/mail-assets.controller';
           autoLoadEntities: true,
           synchronize: config.get<string>('DB_SYNC') === 'true',
           ssl: false,
+          schema: 'public',
         };
       },
     }),
