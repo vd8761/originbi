@@ -114,7 +114,7 @@ export const getWelcomeEmailTemplate = (
                 </div>
 
                 <div style="margin-top: 10px; margin-bottom: 30px;">
-                  <a href="${frontendUrl}/students" style="display: inline-block; background-color: #150089; color: #ffffff; padding: 14px 28px; border-radius: 4px; text-decoration: none; font-size: 14px;">Start your assessment</a>
+                  <a href="${frontendUrl}/student" style="display: inline-block; background-color: #150089; color: #ffffff; padding: 14px 28px; border-radius: 4px; text-decoration: none; font-size: 14px;">Start your assessment</a>
                 </div>
 
                 <div style="font-size: 14px; line-height: 1.5; color: #000000; margin-bottom: 30px;">
