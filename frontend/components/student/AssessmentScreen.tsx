@@ -1,5 +1,31 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/contexts/LanguageContext";
+
+const translations = {
+  ENG: {
+    hello: "Hello",
+    subtitle: "Keep going, you're one step closer to completing your personality journey. Unlock upcoming tests as you progress",
+    overall: "Overall Completion",
+    unlocksIn: "Unlocks In",
+    completed: "Completed",
+    start: "Start Assessment",
+    resume: "Resume",
+    finish: "Finish",
+    noAssessments: "No Assessments Found."
+  },
+  TAM: {
+    hello: "Vanakkam",
+    subtitle: "Thodarungal, ungal aalumai payanathai mudikka oru padi nerungiyulleergal.",
+    overall: "Motha Niraivu",
+    unlocksIn: "Thirakkum Neram",
+    completed: "Mudindhadhu",
+    start: "Mathippeetai Thodanga",
+    resume: "Thodara",
+    finish: "Mudikka",
+    noAssessments: "Mathippeedugal Illai."
+  }
+};
 import { studentService } from "@/lib/services/student.service";
 import { Spinner } from "@/components/icons";
 import AssessmentModal from "@/components/student/AssessmentModal";
@@ -52,7 +78,7 @@ interface AssessmentScreenProps {
 const Stepper: React.FC<StepperProps> = ({ steps }) => {
   const lineCount = Math.max(steps.length - 1, 0);
   const lines = Array.from({ length: lineCount }, (_, i) => i);
-  const gap = 3;
+  const gap = 4;
   const colCount = steps.length || 1;
   const colWidth = 100 / colCount;
   const maxContainerWidth = Math.min(steps.length * 280, 1000);
@@ -80,7 +106,7 @@ const Stepper: React.FC<StepperProps> = ({ steps }) => {
           return (
             <div
               key={lineIndex}
-              className="absolute top-[20px] -translate-y-1/2 h-1 -z-20 transition-colors duration-500 rounded-full overflow-hidden bg-brand-light-tertiary dark:bg-white/10"
+              className="absolute top-[20px] -translate-y-1/2 h-1.5 -z-20 transition-colors duration-500 rounded-full bg-brand-light-tertiary dark:bg-white/10"
               style={{
                 left: `${leftPosition}%`,
                 width: `${width}%`,
@@ -109,10 +135,10 @@ const Stepper: React.FC<StepperProps> = ({ steps }) => {
           >
             <div className="bg-brand-light-primary dark:bg-brand-dark-primary rounded-full z-20 p-1">
               {step.status === "completed" ? (
-                /* Completed - Check Icon */
+                /* Completed - Dot Format (No Tick) */
                 <div className="w-8 h-8 rounded-full bg-brand-green flex items-center justify-center shadow-[0_0_12px_rgba(30,211,106,0.4)]">
-                  <svg className="w-4 h-4 text-[#13161B]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
                   </svg>
                 </div>
               ) : step.status === "in-progress" ? (
@@ -149,11 +175,29 @@ const Stepper: React.FC<StepperProps> = ({ steps }) => {
 
 const LockTimer: React.FC<{ time: string }> = ({ time }) => {
   // Static for now, can be made dynamic
+  const [timeLeft, setTimeLeft] = useState("");
+  const { language } = useLanguage();
+  const t = translations[language];
   const radius = 100;
   const stroke = 12;
   const normalizedRadius = radius - stroke / 2;
   const circumference = normalizedRadius * Math.PI;
   const strokeDashoffset = circumference - (75 / 100) * circumference;
+
+  useEffect(() => {
+    const calculateTimeLeft = () => {
+      const difference = +new Date(time) - +new Date();
+      if (difference > 0) {
+        const hours = Math.floor(difference / (1000 * 60 * 60));
+        const minutes = Math.floor((difference / (1000 * 60)) % 60);
+        return `${hours}h:${minutes}Min`;
+      }
+      return "0h:00Min";
+    };
+    setTimeLeft(calculateTimeLeft());
+    const timer = setInterval(() => setTimeLeft(calculateTimeLeft()), 60000);
+    return () => clearInterval(timer);
+  }, [time]);
 
   return (
     <div className="relative w-[100px] h-[55px] flex-shrink-0">
@@ -177,10 +221,10 @@ const LockTimer: React.FC<{ time: string }> = ({ time }) => {
       </svg>
       <div className="absolute inset-x-0 bottom-0 flex flex-col items-center justify-end mb-1">
         <span className="text-[9px] font-medium text-brand-green py-1.5 tracking-wide mb-0">
-          Unlocks In
+          {t.unlocksIn}
         </span>
         <span className="text-base font-bold text-brand-text-light-primary dark:text-white leading-none">
-          {time}
+          {timeLeft}
         </span>
       </div>
     </div>
@@ -199,6 +243,8 @@ const AssessmentCard: React.FC<AssessmentCardProps> = ({
   unlockTime,
   onAction,
 }) => {
+  const { language } = useLanguage();
+  const t = translations[language];
   const isLocked = status === "locked";
   const isNotStarted = status === "not-started";
   const showBlurOverlay = isLocked && !unlockTime;
@@ -257,27 +303,27 @@ const AssessmentCard: React.FC<AssessmentCardProps> = ({
               {completedQuestions}/{totalQuestions}
             </span>
             <span className="text-[clamp(8px,0.7vw,11px)] text-brand-text-light-white dark:text-brand-text-white">
-              {status === 'completed' ? `Completed on ${dateCompleted}` : 'Questions Pending'}
+              {status === 'completed' ? `Completed on ${dateCompleted}` : 'Questions Completed'}
             </span>
           </div>
-          <button
-            onClick={() => onAction(id)}
-            disabled={status === "completed" || isLocked}
-            className={`px-4 py-1.5 rounded-full text-[clamp(8px,0.75vw,11px)] font-medium transition-colors duration-300 ${status === "completed"
-              ? "bg-brand-light-tertiary dark:bg-brand-dark-tertiary text-brand-text-light-white dark:text-brand-text-white cursor-default"
-              : status === "in-progress" || status === "not-started"
-                ? "bg-brand-green text-white hover:bg-brand-green/90 shadow-lg shadow-brand-green/20"
-                : "bg-brand-light-tertiary dark:bg-brand-dark-tertiary text-brand-text-light-white dark:text-brand-text-white cursor-not-allowed"
-              }`}
-          >
-            {status === "completed"
-              ? "Completed"
-              : status === "in-progress"
-                ? "Continue Assessment"
-                : status === "not-started"
-                  ? "Start Assessment"
-                  : "Complete Previous"}
-          </button>
+          {!isLocked && (
+            <button
+              onClick={() => onAction(id)}
+              disabled={status === "completed"}
+              className={`px-4 py-1.5 rounded-full text-[clamp(8px,0.75vw,11px)] font-medium transition-colors duration-300 ${status === "completed"
+                ? "bg-brand-light-tertiary dark:bg-brand-dark-tertiary text-brand-text-light-white dark:text-brand-text-white cursor-default"
+                : status === "in-progress" || status === "not-started"
+                  ? "bg-brand-green text-white hover:bg-brand-green/90 shadow-lg shadow-brand-green/20"
+                  : "bg-brand-light-tertiary dark:bg-brand-dark-tertiary text-brand-text-light-white dark:text-brand-text-white cursor-not-allowed"
+                }`}
+            >
+              {status === "completed"
+                ? t.completed
+                : status === "in-progress"
+                  ? (completedQuestions === totalQuestions ? t.finish : t.resume)
+                  : t.start}
+            </button>
+          )}
         </div>
       </div>
 
@@ -310,6 +356,8 @@ const AssessmentCard: React.FC<AssessmentCardProps> = ({
 const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   onStartAssessment,
 }) => {
+  const { language } = useLanguage();
+  const t = translations[language];
   const router = useRouter();
   const [selectedAssessment, setSelectedAssessment] = useState<AssessmentData | null>(null);
   const [fetchedSteps, setFetchedSteps] = useState<any[]>([]);
@@ -364,6 +412,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       let status: "completed" | "in-progress" | "locked" | "not-started" = "not-started";
       if (step.status === 'COMPLETED') status = 'completed';
       else if (step.status === 'IN_PROGRESS') status = 'in-progress';
+      else if (step.status === 'LOCKED' || step.status === 'locked') status = 'locked';
       else status = 'not-started';
 
       const prev = fetchedSteps[index - 1];
@@ -381,10 +430,14 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
         attemptId: foundAttemptId,
         title: step.stepName,
         description: step.description || step.stepName,
-        totalQuestions: 75,
-        completedQuestions: status === 'completed' ? 75 : (status === 'in-progress' ? 10 : 0),
+        totalQuestions: step.totalQuestions || ((step.levelNumber === 1 || step.stepName.includes('Level 1')) ? 60 : 40),
+        completedQuestions: status === 'completed'
+          ? (step.totalQuestions || ((step.levelNumber === 1 || step.stepName.includes('Level 1')) ? 60 : 40))
+          : (step.completedQuestions || 0),
         status: status,
-        duration: "30 minutes"
+        unlockTime: step.unlockTime,
+        dateCompleted: step.dateCompleted,
+        duration: (step.levelNumber === 1 || step.stepName.includes('Level 1')) ? "60 minutes" : "45 minutes"
       };
     });
   }, [fetchedSteps]);
@@ -431,6 +484,17 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     console.log("Starting Assessment with data:", selectedAssessment); // Debug log
 
     if (selectedAssessment?.attemptId) {
+      // Optimistic Update: Set status to IN_PROGRESS immediately
+      setFetchedSteps((prevSteps) =>
+        prevSteps.map((step) => {
+          const foundAttemptId = step.id || step.attempt_id || step.assessment_attempt_id || step.uuid;
+          if (foundAttemptId === selectedAssessment.attemptId) {
+            return { ...step, status: 'IN_PROGRESS' };
+          }
+          return step;
+        })
+      );
+
       console.log("Redirecting to assessment...");
       router.push(`/student/assessment/start?attempt_id=${selectedAssessment.attemptId}`);
     } else {
@@ -453,7 +517,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   }
 
   if (!loading && assessments.length === 0) {
-    return <div className="p-20 text-center text-brand-text-light-primary dark:text-white text-lg">No Assessments Found.</div>;
+    return <div className="p-20 text-center text-brand-text-light-primary dark:text-white text-lg">{t.noAssessments}</div>;
   }
 
   return (
@@ -465,11 +529,10 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
         <div className="w-full md:w-auto">
           <h1 className="text-[clamp(18px,1.8vw,28px)] font-semibold text-brand-text-light-primary dark:text-brand-text-primary mb-1">
-            Hello {userName}
+            {t.hello} {userName}
           </h1>
           <p className="text-brand-text-light-secondary dark:text-brand-text-secondary text-[clamp(10px,0.8vw,12px)] max-w-xl">
-            Keep going, you're one step closer to completing your personality
-            journey. Unlock upcoming tests as you progress
+            {t.subtitle}
           </p>
         </div>
 
@@ -481,7 +544,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
         >
           <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10 blur-xl"></div>
           <p className="text-[clamp(8px,0.7vw,10px)] opacity-90 mb-0.5 text-white">
-            Overall Completion
+            {t.overall}
           </p>
           <p className="text-[clamp(16px,1.5vw,22px)] font-semibold text-white">
             {overallPercentage}%

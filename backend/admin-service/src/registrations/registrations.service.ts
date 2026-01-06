@@ -252,12 +252,21 @@ export class RegistrationsService {
       await manager.save(session);
 
       // E. Create Assessment Attempts (Mandatory Levels)
-      // Check based on new schema: Filter by programId and isMandatory
+      // Fetch all mandatory levels, ordered by sequence (Level 1 -> Level 2)
       const levels = await manager.getRepository(AssessmentLevel).find({
         where: {
           isMandatory: true,
         },
+        order: {
+          sortOrder: 'ASC',
+        },
       });
+
+      if (!levels || levels.length === 0) {
+        throw new InternalServerErrorException(
+          'No mandatory assessment levels configured in the system.',
+        );
+      }
 
       for (const level of levels) {
         const attempt = manager.create(AssessmentAttempt, {
@@ -270,14 +279,11 @@ export class RegistrationsService {
         });
         await manager.save(attempt);
 
-        // F. Generate Questions for Level 1
-        if (level.name.includes('Level 1') || level.id === 1) {
-          // Need to update generation service to populate all new required fields (user_id, reg_id, etc)
-          await this.assessmentGenService.generateLevel1Questions(
-            attempt, // Pass full attempt object to get context
-            manager,
-          );
-        }
+        // F. Generate Questions for this Level
+        await this.assessmentGenService.generateQuestions(
+          attempt,
+          manager,
+        );
       }
 
       // G. Update Registration to COMPLETED
@@ -409,7 +415,7 @@ export class RegistrationsService {
         await manager.save(attempt);
 
         if (level.name.includes('Level 1') || level.id === 1) {
-          await this.assessmentGenService.generateLevel1Questions(attempt, manager);
+          await this.assessmentGenService.generateQuestions(attempt, manager);
         }
       }
 
@@ -511,12 +517,13 @@ export class RegistrationsService {
 
       return { data, total, page, limit };
     } catch (error) {
+      const err = error as Error;
       this.logger.error(
-        `findAll Registrations Error: ${error.message}`,
-        error.stack,
+        `findAll Registrations Error: ${err.message}`,
+        err.stack,
       );
       throw new InternalServerErrorException(
-        `Failed to fetch registrations: ${error.message}`,
+        `Failed to fetch registrations: ${err.message}`,
       );
     }
   }

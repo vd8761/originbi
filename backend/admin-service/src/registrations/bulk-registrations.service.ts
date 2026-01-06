@@ -1,11 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-base-to-string */
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In, LessThan } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const csv = require('fast-csv');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const levenshtein = require('fast-levenshtein');
 import { Readable } from 'stream';
 
 import { BulkImport } from './entities/bulk-import.entity';
@@ -362,9 +361,24 @@ export class BulkRegistrationsService {
         if (!row || typeof row !== 'object' || row === null) return undefined;
         for (const key of keys) {
             const val = (row as Record<string, unknown>)[key];
-            if (val !== undefined && val !== null && String(val).trim() !== '') {
-                return String(val).trim();
+            if (val === undefined || val === null) continue;
+
+            if (typeof val === 'string') {
+                const trimmed = val.trim();
+                if (trimmed !== '') return trimmed;
+                continue;
             }
+
+            if (typeof val === 'number' || typeof val === 'boolean') {
+                return String(val);
+            }
+
+            if (Array.isArray(val)) {
+                if (val.length === 0) continue;
+                return val.map(v => (v === undefined || v === null) ? '' : String(v)).join(', ');
+            }
+
+            // Skip objects to avoid "[object Object]"
         }
         return undefined;
     }

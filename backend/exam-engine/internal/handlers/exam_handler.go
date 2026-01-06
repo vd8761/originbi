@@ -28,22 +28,22 @@ func (h *ExamHandler) HealthCheck(c *gin.Context) {
 func (h *ExamHandler) StartExam(c *gin.Context) {
 	var req models.ExamStartRequest
 	// User StartExam payload might just need attempt_id if session is already created?
-	// The models.ExamStartRequest has StudentID, ExamID. 
-	// The user logic relies on "assessment_attempt_id". 
+	// The models.ExamStartRequest has StudentID, ExamID.
+	// The user logic relies on "assessment_attempt_id".
 	// Let's assume the frontend sends attempt_id or we derive it.
 	// For now, let's treat ExamID as AttemptID or add AttemptID to the request model.
 	// I'll assume we pass AttemptID in the body for simplicity as "exam_id" or add a field.
 	// Let's assume ExamID = AttemptID for this flow.
-	
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, models.ServiceResponse{
 			Status:  "error",
-			Message: "Invalid request payload",
+			Message: "Invalid request payload: " + err.Error(),
 		})
 		return
 	}
 
-	questions, err := h.service.GetExamQuestions(req.ExamID) // Passing ID as attempt ID
+	questions, err := h.service.GetExamQuestions(req.ExamID, req.StudentID) // Pass both ExamID (AttemptID) and StudentID for verification
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ServiceResponse{
 			Status:  "error",

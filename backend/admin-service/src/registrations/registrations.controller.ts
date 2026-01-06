@@ -26,11 +26,12 @@ interface MulterFile {
 // Type guard
 function isMulterFile(obj: unknown): obj is MulterFile {
   if (!obj || typeof obj !== 'object') return false;
+  const o = obj as Record<string, unknown>;
   return (
-    'buffer' in obj &&
-    Buffer.isBuffer((obj as any).buffer) &&
-    'originalname' in obj &&
-    typeof (obj as any).originalname === 'string'
+    'buffer' in o &&
+    Buffer.isBuffer(o.buffer) &&
+    'originalname' in o &&
+    typeof o.originalname === 'string'
   );
 }
 
@@ -49,7 +50,7 @@ export class RegistrationsController {
 
   @Post('bulk/preview')
   @UseInterceptors(FileInterceptor('file'))
-  async bulkPreview(@UploadedFile() file: unknown) {
+  async bulkPreview(@UploadedFile() file: MulterFile) {
     if (!isMulterFile(file)) {
       throw new BadRequestException('File is required');
     }
