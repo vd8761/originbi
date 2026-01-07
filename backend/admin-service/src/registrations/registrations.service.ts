@@ -596,7 +596,7 @@ export class RegistrationsService {
       popper: `${apiUrl}/assets/Popper.png`,
       pattern: `${apiUrl}/assets/Pattern_mask.png`,
       footer: `${apiUrl}/assets/Email_Vector.png`,
-      logo: `${apiUrl}/assets/logo.png`,
+      logo: `${apiUrl}/assets/logo-light.png`,
     };
 
     mailOptions.html = getStudentWelcomeEmailTemplate(
