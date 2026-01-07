@@ -55,16 +55,9 @@ import { MailAssetsController } from './mail/mail-assets.controller';
           if (!rawUrl) throw new Error('DATABASE_URL is missing');
 
           // Ensure sslmode=require in the URL
-          let url = rawUrl.includes('sslmode=')
+          const url = rawUrl.includes('sslmode=')
             ? rawUrl
             : (rawUrl.includes('?') ? `${rawUrl}&sslmode=require` : `${rawUrl}?sslmode=require`);
-
-          // Optional but recommended: set default schema
-          url = url.includes('options=')
-            ? url
-            : (url.includes('?')
-              ? `${url}&options=-csearch_path%3Dpublic`
-              : `${url}?options=-csearch_path%3Dpublic`);
 
           return {
             type: 'postgres',
@@ -72,6 +65,7 @@ import { MailAssetsController } from './mail/mail-assets.controller';
             autoLoadEntities: true,
             synchronize: config.get<string>('DB_SYNC') === 'true',
             ssl: { rejectUnauthorized: false },
+            schema: 'public',
           };
         }
 
