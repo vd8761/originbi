@@ -47,7 +47,7 @@ export class TestController {
 
     @Get('preview-corporate-email')
     previewCorporateEmail(@Res() res: Response) {
-        const baseUrl = process.env.BACKEND_URL || 'http://localhost:4000';
+        const baseUrl = process.env.BACKEND_URL || 'http://localhost:4001';
 
         // Mock assets for preview - assuming they work via relative path or need full URL
         // Currently test controller uses base64 for previewEmail but URLs for sendTestEmail
@@ -97,7 +97,7 @@ export class TestController {
         // Construct public URLs for the assets
         // NOTE: In production, 'localhost:4001' must be replaced with the actual public domain/IP
         // For this test context, we assume the user can access localhost or we use the configured headers
-        const baseUrl = process.env.BACKEND_URL || 'http://localhost:4000';
+        const baseUrl = process.env.BACKEND_URL || 'http://localhost:4001';
 
         const assets = {
             popper: `${baseUrl}/assets/Popper.png`,

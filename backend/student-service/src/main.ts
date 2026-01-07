@@ -11,7 +11,7 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
-  const port = process.env.PORT || 4003;
+  const port = process.env.PORT || 4004;
   await app.listen(port);
   console.log(`Student Service running on port ${port}`);
 }

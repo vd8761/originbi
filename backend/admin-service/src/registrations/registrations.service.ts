@@ -589,8 +589,8 @@ export class RegistrationsService {
     };
 
     // Use full URLs for assets ("from application itself")
-    // Controller is at /assets/:filename in admin-service (Port 4000)
-    const apiUrl = process.env.API_URL || 'http://localhost:4000';
+    // Controller is at /assets/:filename in admin-service (Port 4001)
+    const apiUrl = process.env.API_URL || 'http://localhost:4001';
 
     const assets = {
       popper: `${apiUrl}/assets/Popper.png`,

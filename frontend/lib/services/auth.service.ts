@@ -2,7 +2,7 @@
 // Use environment variable to toggle mock mode
 const USE_REAL_API = process.env.NEXT_PUBLIC_USE_MOCKS === 'false';
 const API_URL =
-    process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "http://localhost:4000";
+    process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "http://localhost:4001";
 
 const simulateDelay = (ms: number) =>
     new Promise((resolve) => setTimeout(resolve, ms));

@@ -135,7 +135,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
 
       // --- Fetch and Store User Profile ---
       try {
-        const CORPORATE_API = process.env.NEXT_PUBLIC_CORPORATE_API_BASE_URL || "http://localhost:4003";
+        const CORPORATE_API = process.env.NEXT_PUBLIC_CORPORATE_API_URL || "http://localhost:4003";
         const profileRes = await fetch(`${CORPORATE_API}/dashboard/profile?email=${encodeURIComponent(values.email)}`, {
           headers: { Authorization: `Bearer ${accessToken}` }
         });
