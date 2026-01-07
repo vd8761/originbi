@@ -349,7 +349,8 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
           exam_id: examId,
         };
 
-        const response = await fetch("http://localhost:4005/api/v1/exam/start", {
+        const examApiUrl = process.env.NEXT_PUBLIC_EXAM_ENGINE_API_URL || "http://localhost:4005";
+        const response = await fetch(`${examApiUrl}/api/v1/exam/start`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -488,7 +489,8 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
     };
 
     try {
-      await fetch("http://localhost:4005/api/v1/exam/answer", {
+      const examApiUrl = process.env.NEXT_PUBLIC_EXAM_ENGINE_API_URL || "http://localhost:4005";
+      await fetch(`${examApiUrl}/api/v1/exam/answer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
