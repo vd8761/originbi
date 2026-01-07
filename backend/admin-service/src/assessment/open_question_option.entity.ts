@@ -11,23 +11,18 @@ import { OpenQuestion } from './open_question.entity';
 
 @Entity('open_question_options')
 export class OpenQuestionOption {
-  @PrimaryGeneratedColumn({ name: 'open_question_option_ID', type: 'int' })
+  @PrimaryGeneratedColumn({ type: 'bigint' })
   id: number;
 
-  @Column({ name: 'open_question_ID', type: 'int', default: 0 })
+  @Column({ name: 'open_question_id', type: 'bigint' })
   openQuestionId: number;
 
   @ManyToOne(() => OpenQuestion, (question) => question.options)
-  @JoinColumn({ name: 'open_question_ID' })
+  @JoinColumn({ name: 'open_question_id' })
   openQuestion: OpenQuestion;
 
-  @Column({
-    name: 'option_type',
-    type: 'int',
-    default: 0,
-    comment: '1-Text | 2-Image',
-  })
-  optionType: number;
+  @Column({ name: 'option_type', type: 'varchar', length: 20 })
+  optionType: string;
 
   @Column({ name: 'option_text_en', type: 'text', nullable: true })
   optionTextEn: string | null;
@@ -35,34 +30,24 @@ export class OpenQuestionOption {
   @Column({ name: 'option_text_ta', type: 'text', nullable: true })
   optionTextTa: string | null;
 
-  @Column({
-    name: 'option_image_file',
-    type: 'varchar',
-    length: 255,
-    nullable: true,
-  })
+  @Column({ name: 'option_image_file', type: 'varchar', length: 255, nullable: true })
   optionImageFile: string | null;
 
-  @Column({
-    name: 'trait_type',
-    type: 'smallint',
-    default: 0,
-    comment: '0 - Wrong | 1 - Valid',
-  })
-  traitType: number;
+  @Column({ name: 'is_valid', type: 'boolean', default: false })
+  isValid: boolean;
 
-  @Column({ name: 'createdby', type: 'int', default: 0 })
-  createdBy: number;
+  @Column({ name: 'display_order', type: 'smallint', default: 1 })
+  displayOrder: number;
 
-  @CreateDateColumn({ name: 'createdon' })
-  createdOn: Date;
+  @Column({ name: 'is_active', type: 'boolean', default: true })
+  isActive: boolean;
 
-  @UpdateDateColumn({ name: 'updatedon', nullable: true })
-  updatedOn: Date | null;
+  @Column({ name: 'is_deleted', type: 'boolean', default: false })
+  isDeleted: boolean;
 
-  @Column({ name: 'status', type: 'smallint', default: 0 })
-  status: number;
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
 
-  @Column({ name: 'deleted', type: 'smallint', default: 0 })
-  deleted: number;
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
 }
