@@ -470,7 +470,7 @@ export class BulkRegistrationsService {
             degreeId: isCollege ? degId : undefined,
             currentYear: isCollege ? this.getValue(rawData, ['current_year', 'CurrentYear', 'Year', 'year']) : undefined,
 
-            password: 'Welcome@123',
+            password: this.getValue(rawData, ['Password', 'password']) || 'Admin@123',
             sendEmail: true,
             examStart: this.getValue(rawData, ['ExamStart', 'exam_start_date', 'valid_from']),
             examEnd: this.getValue(rawData, ['ExamEnd', 'exam_end_date', 'valid_to']),
@@ -741,18 +741,30 @@ export class BulkRegistrationsService {
             return new Date(str);
         }
 
-        // 2. Regex for DD-MM-YYYY or DD/MM/YYYY with optional time
-        // Matches: 10-01-2026, 10/01/2026, 10-01-2026 09:00
+        // 2. Regex for DD-MM-YYYY or MM-DD-YYYY with optional time
+        // Matches: 01-07-2026 (Jan 7 or July 1), 13-01-2026 (Jan 13)
         const dmyPattern = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/;
 
         const match = str.match(dmyPattern);
         if (match) {
-            const day = parseInt(match[1], 10);
-            const month = parseInt(match[2], 10) - 1; // Month is 0-indexed
+            const part1 = parseInt(match[1], 10);
+            const part2 = parseInt(match[2], 10);
             const year = parseInt(match[3], 10);
             const hour = match[4] ? parseInt(match[4], 10) : 0;
             const minute = match[5] ? parseInt(match[5], 10) : 0;
             const second = match[6] ? parseInt(match[6], 10) : 0;
+
+            // User preference: "01-07-2026 means Jan 7" => MM-DD-YYYY preference for ambiguous cases.
+            // Heuristic: If part1 <= 12, treat as Month (MM-DD). Else treat as Day (DD-MM).
+            let day, month;
+            if (part1 <= 12) {
+                month = part1 - 1; // Month is 0-indexed
+                day = part2;
+            } else {
+                day = part1;
+                month = part2 - 1;
+            }
+
             return new Date(year, month, day, hour, minute, second);
         }
 
