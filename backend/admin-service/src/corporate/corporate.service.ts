@@ -655,7 +655,7 @@ export class CorporateService {
         } as any);
         const ccEmail = process.env.EMAIL_CC || '';
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-        const backendUrl = process.env.BACKEND_URL || 'http://localhost:4000';
+        const backendUrl = process.env.BACKEND_URL || 'http://localhost:4001';
 
         const fromName =
             process.env.EMAIL_SEND_FROM_NAME || 'Origin BI (Corporate)';

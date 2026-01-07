@@ -11,7 +11,7 @@ import {
 } from "../types";
 
 const API_URL =
-  process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "http://localhost:4000";
+  process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "http://localhost:4001";
 
 const CORPORATE_API_URL =
   process.env.NEXT_PUBLIC_CORPORATE_API_BASE_URL || "http://localhost:4003";

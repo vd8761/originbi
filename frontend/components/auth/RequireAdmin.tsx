@@ -33,7 +33,7 @@ const RequireAdmin: React.FC<RequireAdminProps> = ({ children }) => {
 
         // 2️⃣ Ask backend: /admin/me
         const apiBase =
-          process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4000';
+          process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4001';
 
         const res = await fetch(`${apiBase}/admin/me`, {
           method: 'GET',

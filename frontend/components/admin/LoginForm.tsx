@@ -172,7 +172,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
 
       // 5️⃣ Call backend to verify token + role
       const apiBase =
-        process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4000';
+        process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4001';
 
       let backendUrl = `${apiBase}/admin/me`;
       if (portalMode === 'student') {

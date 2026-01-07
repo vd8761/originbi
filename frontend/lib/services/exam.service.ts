@@ -2,7 +2,7 @@ import { AssessmentQuestion } from "@/lib/types";
 import { AuthService } from "./auth.service";
 
 const API_URL =
-    process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "http://localhost:4000";
+    process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "http://localhost:4001";
 
 export const examService = {
     // Get questions for a specific assessment/exam
