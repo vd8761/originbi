@@ -33,7 +33,7 @@ import { MailAssetsController } from './mail/mail-assets.controller';
         const isProd =
           (config.get<string>('NODE_ENV') || 'development') === 'production';
 
-        if (isProd) {
+        /* if (isProd) {
           const url = config.get<string>('DATABASE_URL');
           if (!url)
             throw new Error(
@@ -47,6 +47,31 @@ import { MailAssetsController } from './mail/mail-assets.controller';
             synchronize: config.get<string>('DB_SYNC') === 'true',
             ssl: { rejectUnauthorized: false },
             schema: 'public',
+          };
+        } */
+
+        if (isProd) {
+          const rawUrl = config.get<string>('DATABASE_URL');
+          if (!rawUrl) throw new Error('DATABASE_URL is missing');
+
+          // Ensure sslmode=require in the URL
+          let url = rawUrl.includes('sslmode=')
+            ? rawUrl
+            : (rawUrl.includes('?') ? `${rawUrl}&sslmode=require` : `${rawUrl}?sslmode=require`);
+
+          // Optional but recommended: set default schema
+          url = url.includes('options=')
+            ? url
+            : (url.includes('?')
+              ? `${url}&options=-csearch_path%3Dpublic`
+              : `${url}?options=-csearch_path%3Dpublic`);
+
+          return {
+            type: 'postgres',
+            url,
+            autoLoadEntities: true,
+            synchronize: config.get<string>('DB_SYNC') === 'true',
+            ssl: { rejectUnauthorized: false },
           };
         }
 
