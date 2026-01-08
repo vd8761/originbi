@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CorporateDashboardModule } from './dashboard/corporate-dashboard.module';
 import { MailAssetsController } from './mail/mail-assets.controller';
@@ -45,6 +46,7 @@ import { AssessmentModule } from './assessment/assessment.module';
         CorporateDashboardModule,
         CorporateRegistrationsModule,
         AssessmentModule,
+        ScheduleModule.forRoot(),
     ],
     controllers: [MailAssetsController],
 })
