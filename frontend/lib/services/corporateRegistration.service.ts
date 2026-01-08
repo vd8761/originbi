@@ -199,4 +199,106 @@ export const corporateRegistrationService = {
         });
         if (!res.ok) throw new Error("Failed to update status");
     },
+
+    // -------------------------------------------------------------
+    // Bulk Upload (Corporate Self-Service)
+    // -------------------------------------------------------------
+    // Note: These endpoints point to Corporate Service, not Admin Service
+    // We assume backend runs on Port 4003 or via Gateway.
+    // For now, let's assume we use a BASE_CORP_URL or similar.
+
+    // Preview CSV
+    async bulkPreview(file: File, userId: string): Promise<{ importId: string; rows: any[] }> {
+        const token = AuthService.getToken();
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('userId', userId); // Pass context
+
+        // Assuming direct call to Corporate Service (4003) or via Gateway
+        // Adjust URL based on your network config.
+        const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_BASE_URL || 'http://127.0.0.1:4003';
+
+        const res = await fetch(`${CORP_API}/corporate/registrations/bulk/preview`, {
+            method: 'POST',
+            headers: {
+                Authorization: token ? `Bearer ${token}` : '',
+            },
+            body: formData,
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.message || 'Failed to preview CSV file');
+        }
+        return res.json();
+    },
+
+    // Execute Bulk Import
+    async bulkExecute(importId: string, overrides: any[]): Promise<void> {
+        const token = AuthService.getToken();
+        const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_BASE_URL || 'http://127.0.0.1:4003';
+
+        const res = await fetch(`${CORP_API}/corporate/registrations/bulk/execute`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: token ? `Bearer ${token}` : '',
+            },
+            body: JSON.stringify({ importId, overrides }),
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.message || 'Failed to execute bulk import');
+        }
+    },
+
+    // Get Bulk Job Status
+    async getBulkJobStatus(importId: string): Promise<{ status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'; total: number; success: number; failed: number }> {
+        const token = AuthService.getToken();
+        const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_BASE_URL || 'http://127.0.0.1:4003';
+
+        const res = await fetch(`${CORP_API}/corporate/registrations/bulk/status/${importId}`, {
+            method: 'GET',
+            headers: {
+                Authorization: token ? `Bearer ${token}` : '',
+            },
+        });
+
+        if (!res.ok) throw new Error("Failed to fetch job status");
+        return res.json();
+    },
+
+    // Get Bulk Job Rows (for review after partial failure)
+    async getBulkJobRows(importId: string): Promise<any[]> {
+        const token = AuthService.getToken();
+        const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_BASE_URL || 'http://127.0.0.1:4003';
+
+        const res = await fetch(`${CORP_API}/corporate/registrations/bulk/rows/${importId}`, {
+            method: 'GET',
+            headers: {
+                Authorization: token ? `Bearer ${token}` : '',
+            },
+        });
+
+        if (!res.ok) throw new Error("Failed to fetch job rows");
+        return res.json();
+    },
+
+    // Get Groups (for dropdown in review table)
+    async getGroups(userId: string): Promise<any[]> {
+        const token = AuthService.getToken();
+        const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_BASE_URL || 'http://127.0.0.1:4003';
+
+        // Assuming endpoint exists or creating it
+        const res = await fetch(`${CORP_API}/corporate/groups?userId=${userId}`, {
+            method: 'GET',
+            headers: {
+                Authorization: token ? `Bearer ${token}` : '',
+            },
+        });
+
+        if (!res.ok) return []; // Return empty if failed or not implemented
+        return res.json();
+    }
 };

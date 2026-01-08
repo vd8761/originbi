@@ -207,18 +207,19 @@ export class CorporateRegistrationsService {
             await manager.save(session);
 
             // F. Create Attempt (Level 1)
-            // F. Create Attempt (Level 1)
+            // F. Create Attempts (Mandatory Levels)
+            // Fetch all mandatory levels, ordered by sequence (Level 1 -> Level 2)
             const levels = await manager.getRepository(AssessmentLevel).find({
                 where: {
-                    levelNumber: 1
-                }
+                    isMandatory: true,
+                },
+                order: {
+                    sortOrder: 'ASC',
+                },
             });
 
             if (levels.length === 0) {
-                const mandatory = await manager.getRepository(AssessmentLevel).find({
-                    where: { isMandatory: true }
-                });
-                if (mandatory.length > 0) levels.push(mandatory[0]);
+                this.logger.warn('No mandatory levels found in AssessmentLevel table. Candidate created without assessment attempt.');
             }
 
             for (const level of levels) {
@@ -232,7 +233,11 @@ export class CorporateRegistrationsService {
                 });
                 await manager.save(attempt);
 
-                await this.assessmentGenService.generateLevel1Questions(attempt, manager);
+                // G. Generate Questions for this Level (Only Level 1)
+                // We strictly generate questions ONLY for Level 1 here.
+                if (level.levelNumber === 1 || level.name === 'Level 1') {
+                    await this.assessmentGenService.generateLevel1Questions(attempt, manager);
+                }
             }
 
             // G. Send Email

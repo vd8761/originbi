@@ -3,7 +3,7 @@ import { CorporateAccount } from "@/lib/types";
 
 // Should be changed to Corporate Service URL (4003)
 const API_URL =
-    process.env.NEXT_PUBLIC_CORPORATE_SERVICE_URL || "http://localhost:4003";
+    process.env.NEXT_PUBLIC_CORPORATE_SERVICE_URL || "http://127.0.0.1:4003";
 
 export const corporateDashboardService = {
     async getProfile(email: string): Promise<any> {

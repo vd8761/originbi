@@ -14,6 +14,11 @@ import { Program } from '../entities/program.entity';
 import { AssessmentSession } from '../entities/assessment_session.entity';
 import { AssessmentAttempt } from '../entities/assessment_attempt.entity';
 import { AssessmentLevel } from '../entities/assessment_level.entity';
+import { BulkImport } from './entities/bulk-import.entity';
+import { BulkImportRow } from './entities/bulk-import-row.entity';
+
+import { BulkCorporateRegistrationsService } from './bulk-corporate-registrations.service';
+import { BulkCorporateRegistrationsController } from './bulk-corporate-registrations.controller';
 
 @Module({
     imports: [
@@ -27,11 +32,13 @@ import { AssessmentLevel } from '../entities/assessment_level.entity';
             AssessmentSession,
             AssessmentAttempt,
             AssessmentLevel,
+            BulkImport,
+            BulkImportRow,
         ]),
         HttpModule,
         AssessmentModule,
     ],
-    controllers: [CorporateRegistrationsController],
-    providers: [CorporateRegistrationsService],
+    controllers: [CorporateRegistrationsController, BulkCorporateRegistrationsController],
+    providers: [CorporateRegistrationsService, BulkCorporateRegistrationsService],
 })
 export class CorporateRegistrationsModule { }

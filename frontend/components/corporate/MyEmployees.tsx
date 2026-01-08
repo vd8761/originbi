@@ -8,6 +8,7 @@ import {
     ArrowLeftWithoutLineIcon,
     ArrowRightWithoutLineIcon,
 } from "@/components/icons";
+import BulkUploadRegistration from "./BulkUploadRegistration";
 import AddRegistrationForm from "./AddRegistrationForm";
 import { corporateDashboardService } from "@/lib/services";
 import { Registration } from "@/lib/types";
@@ -27,7 +28,7 @@ const useDebounce = (value: string, delay: number) => {
 };
 
 const MyEmployees: React.FC = () => {
-    const [view, setView] = useState<"list" | "add">("list");
+    const [view, setView] = useState<"list" | "add" | "bulk">("list");
     // Data State
     const [users, setUsers] = useState<Registration[]>([]);
     const [loading, setLoading] = useState(true);
@@ -48,21 +49,22 @@ const MyEmployees: React.FC = () => {
 
     const debouncedSearchTerm = useDebounce(searchTerm, 500);
     const [corporateEmail, setCorporateEmail] = useState<string | null>(null);
+    const [userId, setUserId] = useState<string>("");
 
     useEffect(() => {
         // Get logged in corporate email
         const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
-        if (!email) {
-            try {
-                const u = localStorage.getItem('user');
-                if (u) {
-                    const parsed = JSON.parse(u);
-                    setCorporateEmail(parsed.email);
-                    return;
-                }
-            } catch (e) { /* empty */ }
-        }
-        setCorporateEmail(email);
+        // Get user ID from stored object
+        try {
+            const u = localStorage.getItem('user');
+            if (u) {
+                const parsed = JSON.parse(u);
+                if (parsed.email) setCorporateEmail(parsed.email);
+                if (parsed.id) setUserId(parsed.id);
+            }
+        } catch (e) { /* empty */ }
+
+        if (email && !corporateEmail) setCorporateEmail(email);
     }, []);
 
     const fetchData = useCallback(async () => {
@@ -195,6 +197,18 @@ const MyEmployees: React.FC = () => {
         );
     }
 
+    if (view === "bulk") {
+        return (
+            <BulkUploadRegistration
+                onCancel={() => {
+                    setView("list");
+                    fetchData();
+                }}
+                corporateUserId={userId}
+            />
+        );
+    }
+
     return (
         <div className="flex flex-col h-full w-full gap-6 font-sans">
             <DateRangePickerModal
@@ -323,7 +337,7 @@ const MyEmployees: React.FC = () => {
                     <ExcelExportButton onClick={() => console.log('Exporting...')} />
 
                     <button
-                        onClick={() => console.log('Bulk Upload')}
+                        onClick={() => setView("bulk")}
                         className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] rounded-lg text-sm font-medium text-brand-text-light-primary dark:text-white hover:bg-gray-50 dark:hover:bg-white/30 transition-all shadow-sm cursor-pointer"
                     >
                         <span>Bulk Registration</span>
