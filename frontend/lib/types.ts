@@ -109,6 +109,7 @@ export interface Registration {
   corporate_account_id?: string;
   reseller_account_id?: string;
   group_id?: string;
+  groupName?: string; // For display purposes
 
   // Payment
   payment_required: boolean;

@@ -19,6 +19,7 @@ import { BulkImportRow } from './entities/bulk-import-row.entity';
 
 import { BulkCorporateRegistrationsService } from './bulk-corporate-registrations.service';
 import { BulkCorporateRegistrationsController } from './bulk-corporate-registrations.controller';
+import { GroupAssessment } from '../entities/group_assessment.entity';
 
 @Module({
     imports: [
@@ -34,6 +35,7 @@ import { BulkCorporateRegistrationsController } from './bulk-corporate-registrat
             AssessmentLevel,
             BulkImport,
             BulkImportRow,
+            GroupAssessment,
         ]),
         HttpModule,
         AssessmentModule,

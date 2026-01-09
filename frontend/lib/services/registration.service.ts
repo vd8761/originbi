@@ -63,8 +63,8 @@ export const registrationService = {
     if (search.trim()) params.set("search", search.trim());
     if (filters?.status) params.set("status", filters.status);
     if (filters?.program_id) params.set("program_id", filters.program_id);
-    if (filters?.start_date) params.set("start_date", filters.start_date);
-    if (filters?.end_date) params.set("end_date", filters.end_date);
+    if (filters?.start_date) params.set("startDate", filters.start_date);
+    if (filters?.end_date) params.set("endDate", filters.end_date);
     if (sortBy) params.set("sortBy", sortBy);
     if (sortOrder) params.set("sortOrder", sortOrder);
 

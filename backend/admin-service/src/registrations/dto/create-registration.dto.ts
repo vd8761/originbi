@@ -73,6 +73,9 @@ export class CreateRegistrationDto {
   @IsString()
   departmentId?: string;
 
+  @IsOptional()
+  groupAssessmentId?: number; // Optional: Links to a Group Assessment header
+
   // ✅ password required (Cognito)
   @IsNotEmpty()
   @IsString()

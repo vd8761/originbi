@@ -600,7 +600,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
                 style={{ animationDelay: "100ms" }}
               >
                 {currentQuestion.options.map((option) => {
-                  const isSelected = selectedOption === option.id;
+                  const isSelected = String(selectedOption) === String(option.id);
                   const optionLabel = getDisplayText(option.textEn, option.textTa);
 
                   return (

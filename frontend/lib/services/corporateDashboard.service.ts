@@ -131,10 +131,19 @@ export const corporateDashboardService = {
         return res.json();
     },
 
-    async getMyEmployees(email: string, page = 1, limit = 10, search = '') {
+    async getMyEmployees(email: string, page = 1, limit = 10, search = '', filters: { start_date?: string, end_date?: string } = {}) {
         const token = AuthService.getToken();
+        const query = new URLSearchParams({
+            email,
+            page: String(page),
+            limit: String(limit),
+            search,
+            ...(filters.start_date && { startDate: filters.start_date }),
+            ...(filters.end_date && { endDate: filters.end_date }),
+        });
+
         const res = await fetch(
-            `${API_URL}/dashboard/my-employees?email=${encodeURIComponent(email)}&page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`,
+            `${API_URL}/dashboard/my-employees?${query.toString()}`,
             {
                 method: "GET",
                 headers: {
@@ -146,6 +155,45 @@ export const corporateDashboardService = {
 
         if (!res.ok) {
             throw new Error("Failed to fetch employees");
+        }
+
+        return res.json();
+    },
+
+    async getAssessmentSessions(
+        email: string,
+        page = 1,
+        limit = 10,
+        search = '',
+        sortBy = '',
+        sortOrder: 'ASC' | 'DESC' = 'DESC',
+        filters: { start_date?: string, end_date?: string, status?: string, userId?: number, type?: string } = {}
+    ) {
+        const token = AuthService.getToken();
+        const query = new URLSearchParams({
+            email,
+            page: String(page),
+            limit: String(limit),
+            search,
+            sortBy,
+            sortOrder,
+            ...(filters.start_date && { startDate: filters.start_date }),
+            ...(filters.end_date && { endDate: filters.end_date }),
+            ...(filters.status && { status: filters.status }),
+            ...(filters.userId && { userId: String(filters.userId) }),
+            ...(filters.type && { type: filters.type }),
+        });
+
+        const res = await fetch(`${API_URL}/dashboard/assessment-sessions?${query.toString()}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        });
+
+        if (!res.ok) {
+            throw new Error("Failed to fetch assessment sessions");
         }
 
         return res.json();

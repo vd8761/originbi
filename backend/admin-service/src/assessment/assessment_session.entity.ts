@@ -11,6 +11,7 @@ import {
 import { Registration } from '../registrations/registration.entity';
 import { User } from '../users/user.entity';
 import { AssessmentAttempt } from './assessment_attempt.entity';
+import { GroupAssessment } from './group_assessment.entity';
 
 @Entity('assessment_sessions')
 export class AssessmentSession {
@@ -36,6 +37,13 @@ export class AssessmentSession {
 
   @Column({ name: 'group_id', type: 'bigint', nullable: true })
   groupId: number | null;
+
+  @Column({ name: 'group_assessment_id', type: 'bigint', nullable: true })
+  groupAssessmentId: number | null;
+
+  @ManyToOne(() => GroupAssessment)
+  @JoinColumn({ name: 'group_assessment_id' })
+  groupAssessment: GroupAssessment;
 
   @Column({
     name: 'status',

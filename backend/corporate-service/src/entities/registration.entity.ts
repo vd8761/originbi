@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
+import { Groups } from './groups.entity';
 
 export type RegistrationSource = 'SELF' | 'ADMIN' | 'CORPORATE' | 'RESELLER';
 export type RegistrationStatus = 'INCOMPLETE' | 'COMPLETED' | 'CANCELLED';
@@ -79,6 +80,10 @@ export class Registration {
 
   @Column({ name: 'group_id', type: 'bigint', nullable: true })
   groupId: number | null;
+
+  @ManyToOne(() => Groups)
+  @JoinColumn({ name: 'group_id' })
+  group: Groups;
 
   @Column({ name: 'program_id', type: 'bigint', nullable: true })
   programId: number | null;

@@ -36,4 +36,7 @@ export class CreateCandidateDto {
     @IsString()
     @IsOptional()
     examEnd?: string;
+
+    @IsOptional()
+    groupAssessmentId?: number;
 }

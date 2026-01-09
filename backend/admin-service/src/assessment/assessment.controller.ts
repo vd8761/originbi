@@ -15,6 +15,8 @@ export class AssessmentController {
         @Query('startDate') startDate?: string,
         @Query('endDate') endDate?: string,
         @Query('status') status?: string,
+        @Query('userId') userId?: string,
+        @Query('type') type?: string,
     ) {
         const pageNum = Number(page) || 1;
         const limitNum = Number(limit) || 10;
@@ -28,6 +30,8 @@ export class AssessmentController {
             startDate,
             endDate,
             status,
+            userId,
+            type,
         );
     }
 }

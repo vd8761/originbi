@@ -14,6 +14,7 @@ import { User } from '../entities/user.entity';
 import { Program } from '../entities/program.entity';
 import { CorporateAccount } from '../entities/corporate-account.entity';
 import { CorporateRegistrationsService } from './corporate-registrations.service';
+import { GroupAssessment } from '../entities/group_assessment.entity';
 
 @Injectable()
 export class BulkCorporateRegistrationsService {
@@ -32,6 +33,8 @@ export class BulkCorporateRegistrationsService {
         private programRepo: Repository<Program>,
         @InjectRepository(CorporateAccount)
         private corporateAccountRepo: Repository<CorporateAccount>,
+        @InjectRepository(GroupAssessment)
+        private groupAssessmentRepo: Repository<GroupAssessment>,
         private dataSource: DataSource,
         private readonly corporateRegistrationsService: CorporateRegistrationsService,
     ) { }
@@ -277,14 +280,34 @@ export class BulkCorporateRegistrationsService {
         job.status = 'PROCESSING';
         await this.bulkImportRepo.save(job);
 
+        // Fetch Corporate Account
+        let corporateAccount = await this.corporateAccountRepo.findOne({ where: { userId: createdById } });
+        // Fallback for sub-users
+        if (!corporateAccount) {
+            const user = await this.userRepo.findOne({ where: { id: createdById } });
+            if (user && user.corporateId) {
+                corporateAccount = await this.corporateAccountRepo.findOne({ where: { id: Number(user.corporateId) } });
+            }
+        }
+        if (!corporateAccount) {
+            this.logger.error(`Corporate Account not found for user ${createdById}`);
+            job.status = 'FAILED';
+            job.completedAt = new Date();
+            await this.bulkImportRepo.save(job);
+            return;
+        }
+
+        const corporateAccountId = corporateAccount.id;
+
         // Reload Groups for matching
-        const allGroups = await this.groupsRepo.find({ select: ['id', 'name'] });
+        const allGroups = await this.groupsRepo.find({ where: { corporateAccountId } });
         const groupMap = new Map(allGroups.map(g => [Number(g.id), g.name]));
 
         const allPrograms = await this.programRepo.find();
         const programMap = new Map<string, Program>();
         allPrograms.forEach(p => {
             programMap.set(this.normalizeString(p.name), p);
+            programMap.set(this.normalizeString(p.code), p); // Add code mapping too
         });
 
         const rows = await this.bulkImportRowRepo.find({
@@ -292,43 +315,171 @@ export class BulkCorporateRegistrationsService {
             order: { rowIndex: 'ASC' }
         });
 
+        // 1. Group Rows into Batches
+        const batches = new Map<string, {
+            key: string;
+            groupName: string;
+            programType: string;
+            examStart: string | undefined;
+            examEnd: string | undefined;
+            rows: BulkImportRow[];
+            dtos: any[];
+        }>();
+
+        for (const row of rows) {
+            let effectiveGroupName = row.rawData['GroupName'] || row.rawData['group_name'];
+            if (row.matchedGroupId) {
+                const matchedName = groupMap.get(Number(row.matchedGroupId));
+                if (matchedName) effectiveGroupName = matchedName;
+            }
+
+            const dto = this.mapRowToDto(row.rawData, effectiveGroupName, programMap);
+
+            // Find Program ID for Header
+            let programId: number | null = null;
+            if (dto.programType) {
+                const p = programMap.get(this.normalizeString(dto.programType));
+                if (p) programId = Number(p.id);
+            }
+
+            // Create Batch Key
+            const batchKey = `${this.normalizeString(effectiveGroupName)}|${programId || 'UNKNOWN'}|${dto.examStart}|${dto.examEnd}`;
+
+            if (!batches.has(batchKey)) {
+                batches.set(batchKey, {
+                    key: batchKey,
+                    groupName: effectiveGroupName,
+                    programType: String(programId || 0), // store ID as string key
+                    examStart: dto.examStart,
+                    examEnd: dto.examEnd,
+                    rows: [],
+                    dtos: []
+                });
+            }
+            batches.get(batchKey)?.rows.push(row);
+            batches.get(batchKey)?.dtos.push(dto);
+        }
+
         let successCount = 0;
         let failCount = 0;
 
-        for (const row of rows) {
+        // 2. Process Batches
+        for (const batch of batches.values()) {
+            this.logger.log(`Processing Batch: ${batch.groupName} - Rows: ${batch.rows.length}`);
+
+            let groupAssessmentId = null;
+
+            // A. Create/Find Group
+            let group = allGroups.find(g => this.normalizeString(g.name) === this.normalizeString(batch.groupName));
             try {
-                let effectiveGroupName = row.rawData['GroupName'] || row.rawData['group_name'];
-                if (row.matchedGroupId) {
-                    const matchedName = groupMap.get(Number(row.matchedGroupId));
-                    if (matchedName) effectiveGroupName = matchedName;
+                // If group doesn't exist in map but was passed, Create it ONLY if we are sure?
+                // Actually corporateRegistrationsService.registerCandidate handles group creation per row.
+                // But we need Group ID for the Header.
+                // So we MUST ensure group exists HERE.
+
+                if (!group) {
+                    group = this.groupsRepo.create({
+                        name: batch.groupName,
+                        corporateAccountId: corporateAccountId,
+                        createdByUserId: createdById,
+                        isActive: true,
+                        // code: ... auto
+                    });
+                    await this.groupsRepo.save(group);
+                    // Add to cache
+                    allGroups.push(group);
                 }
-
-                const dto = this.mapRowToDto(row.rawData, effectiveGroupName, programMap);
-
-                // Call Single Registration (Handles Credit Deduction & User Creation)
-                await this.corporateRegistrationsService.registerCandidate(dto, createdById);
-
-                row.resultType = 'CREATED';
-                row.status = 'SUCCESS';
-                successCount++;
-                await this.bulkImportRowRepo.save(row);
-
-                if (successCount % 10 === 0) {
-                    await this.bulkImportRepo.increment({ id: jobId }, 'processedCount', 10);
+            } catch (err) {
+                this.logger.error(`Failed to find/create group ${batch.groupName}`, err);
+                // Fail all rows in batch
+                for (const row of batch.rows) {
+                    row.status = 'FAILED';
+                    row.errorMessage = 'System Error: Failed to create Group';
+                    row.resultType = 'FAILED_DB';
+                    failCount++;
                 }
-
-            } catch (err: any) {
-                this.logger.error(`Row ${row.rowIndex} failed`, err);
-                row.status = 'FAILED';
-                row.errorMessage = err.message || 'Unknown error';
-                row.resultType = 'FAILED_DB';
-                failCount++;
-                await this.bulkImportRowRepo.save(row);
+                await this.bulkImportRowRepo.save(batch.rows);
+                continue;
             }
+
+            // B. Create Header (GroupAssessment)
+            try {
+                // Determine Dates
+                const dtoTemplate = batch.dtos[0];
+                const validFrom = dtoTemplate.examStart ? new Date(dtoTemplate.examStart) : new Date();
+                const validTo = dtoTemplate.examEnd ? new Date(dtoTemplate.examEnd) : new Date();
+
+                const programId = Number(batch.programType);
+                if (!programId) {
+                    throw new Error(`Program ${dtoTemplate.programType} not found in system.`);
+                }
+
+                this.logger.log(`Creating GroupAssessment for Group: ${group.id}, Program: ${programId}`);
+
+                const groupAssessment = this.groupAssessmentRepo.create({
+                    groupId: Number(group.id),
+                    programId: programId,
+                    validFrom,
+                    validTo,
+                    totalCandidates: batch.rows.length,
+                    status: 'NOT_STARTED',
+                    corporateAccountId: corporateAccountId,
+                    createdByUserId: createdById,
+                    metadata: { importId: jobId, source: 'BULK_UPLOAD' }
+                });
+
+                const savedGA = await this.groupAssessmentRepo.save(groupAssessment);
+                groupAssessmentId = savedGA.id;
+
+            } catch (err) {
+                this.logger.error(`CRITICAL: Failed to create GroupAssessment Header for batch ${batch.groupName}`, err);
+
+                for (const row of batch.rows) {
+                    row.status = 'FAILED';
+                    row.errorMessage = 'System Error: Failed to create Group Assessment Header';
+                    row.resultType = 'FAILED_DB';
+                    failCount++;
+                }
+                await this.bulkImportRowRepo.save(batch.rows);
+                continue; // Stop processing this batch
+            }
+
+            // C. Process Rows (Inject ID)
+            for (let i = 0; i < batch.rows.length; i++) {
+                const row = batch.rows[i];
+                const dto = batch.dtos[i];
+
+                try {
+                    if (!groupAssessmentId) {
+                        throw new Error("Group Assessment ID missing.");
+                    }
+                    dto.groupAssessmentId = Number(groupAssessmentId);
+
+                    // Call Registration Service
+                    // Note: registerCandidate also tries to create Group if not exists, but we did it above.
+                    // It also deducts credits.
+                    await this.corporateRegistrationsService.registerCandidate(dto, createdById);
+
+                    row.resultType = 'CREATED';
+                    row.status = 'SUCCESS';
+                    successCount++;
+                    await this.bulkImportRowRepo.save(row);
+
+                } catch (err: any) {
+                    this.logger.error(`Row ${row.rowIndex} failed`, err);
+                    row.status = 'FAILED';
+                    row.errorMessage = err.message || 'Unknown error'; // Could be 'Insufficient credits'
+                    row.resultType = 'FAILED_DB';
+                    failCount++;
+                    await this.bulkImportRowRepo.save(row);
+                }
+            }
+            // Update progress
+            await this.bulkImportRepo.increment({ id: jobId }, 'processedCount', batch.rows.length);
         }
 
         job.status = 'COMPLETED';
-        job.processedCount = successCount + failCount;
+        job.processedCount = successCount + failCount; // Should match total
         job.completedAt = new Date();
         await this.bulkImportRepo.save(job);
         this.logger.log(`Job ${jobId} Completed. Success: ${successCount}, Fail: ${failCount}`);

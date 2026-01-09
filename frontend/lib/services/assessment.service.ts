@@ -20,6 +20,11 @@ export interface AssessmentSession {
         name: string;
         assessment_title: string;
     };
+    groupName?: string;
+    totalCandidates?: number;
+    currentLevel?: number;
+    totalLevels?: number;
+    groupId?: number;
 }
 
 export const assessmentService = {
@@ -29,7 +34,7 @@ export const assessmentService = {
         search?: string,
         sortBy?: string,
         sortOrder?: "ASC" | "DESC",
-        filters?: { start_date?: string; end_date?: string; status?: string }
+        filters?: { start_date?: string; end_date?: string; status?: string; userId?: string; type?: 'individual' | 'group' }
     ): Promise<PaginatedResponse<AssessmentSession>> {
         const params = new URLSearchParams();
         params.set("page", page.toString());
@@ -40,6 +45,8 @@ export const assessmentService = {
         if (filters?.start_date) params.set("startDate", filters.start_date);
         if (filters?.end_date) params.set("endDate", filters.end_date);
         if (filters?.status) params.set("status", filters.status);
+        if (filters?.userId) params.set("userId", filters.userId);
+        if (filters?.type) params.set("type", filters.type);
 
         const token = AuthService.getToken();
 

@@ -22,6 +22,10 @@ import {
     UserRole,
 } from '../entities/user-action-log.entity';
 import { Registration } from '../entities/registration.entity';
+import { AssessmentSession } from '../entities/assessment_session.entity';
+import { Program } from '../entities/program.entity';
+import { GroupAssessment } from '../entities/group_assessment.entity';
+import { Groups } from '../entities/groups.entity';
 
 @Injectable()
 export class CorporateDashboardService {
@@ -40,6 +44,14 @@ export class CorporateDashboardService {
         private readonly ledgerRepo: Repository<CorporateCreditLedger>,
         @InjectRepository(Registration)
         private readonly registrationRepo: Repository<Registration>,
+        @InjectRepository(AssessmentSession)
+        private readonly sessionRepo: Repository<AssessmentSession>,
+        @InjectRepository(Program)
+        private readonly programRepo: Repository<Program>,
+        @InjectRepository(GroupAssessment)
+        private readonly groupAssessmentRepo: Repository<GroupAssessment>,
+        @InjectRepository(Groups)
+        private readonly groupRepo: Repository<Groups>,
         private httpService: HttpService,
         private configService: ConfigService,
         private readonly dataSource: DataSource,
@@ -823,6 +835,8 @@ export class CorporateDashboardService {
         page: number = 1,
         limit: number = 10,
         search?: string,
+        startDate?: string,
+        endDate?: string,
     ) {
         const { ILike } = require('typeorm');
         const user = await this.userRepo.findOne({ where: { email: ILike(email) } });
@@ -844,6 +858,7 @@ export class CorporateDashboardService {
         const query = this.registrationRepo
             .createQueryBuilder('registration')
             .leftJoinAndSelect('registration.user', 'user')
+            .leftJoinAndSelect('registration.group', 'group')
             .where('registration.corporateAccountId = :corpId', {
                 corpId: corporate.id,
             });
@@ -855,11 +870,192 @@ export class CorporateDashboardService {
             );
         }
 
+        if (startDate) {
+            query.andWhere('registration.createdAt >= :startDate', { startDate: `${startDate} 00:00:00` });
+        }
+        if (endDate) {
+            query.andWhere('registration.createdAt <= :endDate', { endDate: `${endDate} 23:59:59` });
+        }
+
         const [data, total] = await query
             .skip((page - 1) * limit)
             .take(limit)
             .orderBy('registration.createdAt', 'DESC')
             .getManyAndCount();
+
+        return {
+            data: data || [],
+            total: total || 0,
+            page,
+            limit,
+        };
+    }
+
+
+    async getAssessmentSessions(
+        email: string,
+        page: number = 1,
+        limit: number = 10,
+        search?: string,
+        sortBy?: string,
+        sortOrder: 'ASC' | 'DESC' = 'DESC',
+        startDate?: string,
+        endDate?: string,
+        status?: string,
+        userId?: number,
+        type?: string
+    ) {
+        const { ILike } = require('typeorm');
+        const user = await this.userRepo.findOne({ where: { email: ILike(email) } });
+        if (!user) throw new NotFoundException('User not found');
+
+        let corporate = await this.corporateRepo.findOne({
+            where: { userId: user.id },
+        });
+
+        if (!corporate && user.corporateId) {
+            corporate = await this.corporateRepo.findOne({
+                where: { id: Number(user.corporateId) }
+            });
+        }
+        if (!corporate) throw new NotFoundException('Corporate account not found');
+
+        // GROUP ASSESSMENT LOGIC
+        if (type === 'group') {
+            const qb = this.groupAssessmentRepo.createQueryBuilder('ga')
+                .leftJoinAndMapOne('ga.program', Program, 'p', 'p.id = ga.programId')
+                .leftJoinAndMapOne('ga.group', Groups, 'g', 'g.id = ga.groupId')
+                .where('ga.corporateAccountId = :corpId', { corpId: corporate.id });
+
+            if (search) {
+                const s = `%${search.toLowerCase()}%`;
+                qb.andWhere('(LOWER(p.name) LIKE :s OR LOWER(p.assessment_title) LIKE :s OR LOWER(g.name) LIKE :s)', { s });
+            }
+
+            if (startDate) qb.andWhere('ga.validFrom >= :startDate', { startDate: `${startDate} 00:00:00` });
+            if (endDate) qb.andWhere('ga.validFrom <= :endDate', { endDate: `${endDate} 23:59:59` });
+            if (status) qb.andWhere('ga.status = :status', { status });
+
+            if (sortBy) {
+                let sortCol = '';
+                switch (sortBy) {
+                    case 'exam_title': sortCol = 'p.assessment_title'; break;
+                    case 'program_name': sortCol = 'p.name'; break;
+                    case 'group_name': sortCol = 'g.name'; break;
+                    case 'exam_status': sortCol = 'ga.status'; break;
+                    case 'exam_starts_on': sortCol = 'ga.validFrom'; break;
+                    case 'exam_ends_on': sortCol = 'ga.validTo'; break;
+                    default: sortCol = 'ga.validFrom';
+                }
+                qb.orderBy(sortCol, sortOrder);
+            } else {
+                qb.orderBy('ga.id', 'DESC');
+            }
+
+            const [rows, total] = await qb
+                .skip((page - 1) * limit)
+                .take(limit)
+                .getManyAndCount();
+
+            const data = rows.map(r => ({
+                id: r.id,
+                programId: r.programId,
+                program: r.program,
+                status: r.status,
+                validFrom: r.validFrom,
+                validTo: r.validTo,
+                createdAt: r.validFrom,
+                groupId: r.groupId,
+                groupName: (r as any).group?.name || 'N/A',
+                userId: 0,
+                registrationId: 0,
+                currentLevel: 0,
+                totalLevels: 0,
+                totalCandidates: r.totalCandidates
+            }));
+
+            return {
+                data,
+                total,
+                page,
+                limit
+            };
+        }
+
+        // INDIVIDUAL ASSESSMENT LOGIC
+        const qb = this.sessionRepo
+            .createQueryBuilder('s')
+            .leftJoinAndSelect('s.user', 'u')
+            .leftJoinAndSelect('s.registration', 'r')
+            // Map Program entity
+            .leftJoinAndMapOne('s.program', Program, 'p', 'p.id = s.programId')
+            .where('r.corporateAccountId = :corpId', { corpId: corporate.id });
+
+        if (search) {
+            const s = `%${search.toLowerCase()}%`;
+            qb.andWhere('(LOWER(r.fullName) LIKE :s OR LOWER(u.email) LIKE :s)', { s });
+        }
+
+        if (startDate) {
+            qb.andWhere('s.validFrom >= :startDate', { startDate: `${startDate} 00:00:00` });
+        }
+        if (endDate) {
+            qb.andWhere('s.validFrom <= :endDate', { endDate: `${endDate} 23:59:59` });
+        }
+
+        if (status && status !== 'All') {
+            qb.andWhere('s.status = :status', { status });
+        }
+
+        if (userId) {
+            qb.andWhere('u.id = :userId', { userId });
+        }
+
+        // Filter out grouped ones if fetching individual
+        // Actually, individual view usually wants non-grouped. 
+        // But previously it showed everything? 
+        // Admin service logic: if 'individual' -> filter out grouped.
+        // User request: "in the Employee management page also, introfuce ne tabs like in admin Individual assesment and group assessments"
+        // So yes, split them.
+        if (type === 'individual') {
+            qb.andWhere('(s.groupId IS NULL OR s.groupId = 0)');
+        }
+
+        if (sortBy) {
+            let sortCol = '';
+            switch (sortBy) {
+                // Mappings for AssessmentSessionsTable
+                case 'exam_title': sortCol = 'p.assessment_title'; break;
+                case 'exam_status': sortCol = 's.status'; break;
+                case 'program_name': sortCol = 'p.name'; break;
+                case 'exam_starts_on': sortCol = 's.validFrom'; break;
+                case 'exam_ends_on': sortCol = 's.validTo'; break;
+                // Fallbacks/Others
+                case 'name': sortCol = 'r.fullName'; break;
+                case 'email': sortCol = 'u.email'; break;
+                case 'status': sortCol = 's.status'; break;
+                case 'validFrom': sortCol = 's.validFrom'; break;
+                case 'validTo': sortCol = 's.validTo'; break;
+                default: sortCol = 's.createdAt';
+            }
+            qb.orderBy(sortCol, sortOrder);
+        } else {
+            qb.orderBy('s.createdAt', 'DESC');
+        }
+
+        const [data, total] = await qb
+            .skip((page - 1) * limit)
+            .take(limit)
+            .getManyAndCount();
+
+        // Populate groupName for individual sessions if they happen to belong to group but shown here (unlikely if filtered)
+        // or just return as is.
+        // But wait, the frontend expects `groupName` if we reuse the table.
+        // Individual sessions usually don't have groupName or we can fetch it.
+        // But if filtering `groupId IS NULL`, no group name needed.
+
+        // However, we need to adapt structure to match frontend expectations if it changed.
+        // Frontend `AssessmentSessionsTable` uses `session.groupName`.
 
         return {
             data: data || [],

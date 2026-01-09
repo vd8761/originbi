@@ -99,8 +99,39 @@ export class CorporateDashboardController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('search') search?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
     if (!email) throw new BadRequestException('Email is required');
-    return this.dashboardService.getMyEmployees(email, page, limit, search);
+    return this.dashboardService.getMyEmployees(email, page, limit, search, startDate, endDate);
+  }
+  @Get('assessment-sessions')
+  async getAssessmentSessions(
+    @Query('email') email: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('status') status?: string,
+    @Query('userId') userId?: number,
+    @Query('type') type?: string,
+  ) {
+    if (!email) throw new BadRequestException('Email is required');
+    return this.dashboardService.getAssessmentSessions(
+      email,
+      page,
+      limit,
+      search,
+      sortBy,
+      sortOrder,
+      startDate,
+      endDate,
+      status,
+      userId,
+      type
+    );
   }
 }

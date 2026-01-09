@@ -18,6 +18,7 @@ import DateRangePickerModal from "@/components/ui/DateRangePickerModal";
 import ExcelExportButton from "@/components/ui/ExcelExportButton";
 import RegistrationTable from "@/components/ui/RegistrationTable";
 import AssessmentSessionsTable from "@/components/admin/AssessmentSessionsTable"; // Import
+import RegistrationPreview from "@/components/admin/RegistrationPreview"; // Import
 import { Registration } from "@/lib/types";
 import { registrationService } from "@/lib/services/registration.service";
 import { assessmentService, AssessmentSession } from "@/lib/services/assessment.service";
@@ -33,10 +34,11 @@ const useDebounce = (value: string, delay: number) => {
 };
 
 const RegistrationManagement: React.FC = () => {
-  const [view, setView] = useState<"list" | "add" | "bulk">("list");
-  const [activeTab, setActiveTab] = useState<"registrations" | "assigned">(
+  const [view, setView] = useState<"list" | "add" | "bulk" | "preview">("list");
+  const [activeTab, setActiveTab] = useState<"registrations" | "individual" | "group">(
     "registrations"
   );
+  const [selectedRegistration, setSelectedRegistration] = useState<Registration | null>(null);
 
   // Data State
   const [users, setUsers] = useState<Registration[]>([]);
@@ -47,10 +49,12 @@ const RegistrationManagement: React.FC = () => {
   // Independent Tab Counts
   const [tabCounts, setTabCounts] = useState<{
     registrations: number | null;
-    assigned: number | null;
+    individual: number | null;
+    group: number | null;
   }>({
     registrations: null,
-    assigned: null,
+    individual: null,
+    group: null,
   });
 
   // Pagination & Filter State
@@ -61,8 +65,11 @@ const RegistrationManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
 
   // Date Filter State
-  const [dateRangeLabel, setDateRangeLabel] = useState<string>("Today");
-  const [startDate, setStartDate] = useState<Date | null>(new Date());
+  const [dateRangeLabel, setDateRangeLabel] = useState<string>("This Month");
+  const [startDate, setStartDate] = useState<Date | null>(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
   const [endDate, setEndDate] = useState<Date | null>(new Date());
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
 
@@ -94,13 +101,15 @@ const RegistrationManagement: React.FC = () => {
   useEffect(() => {
     const fetchInitialCounts = async () => {
       try {
-        const [regRes, sessRes] = await Promise.all([
+        const [regRes, indRes, grpRes] = await Promise.all([
           registrationService.getRegistrations(1, 1, ""),
-          assessmentService.getSessions(1, 1, ""),
+          assessmentService.getSessions(1, 1, "", undefined, undefined, { type: 'individual' }),
+          assessmentService.getSessions(1, 1, "", undefined, undefined, { type: 'group' }),
         ]);
         setTabCounts({
           registrations: regRes.total,
-          assigned: sessRes.total,
+          individual: indRes.total,
+          group: grpRes.total,
         });
       } catch (e) {
         console.error("Failed to fetch initial tab counts", e);
@@ -123,42 +132,68 @@ const RegistrationManagement: React.FC = () => {
         return `${year}-${month}-${day}`;
       };
 
-      if (activeTab === 'registrations') {
-        const response = await registrationService.getRegistrations(
-          currentPage,
-          entriesPerPage,
+      const dateFilters = {
+        start_date: formatDate(startDate),
+        end_date: formatDate(endDate),
+      };
+
+      // Fetch both simultaneously to ensure tab counts are accurate with filters
+      // Fetch both simultaneously to ensure tab counts are accurate with filters
+      const [regRes, indRes, grpRes] = await Promise.all([
+        registrationService.getRegistrations(
+          activeTab === 'registrations' ? currentPage : 1,
+          activeTab === 'registrations' ? entriesPerPage : 1,
           debouncedSearchTerm,
           {
-            start_date: formatDate(startDate),
-            end_date: formatDate(endDate),
+            ...dateFilters,
+            status: statusFilter as any
           },
-          sortColumn,
-          sortOrder
-        );
-        setUsers(response.data);
-        setTotalCount(response.total);
-        if (tabCounts.registrations !== response.total) { // Update if changed (optional)
-          setTabCounts(prev => ({ ...prev, registrations: response.total }));
-        }
-      } else {
-        // ASSESSMENTS TAB
-        const response = await assessmentService.getSessions(
-          currentPage,
-          entriesPerPage,
+          activeTab === 'registrations' ? sortColumn : undefined,
+          activeTab === 'registrations' ? sortOrder : undefined
+        ),
+        assessmentService.getSessions(
+          activeTab === 'individual' ? currentPage : 1,
+          activeTab === 'individual' ? entriesPerPage : 1,
           debouncedSearchTerm,
-          sortColumn,
-          sortOrder,
+          activeTab === 'individual' ? sortColumn : undefined,
+          activeTab === 'individual' ? sortOrder : undefined,
           {
-            start_date: formatDate(startDate),
-            end_date: formatDate(endDate),
+            ...dateFilters,
             status: statusFilter || undefined,
+            type: 'individual'
           }
-        );
-        setSessions(response.data);
-        setTotalCount(response.total);
-        if (tabCounts.assigned !== response.total) {
-          setTabCounts(prev => ({ ...prev, assigned: response.total }));
-        }
+        ),
+        assessmentService.getSessions(
+          activeTab === 'group' ? currentPage : 1,
+          activeTab === 'group' ? entriesPerPage : 1,
+          debouncedSearchTerm,
+          activeTab === 'group' ? sortColumn : undefined,
+          activeTab === 'group' ? sortOrder : undefined,
+          {
+            ...dateFilters,
+            status: statusFilter || undefined,
+            type: 'group'
+          }
+        )
+      ]);
+
+      // Update Counts
+      setTabCounts({
+        registrations: regRes.total,
+        individual: indRes.total,
+        group: grpRes.total
+      });
+
+      // Update Data for Active View
+      if (activeTab === 'registrations') {
+        setUsers(regRes.data);
+        setTotalCount(regRes.total);
+      } else if (activeTab === 'individual') {
+        setSessions(indRes.data);
+        setTotalCount(indRes.total);
+      } else {
+        setSessions(grpRes.data);
+        setTotalCount(grpRes.total);
       }
 
     } catch (err) {
@@ -179,7 +214,7 @@ const RegistrationManagement: React.FC = () => {
     endDate,
     sortColumn,
     sortOrder,
-    tabCounts
+    statusFilter
   ]);
 
   const handleSort = (column: string) => {
@@ -214,10 +249,19 @@ const RegistrationManagement: React.FC = () => {
     }
   };
 
-  const handleTabChange = (tab: "registrations" | "assigned") => {
+  const handleViewDetails = (id: string) => {
+    const user = users.find(u => u.id === id);
+    if (user) {
+      setSelectedRegistration(user);
+      setView("preview");
+    }
+  };
+
+  const handleTabChange = (tab: "registrations" | "individual" | "group") => {
     setActiveTab(tab);
     setCurrentPage(1);
     setSearchTerm("");
+    setStatusFilter(null);
   };
 
   const handleExport = async () => {
@@ -413,6 +457,18 @@ const RegistrationManagement: React.FC = () => {
     return <BulkUploadRegistration onCancel={() => setView("list")} />;
   }
 
+  if (view === "preview" && selectedRegistration) {
+    return (
+      <RegistrationPreview
+        registration={selectedRegistration}
+        onBack={() => {
+          setView("list");
+          setSelectedRegistration(null);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col h-full w-full gap-6 font-sans">
       <DateRangePickerModal
@@ -433,7 +489,7 @@ const RegistrationManagement: React.FC = () => {
           <span className="mx-2 text-gray-400 dark:text-gray-600">
             <ArrowRightWithoutLineIcon className="w-3 h-3 text-black dark:text-white" />
           </span>
-          <span className="text-brand-green font-semibold">My Employees</span>
+          <span className="text-brand-green font-semibold">Registrations</span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-semibold text-[#150089] dark:text-white">
           Registrations &amp; Assessment Management
@@ -457,15 +513,27 @@ const RegistrationManagement: React.FC = () => {
             </span>
           </button>
           <button
-            onClick={() => handleTabChange("assigned")}
-            className={`px-1 py-3 text-sm sm:text-base border-b-2 transition-colors whitespace-nowrap cursor-pointer ${activeTab === "assigned"
+            onClick={() => handleTabChange("individual")}
+            className={`px-1 py-3 mr-8 text-sm sm:text-base border-b-2 transition-colors whitespace-nowrap cursor-pointer ${activeTab === "individual"
               ? "border-brand-green font-medium"
               : "border-transparent hover:border-gray-200 font-[300] opacity-60 hover:opacity-100"
               }`}
           >
-            <span className="text-[#19211C] dark:text-white">Assign Assessment</span>
+            <span className="text-[#19211C] dark:text-white">Individual Assessment</span>
             <span className="text-brand-green ml-1">
-              ({tabCounts.assigned !== null ? tabCounts.assigned : "..."})
+              ({tabCounts.individual !== null ? tabCounts.individual : "..."})
+            </span>
+          </button>
+          <button
+            onClick={() => handleTabChange("group")}
+            className={`px-1 py-3 text-sm sm:text-base border-b-2 transition-colors whitespace-nowrap cursor-pointer ${activeTab === "group"
+              ? "border-brand-green font-medium"
+              : "border-transparent hover:border-gray-200 font-[300] opacity-60 hover:opacity-100"
+              }`}
+          >
+            <span className="text-[#19211C] dark:text-white">Group Assessments</span>
+            <span className="text-brand-green ml-1">
+              ({tabCounts.group !== null ? tabCounts.group : "..."})
             </span>
           </button>
         </div>
@@ -565,7 +633,9 @@ const RegistrationManagement: React.FC = () => {
           />
 
           {/* Status Filter */}
-          {activeTab === 'assigned' && (
+          {/* Status Filter */}
+          {/* Status Filter */}
+          {activeTab !== 'registrations' && (
             <div className="relative" ref={statusDropdownRef}>
               <button
                 onClick={() => setShowStatusDropdown(!showStatusDropdown)}
@@ -578,7 +648,7 @@ const RegistrationManagement: React.FC = () => {
                       .toLowerCase()
                       .replace(/_/g, " ")
                       .replace(/\b\w/g, (c) => c.toUpperCase())
-                    : "All"}
+                    : "Filter"}
                 </span>
                 <ChevronDownIcon className="w-3 h-3 text-gray-500 dark:text-white" />
               </button>
@@ -589,14 +659,14 @@ const RegistrationManagement: React.FC = () => {
                     { label: 'Not Started', value: 'NOT_STARTED' },
                     { label: 'In Progress', value: 'IN_PROGRESS' },
                     { label: 'Completed', value: 'COMPLETED' },
-                    { label: 'Partially Completed', value: 'PARTIALLY_COMPLETED' },
+                    { label: 'Partially Expired', value: 'PARTIALLY_EXP' },
                     { label: 'Expired', value: 'EXPIRED' },
                   ].map((option) => (
                     <button
                       key={option.label}
                       onClick={() => { setStatusFilter(option.value); setShowStatusDropdown(false); }}
                       className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors
-                        ${statusFilter === option.value
+                          ${statusFilter === option.value
                           ? 'text-brand-green bg-gray-50 dark:bg-white/5'
                           : 'text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/5'
                         }`}
@@ -645,6 +715,7 @@ const RegistrationManagement: React.FC = () => {
             loading={loading}
             error={error}
             onToggleStatus={handleToggleStatus}
+            onViewDetails={handleViewDetails}
             sortColumn={sortColumn}
             sortOrder={sortOrder}
             onSort={handleSort}
@@ -657,6 +728,7 @@ const RegistrationManagement: React.FC = () => {
             sortColumn={sortColumn}
             sortOrder={sortOrder}
             onSort={handleSort}
+            isGroupView={activeTab === 'group'}
           />
         )}
 

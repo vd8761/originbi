@@ -199,6 +199,7 @@ export class CorporateRegistrationsService {
                 registrationId: registration.id,
                 programId: Number(program.id), // program.id is string in entity, cast if needed or use as is
                 groupId: groupId,
+                groupAssessmentId: dto.groupAssessmentId, // Link to Header
                 status: 'NOT_STARTED',
                 validFrom,
                 validTo,
