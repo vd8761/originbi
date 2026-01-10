@@ -63,6 +63,7 @@ export class CorporateService {
         } catch (err: any) {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
             const authErr = err?.response?.data || err?.message || err;
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
             const status = err?.response?.status;
 
             this.logger.error(`Error creating Cognito user (Status: ${status}):`, authErr);
