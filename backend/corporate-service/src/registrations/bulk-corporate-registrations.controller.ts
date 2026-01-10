@@ -11,6 +11,11 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { BulkCorporateRegistrationsService } from './bulk-corporate-registrations.service';
 
+export interface MulterFile {
+    buffer: Buffer;
+    originalname: string;
+}
+
 @Controller('corporate/registrations/bulk')
 export class BulkCorporateRegistrationsController {
     constructor(
@@ -20,7 +25,7 @@ export class BulkCorporateRegistrationsController {
     @Post('preview')
     @UseInterceptors(FileInterceptor('file'))
     async preview(
-        @UploadedFile() file: Express.Multer.File,
+        @UploadedFile() file: MulterFile,
         @Body('userId') userId: number
     ) {
         if (!file) throw new BadRequestException('File is required');
