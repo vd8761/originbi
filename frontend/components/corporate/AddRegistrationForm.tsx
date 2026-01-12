@@ -390,7 +390,12 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
           disabled={isLoading}
           className="w-full sm:w-auto px-12 py-3.5 rounded-full bg-brand-green text-white font-bold hover:bg-brand-green/90 shadow-lg shadow-green-900/20 transition-all disabled:opacity-50 text-sm flex justify-center items-center"
         >
-          {isLoading ? "Processing..." : "Register"}
+          {isLoading ? (
+            <>
+              <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+              Processing...
+            </>
+          ) : "Register"}
         </button>
       </div>
     </div>

@@ -97,17 +97,27 @@ const BulkUploadRegistration: React.FC<BulkUploadRegistrationProps> = ({ onCance
         }
     };
 
+    // Confirm State
+    const [isConfirming, setIsConfirming] = useState(false);
+
+    // ... (keep polling effect)
+
+    // ... (keep handleFileSelected)
+
     const handleReviewClick = () => {
         setView('review');
     };
 
     const handleConfirm = async (overrides: any[]) => {
         if (!importId) return;
+        setIsConfirming(true);
         try {
             await corporateRegistrationService.bulkExecute(importId, overrides);
             setView('processing');
         } catch (err: any) {
             setError(err.message);
+        } finally {
+            setIsConfirming(false);
         }
     };
 
@@ -153,6 +163,7 @@ const BulkUploadRegistration: React.FC<BulkUploadRegistrationProps> = ({ onCance
                     onConfirm={handleConfirm}
                     onCancel={handleReset}
                     groups={groups}
+                    isSubmitting={isConfirming}
                 />
             )}
 

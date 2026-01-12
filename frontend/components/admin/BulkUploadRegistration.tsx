@@ -23,6 +23,7 @@ const BulkUploadRegistration: React.FC<BulkUploadRegistrationProps> = ({ onCance
     // Review State
     const [validRows, setValidRows] = useState<any[]>([]);
     const [invalidRows, setInvalidRows] = useState<any[]>([]);
+    const [isConfirming, setIsConfirming] = useState(false);
 
     // Success State
     const [summary, setSummary] = useState({ total: 0, success: 0, skipped: 0 });
@@ -102,11 +103,14 @@ const BulkUploadRegistration: React.FC<BulkUploadRegistrationProps> = ({ onCance
 
     const handleConfirm = async (overrides: any[]) => {
         if (!importId) return;
+        setIsConfirming(true);
         try {
             await registrationService.bulkExecute(importId, overrides);
             setView('processing');
         } catch (err: any) {
             setError(err.message);
+        } finally {
+            setIsConfirming(false);
         }
     };
 
@@ -152,6 +156,7 @@ const BulkUploadRegistration: React.FC<BulkUploadRegistrationProps> = ({ onCance
                     onConfirm={handleConfirm}
                     onCancel={handleReset}
                     groups={groups}
+                    isSubmitting={isConfirming}
                 />
             )}
 
