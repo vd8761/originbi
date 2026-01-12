@@ -32,6 +32,19 @@ export class CorporateRegistrationsService {
     private authServiceBaseUrl =
         process.env.AUTH_SERVICE_URL || 'http://localhost:4002';
 
+    async withRetry<T>(operation: () => Promise<T>, retries = 5, delay = 1000): Promise<T> {
+        try {
+            return await operation();
+        } catch (error: any) {
+            if (retries > 0 && (error.response?.status === 429 || error.code === 'TooManyRequestsException' || error.message?.includes('Too Many Requests'))) {
+                this.logger.warn(`Rate limit hit. Retrying in ${delay}ms... (${retries} retries left)`);
+                await new Promise(res => setTimeout(res, delay));
+                return this.withRetry(operation, retries - 1, delay * 2);
+            }
+            throw error;
+        }
+    }
+
     constructor(
         @InjectRepository(CorporateAccount)
         private readonly corpRepo: Repository<CorporateAccount>,
@@ -84,15 +97,18 @@ export class CorporateRegistrationsService {
         // 3. Create Cognito User
         let sub: string;
         try {
-            const res$ = this.http.post(
-                `${this.authServiceBaseUrl}/internal/cognito/users`,
-                {
-                    email: dto.email,
-                    password,
-                    groupName: 'STUDENT',
-                },
+            const res = await this.withRetry(() =>
+                firstValueFrom(
+                    this.http.post(
+                        `${this.authServiceBaseUrl}/internal/cognito/users`,
+                        {
+                            email: dto.email,
+                            password,
+                            groupName: 'STUDENT',
+                        },
+                    )
+                )
             );
-            const res = await firstValueFrom(res$);
             sub = res.data.sub;
         } catch (err: any) {
             this.logger.error('Error creating Cognito user', err.response?.data || err);

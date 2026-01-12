@@ -46,27 +46,54 @@ export class RegistrationsService {
     private readonly http: HttpService,
   ) { }
 
+  async withRetry<T>(operation: () => Promise<T>, retries = 5, delay = 1000): Promise<T> {
+    try {
+      return await operation();
+    } catch (error: unknown) {
+      type Retryable = { response?: { status?: number }; code?: string; message?: string };
+      const err = (typeof error === 'object' && error !== null) ? (error as Retryable) : {};
+
+      const isRateLimit =
+        (err.response?.status === 429) ||
+        (err.code === 'TooManyRequestsException') ||
+        (typeof err.message === 'string' && err.message.includes('Too Many Requests'));
+
+      if (retries > 0 && isRateLimit) {
+        this.logger.warn(`Rate limit hit in RegistrationsService. Retrying in ${delay}ms... (${retries} retries left)`);
+        await new Promise(res => setTimeout(res, delay));
+        return this.withRetry(operation, retries - 1, delay * 2);
+      }
+      throw error;
+    }
+  }
+
   // ---------------------------------------------------------
   // Helper: Call auth-service to create a Cognito user
   // ---------------------------------------------------------
   private async createCognitoUser(email: string, password: string) {
     try {
-      const res$ = this.http.post(
-        `${this.authServiceBaseUrl}/internal/cognito/users`,
-        { email, password },
-        { proxy: false },
+      const res = await this.withRetry(() =>
+        firstValueFrom(
+          this.http.post(
+            `${this.authServiceBaseUrl}/internal/cognito/users`,
+            { email, password },
+            { proxy: false },
+          )
+        )
       );
-      const res = await firstValueFrom(res$);
       return res.data as { sub?: string };
-    } catch (err: any) {
+    } catch (err: unknown) {
       /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-      const authErr = err?.response?.data || err?.message || err;
+      type AuthErr = { response?: { data?: any; status?: number }; message?: string; code?: string };
+      const e = (typeof err === 'object' && err !== null) ? (err as AuthErr) : {};
+
+      const authErr = e.response?.data || e.message || err;
 
       this.logger.error('Error creating Cognito user:', authErr);
 
       const msg =
         typeof authErr === 'object' && authErr !== null
-          ? authErr.message || JSON.stringify(authErr)
+          ? (authErr as any).message || JSON.stringify(authErr)
           : String(authErr);
 
       throw new InternalServerErrorException(

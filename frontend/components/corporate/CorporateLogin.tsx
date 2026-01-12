@@ -20,7 +20,7 @@ const CorporateLogin: React.FC<CorporateLoginProps> = ({
   return (
     <div className="relative w-full min-h-[100dvh] overflow-hidden bg-[#FAFAFA] dark:bg-brand-dark-primary transition-colors duration-300">
       {/* GLOBAL BACKGROUND LAYERS (Full Screen) */}
-      <div className="absolute inset-0 pointer-events-none z-0">
+      <div className="fixed inset-0 pointer-events-none z-0">
         {/* Light Theme Background */}
         <div className="absolute inset-0 bg-[url('/Background_Light_Theme.svg')] bg-cover bg-center bg-no-repeat opacity-100 dark:hidden" />
         {/* Dark Theme Background */}
@@ -32,9 +32,9 @@ const CorporateLogin: React.FC<CorporateLoginProps> = ({
       </div>
 
       {/* CONTENT CONTAINER (Centered / Max Width) */}
-      <div className="relative z-10 w-full max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-12 lg:h-screen min-h-[100dvh] px-[clamp(24px,8.33vw,160px)]">
+      <div className="relative z-10 w-full max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-12 min-h-[100dvh] px-[clamp(24px,8.33vw,160px)]">
         {/* Left Column: Grid Layout [Header, Content, Footer] */}
-        <div className="order-1 lg:col-span-5 flex flex-col justify-start gap-4 lg:h-full h-auto py-[clamp(16px,2vw,32px)] px-1 relative lg:overflow-y-auto z-10 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+        <div className="order-1 lg:col-span-5 flex flex-col justify-start gap-4 h-auto py-[clamp(16px,2vw,32px)] px-1 relative z-10">
           {/* Header */}
           <header className="w-full max-w-[clamp(360px,30vw,640px)] self-start flex items-center justify-between shrink-0 mb-8">
             <div className="w-[clamp(100px,7vw,130px)]">
