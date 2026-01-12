@@ -142,8 +142,8 @@ export class CognitoService {
    */
   private async executeWithRetry<T>(
     operation: () => Promise<T>,
-    maxRetries = 5,
-    baseDelay = 1000
+    maxRetries = 10,
+    baseDelay = 2000
   ): Promise<T> {
     let lastError: any;
 
