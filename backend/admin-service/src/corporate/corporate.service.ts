@@ -84,7 +84,7 @@ export class CorporateService {
             return res.data as { sub?: string };
         } catch (err: unknown) {
             // Narrow error shape
-            type AuthErr = { response?: { data?: any; status?: number }; message?: string; code?: string };
+            type AuthErr = { response?: { data?: unknown; status?: number }; message?: string; code?: string };
             const e = (typeof err === 'object' && err !== null) ? (err as AuthErr) : {};
 
             // Preserve the previous behavior: prefer response.data, then message, then raw error
