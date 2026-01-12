@@ -111,12 +111,6 @@ export class BulkCorporateRegistrationsService {
                 .on('end', () => resolve(true));
         });
 
-        // Check Credits
-        if (rawRows.length > corporateAccount.availableCredits) {
-            this.logger.warn(`Insufficient credits. Required: ${rawRows.length}, Available: ${corporateAccount.availableCredits}`);
-            throw new BadRequestException(`Insufficient credits. You have ${corporateAccount.availableCredits} credits but uploaded ${rawRows.length} users.`);
-        }
-
         // 4. Batch Validation Checks (Duplicates)
         const emails = rawRows.map(r => r['Email'] || r['email']).filter(Boolean);
         const mobiles = rawRows.map(r => r['Mobile'] || r['mobile'] || r['mobile_number']).filter(Boolean);
@@ -150,6 +144,31 @@ export class BulkCorporateRegistrationsService {
             const m = u.metadata?.mobile;
             if (m) userMapByMobile.set(String(m).trim(), u);
         });
+
+        // Check Credits
+        let newRegistrationsCount = 0;
+        for (const row of rawRows) {
+            const email = row['Email'] || row['email'];
+            const mobile = row['Mobile'] || row['mobile'] || row['mobile_number'];
+            // Normalize mobile for comparison if available
+            const inputMobile = mobile ? String(mobile).trim() : '';
+
+            const exists = (email && userMapByEmail.has(email)) || (inputMobile && userMapByMobile.has(inputMobile));
+            if (!exists) {
+                newRegistrationsCount++;
+            }
+        }
+
+        // Check if credits are zero - ONLY if we are trying to add new people
+        if (corporateAccount.availableCredits <= 0 && newRegistrationsCount > 0) {
+            throw new BadRequestException('Could not register the employees since credits are zero. You need to purchase the credits before the registrations.');
+        }
+
+        // Check if credits are sufficient for the NEW registrations
+        if (newRegistrationsCount > corporateAccount.availableCredits) {
+            this.logger.warn(`Insufficient credits. Required: ${newRegistrationsCount}, Available: ${corporateAccount.availableCredits}, Total Skipped: ${rawRows.length - newRegistrationsCount}`);
+            throw new BadRequestException(`Insufficient credits. You have ${corporateAccount.availableCredits} credits but new registrations count is ${newRegistrationsCount}.`);
+        }
 
         // 5. Process Rows
         const rowsToInsert: BulkImportRow[] = [];
@@ -343,7 +362,7 @@ export class BulkCorporateRegistrationsService {
             }
 
             // Create Batch Key
-            const batchKey = `${this.normalizeString(effectiveGroupName)}|${programId || 'UNKNOWN'}|${dto.examStart}|${dto.examEnd}`;
+            const batchKey = `${this.normalizeString(effectiveGroupName)}|${programId || 'UNKNOWN'}`;
 
             if (!batches.has(batchKey)) {
                 batches.set(batchKey, {
@@ -455,12 +474,37 @@ export class BulkCorporateRegistrationsService {
                     }
                     dto.groupAssessmentId = Number(groupAssessmentId);
 
-                    // Call Registration Service
-                    // Note: registerCandidate also tries to create Group if not exists, but we did it above.
-                    // It also deducts credits.
-                    await this.corporateRegistrationsService.registerCandidate(dto, createdById);
+                    // Check if user exists to decide between Register (Paid) or Assign (Free)
+                    const email = row.rawData['Email'] || row.rawData['email'];
+                    const mobile = row.rawData['Mobile'] || row.rawData['mobile'] || row.rawData['mobile_number'];
+                    const mobileNorm = mobile ? String(mobile).trim() : '';
 
-                    row.resultType = 'CREATED';
+                    // We need to re-verify existence here or use the map.
+                    // Since specific user ID is needed for assignment, we need to query or re-use map.
+                    // For safety, let's query the specific user.
+                    // (To avoid N+1, ideally we passed the map, but processJob is batch-async)
+                    // We can reuse the `existingUsersCheck` logic if we scope it correctly, but we didn't save it to a map with IDs.
+
+                    let existingUserId: number | null = null;
+                    if (email) {
+                        const u = await this.userRepo.findOne({ where: { email } });
+                        if (u) existingUserId = u.id;
+                    }
+                    if (!existingUserId && mobileNorm) {
+                        const u = await this.userRepo.createQueryBuilder('u').where("u.metadata->>'mobile' = :mobile", { mobile: mobileNorm }).getOne();
+                        if (u) existingUserId = u.id;
+                    }
+
+                    if (existingUserId) {
+                        // Free Assignment
+                        await this.corporateRegistrationsService.assignAssessmentToExistingUser(existingUserId, dto, createdById);
+                        row.resultType = 'ASSIGNED'; // Specific status for existing users
+                    } else {
+                        // Paid Registration
+                        await this.corporateRegistrationsService.registerCandidate(dto, createdById);
+                        row.resultType = 'CREATED';
+                    }
+
                     row.status = 'SUCCESS';
                     successCount++;
                     await this.bulkImportRowRepo.save(row);
