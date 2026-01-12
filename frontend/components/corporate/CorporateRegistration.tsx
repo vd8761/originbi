@@ -13,7 +13,7 @@ const CorporateRegistration: React.FC = () => {
     return (
         <div className="relative w-full min-h-[100dvh] overflow-hidden bg-[#FAFAFA] dark:bg-brand-dark-primary transition-colors duration-300">
             {/* GLOBAL BACKGROUND LAYERS (Full Screen) */}
-            <div className="absolute inset-0 pointer-events-none z-0">
+            <div className="fixed inset-0 pointer-events-none z-0">
                 <div className="absolute inset-0 bg-[url('/Background_Light_Theme.svg')] bg-cover bg-center bg-no-repeat opacity-100 dark:hidden" />
                 <div className="absolute inset-0 bg-[url('/Background_Dark_Theme.svg')] bg-cover bg-center bg-no-repeat opacity-100 hidden dark:block" />
 
@@ -26,7 +26,7 @@ const CorporateRegistration: React.FC = () => {
             <div className="relative z-10 w-full max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-12 lg:h-screen min-h-[100dvh] px-[clamp(24px,8.33vw,160px)]">
                 {/* Left Column: Grid Layout [Header, Content, Footer] */}
                 {/* Added overflow-y-auto to allow scrolling for long form */}
-                <div className="order-1 lg:col-span-5 flex flex-col justify-start gap-4 lg:h-full h-auto py-[clamp(16px,2vw,32px)] px-1 relative lg:overflow-y-auto z-10 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+                <div className="order-1 lg:col-span-5 flex flex-col justify-start gap-4 lg:h-full h-auto py-[clamp(16px,2vw,32px)] px-1 relative lg:overflow-y-auto z-10 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                     {/* Header */}
                     <header className="w-full max-w-[clamp(360px,30vw,640px)] self-start flex items-center justify-between shrink-0 mb-8">
                         <div className="w-[clamp(100px,7vw,130px)]">
@@ -63,7 +63,7 @@ const CorporateRegistration: React.FC = () => {
                 </div>
 
                 {/* Right Column: Testimonial/Hero Image */}
-                <div className="order-2 lg:col-span-7 hidden lg:flex h-full p-[clamp(16px,2vw,32px)] items-center justify-center">
+                <div className="order-2 lg:col-span-7 hidden lg:flex h-full pt-8 items-center justify-center">
                     <div className="w-full h-full rounded-[clamp(1.5rem,2.5vw,2.5rem)] overflow-hidden relative shadow-2xl">
                         <CorporateTestimonial />
                     </div>

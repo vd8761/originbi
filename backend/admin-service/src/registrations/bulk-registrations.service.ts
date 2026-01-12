@@ -453,6 +453,9 @@ export class BulkRegistrationsService {
 
             // C. Process Rows
             for (let i = 0; i < batch.rows.length; i++) {
+                // Throttle to prevent Cognito 429 errors (approx 5 requests/second)
+                await new Promise(resolve => setTimeout(resolve, 200));
+
                 const row = batch.rows[i];
                 const dto = batch.dtos[i];
 
