@@ -6,9 +6,10 @@ interface BulkReviewTableProps {
     onConfirm: (overrides: any[]) => void;
     onCancel: () => void;
     groups: any[]; // For dropdown
+    isSubmitting?: boolean;
 }
 
-export const BulkReviewTable: React.FC<BulkReviewTableProps> = ({ validRows, invalidRows, onConfirm, onCancel, groups }) => {
+export const BulkReviewTable: React.FC<BulkReviewTableProps> = ({ validRows, invalidRows, onConfirm, onCancel, groups, isSubmitting }) => {
     const [activeTab, setActiveTab] = useState<'valid' | 'invalid'>('valid');
     const [overrides, setOverrides] = useState<Record<number, string>>({}); // rowIndex -> groupId
 
@@ -211,9 +212,9 @@ export const BulkReviewTable: React.FC<BulkReviewTableProps> = ({ validRows, inv
                             ? 'bg-[#1ED36A] text-white hover:bg-[#1ED36A]/90'
                             : 'bg-gray-700 text-gray-400 cursor-not-allowed opacity-50'
                         }`}
-                    disabled={!(validRows.length > 0)}
+                    disabled={!(validRows.length > 0) || isSubmitting}
                 >
-                    Confirm & Register
+                    {isSubmitting ? 'Processing...' : 'Confirm & Register'}
                 </button>
             </div>
         </div>

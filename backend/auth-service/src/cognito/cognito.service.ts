@@ -58,7 +58,7 @@ export class CognitoService {
       let userSub: string | null = null;
 
       try {
-        const createRes = await this.cognitoClient.send(
+        const createRes = await this.executeWithRetry(() => this.cognitoClient.send(
           new AdminCreateUserCommand({
             UserPoolId: this.userPoolId,
             Username: email,
@@ -68,7 +68,7 @@ export class CognitoService {
             ],
             MessageAction: 'SUPPRESS',
           }),
-        );
+        ));
 
         username = createRes.User?.Username || email;
         userSub =
@@ -82,33 +82,33 @@ export class CognitoService {
         }
       }
 
-      await this.cognitoClient.send(
+      await this.executeWithRetry(() => this.cognitoClient.send(
         new AdminSetUserPasswordCommand({
           UserPoolId: this.userPoolId,
           Username: username,
           Password: password,
           Permanent: true,
         }),
-      );
+      ));
 
       if (groupName) {
-        await this.cognitoClient.send(
+        await this.executeWithRetry(() => this.cognitoClient.send(
           new AdminAddUserToGroupCommand({
             UserPoolId: this.userPoolId,
             Username: username,
             GroupName: groupName,
           }),
-        );
+        ));
       }
 
       if (!userSub) {
         try {
-          const getUserRes = await this.cognitoClient.send(
+          const getUserRes = await this.executeWithRetry(() => this.cognitoClient.send(
             new AdminGetUserCommand({
               UserPoolId: this.userPoolId,
               Username: username,
             }),
-          );
+          ));
 
           userSub =
             getUserRes.UserAttributes?.find((a) => a.Name === 'sub')?.Value ||
@@ -134,6 +134,40 @@ export class CognitoService {
         `Cognito error: ${error?.name || 'Unknown'} - ${error?.message || 'No message'}`,
       );
     }
+  }
+
+  /**
+   * Execute an AWS command with exponential backoff retry logic.
+   * Handles ToolManyRequestsException and ThrottlingException.
+   */
+  private async executeWithRetry<T>(
+    operation: () => Promise<T>,
+    maxRetries = 5,
+    baseDelay = 1000
+  ): Promise<T> {
+    let lastError: any;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error: any) {
+        lastError = error;
+        const isThrottling =
+          error?.name === 'TooManyRequestsException' ||
+          error?.name === 'ThrottlingException';
+
+        if (isThrottling && attempt < maxRetries) {
+          const delay = baseDelay * Math.pow(2, attempt); // 1s, 2s, 4s, 8s, 16s
+          console.warn(
+            `[CognitoService] Throttling detected. Retrying in ${delay}ms (Attempt ${attempt + 1}/${maxRetries})...`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        } else {
+          throw error;
+        }
+      }
+    }
+    throw lastError;
   }
 
   /**

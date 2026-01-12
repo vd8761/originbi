@@ -473,6 +473,9 @@ export class BulkCorporateRegistrationsService {
                     failCount++;
                     await this.bulkImportRowRepo.save(row);
                 }
+
+                // 200ms delay to throttle requests (Approx 5 req/sec)
+                await new Promise(resolve => setTimeout(resolve, 200));
             }
             // Update progress
             await this.bulkImportRepo.increment({ id: jobId }, 'processedCount', batch.rows.length);
