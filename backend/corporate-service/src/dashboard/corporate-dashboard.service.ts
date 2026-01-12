@@ -83,6 +83,19 @@ export class CorporateDashboardService {
         }
     }
 
+    async withRetry<T>(operation: () => Promise<T>, retries = 5, delay = 1000): Promise<T> {
+        try {
+            return await operation();
+        } catch (error: any) {
+            if (retries > 0 && (error.response?.status === 429 || error.code === 'TooManyRequestsException' || error.message?.includes('Too Many Requests'))) {
+                console.warn(`Rate limit hit in CorporateDashboardService. Retrying in ${delay}ms... (${retries} retries left)`);
+                await new Promise(res => setTimeout(res, delay));
+                return this.withRetry(operation, retries - 1, delay * 2);
+            }
+            throw error;
+        }
+    }
+
     async getStats(email: string) {
         const { ILike } = require('typeorm');
         const user = await this.userRepo.findOne({ where: { email: ILike(email) } });
@@ -260,8 +273,7 @@ export class CorporateDashboardService {
         try {
             const baseUrl = this.authServiceUrl.replace(/\/$/, '');
             const url = `${baseUrl}/internal/cognito/users`;
-            const res$ = this.httpService.post(url, { email, password, groupName });
-            const res = await firstValueFrom(res$);
+            const res = await this.withRetry(() => firstValueFrom(this.httpService.post(url, { email, password, groupName })));
             return res.data as { sub?: string };
         } catch (err: any) {
             console.error('Error creating Cognito user:', err);

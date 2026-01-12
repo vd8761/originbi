@@ -34,6 +34,27 @@ export class ForgotPasswordService {
       'http://localhost:4002';
   }
 
+  async withRetry<T>(operation: () => Promise<T>, retries = 5, delay = 1000): Promise<T> {
+    try {
+      return await operation();
+    } catch (error: unknown) {
+      type Retryable = { response?: { status?: number }; code?: string; message?: string };
+      const err = (typeof error === 'object' && error !== null) ? (error as Retryable) : {};
+
+      const isRateLimit =
+        (err.response?.status === 429) ||
+        (err.code === 'TooManyRequestsException') ||
+        (typeof err.message === 'string' && err.message.includes('Too Many Requests'));
+
+      if (retries > 0 && isRateLimit) {
+        console.warn(`Rate limit hit in ForgotPasswordService. Retrying in ${delay}ms... (${retries} retries left)`);
+        await new Promise(res => setTimeout(res, delay));
+        return this.withRetry(operation, retries - 1, delay * 2);
+      }
+      throw error;
+    }
+  }
+
   async checkAdminEligibility(email: string): Promise<boolean> {
     const user = await this.usersRepository.findOne({ where: { email } });
     if (!user) return false;
@@ -72,17 +93,19 @@ export class ForgotPasswordService {
 
     // 3. Call Auth Service to Trigger Reset
     try {
-      await firstValueFrom(
+      await this.withRetry(() => firstValueFrom(
         this.httpService.post(
           `${this.authServiceUrl}/internal/cognito/forgot-password`,
           { email },
         ),
-      );
-    } catch (error: any) {
+      ));
+    } catch (error: unknown) {
+      type ApiErr = { response?: { data?: any; status?: number }; message?: string; code?: string };
+      const e = (typeof error === 'object' && error !== null) ? (error as ApiErr) : {};
+
       console.error(
         'Auth Service Forgot Password Failed:',
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        error?.response?.data || error.message,
+        e.response?.data || e.message || error,
       );
       throw new InternalServerErrorException(
         'Failed to initiate password reset. Please try again.',
