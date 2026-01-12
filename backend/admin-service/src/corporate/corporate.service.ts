@@ -131,7 +131,7 @@ export class CorporateService {
                     case 'is_blocked': sortCol = 'c.isBlocked'; break;
                     case 'user.email': sortCol = 'u.email'; break;
                     case 'user.mobile_number': sortCol = 'c.mobileNumber'; break;
-                    case 'user.gender': sortCol = 'u.gender'; break;
+
                     // For things we can't easily sort (like metadata json), we skip or fallback
                     default: sortCol = 'c.createdAt'; // Fallback
                 }
@@ -169,8 +169,7 @@ export class CorporateService {
                 data: rows.map((r) => ({
                     ...r, // Include original properties just in case
                     id: r.id,
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-                    full_name: r.user?.metadata?.fullName || '',
+                    full_name: (r.user?.metadata as { fullName?: string })?.fullName || '', // eslint-disable-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
                     email: r.user?.email || '',
                     mobile_number: r.mobileNumber,
                     country_code: r.countryCode,
