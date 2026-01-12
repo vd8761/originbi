@@ -144,7 +144,7 @@ export class CorporateService {
                 data: rows.map((r) => ({
                     ...r, // Include original properties just in case
                     id: r.id,
-                    full_name: (r.user?.metadata as { fullName?: string })?.fullName || '',
+                    full_name: (r.user?.metadata as { fullName?: string })?.fullName || '', // eslint-disable-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
                     email: r.user?.email || '',
                     mobile_number: r.mobileNumber,
                     country_code: r.countryCode,
