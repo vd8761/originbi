@@ -106,7 +106,10 @@ export class CorporateService {
                     case 'is_blocked': sortCol = 'c.isBlocked'; break;
                     case 'user.email': sortCol = 'u.email'; break;
                     case 'user.mobile_number': sortCol = 'c.mobileNumber'; break;
-                    case 'user.gender': sortCol = 'u.gender'; break;
+                    case 'user.gender':
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                        sortCol = 'u.gender';
+                        break;
                     // For things we can't easily sort (like metadata json), we skip or fallback
                     default: sortCol = 'c.createdAt'; // Fallback
                 }
