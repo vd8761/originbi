@@ -162,7 +162,13 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
       await registrationService.createRegistration(formData);
       onRegister();
     } catch (err: any) {
-      setError(err.message || "Failed to create registration.");
+      console.error("Registration Error:", err);
+      let message = err.message || "Failed to create registration.";
+      // Sanitize if HTML/Document is returned (e.g., Cloudflare, 404/500 HTML pages)
+      if (typeof message === "string" && (message.trim().startsWith("<") || message.includes("<!DOCTYPE"))) {
+        message = "Server Connection Error: The API returned an invalid response (HTML). Please check your NEXT_PUBLIC_ADMIN_API_BASE_URL configuration to ensure it points to the correct backend service.";
+      }
+      setError(message);
     } finally {
       setIsLoading(false);
     }

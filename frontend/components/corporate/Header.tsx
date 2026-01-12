@@ -248,7 +248,7 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <header
-      className="fixed top-0 left-0 right-0 w-full z-50 transition-all duration-300 bg-transparent backdrop-blur-xl border-b border-[#E0E0E0] dark:border-white/10 shadow-none"
+      className="fixed top-0 left-0 right-0 w-full z-50 transition-all duration-300 bg-transparent dark:bg-white/[0.08] backdrop-blur-xl border-b border-[#E0E0E0] dark:border-white/10 shadow-none"
     >
       <div className="w-full max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 2xl:px-12 py-3 sm:py-4 flex items-center justify-between h-full">
         <div className="flex items-center gap-2 lg:gap-2 2xl:gap-4">
