@@ -23,7 +23,7 @@ const CorporateRegistration: React.FC = () => {
             </div>
 
             {/* CONTENT CONTAINER */}
-            <div className="relative z-10 w-full max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-12 lg:h-screen min-h-[100dvh] px-[clamp(24px,8.33vw,160px)]">
+            <div className="relative z-10 w-full max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-12 lg:h-[100dvh] min-h-[100dvh] px-[clamp(24px,8.33vw,160px)]">
                 {/* Left Column: Grid Layout [Header, Content, Footer] */}
                 {/* Added overflow-y-auto to allow scrolling for long form */}
                 <div className="order-1 lg:col-span-5 flex flex-col justify-start gap-4 lg:h-full h-auto py-[clamp(16px,2vw,32px)] px-1 relative lg:overflow-y-auto z-10 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
