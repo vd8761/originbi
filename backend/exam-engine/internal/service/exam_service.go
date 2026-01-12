@@ -165,7 +165,7 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 		db.Raw(`
             SELECT o.disc_factor, SUM(o.score_value) as total 
             FROM assessment_answers a 
-            JOIN assessment_question_options o ON a.main_option_id = o.id 
+            JOIN assessment_question_options o ON a.main_option_id = o."qus_option_ID" 
             WHERE a.assessment_attempt_id = ? 
             GROUP BY o.disc_factor
         `, answerRecord.AssessmentAttemptID).Scan(&scores)
