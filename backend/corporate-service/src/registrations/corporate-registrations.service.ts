@@ -316,4 +316,134 @@ export class CorporateRegistrationsService {
             // Attachments removed in favor of hosted images
         });
     }
+    async assignAssessmentToExistingUser(
+        userId: number,
+        dto: CreateCandidateDto,
+        corporateUserId: number
+    ) {
+        // 1. Fetch Corporate Account (needed for linking)
+        let corporateAccount = await this.corpRepo.findOne({ where: { userId: corporateUserId } });
+        if (!corporateAccount) {
+            const u = await this.userRepo.findOne({ where: { id: corporateUserId } });
+            if (u && u.corporateId) {
+                corporateAccount = await this.corpRepo.findOne({ where: { id: Number(u.corporateId) } });
+            }
+        }
+        if (!corporateAccount) throw new BadRequestException('Corporate account not found');
+
+        return this.dataSource.transaction(async (manager: EntityManager) => {
+            const user = await manager.findOne(User, { where: { id: userId } });
+            if (!user) throw new BadRequestException('User not found');
+
+            // 2. Ensure Registration Exists for this Corporate
+            let registration = await manager.findOne(Registration, {
+                where: { userId: user.id, corporateAccountId: corporateAccount.id }
+            });
+
+            if (!registration) {
+                // Determine Group ID if provided
+                let groupId: number | null = null;
+                if (dto.groupName) {
+                    let group = await manager.getRepository(Groups).findOne({
+                        where: { name: dto.groupName, corporateAccountId: corporateAccount.id }
+                    });
+                    if (!group) {
+                        // Should we create group? Yes, consistent with registerCandidate
+                        group = manager.create(Groups, {
+                            name: dto.groupName,
+                            corporateAccountId: corporateAccount.id,
+                            createdByUserId: corporateUserId,
+                            isActive: true
+                        });
+                        await manager.save(group);
+                    }
+                    groupId = group.id;
+                }
+
+                // Create Registration (No Debit)
+                registration = manager.create(Registration, {
+                    userId: user.id,
+                    registrationSource: 'CORPORATE',
+                    createdByUserId: corporateUserId,
+                    corporateAccountId: corporateAccount.id,
+                    status: 'COMPLETED',
+                    fullName: user.metadata?.fullName || dto.fullName,
+                    mobileNumber: user.metadata?.mobile || dto.mobile,
+                    gender: user.metadata?.gender || dto.gender || 'FEMALE',
+                    countryCode: '+91',
+                    groupId: groupId,
+                    metadata: {
+                        programType: dto.programType,
+                        groupName: dto.groupName,
+                        sendEmail: true
+                    }
+                });
+                await manager.save(registration);
+            }
+
+            // 3. Find Program
+            const program = await manager.getRepository(Program).findOne({ where: { name: dto.programType } });
+            if (!program) throw new BadRequestException(`Program '${dto.programType}' not found.`);
+
+            // 4. Create Session (Linked to GroupAssessment Header)
+            const validFrom = dto.examStart ? new Date(dto.examStart) : new Date();
+            const validTo = dto.examEnd ? new Date(dto.examEnd) : new Date();
+            if (!dto.examEnd) validTo.setDate(validTo.getDate() + 7);
+
+            const session = manager.create(AssessmentSession, {
+                userId: user.id,
+                registrationId: registration.id,
+                programId: Number(program.id),
+                groupId: registration.groupId, // Use group from registration
+                groupAssessmentId: dto.groupAssessmentId,
+                status: 'NOT_STARTED',
+                validFrom,
+                validTo,
+                metadata: {}
+            });
+            await manager.save(session);
+
+            // 5. Create Attempts
+            const levels = await manager.getRepository(AssessmentLevel).find({
+                where: { isMandatory: true },
+                order: { sortOrder: 'ASC' }
+            });
+
+            for (const level of levels) {
+                const attempt = manager.create(AssessmentAttempt, {
+                    userId: user.id,
+                    registrationId: registration.id,
+                    assessmentSessionId: session.id,
+                    programId: Number(program.id),
+                    assessmentLevelId: level.id,
+                    status: 'NOT_STARTED'
+                });
+                await manager.save(attempt);
+
+                if (level.levelNumber === 1 || level.name === 'Level 1') {
+                    await this.assessmentGenService.generateLevel1Questions(attempt, manager);
+                }
+            }
+
+            // 6. Send Email
+            try {
+                // Pass null password as we didn't create it
+                await this.sendWelcomeEmail(
+                    user.email,
+                    user.metadata?.fullName || dto.fullName,
+                    '******', // Masked password for existing users
+                    validFrom,
+                    program.assessment_title || program.name
+                );
+            } catch (e) {
+                this.logger.error('Failed to send welcome email', e);
+            }
+
+            return {
+                message: 'Assessment assigned to existing user successfully',
+                registrationId: registration.id,
+                userId: user.id
+            };
+        });
+    }
 }
