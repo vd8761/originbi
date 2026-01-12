@@ -46,17 +46,33 @@ export class RegistrationsService {
     private readonly http: HttpService,
   ) { }
 
+  async withRetry<T>(operation: () => Promise<T>, retries = 5, delay = 1000): Promise<T> {
+    try {
+      return await operation();
+    } catch (error: any) {
+      if (retries > 0 && (error.response?.status === 429 || error.code === 'TooManyRequestsException' || error.message?.includes('Too Many Requests'))) {
+        this.logger.warn(`Rate limit hit in RegistrationsService. Retrying in ${delay}ms... (${retries} retries left)`);
+        await new Promise(res => setTimeout(res, delay));
+        return this.withRetry(operation, retries - 1, delay * 2);
+      }
+      throw error;
+    }
+  }
+
   // ---------------------------------------------------------
   // Helper: Call auth-service to create a Cognito user
   // ---------------------------------------------------------
   private async createCognitoUser(email: string, password: string) {
     try {
-      const res$ = this.http.post(
-        `${this.authServiceBaseUrl}/internal/cognito/users`,
-        { email, password },
-        { proxy: false },
+      const res = await this.withRetry(() =>
+        firstValueFrom(
+          this.http.post(
+            `${this.authServiceBaseUrl}/internal/cognito/users`,
+            { email, password },
+            { proxy: false },
+          )
+        )
       );
-      const res = await firstValueFrom(res$);
       return res.data as { sub?: string };
     } catch (err: any) {
       /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */

@@ -47,6 +47,19 @@ export class CorporateService {
             'http://localhost:4002';
     }
 
+    async withRetry<T>(operation: () => Promise<T>, retries = 5, delay = 1000): Promise<T> {
+        try {
+            return await operation();
+        } catch (error: any) {
+            if (retries > 0 && (error.response?.status === 429 || error.code === 'TooManyRequestsException' || error.message?.includes('Too Many Requests'))) {
+                this.logger.warn(`Rate limit hit in CorporateService. Retrying in ${delay}ms... (${retries} retries left)`);
+                await new Promise(res => setTimeout(res, delay));
+                return this.withRetry(operation, retries - 1, delay * 2);
+            }
+            throw error;
+        }
+    }
+
     // ----------------------------------------------------------------
     // Helper: Create Cognito User (Shared logic with Registrations)
     // ----------------------------------------------------------------
@@ -57,8 +70,7 @@ export class CorporateService {
     ) {
         try {
             const url = `${this.authServiceBaseUrl}/internal/cognito/users`;
-            const res$ = this.http.post(url, { email, password, groupName });
-            const res = await firstValueFrom(res$);
+            const res = await this.withRetry(() => firstValueFrom(this.http.post(url, { email, password, groupName })));
             return res.data as { sub?: string };
         } catch (err: any) {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment

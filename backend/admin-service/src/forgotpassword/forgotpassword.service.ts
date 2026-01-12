@@ -34,6 +34,19 @@ export class ForgotPasswordService {
       'http://localhost:4002';
   }
 
+  async withRetry<T>(operation: () => Promise<T>, retries = 5, delay = 1000): Promise<T> {
+    try {
+      return await operation();
+    } catch (error: any) {
+      if (retries > 0 && (error.response?.status === 429 || error.code === 'TooManyRequestsException' || error.message?.includes('Too Many Requests'))) {
+        console.warn(`Rate limit hit in ForgotPasswordService. Retrying in ${delay}ms... (${retries} retries left)`);
+        await new Promise(res => setTimeout(res, delay));
+        return this.withRetry(operation, retries - 1, delay * 2);
+      }
+      throw error;
+    }
+  }
+
   async checkAdminEligibility(email: string): Promise<boolean> {
     const user = await this.usersRepository.findOne({ where: { email } });
     if (!user) return false;
@@ -72,12 +85,12 @@ export class ForgotPasswordService {
 
     // 3. Call Auth Service to Trigger Reset
     try {
-      await firstValueFrom(
+      await this.withRetry(() => firstValueFrom(
         this.httpService.post(
           `${this.authServiceUrl}/internal/cognito/forgot-password`,
           { email },
         ),
-      );
+      ));
     } catch (error: any) {
       console.error(
         'Auth Service Forgot Password Failed:',
