@@ -49,8 +49,16 @@ export class RegistrationsService {
   async withRetry<T>(operation: () => Promise<T>, retries = 5, delay = 1000): Promise<T> {
     try {
       return await operation();
-    } catch (error: any) {
-      if (retries > 0 && (error.response?.status === 429 || error.code === 'TooManyRequestsException' || error.message?.includes('Too Many Requests'))) {
+    } catch (error: unknown) {
+      type Retryable = { response?: { status?: number }; code?: string; message?: string };
+      const err = (typeof error === 'object' && error !== null) ? (error as Retryable) : {};
+
+      const isRateLimit =
+        (err.response?.status === 429) ||
+        (err.code === 'TooManyRequestsException') ||
+        (typeof err.message === 'string' && err.message.includes('Too Many Requests'));
+
+      if (retries > 0 && isRateLimit) {
         this.logger.warn(`Rate limit hit in RegistrationsService. Retrying in ${delay}ms... (${retries} retries left)`);
         await new Promise(res => setTimeout(res, delay));
         return this.withRetry(operation, retries - 1, delay * 2);
@@ -74,15 +82,18 @@ export class RegistrationsService {
         )
       );
       return res.data as { sub?: string };
-    } catch (err: any) {
+    } catch (err: unknown) {
       /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-      const authErr = err?.response?.data || err?.message || err;
+      type AuthErr = { response?: { data?: any; status?: number }; message?: string; code?: string };
+      const e = (typeof err === 'object' && err !== null) ? (err as AuthErr) : {};
+
+      const authErr = e.response?.data || e.message || err;
 
       this.logger.error('Error creating Cognito user:', authErr);
 
       const msg =
         typeof authErr === 'object' && authErr !== null
-          ? authErr.message || JSON.stringify(authErr)
+          ? (authErr as any).message || JSON.stringify(authErr)
           : String(authErr);
 
       throw new InternalServerErrorException(

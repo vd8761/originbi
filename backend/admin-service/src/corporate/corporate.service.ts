@@ -50,12 +50,22 @@ export class CorporateService {
     async withRetry<T>(operation: () => Promise<T>, retries = 5, delay = 1000): Promise<T> {
         try {
             return await operation();
-        } catch (error: any) {
-            if (retries > 0 && (error.response?.status === 429 || error.code === 'TooManyRequestsException' || error.message?.includes('Too Many Requests'))) {
+        } catch (error: unknown) {
+            // Narrow the error so eslint knows the shape we expect
+            type Retryable = { response?: { status?: number }; code?: string; message?: string };
+            const err = (typeof error === 'object' && error !== null) ? (error as Retryable) : {};
+
+            const isRateLimit =
+                (err.response?.status === 429) ||
+                (err.code === 'TooManyRequestsException') ||
+                (typeof err.message === 'string' && err.message.includes('Too Many Requests'));
+
+            if (retries > 0 && isRateLimit) {
                 this.logger.warn(`Rate limit hit in CorporateService. Retrying in ${delay}ms... (${retries} retries left)`);
                 await new Promise(res => setTimeout(res, delay));
                 return this.withRetry(operation, retries - 1, delay * 2);
             }
+            // Re-throw the original error (unknown) — caller will handle it
             throw error;
         }
     }
@@ -72,11 +82,14 @@ export class CorporateService {
             const url = `${this.authServiceBaseUrl}/internal/cognito/users`;
             const res = await this.withRetry(() => firstValueFrom(this.http.post(url, { email, password, groupName })));
             return res.data as { sub?: string };
-        } catch (err: any) {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-            const authErr = err?.response?.data || err?.message || err;
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-            const status = err?.response?.status;
+        } catch (err: unknown) {
+            // Narrow error shape
+            type AuthErr = { response?: { data?: any; status?: number }; message?: string; code?: string };
+            const e = (typeof err === 'object' && err !== null) ? (err as AuthErr) : {};
+
+            // Preserve the previous behavior: prefer response.data, then message, then raw error
+            const authErr = e.response?.data ?? e.message ?? err;
+            const status = e.response?.status;
 
             this.logger.error(`Error creating Cognito user (Status: ${status}):`, authErr);
 
