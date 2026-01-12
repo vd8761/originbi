@@ -83,7 +83,7 @@ export default function CorporateLayout({
             )}
 
             {/* --- CONTENT LAYER --- */}
-            <div className={`relative z-10 w-full min-h-screen ${showHeader ? 'pt-[clamp(75px,8vh,100px)]' : ''}`}>
+            <div className={`relative z-10 w-full min-h-screen ${showHeader ? 'pt-[clamp(70px,7.6vh,100px)]' : ''}`}>
                 {/* Responsive Container */}
                 <div className="w-full h-full max-w-[2000px] mx-auto transition-all duration-300 relative">
                     {/* --- DEV GRID OVERLAY --- */}
