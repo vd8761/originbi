@@ -27,10 +27,10 @@ const ToggleSwitch: React.FC<ToggleSwitchProps> = ({
     >
       {/* Text Labels */}
       {/* Text Labels */}
-      <span className={`text-[10px] lg:text-[0.52vw] font-bold text-white absolute left-2 lg:left-[0.41vw] transition-opacity duration-300 ${isOn ? 'opacity-100' : 'opacity-0'}`}>
+      <span className={`text-[10px] lg:text-[0.52vw] font-bold text-white absolute left-2 lg:left-[0.41vw] top-1/2 -translate-y-1/2 transition-opacity duration-300 ${isOn ? 'opacity-100' : 'opacity-0'}`}>
         {onLabel}
       </span>
-      <span className={`text-[10px] lg:text-[0.52vw] font-bold text-gray-500 absolute right-2 lg:right-[0.41vw] transition-opacity duration-300 ${isOn ? 'opacity-0' : 'opacity-100'}`}>
+      <span className={`text-[10px] lg:text-[0.52vw] font-bold text-gray-500 dark:text-gray-400 absolute right-2 lg:right-[0.41vw] top-1/2 -translate-y-1/2 transition-opacity duration-300 ${isOn ? 'opacity-0' : 'opacity-100'}`}>
         {offLabel}
       </span>
 

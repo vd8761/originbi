@@ -175,31 +175,55 @@ const Stepper: React.FC<StepperProps> = ({ steps }) => {
   );
 };
 
-const LockTimer: React.FC<{ time: string }> = ({ time }) => {
-  // Static for now, can be made dynamic
+interface LockTimerProps {
+  time: string;
+  onTimerExpire?: () => void;
+}
+
+const LockTimer: React.FC<LockTimerProps> = ({ time, onTimerExpire }) => {
   const [timeLeft, setTimeLeft] = useState("");
+  const [percentRemaining, setPercentRemaining] = useState(1); // 0 to 1
   const { language } = useLanguage();
   const t = translations[language];
   const radius = 100;
   const stroke = 12;
   const normalizedRadius = radius - stroke / 2;
   const circumference = normalizedRadius * Math.PI;
-  const strokeDashoffset = circumference - (75 / 100) * circumference;
 
   useEffect(() => {
+    let fired = false;
     const calculateTimeLeft = () => {
       const difference = +new Date(time) - +new Date();
+
+      // Calculate progress (Visual scale: 24h)
+      // If remaining time > 24h, bar is full.
+      const maxVisualDuration = 24 * 60 * 60 * 1000;
+      const ratio = Math.max(0, Math.min(difference / maxVisualDuration, 1));
+      setPercentRemaining(ratio);
+
       if (difference > 0) {
         const hours = Math.floor(difference / (1000 * 60 * 60));
         const minutes = Math.floor((difference / (1000 * 60)) % 60);
         return `${hours}h:${minutes}Min`;
       }
+
+      if (!fired && difference <= 0 && onTimerExpire) {
+        fired = true;
+        onTimerExpire();
+        return "0h:00Min";
+      }
+
       return "0h:00Min";
     };
+
     setTimeLeft(calculateTimeLeft());
-    const timer = setInterval(() => setTimeLeft(calculateTimeLeft()), 60000);
+    const timer = setInterval(() => setTimeLeft(calculateTimeLeft()), 60000); // Check every minute
     return () => clearInterval(timer);
-  }, [time]);
+  }, [time, onTimerExpire]);
+
+  // If ratio=1 (full time), offset=0 (Full stroke).
+  // If ratio=0 (empty), offset=circumference (Empty stroke).
+  const strokeDashoffset = circumference * (1 - percentRemaining);
 
   return (
     <div className="relative w-[100px] h-[55px] flex-shrink-0">
@@ -212,7 +236,7 @@ const LockTimer: React.FC<{ time: string }> = ({ time }) => {
           strokeLinecap="round"
         />
         <path
-          className="stroke-brand-green transition-all duration-1000 ease-out"
+          className="stroke-brand-green transition-all duration-1000 ease-linear"
           d="M 12 106 A 100 100 0 0 1 212 106"
           fill="none"
           strokeWidth={stroke}
@@ -247,8 +271,16 @@ const AssessmentCard: React.FC<AssessmentCardProps> = ({
 }) => {
   const { language } = useLanguage();
   const t = translations[language];
-  const isLocked = status === "locked";
-  const isNotStarted = status === "not-started";
+
+  // Local state to handle auto-unlock when timer expires
+  const [isTimerExpired, setIsTimerExpired] = useState(false);
+
+  // Derive status
+  // If original status is 'locked' BUT timer has expired, treat as 'not-started'
+  const effectiveStatus = (status === "locked" && isTimerExpired) ? "not-started" : status;
+
+  const isLocked = effectiveStatus === "locked";
+  const isNotStarted = effectiveStatus === "not-started";
   const showBlurOverlay = isLocked && !unlockTime;
 
   return (
@@ -276,7 +308,13 @@ const AssessmentCard: React.FC<AssessmentCardProps> = ({
               {description}
             </p>
           </div>
-          {isLocked && unlockTime && <LockTimer time={unlockTime} />}
+          {/* Only show timer if actually locked on server (status) and not yet expired locally */}
+          {status === "locked" && unlockTime && !isTimerExpired && (
+            <LockTimer
+              time={unlockTime}
+              onTimerExpire={() => setIsTimerExpired(true)}
+            />
+          )}
         </div>
 
         <div className="mb-4 mt-auto relative z-20">
@@ -305,23 +343,23 @@ const AssessmentCard: React.FC<AssessmentCardProps> = ({
               {completedQuestions}/{totalQuestions}
             </span>
             <span className="text-[clamp(8px,0.7vw,11px)] text-brand-text-light-white dark:text-brand-text-white">
-              {status === 'completed' ? `Completed on ${dateCompleted}` : 'Questions Completed'}
+              {effectiveStatus === 'completed' ? `Completed on ${dateCompleted}` : 'Questions Completed'}
             </span>
           </div>
           {!isLocked && (
             <button
               onClick={() => onAction(id)}
-              disabled={status === "completed"}
-              className={`px-4 py-1.5 rounded-full text-[clamp(8px,0.75vw,11px)] font-medium transition-colors duration-300 ${status === "completed"
+              disabled={effectiveStatus === "completed"}
+              className={`px-4 py-1.5 rounded-full text-[clamp(8px,0.75vw,11px)] font-medium transition-colors duration-300 ${effectiveStatus === "completed"
                 ? "bg-brand-light-tertiary dark:bg-brand-dark-tertiary text-brand-text-light-white dark:text-brand-text-white cursor-default"
-                : status === "in-progress" || status === "not-started"
+                : effectiveStatus === "in-progress" || effectiveStatus === "not-started"
                   ? "bg-brand-green text-white hover:bg-brand-green/90 shadow-lg shadow-brand-green/20"
                   : "bg-brand-light-tertiary dark:bg-brand-dark-tertiary text-brand-text-light-white dark:text-brand-text-white cursor-not-allowed"
                 }`}
             >
-              {status === "completed"
+              {effectiveStatus === "completed"
                 ? t.completed
-                : status === "in-progress"
+                : effectiveStatus === "in-progress"
                   ? (completedQuestions === totalQuestions ? t.finish : t.resume)
                   : t.start}
             </button>

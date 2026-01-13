@@ -65,20 +65,25 @@ export class ProgramsService {
         take: limit,
       });
 
-      return { data, total, page, limit };
+      return {
+        data: data.map(p => this.toResponse(p)),
+        total,
+        page,
+        limit
+      };
     } catch (error) {
       console.error('ProgramsService.findAll Error:', error);
       throw error;
     }
   }
 
-  async findOne(id: number): Promise<Program> { // id is number/bigint in shared entity
+  async findOne(id: number): Promise<any> { // id is number/bigint in shared entity
     const program = await this.programRepo.findOne({ where: { id: Number(id) } }); // Ensure numeric ID
     if (!program) throw new NotFoundException('Program not found');
-    return program;
+    return this.toResponse(program);
   }
 
-  async create(body: any): Promise<Program> {
+  async create(body: any): Promise<any> {
     const program = this.programRepo.create({
       code: body.code,
       name: body.name,
@@ -89,11 +94,12 @@ export class ProgramsService {
       isActive: body.is_active ?? true,
     });
 
-    return this.programRepo.save(program);
+    const saved = await this.programRepo.save(program);
+    return this.toResponse(saved);
   }
 
-  async update(id: number, body: any): Promise<Program> {
-    const program = await this.findOne(id);
+  async update(id: number, body: any): Promise<any> {
+    const program = await this.findOneEntity(id);
 
     if (body.code !== undefined) program.code = body.code;
     if (body.name !== undefined) program.name = body.name;
@@ -106,14 +112,39 @@ export class ProgramsService {
     if (body.is_demo !== undefined) program.isDemo = body.is_demo;
     if (body.is_active !== undefined) program.isActive = body.is_active;
 
-    return this.programRepo.save(program);
+    const saved = await this.programRepo.save(program);
+    return this.toResponse(saved);
   }
 
   // ⭐ FIXED: Toggle API
-  async updateStatus(id: number, isActive: boolean): Promise<Program> {
-    const program = await this.findOne(id);
+  async updateStatus(id: number, isActive: boolean): Promise<any> {
+    const program = await this.findOneEntity(id);
     program.isActive = isActive;
-    return this.programRepo.save(program);
+    const saved = await this.programRepo.save(program);
+    return this.toResponse(saved);
+  }
+
+  // Helper to find entity without mapping
+  private async findOneEntity(id: number): Promise<Program> {
+    const program = await this.programRepo.findOne({ where: { id: Number(id) } });
+    if (!program) throw new NotFoundException('Program not found');
+    return program;
+  }
+
+  // Helper to map to snake_case
+  private toResponse(program: Program) {
+    return {
+      id: program.id,
+      code: program.code,
+      name: program.name,
+      description: program.description,
+      assessment_title: program.assessmentTitle,
+      report_title: program.reportTitle,
+      is_demo: program.isDemo,
+      is_active: program.isActive,
+      created_at: program.createdAt,
+      updated_at: program.updatedAt,
+    };
   }
 
   async remove(id: number): Promise<void> {
