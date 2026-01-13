@@ -10,7 +10,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ProgramsService } from './programs.service';
-import { Program } from './entities/program.entity';
+import { Program } from '@originbi/shared-entities';
 
 @Controller('admin/programs')
 export class ProgramsController {
@@ -40,7 +40,7 @@ export class ProgramsController {
 
   @Get(':id')
   findOne(@Param('id') id: string): Promise<Program> {
-    return this.programsService.findOne(id);
+    return this.programsService.findOne(Number(id));
   }
 
   @Post()
@@ -50,7 +50,7 @@ export class ProgramsController {
 
   @Put(':id')
   update(@Param('id') id: string, @Body() body: any): Promise<Program> {
-    return this.programsService.update(id, body);
+    return this.programsService.update(Number(id), body);
   }
 
   // ⭐ FIXED: Status Toggle API
@@ -59,12 +59,12 @@ export class ProgramsController {
     @Param('id') id: string,
     @Body('is_active') is_active: boolean,
   ): Promise<Program> {
-    return this.programsService.updateStatus(id, is_active);
+    return this.programsService.updateStatus(Number(id), is_active);
   }
 
   @Delete(':id')
   async remove(@Param('id') id: string) {
-    await this.programsService.remove(id);
+    await this.programsService.remove(Number(id));
     return { success: true };
   }
 }

@@ -1,0 +1,29 @@
+{
+    "name": "@originbi/shared-entities",
+    "version": "1.0.0",
+    "description": "Shared TypeORM entities for OriginBI microservices",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "watch": "tsc --watch",
+        "prepublishOnly": "npm run build"
+    },
+    "peerDependencies": {
+        "typeorm": "^0.3.0"
+    },
+    "devDependencies": {
+        "typescript": "^5.3.0",
+        "typeorm": "^0.3.20"
+    },
+    "files": [
+        "dist",
+        "entities"
+    ],
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        }
+    }
+}

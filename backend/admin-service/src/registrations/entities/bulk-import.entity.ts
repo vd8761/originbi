@@ -6,7 +6,7 @@ import {
     ManyToOne,
     JoinColumn,
 } from 'typeorm';
-import { User } from '../../users/user.entity';
+import { User as AdminUser } from '@originbi/shared-entities';
 
 @Entity('bulk_imports')
 export class BulkImport {
@@ -16,9 +16,9 @@ export class BulkImport {
     @Column({ name: 'created_by', type: 'bigint', nullable: true })
     createdById: number;
 
-    @ManyToOne(() => User)
+    @ManyToOne(() => AdminUser)
     @JoinColumn({ name: 'created_by' })
-    createdBy: User;
+    createdBy: AdminUser;
 
     @Column({ type: 'varchar', length: 255, nullable: true })
     filename: string;

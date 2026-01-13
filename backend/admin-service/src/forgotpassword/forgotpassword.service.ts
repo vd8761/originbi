@@ -10,20 +10,20 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import { User } from '../users/user.entity';
 import {
+  User as AdminUser,
   UserActionLog,
   ActionType,
-  UserRole,
-} from '../entities/user-action-log.entity';
+  UserRole as AdminUserRole,
+} from '@originbi/shared-entities';
 
 @Injectable()
 export class ForgotPasswordService {
   private authServiceUrl: string;
 
   constructor(
-    @InjectRepository(User)
-    private usersRepository: Repository<User>,
+    @InjectRepository(AdminUser)
+    private usersRepository: Repository<AdminUser>,
     @InjectRepository(UserActionLog)
     private actionLogRepository: Repository<UserActionLog>,
     private httpService: HttpService,
@@ -80,7 +80,7 @@ export class ForgotPasswordService {
       where: {
         user: { id: user.id },
         actionType: ActionType.RESET_PASSWORD,
-        role: UserRole.ADMIN,
+        role: AdminUserRole.ADMIN,
         actionDate: today,
       },
     });
@@ -120,7 +120,7 @@ export class ForgotPasswordService {
       const newLog = this.actionLogRepository.create({
         user: user,
         userId: user.id,
-        role: UserRole.ADMIN,
+        role: AdminUserRole.ADMIN,
         actionType: ActionType.RESET_PASSWORD,
         actionDate: today,
         attemptCount: 1,

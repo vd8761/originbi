@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, EntityManager } from 'typeorm';
-import { Groups } from './groups.entity';
+import { Groups } from '@originbi/shared-entities';
 
 @Injectable()
 export class GroupsService {

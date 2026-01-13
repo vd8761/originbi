@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 
-import { AdminUser } from '../entities/AdminUser';
+import { User as AdminUser } from '@originbi/shared-entities';
 import { AdminLoginService } from './adminlogin.service';
 import { AdminLoginGuard } from './adminlogin.guard';
 
@@ -14,4 +14,4 @@ import { AdminLoginGuard } from './adminlogin.guard';
   providers: [AdminLoginService, AdminLoginGuard],
   exports: [AdminLoginGuard, AdminLoginService, TypeOrmModule],
 })
-export class AdminLoginModule {}
+export class AdminLoginModule { }

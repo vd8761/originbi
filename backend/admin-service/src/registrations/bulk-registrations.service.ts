@@ -10,12 +10,14 @@ import { Readable } from 'stream';
 
 import { BulkImport } from './entities/bulk-import.entity';
 import { BulkImportRow } from './entities/bulk-import-row.entity';
-import { Groups } from '../groups/groups.entity';
+import {
+    Groups,
+    User as AdminUser,
+    Program,
+    GroupAssessment
+} from '@originbi/shared-entities';
 import { RegistrationsService } from './registrations.service';
-import { User } from '../users/user.entity';
-import { Program } from '../programs/entities/program.entity';
 import { Department } from '../departments/department.entity';
-import { GroupAssessment } from '../assessment/group_assessment.entity';
 
 @Injectable()
 export class BulkRegistrationsService {
@@ -28,8 +30,8 @@ export class BulkRegistrationsService {
         private bulkImportRowRepo: Repository<BulkImportRow>,
         @InjectRepository(Groups)
         private groupsRepo: Repository<Groups>,
-        @InjectRepository(User)
-        private userRepo: Repository<User>,
+        @InjectRepository(AdminUser)
+        private userRepo: Repository<AdminUser>,
         @InjectRepository(Program)
         private programRepo: Repository<Program>,
         @InjectRepository(Department)
@@ -108,7 +110,7 @@ export class BulkRegistrationsService {
         const mobiles = rawRows.map(r => r['Mobile'] || r['mobile'] || r['mobile_number']).filter(Boolean);
 
         // Fetch users by Email OR Mobile
-        let existingUsers: User[] = [];
+        let existingUsers: AdminUser[] = [];
 
         if (emails.length > 0 || mobiles.length > 0) {
             const qb = this.userRepo.createQueryBuilder('u')
@@ -129,8 +131,8 @@ export class BulkRegistrationsService {
         }
 
         // Build User Maps
-        const userMapByEmail = new Map<string, User>();
-        const userMapByMobile = new Map<string, User>();
+        const userMapByEmail = new Map<string, AdminUser>();
+        const userMapByMobile = new Map<string, AdminUser>();
 
         existingUsers.forEach(u => {
             if (u.email) userMapByEmail.set(u.email, u); // Email is unique
@@ -619,8 +621,8 @@ export class BulkRegistrationsService {
         degreeMap: Map<string, any>,
         allGroups: Groups[],
         groupMap: Map<string, Groups>,
-        userMapByEmail: Map<string, User>,
-        userMapByMobile: Map<string, User>,
+        userMapByEmail: Map<string, AdminUser>,
+        userMapByMobile: Map<string, AdminUser>,
         userAssessmentMap: Map<number, any[]>,
         seenEmails: Set<string>,
         seenMobiles: Set<string>
@@ -708,8 +710,8 @@ export class BulkRegistrationsService {
         programMap: Map<string, Program>,
         deptMap: Map<string, Department>,
         degreeMap: Map<string, any>,
-        userMapByEmail: Map<string, User>,
-        userMapByMobile: Map<string, User>,
+        userMapByEmail: Map<string, AdminUser>,
+        userMapByMobile: Map<string, AdminUser>,
         userAssessmentMap: Map<number, any[]>,
         seenEmails: Set<string>,
         seenMobiles: Set<string>
@@ -811,7 +813,7 @@ export class BulkRegistrationsService {
         const existingByEmail = userMapByEmail.get(email);
         const existingByMobile = userMapByMobile.get(inputMobile);
 
-        // Case: User Exists by Email
+        // Case: AdminUser Exists by Email
         if (existingByEmail) {
             const dbMobile = normalizeMobile(existingByEmail.metadata?.mobile || '');
             if (dbMobile !== inputMobile) {
@@ -819,7 +821,7 @@ export class BulkRegistrationsService {
             }
         }
 
-        // Case: User Exists by Mobile
+        // Case: AdminUser Exists by Mobile
         if (existingByMobile) {
             const dbEmail = existingByMobile.email;
             if (dbEmail !== email) {
@@ -843,7 +845,7 @@ export class BulkRegistrationsService {
             );
 
             if (activeSession) {
-                return `Error: User already has an active assessment (Status: ${activeSession.status}). Cannot create a new one.`;
+                return `Error: AdminUser already has an active assessment (Status: ${activeSession.status}). Cannot create a new one.`;
             }
         } else {
             // New User -> Check Duplicates within the file itself

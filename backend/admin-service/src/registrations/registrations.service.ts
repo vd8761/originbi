@@ -9,13 +9,15 @@ import { Repository, DataSource } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 
-import { User } from '../users/user.entity';
-import { Registration } from './registration.entity';
+import {
+  User as AdminUser,
+  Registration,
+  Program,
+  AssessmentSession,
+  AssessmentAttempt,
+  AssessmentLevel,
+} from '@originbi/shared-entities';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
-import { Program } from '../programs/entities/program.entity';
-import { AssessmentSession } from '../assessment/assessment_session.entity';
-import { AssessmentAttempt } from '../assessment/assessment_attempt.entity';
-import { AssessmentLevel } from '../assessment/assessment_level.entity';
 import { GroupsService } from '../groups/groups.service';
 import { AssessmentGenerationService } from '../assessment/assessment-generation.service';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
@@ -33,8 +35,8 @@ export class RegistrationsService {
   private readonly ADMIN_USER_ID = 1;
 
   constructor(
-    @InjectRepository(User)
-    private readonly userRepo: Repository<User>,
+    @InjectRepository(AdminUser)
+    private readonly userRepo: Repository<AdminUser>,
 
     @InjectRepository(Registration)
     private readonly regRepo: Repository<Registration>,
@@ -169,7 +171,7 @@ export class RegistrationsService {
     // 4. Transaction
     return this.dataSource.transaction(async (manager) => {
       // A. Create User
-      const user = manager.create(User, {
+      const user = manager.create(AdminUser, {
         email: dto.email,
         role: 'STUDENT',
         emailVerified: true,
@@ -230,14 +232,14 @@ export class RegistrationsService {
         // Strict lookup for selected program
         const selectedProgram = await manager
           .getRepository(Program)
-          .findOne({ where: { id: dto.programType } });
+          .findOne({ where: { id: Number(dto.programType) } });
 
         if (!selectedProgram) {
           throw new BadRequestException(
             `Selected Program (ID: ${dto.programType}) not found.`,
           );
         }
-        if (!selectedProgram.is_active) {
+        if (!selectedProgram.isActive) {
           throw new BadRequestException(
             `Selected Program '${selectedProgram.name}' is not active.`,
           );
@@ -245,12 +247,12 @@ export class RegistrationsService {
 
         programId = Number(selectedProgram.id);
         programTitle =
-          selectedProgram.assessment_title || selectedProgram.name;
+          selectedProgram.assessmentTitle || selectedProgram.name;
       } else {
         // Fallback: Pick any active program (Legacy / Default)
         const defaultProgram = await manager
           .getRepository(Program)
-          .findOne({ where: { is_active: true } });
+          .findOne({ where: { isActive: true } });
 
         if (!defaultProgram) {
           throw new BadRequestException(
@@ -260,8 +262,9 @@ export class RegistrationsService {
 
         programId = Number(defaultProgram.id);
         programTitle =
-          defaultProgram.assessment_title || defaultProgram.name;
+          defaultProgram.assessmentTitle || defaultProgram.name;
       }
+
 
       const validFrom = dto.examStart ? new Date(dto.examStart) : new Date();
       const validTo = dto.examEnd
@@ -353,7 +356,7 @@ export class RegistrationsService {
   // ---------------------------------------------------------
   // CREATE FOR EXISTING USER (Assessment Only)
   // ---------------------------------------------------------
-  async createForExistingUser(user: User, dto: CreateRegistrationDto) {
+  async createForExistingUser(user: AdminUser, dto: CreateRegistrationDto) {
     this.logger.log(`Creating assessment for existing user ${user.email}`);
 
     // 1. Prepare Data
@@ -406,16 +409,16 @@ export class RegistrationsService {
       if (dto.programType) {
         const selectedProgram = await manager
           .getRepository(Program)
-          .findOne({ where: { id: dto.programType } });
+          .findOne({ where: { id: Number(dto.programType) } });
 
         if (!selectedProgram) throw new BadRequestException(`Program ${dto.programType} not found`);
-        if (!selectedProgram.is_active) throw new BadRequestException(`Program inactive`);
+        if (!selectedProgram.isActive) throw new BadRequestException(`Program inactive`);
 
         programId = Number(selectedProgram.id);
       } else {
         const defaultProgram = await manager
           .getRepository(Program)
-          .findOne({ where: { is_active: true } });
+          .findOne({ where: { isActive: true } });
         if (!defaultProgram) throw new BadRequestException('No active Program');
         programId = Number(defaultProgram.id);
       }

@@ -7,8 +7,8 @@ import {
     ManyToOne,
     JoinColumn,
 } from 'typeorm';
-import { Groups } from '../groups/groups.entity';
-import { Program } from '../programs/entities/program.entity';
+import { Groups } from './groups.entity';
+import { Program } from './program.entity';
 
 @Entity('group_assessments')
 export class GroupAssessment {
@@ -45,7 +45,6 @@ export class GroupAssessment {
     })
     status: string;
 
-    // -- Multi-tenancy --
     @Column({ name: 'corporate_account_id', type: 'bigint', nullable: true })
     corporateAccountId: number | null;
 
