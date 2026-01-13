@@ -90,13 +90,14 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
         if (status === 'COMPLETED') return true;
 
         // For IN_PROGRESS
-        // Tab 1 (Level 1) is accessible if currentLevel >= 1
-        return index <= currentLvl;
+        // If index is 1 (Level 1), it is accessible if currentLvl > 1 (meaning level 1 is done)
+        // If index is 2 (Level 2), it is accessible if currentLvl > 2 (meaning level 2 is done)
+        return currentLvl > index;
     };
 
     // Correctly map data from the fresh session object
     const displayData = {
-        title: session?.program?.assessment_title || session?.groupAssessment?.program?.assessment_title || 'Assessment',
+        title: session?.program?.assessment_title || session?.program?.assessmentTitle || session?.groupAssessment?.program?.assessment_title || session?.groupAssessment?.program?.assessmentTitle || 'Assessment',
         program: session?.program?.name || session?.groupAssessment?.program?.name || '-',
         type: 'WebApp', // Hardcoded as per request
         startsOn: formatDate(session?.validFrom),
@@ -112,40 +113,51 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
 
 
     // Renderers
-    const renderStatsBar = () => (
-        <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6 grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
-            <div>
-                <p className="text-xs text-gray-400 mb-1">Exam Starts On</p>
-                <p className="text-sm font-semibold">{displayData.startsOn}</p>
+    const renderStatsBar = (attemptData?: any) => {
+        // Use status from attemptData if available, otherwise fallback to session status
+        const currentStatus = attemptData?.status || status;
+
+        return (
+            <div className={`bg-[#19211C] border border-white/10 rounded-2xl p-6 grid grid-cols-2 md:grid-cols-4 gap-6 mb-6`}>
+                <div>
+                    <p className="text-xs text-gray-400 mb-1">Exam Starts On</p>
+                    <p className="text-sm font-semibold">{formatDate(attemptData?.startedAt) || '-'}</p>
+                </div>
+                <div>
+                    <p className="text-xs text-gray-400 mb-1">
+                        {currentStatus === 'IN_PROGRESS' || currentStatus === 'ON_GOING' ? 'To be completed by' : 'Completed At'}
+                    </p>
+                    <p className="text-sm font-semibold">
+                        {currentStatus === 'IN_PROGRESS' || currentStatus === 'ON_GOING'
+                            ? formatDate(attemptData?.expiresAt) || '-'
+                            : formatDate(attemptData?.completedAt) || '-'}
+                    </p>
+                </div>
+                {/* Mock Data for now as backend doesn't seem to track duration/questions yet in this object */}
+                <div>
+                    <p className="text-xs text-gray-400 mb-1">Total Exam Duration</p>
+                    <p className="text-sm font-semibold">--</p>
+                </div>
+                <div>
+                    <p className="text-xs text-gray-400 mb-1">Questions Attempted</p>
+                    <p className="text-sm font-semibold">--</p>
+                </div>
+                <div>
+                    <p className="text-xs text-gray-400 mb-1">Exam Status</p>
+                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold 
+                    ${currentStatus === 'COMPLETED' ? 'bg-[#00B69B] text-white' :
+                            currentStatus === 'IN_PROGRESS' ? 'bg-[#F59E0B] text-black' :
+                                'bg-gray-600 text-gray-200'}`}>
+                        {currentStatus.replace(/_/g, " ")}
+                    </span>
+                </div>
+                <div>
+                    <p className="text-xs text-gray-400 mb-1">Generated Report Trait Code</p>
+                    <p className="text-sm font-semibold">{session?.metadata?.traitCode || '--'}</p>
+                </div>
             </div>
-            <div>
-                <p className="text-xs text-gray-400 mb-1">Exam Ends On</p>
-                <p className="text-sm font-semibold">{displayData.endsOn}</p>
-            </div>
-            {/* Mock Data for now as backend doesn't seem to track duration/questions yet in this object */}
-            <div>
-                <p className="text-xs text-gray-400 mb-1">Total Exam Duration</p>
-                <p className="text-sm font-semibold">--</p>
-            </div>
-            <div>
-                <p className="text-xs text-gray-400 mb-1">Questions Attempted</p>
-                <p className="text-sm font-semibold">--</p>
-            </div>
-            <div>
-                <p className="text-xs text-gray-400 mb-1">Exam Status</p>
-                <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold 
-                    ${status === 'COMPLETED' ? 'bg-[#00B69B] text-white' :
-                        status === 'IN_PROGRESS' ? 'bg-[#F59E0B] text-black' :
-                            'bg-gray-600 text-gray-200'}`}>
-                    {status.replace(/_/g, " ")}
-                </span>
-            </div>
-            <div>
-                <p className="text-xs text-gray-400 mb-1">Generated Report Trait Code</p>
-                <p className="text-sm font-semibold">{session?.metadata?.traitCode || '--'}</p>
-            </div>
-        </div>
-    );
+        );
+    };
 
     const renderBasicInfoCards = () => (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -210,11 +222,11 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
         </div>
     );
 
-    const renderLevelReport = (title: string, breakdown: any[], compatibility: any) => (
+    const renderLevelReport = (title: string, breakdown: any[], compatibility: any, levelAttempt?: any) => (
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-6">
             <div className="flex flex-col gap-6">
-                {/* Re-use stats bar here if needed, or keep it common */}
-                {renderStatsBar()}
+                {/* Pass specific level attempt if available. Do not fallback to current session attempt for level reports. */}
+                {renderStatsBar(levelAttempt)}
 
                 {/* Breakdown Table */}
                 <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6">
@@ -252,7 +264,7 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
 
                 {/* Compatibility Index */}
                 <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6">
-                    <h3 className="text-sm font-semibold mb-4">{title} – Score Overview</h3>
+                    <h3 className="text-sm font-semibold mb-4">{title} SCORE</h3>
                     <div className="overflow-x-auto border border-white/10 rounded-lg">
                         <table className="w-full text-sm">
                             {/* ... (Existing table content) ... */}
@@ -449,10 +461,81 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                 (() => {
                     const levelIndex = activeTab - 1;
                     const level = levels[levelIndex];
-                    if (level?.name.toLowerCase().includes('disc')) {
-                        return renderLevelReport('DISC', discBreakdownData, discCompatibilityData);
+
+                    // Find the attempt corresponding to this level generically
+                    const attempt = session?.attempts?.find((a: any) => {
+                        const levelId = String(level?.id);
+                        const aId = String(a.assessmentLevelId);
+                        const alId = a.assessmentLevel ? String(a.assessmentLevel.id) : null;
+
+                        console.log(`Debug Attempt Match: Level ${levelId} vs Attempt ${a.id} (LevelId: ${aId}, RelId: ${alId})`);
+
+                        return aId === levelId || alId === levelId;
+                    });
+
+                    console.log('Found attempt for level:', level?.name, attempt);
+
+                    // Check for DISC pattern in robust ways: patternType (database), name includes 'disc', or exact name 'Behavioral Insight'
+                    const isDisc = level?.pattern_type === 'DISC' || level?.patternType === 'DISC' || level?.name.toLowerCase().includes('disc') || level?.name === 'Behavioral Insight';
+
+                    if (isDisc) {
+                        let breakdown = discBreakdownData;
+                        let compatibility = discCompatibilityData;
+
+                        if (attempt && attempt.metadata?.disc_scores) {
+                            const scores = attempt.metadata.disc_scores;
+                            breakdown = [
+                                { value: 'Dominance', score: scores['D'] || '-', note: 'Direct and decisive.' },
+                                { value: 'Influence', score: scores['I'] || '-', note: 'Enthusiastic and persuasive.' },
+                                { value: 'Steadiness', score: scores['S'] || '-', note: 'Patient and reliable.' },
+                                { value: 'Compliance', score: scores['C'] || '-', note: 'Precise and analytical.' },
+                            ];
+
+                            // Compatibility from table columns or metadata
+                            compatibility = {
+                                totalScore: attempt.totalScore || attempt.metadata.disc_scores?.total || scores['total'] || '0',
+                                level: attempt.sincerityClass || '-',
+                                tag: '-', // Not available in provided data
+                                interpretation: '-' // Not available in provided data
+                            };
+                            if (compatibility.totalScore) {
+                                // Add / 125 if it's just a number
+                                if (!String(compatibility.totalScore).includes('/')) {
+                                    compatibility.totalScore = `${compatibility.totalScore} / 125`;
+                                }
+                            }
+                        }
+
+                        return renderLevelReport('DISC', breakdown, compatibility, attempt);
                     } else {
-                        return renderLevelReport('ACI', aciBreakdownData, aciCompatibilityData);
+                        // ACI Logic
+                        let breakdown = aciBreakdownData;
+                        let compatibility = aciCompatibilityData;
+
+                        if (attempt && (attempt.metadata?.aci_scores || attempt.metadata?.scores)) {
+                            const scores = attempt.metadata.aci_scores || attempt.metadata.scores || {};
+                            breakdown = [
+                                { value: 'Commitment', score: scores['Commitment'] || scores['commitment'] || '-', note: 'Deeply dedicated and consistent.' },
+                                { value: 'Focus', score: scores['Focus'] || scores['focus'] || '-', note: 'Exceptionally attentive to detail and priority.' },
+                                { value: 'Openness', score: scores['Openness'] || scores['openness'] || '-', note: 'Learning to adapt and welcome diverse approaches.' },
+                                { value: 'Respect', score: scores['Respect'] || scores['respect'] || '-', note: 'Professional tone with scope to show empathy.' },
+                                { value: 'Courage', score: scores['Courage'] || scores['courage'] || '-', note: 'Honest and principled; leads through integrity.' },
+                            ];
+
+                            compatibility = {
+                                totalScore: attempt.totalScore || scores['total'] || '0',
+                                level: attempt.sincerityClass || '-',
+                                tag: '-', // Not available in provided data
+                                interpretation: '-' // Not available in provided data
+                            };
+                            if (compatibility.totalScore) {
+                                if (!String(compatibility.totalScore).includes('/')) {
+                                    compatibility.totalScore = `${compatibility.totalScore} / 125`;
+                                }
+                            }
+                        }
+
+                        return renderLevelReport('ACI', breakdown, compatibility, attempt);
                     }
                 })()
             }
