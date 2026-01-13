@@ -17,7 +17,9 @@ type Config struct {
 }
 
 func LoadConfig() *Config {
-	// Try loading from .env, ignore error if not found
+	// Try loading from .env.local first (highest priority)
+	_ = godotenv.Load(".env.local")
+	// Try loading from .env
 	_ = godotenv.Load()
 	// Try loading from config.env (fallback/alternative)
 	_ = godotenv.Load("config.env")

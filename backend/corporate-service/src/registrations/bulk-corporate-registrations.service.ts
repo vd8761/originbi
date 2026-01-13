@@ -9,12 +9,14 @@ import { Readable } from 'stream';
 
 import { BulkImport } from './entities/bulk-import.entity';
 import { BulkImportRow } from './entities/bulk-import-row.entity';
-import { Groups } from '../entities/groups.entity';
-import { User } from '../entities/user.entity';
-import { Program } from '../entities/program.entity';
-import { CorporateAccount } from '../entities/corporate-account.entity';
+import {
+    Groups,
+    User,
+    Program,
+    CorporateAccount,
+    GroupAssessment,
+} from '@originbi/shared-entities';
 import { CorporateRegistrationsService } from './corporate-registrations.service';
-import { GroupAssessment } from '../entities/group_assessment.entity';
 
 @Injectable()
 export class BulkCorporateRegistrationsService {

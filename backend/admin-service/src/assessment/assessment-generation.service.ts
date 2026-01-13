@@ -1,11 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, EntityManager } from 'typeorm';
-import { AssessmentLevel } from './assessment_level.entity';
-import { AssessmentQuestion } from './assessment_question.entity';
-import { OpenQuestion } from './open_question.entity';
-import { AssessmentAnswer } from './assessment_answer.entity';
-import { AssessmentAttempt } from './assessment_attempt.entity';
+import {
+  AssessmentLevel,
+  AssessmentQuestion,
+  OpenQuestion,
+  AssessmentAnswer,
+  AssessmentAttempt,
+} from '@originbi/shared-entities';
 
 @Injectable()
 export class AssessmentGenerationService {
@@ -18,7 +20,7 @@ export class AssessmentGenerationService {
     private questionRepo: Repository<AssessmentQuestion>,
     @InjectRepository(OpenQuestion)
     private openQuestionRepo: Repository<OpenQuestion>,
-  ) { }
+  ) {}
 
   /**
    * Generates Level 1 questions following the 2:1 pattern (2 Main : 1 Open).
@@ -49,10 +51,7 @@ export class AssessmentGenerationService {
    *    - Use all Main Questions from the Set.
    *    - No Open Questions.
    */
-  async generateQuestions(
-    attempt: AssessmentAttempt,
-    manager: EntityManager,
-  ) {
+  async generateQuestions(attempt: AssessmentAttempt, manager: EntityManager) {
     this.logger.log(
       `Generating questions for Attempt ID: ${attempt.id}, Program: ${attempt.programId}, Level: ${attempt.assessmentLevelId}`,
     );
@@ -89,7 +88,8 @@ export class AssessmentGenerationService {
     const selectedSet: number = sets[Math.floor(Math.random() * sets.length)];
 
     this.logger.log(
-      `Selected Set ${selectedSet} (from [${sets.join(', ')}]) for Attempt ${attempt.id
+      `Selected Set ${selectedSet} (from [${sets.join(', ')}]) for Attempt ${
+        attempt.id
       } (Level ${isLevel1 ? '1' : 'Other'})`,
     );
 

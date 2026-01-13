@@ -9,13 +9,15 @@ import { Repository, DataSource } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 
-import { User } from '../users/user.entity';
-import { Registration } from './registration.entity';
+import {
+  User as AdminUser,
+  Registration,
+  Program,
+  AssessmentSession,
+  AssessmentAttempt,
+  AssessmentLevel,
+} from '@originbi/shared-entities';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
-import { Program } from '../programs/entities/program.entity';
-import { AssessmentSession } from '../assessment/assessment_session.entity';
-import { AssessmentAttempt } from '../assessment/assessment_attempt.entity';
-import { AssessmentLevel } from '../assessment/assessment_level.entity';
 import { GroupsService } from '../groups/groups.service';
 import { AssessmentGenerationService } from '../assessment/assessment-generation.service';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
@@ -33,8 +35,8 @@ export class RegistrationsService {
   private readonly ADMIN_USER_ID = 1;
 
   constructor(
-    @InjectRepository(User)
-    private readonly userRepo: Repository<User>,
+    @InjectRepository(AdminUser)
+    private readonly userRepo: Repository<AdminUser>,
 
     @InjectRepository(Registration)
     private readonly regRepo: Repository<Registration>,
@@ -44,23 +46,35 @@ export class RegistrationsService {
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
-  ) { }
+  ) {}
 
-  async withRetry<T>(operation: () => Promise<T>, retries = 5, delay = 1000): Promise<T> {
+  async withRetry<T>(
+    operation: () => Promise<T>,
+    retries = 5,
+    delay = 1000,
+  ): Promise<T> {
     try {
       return await operation();
     } catch (error: unknown) {
-      type Retryable = { response?: { status?: number }; code?: string; message?: string };
-      const err = (typeof error === 'object' && error !== null) ? (error as Retryable) : {};
+      type Retryable = {
+        response?: { status?: number };
+        code?: string;
+        message?: string;
+      };
+      const err =
+        typeof error === 'object' && error !== null ? (error as Retryable) : {};
 
       const isRateLimit =
-        (err.response?.status === 429) ||
-        (err.code === 'TooManyRequestsException') ||
-        (typeof err.message === 'string' && err.message.includes('Too Many Requests'));
+        err.response?.status === 429 ||
+        err.code === 'TooManyRequestsException' ||
+        (typeof err.message === 'string' &&
+          err.message.includes('Too Many Requests'));
 
       if (retries > 0 && isRateLimit) {
-        this.logger.warn(`Rate limit hit in RegistrationsService. Retrying in ${delay}ms... (${retries} retries left)`);
-        await new Promise(res => setTimeout(res, delay));
+        this.logger.warn(
+          `Rate limit hit in RegistrationsService. Retrying in ${delay}ms... (${retries} retries left)`,
+        );
+        await new Promise((res) => setTimeout(res, delay));
         return this.withRetry(operation, retries - 1, delay * 2);
       }
       throw error;
@@ -78,14 +92,18 @@ export class RegistrationsService {
             `${this.authServiceBaseUrl}/internal/cognito/users`,
             { email, password },
             { proxy: false },
-          )
-        )
+          ),
+        ),
       );
       return res.data as { sub?: string };
     } catch (err: unknown) {
       /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-      type AuthErr = { response?: { data?: any; status?: number }; message?: string; code?: string };
-      const e = (typeof err === 'object' && err !== null) ? (err as AuthErr) : {};
+      type AuthErr = {
+        response?: { data?: any; status?: number };
+        message?: string;
+        code?: string;
+      };
+      const e = typeof err === 'object' && err !== null ? (err as AuthErr) : {};
 
       const authErr = e.response?.data || e.message || err;
 
@@ -93,7 +111,7 @@ export class RegistrationsService {
 
       const msg =
         typeof authErr === 'object' && authErr !== null
-          ? (authErr as any).message || JSON.stringify(authErr)
+          ? authErr.message || JSON.stringify(authErr)
           : String(authErr);
 
       throw new InternalServerErrorException(
@@ -167,193 +185,204 @@ export class RegistrationsService {
     const departmentDegreeId = this.toBigIntOrNull(dto.departmentId);
 
     // 4. Transaction
-    return this.dataSource.transaction(async (manager) => {
-      // A. Create User
-      const user = manager.create(User, {
-        email: dto.email,
-        role: 'STUDENT',
-        emailVerified: true,
-        cognitoSub: sub,
-        isActive: true,
-        isBlocked: false,
-        metadata: {
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        // A. Create User
+        const user = manager.create(AdminUser, {
+          email: dto.email,
+          role: 'STUDENT',
+          emailVerified: true,
+          cognitoSub: sub,
+          isActive: true,
+          isBlocked: false,
+          metadata: {
+            fullName: dto.name,
+            countryCode: dto.countryCode ?? '+91',
+            mobile: dto.mobile,
+            gender: gender,
+          },
+        });
+        await manager.save(user);
+
+        // B. Get or Create Group
+        let groupId: number | null = null;
+        if (dto.groupName) {
+          const group = await this.groupsService.findOrCreate(
+            dto.groupName,
+            manager,
+          );
+          groupId = group.id;
+        }
+
+        // C. Create Registration (INCOMPLETE)
+        const registration = manager.create(Registration, {
+          userId: user.id,
+          registrationSource: 'ADMIN',
+          createdByUserId: this.ADMIN_USER_ID,
+          status: 'INCOMPLETE',
           fullName: dto.name,
           countryCode: dto.countryCode ?? '+91',
-          mobile: dto.mobile,
+          mobileNumber: dto.mobile,
           gender: gender,
-        },
-      });
-      await manager.save(user);
+          schoolLevel,
+          schoolStream,
+          departmentDegreeId,
+          group: groupId ? { id: groupId } : undefined, // Assign relation object, or undefined
+          metadata: {
+            programType: dto.programType,
+            groupName: dto.groupName,
+            sendEmail: dto.sendEmail,
+            currentYear: dto.currentYear,
+            examStart: dto.examStart,
+            examEnd: dto.examEnd,
+            departmentId: dto.departmentId ?? null,
+          },
+        });
+        await manager.save(registration);
 
-      // B. Get or Create Group
-      let groupId: number | null = null;
-      if (dto.groupName) {
-        const group = await this.groupsService.findOrCreate(
-          dto.groupName,
-          manager,
-        );
-        groupId = group.id;
-      }
+        // D. Create Assessment Session
+        let programId: number;
+        let programTitle: string;
 
-      // C. Create Registration (INCOMPLETE)
-      const registration = manager.create(Registration, {
-        userId: user.id,
-        registrationSource: 'ADMIN',
-        createdByUserId: this.ADMIN_USER_ID,
-        status: 'INCOMPLETE',
-        fullName: dto.name,
-        countryCode: dto.countryCode ?? '+91',
-        mobileNumber: dto.mobile,
-        gender: gender,
-        schoolLevel,
-        schoolStream,
-        departmentDegreeId,
-        group: groupId ? { id: groupId } : undefined, // Assign relation object, or undefined
-        metadata: {
-          programType: dto.programType,
-          groupName: dto.groupName,
-          sendEmail: dto.sendEmail,
-          currentYear: dto.currentYear,
-          examStart: dto.examStart,
-          examEnd: dto.examEnd,
-          departmentId: dto.departmentId ?? null,
-        },
-      });
-      await manager.save(registration);
+        if (dto.programType) {
+          // Strict lookup for selected program
+          const selectedProgram = await manager
+            .getRepository(Program)
+            .findOne({ where: { id: Number(dto.programType) } });
 
-      // D. Create Assessment Session
-      // D. Create Assessment Session
-      let programId: number;
-      let programTitle: string;
+          if (!selectedProgram) {
+            throw new BadRequestException(
+              `Selected Program (ID: ${dto.programType}) not found.`,
+            );
+          }
+          if (!selectedProgram.isActive) {
+            throw new BadRequestException(
+              `Selected Program '${selectedProgram.name}' is not active.`,
+            );
+          }
 
-      if (dto.programType) {
-        // Strict lookup for selected program
-        const selectedProgram = await manager
-          .getRepository(Program)
-          .findOne({ where: { id: dto.programType } });
+          programId = Number(selectedProgram.id);
+          programTitle =
+            selectedProgram.assessmentTitle || selectedProgram.name;
+        } else {
+          // Fallback: Pick any active program (Legacy / Default)
+          const defaultProgram = await manager
+            .getRepository(Program)
+            .findOne({ where: { isActive: true } });
 
-        if (!selectedProgram) {
-          throw new BadRequestException(
-            `Selected Program (ID: ${dto.programType}) not found.`,
-          );
-        }
-        if (!selectedProgram.is_active) {
-          throw new BadRequestException(
-            `Selected Program '${selectedProgram.name}' is not active.`,
-          );
+          if (!defaultProgram) {
+            throw new BadRequestException(
+              'No active Program found in the system. Please create a Program first.',
+            );
+          }
+
+          programId = Number(defaultProgram.id);
+          programTitle = defaultProgram.assessmentTitle || defaultProgram.name;
         }
 
-        programId = Number(selectedProgram.id);
-        programTitle =
-          selectedProgram.assessment_title || selectedProgram.name;
-      } else {
-        // Fallback: Pick any active program (Legacy / Default)
-        const defaultProgram = await manager
-          .getRepository(Program)
-          .findOne({ where: { is_active: true } });
+        const validFrom = dto.examStart ? new Date(dto.examStart) : new Date();
+        const validTo = dto.examEnd
+          ? new Date(dto.examEnd)
+          : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // +7 days default
 
-        if (!defaultProgram) {
-          throw new BadRequestException(
-            'No active Program found in the system. Please create a Program first.',
-          );
-        }
-
-        programId = Number(defaultProgram.id);
-        programTitle =
-          defaultProgram.assessment_title || defaultProgram.name;
-      }
-
-      const validFrom = dto.examStart ? new Date(dto.examStart) : new Date();
-      const validTo = dto.examEnd
-        ? new Date(dto.examEnd)
-        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // +7 days default
-
-      const session = manager.create(AssessmentSession, {
-        userId: user.id,
-        registrationId: registration.id,
-        programId: programId,
-        groupId: groupId ?? null,
-        groupAssessmentId: dto.groupAssessmentId ?? null,
-        status: 'NOT_STARTED',
-        validFrom,
-        validTo,
-        metadata: {},
-      });
-      await manager.save(session);
-
-      // E. Create Assessment Attempts (Mandatory Levels)
-      // Fetch all mandatory levels, ordered by sequence (Level 1 -> Level 2)
-      const levels = await manager.getRepository(AssessmentLevel).find({
-        where: {
-          isMandatory: true,
-        },
-        order: {
-          sortOrder: 'ASC',
-        },
-      });
-
-      if (!levels || levels.length === 0) {
-        throw new InternalServerErrorException(
-          'No mandatory assessment levels configured in the system.',
-        );
-      }
-
-      for (const level of levels) {
-        const attempt = manager.create(AssessmentAttempt, {
+        const session = manager.create(AssessmentSession, {
           userId: user.id,
           registrationId: registration.id,
           programId: programId,
-          assessmentSessionId: session.id,
-          assessmentLevelId: level.id,
+          groupId: groupId ?? null,
+          groupAssessmentId: dto.groupAssessmentId ?? null,
           status: 'NOT_STARTED',
+          validFrom,
+          validTo,
+          metadata: {},
         });
-        await manager.save(attempt);
+        await manager.save(session);
 
-        // F. Generate Questions for this Level (Only Level 1)
-        // F. Generate Questions for this Level (Only Level 1)
-        // NOTE: This logic applies to both Single Registration and Bulk Upload.
-        // We strictly generate questions ONLY for Level 1 here.
-        // Level 2+ questions are generated JIT when the user starts the assessment.
-        if (level.levelNumber === 1 || level.name === 'Level 1') {
-          await this.assessmentGenService.generateQuestions(
-            attempt,
-            manager,
+        // E. Create Assessment Attempts (Mandatory Levels)
+        // Fetch all mandatory levels, ordered by sequence (Level 1 -> Level 2)
+        const levels = await manager.getRepository(AssessmentLevel).find({
+          where: {
+            isMandatory: true,
+          },
+          order: {
+            sortOrder: 'ASC',
+          },
+        });
+
+        this.logger.log(
+          `Found ${levels ? levels.length : 0} mandatory levels for new registration.`,
+        );
+
+        if (!levels || levels.length === 0) {
+          this.logger.warn(
+            'No mandatory assessment levels found. Registration will proceed without attempts.',
           );
         }
-      }
 
-      // G. Update Registration to COMPLETED
-      registration.status = 'COMPLETED';
-      await manager.save(registration);
+        for (const level of levels) {
+          const attempt = manager.create(AssessmentAttempt, {
+            userId: user.id,
+            registrationId: registration.id,
+            programId: programId,
+            assessmentSessionId: session.id,
+            assessmentLevelId: level.id,
+            status: 'NOT_STARTED',
+          });
+          await manager.save(attempt);
 
-      // H. Send Email (Best Effort)
-      if (dto.sendEmail && dto.password) {
-        try {
-          await this.sendWelcomeEmail(
-            dto.email,
-            dto.name,
-            dto.password,
-            validFrom,
-            programTitle,
-          );
-        } catch (emailErr) {
-          this.logger.error('Failed to send welcome email', emailErr);
-          // Do not rollback
+          // F. Generate Questions for this Level (Only Level 1)
+          if (level.levelNumber === 1 || level.name === 'Level 1') {
+            try {
+              await this.assessmentGenService.generateQuestions(
+                attempt,
+                manager,
+              );
+            } catch (err) {
+              this.logger.error(
+                `Failed to generate questions for Attempt ${attempt.id} (Level ${level.id}):`,
+                err,
+              );
+            }
+          }
         }
-      }
 
-      return {
-        registrationId: registration.id,
-        userId: user.id,
-        email: user.email,
-      };
-    });
+        // G. Update Registration to COMPLETED
+        registration.status = 'COMPLETED';
+        await manager.save(registration);
+
+        // H. Send Email (Best Effort)
+        if (dto.sendEmail && dto.password) {
+          try {
+            await this.sendWelcomeEmail(
+              dto.email,
+              dto.name,
+              dto.password,
+              validFrom,
+              programTitle,
+            );
+          } catch (emailErr) {
+            this.logger.error('Failed to send welcome email', emailErr);
+            // Do not rollback
+          }
+        }
+
+        return {
+          registrationId: registration.id,
+          userId: user.id,
+          email: user.email,
+        };
+      });
+    } catch (e: unknown) {
+      this.logger.error('Registration Transaction Failed', e);
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new BadRequestException(`Registration Failed: ${msg}`);
+    }
   }
 
   // ---------------------------------------------------------
   // CREATE FOR EXISTING USER (Assessment Only)
   // ---------------------------------------------------------
-  async createForExistingUser(user: User, dto: CreateRegistrationDto) {
+  async createForExistingUser(user: AdminUser, dto: CreateRegistrationDto) {
     this.logger.log(`Creating assessment for existing user ${user.email}`);
 
     // 1. Prepare Data
@@ -406,22 +435,26 @@ export class RegistrationsService {
       if (dto.programType) {
         const selectedProgram = await manager
           .getRepository(Program)
-          .findOne({ where: { id: dto.programType } });
+          .findOne({ where: { id: Number(dto.programType) } });
 
-        if (!selectedProgram) throw new BadRequestException(`Program ${dto.programType} not found`);
-        if (!selectedProgram.is_active) throw new BadRequestException(`Program inactive`);
+        if (!selectedProgram)
+          throw new BadRequestException(`Program ${dto.programType} not found`);
+        if (!selectedProgram.isActive)
+          throw new BadRequestException(`Program inactive`);
 
         programId = Number(selectedProgram.id);
       } else {
         const defaultProgram = await manager
           .getRepository(Program)
-          .findOne({ where: { is_active: true } });
+          .findOne({ where: { isActive: true } });
         if (!defaultProgram) throw new BadRequestException('No active Program');
         programId = Number(defaultProgram.id);
       }
 
       const validFrom = dto.examStart ? new Date(dto.examStart) : new Date();
-      const validTo = dto.examEnd ? new Date(dto.examEnd) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const validTo = dto.examEnd
+        ? new Date(dto.examEnd)
+        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
       const session = manager.create(AssessmentSession, {
         userId: user.id,
@@ -439,6 +472,16 @@ export class RegistrationsService {
       const levels = await manager.getRepository(AssessmentLevel).find({
         where: { isMandatory: true },
       });
+
+      this.logger.log(
+        `Found ${levels ? levels.length : 0} mandatory levels for existing user.`,
+      );
+
+      if (!levels || levels.length === 0) {
+        this.logger.warn(
+          'No mandatory assessment levels found. Registration will proceed without attempts.',
+        );
+      }
 
       for (const level of levels) {
         const attempt = manager.create(AssessmentAttempt, {
@@ -465,7 +508,7 @@ export class RegistrationsService {
         registrationId: registration.id,
         userId: user.id,
         email: user.email,
-        wasExisting: true
+        wasExisting: true,
       };
     });
   }
@@ -499,10 +542,14 @@ export class RegistrationsService {
       }
 
       if (startDate) {
-        qb.andWhere('r.createdAt >= :startDate', { startDate: `${startDate} 00:00:00` });
+        qb.andWhere('r.createdAt >= :startDate', {
+          startDate: `${startDate} 00:00:00`,
+        });
       }
       if (endDate) {
-        qb.andWhere('r.createdAt <= :endDate', { endDate: `${endDate} 23:59:59` });
+        qb.andWhere('r.createdAt <= :endDate', {
+          endDate: `${endDate} 23:59:59`,
+        });
       }
 
       // Sorting Logic

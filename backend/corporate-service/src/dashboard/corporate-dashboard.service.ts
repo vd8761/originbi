@@ -13,19 +13,19 @@ import { firstValueFrom } from 'rxjs';
 import { RegisterCorporateDto } from './dto/register-corporate.dto';
 import Razorpay = require('razorpay');
 
-import { User } from '../entities/user.entity';
-import { CorporateAccount } from '../entities/corporate-account.entity';
-import { CorporateCreditLedger } from '../entities/corporate-credit-ledger.entity';
+import { User } from '@originbi/shared-entities';
+import { CorporateAccount } from '@originbi/shared-entities';
+import { CorporateCreditLedger } from '@originbi/shared-entities';
 import {
     UserActionLog,
     ActionType,
     UserRole,
-} from '../entities/user-action-log.entity';
-import { Registration } from '../entities/registration.entity';
-import { AssessmentSession } from '../entities/assessment_session.entity';
-import { Program } from '../entities/program.entity';
-import { GroupAssessment } from '../entities/group_assessment.entity';
-import { Groups } from '../entities/groups.entity';
+} from '@originbi/shared-entities';
+import { Registration } from '@originbi/shared-entities';
+import { AssessmentSession } from '@originbi/shared-entities';
+import { Program } from '@originbi/shared-entities';
+import { GroupAssessment } from '@originbi/shared-entities';
+import { Groups } from '@originbi/shared-entities';
 
 @Injectable()
 export class CorporateDashboardService {

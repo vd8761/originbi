@@ -1,15 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AdminUser } from '../entities/AdminUser';
+import { User as AdminUser } from '@originbi/shared-entities';
+
 @Injectable()
 export class AdminLoginService {
   constructor(
     @InjectRepository(AdminUser)
     private readonly usersRepo: Repository<AdminUser>,
-  ) { }
+  ) {}
 
-  async resolveUser(sub: string, email: string | undefined): Promise<AdminUser | null> {
+  async resolveUser(
+    sub: string,
+    email: string | undefined,
+  ): Promise<AdminUser | null> {
     // 1. Try by sub
     let user = await this.usersRepo.findOne({ where: { cognitoSub: sub } });
     if (user) return user;

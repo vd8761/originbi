@@ -10,20 +10,20 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import { User } from '../users/user.entity';
 import {
+  User as AdminUser,
   UserActionLog,
   ActionType,
-  UserRole,
-} from '../entities/user-action-log.entity';
+  UserRole as AdminUserRole,
+} from '@originbi/shared-entities';
 
 @Injectable()
 export class ForgotPasswordService {
   private authServiceUrl: string;
 
   constructor(
-    @InjectRepository(User)
-    private usersRepository: Repository<User>,
+    @InjectRepository(AdminUser)
+    private usersRepository: Repository<AdminUser>,
     @InjectRepository(UserActionLog)
     private actionLogRepository: Repository<UserActionLog>,
     private httpService: HttpService,
@@ -34,21 +34,33 @@ export class ForgotPasswordService {
       'http://localhost:4002';
   }
 
-  async withRetry<T>(operation: () => Promise<T>, retries = 5, delay = 1000): Promise<T> {
+  async withRetry<T>(
+    operation: () => Promise<T>,
+    retries = 5,
+    delay = 1000,
+  ): Promise<T> {
     try {
       return await operation();
     } catch (error: unknown) {
-      type Retryable = { response?: { status?: number }; code?: string; message?: string };
-      const err = (typeof error === 'object' && error !== null) ? (error as Retryable) : {};
+      type Retryable = {
+        response?: { status?: number };
+        code?: string;
+        message?: string;
+      };
+      const err =
+        typeof error === 'object' && error !== null ? (error as Retryable) : {};
 
       const isRateLimit =
-        (err.response?.status === 429) ||
-        (err.code === 'TooManyRequestsException') ||
-        (typeof err.message === 'string' && err.message.includes('Too Many Requests'));
+        err.response?.status === 429 ||
+        err.code === 'TooManyRequestsException' ||
+        (typeof err.message === 'string' &&
+          err.message.includes('Too Many Requests'));
 
       if (retries > 0 && isRateLimit) {
-        console.warn(`Rate limit hit in ForgotPasswordService. Retrying in ${delay}ms... (${retries} retries left)`);
-        await new Promise(res => setTimeout(res, delay));
+        console.warn(
+          `Rate limit hit in ForgotPasswordService. Retrying in ${delay}ms... (${retries} retries left)`,
+        );
+        await new Promise((res) => setTimeout(res, delay));
         return this.withRetry(operation, retries - 1, delay * 2);
       }
       throw error;
@@ -80,7 +92,7 @@ export class ForgotPasswordService {
       where: {
         user: { id: user.id },
         actionType: ActionType.RESET_PASSWORD,
-        role: UserRole.ADMIN,
+        role: AdminUserRole.ADMIN,
         actionDate: today,
       },
     });
@@ -93,15 +105,22 @@ export class ForgotPasswordService {
 
     // 3. Call Auth Service to Trigger Reset
     try {
-      await this.withRetry(() => firstValueFrom(
-        this.httpService.post(
-          `${this.authServiceUrl}/internal/cognito/forgot-password`,
-          { email },
+      await this.withRetry(() =>
+        firstValueFrom(
+          this.httpService.post(
+            `${this.authServiceUrl}/internal/cognito/forgot-password`,
+            { email },
+          ),
         ),
-      ));
+      );
     } catch (error: unknown) {
-      type ApiErr = { response?: { data?: any; status?: number }; message?: string; code?: string };
-      const e = (typeof error === 'object' && error !== null) ? (error as ApiErr) : {};
+      type ApiErr = {
+        response?: { data?: any; status?: number };
+        message?: string;
+        code?: string;
+      };
+      const e =
+        typeof error === 'object' && error !== null ? (error as ApiErr) : {};
 
       console.error(
         'Auth Service Forgot Password Failed:',
@@ -120,7 +139,7 @@ export class ForgotPasswordService {
       const newLog = this.actionLogRepository.create({
         user: user,
         userId: user.id,
-        role: UserRole.ADMIN,
+        role: AdminUserRole.ADMIN,
         actionType: ActionType.RESET_PASSWORD,
         actionDate: today,
         attemptCount: 1,

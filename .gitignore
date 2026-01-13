@@ -55,3 +55,9 @@ logs
 
 # OS FILES
 Thumbs.db
+
+# Backups
+*.backup
+
+# Binaries
+backend/exam-engine/exam-engine
