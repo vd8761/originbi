@@ -20,6 +20,8 @@ import AssessmentSessionsTable from "@/components/admin/AssessmentSessionsTable"
 import DateRangeFilter, { DateRangeOption } from "@/components/ui/DateRangeFilter";
 import ExcelExportButton from "@/components/ui/ExcelExportButton";
 import DateRangePickerModal from "@/components/ui/DateRangePickerModal";
+import GroupAssessmentPreview from "@/components/corporate/GroupAssessmentPreview";
+import GroupCandidateAssessmentPreview from "@/components/corporate/GroupCandidateAssessmentPreview";
 
 // Debounce utility
 const useDebounce = (value: string, delay: number) => {
@@ -32,9 +34,11 @@ const useDebounce = (value: string, delay: number) => {
 };
 
 const MyEmployees: React.FC = () => {
-    const [view, setView] = useState<"list" | "add" | "bulk" | "preview">("list");
+    const [view, setView] = useState<"list" | "add" | "bulk" | "preview" | "group-assessment-preview" | "group-candidate-assessment-preview">("list");
     const [selectedEmployee, setSelectedEmployee] = useState<Registration | null>(null);
     const [activeTab, setActiveTab] = useState<"registrations" | "individual" | "group">("registrations");
+    const [selectedGroupSessionId, setSelectedGroupSessionId] = useState<string | null>(null);
+    const [selectedSession, setSelectedSession] = useState<AssessmentSession | null>(null);
 
     // Data State
     const [users, setUsers] = useState<Registration[]>([]);
@@ -377,6 +381,20 @@ const MyEmployees: React.FC = () => {
         }
     };
 
+    const handleViewGroupSession = (id: string | number) => {
+        console.log("MyEmployees: handleViewGroupSession triggered with ID:", id);
+        if (id === undefined || id === null || id === "") return;
+        setSelectedGroupSessionId(String(id));
+        setView('group-assessment-preview');
+    };
+
+    const handleViewGroupCandidateSession = (session: any) => {
+        if (session && session.id) {
+            setSelectedSession(session);
+            setView('group-candidate-assessment-preview');
+        }
+    };
+
     const handleExport = async () => {
         try {
             const formatDate = (d: Date) => d.toISOString().split('T')[0];
@@ -485,6 +503,32 @@ const MyEmployees: React.FC = () => {
                     fetchData();
                 }}
                 corporateUserId={userId}
+            />
+        );
+    }
+
+    if (view === 'group-assessment-preview' && selectedGroupSessionId) {
+        return (
+            <GroupAssessmentPreview
+                sessionId={selectedGroupSessionId}
+                onBack={() => setView('list')}
+                onViewSession={handleViewGroupCandidateSession}
+            />
+        );
+    }
+
+    if (view === 'group-candidate-assessment-preview' && selectedSession) {
+        return (
+            <GroupCandidateAssessmentPreview
+                session={selectedSession}
+                onBack={() => {
+                    // Back logic: if we have a group ID, go back to group preview, else list
+                    if (selectedGroupSessionId) {
+                        setView('group-assessment-preview');
+                    } else {
+                        setView('list');
+                    }
+                }}
             />
         );
     }
@@ -737,6 +781,19 @@ const MyEmployees: React.FC = () => {
                         sortOrder={sortOrder}
                         onSort={handleSort}
                         isGroupView={activeTab === 'group'}
+                        onView={(id) => {
+                            if (activeTab === 'group') {
+                                handleViewGroupSession(id);
+                            } else {
+                                // Individual view logic
+                                const sess = sessions.find(s => String(s.id) === String(id));
+                                if (sess) {
+                                    setSelectedSession(sess);
+                                    setSelectedGroupSessionId(null);
+                                    setView('group-candidate-assessment-preview');
+                                }
+                            }
+                        }}
                     />
                 )}
             </div>

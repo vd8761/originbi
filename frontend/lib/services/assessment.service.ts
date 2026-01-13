@@ -20,11 +20,20 @@ export interface AssessmentSession {
         name: string;
         assessment_title: string;
     };
+    registration?: {
+        fullName?: string;
+        gender?: string;
+        mobileNumber?: string;
+        countryCode?: string;
+    };
+    groupAssessment?: any; // GroupAssessment interface can be defined separately if needed
     groupName?: string;
     totalCandidates?: number;
     currentLevel?: number;
     totalLevels?: number;
     groupId?: number;
+    isReportReady?: boolean;
+    metadata?: any;
 }
 
 export const assessmentService = {
@@ -64,4 +73,42 @@ export const assessmentService = {
 
         return res.json();
     },
+    async getLevels(): Promise<any[]> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/admin/assessments/levels`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: token ? `Bearer ${token}` : "",
+            },
+        });
+        if (!res.ok) throw new Error("Failed to fetch assessment levels");
+        return res.json();
+    },
+
+    async getSessionDetails(id: string): Promise<AssessmentSession> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/admin/assessments/sessions/${id}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: token ? `Bearer ${token}` : "",
+            },
+        });
+        if (!res.ok) throw new Error("Failed to fetch assessment session details");
+        return res.json();
+    },
+
+    async getGroupSession(id: string): Promise<any> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/admin/assessments/group/${id}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: token ? `Bearer ${token}` : "",
+            },
+        });
+        if (!res.ok) throw new Error("Failed to fetch group assessment details");
+        return res.json();
+    }
 };
