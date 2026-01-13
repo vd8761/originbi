@@ -14,7 +14,7 @@ import { UpdateCorporateRegistrationDto } from './dto/update-corporate-registrat
 
 @Controller('admin/corporate-accounts')
 export class CorporateController {
-  constructor(private readonly corporateService: CorporateService) { }
+  constructor(private readonly corporateService: CorporateService) {}
 
   @Post()
   async register(@Body() dto: CreateCorporateRegistrationDto) {
@@ -31,7 +31,13 @@ export class CorporateController {
   ) {
     const pageNum = Number(page) || 1;
     const limitNum = Number(limit) || 10;
-    return this.corporateService.findAll(pageNum, limitNum, search, sortBy, sortOrder);
+    return this.corporateService.findAll(
+      pageNum,
+      limitNum,
+      search,
+      sortBy,
+      sortOrder,
+    );
   }
 
   @Get(':id')

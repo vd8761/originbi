@@ -33,4 +33,4 @@ import { AssessmentController } from './assessment.controller';
   providers: [AssessmentGenerationService, AssessmentService],
   exports: [TypeOrmModule, AssessmentGenerationService, AssessmentService],
 })
-export class AssessmentModule { }
+export class AssessmentModule {}

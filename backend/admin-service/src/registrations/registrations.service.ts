@@ -46,23 +46,35 @@ export class RegistrationsService {
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
-  ) { }
+  ) {}
 
-  async withRetry<T>(operation: () => Promise<T>, retries = 5, delay = 1000): Promise<T> {
+  async withRetry<T>(
+    operation: () => Promise<T>,
+    retries = 5,
+    delay = 1000,
+  ): Promise<T> {
     try {
       return await operation();
     } catch (error: unknown) {
-      type Retryable = { response?: { status?: number }; code?: string; message?: string };
-      const err = (typeof error === 'object' && error !== null) ? (error as Retryable) : {};
+      type Retryable = {
+        response?: { status?: number };
+        code?: string;
+        message?: string;
+      };
+      const err =
+        typeof error === 'object' && error !== null ? (error as Retryable) : {};
 
       const isRateLimit =
-        (err.response?.status === 429) ||
-        (err.code === 'TooManyRequestsException') ||
-        (typeof err.message === 'string' && err.message.includes('Too Many Requests'));
+        err.response?.status === 429 ||
+        err.code === 'TooManyRequestsException' ||
+        (typeof err.message === 'string' &&
+          err.message.includes('Too Many Requests'));
 
       if (retries > 0 && isRateLimit) {
-        this.logger.warn(`Rate limit hit in RegistrationsService. Retrying in ${delay}ms... (${retries} retries left)`);
-        await new Promise(res => setTimeout(res, delay));
+        this.logger.warn(
+          `Rate limit hit in RegistrationsService. Retrying in ${delay}ms... (${retries} retries left)`,
+        );
+        await new Promise((res) => setTimeout(res, delay));
         return this.withRetry(operation, retries - 1, delay * 2);
       }
       throw error;
@@ -80,14 +92,18 @@ export class RegistrationsService {
             `${this.authServiceBaseUrl}/internal/cognito/users`,
             { email, password },
             { proxy: false },
-          )
-        )
+          ),
+        ),
       );
       return res.data as { sub?: string };
     } catch (err: unknown) {
       /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-      type AuthErr = { response?: { data?: any; status?: number }; message?: string; code?: string };
-      const e = (typeof err === 'object' && err !== null) ? (err as AuthErr) : {};
+      type AuthErr = {
+        response?: { data?: any; status?: number };
+        message?: string;
+        code?: string;
+      };
+      const e = typeof err === 'object' && err !== null ? (err as AuthErr) : {};
 
       const authErr = e.response?.data || e.message || err;
 
@@ -95,7 +111,7 @@ export class RegistrationsService {
 
       const msg =
         typeof authErr === 'object' && authErr !== null
-          ? (authErr as any).message || JSON.stringify(authErr)
+          ? authErr.message || JSON.stringify(authErr)
           : String(authErr);
 
       throw new InternalServerErrorException(
@@ -261,10 +277,8 @@ export class RegistrationsService {
           }
 
           programId = Number(defaultProgram.id);
-          programTitle =
-            defaultProgram.assessmentTitle || defaultProgram.name;
+          programTitle = defaultProgram.assessmentTitle || defaultProgram.name;
         }
-
 
         const validFrom = dto.examStart ? new Date(dto.examStart) : new Date();
         const validTo = dto.examEnd
@@ -295,10 +309,14 @@ export class RegistrationsService {
           },
         });
 
-        this.logger.log(`Found ${levels ? levels.length : 0} mandatory levels for new registration.`);
+        this.logger.log(
+          `Found ${levels ? levels.length : 0} mandatory levels for new registration.`,
+        );
 
         if (!levels || levels.length === 0) {
-          this.logger.warn('No mandatory assessment levels found. Registration will proceed without attempts.');
+          this.logger.warn(
+            'No mandatory assessment levels found. Registration will proceed without attempts.',
+          );
         }
 
         for (const level of levels) {
@@ -320,7 +338,10 @@ export class RegistrationsService {
                 manager,
               );
             } catch (err) {
-              this.logger.error(`Failed to generate questions for Attempt ${attempt.id} (Level ${level.id}):`, err);
+              this.logger.error(
+                `Failed to generate questions for Attempt ${attempt.id} (Level ${level.id}):`,
+                err,
+              );
             }
           }
         }
@@ -351,9 +372,10 @@ export class RegistrationsService {
           email: user.email,
         };
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       this.logger.error('Registration Transaction Failed', e);
-      throw new BadRequestException(`Registration Failed: ${e.message || e}`);
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new BadRequestException(`Registration Failed: ${msg}`);
     }
   }
 
@@ -415,8 +437,10 @@ export class RegistrationsService {
           .getRepository(Program)
           .findOne({ where: { id: Number(dto.programType) } });
 
-        if (!selectedProgram) throw new BadRequestException(`Program ${dto.programType} not found`);
-        if (!selectedProgram.isActive) throw new BadRequestException(`Program inactive`);
+        if (!selectedProgram)
+          throw new BadRequestException(`Program ${dto.programType} not found`);
+        if (!selectedProgram.isActive)
+          throw new BadRequestException(`Program inactive`);
 
         programId = Number(selectedProgram.id);
       } else {
@@ -428,7 +452,9 @@ export class RegistrationsService {
       }
 
       const validFrom = dto.examStart ? new Date(dto.examStart) : new Date();
-      const validTo = dto.examEnd ? new Date(dto.examEnd) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const validTo = dto.examEnd
+        ? new Date(dto.examEnd)
+        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
       const session = manager.create(AssessmentSession, {
         userId: user.id,
@@ -447,10 +473,14 @@ export class RegistrationsService {
         where: { isMandatory: true },
       });
 
-      this.logger.log(`Found ${levels ? levels.length : 0} mandatory levels for existing user.`);
+      this.logger.log(
+        `Found ${levels ? levels.length : 0} mandatory levels for existing user.`,
+      );
 
       if (!levels || levels.length === 0) {
-        this.logger.warn('No mandatory assessment levels found. Registration will proceed without attempts.');
+        this.logger.warn(
+          'No mandatory assessment levels found. Registration will proceed without attempts.',
+        );
       }
 
       for (const level of levels) {
@@ -478,7 +508,7 @@ export class RegistrationsService {
         registrationId: registration.id,
         userId: user.id,
         email: user.email,
-        wasExisting: true
+        wasExisting: true,
       };
     });
   }
@@ -512,10 +542,14 @@ export class RegistrationsService {
       }
 
       if (startDate) {
-        qb.andWhere('r.createdAt >= :startDate', { startDate: `${startDate} 00:00:00` });
+        qb.andWhere('r.createdAt >= :startDate', {
+          startDate: `${startDate} 00:00:00`,
+        });
       }
       if (endDate) {
-        qb.andWhere('r.createdAt <= :endDate', { endDate: `${endDate} 23:59:59` });
+        qb.andWhere('r.createdAt <= :endDate', {
+          endDate: `${endDate} 23:59:59`,
+        });
       }
 
       // Sorting Logic

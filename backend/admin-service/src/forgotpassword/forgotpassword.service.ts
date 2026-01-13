@@ -34,21 +34,33 @@ export class ForgotPasswordService {
       'http://localhost:4002';
   }
 
-  async withRetry<T>(operation: () => Promise<T>, retries = 5, delay = 1000): Promise<T> {
+  async withRetry<T>(
+    operation: () => Promise<T>,
+    retries = 5,
+    delay = 1000,
+  ): Promise<T> {
     try {
       return await operation();
     } catch (error: unknown) {
-      type Retryable = { response?: { status?: number }; code?: string; message?: string };
-      const err = (typeof error === 'object' && error !== null) ? (error as Retryable) : {};
+      type Retryable = {
+        response?: { status?: number };
+        code?: string;
+        message?: string;
+      };
+      const err =
+        typeof error === 'object' && error !== null ? (error as Retryable) : {};
 
       const isRateLimit =
-        (err.response?.status === 429) ||
-        (err.code === 'TooManyRequestsException') ||
-        (typeof err.message === 'string' && err.message.includes('Too Many Requests'));
+        err.response?.status === 429 ||
+        err.code === 'TooManyRequestsException' ||
+        (typeof err.message === 'string' &&
+          err.message.includes('Too Many Requests'));
 
       if (retries > 0 && isRateLimit) {
-        console.warn(`Rate limit hit in ForgotPasswordService. Retrying in ${delay}ms... (${retries} retries left)`);
-        await new Promise(res => setTimeout(res, delay));
+        console.warn(
+          `Rate limit hit in ForgotPasswordService. Retrying in ${delay}ms... (${retries} retries left)`,
+        );
+        await new Promise((res) => setTimeout(res, delay));
         return this.withRetry(operation, retries - 1, delay * 2);
       }
       throw error;
@@ -93,15 +105,22 @@ export class ForgotPasswordService {
 
     // 3. Call Auth Service to Trigger Reset
     try {
-      await this.withRetry(() => firstValueFrom(
-        this.httpService.post(
-          `${this.authServiceUrl}/internal/cognito/forgot-password`,
-          { email },
+      await this.withRetry(() =>
+        firstValueFrom(
+          this.httpService.post(
+            `${this.authServiceUrl}/internal/cognito/forgot-password`,
+            { email },
+          ),
         ),
-      ));
+      );
     } catch (error: unknown) {
-      type ApiErr = { response?: { data?: any; status?: number }; message?: string; code?: string };
-      const e = (typeof error === 'object' && error !== null) ? (error as ApiErr) : {};
+      type ApiErr = {
+        response?: { data?: any; status?: number };
+        message?: string;
+        code?: string;
+      };
+      const e =
+        typeof error === 'object' && error !== null ? (error as ApiErr) : {};
 
       console.error(
         'Auth Service Forgot Password Failed:',

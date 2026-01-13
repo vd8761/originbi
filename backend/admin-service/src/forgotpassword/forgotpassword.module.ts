@@ -11,4 +11,4 @@ import { ForgotPasswordService } from './forgotpassword.service';
   providers: [ForgotPasswordService],
   exports: [ForgotPasswordService],
 })
-export class ForgotPasswordModule { }
+export class ForgotPasswordModule {}

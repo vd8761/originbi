@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProgramsService } from './programs.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Program } from './entities/program.entity';
+import { Program } from '@originbi/shared-entities';
 
 describe('ProgramsService', () => {
   let service: ProgramsService;

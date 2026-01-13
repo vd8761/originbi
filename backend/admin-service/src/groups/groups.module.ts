@@ -8,4 +8,4 @@ import { GroupsService } from './groups.service';
   providers: [GroupsService],
   exports: [GroupsService, TypeOrmModule], // Export TypeOrmModule too if needed by others
 })
-export class GroupsModule { }
+export class GroupsModule {}

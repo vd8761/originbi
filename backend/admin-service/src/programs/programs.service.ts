@@ -9,7 +9,7 @@ export class ProgramsService {
   constructor(
     @InjectRepository(Program)
     private readonly programRepo: Repository<Program>,
-  ) { }
+  ) {}
 
   async findAll(
     page = 1,
@@ -45,12 +45,12 @@ export class ProgramsService {
       if (sortBy) {
         // Map snake_case sort keys to camelCase if needed, or assume frontend sends valid keys
         const keyMap: Record<string, string> = {
-          'created_at': 'createdAt',
-          'updated_at': 'updatedAt',
-          'assessment_title': 'assessmentTitle',
-          'report_title': 'reportTitle',
-          'is_demo': 'isDemo',
-          'is_active': 'isActive'
+          created_at: 'createdAt',
+          updated_at: 'updatedAt',
+          assessment_title: 'assessmentTitle',
+          report_title: 'reportTitle',
+          is_demo: 'isDemo',
+          is_active: 'isActive',
         };
         const key = keyMap[sortBy] || sortBy;
         order[key] = sortOrder;
@@ -66,10 +66,10 @@ export class ProgramsService {
       });
 
       return {
-        data: data.map(p => this.toResponse(p)),
+        data: data.map((p) => this.toResponse(p)),
         total,
         page,
-        limit
+        limit,
       };
     } catch (error) {
       console.error('ProgramsService.findAll Error:', error);
@@ -77,8 +77,11 @@ export class ProgramsService {
     }
   }
 
-  async findOne(id: number): Promise<any> { // id is number/bigint in shared entity
-    const program = await this.programRepo.findOne({ where: { id: Number(id) } }); // Ensure numeric ID
+  async findOne(id: number): Promise<any> {
+    // id is number/bigint in shared entity
+    const program = await this.programRepo.findOne({
+      where: { id: Number(id) },
+    }); // Ensure numeric ID
     if (!program) throw new NotFoundException('Program not found');
     return this.toResponse(program);
   }
@@ -126,7 +129,9 @@ export class ProgramsService {
 
   // Helper to find entity without mapping
   private async findOneEntity(id: number): Promise<Program> {
-    const program = await this.programRepo.findOne({ where: { id: Number(id) } });
+    const program = await this.programRepo.findOne({
+      where: { id: Number(id) },
+    });
     if (!program) throw new NotFoundException('Program not found');
     return program;
   }
@@ -148,7 +153,7 @@ export class ProgramsService {
   }
 
   async remove(id: number): Promise<void> {
-    const program = await this.findOne(id);
+    const program = await this.findOneEntity(id);
     await this.programRepo.remove(program);
   }
 }
