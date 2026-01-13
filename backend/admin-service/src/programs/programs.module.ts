@@ -10,4 +10,4 @@ import { ProgramsController } from './programs.controller';
   controllers: [ProgramsController],
   exports: [ProgramsService],
 })
-export class ProgramsModule { }
+export class ProgramsModule {}

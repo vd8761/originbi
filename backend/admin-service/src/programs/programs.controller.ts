@@ -14,7 +14,7 @@ import { Program } from '@originbi/shared-entities';
 
 @Controller('admin/programs')
 export class ProgramsController {
-  constructor(private readonly programsService: ProgramsService) { }
+  constructor(private readonly programsService: ProgramsService) {}
 
   // GET ALL (with pagination + search)
   @Get()

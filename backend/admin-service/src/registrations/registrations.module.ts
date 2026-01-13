@@ -26,7 +26,7 @@ import { Department } from '../departments/department.entity';
       BulkImport,
       BulkImportRow,
       Program,
-      Department
+      Department,
     ]),
     HttpModule,
     GroupsModule,
@@ -35,4 +35,4 @@ import { Department } from '../departments/department.entity';
   providers: [RegistrationsService, BulkRegistrationsService],
   controllers: [RegistrationsController],
 })
-export class RegistrationsModule { }
+export class RegistrationsModule {}

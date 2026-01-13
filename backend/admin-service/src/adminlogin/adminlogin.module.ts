@@ -14,4 +14,4 @@ import { AdminLoginGuard } from './adminlogin.guard';
   providers: [AdminLoginService, AdminLoginGuard],
   exports: [AdminLoginGuard, AdminLoginService, TypeOrmModule],
 })
-export class AdminLoginModule { }
+export class AdminLoginModule {}

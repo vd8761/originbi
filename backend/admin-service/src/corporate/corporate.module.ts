@@ -12,11 +12,15 @@ import {
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([CorporateAccount, CorporateCreditLedger, AdminUser]),
+    TypeOrmModule.forFeature([
+      CorporateAccount,
+      CorporateCreditLedger,
+      AdminUser,
+    ]),
     HttpModule,
   ],
   controllers: [CorporateController],
   providers: [CorporateService],
   exports: [CorporateService],
 })
-export class CorporateModule { }
+export class CorporateModule {}
