@@ -12,15 +12,17 @@ import * as nodemailer from 'nodemailer';
 import { SES } from 'aws-sdk';
 import * as path from 'path';
 
-import { CorporateAccount } from '../entities/corporate-account.entity';
-import { CorporateCreditLedger } from '../entities/corporate-credit-ledger.entity';
-import { User } from '../entities/user.entity';
-import { Registration } from '../entities/registration.entity';
-import { Groups } from '../entities/groups.entity';
-import { Program } from '../entities/program.entity';
-import { AssessmentSession } from '../entities/assessment_session.entity';
-import { AssessmentAttempt } from '../entities/assessment_attempt.entity';
-import { AssessmentLevel } from '../entities/assessment_level.entity';
+import {
+    CorporateAccount,
+    CorporateCreditLedger,
+    User,
+    Registration,
+    Groups,
+    Program,
+    AssessmentSession,
+    AssessmentAttempt,
+    AssessmentLevel,
+} from '@originbi/shared-entities';
 
 import { AssessmentGenerationService } from '../assessment/assessment-generation.service';
 import { getWelcomeEmailTemplate } from '../mail/templates/welcome.template';
@@ -264,7 +266,7 @@ export class CorporateRegistrationsService {
                     dto.fullName,
                     password,
                     validFrom,
-                    program.assessment_title || program.name,
+                    program.assessmentTitle || program.name,
                 );
             } catch (e) {
                 this.logger.error('Failed to send welcome email', e);
@@ -449,7 +451,7 @@ export class CorporateRegistrationsService {
                     user.metadata?.fullName || dto.fullName,
                     '******', // Masked password for existing users
                     validFrom,
-                    program.assessment_title || program.name
+                    program.assessmentTitle || program.name
                 );
             } catch (e) {
                 this.logger.error('Failed to send welcome email', e);

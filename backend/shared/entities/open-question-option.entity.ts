@@ -2,12 +2,9 @@ import {
     Entity,
     PrimaryGeneratedColumn,
     Column,
-    ManyToOne,
-    JoinColumn,
     CreateDateColumn,
     UpdateDateColumn,
 } from 'typeorm';
-import { OpenQuestion } from './open_question.entity';
 
 @Entity('open_question_options')
 export class OpenQuestionOption {
@@ -16,10 +13,6 @@ export class OpenQuestionOption {
 
     @Column({ name: 'open_question_id', type: 'bigint' })
     openQuestionId: number;
-
-    @ManyToOne(() => OpenQuestion, (question) => question.options)
-    @JoinColumn({ name: 'open_question_id' })
-    openQuestion: OpenQuestion;
 
     @Column({ name: 'option_type', type: 'varchar', length: 20 })
     optionType: string;
@@ -45,9 +38,9 @@ export class OpenQuestionOption {
     @Column({ name: 'is_deleted', type: 'boolean', default: false })
     isDeleted: boolean;
 
-    @CreateDateColumn({ name: 'created_at' })
+    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 
-    @UpdateDateColumn({ name: 'updated_at' })
+    @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
     updatedAt: Date;
 }

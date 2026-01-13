@@ -7,7 +7,9 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
 } from 'typeorm';
-import { AssessmentQuestion } from './assessment_question.entity';
+
+// Forward reference - AssessmentQuestion will be defined separately
+// The relation is defined from Option -> Question side to avoid circular deps
 
 @Entity('assessment_question_options')
 export class AssessmentQuestionOption {
@@ -16,10 +18,6 @@ export class AssessmentQuestionOption {
 
     @Column({ name: 'question_id', type: 'bigint' })
     questionId: number;
-
-    @ManyToOne(() => AssessmentQuestion, (question) => question.options)
-    @JoinColumn({ name: 'question_id' })
-    question: AssessmentQuestion;
 
     @Column({ name: 'display_order', type: 'smallint', default: 1 })
     displayOrder: number;
@@ -58,9 +56,9 @@ export class AssessmentQuestionOption {
     @Column({ name: 'is_deleted', type: 'boolean', default: false })
     isDeleted: boolean;
 
-    @CreateDateColumn({ name: 'created_at' })
+    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 
-    @UpdateDateColumn({ name: 'updated_at' })
+    @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
     updatedAt: Date;
 }

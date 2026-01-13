@@ -6,7 +6,7 @@ import {
     ManyToOne,
     JoinColumn,
 } from 'typeorm';
-import { User } from '../../entities/user.entity';
+import { User } from '@originbi/shared-entities';
 
 @Entity('corporate_bulk_imports')
 export class BulkImport {
