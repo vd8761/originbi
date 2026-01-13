@@ -11,6 +11,7 @@ interface AssessmentSessionsTableProps {
     sortColumn?: string;
     sortOrder?: "ASC" | "DESC";
     isGroupView?: boolean;
+    hideCandidateName?: boolean;
 }
 
 const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
@@ -21,7 +22,8 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
     onSort,
     sortColumn,
     sortOrder,
-    isGroupView
+    isGroupView,
+    hideCandidateName
 }) => {
 
     const formatDate = (dateStr?: string) => {
@@ -71,7 +73,7 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                             <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider text-center w-16">
                                 Action
                             </th>
-                            {!isGroupView && (
+                            {!isGroupView && !hideCandidateName && (
                                 <th
                                     className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors w-[15%] min-w-[140px]"
                                     onClick={() => onSort?.('candidate_name')}
@@ -112,17 +114,15 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                                     <SortIcon sort={sortColumn === 'program_name' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                                 </div>
                             </th>
-                            {isGroupView && (
-                                <th
-                                    className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                                    onClick={() => onSort?.('group_name')}
-                                >
-                                    <div className="flex items-center gap-1">
-                                        Group Name
-                                        <SortIcon sort={sortColumn === 'group_name' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
-                                    </div>
-                                </th>
-                            )}
+                            <th
+                                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                onClick={() => onSort?.('group_name')}
+                            >
+                                <div className="flex items-center gap-1">
+                                    Group Name
+                                    <SortIcon sort={sortColumn === 'group_name' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
+                                </div>
+                            </th>
                             {isGroupView && (
                                 <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider text-center">
                                     No. of Candidates
@@ -198,13 +198,13 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                                                 <EyeVisibleIcon className="w-4 h-4" />
                                             </button>
                                         </td>
-                                        {!isGroupView && (
+                                        {!isGroupView && !hideCandidateName && (
                                             <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-primary font-medium whitespace-nowrap">
-                                                {session.registration?.fullName || session.user?.email || '-'}
+                                                {session.registration?.fullName || (session.registration as any)?.full_name || '-'}
                                             </td>
                                         )}
                                         <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-primary font-medium">
-                                            {session.program?.assessment_title || '-'}
+                                            {session.program?.assessment_title || session.program?.assessmentTitle || '-'}
                                         </td>
                                         <td className="p-4 text-center">
                                             <span className={`px-3 py-1 rounded text-[10px] font-semibold border ${status.color}`}>
@@ -217,27 +217,29 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                                         <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-primary">
                                             {session.program?.name || '-'}
                                         </td>
-                                        {isGroupView && (
-                                            <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-primary">
-                                                {session.groupName || '-'}
-                                            </td>
-                                        )}
-                                        {isGroupView && (
-                                            <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-primary text-center">
-                                                {session.totalCandidates || 0}
-                                            </td>
-                                        )}
+                                        <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-primary">
+                                            {session.groupName || '-'}
+                                        </td>
+                                        {
+                                            isGroupView && (
+                                                <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-primary text-center">
+                                                    {session.totalCandidates || 0}
+                                                </td>
+                                            )
+                                        }
                                         <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-secondary whitespace-nowrap">
                                             {formatDate(session.validFrom)}
                                         </td>
                                         <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-secondary whitespace-nowrap">
                                             {formatDate(session.validTo)}
                                         </td>
-                                        {!isGroupView && (
-                                            <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-secondary whitespace-nowrap">
-                                                {session.status === 'EXPIRED' ? formatDate(session.validTo) : '-'}
-                                            </td>
-                                        )}
+                                        {
+                                            !isGroupView && (
+                                                <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-secondary whitespace-nowrap">
+                                                    {session.status === 'EXPIRED' ? formatDate(session.validTo) : '-'}
+                                                </td>
+                                            )
+                                        }
                                     </tr>
                                 );
                             })
@@ -245,7 +247,7 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                     </tbody>
                 </table>
             </div>
-        </div>
+        </div >
     );
 };
 

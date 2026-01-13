@@ -124,12 +124,15 @@ export class AssessmentService {
       const qb = this.sessionRepo
         .createQueryBuilder('as')
         .leftJoinAndMapOne('as.program', Program, 'p', 'p.id = as.programId')
-        .leftJoinAndSelect('as.user', 'u');
+        .leftJoinAndSelect('as.user', 'u')
+        .leftJoinAndSelect('as.registration', 'r')
+        .leftJoinAndSelect('as.groupAssessment', 'ga')
+        .leftJoinAndSelect('ga.group', 'g');
 
       if (search) {
         const s = `%${search.toLowerCase()}%`;
         qb.andWhere(
-          '(LOWER(p.name) LIKE :s OR LOWER(p.assessment_title) LIKE :s OR LOWER(u.email) LIKE :s)',
+          '(LOWER(p.name) LIKE :s OR LOWER(p.assessment_title) LIKE :s OR LOWER(u.email) LIKE :s OR LOWER(r.full_name) LIKE :s)',
           { s },
         );
       }
@@ -218,6 +221,7 @@ export class AssessmentService {
 
       const augmentedRows = rows.map((r) => ({
         ...r,
+        groupName: r.groupAssessment?.group?.name || 'N/A',
         totalLevels,
         currentLevel:
           currentLevelsMap[r.id] || (r.status === 'NOT_STARTED' ? 0 : 1),
@@ -275,17 +279,26 @@ export class AssessmentService {
         ],
       });
 
-      if (!session) {
-        console.warn(`Session with ID ${id} not found in getSessionDetails`);
-      } else {
-        console.log(`Session ${id} fetched. relations:`, {
-          hasUser: !!session.user,
-          hasRegistration: !!session.registration,
-          hasGroupAssessment: !!session.groupAssessment,
-        });
-      }
+      if (!session) return null;
 
-      return session;
+      // Fetch all attempts for the session to populate level-wise reports
+      const attempts = await this.attemptRepo.find({
+        where: { assessmentSessionId: id },
+        relations: ['assessmentLevel'],
+        order: { assessmentLevelId: 'ASC' },
+      });
+
+      // Maintain currentAttempt logic for stats bar if needed (usually latest active)
+      // If we just sort attempts by ID DESC, the first one is the latest.
+      const currentAttempt = attempts.sort((a, b) => Number(b.id) - Number(a.id))[0];
+
+      return {
+        ...session,
+        attempts, // Return full list
+        currentAttempt
+      };
+
+
     } catch (error) {
       console.error('Error fetching session details:', error);
       throw error;
