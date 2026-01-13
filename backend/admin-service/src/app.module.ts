@@ -12,6 +12,7 @@ import { GroupsModule } from './groups/groups.module';
 import { AssessmentModule } from './assessment/assessment.module';
 import { CorporateModule } from './corporate/corporate.module';
 import { ForgotPasswordModule } from './forgotpassword/forgotpassword.module';
+import { RagModule } from './rag/rag.module';
 import { TestController } from './test/test.controller';
 import { MailAssetsController } from './mail/mail-assets.controller';
 
@@ -93,6 +94,7 @@ import { MailAssetsController } from './mail/mail-assets.controller';
     AssessmentModule,
     CorporateModule,
     ForgotPasswordModule,
+    RagModule,
   ],
   controllers: [TestController, MailAssetsController],
 })
