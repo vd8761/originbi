@@ -39,30 +39,53 @@ export class AssessmentService {
     try {
       // NEW LOGIC FOR GROUP ASSESSMENTS
       if (type === 'group') {
-        const qb = this.groupAssessmentRepo.createQueryBuilder('ga')
+        const qb = this.groupAssessmentRepo
+          .createQueryBuilder('ga')
           .leftJoinAndMapOne('ga.program', Program, 'p', 'p.id = ga.programId')
           .leftJoinAndMapOne('ga.group', Groups, 'g', 'g.id = ga.groupId'); // Join Group
 
         if (search) {
           const s = `%${search.toLowerCase()}%`;
-          qb.andWhere('(LOWER(p.name) LIKE :s OR LOWER(p.assessment_title) LIKE :s OR LOWER(g.name) LIKE :s)', { s });
+          qb.andWhere(
+            '(LOWER(p.name) LIKE :s OR LOWER(p.assessment_title) LIKE :s OR LOWER(g.name) LIKE :s)',
+            { s },
+          );
         }
 
-        if (startDate) qb.andWhere('ga.validFrom >= :startDate', { startDate: `${startDate} 00:00:00` });
-        if (endDate) qb.andWhere('ga.validFrom <= :endDate', { endDate: `${endDate} 23:59:59` });
+        if (startDate)
+          qb.andWhere('ga.validFrom >= :startDate', {
+            startDate: `${startDate} 00:00:00`,
+          });
+        if (endDate)
+          qb.andWhere('ga.validFrom <= :endDate', {
+            endDate: `${endDate} 23:59:59`,
+          });
         if (status) qb.andWhere('ga.status = :status', { status });
 
         // Sort
         if (sortBy) {
           let sortCol = '';
           switch (sortBy) {
-            case 'exam_title': sortCol = 'p.assessment_title'; break;
-            case 'program_name': sortCol = 'p.name'; break;
-            case 'group_name': sortCol = 'g.name'; break;
-            case 'exam_status': sortCol = 'ga.status'; break;
-            case 'exam_starts_on': sortCol = 'ga.validFrom'; break;
-            case 'exam_ends_on': sortCol = 'ga.validTo'; break;
-            default: sortCol = 'ga.validFrom';
+            case 'exam_title':
+              sortCol = 'p.assessment_title';
+              break;
+            case 'program_name':
+              sortCol = 'p.name';
+              break;
+            case 'group_name':
+              sortCol = 'g.name';
+              break;
+            case 'exam_status':
+              sortCol = 'ga.status';
+              break;
+            case 'exam_starts_on':
+              sortCol = 'ga.validFrom';
+              break;
+            case 'exam_ends_on':
+              sortCol = 'ga.validTo';
+              break;
+            default:
+              sortCol = 'ga.validFrom';
           }
           qb.orderBy(sortCol, sortOrder);
         } else {
@@ -75,7 +98,7 @@ export class AssessmentService {
           .take(limit)
           .getMany();
 
-        const data = rows.map(r => ({
+        const data = rows.map((r) => ({
           id: r.id,
           programId: r.programId,
           program: r.program,
@@ -91,14 +114,15 @@ export class AssessmentService {
           registrationId: 0,
           currentLevel: 0,
           totalLevels: 0,
-          totalCandidates: r.totalCandidates
+          totalCandidates: r.totalCandidates,
         }));
 
         return { data, total, page, limit };
       }
 
       // EXISTING LOGIC FOR INDIVIDUAL SESSIONS
-      const qb = this.sessionRepo.createQueryBuilder('as')
+      const qb = this.sessionRepo
+        .createQueryBuilder('as')
         .leftJoinAndMapOne('as.program', Program, 'p', 'p.id = as.programId')
         .leftJoinAndSelect('as.user', 'u');
 
@@ -111,10 +135,14 @@ export class AssessmentService {
       }
 
       if (startDate) {
-        qb.andWhere('as.validFrom >= :startDate', { startDate: `${startDate} 00:00:00` });
+        qb.andWhere('as.validFrom >= :startDate', {
+          startDate: `${startDate} 00:00:00`,
+        });
       }
       if (endDate) {
-        qb.andWhere('as.validFrom <= :endDate', { endDate: `${endDate} 23:59:59` });
+        qb.andWhere('as.validFrom <= :endDate', {
+          endDate: `${endDate} 23:59:59`,
+        });
       }
 
       if (status) {
@@ -132,13 +160,26 @@ export class AssessmentService {
       if (sortBy) {
         let sortCol = '';
         switch (sortBy) {
-          case 'exam_title': sortCol = 'p.assessment_title'; break;
-          case 'program_name': sortCol = 'p.name'; break;
-          case 'exam_status': sortCol = 'as.status'; break;
-          case 'exam_starts_on': sortCol = 'as.validFrom'; break;
-          case 'exam_ends_on': sortCol = 'as.validTo'; break;
-          case 'exam_published_on': sortCol = 'as.createdAt'; break;
-          default: sortCol = 'as.createdAt';
+          case 'exam_title':
+            sortCol = 'p.assessment_title';
+            break;
+          case 'program_name':
+            sortCol = 'p.name';
+            break;
+          case 'exam_status':
+            sortCol = 'as.status';
+            break;
+          case 'exam_starts_on':
+            sortCol = 'as.validFrom';
+            break;
+          case 'exam_ends_on':
+            sortCol = 'as.validTo';
+            break;
+          case 'exam_published_on':
+            sortCol = 'as.createdAt';
+            break;
+          default:
+            sortCol = 'as.createdAt';
         }
         qb.orderBy(sortCol, sortOrder);
       } else {
@@ -152,13 +193,16 @@ export class AssessmentService {
         .getMany();
 
       // Calculate Metrics
-      const totalLevels = await this.levelRepo.count({ where: { isMandatory: true } });
+      const totalLevels = await this.levelRepo.count({
+        where: { isMandatory: true },
+      });
 
       let currentLevelsMap: Record<number, number> = {};
       if (rows.length > 0) {
-        const sessionIds = rows.map(r => r.id);
+        const sessionIds = rows.map((r) => r.id);
         // Get Max Level attempted for each session using attemptRepo
-        const rawLevels = await this.attemptRepo.createQueryBuilder('aa')
+        const rawLevels = await this.attemptRepo
+          .createQueryBuilder('aa')
           .select('aa.assessmentSessionId', 'sid')
           .addSelect('MAX(al.levelNumber)', 'maxLvl')
           .leftJoin('aa.assessmentLevel', 'al')
@@ -172,14 +216,14 @@ export class AssessmentService {
         }, {});
       }
 
-      const augmentedRows = rows.map(r => ({
+      const augmentedRows = rows.map((r) => ({
         ...r,
         totalLevels,
-        currentLevel: currentLevelsMap[r.id] || (r.status === 'NOT_STARTED' ? 0 : 1),
+        currentLevel:
+          currentLevelsMap[r.id] || (r.status === 'NOT_STARTED' ? 0 : 1),
       }));
 
       return { data: augmentedRows, total, page, limit };
-
     } catch (error) {
       console.error('AssessmentService.findAllSessions Error:', error);
       throw error;
@@ -190,7 +234,7 @@ export class AssessmentService {
     try {
       const groupAssessment = await this.groupAssessmentRepo.findOne({
         where: { id },
-        relations: ['group', 'program']
+        relations: ['group', 'program'],
       });
 
       if (!groupAssessment) {
@@ -200,16 +244,16 @@ export class AssessmentService {
       const sessions = await this.sessionRepo.find({
         where: { groupAssessmentId: id },
         relations: ['user', 'registration'],
-        order: { createdAt: 'DESC' }
+        order: { createdAt: 'DESC' },
       });
 
       return {
         ...groupAssessment,
-        sessions: sessions.map(s => ({
+        sessions: sessions.map((s) => ({
           ...s,
           userFullName: s.registration?.fullName || 'N/A',
           userEmail: s.user?.email || 'N/A',
-        }))
+        })),
       };
     } catch (error) {
       console.error('Error fetching group session details:', error);
@@ -221,7 +265,14 @@ export class AssessmentService {
     try {
       const session = await this.sessionRepo.findOne({
         where: { id },
-        relations: ['user', 'registration', 'program', 'groupAssessment', 'groupAssessment.group', 'groupAssessment.program']
+        relations: [
+          'user',
+          'registration',
+          'program',
+          'groupAssessment',
+          'groupAssessment.group',
+          'groupAssessment.program',
+        ],
       });
 
       if (!session) {
@@ -230,7 +281,7 @@ export class AssessmentService {
         console.log(`Session ${id} fetched. relations:`, {
           hasUser: !!session.user,
           hasRegistration: !!session.registration,
-          hasGroupAssessment: !!session.groupAssessment
+          hasGroupAssessment: !!session.groupAssessment,
         });
       }
 
@@ -243,7 +294,8 @@ export class AssessmentService {
 
   async getLevels() {
     try {
-      return await this.levelRepo.createQueryBuilder('al')
+      return await this.levelRepo
+        .createQueryBuilder('al')
         .where('al.is_mandatory = :isMandatory', { isMandatory: true })
         .orderBy('al.sort_order', 'ASC')
         .getMany();
