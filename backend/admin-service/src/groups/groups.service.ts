@@ -8,7 +8,7 @@ export class GroupsService {
   constructor(
     @InjectRepository(Groups)
     private groupsRepository: Repository<Groups>,
-  ) { }
+  ) {}
 
   /**
    * Finds an existing group by name or creates a new one.
@@ -35,6 +35,8 @@ export class GroupsService {
   }
 
   async findAll(): Promise<Groups[]> {
-    return this.groupsRepository.find({ where: { isDeleted: false, isActive: true } });
+    return this.groupsRepository.find({
+      where: { isDeleted: false, isActive: true },
+    });
   }
 }
