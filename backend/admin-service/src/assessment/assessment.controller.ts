@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, Param } from '@nestjs/common';
 import { AssessmentService } from './assessment.service';
 
 @Controller('admin/assessments')
@@ -33,5 +33,20 @@ export class AssessmentController {
             userId,
             type,
         );
+    }
+
+    @Get('group/:id')
+    async getGroupSessionDetails(@Param('id') id: string) {
+        return this.assessmentService.findGroupSessionDetails(Number(id));
+    }
+
+    @Get('sessions/:id')
+    async getSessionDetails(@Param('id') id: string) {
+        return this.assessmentService.getSessionDetails(Number(id));
+    }
+
+    @Get('levels')
+    async getLevels() {
+        return this.assessmentService.getLevels();
     }
 }

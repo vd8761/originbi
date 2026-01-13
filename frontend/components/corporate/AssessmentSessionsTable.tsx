@@ -6,7 +6,7 @@ interface AssessmentSessionsTableProps {
     sessions: AssessmentSession[];
     loading: boolean;
     error: string | null;
-    onView?: (id: string) => void;
+    onView?: (id: string | number) => void;
     onSort?: (column: string) => void;
     sortColumn?: string;
     sortOrder?: "ASC" | "DESC";
@@ -158,13 +158,13 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                     </thead>
                     <tbody className="divide-y divide-brand-light-tertiary dark:divide-brand-dark-tertiary">
                         {loading && sessions.length === 0 ? (
-                            // Skeleton Row
-                            [...Array(5)].map((_, i) => (
+                            Array.from({ length: 5 }).map((_, i) => (
                                 <tr key={i} className="animate-pulse">
-                                    <td className="p-4"><div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded mx-auto"></div></td>
+                                    <td className="p-4"><div className="h-4 w-6 bg-gray-200 dark:bg-gray-700 rounded mx-auto"></div></td>
                                     <td className="p-4"><div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
-                                    <td className="p-4"><div className="h-6 w-20 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto"></div></td>
+                                    <td className="p-4 flex justify-center"><div className="h-6 w-20 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                                     <td className="p-4"><div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded mx-auto"></div></td>
+                                    <td className="p-4"><div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                                     <td className="p-4"><div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                                     <td className="p-4"><div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                                     <td className="p-4"><div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
@@ -192,7 +192,10 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                                     >
                                         <td className="p-4 text-center">
                                             <button
-                                                onClick={() => onView?.(session.id)}
+                                                onClick={() => {
+                                                    console.log("View button clicked for session ID:", session.id);
+                                                    onView?.(session.id);
+                                                }}
                                                 className="p-1 hover:bg-brand-light-tertiary dark:hover:bg-white/10 rounded transition-colors text-brand-green"
                                             >
                                                 <EyeVisibleIcon className="w-4 h-4" />
@@ -224,18 +227,19 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                                         )}
                                         {isGroupView && (
                                             <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-primary text-center">
-                                                {session.totalCandidates || 0}
+                                                {session.totalCandidates || '-'}
                                             </td>
                                         )}
-                                        <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-secondary whitespace-nowrap">
+                                        <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-secondary font-medium whitespace-nowrap">
                                             {formatDate(session.validFrom)}
                                         </td>
-                                        <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-secondary whitespace-nowrap">
+                                        <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-secondary font-medium whitespace-nowrap">
                                             {formatDate(session.validTo)}
                                         </td>
                                         {!isGroupView && (
-                                            <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-secondary whitespace-nowrap">
-                                                {session.status === 'EXPIRED' ? formatDate(session.validTo) : '-'}
+                                            <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-secondary font-medium whitespace-nowrap">
+                                                {/* No expiration date field explicitly in mocked session interface, using validTo or dash */}
+                                                -
                                             </td>
                                         )}
                                     </tr>
@@ -245,6 +249,7 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                     </tbody>
                 </table>
             </div>
+            {/* Pagination footer normally handled by parent */}
         </div>
     );
 };

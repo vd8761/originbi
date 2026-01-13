@@ -35,6 +35,11 @@ export class AssessmentSession {
   @Column({ name: 'program_id', type: 'bigint', default: 0 })
   programId: number;
 
+  @ManyToOne('Program')
+  @JoinColumn({ name: 'program_id' })
+  program: any; // Using 'any' to avoid strict typing issues for now, or import Program properly if possible.
+  // Better to use string for relation to avoid circular dependency issues if any.
+
   @Column({ name: 'group_id', type: 'bigint', nullable: true })
   groupId: number | null;
 

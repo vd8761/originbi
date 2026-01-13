@@ -6,6 +6,7 @@ import { AssessmentSession } from './assessment_session.entity';
 import { Program } from '../programs/entities/program.entity';
 import { AssessmentLevel } from './assessment_level.entity';
 import { AssessmentAttempt } from './assessment_attempt.entity';
+import { AssessmentAnswer } from './assessment_answer.entity';
 import { GroupAssessment } from './group_assessment.entity';
 import { Groups } from '../groups/groups.entity';
 
@@ -18,9 +19,13 @@ export class AssessmentService {
         private readonly levelRepo: Repository<AssessmentLevel>,
         @InjectRepository(AssessmentAttempt)
         private readonly attemptRepo: Repository<AssessmentAttempt>,
+        @InjectRepository(AssessmentAnswer)
+        private readonly answerRepo: Repository<AssessmentAnswer>,
         @InjectRepository(GroupAssessment)
         private readonly groupAssessmentRepo: Repository<GroupAssessment>,
     ) { }
+
+
 
     async findAllSessions(
         page: number,
@@ -98,7 +103,8 @@ export class AssessmentService {
             // EXISTING LOGIC FOR INDIVIDUAL SESSIONS
             const qb = this.sessionRepo.createQueryBuilder('as')
                 .leftJoinAndMapOne('as.program', Program, 'p', 'p.id = as.programId')
-                .leftJoinAndSelect('as.user', 'u');
+                .leftJoinAndSelect('as.user', 'u')
+                .leftJoinAndSelect('as.registration', 'reg');
 
             if (search) {
                 const s = `%${search.toLowerCase()}%`;
@@ -170,16 +176,15 @@ export class AssessmentService {
             if (rows.length > 0) {
                 const sessionIds = rows.map(r => r.id);
                 // Get Max Level attempted for each session
-                const rawLevels = await this.attemptRepo.createQueryBuilder('aa')
-                    .select('aa.assessmentSessionId', 'sid')
-                    .addSelect('MAX(al.levelNumber)', 'maxLvl')
-                    .leftJoin('aa.assessmentLevel', 'al')
-                    .where('aa.assessmentSessionId IN (:...ids)', { ids: sessionIds })
-                    .groupBy('aa.assessmentSessionId')
+                const rawLevels = await this.answerRepo.createQueryBuilder('ans')
+                    .select('ans.assessmentSessionId', 'sid')
+                    .addSelect('COUNT(DISTINCT ans.assessmentLevelId)', 'lvlCount')
+                    .where('ans.assessmentSessionId IN (:...ids)', { ids: sessionIds })
+                    .groupBy('ans.assessmentSessionId')
                     .getRawMany();
 
                 currentLevelsMap = rawLevels.reduce((acc, curr) => {
-                    acc[curr.sid] = Number(curr.maxLvl) || 1;
+                    acc[curr.sid] = Number(curr.lvlCount) || 1;
                     return acc;
                 }, {});
             }
@@ -187,7 +192,17 @@ export class AssessmentService {
             const augmentedRows = rows.map(r => ({
                 ...r,
                 totalLevels,
-                currentLevel: currentLevelsMap[r.id] || (r.status === 'NOT_STARTED' ? 0 : 1),
+                currentLevel: r.status === 'NOT_STARTED' || r.status === 'ASSIGNED'
+                    ? 0
+                    : (currentLevelsMap[r.id] || 0) // If started but no attempts found, it might mean level 0 completed or just started level 1? Usually 0 completed.
+                // Wait, if status is IN_PROGRESS, they might have completed 0 levels (working on 1st).
+                // If map has value, use it. If not, stick to 0 or check if they finished level 1?
+                // The map calculates MAX level attempted. If they attempted level 1, max is 1. Completed count?
+                // If they attempted level 1, and finished it, maybe we count it?
+                // For now, let's assume map returns completed levels count if possible, or we interpret it.
+                // Map query: MAX(al.levelNumber). If max is 1, they are ON level 1 or finished level 1?
+                // Usually 'attempt' means they took it. If they finished, maybe status is captured.
+                // Let's stick to: if NOT_STARTED -> 0. Else use map value. If map empty -> 0.
             }));
 
             return { data: augmentedRows, total, page, limit };
@@ -195,6 +210,73 @@ export class AssessmentService {
         } catch (error) {
             console.error('AssessmentService.findAllSessions Error:', error);
             throw error;
+        }
+    }
+
+    async findGroupSessionDetails(id: number) {
+        try {
+            const groupAssessment = await this.groupAssessmentRepo.findOne({
+                where: { id },
+                relations: ['group', 'program']
+            });
+
+            if (!groupAssessment) {
+                return null;
+            }
+
+            const sessions = await this.sessionRepo.find({
+                where: { groupAssessmentId: id },
+                relations: ['user', 'registration'],
+                order: { createdAt: 'DESC' }
+            });
+
+            return {
+                ...groupAssessment,
+                sessions: sessions.map(s => ({
+                    ...s,
+                    userFullName: s.registration?.fullName || 'N/A',
+                    userEmail: s.user?.email || 'N/A',
+                }))
+            };
+        } catch (error) {
+            console.error('Error fetching group session details:', error);
+            throw error;
+        }
+    }
+
+    async getSessionDetails(id: number) {
+        try {
+            const session = await this.sessionRepo.findOne({
+                where: { id },
+                relations: ['user', 'registration', 'program', 'groupAssessment', 'groupAssessment.group', 'groupAssessment.program']
+            });
+
+            if (!session) {
+                console.warn(`Session with ID ${id} not found in getSessionDetails`);
+            } else {
+                console.log(`Session ${id} fetched. relations:`, {
+                    hasUser: !!session.user,
+                    hasRegistration: !!session.registration,
+                    hasGroupAssessment: !!session.groupAssessment
+                });
+            }
+
+            return session;
+        } catch (error) {
+            console.error('Error fetching session details:', error);
+            throw error;
+        }
+    }
+
+    async getLevels() {
+        try {
+            return await this.levelRepo.createQueryBuilder('al')
+                .where('al.is_mandatory = :isMandatory', { isMandatory: true })
+                .orderBy('al.sort_order', 'ASC')
+                .getMany();
+        } catch (error) {
+            console.error('Error fetching levels:', error);
+            return [];
         }
     }
 }
