@@ -164,6 +164,7 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 		var totalScore float64
 		var dominantFactor string
 		var traitID *int64
+		var agileOrderedData interface{}
 
 		// --- Scoring Logic Based on Level ---
 		if currentLevel.LevelNumber == 1 || currentLevel.Name == "Level 1" || currentLevel.PatternType == "DISC" {
@@ -226,12 +227,38 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
                 GROUP BY q.category
             `, answerRecord.AssessmentAttemptID).Scan(&agileScores)
 
+			// Define struct with specific field order (Total last)
+			var orderedAgile struct {
+				Commitment float64 `json:"Commitment"`
+				Courage    float64 `json:"Courage"`
+				Focus      float64 `json:"Focus"`
+				Openness   float64 `json:"Openness"`
+				Respect    float64 `json:"Respect"`
+				Total      float64 `json:"total"`
+			}
+
 			for _, s := range agileScores {
 				totalScore += s.Total
+				// Populate struct fields
+				switch s.Category {
+				case "Commitment":
+					orderedAgile.Commitment = s.Total
+				case "Courage":
+					orderedAgile.Courage = s.Total
+				case "Focus":
+					orderedAgile.Focus = s.Total
+				case "Openness":
+					orderedAgile.Openness = s.Total
+				case "Respect":
+					orderedAgile.Respect = s.Total
+				}
+				// Also populate map for legacy/fallback (excluding total here to avoid duplicate if needed, but scoreMap['total'] is added later anyway)
 				if s.Category != "" {
 					scoreMap[s.Category] = s.Total
 				}
 			}
+			orderedAgile.Total = totalScore
+			agileOrderedData = orderedAgile
 		}
 
 		// Add Total to Map
@@ -278,7 +305,11 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 		if currentLevel.LevelNumber == 1 || currentLevel.PatternType == "DISC" || currentLevel.Name == "Level 1" {
 			metaMap["disc_scores"] = scoreMap
 		} else if currentLevel.LevelNumber == 2 || currentLevel.Name == "Level 2" {
-			metaMap["agile_scores"] = scoreMap
+			if agileOrderedData != nil {
+				metaMap["agile_scores"] = agileOrderedData
+			} else {
+				metaMap["agile_scores"] = scoreMap
+			}
 		} else if currentLevel.LevelNumber == 3 {
 			metaMap["level3_scores"] = scoreMap
 		} else if currentLevel.LevelNumber == 4 {
