@@ -12,15 +12,17 @@ import * as nodemailer from 'nodemailer';
 import { SES } from 'aws-sdk';
 import * as path from 'path';
 
-import { CorporateAccount } from '../entities/corporate-account.entity';
-import { CorporateCreditLedger } from '../entities/corporate-credit-ledger.entity';
-import { User } from '../entities/user.entity';
-import { Registration } from '../entities/registration.entity';
-import { Groups } from '../entities/groups.entity';
-import { Program } from '../entities/program.entity';
-import { AssessmentSession } from '../entities/assessment_session.entity';
-import { AssessmentAttempt } from '../entities/assessment_attempt.entity';
-import { AssessmentLevel } from '../entities/assessment_level.entity';
+import {
+    CorporateAccount,
+    CorporateCreditLedger,
+    User,
+    Registration,
+    Groups,
+    Program,
+    AssessmentSession,
+    AssessmentAttempt,
+    AssessmentLevel,
+} from '@originbi/shared-entities';
 
 import { AssessmentGenerationService } from '../assessment/assessment-generation.service';
 import { getWelcomeEmailTemplate } from '../mail/templates/welcome.template';
@@ -31,6 +33,19 @@ export class CorporateRegistrationsService {
     private readonly logger = new Logger(CorporateRegistrationsService.name);
     private authServiceBaseUrl =
         process.env.AUTH_SERVICE_URL || 'http://localhost:4002';
+
+    async withRetry<T>(operation: () => Promise<T>, retries = 5, delay = 1000): Promise<T> {
+        try {
+            return await operation();
+        } catch (error: any) {
+            if (retries > 0 && (error.response?.status === 429 || error.code === 'TooManyRequestsException' || error.message?.includes('Too Many Requests'))) {
+                this.logger.warn(`Rate limit hit. Retrying in ${delay}ms... (${retries} retries left)`);
+                await new Promise(res => setTimeout(res, delay));
+                return this.withRetry(operation, retries - 1, delay * 2);
+            }
+            throw error;
+        }
+    }
 
     constructor(
         @InjectRepository(CorporateAccount)
@@ -84,15 +99,18 @@ export class CorporateRegistrationsService {
         // 3. Create Cognito User
         let sub: string;
         try {
-            const res$ = this.http.post(
-                `${this.authServiceBaseUrl}/internal/cognito/users`,
-                {
-                    email: dto.email,
-                    password,
-                    groupName: 'STUDENT',
-                },
+            const res = await this.withRetry(() =>
+                firstValueFrom(
+                    this.http.post(
+                        `${this.authServiceBaseUrl}/internal/cognito/users`,
+                        {
+                            email: dto.email,
+                            password,
+                            groupName: 'STUDENT',
+                        },
+                    )
+                )
             );
-            const res = await firstValueFrom(res$);
             sub = res.data.sub;
         } catch (err: any) {
             this.logger.error('Error creating Cognito user', err.response?.data || err);
@@ -248,7 +266,7 @@ export class CorporateRegistrationsService {
                     dto.fullName,
                     password,
                     validFrom,
-                    program.assessment_title || program.name,
+                    program.assessmentTitle || program.name,
                 );
             } catch (e) {
                 this.logger.error('Failed to send welcome email', e);
@@ -314,6 +332,136 @@ export class CorporateRegistrationsService {
             subject: 'Welcome to OriginBI - Assessment Invitation',
             html,
             // Attachments removed in favor of hosted images
+        });
+    }
+    async assignAssessmentToExistingUser(
+        userId: number,
+        dto: CreateCandidateDto,
+        corporateUserId: number
+    ) {
+        // 1. Fetch Corporate Account (needed for linking)
+        let corporateAccount = await this.corpRepo.findOne({ where: { userId: corporateUserId } });
+        if (!corporateAccount) {
+            const u = await this.userRepo.findOne({ where: { id: corporateUserId } });
+            if (u && u.corporateId) {
+                corporateAccount = await this.corpRepo.findOne({ where: { id: Number(u.corporateId) } });
+            }
+        }
+        if (!corporateAccount) throw new BadRequestException('Corporate account not found');
+
+        return this.dataSource.transaction(async (manager: EntityManager) => {
+            const user = await manager.findOne(User, { where: { id: userId } });
+            if (!user) throw new BadRequestException('User not found');
+
+            // 2. Ensure Registration Exists for this Corporate
+            let registration = await manager.findOne(Registration, {
+                where: { userId: user.id, corporateAccountId: corporateAccount.id }
+            });
+
+            if (!registration) {
+                // Determine Group ID if provided
+                let groupId: number | null = null;
+                if (dto.groupName) {
+                    let group = await manager.getRepository(Groups).findOne({
+                        where: { name: dto.groupName, corporateAccountId: corporateAccount.id }
+                    });
+                    if (!group) {
+                        // Should we create group? Yes, consistent with registerCandidate
+                        group = manager.create(Groups, {
+                            name: dto.groupName,
+                            corporateAccountId: corporateAccount.id,
+                            createdByUserId: corporateUserId,
+                            isActive: true
+                        });
+                        await manager.save(group);
+                    }
+                    groupId = group.id;
+                }
+
+                // Create Registration (No Debit)
+                registration = manager.create(Registration, {
+                    userId: user.id,
+                    registrationSource: 'CORPORATE',
+                    createdByUserId: corporateUserId,
+                    corporateAccountId: corporateAccount.id,
+                    status: 'COMPLETED',
+                    fullName: user.metadata?.fullName || dto.fullName,
+                    mobileNumber: user.metadata?.mobile || dto.mobile,
+                    gender: user.metadata?.gender || dto.gender || 'FEMALE',
+                    countryCode: '+91',
+                    groupId: groupId,
+                    metadata: {
+                        programType: dto.programType,
+                        groupName: dto.groupName,
+                        sendEmail: true
+                    }
+                });
+                await manager.save(registration);
+            }
+
+            // 3. Find Program
+            const program = await manager.getRepository(Program).findOne({ where: { name: dto.programType } });
+            if (!program) throw new BadRequestException(`Program '${dto.programType}' not found.`);
+
+            // 4. Create Session (Linked to GroupAssessment Header)
+            const validFrom = dto.examStart ? new Date(dto.examStart) : new Date();
+            const validTo = dto.examEnd ? new Date(dto.examEnd) : new Date();
+            if (!dto.examEnd) validTo.setDate(validTo.getDate() + 7);
+
+            const session = manager.create(AssessmentSession, {
+                userId: user.id,
+                registrationId: registration.id,
+                programId: Number(program.id),
+                groupId: registration.groupId, // Use group from registration
+                groupAssessmentId: dto.groupAssessmentId,
+                status: 'NOT_STARTED',
+                validFrom,
+                validTo,
+                metadata: {}
+            });
+            await manager.save(session);
+
+            // 5. Create Attempts
+            const levels = await manager.getRepository(AssessmentLevel).find({
+                where: { isMandatory: true },
+                order: { sortOrder: 'ASC' }
+            });
+
+            for (const level of levels) {
+                const attempt = manager.create(AssessmentAttempt, {
+                    userId: user.id,
+                    registrationId: registration.id,
+                    assessmentSessionId: session.id,
+                    programId: Number(program.id),
+                    assessmentLevelId: level.id,
+                    status: 'NOT_STARTED'
+                });
+                await manager.save(attempt);
+
+                if (level.levelNumber === 1 || level.name === 'Level 1') {
+                    await this.assessmentGenService.generateLevel1Questions(attempt, manager);
+                }
+            }
+
+            // 6. Send Email
+            try {
+                // Pass null password as we didn't create it
+                await this.sendWelcomeEmail(
+                    user.email,
+                    user.metadata?.fullName || dto.fullName,
+                    '******', // Masked password for existing users
+                    validFrom,
+                    program.assessmentTitle || program.name
+                );
+            } catch (e) {
+                this.logger.error('Failed to send welcome email', e);
+            }
+
+            return {
+                message: 'Assessment assigned to existing user successfully',
+                registrationId: registration.id,
+                userId: user.id
+            };
         });
     }
 }

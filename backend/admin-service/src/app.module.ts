@@ -58,7 +58,9 @@ import { MailAssetsController } from './mail/mail-assets.controller';
           // Ensure sslmode=require in the URL
           const url = rawUrl.includes('sslmode=')
             ? rawUrl
-            : (rawUrl.includes('?') ? `${rawUrl}&sslmode=require` : `${rawUrl}?sslmode=require`);
+            : rawUrl.includes('?')
+              ? `${rawUrl}&sslmode=require`
+              : `${rawUrl}?sslmode=require`;
 
           return {
             type: 'postgres',
@@ -98,4 +100,4 @@ import { MailAssetsController } from './mail/mail-assets.controller';
   ],
   controllers: [TestController, MailAssetsController],
 })
-export class AppModule { }
+export class AppModule {}

@@ -111,19 +111,19 @@ type AssessmentQuestion struct {
 
 // Table: assessment_question_options
 type AssessmentQuestionOption struct {
-	ID           int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	QuestionID   int64     `gorm:"not null" json:"question_id"`
+	ID           int64     `gorm:"primaryKey;autoIncrement;column:id" json:"id"`
+	QuestionID   int64     `gorm:"not null;column:question_id" json:"question_id"`
 	DisplayOrder int       `gorm:"type:smallint;default:1;not null" json:"display_order"`
 	OptionTextEn string    `gorm:"column:option_text_en;type:text" json:"option_text_en"`
 	OptionTextTa *string   `gorm:"column:option_text_ta;type:text" json:"option_text_ta"`
-	DiscFactor   *string   `gorm:"column:disc_factor;type:varchar(10)" json:"disc_factor"`
+	DiscFactor   *string   `gorm:"column:disc_factor;type:text" json:"disc_factor"`
 	ScoreValue   float64   `gorm:"column:score_value;type:numeric(5,2);default:0" json:"score_value"`
 	IsCorrect    bool      `gorm:"column:is_correct;default:false" json:"is_correct"`
 	Metadata     string    `gorm:"type:jsonb;default:'{}'" json:"metadata"`
-	IsActive     bool      `gorm:"default:true" json:"is_active"`
-	IsDeleted    bool      `gorm:"default:false" json:"is_deleted"`
-	CreatedAt    time.Time `gorm:"default:current_timestamp" json:"created_at"`
-	UpdatedAt    time.Time `gorm:"default:current_timestamp" json:"updated_at"`
+	IsActive     bool      `gorm:"column:is_active;default:true" json:"is_active"`
+	IsDeleted    bool      `gorm:"column:is_deleted;default:false" json:"is_deleted"`
+	CreatedAt    time.Time `gorm:"column:created_at;default:current_timestamp" json:"created_at"`
+	UpdatedAt    time.Time `gorm:"column:updated_at;default:current_timestamp" json:"updated_at"`
 
 	// Fallback Compat for Frontend if needed
 	OptionText string `gorm:"-" json:"option_text"`
@@ -280,12 +280,12 @@ type OpenQuestionImage struct {
 type OpenQuestionOption struct {
 	ID              int64     `gorm:"primaryKey;autoIncrement;column:id" json:"id"`
 	OpenQuestionID  int64     `gorm:"not null;column:open_question_id" json:"open_question_id"`
-	OptionType      string    `gorm:"type:varchar(20);not null;column:option_type" json:"option_type"`
+	OptionType      string    `gorm:"not null;column:option_type" json:"option_type"`
 	OptionTextEn    string    `gorm:"column:option_text_en;type:text" json:"option_text_en"`
 	OptionTextTa    *string   `gorm:"column:option_text_ta;type:text" json:"option_text_ta"`
 	OptionImageFile string    `gorm:"column:option_image_file;type:varchar(255)" json:"option_image_file"`
 	IsValid         bool      `gorm:"column:is_valid;default:false" json:"is_valid"`
-	DisplayOrder    int       `gorm:"column:display_order;type:smallint;default:1" json:"display_order"`
+	DisplayOrder    int       `gorm:"column:display_order;default:1" json:"display_order"`
 	IsActive        bool      `gorm:"column:is_active;default:true" json:"is_active"`
 	IsDeleted       bool      `gorm:"column:is_deleted;default:false" json:"is_deleted"`
 	CreatedAt       time.Time `gorm:"column:created_at;default:now()" json:"created_at"`

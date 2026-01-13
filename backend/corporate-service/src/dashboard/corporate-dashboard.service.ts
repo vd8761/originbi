@@ -13,19 +13,19 @@ import { firstValueFrom } from 'rxjs';
 import { RegisterCorporateDto } from './dto/register-corporate.dto';
 import Razorpay = require('razorpay');
 
-import { User } from '../entities/user.entity';
-import { CorporateAccount } from '../entities/corporate-account.entity';
-import { CorporateCreditLedger } from '../entities/corporate-credit-ledger.entity';
+import { User } from '@originbi/shared-entities';
+import { CorporateAccount } from '@originbi/shared-entities';
+import { CorporateCreditLedger } from '@originbi/shared-entities';
 import {
     UserActionLog,
     ActionType,
     UserRole,
-} from '../entities/user-action-log.entity';
-import { Registration } from '../entities/registration.entity';
-import { AssessmentSession } from '../entities/assessment_session.entity';
-import { Program } from '../entities/program.entity';
-import { GroupAssessment } from '../entities/group_assessment.entity';
-import { Groups } from '../entities/groups.entity';
+} from '@originbi/shared-entities';
+import { Registration } from '@originbi/shared-entities';
+import { AssessmentSession } from '@originbi/shared-entities';
+import { Program } from '@originbi/shared-entities';
+import { GroupAssessment } from '@originbi/shared-entities';
+import { Groups } from '@originbi/shared-entities';
 
 @Injectable()
 export class CorporateDashboardService {
@@ -80,6 +80,19 @@ export class CorporateDashboardService {
                 key_id: keyId,
                 key_secret: keySecret,
             });
+        }
+    }
+
+    async withRetry<T>(operation: () => Promise<T>, retries = 5, delay = 1000): Promise<T> {
+        try {
+            return await operation();
+        } catch (error: any) {
+            if (retries > 0 && (error.response?.status === 429 || error.code === 'TooManyRequestsException' || error.message?.includes('Too Many Requests'))) {
+                console.warn(`Rate limit hit in CorporateDashboardService. Retrying in ${delay}ms... (${retries} retries left)`);
+                await new Promise(res => setTimeout(res, delay));
+                return this.withRetry(operation, retries - 1, delay * 2);
+            }
+            throw error;
         }
     }
 
@@ -260,8 +273,7 @@ export class CorporateDashboardService {
         try {
             const baseUrl = this.authServiceUrl.replace(/\/$/, '');
             const url = `${baseUrl}/internal/cognito/users`;
-            const res$ = this.httpService.post(url, { email, password, groupName });
-            const res = await firstValueFrom(res$);
+            const res = await this.withRetry(() => firstValueFrom(this.httpService.post(url, { email, password, groupName })));
             return res.data as { sub?: string };
         } catch (err: any) {
             console.error('Error creating Cognito user:', err);

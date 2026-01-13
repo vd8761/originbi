@@ -4,13 +4,19 @@ import { HttpModule } from '@nestjs/axios';
 
 import { CorporateController } from './corporate.controller';
 import { CorporateService } from './corporate.service';
-import { CorporateAccount } from './entities/corporate-account.entity';
-import { CorporateCreditLedger } from './entities/corporate-credit-ledger.entity';
-import { User } from '../users/user.entity';
+import {
+  CorporateAccount,
+  CorporateCreditLedger,
+  User as AdminUser,
+} from '@originbi/shared-entities';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([CorporateAccount, CorporateCreditLedger, User]),
+    TypeOrmModule.forFeature([
+      CorporateAccount,
+      CorporateCreditLedger,
+      AdminUser,
+    ]),
     HttpModule,
   ],
   controllers: [CorporateController],

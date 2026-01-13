@@ -1,0 +1,23 @@
+{
+    "name": "originbi-backend",
+    "version": "1.0.0",
+    "private": true,
+    "workspaces": [
+        "shared",
+        "admin-service",
+        "corporate-service",
+        "student-service"
+    ],
+    "scripts": {
+        "build:shared": "cd shared && npm run build",
+        "build:all": "npm run build:shared && npm run build:services",
+        "build:services": "npm run build:admin && npm run build:corporate && npm run build:student",
+        "build:admin": "cd admin-service && npm run build",
+        "build:corporate": "cd corporate-service && npm run build",
+        "build:student": "cd student-service && npm run build",
+        "start:admin": "cd admin-service && npm run start:dev",
+        "start:corporate": "cd corporate-service && npm run start:dev",
+        "start:student": "cd student-service && npm run start:dev",
+        "postinstall": "npm run build:shared"
+    }
+}

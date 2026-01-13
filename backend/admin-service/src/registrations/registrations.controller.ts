@@ -41,7 +41,7 @@ export class RegistrationsController {
     private readonly registrationsService: RegistrationsService,
     private readonly bulkRegistrationsService: BulkRegistrationsService,
     private readonly groupsService: GroupsService,
-  ) { }
+  ) {}
 
   @Get('groups')
   async getGroups() {
@@ -56,11 +56,17 @@ export class RegistrationsController {
     }
     // Hardcoded adminId = 1 as per existing pattern
     const adminId = 1;
-    return this.bulkRegistrationsService.preview(file.buffer, file.originalname, adminId);
+    return this.bulkRegistrationsService.preview(
+      file.buffer,
+      file.originalname,
+      adminId,
+    );
   }
 
   @Post('bulk/execute')
-  async bulkExecute(@Body() body: { import_id: string; overrides?: Record<string, any>[] }) {
+  async bulkExecute(
+    @Body() body: { import_id: string; overrides?: Record<string, any>[] },
+  ) {
     return this.bulkRegistrationsService.execute(body);
   }
 

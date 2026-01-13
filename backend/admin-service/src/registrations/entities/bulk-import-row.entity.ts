@@ -1,10 +1,10 @@
 import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    ManyToOne,
-    JoinColumn,
-    Index,
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  Index,
 } from 'typeorm';
 import { BulkImport } from './bulk-import.entity';
 
@@ -12,43 +12,43 @@ import { BulkImport } from './bulk-import.entity';
 @Index('idx_bulk_rows_ready', ['importId'], { where: "status = 'READY'" })
 @Index('uniq_bulk_row', ['importId', 'rowIndex'], { unique: true })
 export class BulkImportRow {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-    @Column({ name: 'import_id', type: 'uuid' })
-    importId: string;
+  @Column({ name: 'import_id', type: 'uuid' })
+  importId: string;
 
-    @ManyToOne(() => BulkImport)
-    @JoinColumn({ name: 'import_id' })
-    import: BulkImport;
+  @ManyToOne(() => BulkImport)
+  @JoinColumn({ name: 'import_id' })
+  import: BulkImport;
 
-    @Column({ name: 'row_index', type: 'int' })
-    rowIndex: number;
+  @Column({ name: 'row_index', type: 'int' })
+  rowIndex: number;
 
-    @Column({ name: 'raw_data', type: 'jsonb', nullable: true })
-    rawData: any;
+  @Column({ name: 'raw_data', type: 'jsonb', nullable: true })
+  rawData: any;
 
-    @Column({ name: 'normalized_data', type: 'jsonb', nullable: true })
-    normalizedData: any;
+  @Column({ name: 'normalized_data', type: 'jsonb', nullable: true })
+  normalizedData: any;
 
-    @Column({ type: 'varchar', length: 20, default: 'PENDING' })
-    status: string;
+  @Column({ type: 'varchar', length: 20, default: 'PENDING' })
+  status: string;
 
-    @Column({ name: 'result_type', type: 'varchar', length: 50, nullable: true })
-    resultType: string;
+  @Column({ name: 'result_type', type: 'varchar', length: 50, nullable: true })
+  resultType: string;
 
-    @Column({ name: 'error_message', type: 'text', nullable: true })
-    errorMessage: string;
+  @Column({ name: 'error_message', type: 'text', nullable: true })
+  errorMessage: string;
 
-    @Column({ name: 'group_match_score', type: 'int', nullable: true })
-    groupMatchScore: number;
+  @Column({ name: 'group_match_score', type: 'int', nullable: true })
+  groupMatchScore: number;
 
-    @Column({ name: 'matched_group_id', type: 'bigint', nullable: true })
-    matchedGroupId: number | null;
+  @Column({ name: 'matched_group_id', type: 'bigint', nullable: true })
+  matchedGroupId: number | null;
 
-    @Column({ type: 'boolean', default: false })
-    overridden: boolean;
+  @Column({ type: 'boolean', default: false })
+  overridden: boolean;
 
-    @Column({ name: 'override_data', type: 'jsonb', nullable: true })
-    overrideData: any;
+  @Column({ name: 'override_data', type: 'jsonb', nullable: true })
+  overrideData: any;
 }
