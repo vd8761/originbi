@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Registration } from '@/lib/types';
 import { AssessmentSession, assessmentService } from '@/lib/services/assessment.service';
 import AssessmentSessionsTable from '@/components/admin/AssessmentSessionsTable';
-import AssessmentDetails from '@/components/admin/AssessmentDetails';
+import AssessmentResultPreview from '@/components/admin/AssessmentResultPreview';
 import { ArrowLeftWithoutLineIcon, PlusIcon, ChevronDownIcon, ArrowRightWithoutLineIcon, FilterFunnelIcon } from '@/components/icons';
 import ExcelExportButton from '@/components/ui/ExcelExportButton';
 import DateRangeFilter, { DateRangeOption } from '@/components/ui/DateRangeFilter';
@@ -186,9 +186,8 @@ const RegistrationPreview: React.FC<RegistrationPreviewProps> = ({ registration,
 
     if (selectedSessionId && selectedSession) {
         return (
-            <AssessmentDetails
-                session={selectedSession}
-                registration={registration}
+            <AssessmentResultPreview
+                session={selectedSession || null}
                 onBack={() => setSelectedSessionId(null)}
             />
         );
@@ -368,6 +367,7 @@ const RegistrationPreview: React.FC<RegistrationPreviewProps> = ({ registration,
                         sortOrder={sortOrder}
                         onSort={handleSort}
                         onView={(id) => setSelectedSessionId(id)}
+                        hideCandidateName={true}
                     />
                 </div>
 
