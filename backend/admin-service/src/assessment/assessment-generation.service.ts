@@ -1,11 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, EntityManager } from 'typeorm';
-import { AssessmentLevel } from './assessment_level.entity';
-import { AssessmentQuestion } from './assessment_question.entity';
-import { OpenQuestion } from './open_question.entity';
-import { AssessmentAnswer } from './assessment_answer.entity';
-import { AssessmentAttempt } from './assessment_attempt.entity';
+import {
+  AssessmentLevel,
+  AssessmentQuestion,
+  OpenQuestion,
+  AssessmentAnswer,
+  AssessmentAttempt,
+} from '@originbi/shared-entities';
 
 @Injectable()
 export class AssessmentGenerationService {

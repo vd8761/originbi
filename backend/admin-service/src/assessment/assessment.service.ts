@@ -2,12 +2,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AssessmentSession } from './assessment_session.entity';
-import { Program } from '../programs/entities/program.entity';
-import { AssessmentLevel } from './assessment_level.entity';
-import { AssessmentAttempt } from './assessment_attempt.entity';
-import { GroupAssessment } from './group_assessment.entity';
-import { Groups } from '../groups/groups.entity';
+import {
+    AssessmentSession,
+    Program,
+    AssessmentLevel,
+    AssessmentAttempt,
+    GroupAssessment,
+    Groups,
+} from '@originbi/shared-entities';
 
 @Injectable()
 export class AssessmentService {

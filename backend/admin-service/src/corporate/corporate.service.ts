@@ -11,9 +11,11 @@ import { Repository, DataSource } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 
-import { User } from '../users/user.entity';
-import { CorporateAccount } from './entities/corporate-account.entity';
-import { CorporateCreditLedger } from './entities/corporate-credit-ledger.entity';
+import {
+    User as AdminUser,
+    CorporateAccount,
+    CorporateCreditLedger,
+} from '@originbi/shared-entities';
 import { CreateCorporateRegistrationDto } from './dto/create-corporate-registration.dto';
 import { getCorporateWelcomeEmailTemplate } from '../mail/templates/corporate-welcome.template';
 import * as nodemailer from 'nodemailer';
@@ -30,8 +32,8 @@ export class CorporateService {
 
     constructor(
         private readonly configService: ConfigService,
-        @InjectRepository(User)
-        private readonly userRepo: Repository<User>,
+        @InjectRepository(AdminUser)
+        private readonly userRepo: Repository<AdminUser>,
 
         @InjectRepository(CorporateAccount)
         private readonly corporateRepo: Repository<CorporateAccount>,
@@ -282,7 +284,7 @@ export class CorporateService {
                 if (dto.email && dto.email !== user.email) {
                     // Check uniqueness
                     const existing = await manager
-                        .getRepository(User)
+                        .getRepository(AdminUser)
                         .findOne({ where: { email: dto.email } });
                     if (existing && existing.id !== user.id)
                         throw new BadRequestException('Email already in use');
@@ -513,7 +515,7 @@ export class CorporateService {
             // This means if USER is deleted, corporate account is deleted.
             // So we should delete the USER.
 
-            await manager.delete(User, account.userId);
+            await manager.delete(AdminUser, account.userId);
 
             // Cognito deletion? Ideally yes.
             // Skipping cognito delete implementation for now as we don't have the method ready/exposed easily without more auth-service plumbing.
@@ -577,7 +579,7 @@ export class CorporateService {
             return await this.dataSource.transaction(async (manager) => {
                 // ... same transaction logic ...
                 // A. Create User Record
-                const user = manager.create(User, {
+                const user = manager.create(AdminUser, {
                     email: email,
                     role: 'CORPORATE',
                     emailVerified: true,

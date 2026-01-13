@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Groups } from './groups.entity';
+import { Groups } from '@originbi/shared-entities';
 import { GroupsService } from './groups.service';
 
 @Module({
@@ -8,4 +8,4 @@ import { GroupsService } from './groups.service';
   providers: [GroupsService],
   exports: [GroupsService, TypeOrmModule], // Export TypeOrmModule too if needed by others
 })
-export class GroupsModule {}
+export class GroupsModule { }
