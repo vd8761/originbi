@@ -189,6 +189,23 @@ export class RagController {
     }
 
     /**
+     * POST /rag/rebuild
+     * Clear and rebuild the entire knowledge base
+     */
+    @Post('rebuild')
+    async rebuildKnowledgeBase() {
+        try {
+            const result = await this.ragService.rebuildKnowledgeBase();
+            return { success: true, message: 'Knowledge base rebuilt', ...result };
+        } catch (error) {
+            throw new HttpException(
+                error.message || 'Failed to rebuild',
+                HttpStatus.INTERNAL_SERVER_ERROR,
+            );
+        }
+    }
+
+    /**
      * POST /rag/query/pdf
      * Generate PDF from query result
      */

@@ -3,10 +3,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { RagController } from './rag.controller';
 import { RagService } from './rag.service';
 import { EmbeddingsService } from './embeddings.service';
-import { Registration } from '../registrations/registration.entity';
-import { AssessmentAttempt } from '../assessment/assessment_attempt.entity';
-import { AssessmentSession } from '../assessment/assessment_session.entity';
-import { User } from '../users/user.entity';
+import {
+    Registration,
+    AssessmentAttempt,
+    AssessmentSession,
+    User
+} from '@originbi/shared-entities';
 
 @Module({
     imports: [

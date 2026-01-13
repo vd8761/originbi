@@ -13,29 +13,33 @@ async function check() {
 
     try {
         await client.connect();
-        console.log('Connected to:', process.env.DB_HOST, process.env.DB_NAME);
 
-        // Check RAG tables
-        const tables = await client.query(`SELECT table_name FROM information_schema.tables WHERE table_name LIKE 'rag%'`);
-        console.log('RAG Tables:', tables.rows);
+        // Check document count by category
+        const categories = await client.query(`
+            SELECT category, COUNT(*) as count 
+            FROM rag_documents 
+            GROUP BY category
+        `);
+        console.log('Documents by category:', categories.rows);
 
-        // Check pgvector extension
-        const ext = await client.query(`SELECT extname FROM pg_extension WHERE extname = 'vector'`);
-        console.log('Vector Extension:', ext.rows);
+        // Check sample of each category
+        const sample = await client.query(`
+            SELECT category, LEFT(content, 100) as sample 
+            FROM rag_documents 
+            GROUP BY category, content 
+            LIMIT 5
+        `);
+        console.log('\nSample documents:');
+        sample.rows.forEach(r => console.log(`- [${r.category}] ${r.sample}...`));
 
-        // Check document count
-        if (tables.rows.length > 0) {
-            const docs = await client.query(`SELECT COUNT(*) as count FROM rag_documents`);
-            console.log('Document Count:', docs.rows[0].count);
-        }
+        // Check career roles
+        const roles = await client.query(`SELECT COUNT(*) FROM career_roles WHERE is_deleted = false`);
+        console.log('\nCareer roles in DB:', roles.rows[0].count);
 
-        // Test vector type
-        try {
-            await client.query(`SELECT '[1,2,3]'::vector(3)`);
-            console.log('pgvector type test: PASSED');
-        } catch (e) {
-            console.log('pgvector type test: FAILED -', e.message);
-        }
+        // Check courses
+        const courses = await client.query(`SELECT COUNT(*) FROM trait_based_course_details WHERE is_deleted = false`);
+        console.log('Courses in DB:', courses.rows[0].count);
+
     } catch (error) {
         console.error('Error:', error.message);
     } finally {
