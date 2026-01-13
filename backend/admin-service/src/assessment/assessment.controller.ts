@@ -21,32 +21,32 @@ export class AssessmentController {
     const pageNum = Number(page) || 1;
     const limitNum = Number(limit) || 10;
 
-        return this.assessmentService.findAllSessions(
-            pageNum,
-            limitNum,
-            search,
-            sortBy,
-            sortOrder,
-            startDate,
-            endDate,
-            status,
-            userId,
-            type,
-        );
-    }
+    return this.assessmentService.findAllSessions(
+      pageNum,
+      limitNum,
+      search,
+      sortBy,
+      sortOrder,
+      startDate,
+      endDate,
+      status,
+      userId,
+      type,
+    );
+  }
 
-    @Get('group/:id')
-    async getGroupSessionDetails(@Param('id') id: string) {
-        return this.assessmentService.findGroupSessionDetails(Number(id));
-    }
+  @Get('group/:id')
+  async getGroupSessionDetails(@Param('id') id: string) {
+    return this.assessmentService.findGroupSessionDetails(Number(id));
+  }
 
-    @Get('sessions/:id')
-    async getSessionDetails(@Param('id') id: string) {
-        return this.assessmentService.getSessionDetails(Number(id));
-    }
+  @Get('sessions/:id')
+  async getSessionDetails(@Param('id') id: string) {
+    return this.assessmentService.getSessionDetails(Number(id));
+  }
 
-    @Get('levels')
-    async getLevels() {
-        return this.assessmentService.getLevels();
-    }
+  @Get('levels')
+  async getLevels() {
+    return this.assessmentService.getLevels();
+  }
 }
