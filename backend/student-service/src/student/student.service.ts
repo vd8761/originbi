@@ -292,9 +292,9 @@ export class StudentService {
   async createDemoSession(user: User): Promise<AssessmentSession | null> {
 
     // 1. Find Existing Demo Program (Dynamic Lookup)
-    const demoProgramArr = await this.sessionRepo.query(
+    const demoProgramArr = (await this.sessionRepo.query(
       `SELECT id FROM programs WHERE is_demo = true OR name ILIKE 'Demo' OR code ILIKE '%demo%' ORDER BY id DESC LIMIT 1`
-    );
+    )) as { id: number }[];
 
     if (!demoProgramArr || demoProgramArr.length === 0) {
       this.logger.error('No Demo Program found in database. Please create one.');
@@ -305,20 +305,20 @@ export class StudentService {
     this.logger.log(`Using Demo Program ID: ${PROGRAM_ID}`);
 
     // 2. Find Demo Registration
-    const registration = await this.sessionRepo.query(
+    const registration = (await this.sessionRepo.query(
       `SELECT id FROM registrations WHERE user_id = $1 AND program_id = $2 LIMIT 1`,
       [user.id, PROGRAM_ID]
-    );
+    )) as { id: number }[];
 
     if (!registration || registration.length === 0) {
       this.logger.warn('Demo Registration not found. Creating one on the fly.');
 
       // Auto-create registration if missing
-      const newReg = await this.sessionRepo.query(`
+      const newReg = (await this.sessionRepo.query(`
         INSERT INTO registrations (user_id, program_id, status, payment_status, full_name, mobile_number, created_at, updated_at)
         VALUES ($1, $2, 'COMPLETED', 'NOT_REQUIRED', 'Demo User', '0000000000', NOW(), NOW())
         RETURNING id
-      `, [user.id, PROGRAM_ID]);
+      `, [user.id, PROGRAM_ID])) as { id: number }[];
 
       if (newReg && newReg.length > 0) {
         registration.push({ id: newReg[0].id });
