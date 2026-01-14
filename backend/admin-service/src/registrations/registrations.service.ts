@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In, Not } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 
@@ -46,7 +46,7 @@ export class RegistrationsService {
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
-  ) {}
+  ) { }
 
   async withRetry<T>(
     operation: () => Promise<T>,
@@ -384,6 +384,22 @@ export class RegistrationsService {
   // ---------------------------------------------------------
   async createForExistingUser(user: AdminUser, dto: CreateRegistrationDto) {
     this.logger.log(`Creating assessment for existing user ${user.email}`);
+
+    // Check for active assessments
+    const activeSession = await this.dataSource
+      .getRepository(AssessmentSession)
+      .findOne({
+        where: {
+          userId: user.id,
+          status: Not(In(['COMPLETED', 'EXPIRED', 'PARTIALLY_EXPIRED'])),
+        },
+      });
+
+    if (activeSession) {
+      throw new BadRequestException(
+        `User already has an active assessment (Status: ${activeSession.status}). Cannot assign a new one.`,
+      );
+    }
 
     // 1. Prepare Data
     const gender = this.normalizeGender(dto.gender);
