@@ -68,8 +68,8 @@ const RequireAdmin: React.FC<RequireAdminProps> = ({ children }) => {
   if (checking) {
     // You can replace this with a spinner or skeleton
     return (
-      <div className="w-full h-screen flex items-center justify-center text-sm text-gray-500">
-        Checking your access…
+      <div className="flex h-screen w-full items-center justify-center bg-white dark:bg-black">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-brand-green"></div>
       </div>
     );
   }

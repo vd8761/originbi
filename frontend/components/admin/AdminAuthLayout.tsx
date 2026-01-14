@@ -57,12 +57,12 @@ const AdminAuthLayout: React.FC<AdminAuthLayoutProps> = ({ children, heroTitle, 
 
                 {/* Right Panel - Auth Form with Theme Background */}
                 <div className="w-full lg:w-1/2 xl:w-5/12 relative flex flex-col h-full z-10 bg-white/90 dark:bg-[#0F1115]/90 backdrop-blur-xl transition-colors duration-500 bg-cover bg-center bg-no-repeat bg-[url('/Background_Light_Theme.svg')] dark:bg-[url('/Background_Dark_Theme.svg')]">
-                    <div className="flex flex-col h-full w-full items-center p-6 lg:p-8 xl:p-12 overflow-y-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
+                    <div className="flex flex-col h-full w-full items-center p-6 lg:p-8 xl:p-12 overflow-y-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none] lg:[zoom:0.8]">
 
                         {/* Header Actions */}
-                        <div className="w-full max-w-sm flex justify-between items-center shrink-0">
-                            <div className="scale-90 origin-left">
-                                <Logo />
+                        <div className="w-full max-w-md flex justify-between items-center shrink-0">
+                            <div className="origin-left w-[clamp(100px,7vw,130px)]">
+                                <Logo className="w-full h-auto object-contain" />
                             </div>
                             <div className="flex items-center gap-4">
                                 <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
@@ -71,13 +71,13 @@ const AdminAuthLayout: React.FC<AdminAuthLayoutProps> = ({ children, heroTitle, 
 
                         {/* Form Wrapper - Centered Vertically */}
                         <div className="w-full flex-grow flex flex-col justify-center items-center py-8">
-                            <div className="w-full max-w-sm space-y-4">
+                            <div className="w-full max-w-md space-y-4">
                                 {children}
                             </div>
                         </div>
 
                         {/* Footer - Sticky Bottom with Privacy/Terms */}
-                        <div className="w-full max-w-sm mt-auto shrink-0 border-t border-gray-100 dark:border-gray-800 pt-4">
+                        <div className="w-full max-w-md mt-auto shrink-0 border-t border-gray-100 dark:border-gray-800 pt-4">
                             <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-4 text-[10px] sm:text-xs font-medium text-brand-green">
                                 <div className="flex items-center gap-4">
                                     <a href="#" className="hover:text-brand-green transition-colors">Privacy Policy</a>

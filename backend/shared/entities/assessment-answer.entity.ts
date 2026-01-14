@@ -8,6 +8,7 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import { AssessmentAttempt } from './assessment-attempt.entity';
+import { AssessmentLevel } from './assessment-level.entity';
 
 @Entity('assessment_answers')
 export class AssessmentAnswer {
@@ -20,6 +21,10 @@ export class AssessmentAnswer {
     @ManyToOne(() => AssessmentAttempt)
     @JoinColumn({ name: 'assessment_attempt_id' })
     assessmentAttempt: AssessmentAttempt;
+
+    @ManyToOne(() => AssessmentLevel)
+    @JoinColumn({ name: 'assessment_level_id' })
+    assessmentLevel: AssessmentLevel;
 
     @Column({ name: 'assessment_session_id', type: 'bigint' })
     assessmentSessionId: number;

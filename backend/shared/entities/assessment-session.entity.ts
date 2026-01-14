@@ -10,7 +10,9 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { Registration } from './registration.entity';
+import { Program } from './program.entity';
 import { GroupAssessment } from './group-assessment.entity';
+import { Program as ProgramEntity } from './program.entity';
 
 @Entity('assessment_sessions')
 export class AssessmentSession {
@@ -33,6 +35,10 @@ export class AssessmentSession {
 
     @Column({ name: 'program_id', type: 'bigint', default: 0 })
     programId: number;
+
+    @ManyToOne(() => ProgramEntity)
+    @JoinColumn({ name: 'program_id' })
+    program: ProgramEntity;
 
     @Column({ name: 'group_id', type: 'bigint', nullable: true })
     groupId: number | null;

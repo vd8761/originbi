@@ -187,8 +187,9 @@ const LockTimer: React.FC<LockTimerProps> = ({ time, onTimerExpire }) => {
   const t = translations[language];
   const radius = 100;
   const stroke = 12;
-  const normalizedRadius = radius - stroke / 2;
-  const circumference = normalizedRadius * Math.PI;
+  // Path 'd' uses radius 100 (A 100 100), so we must match that for dasharray calculations.
+  // Previous calculation (radius - stroke/2) was incorrect for this manually defined path.
+  const circumference = radius * Math.PI;
 
   useEffect(() => {
     let fired = false;
@@ -217,7 +218,7 @@ const LockTimer: React.FC<LockTimerProps> = ({ time, onTimerExpire }) => {
     };
 
     setTimeLeft(calculateTimeLeft());
-    const timer = setInterval(() => setTimeLeft(calculateTimeLeft()), 60000); // Check every minute
+    const timer = setInterval(() => setTimeLeft(calculateTimeLeft()), 1000); // Check every second for better precision
     return () => clearInterval(timer);
   }, [time, onTimerExpire]);
 
@@ -505,7 +506,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     if (isLocked) status = 'locked';
 
     return {
-      label: isLocked ? 'Locked' : assessment.title,
+      label: assessment.title,
       status,
       progress: Math.round(
         (assessment.completedQuestions / assessment.totalQuestions) * 100

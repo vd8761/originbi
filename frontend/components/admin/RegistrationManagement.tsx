@@ -19,6 +19,9 @@ import ExcelExportButton from "@/components/ui/ExcelExportButton";
 import RegistrationTable from "@/components/ui/RegistrationTable";
 import AssessmentSessionsTable from "@/components/admin/AssessmentSessionsTable"; // Import
 import RegistrationPreview from "@/components/admin/RegistrationPreview"; // Import
+import AssessmentResultPreview from "@/components/admin/AssessmentResultPreview"; // Import
+import GroupAssessmentPreview from './GroupAssessmentPreview';
+import GroupCandidateAssessmentPreview from './GroupCandidateAssessmentPreview'; // Import
 import { Registration } from "@/lib/types";
 import { registrationService } from "@/lib/services/registration.service";
 import { assessmentService, AssessmentSession } from "@/lib/services/assessment.service";
@@ -34,11 +37,15 @@ const useDebounce = (value: string, delay: number) => {
 };
 
 const RegistrationManagement: React.FC = () => {
-  const [view, setView] = useState<"list" | "add" | "bulk" | "preview">("list");
+  const [view, setView] = useState<"list" | "add" | "bulk" | "preview" | "assessment-preview" | "group-assessment-preview" | "group-candidate-assessment-preview">("list");
   const [activeTab, setActiveTab] = useState<"registrations" | "individual" | "group">(
     "registrations"
   );
   const [selectedRegistration, setSelectedRegistration] = useState<Registration | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedSession, setSelectedSession] = useState<AssessmentSession | null>(null);
+
+  const [selectedGroupSessionId, setSelectedGroupSessionId] = useState<string | null>(null);
 
   // Data State
   const [users, setUsers] = useState<Registration[]>([]);
@@ -70,7 +77,11 @@ const RegistrationManagement: React.FC = () => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
-  const [endDate, setEndDate] = useState<Date | null>(new Date());
+  const [endDate, setEndDate] = useState<Date | null>(() => {
+    const now = new Date();
+    // Set to last day of the current month
+    return new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  });
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
 
   // Sorting
@@ -255,6 +266,43 @@ const RegistrationManagement: React.FC = () => {
       setSelectedRegistration(user);
       setView("preview");
     }
+  };
+
+  const handleViewSession = (id: string) => {
+    // Check if sessions array has items and what type ID is.
+    // Assuming s.id is number based on backend, but if frontend interface says string/number, safely compare.
+    const session = sessions.find(s => String(s.id) === String(id));
+
+    if (session) {
+      setSelectedSession(session);
+      setView("assessment-preview");
+    } else {
+      // Fallback: create a minimal object that satisfies the type system enough for runtime (fetched later)
+      // casting through 'unknown' to bypass partial check
+      const partialSession = { id: Number(id) } as unknown as AssessmentSession;
+      setSelectedSession(partialSession);
+      setView("assessment-preview");
+    }
+  };
+
+  const handleViewGroupCandidateSession = (id: string) => {
+    // Similar to handleViewSession, we need to handle potentially sparse data or IDs
+    // But for group candidates, we might need to rely on the ID being sufficient for the Preview component to fetch details
+    const session = sessions.find(s => String(s.id) === String(id));
+
+    if (session) {
+      setSelectedSession(session);
+      setView('group-candidate-assessment-preview');
+    } else {
+      const partialSession = { id: id } as unknown as AssessmentSession;
+      setSelectedSession(partialSession);
+      setView('group-candidate-assessment-preview');
+    }
+  };
+
+  const handleViewGroupSession = (id: string) => {
+    setSelectedGroupSessionId(id);
+    setView("group-assessment-preview");
   };
 
   const handleTabChange = (tab: "registrations" | "individual" | "group") => {
@@ -465,6 +513,58 @@ const RegistrationManagement: React.FC = () => {
           setView("list");
           setSelectedRegistration(null);
         }}
+      />
+    );
+  }
+
+  if (view === "assessment-preview" && selectedSession) {
+    return (
+      <AssessmentResultPreview
+        session={selectedSession}
+        onBack={() => {
+          setView("list");
+          setSelectedSession(null);
+        }}
+      />
+    );
+  }
+
+  // The following blocks are for rendering different assessment preview views
+  // They are placed here to return early if a specific view is active.
+  // Note: The original `if (view === "group-assessment-preview" && selectedGroupSessionId)`
+  // block is replaced and updated to use `selectedSession` for consistency,
+  // and a new `group-candidate-assessment-preview` view is added.
+
+  if (view === 'group-assessment-preview' && selectedGroupSessionId) {
+    // Find the group session from the sessions list if needed, or pass ID directly
+    return (
+      <GroupAssessmentPreview
+        sessionId={selectedGroupSessionId}
+        onBack={() => {
+          setView('list'); // Changed from 'registrations' to 'list' to match existing pattern
+          setSelectedGroupSessionId(null);
+        }}
+        onViewSession={handleViewGroupCandidateSession} // Use the new handler for group candidates
+      />
+    );
+  }
+
+  if (view === 'group-candidate-assessment-preview' && selectedSession) {
+    return (
+      <GroupCandidateAssessmentPreview
+        session={selectedSession}
+        onBack={() => setView('group-assessment-preview')}
+      />
+    );
+  }
+
+  // This block is for individual assessment preview, updated to use `selectedSession`
+  // and a consistent `onBack` behavior.
+  if (view === 'assessment-preview' && selectedSession) {
+    return (
+      <AssessmentResultPreview
+        session={selectedSession}
+        onBack={() => setView('list')} // Changed from 'registrations' to 'list' to match existing pattern
       />
     );
   }
@@ -728,6 +828,7 @@ const RegistrationManagement: React.FC = () => {
             sortColumn={sortColumn}
             sortOrder={sortOrder}
             onSort={handleSort}
+            onView={activeTab === 'group' ? handleViewGroupSession : handleViewSession}
             isGroupView={activeTab === 'group'}
           />
         )}

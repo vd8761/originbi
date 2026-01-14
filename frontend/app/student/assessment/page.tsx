@@ -3,6 +3,11 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
+import { signOut } from 'aws-amplify/auth';
+import { configureAmplify } from '@/lib/aws-amplify-config';
+import RequireStudent from '@/components/auth/RequireStudent';
+
+configureAmplify();
 import AssessmentLayout from '@/components/student/AssessmentLayout';
 import AssessmentScreen from '@/components/student/AssessmentScreen';
 
@@ -17,7 +22,8 @@ export default function StudentAssessmentPage() {
     }
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try { await signOut(); } catch { /* ignore */ }
     sessionStorage.removeItem('isAssessmentMode');
     router.push('/student/login');
   };
@@ -28,8 +34,10 @@ export default function StudentAssessmentPage() {
 
   return (
     // Update: Passing hideNav={true} to remove the menu from the Assessment Listing screen aswell
-    <AssessmentLayout onLogout={handleLogout} showAssessmentOnly={showAssessmentOnly} hideNav={true}>
-      <AssessmentScreen onStartAssessment={handleStart} />
-    </AssessmentLayout>
+    <RequireStudent>
+      <AssessmentLayout onLogout={handleLogout} showAssessmentOnly={showAssessmentOnly} hideNav={true}>
+        <AssessmentScreen onStartAssessment={handleStart} />
+      </AssessmentLayout>
+    </RequireStudent>
   );
 }

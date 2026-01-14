@@ -19,7 +19,12 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
+    "noFallthroughCasesInSwitch": false,
+    "paths": {
+      "@originbi/shared-entities": [
+        "../shared/dist/index.d.ts"
+      ]
+    }
   },
   "exclude": [
     "node_modules",

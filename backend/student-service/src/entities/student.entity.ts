@@ -17,7 +17,12 @@ export class User {
   @Column({ name: 'corporate_id', nullable: true })
   corporateId: string;
 
-  @Column({ name: 'metadata', type: 'jsonb', default: () => `'{}'`, nullable: true })
+  @Column({
+    name: 'metadata',
+    type: 'jsonb',
+    default: () => `'{}'`,
+    nullable: true,
+  })
   metadata: any;
 
   @Column({

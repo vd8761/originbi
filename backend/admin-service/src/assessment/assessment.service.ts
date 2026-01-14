@@ -22,7 +22,7 @@ export class AssessmentService {
     private readonly attemptRepo: Repository<AssessmentAttempt>,
     @InjectRepository(GroupAssessment)
     private readonly groupAssessmentRepo: Repository<GroupAssessment>,
-  ) {}
+  ) { }
 
   async findAllSessions(
     page: number,
@@ -74,7 +74,7 @@ export class AssessmentService {
               break;
             case 'group_name':
               sortCol = 'g.name';
-              break; // Support sort by group
+              break;
             case 'exam_status':
               sortCol = 'ga.status';
               break;
@@ -108,7 +108,7 @@ export class AssessmentService {
           createdAt: r.validFrom,
           // Map Group Info
           groupId: r.groupId,
-          groupName: (r as any).group?.name || 'N/A', // TypeORM mapOne attaches to property
+          groupName: (r as any).group?.name || 'N/A',
 
           userId: 0,
           registrationId: 0,
@@ -124,12 +124,13 @@ export class AssessmentService {
       const qb = this.sessionRepo
         .createQueryBuilder('as')
         .leftJoinAndMapOne('as.program', Program, 'p', 'p.id = as.programId')
-        .leftJoinAndSelect('as.user', 'u');
+        .leftJoinAndSelect('as.user', 'u')
+        .leftJoinAndSelect('as.registration', 'r');
 
       if (search) {
         const s = `%${search.toLowerCase()}%`;
         qb.andWhere(
-          '(LOWER(p.name) LIKE :s OR LOWER(p.assessment_title) LIKE :s OR LOWER(u.email) LIKE :s)',
+          '(LOWER(p.name) LIKE :s OR LOWER(p.assessment_title) LIKE :s OR LOWER(u.email) LIKE :s OR LOWER(r.fullName) LIKE :s)',
           { s },
         );
       }
@@ -153,23 +154,9 @@ export class AssessmentService {
         qb.andWhere('as.userId = :userId', { userId });
       }
 
-      // Since we handled 'group' type above, we assume default or 'individual' here.
-      // But we must preserve 'individual' filter strictness.
-      // If type was NOT 'group' (undefined or 'individual'), we apply this logic.
-      // Actually original logic had `if (type === 'individual') ... else if (type === 'group')`.
-      // Now `type === 'group'` is handled separately.
-
       if (type === 'individual') {
         qb.andWhere('(as.groupId IS NULL OR as.groupId = 0)');
       }
-      // If type is empty/undefined, it might return all sessions (mixed).
-      // We should keep the original logic for that if needed, or strictly separate.
-      // Original code:
-      // if (type === 'individual') qb.andWhere(...)
-      // else if (type === 'group') qb.andWhere(...)
-
-      // If we moved 'group' logic out, we just need to handle 'individual' or 'all'.
-      // However, the user request specifically targets Group Assessments list.
 
       if (sortBy) {
         let sortCol = '';
@@ -179,6 +166,12 @@ export class AssessmentService {
             break;
           case 'program_name':
             sortCol = 'p.name';
+            break;
+          case 'candidate_name':
+            sortCol = 'r.fullName';
+            break;
+          case 'email':
+            sortCol = 'u.email';
             break;
           case 'exam_status':
             sortCol = 'as.status';
@@ -211,10 +204,10 @@ export class AssessmentService {
         where: { isMandatory: true },
       });
 
-      let currentLevelsMap = {};
+      let currentLevelsMap: Record<number, number> = {};
       if (rows.length > 0) {
         const sessionIds = rows.map((r) => r.id);
-        // Get Max Level attempted for each session
+        // Get Max Level attempted for each session using attemptRepo
         const rawLevels = await this.attemptRepo
           .createQueryBuilder('aa')
           .select('aa.assessmentSessionId', 'sid')
@@ -232,6 +225,7 @@ export class AssessmentService {
 
       const augmentedRows = rows.map((r) => ({
         ...r,
+        groupName: r.groupAssessment?.group?.name || 'N/A',
         totalLevels,
         currentLevel:
           currentLevelsMap[r.id] || (r.status === 'NOT_STARTED' ? 0 : 1),
@@ -241,6 +235,95 @@ export class AssessmentService {
     } catch (error) {
       console.error('AssessmentService.findAllSessions Error:', error);
       throw error;
+    }
+  }
+
+  async findGroupSessionDetails(id: number) {
+    try {
+      const groupAssessment = await this.groupAssessmentRepo.findOne({
+        where: { id },
+        relations: ['group', 'program'],
+      });
+
+      if (!groupAssessment) {
+        return null;
+      }
+
+      const sessions = await this.sessionRepo.find({
+        where: { groupAssessmentId: id },
+        relations: ['user', 'registration'],
+        order: { createdAt: 'DESC' },
+      });
+
+      return {
+        ...groupAssessment,
+        sessions: sessions.map((s) => ({
+          ...s,
+          userFullName: s.registration?.fullName || 'N/A',
+          userEmail: s.user?.email || 'N/A',
+        })),
+      };
+    } catch (error) {
+      console.error('Error fetching group session details:', error);
+      throw error;
+    }
+  }
+
+  async getSessionDetails(id: number) {
+    try {
+      const session = await this.sessionRepo.createQueryBuilder('s')
+        .leftJoinAndSelect('s.user', 'u')
+        .leftJoinAndSelect('s.registration', 'r')
+        .leftJoinAndSelect('s.groupAssessment', 'ga')
+        .leftJoinAndSelect('ga.group', 'g')
+        .leftJoinAndMapOne('s.program', Program, 'p', 'p.id = s.programId')
+        .leftJoinAndMapOne('ga.program', Program, 'gap', 'gap.id = ga.programId')
+        .where('s.id = :id', { id })
+        .getOne();
+
+      if (!session) return null;
+
+      // Fetch all attempts for the session to populate level-wise reports
+      const attempts = await this.attemptRepo.find({
+        where: { assessmentSessionId: id },
+        relations: ['assessmentLevel'],
+        order: { assessmentLevelId: 'ASC' },
+      });
+
+      // Maintain currentAttempt logic for stats bar if needed (usually latest active)
+      // If we just sort attempts by ID DESC, the first one is the latest.
+      const currentAttempt = attempts.sort((a, b) => Number(b.id) - Number(a.id))[0];
+
+      // Calculate currentLevel from max level number in attempts
+      const currentLevel = attempts.reduce((max, attempt) => {
+        const lvl = attempt.assessmentLevel?.levelNumber || 0;
+        return lvl > max ? lvl : max;
+      }, 1);
+
+      return {
+        ...session,
+        attempts, // Return full list
+        currentAttempt,
+        currentLevel
+      };
+
+
+    } catch (error) {
+      console.error('Error fetching session details:', error);
+      throw error;
+    }
+  }
+
+  async getLevels() {
+    try {
+      return await this.levelRepo
+        .createQueryBuilder('al')
+        .where('al.is_mandatory = :isMandatory', { isMandatory: true })
+        .orderBy('al.sort_order', 'ASC')
+        .getMany();
+    } catch (error) {
+      console.error('Error fetching levels:', error);
+      return [];
     }
   }
 }

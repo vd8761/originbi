@@ -3,7 +3,7 @@ import { StudentService } from './student.service';
 
 @Controller('student')
 export class StudentController {
-  constructor(private readonly studentService: StudentService) { }
+  constructor(private readonly studentService: StudentService) {}
 
   @Post('profile')
   async getProfile(@Body() body: { email: string }) {
@@ -32,5 +32,4 @@ export class StudentController {
   async getAssessmentProgress(@Body() body: { email: string }) {
     return this.studentService.getAssessmentProgress(body.email);
   }
-
 }
