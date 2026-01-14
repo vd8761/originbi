@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, Copy, Check, Trash2, Sparkles, MessageSquare, Zap } from 'lucide-react';
+import { Send, Bot, User, Loader2, Copy, Check, Trash2, Sparkles, MessageSquare, Zap, Download } from 'lucide-react';
 
 interface Message {
     id: string;
@@ -44,14 +44,49 @@ const TypeWriter = ({ text, speed = 12, onDone }: { text: string; speed?: number
     );
 };
 
-// Enhanced content renderer with markdown support
-const RenderContent = ({ content, streaming, onDone }: { content: string; streaming?: boolean; onDone?: () => void }) => {
+// Enhanced content renderer with markdown and download button support
+const RenderContent = ({ content, streaming, onDone, apiUrl }: { content: string; streaming?: boolean; onDone?: () => void; apiUrl?: string }) => {
     if (streaming) return <TypeWriter text={content} onDone={onDone} />;
+
+    const handleDownload = async (reportPath: string) => {
+        try {
+            const baseUrl = apiUrl || process.env.NEXT_PUBLIC_ADMIN_API_URL || 'http://localhost:4001';
+            const url = `${baseUrl}${reportPath}`;
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = `${reportPath.split('/').pop()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(downloadUrl);
+        } catch (error) {
+            console.error('Download failed:', error);
+        }
+    };
 
     const lines = content.split('\n');
     return (
         <div className="space-y-2 leading-relaxed">
             {lines.map((line, i) => {
+                // Check for download link pattern [text](url)
+                const downloadMatch = line.match(/\[([^\]]+)\]\(([^)]+)\)/);
+                if (downloadMatch && (line.includes('Download') || line.includes('report'))) {
+                    const [, linkText, linkUrl] = downloadMatch;
+                    return (
+                        <button
+                            key={i}
+                            onClick={() => handleDownload(linkUrl)}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl font-medium text-sm transition-all shadow-md shadow-emerald-500/20 hover:shadow-lg"
+                        >
+                            <Download className="w-4 h-4" />
+                            {linkText.replace(/\[|\]/g, '')}
+                        </button>
+                    );
+                }
+
                 let processed: React.ReactNode = line;
 
                 // Bold text **text**
@@ -86,9 +121,14 @@ const RenderContent = ({ content, streaming, onDone }: { content: string; stream
                     );
                 }
 
+                // Remove plain markdown links from display (they're handled above)
+                if (line.includes('📥') && downloadMatch) {
+                    return null;
+                }
+
                 if (!line.trim()) return <div key={i} className="h-1.5" />;
                 return <p key={i} className="text-gray-700">{processed}</p>;
-            })}
+            }).filter(Boolean)}
         </div>
     );
 };
@@ -143,21 +183,21 @@ export default function ChatAssistant({
 
             const data = await res.json();
             // Add assistant message with content directly
-            setMessages(prev => [...prev, { 
-                id: botId, 
-                role: 'assistant', 
-                content: data.answer || 'Sorry, I could not process that request.', 
-                timestamp: new Date(), 
-                isStreaming: true 
+            setMessages(prev => [...prev, {
+                id: botId,
+                role: 'assistant',
+                content: data.answer || 'Sorry, I could not process that request.',
+                timestamp: new Date(),
+                isStreaming: true
             }]);
         } catch {
             // Add error message directly
-            setMessages(prev => [...prev, { 
-                id: botId, 
-                role: 'assistant', 
-                content: 'Unable to connect. Please check your connection and try again.', 
-                timestamp: new Date(), 
-                isStreaming: false 
+            setMessages(prev => [...prev, {
+                id: botId,
+                role: 'assistant',
+                content: 'Unable to connect. Please check your connection and try again.',
+                timestamp: new Date(),
+                isStreaming: false
             }]);
         } finally {
             setLoading(false);
@@ -171,10 +211,10 @@ export default function ChatAssistant({
     const clearChat = () => setMessages([]);
 
     const suggestions = [
-        { icon: '👥', text: 'How many users registered?' },
-        { icon: '💼', text: 'List all career roles' },
-        { icon: '📚', text: 'Show available courses' },
-        { icon: '📊', text: 'Generate summary report' },
+        { icon: '👥', text: 'How many users?' },
+        { icon: '📝', text: 'Show exam results' },
+        { icon: '💼', text: 'List career roles' },
+        { icon: '📊', text: 'Generate user report' },
     ];
 
     return (
@@ -220,7 +260,7 @@ export default function ChatAssistant({
                         <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-2xl sm:rounded-[1.5rem] md:rounded-[2rem] bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 flex items-center justify-center mb-6 sm:mb-8 shadow-2xl shadow-emerald-500/30">
                             <Bot className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-white" />
                         </div>
-                        
+
                         <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-2 sm:mb-3 tracking-tight text-center">
                             How can I help you?
                         </h2>
@@ -273,16 +313,16 @@ export default function ChatAssistant({
 
                                 {/* Message Bubble */}
                                 <div className={`group flex flex-col max-w-[80%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                    <div className={`rounded-2xl px-4 py-3 ${
-                                        m.role === 'user'
-                                            ? 'bg-white border border-gray-100 shadow-sm'
-                                            : 'bg-white border border-gray-100 shadow-sm'
-                                    }`}>
+                                    <div className={`rounded-2xl px-4 py-3 ${m.role === 'user'
+                                        ? 'bg-white border border-gray-100 shadow-sm'
+                                        : 'bg-white border border-gray-100 shadow-sm'
+                                        }`}>
                                         {m.role === 'assistant' ? (
                                             <RenderContent
                                                 content={m.content}
                                                 streaming={m.isStreaming}
                                                 onDone={() => finishStreaming(m.id)}
+                                                apiUrl={apiUrl}
                                             />
                                         ) : (
                                             <p className="text-[15px] text-gray-900">{m.content}</p>

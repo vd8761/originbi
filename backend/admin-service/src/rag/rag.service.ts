@@ -7,15 +7,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
- * PRODUCTION AGENTIC RAG v5.0
- * - Intent Classification with LLM
- * - Multi-Tool Execution
- * - Re-Ranking & Fusion
- * - Query Decomposition
- * - PDF Report Generation
+ * PRODUCTION AGENTIC RAG v6.0
+ * - Direct, concise answers (no filler)
+ * - Assessment/Exam results support
+ * - Smart report generation with analysis
+ * - Intent-based routing
  */
 
-type Intent = 'DATA_QUERY' | 'REPORT' | 'COMPARE' | 'EXPLAIN' | 'LIST' | 'COUNT';
+type Intent = 'DATA_QUERY' | 'REPORT' | 'COMPARE' | 'EXPLAIN' | 'LIST' | 'COUNT' | 'EXAM_RESULT';
 
 interface QueryResult {
     answer: string;
@@ -23,6 +22,7 @@ interface QueryResult {
     sources?: any;
     confidence: number;
     reportUrl?: string;
+    reportId?: string;
     intent?: string;
 }
 
@@ -36,7 +36,6 @@ export class RagService {
         private dataSource: DataSource,
         private embeddingsService: EmbeddingsService,
     ) {
-        // Setup reports directory
         this.reportsDir = path.join(process.cwd(), 'reports');
         if (!fs.existsSync(this.reportsDir)) {
             fs.mkdirSync(this.reportsDir, { recursive: true });
@@ -61,41 +60,35 @@ export class RagService {
      */
     async query(question: string, user: any): Promise<QueryResult> {
         if (!question?.trim()) {
-            return { answer: 'Please ask a question about careers, users, or assessments.', searchType: 'none', confidence: 0 };
+            return { answer: 'Please ask a question.', searchType: 'none', confidence: 0 };
         }
 
         this.logger.log(`🤖 Query: "${question}"`);
 
         try {
-            // Step 1: Classify Intent
             const intent = this.classifyIntent(question);
             this.logger.log(`📋 Intent: ${intent}`);
 
-            // Step 2: Execute Tools in Parallel
-            const [sqlResult, semanticResults] = await Promise.all([
-                this.executeSqlQuery(question),
-                this.embeddingsService.semanticSearch(question, 10, undefined, 0.15),
-            ]);
+            // Execute SQL with intent-aware query generation
+            const sqlResult = await this.executeSqlQuery(question, intent);
+            const semanticResults = await this.embeddingsService.semanticSearch(question, 5, undefined, 0.2);
 
-            // Step 3: Re-rank and Fuse Results
-            const fusedResults = this.fuseAndRerank(sqlResult, semanticResults);
-
-            // Step 4: Handle Special Intents
+            // Handle special intents
             if (intent === 'REPORT') {
-                return await this.handleReportIntent(question, fusedResults, user);
+                return await this.handleReportIntent(question, sqlResult, user);
             }
 
             if (intent === 'COMPARE') {
-                return await this.handleCompareIntent(question, fusedResults);
+                return await this.handleCompareIntent(question);
             }
 
-            // Step 5: Generate Response
-            return await this.generateResponse(question, fusedResults, intent);
+            // Generate direct response
+            return await this.generateDirectResponse(question, sqlResult, semanticResults, intent);
 
         } catch (error) {
             this.logger.error('Query failed:', error.message);
             return {
-                answer: `I apologize, but I encountered an issue processing your question. Please try rephrasing or ask about specific data like users, careers, or courses.`,
+                answer: `Sorry, I couldn't process that. Please try rephrasing.`,
                 searchType: 'error',
                 confidence: 0,
             };
@@ -103,35 +96,38 @@ export class RagService {
     }
 
     /**
-     * Fast Intent Classification
+     * Enhanced Intent Classification
      */
     private classifyIntent(question: string): Intent {
         const q = question.toLowerCase();
 
-        // Count/Number queries
-        if (q.match(/how many|count|total|number of/)) return 'COUNT';
+        // Exam/Test/Assessment results
+        if (q.match(/exam|test|result|score|assessment|attempt|performance/)) return 'EXAM_RESULT';
 
-        // Comparison queries
-        if (q.match(/compare|vs|versus|difference|between.*and/)) return 'COMPARE';
+        // Count queries
+        if (q.match(/how many|count|total|number of/)) return 'COUNT';
 
         // Report generation
         if (q.match(/report|generate|download|export|pdf/)) return 'REPORT';
 
-        // Explanation queries
+        // Comparison
+        if (q.match(/compare|vs|versus|difference|between.*and/)) return 'COMPARE';
+
+        // Explanation
         if (q.match(/what is|explain|describe|tell me about|define/)) return 'EXPLAIN';
 
-        // List queries
+        // List
         if (q.match(/list|show|display|get all|find all/)) return 'LIST';
 
         return 'DATA_QUERY';
     }
 
     /**
-     * Execute SQL Query with Smart Generation
+     * Execute SQL with Enhanced Schema
      */
-    private async executeSqlQuery(question: string): Promise<{ success: boolean; sql?: string; data?: any[]; error?: string }> {
+    private async executeSqlQuery(question: string, intent: Intent): Promise<{ success: boolean; sql?: string; data?: any[]; error?: string }> {
         try {
-            const sql = await this.generateSQL(question);
+            const sql = await this.generateSQL(question, intent);
             if (!sql) return { success: false, error: 'Could not generate query' };
 
             this.logger.log(`🔍 SQL: ${sql}`);
@@ -144,53 +140,59 @@ export class RagService {
     }
 
     /**
-     * Generate SQL with Comprehensive Examples
+     * Generate SQL with Exam/Assessment Support
      */
-    private async generateSQL(question: string): Promise<string | null> {
+    private async generateSQL(question: string, intent: Intent): Promise<string | null> {
         const prompt = `You are an expert PostgreSQL query writer for OriginBI.
 Output ONLY the SQL query - no markdown, no explanation, no backticks.
 
 DATABASE SCHEMA:
 ================
-users: id, email (user identifier), role, is_active, is_blocked, login_count, last_login_at
-registrations: id, full_name (candidate name), gender, status, program_id, mobile_number, is_deleted
-career_roles: id, career_role_name (THE NAME COLUMN), short_description, is_active, is_deleted
+users: id, email, role, is_active, is_blocked, login_count, last_login_at
+registrations: id, full_name (candidate name), email, gender, status, program_id, mobile_number, is_deleted
+career_roles: id, career_role_name (THE NAME), short_description, is_active, is_deleted
 career_role_tools: id, career_role_id, tool_name, is_deleted
 trait_based_course_details: id, course_name, notes, compatibility_percentage, is_deleted
 programs: id, code, name, description, is_active, is_demo
 personality_traits: id, code, blended_style_name, blended_style_desc, is_active
 corporate_accounts: id, company_name, sector_code, total_credits, available_credits, is_deleted
 groups: id, code, name, corporate_account_id, is_deleted
-assessment_attempts: id, registration_id, program_id, status, score
 departments: id, name, short_name, category, is_deleted
+assessment_attempts: id, registration_id, program_id, status, score, created_at, updated_at
+open_questions: id, registration_id, question, response, marks, is_deleted
+assessment_summary: id, registration_id, program_id, total_score, percentile, created_at
 
-QUERY EXAMPLES:
+QUERY EXAMPLES (NEVER include 'id' columns in SELECT):
 ===============
 "how many users" → SELECT COUNT(*) as count FROM users WHERE is_active = true
-"list users" → SELECT email, role, is_active FROM users WHERE is_active = true LIMIT 30
-"show career roles" → SELECT career_role_name, short_description FROM career_roles WHERE is_deleted = false LIMIT 30
-"count careers" → SELECT COUNT(*) as count FROM career_roles WHERE is_deleted = false
-"show courses" → SELECT course_name, notes FROM trait_based_course_details WHERE is_deleted = false LIMIT 30
-"find java" → SELECT career_role_name, short_description FROM career_roles WHERE career_role_name ILIKE '%java%' AND is_deleted = false LIMIT 30
-"list tools" → SELECT DISTINCT tool_name FROM career_role_tools WHERE is_deleted = false LIMIT 50
-"show programs" → SELECT code, name, description FROM programs WHERE is_active = true
+"list users" → SELECT email, role, is_active, login_count FROM users WHERE is_active = true LIMIT 20
+"user details" → SELECT email, role, is_active, is_blocked, login_count, last_login_at FROM users LIMIT 20
+"show career roles" → SELECT career_role_name, short_description FROM career_roles WHERE is_deleted = false LIMIT 20
+"find java developer" → SELECT career_role_name, short_description FROM career_roles WHERE career_role_name ILIKE '%java%' AND is_deleted = false
+"show courses" → SELECT course_name, notes, compatibility_percentage FROM trait_based_course_details WHERE is_deleted = false LIMIT 20
+"test user exam" → SELECT registrations.full_name, registrations.email, assessment_attempts.status, assessment_attempts.score FROM assessment_attempts JOIN registrations ON assessment_attempts.registration_id = registrations.id LIMIT 20
+"exam results" → SELECT registrations.full_name, registrations.email, assessment_attempts.score, assessment_attempts.status FROM assessment_attempts JOIN registrations ON assessment_attempts.registration_id = registrations.id ORDER BY assessment_attempts.created_at DESC LIMIT 20
+"test result for john" → SELECT registrations.full_name, registrations.email, assessment_attempts.score, assessment_attempts.status, programs.name as program FROM assessment_attempts JOIN registrations ON assessment_attempts.registration_id = registrations.id LEFT JOIN programs ON assessment_attempts.program_id = programs.id WHERE registrations.full_name ILIKE '%john%'
+"assessment summary" → SELECT registrations.full_name, registrations.email, assessment_summary.total_score, assessment_summary.percentile FROM assessment_summary JOIN registrations ON assessment_summary.registration_id = registrations.id LIMIT 20
+"show candidates" → SELECT full_name, email, gender, status, mobile_number FROM registrations WHERE is_deleted = false LIMIT 20
 "count registrations" → SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false
-"show candidates" → SELECT full_name, gender, status FROM registrations WHERE is_deleted = false LIMIT 30
-"list companies" → SELECT company_name, sector_code FROM corporate_accounts WHERE is_deleted = false
+"list companies" → SELECT company_name, sector_code, total_credits, available_credits FROM corporate_accounts WHERE is_deleted = false
+"show programs" → SELECT code, name, description, is_active FROM programs WHERE is_active = true
 "personality types" → SELECT blended_style_name, blended_style_desc FROM personality_traits WHERE is_active = true
-"show groups" → SELECT code, name FROM groups WHERE is_deleted = false
-"show departments" → SELECT name, short_name, category FROM departments WHERE is_deleted = false
+"find user by email" → SELECT email, role, is_active, is_blocked, login_count FROM users WHERE email ILIKE '%keyword%'
 
 STRICT RULES:
 =============
-1. Return ONLY the SQL query - nothing else
-2. NEVER use table aliases (like u, cr, etc)
-3. For career_roles: use career_role_name (NOT name)
-4. Always add LIMIT 30 (except for COUNT)
-5. Use is_deleted = false where column exists
-6. Use is_active = true where column exists
+1. Return ONLY the SQL query
+2. NEVER use table aliases like u, cr
+3. NEVER include 'id' columns in SELECT - show meaningful data only (email, role, name, etc.)
+4. For career_roles: use career_role_name (NOT name)
+5. Always add LIMIT 20 (except for COUNT)
+6. Use is_deleted = false where column exists
 7. Use ILIKE '%keyword%' for text search
-8. users table has NO is_deleted column
+8. For exam/test queries: JOIN assessment_attempts with registrations
+9. Always include meaningful columns like email, role, name, status, score
+10. For users: always include email, role, is_active at minimum
 
 Question: "${question}"
 
@@ -200,11 +202,9 @@ SQL:`;
             const response = await this.getLlm().invoke([new SystemMessage(prompt)]);
             let sql = response.content.toString().trim();
 
-            // Clean up
             sql = sql.replace(/```sql/gi, '').replace(/```/g, '').trim();
             sql = sql.split('\n')[0].trim();
 
-            // Validate
             const upper = sql.toUpperCase();
             if (!upper.startsWith('SELECT')) return null;
             if (['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER'].some(k => upper.includes(k + ' '))) return null;
@@ -217,191 +217,351 @@ SQL:`;
     }
 
     /**
-     * Fuse and Re-rank Results from Multiple Sources
+     * Generate Direct Response - No Filler
      */
-    private fuseAndRerank(sqlResult: any, semanticResults: any[]): any {
-        const fused: any[] = [];
-        let totalScore = 0;
+    private async generateDirectResponse(question: string, sqlResult: any, semanticResults: any[], intent: Intent): Promise<QueryResult> {
+        if (!sqlResult.success || !sqlResult.data?.length) {
+            // Try semantic fallback
+            if (semanticResults.length > 0) {
+                return {
+                    answer: this.formatSemanticResponse(semanticResults),
+                    searchType: intent,
+                    sources: { semanticMatches: semanticResults.length },
+                    confidence: 0.6,
+                };
+            }
 
-        // SQL results get high base score
-        if (sqlResult.success && sqlResult.data?.length > 0) {
-            fused.push({
-                source: 'sql',
-                score: 0.95,
-                data: sqlResult.data,
-                count: sqlResult.data.length,
-                sql: sqlResult.sql,
-            });
-            totalScore += 0.95;
+            return {
+                answer: `No data found for "${question}". Try: "list users", "show career roles", "exam results"`,
+                searchType: 'none',
+                confidence: 0.1,
+            };
         }
 
-        // Semantic results with similarity scores
-        if (semanticResults.length > 0) {
-            semanticResults.forEach((r, i) => {
-                const similarity = parseFloat(r.similarity) || (0.5 - i * 0.05);
-                fused.push({
-                    source: 'semantic',
-                    score: similarity,
-                    content: r.content,
-                    category: r.category,
-                });
-                totalScore += similarity * 0.3;
-            });
-        }
+        // Direct formatting based on intent
+        const data = sqlResult.data;
+        let answer: string;
 
-        // Sort by score
-        fused.sort((a, b) => b.score - a.score);
+        if (intent === 'COUNT') {
+            const count = data[0]?.count || data.length;
+            answer = `**${count}** records found.`;
+        } else if (intent === 'EXAM_RESULT') {
+            answer = this.formatExamResults(data);
+        } else if (intent === 'LIST' || data.length > 1) {
+            answer = this.formatListResponse(data, question);
+        } else {
+            answer = this.formatDataResponse(data);
+        }
 
         return {
-            results: fused,
-            hasSQL: sqlResult.success,
-            hasSemantic: semanticResults.length > 0,
-            totalScore: Math.min(totalScore, 1),
-            sqlData: sqlResult.data || [],
-            semanticData: semanticResults,
+            answer,
+            searchType: intent,
+            sources: { sqlRowCount: data.length },
+            confidence: 0.9,
+            intent,
         };
     }
 
     /**
-     * Handle Report Generation Intent
+     * Format Exam/Assessment Results
      */
-    private async handleReportIntent(question: string, fusedResults: any, user: any): Promise<QueryResult> {
+    private formatExamResults(data: any[]): string {
+        if (!data.length) return 'No exam results found.';
+
+        let response = `**Exam Results** (${data.length} records)\n\n`;
+
+        data.slice(0, 10).forEach((row, i) => {
+            const name = row.full_name || row.email || 'Unknown';
+            const score = row.score !== undefined ? row.score : row.total_score || 'N/A';
+            const status = row.status || '';
+            const program = row.program || row.name || '';
+
+            response += `${i + 1}. **${name}**`;
+            if (score !== 'N/A') response += ` — Score: **${score}**`;
+            if (status) response += ` (${status})`;
+            if (program) response += ` [${program}]`;
+            response += '\n';
+        });
+
+        if (data.length > 10) {
+            response += `\n... and ${data.length - 10} more results.`;
+        }
+
+        return response;
+    }
+
+    /**
+     * Format List Response - Smart Column Selection
+     */
+    private formatListResponse(data: any[], question: string): string {
+        if (!data.length) return 'No results found.';
+
+        // Filter out id columns and internal columns
+        const skipColumns = ['id', 'created_at', 'updated_at', 'is_deleted', 'registration_id', 'program_id', 'career_role_id', 'corporate_account_id'];
+        const allKeys = Object.keys(data[0]);
+        const keys = allKeys.filter(k => !skipColumns.includes(k.toLowerCase()));
+
+        // If all columns were filtered, use original keys minus just 'id'
+        const displayKeys = keys.length > 0 ? keys : allKeys.filter(k => k.toLowerCase() !== 'id');
+
+        let response = `**Found ${data.length} results:**\n\n`;
+
+        data.slice(0, 15).forEach((row, i) => {
+            // Find primary display field (prefer name, email, title)
+            const primaryKey = displayKeys.find(k =>
+                k.includes('name') || k.includes('email') || k.includes('title') || k === 'career_role_name'
+            ) || displayKeys[0];
+
+            const primary = row[primaryKey] || 'N/A';
+
+            // Build detail string from other columns
+            const details: string[] = [];
+            displayKeys.forEach(key => {
+                if (key !== primaryKey && row[key] !== null && row[key] !== undefined) {
+                    const value = row[key];
+                    const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+                    // Format based on type
+                    if (typeof value === 'boolean') {
+                        details.push(`${label}: ${value ? 'Yes' : 'No'}`);
+                    } else if (typeof value === 'string' && value.length < 50) {
+                        details.push(`${label}: ${value}`);
+                    } else if (typeof value === 'number') {
+                        details.push(`${label}: ${value}`);
+                    }
+                }
+            });
+
+            response += `${i + 1}. **${primary}**`;
+            if (details.length > 0) {
+                response += `\n   ${details.slice(0, 4).join(' | ')}`;
+            }
+            response += '\n\n';
+        });
+
+        if (data.length > 15) {
+            response += `... and ${data.length - 15} more.`;
+        }
+
+        return response.trim();
+    }
+
+    /**
+     * Format Data Response
+     */
+    private formatDataResponse(data: any[]): string {
+        if (!data.length) return 'No data found.';
+
+        const row = data[0];
+        const entries = Object.entries(row).slice(0, 6);
+
+        let response = '';
+        entries.forEach(([key, value]) => {
+            const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            response += `**${label}:** ${value}\n`;
+        });
+
+        return response;
+    }
+
+    /**
+     * Format Semantic Response
+     */
+    private formatSemanticResponse(results: any[]): string {
+        let response = 'Here\'s what I found:\n\n';
+        results.slice(0, 5).forEach((r, i) => {
+            response += `${i + 1}. ${r.content?.slice(0, 150)}...\n`;
+        });
+        return response;
+    }
+
+    /**
+     * Handle Report Generation with Analysis
+     */
+    private async handleReportIntent(question: string, sqlResult: any, user: any): Promise<QueryResult> {
+        // Analyze what report the user wants
+        const reportType = this.analyzeReportType(question);
+
+        // Get relevant data
+        let reportData = sqlResult.data || [];
+        let reportQuery = question;
+
+        // If no data from initial query, try to get relevant data based on report type
+        if (!reportData.length) {
+            const fallbackResult = await this.getReportData(reportType);
+            reportData = fallbackResult.data || [];
+            reportQuery = fallbackResult.query;
+        }
+
         const reportId = `report_${Date.now()}`;
         const reportPath = path.join(this.reportsDir, `${reportId}.txt`);
 
-        // Build report content
-        let content = `OriginBI Report\n${'='.repeat(50)}\n`;
-        content += `Generated: ${new Date().toISOString()}\n`;
-        content += `Query: ${question}\n\n`;
-
-        if (fusedResults.sqlData.length > 0) {
-            content += `Data Results (${fusedResults.sqlData.length} records):\n`;
-            content += JSON.stringify(fusedResults.sqlData.slice(0, 50), null, 2);
-        }
+        // Build formatted report
+        let content = this.buildReport(reportType, reportData, question);
 
         // Save report
         fs.writeFileSync(reportPath, content);
 
+        const recordCount = reportData.length;
+
         return {
-            answer: `📊 **Report Generated Successfully!**\n\nI've compiled a report based on your query. The report contains ${fusedResults.sqlData.length} records.\n\n📥 **Download:** [Click here to download](/api/reports/${reportId})\n\nThe report includes all matching data from your search.`,
+            answer: `📊 **${reportType} Report Generated**\n\nReport contains **${recordCount}** records.\n\n📥 **[Download Report](/rag/reports/${reportId})**`,
             searchType: 'report',
-            sources: { sqlRowCount: fusedResults.sqlData.length },
-            confidence: 0.9,
-            reportUrl: `/api/reports/${reportId}`,
+            sources: { records: recordCount },
+            confidence: 0.95,
+            reportUrl: `/rag/reports/${reportId}`,
+            reportId: reportId,
             intent: 'REPORT',
         };
     }
 
     /**
+     * Analyze Report Type
+     */
+    private analyzeReportType(question: string): string {
+        const q = question.toLowerCase();
+
+        if (q.includes('user')) return 'User Report';
+        if (q.includes('exam') || q.includes('test') || q.includes('assessment')) return 'Assessment Report';
+        if (q.includes('career') || q.includes('role')) return 'Career Roles Report';
+        if (q.includes('course')) return 'Courses Report';
+        if (q.includes('candidate') || q.includes('registration')) return 'Candidates Report';
+        if (q.includes('company') || q.includes('corporate')) return 'Corporate Report';
+
+        return 'Data Report';
+    }
+
+    /**
+     * Get Report Data
+     */
+    private async getReportData(reportType: string): Promise<{ data: any[]; query: string }> {
+        let query = '';
+
+        switch (reportType) {
+            case 'User Report':
+                query = 'SELECT id, email, role, is_active, login_count FROM users LIMIT 100';
+                break;
+            case 'Assessment Report':
+                query = `SELECT registrations.full_name, assessment_attempts.score, assessment_attempts.status, programs.name as program 
+                         FROM assessment_attempts 
+                         JOIN registrations ON assessment_attempts.registration_id = registrations.id 
+                         LEFT JOIN programs ON assessment_attempts.program_id = programs.id 
+                         ORDER BY assessment_attempts.created_at DESC LIMIT 100`;
+                break;
+            case 'Career Roles Report':
+                query = 'SELECT career_role_name, short_description FROM career_roles WHERE is_deleted = false LIMIT 100';
+                break;
+            case 'Courses Report':
+                query = 'SELECT course_name, notes, compatibility_percentage FROM trait_based_course_details WHERE is_deleted = false LIMIT 100';
+                break;
+            case 'Candidates Report':
+                query = 'SELECT full_name, email, gender, status FROM registrations WHERE is_deleted = false LIMIT 100';
+                break;
+            default:
+                query = 'SELECT id, email, role FROM users LIMIT 50';
+        }
+
+        try {
+            const data = await this.dataSource.query(query);
+            return { data, query };
+        } catch {
+            return { data: [], query };
+        }
+    }
+
+    /**
+     * Build Formatted Report
+     */
+    private buildReport(reportType: string, data: any[], question: string): string {
+        const divider = '═'.repeat(60);
+        const now = new Date().toLocaleString();
+
+        let content = `
+${divider}
+                    ORIGINBI ${reportType.toUpperCase()}
+${divider}
+
+Generated: ${now}
+Query: ${question}
+Total Records: ${data.length}
+
+${divider}
+                         DATA
+${divider}
+
+`;
+
+        if (data.length === 0) {
+            content += 'No records found matching your criteria.\n';
+        } else {
+            // Get column headers
+            const headers = Object.keys(data[0]);
+
+            // Add header row
+            content += headers.map(h => h.toUpperCase().padEnd(20)).join(' | ') + '\n';
+            content += '-'.repeat(headers.length * 22) + '\n';
+
+            // Add data rows
+            data.forEach(row => {
+                const values = headers.map(h => {
+                    const val = row[h];
+                    return String(val || '').slice(0, 18).padEnd(20);
+                });
+                content += values.join(' | ') + '\n';
+            });
+        }
+
+        content += `
+${divider}
+                      END OF REPORT
+${divider}
+Generated by OriginBI RAG System v6.0
+`;
+
+        return content;
+    }
+
+    /**
      * Handle Comparison Intent
      */
-    private async handleCompareIntent(question: string, fusedResults: any): Promise<QueryResult> {
-        // Extract entities to compare
+    private async handleCompareIntent(question: string): Promise<QueryResult> {
         const match = question.match(/compare\s+(.+?)\s+(?:and|vs|versus|with)\s+(.+)/i) ||
             question.match(/(.+?)\s+vs\s+(.+)/i);
 
         if (!match) {
-            return this.generateResponse(question, fusedResults, 'COMPARE');
+            return {
+                answer: 'Please specify two items to compare. Example: "compare Java Developer and Python Developer"',
+                searchType: 'compare',
+                confidence: 0.3,
+            };
         }
 
         const [, entity1, entity2] = match;
 
-        // Query both entities
         const [result1, result2] = await Promise.all([
-            this.executeSqlQuery(`find ${entity1.trim()}`),
-            this.executeSqlQuery(`find ${entity2.trim()}`),
+            this.executeSqlQuery(`find ${entity1.trim()}`, 'DATA_QUERY'),
+            this.executeSqlQuery(`find ${entity2.trim()}`, 'DATA_QUERY'),
         ]);
 
-        // Build comparison context
-        let context = `Comparing "${entity1.trim()}" vs "${entity2.trim()}":\n\n`;
+        let answer = `**Comparison: ${entity1.trim()} vs ${entity2.trim()}**\n\n`;
 
         if (result1.success && result1.data && result1.data.length > 0) {
-            context += `${entity1.trim()} (${result1.data.length} results):\n`;
-            context += JSON.stringify(result1.data.slice(0, 5), null, 2) + '\n\n';
+            answer += `**${entity1.trim()}:** Found ${result1.data.length} matches\n`;
+        } else {
+            answer += `**${entity1.trim()}:** No data found\n`;
         }
 
         if (result2.success && result2.data && result2.data.length > 0) {
-            context += `${entity2.trim()} (${result2.data.length} results):\n`;
-            context += JSON.stringify(result2.data.slice(0, 5), null, 2);
+            answer += `**${entity2.trim()}:** Found ${result2.data.length} matches\n`;
+        } else {
+            answer += `**${entity2.trim()}:** No data found\n`;
         }
 
-        return this.synthesizeAnswer(question, context, 'comparison');
-    }
-
-    /**
-     * Generate Final Response
-     */
-    private async generateResponse(question: string, fusedResults: any, intent: Intent): Promise<QueryResult> {
-        // Build context
-        let context = '';
-
-        if (fusedResults.hasSQL && fusedResults.sqlData.length > 0) {
-            context += `Database Results (${fusedResults.sqlData.length} records):\n`;
-            context += JSON.stringify(fusedResults.sqlData.slice(0, 20), null, 2) + '\n\n';
-        }
-
-        if (fusedResults.hasSemantic && fusedResults.semanticData.length > 0) {
-            context += 'Knowledge Base Matches:\n';
-            fusedResults.semanticData.slice(0, 5).forEach((r: any, i: number) => {
-                context += `${i + 1}. ${r.content} (${((r.similarity || 0) * 100).toFixed(0)}% match)\n`;
-            });
-        }
-
-        if (!context) {
-            return {
-                answer: `I couldn't find specific data for your query. Try asking about:\n• **Users** - "how many users", "list users"\n• **Careers** - "show career roles", "find java developer"\n• **Courses** - "list courses"\n• **Programs** - "show assessment programs"`,
-                searchType: 'none',
-                confidence: 0.2,
-                intent: intent,
-            };
-        }
-
-        return this.synthesizeAnswer(question, context, intent);
-    }
-
-    /**
-     * Synthesize Natural Language Answer
-     */
-    private async synthesizeAnswer(question: string, context: string, searchType: string): Promise<QueryResult> {
-        const prompt = `You are OriginBI's AI Assistant - a helpful career guidance expert.
-
-USER QUESTION: "${question}"
-
-AVAILABLE DATA:
-${context}
-
-RESPONSE GUIDELINES:
-1. Be conversational and professional
-2. Use **bold** for important numbers and names
-3. Use bullet points for lists (max 10 items)
-4. Keep response concise (max 250 words)
-5. Don't mention "database" or "SQL"
-6. If it's a count, state the number clearly
-7. For careers/courses, highlight key details
-8. End with a helpful follow-up suggestion
-
-Generate a helpful, well-formatted response:`;
-
-        try {
-            const response = await this.getLlm().invoke([new SystemMessage(prompt)]);
-            const answer = response.content.toString();
-
-            return {
-                answer,
-                searchType,
-                sources: {
-                    sqlRowCount: context.includes('Database Results') ? 1 : 0,
-                    semanticMatches: context.includes('Knowledge Base') ? 1 : 0,
-                },
-                confidence: context.length > 100 ? 0.85 : 0.5,
-            };
-        } catch (error) {
-            return {
-                answer: 'I apologize, but I had trouble generating a response. Please try again.',
-                searchType: 'error',
-                confidence: 0,
-            };
-        }
+        return {
+            answer,
+            searchType: 'compare',
+            confidence: 0.8,
+        };
     }
 
     // ============ Service Methods ============
@@ -418,10 +578,10 @@ Generate a helpful, well-formatted response:`;
         return {
             status: 'ok',
             service: 'rag',
-            version: '5.0.0-production',
+            version: '6.0.0-production',
             embeddings: embeddingStatus,
             knowledgeBase: { totalDocuments: totalDocs, categories: docStats, ready: totalDocs > 0 },
-            capabilities: ['sql_query', 'semantic_search', 'compare', 'report_generation', 're_ranking'],
+            capabilities: ['sql_query', 'semantic_search', 'compare', 'report_generation', 'exam_results'],
         };
     }
 
