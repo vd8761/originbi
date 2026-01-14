@@ -11,6 +11,7 @@ interface AssessmentSessionsTableProps {
     sortColumn?: string;
     sortOrder?: "ASC" | "DESC";
     isGroupView?: boolean;
+    hideCandidateName?: boolean;
 }
 
 const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
@@ -21,7 +22,8 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
     onSort,
     sortColumn,
     sortOrder,
-    isGroupView
+    isGroupView,
+    hideCandidateName
 }) => {
 
     const getAvatarColor = (name: string) => {
@@ -277,7 +279,7 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                     </tbody>
                 </table>
             </div>
-        </div>
+        </div >
     );
 };
 

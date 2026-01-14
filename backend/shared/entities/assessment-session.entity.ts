@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { Registration } from './registration.entity';
+import { Program } from './program.entity';
 import { GroupAssessment } from './group-assessment.entity';
 import { Program as ProgramEntity } from './program.entity';
 
