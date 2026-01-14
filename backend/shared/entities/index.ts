@@ -8,6 +8,7 @@ export { User } from './user.entity';
 export { AssessmentLevel } from './assessment-level.entity';
 export { Program } from './program.entity';
 export { Groups } from './groups.entity';
+export { PersonalityTrait } from './personality-trait.entity';
 
 // Corporate entities
 export { CorporateAccount } from './corporate-account.entity';
@@ -33,7 +34,7 @@ export { UserActionLog, UserRole, ActionType } from './user-action-log.entity';
 
 // ============================================
 // Usage in services:
-// 
+//
 // import { User, AssessmentQuestion, AssessmentQuestionOption } from '@originbi/shared-entities';
 //
 // In app.module.ts TypeOrmModule:
