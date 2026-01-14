@@ -10,9 +10,18 @@ import { AssessmentLevel } from '../entities/assessment_level.entity';
 import { AssessmentAnswer } from '../entities/assessment_answer.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, AssessmentSession, AssessmentAttempt, AssessmentLevel, AssessmentAnswer]), HttpModule],
+  imports: [
+    TypeOrmModule.forFeature([
+      User,
+      AssessmentSession,
+      AssessmentAttempt,
+      AssessmentLevel,
+      AssessmentAnswer,
+    ]),
+    HttpModule,
+  ],
   controllers: [StudentController],
   providers: [StudentService],
   exports: [StudentService],
 })
-export class StudentModule { }
+export class StudentModule {}
