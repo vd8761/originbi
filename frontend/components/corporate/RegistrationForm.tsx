@@ -172,6 +172,8 @@ const RegistrationForm: React.FC = () => {
         setSectorSearch("");
     }
 
+    const formTopRef = useRef<HTMLDivElement>(null);
+
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setFormError('');
@@ -193,10 +195,9 @@ const RegistrationForm: React.FC = () => {
 
         if (!isValid) {
             setFormError("Please fix the errors below.");
-            // Focus the first error field
+            // Scroll to top error
             setTimeout(() => {
-                const firstError = document.querySelector('.border-red-500');
-                if (firstError) (firstError as HTMLElement).focus();
+                formTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }, 100);
             return;
         }
@@ -220,6 +221,10 @@ const RegistrationForm: React.FC = () => {
         } catch (err: any) {
             console.error('Registration error:', err);
             setFormError(err.message || 'An error occurred during registration.');
+            // Scroll to top on API error too
+            setTimeout(() => {
+                formTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
         } finally {
             setIsSubmitting(false);
         }
@@ -287,8 +292,9 @@ const RegistrationForm: React.FC = () => {
 
     return (
         <form onSubmit={handleSubmit} className="flex flex-col gap-5 animate-fade-in pb-8" noValidate>
+            <div ref={formTopRef} className="scroll-mt-24" />
             {formError && (
-                <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm rounded-lg mb-2">
+                <div id="form-error-top" className="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm rounded-lg mb-2">
                     {formError}
                 </div>
             )}
@@ -582,11 +588,18 @@ const RegistrationForm: React.FC = () => {
                 </div>
             </div>
 
+            {/* Error Message near Button */}
+            {formError && (
+                <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm rounded-lg text-center animate-fade-in">
+                    {formError}
+                </div>
+            )}
+
             {/* Submit Button */}
             <button
                 type="submit"
                 disabled={isSubmitting}
-                className="mt-6 w-full text-white bg-brand-green hover:bg-brand-green/90 font-semibold rounded-full p-[clamp(18px,1.2vw,24px)] text-[clamp(16px,1vw,20px)] leading-none tracking-[0px] transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
+                className="mt-2 w-full text-white bg-brand-green hover:bg-brand-green/90 font-semibold rounded-full p-[clamp(18px,1.2vw,24px)] text-[clamp(16px,1vw,20px)] leading-none tracking-[0px] transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
             >
                 {isSubmitting ? (
                     <svg className="animate-spin h-6 w-6 text-white" fill="none" viewBox="0 0 24 24">
