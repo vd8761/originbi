@@ -475,7 +475,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
   };
 
   // Submit Answer & Next
-  const handleNext = async () => {
+  const handleNext = () => {
     if (!currentQuestion || !selectedOption) return;
 
     const timeSpent = Math.floor((Date.now() - startTimeRef.current) / 1000);
@@ -488,25 +488,26 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
       answer_change_count: changeCount,
     };
 
-    try {
-      const examApiUrl = process.env.NEXT_PUBLIC_EXAM_ENGINE_API_URL || "http://localhost:4005";
-      await fetch(`${examApiUrl}/api/v1/exam/answer`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (currentNumber < totalQuestions) {
-        setCurrentQIndex((prev) => prev + 1);
-        // setSelectedOption handled by useEffect
-        setChangeCount(0);
-        startTimeRef.current = Date.now();
-      } else {
-        setIsCompleted(true);
-      }
-    } catch (err) {
-      console.error("Failed to submit answer:", err);
+    // Optimistic Update: Switch to next question immediately
+    if (currentNumber < totalQuestions) {
+      setCurrentQIndex((prev) => prev + 1);
+      // setSelectedOption handled by useEffect
+      setChangeCount(0);
+      startTimeRef.current = Date.now();
+    } else {
+      setIsCompleted(true);
     }
+
+    // Send Answer in Background
+    const examApiUrl = process.env.NEXT_PUBLIC_EXAM_ENGINE_API_URL || "http://localhost:4005";
+    fetch(`${examApiUrl}/api/v1/exam/answer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).catch((err) => {
+      console.error("Failed to submit answer (background):", err);
+      // TODO: Implement retry logic or offline queue if needed
+    });
   };
 
   const handlePrevious = () => {

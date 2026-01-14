@@ -201,11 +201,10 @@ const LoginForm: React.FC<LoginFormProps> = ({
           value={values.email}
           onChange={handleChange}
           onBlur={handleBlur}
-          className={`bg-brand-light-secondary dark:bg-brand-dark-tertiary border text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] font-normal leading-none tracking-[0px] rounded-full block w-full transition-colors duration-300 ${isEmailInvalid
+          className={`bg-brand-light-secondary dark:bg-brand-dark-tertiary border text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] font-normal leading-none tracking-[0px] rounded-full block w-full h-[clamp(56px,3.5vw,68px)] px-[clamp(20px,1.2vw,30px)] transition-colors duration-300 ${isEmailInvalid
             ? "border-red-500 focus:ring-red-500 focus:border-red-500"
             : "border-brand-light-tertiary dark:border-brand-dark-tertiary focus:ring-brand-green focus:border-brand-green"
             }`}
-          style={{ padding: 'clamp(14px,1vw,20px)' }}
           placeholder={portalMode === 'corporate' ? 'name@company.com' : 'example@domain.com'}
           required
           disabled={isSubmitting}
@@ -237,11 +236,10 @@ const LoginForm: React.FC<LoginFormProps> = ({
             onChange={handleChange}
             onBlur={handleBlur}
             placeholder="Enter your password"
-            className={`bg-brand-light-secondary dark:bg-brand-dark-tertiary border text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] font-normal leading-none tracking-[0px] rounded-full block w-full pr-16 transition-colors duration-300 ${isPasswordInvalid
+            className={`bg-brand-light-secondary dark:bg-brand-dark-tertiary border text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] font-normal leading-none tracking-[0px] rounded-full block w-full h-[clamp(56px,3.5vw,68px)] pl-[clamp(20px,1.2vw,30px)] pr-16 transition-colors duration-300 ${isPasswordInvalid
               ? "border-red-500 focus:ring-red-500 focus:border-red-500"
               : "border-brand-light-tertiary dark:border-brand-dark-tertiary focus:ring-brand-green focus:border-brand-green"
               }`}
-            style={{ padding: 'clamp(14px,1vw,20px)', paddingRight: '4rem' }}
             required
             disabled={isSubmitting}
             aria-invalid={isPasswordInvalid}
@@ -282,8 +280,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
       <button
         type="submit"
         disabled={isSubmitting}
-        style={{ padding: 'clamp(14px,1vw,20px)' }}
-        className={`w-full text-white bg-brand-green hover:bg-brand-green/90 focus:ring-4 focus:outline-none focus:ring-brand-green/30 font-sans font-semibold rounded-full text-[clamp(16px,1vw,20px)] leading-none tracking-[0px] text-center transition-colors duration-300 disabled:bg-brand-green/50 disabled:cursor-not-allowed flex justify-center items-center shadow-lg hover:shadow-xl transform active:scale-[0.99] ${buttonClass}`}
+        className={`w-full text-white bg-brand-green hover:bg-brand-green/90 focus:ring-4 focus:outline-none focus:ring-brand-green/30 font-sans font-semibold rounded-full text-[clamp(16px,1vw,20px)] leading-none tracking-[0px] text-center transition-colors duration-300 disabled:bg-brand-green/50 disabled:cursor-not-allowed flex justify-center items-center h-[clamp(56px,3.5vw,68px)] px-[clamp(20px,1.2vw,30px)] shadow-lg hover:shadow-xl transform active:scale-[0.99] ${buttonClass}`}
         aria-busy={isSubmitting}
       >
         {isSubmitting ? (

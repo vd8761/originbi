@@ -1,6 +1,6 @@
 import React from 'react';
 import { AssessmentSession } from '@/lib/services/assessment.service';
-import { EyeVisibleIcon, SortIcon } from '@/components/icons';
+import { EyeSolidIcon, SortIcon } from '@/components/icons';
 
 interface AssessmentSessionsTableProps {
     sessions: AssessmentSession[];
@@ -24,6 +24,27 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
     isGroupView
 }) => {
 
+    const getAvatarColor = (name: string) => {
+        let hash = 0;
+        for (let i = 0; i < name.length; i++) {
+            hash = name.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const h = Math.abs(hash) % 360;
+        const s = 55 + (Math.abs(hash) % 20);
+        const l = 45 + (Math.abs(hash) % 10);
+        const hslToHex = (h: number, s: number, l: number) => {
+            l /= 100;
+            const a = s * Math.min(l, 1 - l) / 100;
+            const f = (n: number) => {
+                const k = (n + h / 30) % 12;
+                const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+                return Math.round(255 * color).toString(16).padStart(2, '0');
+            };
+            return `${f(0)}${f(8)}${f(4)}`;
+        };
+        return hslToHex(h, s, l);
+    };
+
     const formatDate = (dateStr?: string) => {
         if (!dateStr) return '-';
         try {
@@ -46,8 +67,13 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
             case 'ON_GOING':
             case 'IN_PROGRESS':
                 return {
-                    label: `On Going (Level ${currentLevel || 1}/${totalLevels || '-'})`,
+                    label: `On Going (${currentLevel || 1}/${totalLevels || '-'})`,
                     color: 'bg-[#00B69B]/20 text-[#00B69B] border-[#00B69B]'
+                };
+            case 'NOT_STARTED':
+                return {
+                    label: 'Not Yet Started',
+                    color: 'bg-gray-100 text-gray-600 border-gray-200'
                 };
             case 'COMPLETED': return { label: 'Completed', color: 'bg-[#00B69B] text-white border-[#00B69B]' };
             case 'EXPIRED': return { label: 'Expired', color: 'bg-[#EF3826]/20 text-[#EF3826] border-[#EF3826]' };
@@ -68,9 +94,7 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                 <table className="w-full border-collapse relative min-w-[1200px]">
                     <thead className="sticky top-0 z-20 bg-[#19211C]/4 dark:bg-[#FFFFFF1F] shadow-sm">
                         <tr className="text-left">
-                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider text-center w-16">
-                                Action
-                            </th>
+
                             {!isGroupView && (
                                 <th
                                     className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors w-[15%] min-w-[140px]"
@@ -82,15 +106,29 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                                     </div>
                                 </th>
                             )}
-                            <th
-                                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors w-[20%] min-w-[200px]"
-                                onClick={() => onSort?.('exam_title')}
-                            >
-                                <div className="flex items-center gap-1">
-                                    Exam Title
-                                    <SortIcon sort={sortColumn === 'exam_title' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
-                                </div>
-                            </th>
+                            {!isGroupView && (
+                                <th
+                                    className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors w-[20%] min-w-[200px]"
+                                    onClick={() => onSort?.('email')}
+                                >
+                                    <div className="flex items-center gap-1">
+                                        Email
+                                        <SortIcon sort={sortColumn === 'email' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
+                                    </div>
+                                </th>
+                            )}
+
+                            {isGroupView && (
+                                <th
+                                    className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                    onClick={() => onSort?.('group_name')}
+                                >
+                                    <div className="flex items-center gap-1">
+                                        Group Name
+                                        <SortIcon sort={sortColumn === 'group_name' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
+                                    </div>
+                                </th>
+                            )}
                             <th
                                 className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer text-center group hover:bg-black/5 dark:hover:bg-white/5 transition-colors w-[12%] min-w-[140px]"
                                 onClick={() => onSort?.('exam_status')}
@@ -112,17 +150,7 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                                     <SortIcon sort={sortColumn === 'program_name' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                                 </div>
                             </th>
-                            {isGroupView && (
-                                <th
-                                    className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                                    onClick={() => onSort?.('group_name')}
-                                >
-                                    <div className="flex items-center gap-1">
-                                        Group Name
-                                        <SortIcon sort={sortColumn === 'group_name' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
-                                    </div>
-                                </th>
-                            )}
+
                             {isGroupView && (
                                 <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider text-center">
                                     No. of Candidates
@@ -146,14 +174,9 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                                     <SortIcon sort={sortColumn === 'exam_ends_on' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                                 </div>
                             </th>
-                            {!isGroupView && (
-                                <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors whitespace-nowrap w-[10%] min-w-[120px]">
-                                    <div className="flex items-center gap-1">
-                                        Exam Expired On
-                                        <SortIcon sort={null} />
-                                    </div>
-                                </th>
-                            )}
+                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider text-center w-16">
+                                Action
+                            </th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-brand-light-tertiary dark:divide-brand-dark-tertiary">
@@ -172,13 +195,13 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                             ))
                         ) : error ? (
                             <tr>
-                                <td colSpan={9} className="p-8 text-center text-red-500">
+                                <td colSpan={8} className="p-8 text-center text-red-500">
                                     {error}
                                 </td>
                             </tr>
                         ) : sessions.length === 0 ? (
                             <tr>
-                                <td colSpan={9} className="p-8 text-center text-gray-500 dark:text-gray-400">
+                                <td colSpan={8} className="p-8 text-center text-gray-500 dark:text-gray-400">
                                     No assessment sessions found.
                                 </td>
                             </tr>
@@ -190,24 +213,34 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                                         key={session.id}
                                         className="hover:bg-brand-light-primary/30 dark:hover:bg-[#FFFFFF0D] transition-colors group"
                                     >
-                                        <td className="p-4 text-center">
-                                            <button
-                                                onClick={() => onView?.(session.id)}
-                                                className="p-1 hover:bg-brand-light-tertiary dark:hover:bg-white/10 rounded transition-colors text-brand-green"
-                                            >
-                                                <EyeVisibleIcon className="w-4 h-4" />
-                                            </button>
-                                        </td>
+
                                         {!isGroupView && (
                                             <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-primary font-medium whitespace-nowrap">
-                                                {session.registration?.fullName || session.user?.email || '-'}
+                                                <div className="flex items-center gap-3">
+                                                    <img
+                                                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(session.registration?.fullName || session.user?.email || 'User')}&background=${getAvatarColor(session.registration?.fullName || session.user?.email || 'User')}&color=fff&font-size=0.4`}
+                                                        alt=""
+                                                        className="w-9 h-9 rounded-full object-cover border border-brand-light-tertiary dark:border-brand-dark-tertiary"
+                                                    />
+                                                    <span className="text-sm font-medium text-brand-text-light-primary dark:text-white">
+                                                        {session.registration?.fullName || session.user?.email || '-'}
+                                                    </span>
+                                                </div>
                                             </td>
                                         )}
-                                        <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-primary font-medium">
-                                            {session.program?.assessment_title || '-'}
-                                        </td>
+                                        {!isGroupView && (
+                                            <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-primary font-medium">
+                                                {session.registration?.email || session.user?.email || '-'}
+                                            </td>
+                                        )}
+
+                                        {isGroupView && (
+                                            <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-primary">
+                                                {session.groupName || '-'}
+                                            </td>
+                                        )}
                                         <td className="p-4 text-center">
-                                            <span className={`px-3 py-1 rounded text-[10px] font-semibold border ${status.color}`}>
+                                            <span className={`px-3 py-1 rounded text-[10px] font-semibold border inline-block min-w-[140px] text-center ${status.color}`}>
                                                 {status.label}
                                             </span>
                                         </td>
@@ -217,11 +250,7 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                                         <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-primary">
                                             {session.program?.name || '-'}
                                         </td>
-                                        {isGroupView && (
-                                            <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-primary">
-                                                {session.groupName || '-'}
-                                            </td>
-                                        )}
+
                                         {isGroupView && (
                                             <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-primary text-center">
                                                 {session.totalCandidates || 0}
@@ -233,11 +262,14 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                                         <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-secondary whitespace-nowrap">
                                             {formatDate(session.validTo)}
                                         </td>
-                                        {!isGroupView && (
-                                            <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-secondary whitespace-nowrap">
-                                                {session.status === 'EXPIRED' ? formatDate(session.validTo) : '-'}
-                                            </td>
-                                        )}
+                                        <td className="p-4 text-center">
+                                            <button
+                                                onClick={() => onView?.(session.id)}
+                                                className="p-1 hover:bg-brand-light-tertiary dark:hover:bg-white/10 rounded transition-colors text-brand-green"
+                                            >
+                                                <EyeSolidIcon className="w-5 h-5" />
+                                            </button>
+                                        </td>
                                     </tr>
                                 );
                             })

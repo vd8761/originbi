@@ -251,16 +251,16 @@ const RegistrationForm: React.FC = () => {
     // --- Styles ---
     const getFieldClass = (fieldName: string) => {
         const hasError = touched[fieldName] && !!errors[fieldName];
-        const base = "bg-brand-light-secondary dark:bg-brand-dark-tertiary border text-brand-text-light-primary dark:text-brand-text-primary rounded-full block w-full focus:outline-none transition-all placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] font-normal leading-normal tracking-[0px]";
+        const base = "bg-brand-light-secondary dark:bg-brand-dark-tertiary border text-brand-text-light-primary dark:text-brand-text-primary rounded-full block w-full focus:outline-none transition-all placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] font-normal leading-none tracking-[0px]";
         const border = hasError
             ? "border-red-500 focus:border-red-500 focus:ring-red-500"
             : "border-brand-light-tertiary dark:border-brand-dark-tertiary focus:border-brand-green focus:ring-brand-green";
         return `${base} ${border}`;
     };
 
-    const baseLabelClasses = "block font-sans text-[clamp(13px,0.85vw,16px)] font-semibold text-brand-text-light-secondary dark:text-white mb-2 leading-none";
+    const baseLabelClasses = "block font-sans text-[clamp(14px,0.9vw,18px)] font-semibold text-brand-text-light-secondary dark:text-white mb-2 leading-none";
 
-    const commonInputPadding = "px-5 py-3"; // Standard padding used across fields
+    const commonInputPadding = "p-[clamp(18px,1.2vw,24px)]"; // Increased padding to match Login
 
     if (success) {
         return (
@@ -312,7 +312,7 @@ const RegistrationForm: React.FC = () => {
             {/* --- GENDER (Full Width) --- */}
             <div>
                 <label className={baseLabelClasses}>Gender <span className="text-red-500">*</span></label>
-                <div className="flex w-full bg-brand-light-secondary dark:bg-brand-dark-tertiary rounded-full p-1 border border-brand-light-tertiary dark:border-brand-dark-tertiary h-[48px] sm:h-[50px]">
+                <div className="flex w-full bg-brand-light-secondary dark:bg-brand-dark-tertiary rounded-full p-1 border border-brand-light-tertiary dark:border-brand-dark-tertiary h-[clamp(54px,3.5vw,64px)]">
                     {["MALE", "FEMALE", "OTHER"].map((g) => (
                         <button
                             key={g}
@@ -347,7 +347,7 @@ const RegistrationForm: React.FC = () => {
                 <label className={baseLabelClasses}>Mobile Number <span className="text-red-500">*</span></label>
 
                 {/* Unified Mobile Input Pill */}
-                <div className={`${getFieldClass('mobile')} relative flex items-center p-0 h-[48px] sm:h-[50px]`}>
+                <div className={`${getFieldClass('mobile')} relative flex items-center p-0 h-[clamp(54px,3.5vw,64px)]`}>
 
                     {/* Country Selector */}
                     <div className="relative h-full flex-shrink-0">
@@ -586,7 +586,7 @@ const RegistrationForm: React.FC = () => {
             <button
                 type="submit"
                 disabled={isSubmitting}
-                className="mt-6 w-full text-white bg-brand-green hover:bg-brand-green/90 font-semibold rounded-full py-4 text-[clamp(16px,1vw,20px)] transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
+                className="mt-6 w-full text-white bg-brand-green hover:bg-brand-green/90 font-semibold rounded-full p-[clamp(18px,1.2vw,24px)] text-[clamp(16px,1vw,20px)] leading-none tracking-[0px] transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
             >
                 {isSubmitting ? (
                     <svg className="animate-spin h-6 w-6 text-white" fill="none" viewBox="0 0 24 24">
