@@ -5,7 +5,7 @@ import {
     Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, EntityManager } from 'typeorm';
+import { Repository, DataSource, EntityManager, In, Not } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import * as nodemailer from 'nodemailer';
@@ -260,16 +260,18 @@ export class CorporateRegistrationsService {
             }
 
             // G. Send Email
-            try {
-                await this.sendWelcomeEmail(
-                    dto.email,
-                    dto.fullName,
-                    password,
-                    validFrom,
-                    program.assessmentTitle || program.name,
-                );
-            } catch (e) {
-                this.logger.error('Failed to send welcome email', e);
+            if (dto.sendEmail) {
+                try {
+                    await this.sendWelcomeEmail(
+                        dto.email,
+                        dto.fullName,
+                        password,
+                        validFrom,
+                        program.assessmentTitle || program.name,
+                    );
+                } catch (e) {
+                    this.logger.error('Failed to send welcome email', e);
+                }
             }
 
             return {
@@ -288,57 +290,71 @@ export class CorporateRegistrationsService {
         startDateTime?: Date | string,
         assessmentTitle?: string,
     ) {
-        // Use AWS SDK v3 for Nodemailer compatibility
-        const aws = require('@aws-sdk/client-ses');
+        this.logger.log(`Attempting to send welcome email to ${to} (sendEmail=true)`);
 
-        const ses = new aws.SES({
-            apiVersion: '2010-12-01',
-            region: process.env.AWS_REGION,
-            credentials: {
+        try {
+            // Use aws-sdk v2 (Standard, matches Admin Service)
+            const ses = new SES({
                 accessKeyId: process.env.AWS_ACCESS_KEY_ID,
                 secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-            },
-        });
+                sessionToken: process.env.AWS_SESSION_TOKEN, // Optional
+                region: process.env.AWS_REGION,
+            });
 
-        // Pass both the client instance and the AWS module to nodemailer
-        const transporter = nodemailer.createTransport({
-            ses: { ses, aws }, // Use lowercase 'ses' as per nodemailer v7 docs for @aws-sdk/client-ses
-        } as any);
+            // Create transport securely
+            const transporter = nodemailer.createTransport({
+                SES: ses,
+            } as any);
 
-        // Use full URLs for assets ("from application itself")
-        // Static assets served at /email-assets in corporate-service (Port 4003)
-        const apiUrl = process.env.API_URL || 'http://localhost:4003';
+            // Use full URLs for assets ("from application itself")
+            const apiUrl = process.env.API_URL || 'http://localhost:4003';
 
-        const assets = {
-            popper: `${apiUrl}/email-assets/Popper.png`,
-            pattern: `${apiUrl}/email-assets/Pattern_mask.png`,
-            footer: `${apiUrl}/email-assets/Email_Vector.png`,
-            logo: `${apiUrl}/email-assets/logo.png`,
-        };
+            const assets = {
+                popper: `${apiUrl}/email-assets/Popper.png`,
+                pattern: `${apiUrl}/email-assets/Pattern_mask.png`,
+                footer: `${apiUrl}/email-assets/Email_Vector.png`,
+                logo: `${apiUrl}/email-assets/logo.png`,
+            };
 
-        const html = getWelcomeEmailTemplate(
-            name,
-            to,
-            pass,
-            process.env.FRONTEND_URL || 'http://localhost:3000',
-            assets,
-            startDateTime,
-            assessmentTitle
-        );
+            const html = getWelcomeEmailTemplate(
+                name,
+                to,
+                pass,
+                process.env.FRONTEND_URL || 'http://localhost:3000',
+                assets,
+                startDateTime,
+                assessmentTitle
+            );
 
-        await transporter.sendMail({
-            from: `"${process.env.EMAIL_SEND_FROM_NAME || 'Origin BI'}" <${process.env.EMAIL_FROM || 'no-reply@originbi.com'}>`,
-            to,
-            subject: 'Welcome to OriginBI - Assessment Invitation',
-            html,
-            // Attachments removed in favor of hosted images
-        });
+            const info = await transporter.sendMail({
+                from: `"${process.env.EMAIL_SEND_FROM_NAME || 'Origin BI'}" <${process.env.EMAIL_FROM || 'no-reply@originbi.com'}>`,
+                to,
+                subject: 'Welcome to OriginBI - Assessment Invitation',
+                html,
+            });
+
+            this.logger.log(`Email sent successfully to ${to}. MessageId: ${info.messageId}`);
+        } catch (error) {
+            this.logger.error(`Failed to send email to ${to}`, error);
+            // We do not throw here to avoid failing the transaction/process if email fails
+        }
     }
     async assignAssessmentToExistingUser(
         userId: number,
         dto: CreateCandidateDto,
         corporateUserId: number
     ) {
+        // Check for active assessments
+        const activeSession = await this.dataSource.getRepository(AssessmentSession).findOne({
+            where: {
+                userId: userId,
+                status: Not(In(['COMPLETED', 'EXPIRED', 'PARTIALLY_EXPIRED'])),
+            }
+        });
+
+        if (activeSession) {
+            throw new BadRequestException(`User already has an active assessment (Status: ${activeSession.status}). Cannot assign a new one.`);
+        }
         // 1. Fetch Corporate Account (needed for linking)
         let corporateAccount = await this.corpRepo.findOne({ where: { userId: corporateUserId } });
         if (!corporateAccount) {
@@ -444,17 +460,19 @@ export class CorporateRegistrationsService {
             }
 
             // 6. Send Email
-            try {
-                // Pass null password as we didn't create it
-                await this.sendWelcomeEmail(
-                    user.email,
-                    user.metadata?.fullName || dto.fullName,
-                    '******', // Masked password for existing users
-                    validFrom,
-                    program.assessmentTitle || program.name
-                );
-            } catch (e) {
-                this.logger.error('Failed to send welcome email', e);
+            if (dto.sendEmail) {
+                try {
+                    // Pass null password as we didn't create it
+                    await this.sendWelcomeEmail(
+                        user.email,
+                        user.metadata?.fullName || dto.fullName,
+                        '******', // Masked password for existing users
+                        validFrom,
+                        program.assessmentTitle || program.name
+                    );
+                } catch (e) {
+                    this.logger.error('Failed to send welcome email', e);
+                }
             }
 
             return {
