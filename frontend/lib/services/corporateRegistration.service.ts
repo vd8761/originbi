@@ -216,7 +216,7 @@ export const corporateRegistrationService = {
 
         // Assuming direct call to Corporate Service (4003) or via Gateway
         // Adjust URL based on your network config.
-        const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_BASE_URL || 'http://127.0.0.1:4003';
+        const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://127.0.0.1:4003';
 
         const res = await fetch(`${CORP_API}/corporate/registrations/bulk/preview`, {
             method: 'POST',
@@ -236,7 +236,7 @@ export const corporateRegistrationService = {
     // Execute Bulk Import
     async bulkExecute(importId: string, overrides: any[]): Promise<void> {
         const token = AuthService.getToken();
-        const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_BASE_URL || 'http://127.0.0.1:4003';
+        const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://127.0.0.1:4003';
 
         const res = await fetch(`${CORP_API}/corporate/registrations/bulk/execute`, {
             method: 'POST',
@@ -256,7 +256,7 @@ export const corporateRegistrationService = {
     // Get Bulk Job Status
     async getBulkJobStatus(importId: string): Promise<{ status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'; total: number; success: number; failed: number }> {
         const token = AuthService.getToken();
-        const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_BASE_URL || 'http://127.0.0.1:4003';
+        const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://127.0.0.1:4003';
 
         const res = await fetch(`${CORP_API}/corporate/registrations/bulk/status/${importId}`, {
             method: 'GET',
@@ -272,7 +272,7 @@ export const corporateRegistrationService = {
     // Get Bulk Job Rows (for review after partial failure)
     async getBulkJobRows(importId: string): Promise<any[]> {
         const token = AuthService.getToken();
-        const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_BASE_URL || 'http://127.0.0.1:4003';
+        const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://127.0.0.1:4003';
 
         const res = await fetch(`${CORP_API}/corporate/registrations/bulk/rows/${importId}`, {
             method: 'GET',
@@ -288,7 +288,7 @@ export const corporateRegistrationService = {
     // Get Groups (for dropdown in review table)
     async getGroups(userId: string): Promise<any[]> {
         const token = AuthService.getToken();
-        const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_BASE_URL || 'http://127.0.0.1:4003';
+        const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://127.0.0.1:4003';
 
         // Assuming endpoint exists or creating it
         const res = await fetch(`${CORP_API}/corporate/groups?userId=${userId}`, {

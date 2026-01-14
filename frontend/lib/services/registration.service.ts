@@ -14,7 +14,7 @@ const API_URL =
   process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "http://localhost:4001";
 
 const CORPORATE_API_URL =
-  process.env.NEXT_PUBLIC_CORPORATE_API_BASE_URL || "http://localhost:4003";
+  process.env.NEXT_PUBLIC_CORPORATE_API_URL || "http://localhost:4003";
 
 // DTO for creating a new registration (from frontend form)
 export interface CreateRegistrationDto {
