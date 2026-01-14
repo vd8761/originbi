@@ -23,7 +23,7 @@ export default function StudentAssessmentPage() {
   }, []);
 
   const handleLogout = async () => {
-    try { await signOut(); } catch { }
+    try { await signOut(); } catch { /* ignore */ }
     sessionStorage.removeItem('isAssessmentMode');
     router.push('/student/login');
   };

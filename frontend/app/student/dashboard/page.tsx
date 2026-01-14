@@ -14,7 +14,7 @@ export default function StudentDashboardPage() {
   const router = useRouter();
 
   const handleLogout = async () => {
-    try { await signOut(); } catch { }
+    try { await signOut(); } catch { /* ignore */ }
     router.push('/student/login');
   };
 
