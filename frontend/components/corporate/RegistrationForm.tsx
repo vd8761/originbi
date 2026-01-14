@@ -205,7 +205,7 @@ const RegistrationForm: React.FC = () => {
         setIsSubmitting(true);
 
         try {
-            const corporateServiceUrl = process.env.NEXT_PUBLIC_CORPORATE_SERVICE_URL || 'http://localhost:4003';
+            const corporateServiceUrl = process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://localhost:4003';
             const res = await fetch(`${corporateServiceUrl}/dashboard/register-corporate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

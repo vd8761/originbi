@@ -14,7 +14,6 @@ export class CorporateDashboardController {
   constructor(private readonly dashboardService: CorporateDashboardService) { }
 
   @Get('stats')
-  @Get('stats')
   getDashboardStats(@Query('email') email: string) {
     if (!email) {
       throw new BadRequestException('Email is required');
@@ -23,21 +22,19 @@ export class CorporateDashboardController {
   }
 
   @Post('forgot-password/initiate')
-  @Post('forgot-password/initiate')
   initiateReset(@Body('email') email: string) {
     if (!email) {
       throw new BadRequestException('Email is required');
     }
     return this.dashboardService.initiateCorporateReset(email);
   }
-  @Get('profile')
+
   @Get('profile')
   getProfile(@Query('email') email: string) {
     if (!email) throw new BadRequestException('Email is required');
     return this.dashboardService.getProfile(email);
   }
 
-  @Get('ledger')
   @Get('ledger')
   getLedger(
     @Query('email') email: string,
@@ -49,7 +46,6 @@ export class CorporateDashboardController {
     return this.dashboardService.getLedger(email, page, limit, search);
   }
 
-  @Post('top-up')
   @Post('top-up')
   topUpCredits(
     @Body('email') email: string,
@@ -63,7 +59,6 @@ export class CorporateDashboardController {
   }
 
   @Post('create-order')
-  @Post('create-order')
   createOrder(
     @Body('email') email: string,
     @Body('creditCount') creditCount: number,
@@ -76,7 +71,6 @@ export class CorporateDashboardController {
   }
 
   @Post('verify-payment')
-  @Post('verify-payment')
   verifyPayment(
     @Body('email') email: string,
     @Body('paymentDetails') paymentDetails: any,
@@ -88,7 +82,6 @@ export class CorporateDashboardController {
   }
 
   @Post('record-payment-failure')
-  @Post('record-payment-failure')
   recordPaymentFailure(
     @Body('orderId') orderId: string,
     @Body('description') description: string,
@@ -97,12 +90,10 @@ export class CorporateDashboardController {
   }
 
   @Post('register-corporate')
-  @Post('register-corporate')
   registerCorporate(@Body() dto: RegisterCorporateDto) {
     return this.dashboardService.registerCorporate(dto);
   }
 
-  @Get('my-employees')
   @Get('my-employees')
   getMyEmployees(
     @Query('email') email: string,
@@ -115,7 +106,7 @@ export class CorporateDashboardController {
     if (!email) throw new BadRequestException('Email is required');
     return this.dashboardService.getMyEmployees(email, page, limit, search, startDate, endDate);
   }
-  @Get('assessment-sessions')
+
   @Get('assessment-sessions')
   getAssessmentSessions(
     @Query('email') email: string,
