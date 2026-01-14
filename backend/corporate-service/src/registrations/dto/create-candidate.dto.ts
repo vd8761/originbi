@@ -39,4 +39,7 @@ export class CreateCandidateDto {
 
     @IsOptional()
     groupAssessmentId?: number;
+
+    @IsOptional()
+    sendEmail?: boolean;
 }

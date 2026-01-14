@@ -147,6 +147,26 @@ export class BulkCorporateRegistrationsService {
             if (m) userMapByMobile.set(String(m).trim(), u);
         });
 
+        // Fetch Assessment Sessions for these existing users to check overlaps
+        const userAssessmentMap = new Map<number, any[]>();
+        if (existingUsers.length > 0) {
+            const userIds = existingUsers.map(u => u.id);
+            try {
+                const sessions = await this.dataSource.query(
+                    `SELECT id, user_id, valid_from, valid_to, program_id, status FROM assessment_sessions WHERE user_id IN (${userIds.join(',')})`
+                );
+                sessions.forEach((s: any) => {
+                    const uid = Number(s.user_id);
+                    if (!userAssessmentMap.has(uid)) {
+                        userAssessmentMap.set(uid, []);
+                    }
+                    userAssessmentMap.get(uid)?.push(s);
+                });
+            } catch (err) {
+                this.logger.warn('Failed to fetch existing sessions for validation', err);
+            }
+        }
+
         // Check Credits
         let newRegistrationsCount = 0;
         for (const row of rawRows) {
@@ -194,6 +214,7 @@ export class BulkCorporateRegistrationsService {
                 groupMap, // Pass group map
                 userMapByEmail,
                 userMapByMobile,
+                userAssessmentMap,
                 seenEmails,
                 seenMobiles
             );
@@ -612,7 +633,10 @@ export class BulkCorporateRegistrationsService {
             programType: pName,
             groupName: groupName,
             password: this.getValue(rawData, ['Password', 'password']) || 'Welcome@123',
-            sendEmail: true,
+            sendEmail: (() => {
+                const val = this.getValue(rawData, ['send_email', 'SendEmail']);
+                return val ? val.toUpperCase() === 'TRUE' : false;
+            })(),
             examStart: this.getValue(rawData, ['ExamStart', 'exam_start_date', 'valid_from']),
             examEnd: this.getValue(rawData, ['ExamEnd', 'exam_end_date', 'valid_to']),
         };
@@ -627,6 +651,7 @@ export class BulkCorporateRegistrationsService {
         groupMap: Map<string, Groups>,
         userMapByEmail: Map<string, User>,
         userMapByMobile: Map<string, User>,
+        userAssessmentMap: Map<number, any[]>,
         seenEmails: Set<string>,
         seenMobiles: Set<string>
     ): BulkImportRow {
@@ -641,6 +666,7 @@ export class BulkCorporateRegistrationsService {
             programMap,
             userMapByEmail,
             userMapByMobile,
+            userAssessmentMap,
             seenEmails,
             seenMobiles
         );
@@ -702,6 +728,7 @@ export class BulkCorporateRegistrationsService {
         programMap: Map<string, Program>,
         userMapByEmail: Map<string, User>,
         userMapByMobile: Map<string, User>,
+        userAssessmentMap: Map<number, any[]>,
         seenEmails: Set<string>,
         seenMobiles: Set<string>
     ): string | null {
@@ -774,6 +801,19 @@ export class BulkCorporateRegistrationsService {
             const dbEmail = existingByMobile.email;
             if (dbEmail !== email) {
                 return `Mobile no ${mobile} exists with different email id`;
+            }
+        }
+
+        // Check for Active Assessment
+        const finalExistingUser = existingByEmail || existingByMobile;
+        if (finalExistingUser) {
+            const sessions = userAssessmentMap.get(Number(finalExistingUser.id)) || [];
+            const activeSession = sessions.find(
+                (s) => !['COMPLETED', 'EXPIRED', 'PARTIALLY_EXPIRED'].includes(s.status),
+            );
+
+            if (activeSession) {
+                return `Error: User already has an active assessment (Status: ${activeSession.status}). Cannot create a new one.`;
             }
         }
 

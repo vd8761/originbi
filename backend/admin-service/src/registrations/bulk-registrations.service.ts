@@ -45,7 +45,7 @@ export class BulkRegistrationsService {
     private groupAssessmentRepo: Repository<GroupAssessment>,
     private dataSource: DataSource,
     private readonly registrationsService: RegistrationsService,
-  ) {}
+  ) { }
 
   /**
    * Phase 1: Preview & Validate
@@ -697,15 +697,18 @@ export class BulkRegistrationsService {
       degreeId: isCollege ? degId : undefined,
       currentYear: isCollege
         ? this.getValue(rawData, [
-            'current_year',
-            'CurrentYear',
-            'Year',
-            'year',
-          ])
+          'current_year',
+          'CurrentYear',
+          'Year',
+          'year',
+        ])
         : undefined,
 
       password: this.getValue(rawData, ['Password', 'password']) || 'Admin@123',
-      sendEmail: true,
+      sendEmail: (() => {
+        const val = this.getValue(rawData, ['send_email', 'SendEmail']);
+        return val ? val.toUpperCase() === 'TRUE' : false;
+      })(),
       examStart: this.getValue(rawData, [
         'ExamStart',
         'exam_start_date',
@@ -958,7 +961,8 @@ export class BulkRegistrationsService {
       // We consider an assessment "Active" if it is NOT in a terminal state (COMPLETED or EXPIRED).
       // This includes: NOT_STARTED, ON_GOING, PARTIALLY_EXP (if used).
       const activeSession = sessions.find(
-        (s) => s.status !== 'COMPLETED' && s.status !== 'EXPIRED',
+        (s) =>
+          !['COMPLETED', 'EXPIRED', 'PARTIALLY_EXPIRED'].includes(s.status),
       );
 
       if (activeSession) {
