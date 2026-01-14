@@ -125,14 +125,12 @@ export class AssessmentService {
         .createQueryBuilder('as')
         .leftJoinAndMapOne('as.program', Program, 'p', 'p.id = as.programId')
         .leftJoinAndSelect('as.user', 'u')
-        .leftJoinAndSelect('as.registration', 'r')
-        .leftJoinAndSelect('as.groupAssessment', 'ga')
-        .leftJoinAndSelect('ga.group', 'g');
+        .leftJoinAndSelect('as.registration', 'r');
 
       if (search) {
         const s = `%${search.toLowerCase()}%`;
         qb.andWhere(
-          '(LOWER(p.name) LIKE :s OR LOWER(p.assessment_title) LIKE :s OR LOWER(u.email) LIKE :s OR LOWER(r.full_name) LIKE :s)',
+          '(LOWER(p.name) LIKE :s OR LOWER(p.assessment_title) LIKE :s OR LOWER(u.email) LIKE :s OR LOWER(r.fullName) LIKE :s)',
           { s },
         );
       }
@@ -168,6 +166,12 @@ export class AssessmentService {
             break;
           case 'program_name':
             sortCol = 'p.name';
+            break;
+          case 'candidate_name':
+            sortCol = 'r.fullName';
+            break;
+          case 'email':
+            sortCol = 'u.email';
             break;
           case 'exam_status':
             sortCol = 'as.status';

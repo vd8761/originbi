@@ -11,7 +11,7 @@ const CorporateRegistration: React.FC = () => {
     const { theme, toggleTheme } = useTheme();
 
     return (
-        <div className="relative w-full min-h-[100dvh] overflow-hidden bg-[#FAFAFA] dark:bg-brand-dark-primary transition-colors duration-300">
+        <div className="relative w-full h-screen overflow-hidden bg-[#FAFAFA] dark:bg-brand-dark-primary transition-colors duration-300">
             {/* GLOBAL BACKGROUND LAYERS (Full Screen) */}
             <div className="fixed inset-0 pointer-events-none z-0">
                 <div className="absolute inset-0 bg-[url('/Background_Light_Theme.svg')] bg-cover bg-center bg-no-repeat opacity-100 dark:hidden" />
@@ -23,20 +23,20 @@ const CorporateRegistration: React.FC = () => {
             </div>
 
             {/* CONTENT CONTAINER */}
-            <div className="relative z-10 w-full max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-12 lg:h-[100dvh] min-h-[100dvh] px-[clamp(24px,8.33vw,160px)]">
+            <div className="relative z-10 w-full max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-12 h-full px-[clamp(24px,8.33vw,160px)] lg:[zoom:0.8]">
                 {/* Left Column: Grid Layout [Header, Content, Footer] */}
-                {/* Added overflow-y-auto to allow scrolling for long form */}
-                <div className="order-1 lg:col-span-5 flex flex-col justify-start gap-4 lg:h-full h-auto py-[clamp(16px,2vw,32px)] px-1 relative lg:overflow-y-auto z-10 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                {/* Fixed Header/Footer, Scrollable Content */}
+                <div className="order-1 lg:col-span-5 flex flex-col justify-between gap-4 h-full py-8 px-1 relative z-10 overflow-hidden">
                     {/* Header */}
-                    <header className="w-full max-w-[clamp(360px,30vw,640px)] self-start flex items-center justify-between shrink-0 mb-8">
+                    <header className="w-full max-w-[clamp(480px,40vw,800px)] self-start flex items-center justify-between shrink-0 mb-8">
                         <div className="w-[clamp(100px,7vw,130px)]">
                             <Logo className="w-full h-auto object-contain" />
                         </div>
                         <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
                     </header>
 
-                    {/* Main Content */}
-                    <div className="w-full max-w-[clamp(360px,30vw,640px)] self-start flex flex-col justify-center my-auto">
+                    {/* Main Content (Scrollable) */}
+                    <div className="w-full max-w-[clamp(480px,40vw,800px)] self-start flex flex-col flex-1 overflow-y-auto pr-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                         <div className="text-left w-full mb-[clamp(16px,2vw,32px)]">
                             <h1 className="font-sans font-semibold text-brand-text-light-primary dark:text-brand-text-primary tracking-[0%] leading-none mb-2 text-[clamp(24px,2.5vw,40px)]">
                                 Register Organization
@@ -52,7 +52,7 @@ const CorporateRegistration: React.FC = () => {
                     </div>
 
                     {/* Footer */}
-                    <footer className="w-full max-w-[clamp(360px,30vw,640px)] self-start flex flex-col-reverse sm:flex-row items-center justify-between text-[clamp(11px,0.8vw,14px)] font-medium leading-none tracking-[0px] text-brand-green gap-4 mt-auto shrink-0 py-4">
+                    <footer className="w-full max-w-[clamp(480px,40vw,800px)] self-start flex flex-col-reverse sm:flex-row items-center justify-between text-[clamp(11px,0.8vw,14px)] font-medium leading-none tracking-[0px] text-brand-green gap-4 mt-auto shrink-0 py-4">
                         <div className="flex items-center gap-4">
                             <a href="#" className="hover:text-brand-green/80 transition-colors text-right underline decoration-solid decoration-0 underline-offset-2">Privacy Policy</a>
                             <span className="border-r border-brand-light-tertiary dark:border-white/20 h-3 hidden sm:block"></span>
@@ -63,8 +63,8 @@ const CorporateRegistration: React.FC = () => {
                 </div>
 
                 {/* Right Column: Testimonial/Hero Image */}
-                <div className="order-2 lg:col-span-7 hidden lg:flex h-full pt-8 items-center justify-center">
-                    <div className="w-full h-full rounded-[clamp(1.5rem,2.5vw,2.5rem)] overflow-hidden relative shadow-2xl">
+                <div className="order-2 lg:col-span-7 hidden lg:flex flex-col h-full py-8 items-center justify-center">
+                    <div className="w-full flex-1 rounded-[clamp(1.5rem,2.5vw,2.5rem)] overflow-hidden relative shadow-2xl">
                         <CorporateTestimonial />
                     </div>
                 </div>

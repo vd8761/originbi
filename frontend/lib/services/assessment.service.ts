@@ -26,6 +26,7 @@ export interface AssessmentSession {
         gender?: string;
         mobileNumber?: string;
         countryCode?: string;
+        email?: string;
     };
     groupAssessment?: any; // GroupAssessment interface can be defined separately if needed
     groupName?: string;

@@ -50,6 +50,7 @@ export const corporateRegistrationService = {
 
         if (!res.ok) {
             const err = await res.json().catch(() => null);
+            console.error("Corporate Registration Error:", res.status, res.statusText, err);
             throw new Error(err?.message || "Failed to create corporate registration");
         }
 

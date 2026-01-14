@@ -187,36 +187,30 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
           }}
           className={`
             h-9 w-9 text-xs font-medium flex flex-col items-center justify-center rounded-full transition-all relative
-            ${
-              disabled
-                ? "opacity-30 cursor-not-allowed pointer-events-none"
-                : "cursor-pointer"
+            ${disabled
+              ? "opacity-30 cursor-not-allowed pointer-events-none"
+              : "cursor-pointer"
             }
-            ${
-              isSelected && !disabled
-                ? "bg-brand-green text-white shadow-lg shadow-green-900/20 z-10"
-                : ""
+            ${isSelected && !disabled
+              ? "bg-brand-green text-white shadow-lg shadow-green-900/20 z-10"
+              : ""
             }
-            ${
-              isInRange && !disabled
-                ? "bg-brand-green/10 text-brand-green dark:text-white rounded-none"
-                : ""
+            ${isInRange && !disabled
+              ? "bg-brand-green/10 text-brand-green dark:text-white rounded-none"
+              : ""
             }
-            ${
-              !isSelected && !isInRange && !disabled
-                ? "text-gray-600 dark:text-gray-400 hover:text-brand-text-light-primary dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5"
-                : ""
+            ${!isSelected && !isInRange && !disabled
+              ? "text-gray-600 dark:text-gray-400 hover:text-brand-text-light-primary dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5"
+              : ""
             }
             ${isInRange && !isSelected ? "rounded-none" : ""}
-            ${
-              isStart && endDate.getTime() > startDate.getTime()
-                ? "rounded-r-none"
-                : ""
+            ${isStart && endDate.getTime() > startDate.getTime()
+              ? "rounded-r-none"
+              : ""
             }
-            ${
-              isEnd && startDate.getTime() < endDate.getTime()
-                ? "rounded-l-none"
-                : ""
+            ${isEnd && startDate.getTime() < endDate.getTime()
+              ? "rounded-l-none"
+              : ""
             }
           `}
         >
@@ -293,11 +287,10 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
       <button
         type="button"
         onClick={() => onChange("AM")}
-        className={`px-3 text-[11px] font-bold transition-colors flex items-center justify-center ${
-          period === "AM"
+        className={`px-3 text-[11px] font-bold transition-colors flex items-center justify-center ${period === "AM"
             ? "bg-brand-green text-white"
             : "text-gray-500 hover:text-brand-text-light-primary dark:hover:text-gray-300"
-        }`}
+          }`}
       >
         AM
       </button>
@@ -305,11 +298,10 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
       <button
         type="button"
         onClick={() => onChange("PM")}
-        className={`px-3 text-[11px] font-bold transition-colors flex items-center justify-center ${
-          period === "PM"
+        className={`px-3 text-[11px] font-bold transition-colors flex items-center justify-center ${period === "PM"
             ? "bg-brand-green text-white"
             : "text-gray-500 hover:text-brand-text-light-primary dark:hover:text-gray-300"
-        }`}
+          }`}
       >
         PM
       </button>
@@ -330,9 +322,8 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
           </span>
         </div>
         <ChevronDownIcon
-          className={`w-4 h-4 text-gray-500 transition-transform shrink-0 ${
-            isOpen ? "rotate-180" : ""
-          }`}
+          className={`w-4 h-4 text-gray-500 transition-transform shrink-0 ${isOpen ? "rotate-180" : ""
+            }`}
         />
       </button>
 
@@ -356,7 +347,7 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
             </div>
 
             <div className="flex flex-col md:flex-row overflow-y-auto custom-scrollbar">
-              <div className="p-6 md:border-r border-gray-200 dark:border-white/5 flex-1 bg-white dark:bg-[#1A1D21] min-w-[320px]">
+              <div className="p-4 sm:p-6 md:border-r border-gray-200 dark:border-white/5 flex-1 bg-white dark:bg-[#1A1D21] min-w-[320px]">
                 <div className="flex justify-between items-center mb-6 bg-brand-light-secondary dark:bg-[#24272B] p-1.5 rounded-lg border border-gray-200 dark:border-white/5">
                   <button
                     type="button"
@@ -408,12 +399,12 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
                 </div>
               </div>
 
-              <div className="p-6 flex flex-col justify-center gap-8 bg-brand-light-secondary dark:bg-[#15171A] w-full md:w-[390px] border-t md:border-t-0 border-gray-200 dark:border-white/5">
+              <div className="p-4 sm:p-6 flex flex-col justify-center gap-8 bg-brand-light-secondary dark:bg-[#15171A] w-full md:w-[390px] border-t md:border-t-0 border-gray-200 dark:border-white/5">
                 <div className="space-y-2">
                   <label className="text-xs text-gray-500 dark:text-gray-300 font-bold flex gap-1">
                     From <span className="text-red-500">*</span>
                   </label>
-                  <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <DateDropdown date={startDate} />
                     <div className="flex items-center gap-2 shrink-0">
                       <TimeInput
@@ -441,7 +432,7 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
                   <label className="text-xs text-gray-500 dark:text-gray-300 font-bold flex gap-1">
                     To <span className="text-red-500">*</span>
                   </label>
-                  <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <DateDropdown date={endDate} />
                     <div className="flex items-center gap-2 shrink-0">
                       <TimeInput
