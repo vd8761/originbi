@@ -335,7 +335,7 @@ export class StudentService {
   async createDemoSession(user: User): Promise<AssessmentSession | null> {
     // 1. Find Existing Demo Program (Dynamic Lookup)
     const demoProgramArr = await this.sessionRepo.query(
-      `SELECT id FROM programs WHERE is_demo = true OR name ILIKE 'Demo' OR code ILIKE '%demo%' ORDER BY id DESC LIMIT 1`,
+      `SELECT id FROM programs WHERE is_demo = true OR name ILIKE '%Demo%' OR code ILIKE '%demo%' ORDER BY id DESC LIMIT 1`,
     );
 
     if (!demoProgramArr || demoProgramArr.length === 0) {
