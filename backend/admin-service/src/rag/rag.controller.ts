@@ -5,6 +5,7 @@ import {
     Get,
     Res,
     Req,
+    Param,
     HttpException,
     HttpStatus,
 } from '@nestjs/common';
@@ -12,6 +13,7 @@ import { Response } from 'express';
 import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsIn, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { RagService } from './rag.service';
+import { SyncService } from './sync.service';
 
 // DTO for query request
 export class RagQueryDto {
@@ -31,8 +33,8 @@ export class IngestDocumentDto {
     content: string;
 
     @IsString()
-    @IsIn(['candidate', 'role', 'course', 'question', 'tool'])
-    category: 'candidate' | 'role' | 'course' | 'question' | 'tool';
+    @IsIn(['candidate', 'role', 'course', 'question', 'tool', 'career', 'user', 'program', 'personality', 'group', 'corporate', 'department', 'stats'])
+    category: string;
 
     @IsOptional()
     metadata?: Record<string, any>;
@@ -68,7 +70,10 @@ export interface RagResponse {
 
 @Controller('rag')
 export class RagController {
-    constructor(private readonly ragService: RagService) { }
+    constructor(
+        private readonly ragService: RagService,
+        private readonly syncService: SyncService,
+    ) { }
 
     /**
      * POST /rag/query
@@ -107,7 +112,7 @@ export class RagController {
     @Post('ingest')
     async ingest(@Body() dto: IngestDocumentDto) {
         try {
-            const result = await this.ragService.ingest(dto);
+            const result = await this.ragService.ingest(dto) as any;
             if (result.success) {
                 return { success: true, documentId: result.documentId };
             } else {
@@ -230,6 +235,60 @@ export class RagController {
             throw new HttpException(
                 error.message || 'Failed to generate PDF',
                 HttpStatus.INTERNAL_SERVER_ERROR,
+            );
+        }
+    }
+
+    /**
+     * GET /rag/sync/status
+     * Get auto-sync status
+     */
+    @Get('sync/status')
+    getSyncStatus() {
+        return this.syncService.getStatus();
+    }
+
+    /**
+     * POST /rag/sync/trigger
+     * Manually trigger a sync
+     */
+    @Post('sync/trigger')
+    async triggerSync() {
+        try {
+            const result = await this.syncService.triggerSync();
+            return { success: true, ...result };
+        } catch (error) {
+            throw new HttpException(
+                error.message || 'Failed to trigger sync',
+                HttpStatus.INTERNAL_SERVER_ERROR,
+            );
+        }
+    }
+
+    /**
+     * GET /rag/reports/:id
+     * Download a generated report
+     */
+    @Get('reports/:id')
+    async downloadReport(@Param('id') id: string, @Res() res: Response) {
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const reportsDir = path.join(process.cwd(), 'reports');
+            const reportPath = path.join(reportsDir, `${id}.txt`);
+
+            if (!fs.existsSync(reportPath)) {
+                throw new Error('Report not found');
+            }
+
+            const content = fs.readFileSync(reportPath, 'utf-8');
+            res.setHeader('Content-Type', 'text/plain');
+            res.setHeader('Content-Disposition', `attachment; filename="${id}.txt"`);
+            res.send(content);
+        } catch (error) {
+            throw new HttpException(
+                error.message || 'Report not found',
+                HttpStatus.NOT_FOUND,
             );
         }
     }

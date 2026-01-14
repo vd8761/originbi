@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { RagController } from './rag.controller';
 import { RagService } from './rag.service';
 import { EmbeddingsService } from './embeddings.service';
+import { SyncService } from './sync.service';
 import {
     Registration,
     AssessmentAttempt,
@@ -20,7 +21,7 @@ import {
         ]),
     ],
     controllers: [RagController],
-    providers: [RagService, EmbeddingsService],
-    exports: [RagService],
+    providers: [RagService, EmbeddingsService, SyncService],
+    exports: [RagService, SyncService],
 })
 export class RagModule { }

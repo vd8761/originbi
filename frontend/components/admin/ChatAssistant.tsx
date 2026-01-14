@@ -1,20 +1,14 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Download, Loader2, Bot, User, Sparkles } from 'lucide-react';
+import { Send, Bot, User, Loader2, Copy, Check, Trash2, Sparkles, MessageSquare, Zap } from 'lucide-react';
 
 interface Message {
     id: string;
     role: 'user' | 'assistant';
     content: string;
-    candidates?: Candidate[];
     timestamp: Date;
-}
-
-interface Candidate {
-    name: string;
-    score: number;
-    suitability: string;
+    isStreaming?: boolean;
 }
 
 interface ChatAssistantProps {
@@ -22,263 +16,365 @@ interface ChatAssistantProps {
     apiUrl?: string;
 }
 
+// Smooth typewriter effect
+const TypeWriter = ({ text, speed = 12, onDone }: { text: string; speed?: number; onDone?: () => void }) => {
+    const [display, setDisplay] = useState('');
+
+    useEffect(() => {
+        let i = 0;
+        const timer = setInterval(() => {
+            if (i < text.length) {
+                setDisplay(text.slice(0, i + 1));
+                i++;
+            } else {
+                clearInterval(timer);
+                onDone?.();
+            }
+        }, speed);
+        return () => clearInterval(timer);
+    }, [text, speed, onDone]);
+
+    return (
+        <>
+            {display}
+            {display.length < text.length && (
+                <span className="inline-block w-0.5 h-4 ml-0.5 bg-emerald-500 animate-pulse" />
+            )}
+        </>
+    );
+};
+
+// Enhanced content renderer with markdown support
+const RenderContent = ({ content, streaming, onDone }: { content: string; streaming?: boolean; onDone?: () => void }) => {
+    if (streaming) return <TypeWriter text={content} onDone={onDone} />;
+
+    const lines = content.split('\n');
+    return (
+        <div className="space-y-2 leading-relaxed">
+            {lines.map((line, i) => {
+                let processed: React.ReactNode = line;
+
+                // Bold text **text**
+                if (line.includes('**')) {
+                    processed = line.split(/(\*\*[^*]+\*\*)/g).map((part, j) =>
+                        part.startsWith('**') ? (
+                            <strong key={j} className="font-semibold text-gray-900">{part.slice(2, -2)}</strong>
+                        ) : part
+                    );
+                }
+
+                // Bullet points
+                if (line.trim().startsWith('•') || line.trim().startsWith('-')) {
+                    return (
+                        <div key={i} className="flex items-start gap-2.5 pl-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 flex-shrink-0" />
+                            <span className="text-gray-700">{typeof processed === 'string' ? processed.replace(/^[-•]\s*/, '') : processed}</span>
+                        </div>
+                    );
+                }
+
+                // Numbered lists
+                const numMatch = line.match(/^(\d+)\.\s/);
+                if (numMatch) {
+                    return (
+                        <div key={i} className="flex items-start gap-2.5 pl-1">
+                            <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-medium flex items-center justify-center flex-shrink-0 mt-0.5">
+                                {numMatch[1]}
+                            </span>
+                            <span className="text-gray-700">{line.replace(/^\d+\.\s/, '')}</span>
+                        </div>
+                    );
+                }
+
+                if (!line.trim()) return <div key={i} className="h-1.5" />;
+                return <p key={i} className="text-gray-700">{processed}</p>;
+            })}
+        </div>
+    );
+};
+
 export default function ChatAssistant({
     userRole = 'ADMIN',
     apiUrl = process.env.NEXT_PUBLIC_ADMIN_API_URL || 'http://localhost:4001'
 }: ChatAssistantProps) {
-    const [messages, setMessages] = useState<Message[]>([
-        {
-            id: '1',
-            role: 'assistant',
-            content: 'Hello! I\'m your AI assistant. I can help you find suitable candidates for roles, analyze assessment data, and answer questions. What would you like to know?',
-            timestamp: new Date(),
-        }
-    ]);
+    const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    };
+    const [loading, setLoading] = useState(false);
+    const [copied, setCopied] = useState<string | null>(null);
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => {
-        scrollToBottom();
+        scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    const sendMessage = async () => {
-        if (!input.trim() || isLoading) return;
+    useEffect(() => {
+        inputRef.current?.focus();
+    }, []);
 
-        const userMessage: Message = {
-            id: Date.now().toString(),
+    const copyText = (text: string, id: string) => {
+        navigator.clipboard.writeText(text);
+        setCopied(id);
+        setTimeout(() => setCopied(null), 2000);
+    };
+
+    const handleSend = async () => {
+        if (!input.trim() || loading) return;
+
+        const userMsg: Message = {
+            id: `u-${Date.now()}`,
             role: 'user',
             content: input.trim(),
             timestamp: new Date(),
         };
 
-        setMessages(prev => [...prev, userMessage]);
+        setMessages(prev => [...prev, userMsg]);
         setInput('');
-        setIsLoading(true);
+        setLoading(true);
+
+        const botId = `a-${Date.now()}`;
 
         try {
-            const response = await fetch(`${apiUrl}/rag/query`, {
+            const res = await fetch(`${apiUrl}/rag/query`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ question: userMessage.content }),
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question: userMsg.content }),
             });
 
-            if (!response.ok) {
-                throw new Error('Failed to get response');
-            }
-
-            const data = await response.json();
-
-            const assistantMessage: Message = {
-                id: (Date.now() + 1).toString(),
-                role: 'assistant',
-                content: data.answer || 'I apologize, but I couldn\'t process your request.',
-                candidates: data.candidates,
-                timestamp: new Date(),
-            };
-
-            setMessages(prev => [...prev, assistantMessage]);
-        } catch (error) {
-            console.error('Error:', error);
-            const errorMessage: Message = {
-                id: (Date.now() + 1).toString(),
-                role: 'assistant',
-                content: 'Sorry, I encountered an error. Please try again.',
-                timestamp: new Date(),
-            };
-            setMessages(prev => [...prev, errorMessage]);
+            const data = await res.json();
+            // Add assistant message with content directly
+            setMessages(prev => [...prev, { 
+                id: botId, 
+                role: 'assistant', 
+                content: data.answer || 'Sorry, I could not process that request.', 
+                timestamp: new Date(), 
+                isStreaming: true 
+            }]);
+        } catch {
+            // Add error message directly
+            setMessages(prev => [...prev, { 
+                id: botId, 
+                role: 'assistant', 
+                content: 'Unable to connect. Please check your connection and try again.', 
+                timestamp: new Date(), 
+                isStreaming: false 
+            }]);
         } finally {
-            setIsLoading(false);
+            setLoading(false);
         }
     };
 
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
+    const finishStreaming = (id: string) => {
+        setMessages(prev => prev.map(m => m.id === id ? { ...m, isStreaming: false } : m));
     };
 
-    const downloadPdf = async (question: string) => {
-        try {
-            const response = await fetch(`${apiUrl}/rag/query/pdf`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ question }),
-            });
+    const clearChat = () => setMessages([]);
 
-            if (!response.ok) throw new Error('Failed to generate PDF');
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `report-${Date.now()}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error('PDF download error:', error);
-        }
-    };
-
-    const getSuitabilityColor = (suitability: string) => {
-        if (suitability.includes('Highly')) return 'text-green-400 bg-green-500/20';
-        if (suitability.includes('Suitable')) return 'text-blue-400 bg-blue-500/20';
-        if (suitability.includes('Moderate')) return 'text-yellow-400 bg-yellow-500/20';
-        return 'text-gray-400 bg-gray-500/20';
-    };
+    const suggestions = [
+        { icon: '👥', text: 'How many users registered?' },
+        { icon: '💼', text: 'List all career roles' },
+        { icon: '📚', text: 'Show available courses' },
+        { icon: '📊', text: 'Generate summary report' },
+    ];
 
     return (
-        <div className="flex flex-col h-[600px] bg-gradient-to-br from-[#0a0a1a] to-[#1a1a2e] rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
-            {/* Header */}
-            <div className="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-[#150089]/50 to-[#4a00e0]/30 border-b border-white/10">
-                <div className="p-2 bg-gradient-to-br from-[#150089] to-[#4a00e0] rounded-xl">
-                    <Sparkles className="w-5 h-5 text-white" />
+        <div className="flex flex-col h-full w-full bg-white overflow-hidden">
+            {/* Compact Header - Responsive */}
+            <div className="flex items-center justify-between px-3 sm:px-4 md:px-6 py-2 sm:py-3 bg-white border-b border-gray-100 flex-shrink-0">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className="relative flex-shrink-0">
+                        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 flex items-center justify-center shadow-md shadow-emerald-500/20">
+                            <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+                        </div>
+                        <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-emerald-400 rounded-full border-2 border-white" />
+                    </div>
+                    <div className="min-w-0">
+                        <h1 className="text-gray-900 font-semibold text-xs sm:text-sm truncate">OriginBI Assistant</h1>
+                        <div className="flex items-center gap-1">
+                            <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+                            <span className="text-gray-400 text-[9px] sm:text-[10px] font-medium">Online</span>
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <h3 className="text-white font-semibold">AI Assistant</h3>
-                    <p className="text-white/60 text-xs">
-                        Ask about employees, roles, or assessments
-                    </p>
-                </div>
-                <div className="ml-auto px-3 py-1 bg-white/10 rounded-full text-xs text-white/80">
-                    {userRole}
+                <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                    {messages.length > 0 && (
+                        <button
+                            onClick={clearChat}
+                            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all text-[10px] sm:text-xs font-medium"
+                        >
+                            <Trash2 className="w-3 h-3" />
+                            <span className="hidden sm:inline">Clear</span>
+                        </button>
+                    )}
+                    <div className="px-2 sm:px-2.5 py-0.5 sm:py-1 text-[9px] sm:text-[10px] font-semibold text-emerald-600 bg-emerald-50 rounded-full">
+                        {userRole}
+                    </div>
                 </div>
             </div>
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.map((message) => (
-                    <div
-                        key={message.id}
-                        className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                        {message.role === 'assistant' && (
-                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#150089] to-[#4a00e0] flex items-center justify-center flex-shrink-0">
-                                <Bot className="w-4 h-4 text-white" />
-                            </div>
-                        )}
+            {/* Chat Area */}
+            <div className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-50/50 to-white">
+                {messages.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-12">
+                        {/* Welcome Section */}
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-2xl sm:rounded-[1.5rem] md:rounded-[2rem] bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 flex items-center justify-center mb-6 sm:mb-8 shadow-2xl shadow-emerald-500/30">
+                            <Bot className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-white" />
+                        </div>
+                        
+                        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-2 sm:mb-3 tracking-tight text-center">
+                            How can I help you?
+                        </h2>
+                        <p className="text-gray-500 text-center max-w-md mb-6 sm:mb-10 text-sm sm:text-base px-4">
+                            Ask questions about your data, generate reports, or explore insights from your database.
+                        </p>
 
-                        <div
-                            className={`max-w-[80%] rounded-2xl px-4 py-3 ${message.role === 'user'
-                                    ? 'bg-gradient-to-r from-[#150089] to-[#4a00e0] text-white'
-                                    : 'bg-white/5 text-white/90 border border-white/10'
-                                }`}
-                        >
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                                {message.content}
-                            </p>
-
-                            {/* Candidates list */}
-                            {message.candidates && message.candidates.length > 0 && (
-                                <div className="mt-3 space-y-2">
-                                    <p className="text-xs text-white/60 uppercase tracking-wide">
-                                        Matching Candidates
-                                    </p>
-                                    {message.candidates.map((candidate, idx) => (
-                                        <div
-                                            key={idx}
-                                            className="flex items-center justify-between p-2 bg-white/5 rounded-lg"
-                                        >
-                                            <span className="text-sm font-medium">{candidate.name}</span>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-bold text-green-400">
-                                                    {candidate.score}%
-                                                </span>
-                                                <span className={`text-xs px-2 py-1 rounded-full ${getSuitabilityColor(candidate.suitability)}`}>
-                                                    {candidate.suitability}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    ))}
-
-                                    {/* Download PDF button */}
-                                    <button
-                                        onClick={() => downloadPdf(messages[messages.indexOf(message) - 1]?.content || '')}
-                                        className="flex items-center gap-2 mt-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs text-white/80 transition-colors"
-                                    >
-                                        <Download className="w-3 h-3" />
-                                        Download as PDF
-                                    </button>
-                                </div>
-                            )}
+                        {/* Suggestion Cards - Responsive Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 max-w-xl w-full px-2">
+                            {suggestions.map((s, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => setInput(s.text)}
+                                    className="group flex items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-white hover:bg-emerald-50 border border-gray-100 hover:border-emerald-200 text-left transition-all duration-200 shadow-sm hover:shadow-md"
+                                >
+                                    <span className="text-xl sm:text-2xl">{s.icon}</span>
+                                    <span className="text-gray-600 group-hover:text-gray-900 text-xs sm:text-sm font-medium">{s.text}</span>
+                                </button>
+                            ))}
                         </div>
 
-                        {message.role === 'user' && (
-                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
-                                <User className="w-4 h-4 text-white" />
+                        {/* Feature Pills */}
+                        <div className="flex items-center gap-2 mt-6 sm:mt-10">
+                            <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 bg-gray-100 rounded-full text-[10px] sm:text-xs text-gray-500 font-medium">
+                                <Zap className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                                Fast Responses
                             </div>
-                        )}
+                            <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 bg-gray-100 rounded-full text-[10px] sm:text-xs text-gray-500 font-medium">
+                                <MessageSquare className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                                Natural Language
+                            </div>
+                        </div>
                     </div>
-                ))}
+                ) : (
+                    <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+                        {messages.map(m => (
+                            <div key={m.id} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                                {/* Avatar */}
+                                <div className={`flex-shrink-0 ${m.role === 'user' ? 'mt-1' : ''}`}>
+                                    {m.role === 'assistant' ? (
+                                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-md shadow-emerald-500/20">
+                                            <Bot className="w-5 h-5 text-white" />
+                                        </div>
+                                    ) : (
+                                        <div className="w-9 h-9 rounded-xl bg-gray-900 flex items-center justify-center">
+                                            <User className="w-5 h-5 text-white" />
+                                        </div>
+                                    )}
+                                </div>
 
-                {isLoading && (
-                    <div className="flex gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#150089] to-[#4a00e0] flex items-center justify-center">
-                            <Bot className="w-4 h-4 text-white" />
-                        </div>
-                        <div className="bg-white/5 rounded-2xl px-4 py-3 border border-white/10">
-                            <div className="flex items-center gap-2 text-white/60">
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span className="text-sm">Thinking...</span>
+                                {/* Message Bubble */}
+                                <div className={`group flex flex-col max-w-[80%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                    <div className={`rounded-2xl px-4 py-3 ${
+                                        m.role === 'user'
+                                            ? 'bg-white border border-gray-100 shadow-sm'
+                                            : 'bg-white border border-gray-100 shadow-sm'
+                                    }`}>
+                                        {m.role === 'assistant' ? (
+                                            <RenderContent
+                                                content={m.content}
+                                                streaming={m.isStreaming}
+                                                onDone={() => finishStreaming(m.id)}
+                                            />
+                                        ) : (
+                                            <p className="text-[15px] text-gray-900">{m.content}</p>
+                                        )}
+                                    </div>
+
+                                    {/* Message Actions */}
+                                    {m.role === 'assistant' && m.content && !m.isStreaming && (
+                                        <div className="flex items-center gap-3 mt-2 px-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={() => copyText(m.content, m.id)}
+                                                className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                                            >
+                                                {copied === m.id ? (
+                                                    <>
+                                                        <Check className="w-3 h-3 text-emerald-500" />
+                                                        <span className="text-emerald-500">Copied</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Copy className="w-3 h-3" />
+                                                        <span>Copy</span>
+                                                    </>
+                                                )}
+                                            </button>
+                                            <span className="text-xs text-gray-300">
+                                                {m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
+                        ))}
+
+                        {/* Loading State */}
+                        {loading && (
+                            <div className="flex gap-3">
+                                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-md shadow-emerald-500/20">
+                                    <Bot className="w-5 h-5 text-white" />
+                                </div>
+                                <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 shadow-sm">
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex gap-1">
+                                            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                        </div>
+                                        <span className="text-gray-400 text-sm ml-1">Analyzing...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div ref={scrollRef} />
                     </div>
                 )}
-
-                <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
-            <div className="p-4 border-t border-white/10 bg-white/5">
-                <div className="flex gap-3">
-                    <input
-                        type="text"
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        placeholder="Ask about Team Lead candidates, scores..."
-                        className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-[#150089] focus:border-transparent transition-all"
-                        disabled={isLoading}
-                    />
-                    <button
-                        onClick={sendMessage}
-                        disabled={isLoading || !input.trim()}
-                        className="px-4 py-3 bg-gradient-to-r from-[#150089] to-[#4a00e0] rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-                    >
-                        {isLoading ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                        ) : (
-                            <Send className="w-5 h-5" />
-                        )}
-                    </button>
-                </div>
-
-                {/* Quick actions */}
-                <div className="flex gap-2 mt-3 flex-wrap">
-                    {[
-                        'Who is suitable for Team Lead?',
-                        'Find Software Engineers',
-                        'Show high performers',
-                    ].map((suggestion) => (
+            {/* Input Area - Responsive */}
+            <div className="bg-white px-3 sm:px-4 md:px-6 py-3 sm:py-4 flex-shrink-0 border-t border-gray-50">
+                <div className="max-w-4xl mx-auto">
+                    <div className="flex items-end gap-2 sm:gap-3 p-1.5 sm:p-2 bg-gray-50 rounded-xl sm:rounded-2xl border border-gray-200 focus-within:border-emerald-300 focus-within:bg-white focus-within:shadow-lg focus-within:shadow-emerald-500/5 transition-all duration-200">
+                        <textarea
+                            ref={inputRef}
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSend();
+                                }
+                            }}
+                            placeholder="Ask anything about your data..."
+                            rows={1}
+                            className="flex-1 bg-transparent px-2 sm:px-3 py-2 sm:py-2.5 text-gray-900 placeholder-gray-400 resize-none focus:outline-none text-sm sm:text-[15px]"
+                            disabled={loading}
+                        />
                         <button
-                            key={suggestion}
-                            onClick={() => setInput(suggestion)}
-                            className="text-xs px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-white/60 hover:text-white transition-all"
+                            onClick={handleSend}
+                            disabled={loading || !input.trim()}
+                            className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:from-gray-200 disabled:to-gray-200 rounded-lg sm:rounded-xl text-white disabled:text-gray-400 transition-all duration-200 shadow-md shadow-emerald-500/20 disabled:shadow-none"
                         >
-                            {suggestion}
+                            {loading ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Send className="w-4 h-4" />
+                            )}
                         </button>
-                    ))}
+                    </div>
+                    <p className="text-center text-[10px] sm:text-xs text-gray-400 mt-2 sm:mt-3 hidden sm:block">
+                        OriginBI Assistant can make mistakes. Verify important information.
+                    </p>
                 </div>
             </div>
         </div>
