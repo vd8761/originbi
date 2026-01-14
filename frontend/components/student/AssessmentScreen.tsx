@@ -506,7 +506,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     if (isLocked) status = 'locked';
 
     return {
-      label: isLocked ? 'Locked' : assessment.title,
+      label: assessment.title,
       status,
       progress: Math.round(
         (assessment.completedQuestions / assessment.totalQuestions) * 100

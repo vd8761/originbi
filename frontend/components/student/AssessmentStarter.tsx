@@ -453,7 +453,10 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
 
   // Derive Display Text based on Language
   const getDisplayText = (enText: string, taText?: string) => {
-    return language === "TAM" && taText ? taText : enText;
+    const raw = language === "TAM" && taText ? taText : enText;
+    if (!raw) return "";
+    // Remove ALL backslashes to ensure clean text (Aggressive fix)
+    return raw.replace(/\\/g, '');
   };
 
   const displayQuestionText = currentQuestion ? getDisplayText(currentQuestion.textEn, currentQuestion.textTa) : "";

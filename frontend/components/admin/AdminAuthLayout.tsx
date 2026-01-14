@@ -57,7 +57,7 @@ const AdminAuthLayout: React.FC<AdminAuthLayoutProps> = ({ children, heroTitle, 
 
                 {/* Right Panel - Auth Form with Theme Background */}
                 <div className="w-full lg:w-1/2 xl:w-5/12 relative flex flex-col h-full z-10 bg-white/90 dark:bg-[#0F1115]/90 backdrop-blur-xl transition-colors duration-500 bg-cover bg-center bg-no-repeat bg-[url('/Background_Light_Theme.svg')] dark:bg-[url('/Background_Dark_Theme.svg')]">
-                    <div className="flex flex-col h-full w-full items-center p-6 lg:p-8 xl:p-12 overflow-y-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
+                    <div className="flex flex-col h-full w-full items-center p-6 lg:p-8 xl:p-12 overflow-y-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none] lg:[zoom:0.8]">
 
                         {/* Header Actions */}
                         <div className="w-full max-w-md flex justify-between items-center shrink-0">
