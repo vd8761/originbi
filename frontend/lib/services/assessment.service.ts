@@ -18,7 +18,8 @@ export interface AssessmentSession {
     };
     program?: {
         name: string;
-        assessment_title: string;
+        assessment_title?: string;
+        assessmentTitle?: string;
     };
     registration?: {
         fullName?: string;
@@ -35,6 +36,8 @@ export interface AssessmentSession {
     groupId?: number;
     isReportReady?: boolean;
     metadata?: any;
+    currentAttempt?: any;
+    attempts?: any[];
 }
 
 export const assessmentService = {
