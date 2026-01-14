@@ -9,6 +9,7 @@ import {
     OpenQuestion,
     OpenQuestionOption,
     AssessmentLevel,
+    PersonalityTrait,
 } from '@originbi/shared-entities';
 import { AssessmentGenerationService } from './assessment-generation.service';
 
@@ -23,6 +24,7 @@ import { AssessmentGenerationService } from './assessment-generation.service';
             OpenQuestion,
             OpenQuestionOption,
             AssessmentLevel,
+            PersonalityTrait,
         ]),
     ],
     providers: [AssessmentGenerationService],

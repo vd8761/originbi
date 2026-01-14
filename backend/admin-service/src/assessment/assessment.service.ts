@@ -286,7 +286,7 @@ export class AssessmentService {
       // Fetch all attempts for the session to populate level-wise reports
       const attempts = await this.attemptRepo.find({
         where: { assessmentSessionId: id },
-        relations: ['assessmentLevel'],
+        relations: ['assessmentLevel', 'dominantTrait'],
         order: { assessmentLevelId: 'ASC' },
       });
 

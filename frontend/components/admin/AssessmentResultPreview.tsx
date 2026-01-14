@@ -86,13 +86,19 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
     // Tab Accessibility
     const isTabAccessible = (index: number) => {
         if (index === 0) return true; // Report always active
-        if (!isStarted) return false;
         if (status === 'COMPLETED') return true;
 
-        // For IN_PROGRESS
-        // If index is 1 (Level 1), it is accessible if currentLvl > 1 (meaning level 1 is done)
-        // If index is 2 (Level 2), it is accessible if currentLvl > 2 (meaning level 2 is done)
-        return currentLvl > index;
+        // Find the level corresponding to this tab index (1-based index)
+        const level = levels[index - 1];
+        if (!level) return false;
+
+        // Check if there is a COMPLETED attempt for this level
+        const attempt = session?.attempts?.find((a: any) => {
+            const attemptLevelId = a.assessmentLevelId ?? (a.assessmentLevel ? a.assessmentLevel.id : null);
+            return String(attemptLevelId) === String(level.id);
+        });
+
+        return attempt?.status === 'COMPLETED';
     };
 
     // Correctly map data from the fresh session object
@@ -113,7 +119,7 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
 
 
     // Renderers
-    const renderStatsBar = (attemptData?: any) => {
+    const renderStatsBar = (attemptData?: any, levelData?: any) => {
         // Use status from attemptData if available, otherwise fallback to session status
         const currentStatus = attemptData?.status || status;
 
@@ -133,14 +139,29 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                             : formatDate(attemptData?.completedAt) || '-'}
                     </p>
                 </div>
-                {/* Mock Data for now as backend doesn't seem to track duration/questions yet in this object */}
                 <div>
                     <p className="text-xs text-gray-400 mb-1">Total Exam Duration</p>
-                    <p className="text-sm font-semibold">--</p>
+                    <p className="text-sm font-semibold">
+                        {levelData?.durationMinutes ? `${levelData.durationMinutes} Minutes` : '--'}
+                    </p>
                 </div>
                 <div>
-                    <p className="text-xs text-gray-400 mb-1">Questions Attempted</p>
-                    <p className="text-sm font-semibold">--</p>
+                    <p className="text-xs text-gray-400 mb-1">Maximum Score</p>
+                    <p className="text-sm font-semibold">
+                        {levelData?.maxScore ?? '--'}
+                    </p>
+                </div>
+                <div>
+                    <p className="text-xs text-gray-400 mb-1">Sincerity Index</p>
+                    <p className="text-sm font-semibold">
+                        {attemptData?.sincerityIndex || attemptData?.sincerity_index ? `${attemptData.sincerityIndex || attemptData.sincerity_index}%` : '--'}
+                    </p>
+                </div>
+                <div>
+                    <p className="text-xs text-gray-400 mb-1">Sincerity Class</p>
+                    <p className="text-sm font-semibold">
+                        {attemptData?.sincerityClass || attemptData?.sincerity_class || '--'}
+                    </p>
                 </div>
                 <div>
                     <p className="text-xs text-gray-400 mb-1">Exam Status</p>
@@ -222,11 +243,11 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
         </div>
     );
 
-    const renderLevelReport = (title: string, breakdown: any[], compatibility: any, levelAttempt?: any) => (
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-6">
+    const renderLevelReport = (title: string, breakdown: any[], compatibility: any, levelAttempt?: any, levelData?: any, hideStats: boolean = false) => (
+        <div className={`grid grid-cols-1 ${hideStats ? '' : 'xl:grid-cols-[1fr_300px]'} gap-6`}>
             <div className="flex flex-col gap-6">
                 {/* Pass specific level attempt if available. Do not fallback to current session attempt for level reports. */}
-                {renderStatsBar(levelAttempt)}
+                {!hideStats && renderStatsBar(levelAttempt, levelData)}
 
                 {/* Breakdown Table */}
                 <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6">
@@ -236,7 +257,7 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                             <thead>
                                 <tr className="bg-[#FFFFFF0D] text-brand-green">
                                     <th className="py-3 px-4 text-left font-medium rounded-l-lg">{title} Value</th>
-                                    <th className="py-3 px-4 text-center font-medium">Score (Out of 25)</th>
+                                    <th className="py-3 px-4 text-center font-medium">Score</th>
                                     <th className="py-3 px-4 text-right font-medium rounded-r-lg">Behavioral Note</th>
                                 </tr>
                             </thead>
@@ -249,11 +270,17 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                                     </tr>
                                 ))}
                             </tbody>
-                            <tfoot>
-                                <tr className="bg-[#1ED36A]/20 text-brand-green font-bold">
+                            <tfoot className="bg-[#1ED36A]/20 text-brand-green font-bold">
+                                <tr>
                                     <td className="py-3 px-4 rounded-l-lg" colSpan={3}>
                                         <div className="flex justify-center w-full">
-                                            Total ({title}) – {compatibility.totalScore}
+                                            {levelAttempt?.dominantTrait ? (
+                                                <>
+                                                    {levelAttempt.dominantTrait.code} : {levelAttempt.dominantTrait.blendedStyleName}
+                                                </>
+                                            ) : (
+                                                `Total (${title}) – ${compatibility.totalScore}`
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -262,55 +289,58 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                     </div>
                 </div>
 
-                {/* Compatibility Index */}
-                <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6">
-                    <h3 className="text-sm font-semibold mb-4">{title} SCORE</h3>
-                    <div className="overflow-x-auto border border-white/10 rounded-lg">
-                        <table className="w-full text-sm">
-                            {/* ... (Existing table content) ... */}
-                            <thead>
-                                <tr className="bg-[#FFFFFF0D] text-brand-green border-b border-white/10">
-                                    <th className="py-3 px-4 text-left font-medium w-1/3 border-r border-white/10">Parameter</th>
-                                    <th className="py-3 px-4 text-left font-medium">Description</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/10">
-                                <tr>
-                                    <td className="py-4 px-4 border-r border-white/10 text-gray-300">Total Score:</td>
-                                    <td className="py-4 px-4">{compatibility.totalScore}</td>
-                                </tr>
-                                <tr>
-                                    <td className="py-4 px-4 border-r border-white/10 text-gray-300">Level:</td>
-                                    <td className="py-4 px-4">{compatibility.level}</td>
-                                </tr>
-                                <tr>
-                                    <td className="py-4 px-4 border-r border-white/10 text-gray-300">Compatibility Tag:</td>
-                                    <td className="py-4 px-4">{compatibility.tag}</td>
-                                </tr>
-                                <tr>
-                                    <td className="py-4 px-4 border-r border-white/10 text-gray-300">Interpretation:</td>
-                                    <td className="py-4 px-4">{compatibility.interpretation}</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                {/* Compatibility Index - ONLY FOR ACI */}
+                {title === 'ACI' && (
+                    <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6">
+                        <h3 className="text-sm font-semibold mb-4">Agile Compatibility Index (ACI) – Score Overview</h3>
+                        <div className="overflow-x-auto border border-white/10 rounded-lg">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="bg-[#FFFFFF0D] text-brand-green border-b border-white/10">
+                                        <th className="py-3 px-4 text-left font-medium w-1/3 border-r border-white/10">Parameter</th>
+                                        <th className="py-3 px-4 text-left font-medium">Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/10">
+                                    <tr>
+                                        <td className="py-4 px-4 border-r border-white/10 text-gray-300">Total Score:</td>
+                                        <td className="py-4 px-4">{compatibility.totalScore}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="py-4 px-4 border-r border-white/10 text-gray-300">Level:</td>
+                                        <td className="py-4 px-4">{compatibility.level}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="py-4 px-4 border-r border-white/10 text-gray-300">Compatibility Tag:</td>
+                                        <td className="py-4 px-4">{compatibility.tag}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="py-4 px-4 border-r border-white/10 text-gray-300">Interpretation:</td>
+                                        <td className="py-4 px-4">{compatibility.interpretation}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* Sidebar for Level Tabs (Same Sidebar) */}
-            <div className="flex flex-col gap-4">
-                <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6 flex flex-col gap-6 h-full">
-                    <SidebarItem label="Assessment Title" value={displayData.title} />
-                    <div className="grid grid-cols-1 gap-4">
-                        <SidebarItem label="Exam Published On" value={displayData.startsOn} />
-                        <SidebarItem label="Exam Expired On" value={displayData.endsOn} />
-                    </div>
-                    <div className="grid grid-cols-1 gap-4">
-                        <SidebarItem label="Program Level" value={displayData.program} />
-                        <SidebarItem label="Exam Type" value={displayData.type} />
+            {!hideStats && (
+                <div className="flex flex-col gap-4">
+                    <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6 flex flex-col gap-6 h-full">
+                        <SidebarItem label="Assessment Title" value={displayData.title} />
+                        <div className="grid grid-cols-1 gap-4">
+                            <SidebarItem label="Exam Published On" value={displayData.startsOn} />
+                            <SidebarItem label="Exam Expired On" value={displayData.endsOn} />
+                        </div>
+                        <div className="grid grid-cols-1 gap-4">
+                            <SidebarItem label="Program Level" value={displayData.program} />
+                            <SidebarItem label="Exam Type" value={displayData.type} />
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 
@@ -343,6 +373,21 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
 
 
     const renderOverallReport = () => {
+        // Find levels for displaying stats correctly even in Overall View
+        // Note: This relies on levels being fetched and named conventionally.
+        const discLevel = levels.find(l => l.patternType === 'DISC' || l.name === 'Behavioral Insight');
+        const aciLevel = levels.find(l => l.patternType === 'ACI' || l.name === 'ACI');
+
+        const discAttempt = session?.attempts?.find((a: any) =>
+            String(a.assessmentLevelId) === String(discLevel?.id) ||
+            (a.assessmentLevel && String(a.assessmentLevel.id) === String(discLevel?.id))
+        );
+
+        const aciAttempt = session?.attempts?.find((a: any) =>
+            String(a.assessmentLevelId) === String(aciLevel?.id) ||
+            (a.assessmentLevel && String(a.assessmentLevel.id) === String(aciLevel?.id))
+        );
+
         return (
             <div className="flex flex-col">
                 {renderBasicInfoCards()}
@@ -367,8 +412,16 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                 ) : (
                     // All Completed
                     <div className="flex flex-col gap-6">
-                        {renderLevelReport('DISC', discBreakdownData, discCompatibilityData)}
-                        {renderLevelReport('ACI', aciBreakdownData, aciCompatibilityData)}
+                        {(() => {
+                            const discData = getDiscData(discAttempt);
+                            const aciData = getAciData(aciAttempt);
+                            return (
+                                <>
+                                    {renderLevelReport('DISC', discData.breakdown, discData.compatibility, discAttempt, discLevel, true)}
+                                    {renderLevelReport('ACI', aciData.breakdown, aciData.compatibility, aciAttempt, aciLevel, true)}
+                                </>
+                            );
+                        })()}
                     </div>
                 )}
             </div>
@@ -479,63 +532,11 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                     const isDisc = level?.pattern_type === 'DISC' || level?.patternType === 'DISC' || level?.name.toLowerCase().includes('disc') || level?.name === 'Behavioral Insight';
 
                     if (isDisc) {
-                        let breakdown = discBreakdownData;
-                        let compatibility = discCompatibilityData;
-
-                        if (attempt && attempt.metadata?.disc_scores) {
-                            const scores = attempt.metadata.disc_scores;
-                            breakdown = [
-                                { value: 'Dominance', score: scores['D'] || '-', note: 'Direct and decisive.' },
-                                { value: 'Influence', score: scores['I'] || '-', note: 'Enthusiastic and persuasive.' },
-                                { value: 'Steadiness', score: scores['S'] || '-', note: 'Patient and reliable.' },
-                                { value: 'Compliance', score: scores['C'] || '-', note: 'Precise and analytical.' },
-                            ];
-
-                            // Compatibility from table columns or metadata
-                            compatibility = {
-                                totalScore: attempt.totalScore || attempt.metadata.disc_scores?.total || scores['total'] || '0',
-                                level: attempt.sincerityClass || '-',
-                                tag: '-', // Not available in provided data
-                                interpretation: '-' // Not available in provided data
-                            };
-                            if (compatibility.totalScore) {
-                                // Add / 125 if it's just a number
-                                if (!String(compatibility.totalScore).includes('/')) {
-                                    compatibility.totalScore = `${compatibility.totalScore} / 125`;
-                                }
-                            }
-                        }
-
-                        return renderLevelReport('DISC', breakdown, compatibility, attempt);
+                        const { breakdown, compatibility } = getDiscData(attempt);
+                        return renderLevelReport('DISC', breakdown, compatibility, attempt, level);
                     } else {
-                        // ACI Logic
-                        let breakdown = aciBreakdownData;
-                        let compatibility = aciCompatibilityData;
-
-                        if (attempt && (attempt.metadata?.aci_scores || attempt.metadata?.scores)) {
-                            const scores = attempt.metadata.aci_scores || attempt.metadata.scores || {};
-                            breakdown = [
-                                { value: 'Commitment', score: scores['Commitment'] || scores['commitment'] || '-', note: 'Deeply dedicated and consistent.' },
-                                { value: 'Focus', score: scores['Focus'] || scores['focus'] || '-', note: 'Exceptionally attentive to detail and priority.' },
-                                { value: 'Openness', score: scores['Openness'] || scores['openness'] || '-', note: 'Learning to adapt and welcome diverse approaches.' },
-                                { value: 'Respect', score: scores['Respect'] || scores['respect'] || '-', note: 'Professional tone with scope to show empathy.' },
-                                { value: 'Courage', score: scores['Courage'] || scores['courage'] || '-', note: 'Honest and principled; leads through integrity.' },
-                            ];
-
-                            compatibility = {
-                                totalScore: attempt.totalScore || scores['total'] || '0',
-                                level: attempt.sincerityClass || '-',
-                                tag: '-', // Not available in provided data
-                                interpretation: '-' // Not available in provided data
-                            };
-                            if (compatibility.totalScore) {
-                                if (!String(compatibility.totalScore).includes('/')) {
-                                    compatibility.totalScore = `${compatibility.totalScore} / 125`;
-                                }
-                            }
-                        }
-
-                        return renderLevelReport('ACI', breakdown, compatibility, attempt);
+                        const { breakdown, compatibility } = getAciData(attempt);
+                        return renderLevelReport('ACI', breakdown, compatibility, attempt, level);
                     }
                 })()
             }
@@ -554,6 +555,81 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
         </div>
     );
 };
+// Helper to extract DISC data
+const getDiscData = (attempt: any) => {
+    let breakdown = [
+        { value: 'Dominance', score: '-', note: 'Direct and decisive.' },
+        { value: 'Influence', score: '-', note: 'Enthusiastic and persuasive.' },
+        { value: 'Steadiness', score: '-', note: 'Patient and reliable.' },
+        { value: 'Compliance', score: '-', note: 'Precise and analytical.' },
+    ];
+    let compatibility = {
+        totalScore: '0 / 125',
+        level: '-',
+        tag: '-',
+        interpretation: '-'
+    };
+
+    if (attempt && attempt.metadata?.disc_scores) {
+        const scores = attempt.metadata.disc_scores;
+        breakdown = [
+            { value: 'Dominance', score: scores['D'] || '-', note: 'Direct and decisive.' },
+            { value: 'Influence', score: scores['I'] || '-', note: 'Enthusiastic and persuasive.' },
+            { value: 'Steadiness', score: scores['S'] || '-', note: 'Patient and reliable.' },
+            { value: 'Compliance', score: scores['C'] || '-', note: 'Precise and analytical.' },
+        ];
+
+        const rawTotal = attempt.totalScore || attempt.metadata.disc_scores?.total || scores['total'] || '0';
+        compatibility = {
+            totalScore: String(rawTotal).includes('/') ? rawTotal : `${rawTotal} / 125`,
+            level: attempt.sincerityClass || '-',
+            tag: '-',
+            interpretation: '-'
+        };
+    }
+    return { breakdown, compatibility };
+};
+
+// Helper to extract ACI data
+const getAciData = (attempt: any) => {
+    let breakdown = [
+        { value: 'Commitment', score: '-', note: 'Deeply dedicated and consistent.' },
+        { value: 'Focus', score: '-', note: 'Exceptionally attentive to detail and priority.' },
+        { value: 'Openness', score: '-', note: 'Learning to adapt and welcome diverse approaches.' },
+        { value: 'Respect', score: '-', note: 'Professional tone with scope to show empathy.' },
+        { value: 'Courage', score: '-', note: 'Honest and principled; leads through integrity.' },
+    ];
+    let compatibility = {
+        totalScore: '0 / 125',
+        level: '-',
+        tag: '-',
+        interpretation: '-'
+    };
+
+    const scores = attempt?.metadata?.agile_scores || attempt?.metadata?.aci_scores || attempt?.metadata?.scores;
+
+    if (attempt && scores) {
+        breakdown = [
+            { value: 'Commitment', score: scores['Commitment'] || scores['commitment'] || '-', note: 'Deeply dedicated and consistent.' },
+            { value: 'Focus', score: scores['Focus'] || scores['focus'] || '-', note: 'Exceptionally attentive to detail and priority.' },
+            { value: 'Openness', score: scores['Openness'] || scores['openness'] || '-', note: 'Learning to adapt and welcome diverse approaches.' },
+            { value: 'Respect', score: scores['Respect'] || scores['respect'] || '-', note: 'Professional tone with scope to show empathy.' },
+            { value: 'Courage', score: scores['Courage'] || scores['courage'] || '-', note: 'Honest and principled; leads through integrity.' },
+        ];
+
+        const rawTotal = scores['total'] || attempt.totalScore || '0';
+        const trait = attempt.dominantTrait;
+
+        compatibility = {
+            totalScore: String(rawTotal).includes('/') ? rawTotal : `${rawTotal} / 125`,
+            level: trait?.blendedStyleName || attempt.sincerityClass || '-',
+            tag: trait?.blendedStyleDesc || '-',
+            interpretation: trait?.metadata?.interpretation || '-'
+        };
+    }
+    return { breakdown, compatibility };
+};
+
 // ... (export and SidebarItem helper remain)
 
 const SidebarItem = ({ label, value, small }: { label: string, value: string, small?: boolean }) => (
