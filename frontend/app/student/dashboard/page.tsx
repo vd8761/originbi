@@ -3,13 +3,18 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
+import { signOut } from 'aws-amplify/auth';
+import { configureAmplify } from '@/lib/aws-amplify-config';
+import RequireStudent from '@/components/auth/RequireStudent';
+
+configureAmplify();
 import DashboardLayout from '@/components/student/DashboardLayout';
 
 export default function StudentDashboardPage() {
   const router = useRouter();
 
-  const handleLogout = () => {
-    // Later you can clear auth, etc.
+  const handleLogout = async () => {
+    try { await signOut(); } catch { /* ignore */ }
     router.push('/student/login');
   };
 
@@ -22,10 +27,12 @@ export default function StudentDashboardPage() {
   };
 
   return (
-    <DashboardLayout
-      onLogout={handleLogout}
-      currentView="dashboard"
-      onNavigate={handleNavigate}
-    />
+    <RequireStudent>
+      <DashboardLayout
+        onLogout={handleLogout}
+        currentView="dashboard"
+        onNavigate={handleNavigate}
+      />
+    </RequireStudent>
   );
 }

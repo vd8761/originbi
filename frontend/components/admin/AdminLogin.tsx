@@ -27,7 +27,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({
       <LoginForm
         onLoginSuccess={onLoginSuccess}
         portalMode="admin"
-        buttonClass="bg-brand-green hover:bg-brand-green/90 text-black font-bold h-12 shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_30px_rgba(34,197,94,0.5)] border border-brand-green/50"
+        buttonClass="bg-brand-green hover:bg-brand-green/90 text-black font-bold shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_30px_rgba(34,197,94,0.5)] border border-brand-green/50"
       />
 
       <div className="mt-0 text-center">

@@ -17,8 +17,8 @@ interface LoginFormProps {
 
 const LoginForm: React.FC<LoginFormProps> = ({
   onLoginSuccess,
-  buttonClass = 'bg-brand-green hover:bg-brand-green/90 focus:ring-brand-green/30',
-  portalMode = 'student',
+  buttonClass: _buttonClass,
+  portalMode: _portalMode,
 }) => {
   const router = useRouter();
   const [passwordVisible, setPasswordVisible] = useState(false);
