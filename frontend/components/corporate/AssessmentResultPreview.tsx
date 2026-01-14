@@ -1,42 +1,40 @@
 
 import React, { useEffect, useState } from 'react';
-import { AssessmentSession } from '@/lib/services/assessment.service';
-import { assessmentService } from '@/lib/services/assessment.service';
+import { AssessmentSession, assessmentService } from '@/lib/services/assessment.service';
 import {
     ArrowLeftWithoutLineIcon,
     ArrowRightWithoutLineIcon,
-    CalendarIcon,
-    CheckIcon,
-    ClockIcon,
-    EmailIcon,
-    JobsIcon,
     LockIcon,
+    CheckIcon,
+    CalendarIcon,
+    EmailIcon,
     ProfileIcon,
-    BanIcon,
+    JobsIcon,
+    ClockIcon
 } from '@/components/icons';
 
 interface AssessmentResultPreviewProps {
-    session: AssessmentSession;
+    session: AssessmentSession | null;
     onBack: () => void;
 }
 
-const InfoItem = ({ icon: Icon, label, value }: { icon: any, label: string, value: string | React.ReactNode }) => (
-    <div className="flex items-center gap-3 p-3 bg-black/20 rounded-xl border border-white/5">
-        <div className="p-2 bg-white/5 rounded-lg">
-            <Icon className="w-4 h-4 text-gray-400" />
+// Helper Component for Info Items
+const InfoItem = ({ icon: Icon, label, value, className = "" }: { icon: any, label: string, value: React.ReactNode, className?: string }) => (
+    <div className={`flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/5 ${className}`}>
+        <div className="p-2 rounded-lg bg-white/10 text-brand-green flex-shrink-0">
+            <Icon className="w-4 h-4" />
         </div>
         <div>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</p>
-            <p className="text-xs font-semibold text-gray-200 mt-0.5">{value}</p>
+            <p className="text-xs text-gray-400 mb-0.5">{label}</p>
+            <div className="text-sm font-medium text-gray-200 break-all">{value}</div>
         </div>
     </div>
 );
 
-const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = ({ session: initialSession, onBack }) => {
+// ... (Top of file remains similar, updating imports if needed)
 
-    // Manage local session state to support refetching or just using props
-    // Ideally we might want to fetch fresh details if just an ID was passed, 
-    // but here we have the full object. We'll use the prop as initial state.
+const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ session: initialSession, onBack }) => {
+
     const [session, setSession] = useState<AssessmentSession | null>(initialSession);
     const [levels, setLevels] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState(0);
@@ -104,15 +102,13 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     };
 
     // Correctly map data from the fresh session object
-    console.log('GroupCandidateAssessmentPreview Session Data:', session);
-
     const displayData = {
-        title: session?.program?.assessment_title || session?.program?.assessmentTitle || session?.groupAssessment?.program?.assessment_title || session?.groupAssessment?.program?.assessmentTitle || 'Employee Behavioral & Agility Assessment',
+        title: session?.program?.assessment_title || session?.program?.assessmentTitle || session?.groupAssessment?.program?.assessment_title || session?.groupAssessment?.program?.assessmentTitle || 'Assessment',
         program: session?.program?.name || session?.groupAssessment?.program?.name || '-',
         type: 'WebApp', // Hardcoded as per request
         startsOn: formatDate(session?.validFrom),
         endsOn: formatDate(session?.validTo),
-        studentName: session?.registration?.fullName || session?.registration?.['full_name' as keyof typeof session.registration] || session?.user?.email?.split('@')[0] || '-',
+        studentName: session?.registration?.fullName || session?.registration?.['full_name' as keyof typeof session.registration] || '-',
         gender: session?.registration?.gender || '-',
         email: session?.user?.email || '-',
         mobile: session?.registration?.mobileNumber ? `${session?.registration?.countryCode || ''} ${session?.registration?.mobileNumber}` : '-',
@@ -120,6 +116,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
         reportSent: session?.metadata?.isReportSent ? 'Yes' : 'No',
         isReportReady: session?.isReportReady
     };
+
 
     // Renderers
     const renderStatsBar = (attemptData?: any, levelData?: any) => {
@@ -249,7 +246,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     const renderLevelReport = (title: string, breakdown: any[], compatibility: any, levelAttempt?: any, levelData?: any, hideStats: boolean = false) => (
         <div className={`grid grid-cols-1 ${hideStats ? '' : 'xl:grid-cols-[1fr_300px]'} gap-6`}>
             <div className="flex flex-col gap-6">
-                {/* Re-use stats bar here if needed, or keep it common */}
+                {/* Pass specific level attempt if available. Do not fallback to current session attempt for level reports. */}
                 {!hideStats && renderStatsBar(levelAttempt, levelData)}
 
                 {/* Breakdown Table */}
@@ -328,20 +325,11 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                 )}
             </div>
 
-
-
             {/* Sidebar for Level Tabs (Same Sidebar) */}
             {!hideStats && (
                 <div className="flex flex-col gap-4">
-                    <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6 flex flex-col gap-6">
+                    <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6 flex flex-col gap-6 h-full">
                         <SidebarItem label="Assessment Title" value={displayData.title} />
-
-                        <div className="flex flex-col gap-4">
-                            <SidebarItem label="Candidate Name" value={displayData.studentName} />
-                            <SidebarItem label="Email" value={displayData.email} />
-                            <SidebarItem label="Mobile" value={displayData.mobile} />
-                        </div>
-
                         <div className="grid grid-cols-1 gap-4">
                             <SidebarItem label="Exam Published On" value={displayData.startsOn} />
                             <SidebarItem label="Exam Expired On" value={displayData.endsOn} />
@@ -385,22 +373,20 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
 
 
     const renderOverallReport = () => {
-        // Identify levels and attempts for the overall report view
-        const discLevel = levels.find(l => l.pattern_type === 'DISC' || l.patternType === 'DISC' || l.name.toLowerCase().includes('disc') || l.name === 'Behavioral Insight');
-        const aciLevel = levels.find(l => l.pattern_type === 'ACI' || l.patternType === 'ACI' || l.name === 'ACI');
+        // Find levels for displaying stats correctly even in Overall View
+        // Note: This relies on levels being fetched and named conventionally.
+        const discLevel = levels.find(l => l.patternType === 'DISC' || l.name === 'Behavioral Insight');
+        const aciLevel = levels.find(l => l.patternType === 'ACI' || l.name === 'ACI');
 
-        const getAttemptForLevel = (lvl: any) => {
-            if (!lvl) return undefined;
-            const lvlId = String(lvl.id);
-            return session?.attempts?.find((a: any) => {
-                const aId = String(a.assessmentLevelId);
-                const alId = a.assessmentLevel ? String(a.assessmentLevel.id) : null;
-                return aId === lvlId || alId === lvlId;
-            });
-        };
+        const discAttempt = session?.attempts?.find((a: any) =>
+            String(a.assessmentLevelId) === String(discLevel?.id) ||
+            (a.assessmentLevel && String(a.assessmentLevel.id) === String(discLevel?.id))
+        );
 
-        const discAttempt = getAttemptForLevel(discLevel);
-        const aciAttempt = getAttemptForLevel(aciLevel);
+        const aciAttempt = session?.attempts?.find((a: any) =>
+            String(a.assessmentLevelId) === String(aciLevel?.id) ||
+            (a.assessmentLevel && String(a.assessmentLevel.id) === String(aciLevel?.id))
+        );
 
         return (
             <div className="flex flex-col">
@@ -447,19 +433,17 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
             {/* Header */}
             <div>
                 <div className="flex items-center text-xs text-black dark:text-white mb-2 font-normal flex-wrap">
-                    <span className="cursor-pointer hover:underline opacity-60">Dashboard</span>
+                    <span onClick={onBack} className="cursor-pointer hover:underline opacity-60">Dashboard</span>
                     <span className="mx-2 opacity-40"><ArrowRightWithoutLineIcon className="w-3 h-3" /></span>
-                    <span className="cursor-pointer hover:underline opacity-60">Registrations</span>
+                    <span onClick={onBack} className="cursor-pointer hover:underline opacity-60">Registrations</span>
                     <span className="mx-2 opacity-40"><ArrowRightWithoutLineIcon className="w-3 h-3" /></span>
-                    <span onClick={onBack} className="cursor-pointer hover:underline opacity-60">Group Assessment Preview</span>
-                    <span className="mx-2 opacity-40"><ArrowRightWithoutLineIcon className="w-3 h-3" /></span>
-                    <span className="text-brand-green font-semibold">Group Candidate Assessment Preview</span>
+                    <span className="text-brand-green font-semibold">Review Assessment</span>
                 </div>
                 <h1 className="text-2xl sm:text-3xl font-semibold text-[#150089] dark:text-white flex items-center gap-3">
                     <button onClick={onBack} className="p-1.5 rounded-full hover:bg-white/10 transition-colors">
                         <ArrowLeftWithoutLineIcon className="w-5 h-5" />
                     </button>
-                    {displayData.title !== 'Assessment' ? displayData.title : 'Employee Behavioral & Agility Assessment'}
+                    {displayData.title}
                 </h1>
             </div>
 
@@ -497,12 +481,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                 {isActive ? (
                                     <span className='bg-brand-green rounded-full p-[1px]'><CheckIcon className="w-2 h-2 text-black" /></span>
                                 ) : (
-                                    !accessible && (
-                                        <div className="flex items-center gap-1">
-                                            <LockIcon className="w-3 h-3 text-white/70" />
-                                            <BanIcon className="w-3 h-3 text-white/70" />
-                                        </div>
-                                    )
+                                    !accessible && <LockIcon className="w-3 h-3 text-white/70" />
                                 )}
                             </div>
                         );
@@ -541,8 +520,13 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                         const levelId = String(level?.id);
                         const aId = String(a.assessmentLevelId);
                         const alId = a.assessmentLevel ? String(a.assessmentLevel.id) : null;
+
+                        console.log(`Debug Attempt Match: Level ${levelId} vs Attempt ${a.id} (LevelId: ${aId}, RelId: ${alId})`);
+
                         return aId === levelId || alId === levelId;
                     });
+
+                    console.log('Found attempt for level:', level?.name, attempt);
 
                     // Check for DISC pattern in robust ways: patternType (database), name includes 'disc', or exact name 'Behavioral Insight'
                     const isDisc = level?.pattern_type === 'DISC' || level?.patternType === 'DISC' || level?.name.toLowerCase().includes('disc') || level?.name === 'Behavioral Insight';
@@ -571,7 +555,6 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
         </div>
     );
 };
-
 // Helper to extract DISC data
 const getDiscData = (attempt: any) => {
     let breakdown = [
@@ -647,7 +630,8 @@ const getAciData = (attempt: any) => {
     return { breakdown, compatibility };
 };
 
-// SidebarItem helper components
+// ... (export and SidebarItem helper remain)
+
 const SidebarItem = ({ label, value, small }: { label: string, value: string, small?: boolean }) => (
     <div>
         <p className={`text-xs text-gray-400 mb-1`}>{label}</p>
@@ -655,4 +639,4 @@ const SidebarItem = ({ label, value, small }: { label: string, value: string, sm
     </div>
 );
 
-export default GroupCandidateAssessmentPreview;
+export default AssessmentResultPreview;
