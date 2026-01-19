@@ -125,6 +125,25 @@ export const registrationService = {
     return Array.isArray(body) ? body : (body.data || []);
   },
 
+  // 🔹 DEPARTMENT DEGREES (Joined: Degree + Dept)
+  async getDepartmentDegrees(): Promise<Department[]> {
+    const token = AuthService.getToken();
+    const res = await fetch(`${API_URL}/admin/departments/degrees`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to fetch department degrees");
+    }
+
+    const body = await res.json();
+    return Array.isArray(body) ? body : (body.data || []);
+  },
+
   // 🔹 CREATE registration
   async createRegistration(payload: CreateRegistrationDto): Promise<Registration> {
     const token = AuthService.getToken();

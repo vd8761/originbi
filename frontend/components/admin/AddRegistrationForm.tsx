@@ -79,7 +79,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
 
       // 2) Departments (optional)
       try {
-        const deptRes = await registrationService.getDepartments();
+        const deptRes = await registrationService.getDepartmentDegrees();
         //console.log("Departments in form:", deptRes);
         setDepartments(deptRes);
       } catch (err) {
