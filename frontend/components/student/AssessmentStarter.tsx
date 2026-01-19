@@ -528,7 +528,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
     return (
       <div className="flex flex-col items-center justify-center h-full">
         <div className="text-xl font-semibold text-brand-green mb-2">Loading assessment...</div>
-        <div className="text-sm text-gray-500">Attempt ID: {attemptId}</div>
+        {/* <div className="text-sm text-gray-500">Attempt ID: {attemptId}</div> */}
       </div>
     );
   }
@@ -539,7 +539,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
         <div className="text-xl font-semibold text-red-500">Error loading assessment</div>
         <div className="p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 rounded-lg max-w-lg">
           <p className="text-gray-700 dark:text-red-200 mb-2 font-mono text-sm">{error}</p>
-          <p className="text-xs text-gray-500">Attempt ID: {attemptId}</p>
+          {/* <p className="text-xs text-gray-500">Attempt ID: {attemptId}</p> */}
         </div>
         <div className="flex gap-4">
           <button onClick={() => window.location.reload()} className="px-6 py-2 bg-brand-green text-white rounded-full hover:bg-brand-green/90">Retry</button>
