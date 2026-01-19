@@ -38,10 +38,42 @@ export class AssessmentGenerationService {
             `Generating Level 1 questions for attempt ${attempt.id}, program ${attempt.programId}`,
         );
 
-        // 1. Fetch Main Questions
+        // 1. Find Available Sets for this Program + Level
+        const setsResult = await manager
+            .createQueryBuilder(AssessmentQuestion, 'q')
+            .select('DISTINCT q.set_number', 'setNumber')
+            .where('q.program_id = :programId', { programId: attempt.programId })
+            .andWhere('q.assessment_level_id = :levelId', {
+                levelId: attempt.assessmentLevelId,
+            })
+            .andWhere('q.is_active = true')
+            .andWhere('q.is_deleted = false')
+            .getRawMany<{ setNumber: number }>();
+
+        if (!setsResult || setsResult.length === 0) {
+            this.logger.warn(
+                `No active question sets found for Program ${attempt.programId} Level ${attempt.assessmentLevelId}. Skipping.`,
+            );
+            return;
+        }
+
+        // 2. Pick One Set Randomly
+        const sets = setsResult.map((s) => s.setNumber);
+        const selectedSet: number = sets[Math.floor(Math.random() * sets.length)];
+
+        this.logger.log(
+            `Selected Set ${selectedSet} (from [${sets.join(', ')}]) for Attempt ${attempt.id
+            }`,
+        );
+
+        // 3. Fetch Main Questions (Set-Based)
         const mainQuestions = await manager
             .createQueryBuilder(AssessmentQuestion, 'q')
             .where('q.program_id = :programId', { programId: attempt.programId })
+            .andWhere('q.assessment_level_id = :levelId', {
+                levelId: attempt.assessmentLevelId,
+            })
+            .andWhere('q.set_number = :setNumber', { setNumber: selectedSet })
             .andWhere('q.is_active = true')
             .andWhere('q.is_deleted = false')
             .orderBy('RANDOM()')
