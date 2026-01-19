@@ -8,9 +8,10 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
 
   const allowedOrigins = [
+    'https://mind.originbi.com',
     'https://originbi.vercel.app',
-    process.env.FRONTEND_URL, // optional extra
-  ].filter(Boolean);
+    ...(process.env.FRONTEND_URL || '').split(',').map(u => u.trim()).filter(Boolean),
+  ];
 
   app.enableCors({
     origin: allowedOrigins as string[],
