@@ -1,6 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // config here
+  async rewrites() {
+    return [
+      {
+        source: '/api/proxy/corporate/:path*',
+        destination: `${process.env.NEXT_PUBLIC_CORPORATE_API_URL}/:path*`,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
