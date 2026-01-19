@@ -4,10 +4,15 @@ import { DepartmentsService } from './departments.service';
 
 @Controller('admin/departments')
 export class DepartmentsController {
-  constructor(private readonly departmentsService: DepartmentsService) {}
+  constructor(private readonly departmentsService: DepartmentsService) { }
 
   @Get()
   async getAll() {
     return this.departmentsService.findAll();
+  }
+
+  @Get('degrees')
+  async getDegrees() {
+    return this.departmentsService.findAllDegrees();
   }
 }
