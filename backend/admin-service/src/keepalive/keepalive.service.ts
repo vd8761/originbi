@@ -54,9 +54,10 @@ export class KeepAliveService {
             try {
                 await firstValueFrom(this.http.get(healthUrl, { timeout: 5000 }));
                 this.logger.log(`[KeepAliveService] ${s.name} Ping: Success`);
-            } catch (err: any) {
+            } catch (err: unknown) {
                 // Log simple error message
-                const msg = err.message || 'Unknown error';
+                const msg =
+                    err instanceof Error ? err.message : String(err) || 'Unknown error';
                 this.logger.warn(`[KeepAliveService] ${s.name} Ping Failed: ${msg}`);
             }
         }
