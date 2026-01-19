@@ -415,10 +415,10 @@ export class CorporateDashboardService {
             'http://localhost:4003';
         // Assets served statically from /assets (via MailAssetsController)
         const assets = {
-            logo: `${serviceUrl}/assets/logo.png`,
-            popper: `${serviceUrl}/assets/Popper.png`,
-            pattern: `${serviceUrl}/assets/Pattern_mask.png`,
-            footer: `${serviceUrl}/assets/Email_Vector.png`,
+            logo: `${serviceUrl}/email-assets/logo.png`,
+            popper: `${serviceUrl}/email-assets/Popper.png`,
+            pattern: `${serviceUrl}/email-assets/Pattern_mask.png`,
+            footer: `${serviceUrl}/email-assets/Email_Vector.png`,
         };
 
         // Use the TS template function
@@ -691,10 +691,10 @@ export class CorporateDashboardService {
             'http://localhost:4003';
         // Assets served statically from /assets (via MailAssetsController)
         const assets = {
-            logo: `${serviceUrl}/assets/logo.png`,
-            popper: `${serviceUrl}/assets/Popper.png`,
-            pattern: `${serviceUrl}/assets/Pattern_mask.png`,
-            footer: `${serviceUrl}/assets/Email_Vector.png`,
+            logo: `${serviceUrl}/email-assets/logo.png`,
+            popper: `${serviceUrl}/email-assets/Popper.png`,
+            pattern: `${serviceUrl}/email-assets/Pattern_mask.png`,
+            footer: `${serviceUrl}/email-assets/Email_Vector.png`,
         };
 
         const htmlContent = getPaymentSuccessEmailTemplate(
