@@ -349,7 +349,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
           exam_id: examId,
         };
 
-        const examApiUrl = process.env.NEXT_PUBLIC_EXAM_ENGINE_API_URL || "http://localhost:4005";
+        const examApiUrl = process.env.NEXT_PUBLIC_EXAM_ENGINE_API_URL;
         const response = await fetch(`${examApiUrl}/api/v1/exam/start`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -502,7 +502,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
     }
 
     // Send Answer in Background
-    const examApiUrl = process.env.NEXT_PUBLIC_EXAM_ENGINE_API_URL || "http://localhost:4005";
+    const examApiUrl = process.env.NEXT_PUBLIC_EXAM_ENGINE_API_URL;
     fetch(`${examApiUrl}/api/v1/exam/answer`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

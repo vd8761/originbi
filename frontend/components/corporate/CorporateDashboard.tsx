@@ -25,6 +25,7 @@ interface Participant {
 // (Icons are imported from @/components/icons)
 
 // --- Components ---
+const API_URL = process.env.NEXT_PUBLIC_CORPORATE_API_URL;
 
 // --- Custom Icons ---
 const CircleArrowUpRightFilled = ({ className = "w-6 h-6" }: { className?: string }) => (
@@ -600,7 +601,7 @@ const CorporateDashboard: React.FC = () => {
             const token = sessionStorage.getItem("accessToken");
             if (email && token) {
                 try {
-                    const res = await fetch(`http://localhost:4003/dashboard/stats?email=${email}`, {
+                    const res = await fetch(`${API_URL}/dashboard/stats?email=${email}`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
                     if (res.ok) setStats(await res.json());

@@ -3,7 +3,7 @@ import { PaginatedResponse, Registration } from "../types";
 import { CreateRegistrationDto } from "./registration.service";
 
 const CORPORATE_API_URL =
-    process.env.NEXT_PUBLIC_CORPORATE_API_URL || "http://localhost:4003";
+    process.env.NEXT_PUBLIC_CORPORATE_API_URL;
 
 export const corporateRegistrationService = {
     // 🔹 CORPORATE - Create Candidate
