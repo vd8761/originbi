@@ -30,13 +30,13 @@ loadEnvLocal();
 
 const corporateUrl = process.env.NEXT_PUBLIC_CORPORATE_API_URL;
 
-if (!corporateUrl) {
-  throw new Error('NEXT_PUBLIC_CORPORATE_API_URL is not defined in environment or .env.local');
-}
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async rewrites() {
+    if (!corporateUrl) {
+      console.warn('⚠️  WARNING: NEXT_PUBLIC_CORPORATE_API_URL is missing. The /api/proxy/corporate route will NOT work.');
+      return [];
+    }
     return [
       {
         source: '/api/proxy/corporate/:path*',
