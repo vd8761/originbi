@@ -33,8 +33,8 @@ const ForgotPasswordForm: React.FC = () => {
             setIsSubmitting(true);
 
             // 1. Initiate Reset via Backend
-            const adminServiceUrl = process.env.NEXT_PUBLIC_ADMIN_SERVICE_URL || 'http://localhost:4001';
-            const initiateRes = await fetch(`${adminServiceUrl}/forgot-password/admin/initiate`, {
+            const adminApiUrl = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
+            const initiateRes = await fetch(`${adminApiUrl}/forgot-password/admin/initiate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email }),
@@ -74,8 +74,8 @@ const ForgotPasswordForm: React.FC = () => {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             className={`bg-gray-50 dark:bg-[#1E2124] border text-brand-text-light-primary dark:text-white placeholder:text-gray-400 font-sans text-sm rounded-full block w-full px-5 py-3.5 transition-all duration-300 outline-none focus:ring-2 ${error
-                                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50'
-                                    : 'border-gray-200 dark:border-transparent focus:border-brand-green focus:ring-brand-green/50 hover:bg-gray-100 dark:hover:bg-[#25282C]'
+                                ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50'
+                                : 'border-gray-200 dark:border-transparent focus:border-brand-green focus:ring-brand-green/50 hover:bg-gray-100 dark:hover:bg-[#25282C]'
                                 }`}
                             placeholder="user@originbi.com"
                             required

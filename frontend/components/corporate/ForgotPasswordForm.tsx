@@ -33,10 +33,10 @@ const ForgotPasswordForm: React.FC = () => {
             setIsSubmitting(true);
 
             // 1. Initiate Reset via Corporate Backend
-            const corporateServiceUrl = process.env.NEXT_PUBLIC_CORPORATE_SERVICE_URL || 'http://localhost:4003';
+            const corporateApiUrl = process.env.NEXT_PUBLIC_CORPORATE_API_URL;
 
             // Endpoint matches the one created in CorporateDashboardController
-            const initiateRes = await fetch(`${corporateServiceUrl}/dashboard/forgot-password/initiate`, {
+            const initiateRes = await fetch(`${corporateApiUrl}/dashboard/forgot-password/initiate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email }),

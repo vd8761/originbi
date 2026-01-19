@@ -2,7 +2,7 @@ import { Program, PaginatedResponse } from "@/lib/types";
 import { AuthService } from "@/lib/services";
 
 const API_URL =
-  process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "http://localhost:4001";
+  process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
 
 // ------------------------------
 // Program Service (Updated)

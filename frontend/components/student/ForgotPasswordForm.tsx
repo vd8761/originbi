@@ -33,8 +33,8 @@ const ForgotPasswordForm: React.FC = () => {
             setIsSubmitting(true);
 
             // 1. Initiate Reset via Student Backend
-            const studentServiceUrl = process.env.NEXT_PUBLIC_STUDENT_SERVICE_URL || 'http://localhost:4004';
-            const initiateRes = await fetch(`${studentServiceUrl}/forgot-password/initiate`, {
+            const studentApiUrl = process.env.NEXT_PUBLIC_STUDENT_API_URL;
+            const initiateRes = await fetch(`${studentApiUrl}/forgot-password/initiate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email }),
