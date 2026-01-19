@@ -7,5 +7,6 @@ import { CognitoService } from './cognito.service';
   imports: [ConfigModule],
   controllers: [CognitoController],
   providers: [CognitoService],
+  exports: [CognitoService],
 })
-export class CognitoModule {}
+export class CognitoModule { }
