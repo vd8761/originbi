@@ -11,7 +11,6 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
 
   const allowedOrigins = [
-    'http://localhost:3000',
     'https://originbi.vercel.app',
     process.env.FRONTEND_URL,
   ].filter(Boolean);

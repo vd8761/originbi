@@ -4,6 +4,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CorporateDashboardModule } from './dashboard/corporate-dashboard.module';
 import { MailAssetsController } from './mail/mail-assets.controller';
+import { HealthController } from './health.controller';
 import { CorporateRegistrationsModule } from './registrations/corporate-registrations.module';
 import { AssessmentModule } from './assessment/assessment.module';
 
@@ -50,6 +51,6 @@ import { AssessmentModule } from './assessment/assessment.module';
         AssessmentModule,
         ScheduleModule.forRoot(),
     ],
-    controllers: [MailAssetsController],
+    controllers: [MailAssetsController, HealthController],
 })
 export class AppModule { }
