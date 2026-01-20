@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { Send, Bot, User, Loader2, Copy, Check, Trash2, Sparkles, MessageSquare, Zap, Download } from 'lucide-react';
 
 interface Message {
@@ -16,23 +16,57 @@ interface ChatAssistantProps {
     apiUrl?: string;
 }
 
-// Smooth typewriter effect
-const TypeWriter = ({ text, speed = 12, onDone }: { text: string; speed?: number; onDone?: () => void }) => {
+// Stable typewriter effect - FAST, works even when tab is in background
+const TypeWriter = memo(({ text, speed = 2, onDone }: { text: string; speed?: number; onDone?: () => void }) => {
     const [display, setDisplay] = useState('');
+    const onDoneRef = useRef(onDone);
+    const textRef = useRef(text);
+    const hasCompletedRef = useRef(false);
+    const startTimeRef = useRef<number>(0);
+    const animationRef = useRef<number>(0);
+
+    // Update refs when props change
+    useEffect(() => {
+        onDoneRef.current = onDone;
+    }, [onDone]);
+
+    // Only reset when text actually changes
+    useEffect(() => {
+        if (textRef.current !== text) {
+            textRef.current = text;
+            hasCompletedRef.current = false;
+            startTimeRef.current = 0;
+        }
+    }, [text]);
 
     useEffect(() => {
-        let i = 0;
-        const timer = setInterval(() => {
-            if (i < text.length) {
-                setDisplay(text.slice(0, i + 1));
-                i++;
+        if (hasCompletedRef.current) return;
+
+        // Use requestAnimationFrame with timestamps - works when tab is in background
+        const animate = (timestamp: number) => {
+            if (!startTimeRef.current) startTimeRef.current = timestamp;
+
+            const elapsed = timestamp - startTimeRef.current;
+            const charsToShow = Math.min(Math.floor(elapsed / speed), text.length);
+
+            if (charsToShow < text.length) {
+                setDisplay(text.slice(0, charsToShow + 1));
+                animationRef.current = requestAnimationFrame(animate);
             } else {
-                clearInterval(timer);
-                onDone?.();
+                setDisplay(text);
+                hasCompletedRef.current = true;
+                onDoneRef.current?.();
             }
-        }, speed);
-        return () => clearInterval(timer);
-    }, [text, speed, onDone]);
+        };
+
+        animationRef.current = requestAnimationFrame(animate);
+
+        return () => {
+            if (animationRef.current) {
+                cancelAnimationFrame(animationRef.current);
+            }
+        };
+    }, [text, speed]);
 
     return (
         <>
@@ -42,7 +76,7 @@ const TypeWriter = ({ text, speed = 12, onDone }: { text: string; speed?: number
             )}
         </>
     );
-};
+});
 
 // Enhanced content renderer with markdown and download button support
 const RenderContent = ({ content, streaming, onDone, apiUrl }: { content: string; streaming?: boolean; onDone?: () => void; apiUrl?: string }) => {

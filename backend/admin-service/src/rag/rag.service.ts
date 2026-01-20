@@ -1,20 +1,32 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ChatGroq } from '@langchain/groq';
-import { SystemMessage } from '@langchain/core/messages';
+import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { EmbeddingsService } from './embeddings.service';
+import { FutureRoleReportService } from './future-role-report.service';
+import { OverallRoleFitmentService } from './overall-role-fitment.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
 /**
- * PRODUCTION AGENTIC RAG v6.0
- * - Direct, concise answers (no filler)
- * - Assessment/Exam results support
- * - Smart report generation with analysis
- * - Intent-based routing
+ * ╔═══════════════════════════════════════════════════════════════════════════╗
+ * ║           PRODUCTION RAG v11.0 - ENTERPRISE GRADE                         ║
+ * ╠═══════════════════════════════════════════════════════════════════════════╣
+ * ║                                                                           ║
+ * ║  ARCHITECTURE:                                                            ║
+ * ║  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌────────────┐ ║
+ * ║  │   QUERY     │ → │    LLM      │ → │    SQL      │ → │  RESPONSE  │ ║
+ * ║  │ UNDERSTAND  │    │ INTERPRET   │    │  EXECUTE    │    │  FORMAT    │ ║
+ * ║  └─────────────┘    └─────────────┘    └─────────────┘    └────────────┘ ║
+ * ║                                                                           ║
+ * ║  FEATURES:                                                                ║
+ * ║  • LLM-powered query understanding (handles typos, variations)            ║
+ * ║  • Personality insights (DISC + Agile ACI)                                ║
+ * ║  • Smart SQL generation                                                   ║
+ * ║  • Professional response formatting                                       ║
+ * ║                                                                           ║
+ * ╚═══════════════════════════════════════════════════════════════════════════╝
  */
-
-type Intent = 'DATA_QUERY' | 'REPORT' | 'COMPARE' | 'EXPLAIN' | 'LIST' | 'COUNT' | 'EXAM_RESULT';
 
 interface QueryResult {
     answer: string;
@@ -23,8 +35,60 @@ interface QueryResult {
     confidence: number;
     reportUrl?: string;
     reportId?: string;
-    intent?: string;
 }
+
+// Complete Database Schema
+const COMPLETE_SCHEMA = `
+═══════════════════════════════════════════════════════════════════════════════
+ORIGINBI DATABASE SCHEMA
+═══════════════════════════════════════════════════════════════════════════════
+
+TABLE: users
+Columns: email, role, is_active, is_blocked, login_count, last_login_at
+Notes: System users (admins, managers). Role can be ADMIN, SUPER_ADMIN, CORPORATE, STUDENT
+
+TABLE: registrations  
+Columns: full_name, mobile_number, gender, status, registration_source
+Notes: Candidates/students. ALWAYS use full_name for person searches. Status: INCOMPLETE, COMPLETED, CANCELLED
+
+TABLE: assessment_attempts
+Columns: registration_id, program_id, total_score, status, dominant_trait_id, started_at, completed_at
+Notes: Exam results. JOIN with registrations ON registration_id for candidate name. dominant_trait_id links to personality_traits
+
+TABLE: personality_traits
+Columns: id, blended_style_name, blended_style_desc
+Notes: DISC behavioral styles. Join using assessment_attempts.dominant_trait_id = personality_traits.id
+
+TABLE: assessment_levels
+Columns: name, description, duration_minutes, max_score
+Notes: Types of assessments (Behavioral, Agile, etc.)
+
+TABLE: programs
+Columns: code, name, description, is_active, is_demo
+Notes: Assessment programs
+
+TABLE: career_roles
+Columns: career_role_name, short_description, is_active
+Notes: Job roles for career matching
+
+TABLE: corporate_accounts
+Columns: company_name, sector_code, total_credits, available_credits
+Notes: Company accounts
+
+TABLE: groups
+Columns: code, name
+Notes: Candidate batches
+
+═══════════════════════════════════════════════════════════════════════════════
+`;
+
+// Agile ACI Score Interpretation
+const AGILE_LEVELS = {
+    naturalist: { min: 100, max: 125, name: 'Agile Naturalist', desc: 'Lives the Agile mindset naturally with balance between speed, empathy, and accountability.' },
+    adaptive: { min: 75, max: 99, name: 'Agile Adaptive', desc: 'Works well in dynamic situations and motivates others through enthusiasm.' },
+    learner: { min: 50, max: 74, name: 'Agile Learner', desc: 'Open to Agile ideas but may need guidance for consistency.' },
+    resistant: { min: 0, max: 49, name: 'Agile Resistant', desc: 'Prefers structure and predictability. Needs gradual exposure to flexibility.' }
+};
 
 @Injectable()
 export class RagService {
@@ -35,6 +99,8 @@ export class RagService {
     constructor(
         private dataSource: DataSource,
         private embeddingsService: EmbeddingsService,
+        private futureRoleReportService: FutureRoleReportService,
+        private overallRoleFitmentService: OverallRoleFitmentService,
     ) {
         this.reportsDir = path.join(process.cwd(), 'reports');
         if (!fs.existsSync(this.reportsDir)) {
@@ -55,520 +121,557 @@ export class RagService {
         return this.llm;
     }
 
-    /**
-     * Main Query Entry - Agentic Flow
-     */
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MAIN QUERY ENTRY POINT
+    // ═══════════════════════════════════════════════════════════════════════════
     async query(question: string, user: any): Promise<QueryResult> {
         if (!question?.trim()) {
             return { answer: 'Please ask a question.', searchType: 'none', confidence: 0 };
         }
 
-        this.logger.log(`🤖 Query: "${question}"`);
+        this.logger.log(`\n${'═'.repeat(70)}`);
+        this.logger.log(`🤖 RAG v11.0 - Production`);
+        this.logger.log(`📝 Query: "${question}"`);
 
         try {
-            const intent = this.classifyIntent(question);
-            this.logger.log(`📋 Intent: ${intent}`);
+            // ═══════════════════════════════════════════════════════════════
+            // STEP 1: LLM QUERY UNDERSTANDING
+            // ═══════════════════════════════════════════════════════════════
+            const interpretation = await this.understandQuery(question);
+            this.logger.log(`🎯 Intent: ${interpretation.intent}`);
+            this.logger.log(`🔍 Search: ${interpretation.searchTerm || 'general'}`);
 
-            // Execute SQL with intent-aware query generation
-            const sqlResult = await this.executeSqlQuery(question, intent);
-            const semanticResults = await this.embeddingsService.semanticSearch(question, 5, undefined, 0.2);
-
-            // Handle special intents
-            if (intent === 'REPORT') {
-                return await this.handleReportIntent(question, sqlResult, user);
+            // ═══════════════════════════════════════════════════════════════
+            // SPECIAL HANDLERS: GREETING & HELP
+            // ═══════════════════════════════════════════════════════════════
+            if (interpretation.intent === 'greeting') {
+                return {
+                    answer: `**👋 Hello!** I'm the OriginBI Assistant.\n\nI can help you with:\n• **Users & Candidates** - "list users", "show candidates"\n• **Test Results** - "test results", "[name]'s score"\n• **Career Reports** - "career report for [name]"\n• **Overall Reports** - "overall report", "placement report"\n• **Best Performers** - "top performer", "best score"\n• **Career Roles** - "show career roles"\n• **Counts** - "how many users"\n\nWhat would you like to know?`,
+                    searchType: 'greeting',
+                    confidence: 1.0,
+                };
             }
 
-            if (intent === 'COMPARE') {
-                return await this.handleCompareIntent(question);
+            if (interpretation.intent === 'help') {
+                return {
+                    answer: `**🤖 OriginBI Assistant - Help**\n\n**Available Commands:**\n\n📊 **Data Queries:**\n• "list users" - Show all system users\n• "show candidates" - List registered candidates\n• "test results" - View assessment results\n• "career roles" - Available career paths\n\n👤 **Person-Specific:**\n• "[name]'s score" - Individual test results\n• "career report for [name]" - Full career fitment report\n• "show [name]'s results" - Assessment details\n\n📋 **Group Reports:**\n• "overall report" - Group role fitment by personality\n• "placement report" - Placement guidance for all students\n• "role fitment report" - Roles mapped to personality types\n\n🏆 **Analytics:**\n• "best performer" - Top scoring candidates\n• "how many users" - User counts\n• "total candidates" - Registration stats\n\n**Tips:**\n• If multiple people share a name, I'll ask you to pick one\n• Career reports include personality insights and role fitment analysis`,
+                    searchType: 'help',
+                    confidence: 1.0,
+                };
             }
 
-            // Generate direct response
-            return await this.generateDirectResponse(question, sqlResult, semanticResults, intent);
+
+            // ═══════════════════════════════════════════════════════════════
+            // SPECIAL HANDLER: CAREER REPORT GENERATION
+            // ═══════════════════════════════════════════════════════════════
+            if (interpretation.intent === 'career_report') {
+                return await this.handleCareerReport(interpretation.searchTerm);
+            }
+
+            // ═══════════════════════════════════════════════════════════════
+            // SPECIAL HANDLER: OVERALL ROLE FITMENT REPORT
+            // ═══════════════════════════════════════════════════════════════
+            if (interpretation.intent === 'overall_report') {
+                return await this.handleOverallReport(user);
+            }
+
+            // ═══════════════════════════════════════════════════════════════
+            // STEP 2: EXECUTE QUERY
+            // ═══════════════════════════════════════════════════════════════
+            const data = await this.executeQuery(interpretation);
+            this.logger.log(`📊 Results: ${data.length} rows`);
+
+            // ═══════════════════════════════════════════════════════════════
+            // STEP 3: FORMAT RESPONSE
+            // ═══════════════════════════════════════════════════════════════
+            const answer = this.formatResponse(interpretation, data);
+
+            return {
+                answer,
+                searchType: interpretation.intent,
+                sources: { rows: data.length },
+                confidence: data.length > 0 ? 0.95 : 0.3,
+            };
 
         } catch (error) {
-            this.logger.error('Query failed:', error.message);
+            this.logger.error(`❌ Error: ${error.message}`);
             return {
-                answer: `Sorry, I couldn't process that. Please try rephrasing.`,
+                answer: `Sorry, I couldn't process that. Try: "list users", "test results", or "show [person name]'s score"`,
                 searchType: 'error',
                 confidence: 0,
             };
         }
     }
 
-    /**
-     * Enhanced Intent Classification
-     */
-    private classifyIntent(question: string): Intent {
-        const q = question.toLowerCase();
-
-        // Exam/Test/Assessment results
-        if (q.match(/exam|test|result|score|assessment|attempt|performance/)) return 'EXAM_RESULT';
-
-        // Count queries
-        if (q.match(/how many|count|total|number of/)) return 'COUNT';
-
-        // Report generation
-        if (q.match(/report|generate|download|export|pdf/)) return 'REPORT';
-
-        // Comparison
-        if (q.match(/compare|vs|versus|difference|between.*and/)) return 'COMPARE';
-
-        // Explanation
-        if (q.match(/what is|explain|describe|tell me about|define/)) return 'EXPLAIN';
-
-        // List
-        if (q.match(/list|show|display|get all|find all/)) return 'LIST';
-
-        return 'DATA_QUERY';
-    }
-
-    /**
-     * Execute SQL with Enhanced Schema
-     */
-    private async executeSqlQuery(question: string, intent: Intent): Promise<{ success: boolean; sql?: string; data?: any[]; error?: string }> {
-        try {
-            const sql = await this.generateSQL(question, intent);
-            if (!sql) return { success: false, error: 'Could not generate query' };
-
-            this.logger.log(`🔍 SQL: ${sql}`);
-            const data = await this.dataSource.query(sql);
-            return { success: true, sql, data };
-        } catch (error) {
-            this.logger.warn(`SQL failed: ${error.message}`);
-            return { success: false, error: error.message };
-        }
-    }
-
-    /**
-     * Generate SQL with Exam/Assessment Support
-     */
-    private async generateSQL(question: string, intent: Intent): Promise<string | null> {
-        const prompt = `You are an expert PostgreSQL query writer for OriginBI.
-Output ONLY the SQL query - no markdown, no explanation, no backticks.
-
-DATABASE SCHEMA:
-================
-users: id, email, role, is_active, is_blocked, login_count, last_login_at
-registrations: id, full_name (candidate name), email, gender, status, program_id, mobile_number, is_deleted
-career_roles: id, career_role_name (THE NAME), short_description, is_active, is_deleted
-career_role_tools: id, career_role_id, tool_name, is_deleted
-trait_based_course_details: id, course_name, notes, compatibility_percentage, is_deleted
-programs: id, code, name, description, is_active, is_demo
-personality_traits: id, code, blended_style_name, blended_style_desc, is_active
-corporate_accounts: id, company_name, sector_code, total_credits, available_credits, is_deleted
-groups: id, code, name, corporate_account_id, is_deleted
-departments: id, name, short_name, category, is_deleted
-assessment_attempts: id, registration_id, program_id, status, score, created_at, updated_at
-open_questions: id, registration_id, question, response, marks, is_deleted
-assessment_summary: id, registration_id, program_id, total_score, percentile, created_at
-
-QUERY EXAMPLES (NEVER include 'id' columns in SELECT):
-===============
-"how many users" → SELECT COUNT(*) as count FROM users WHERE is_active = true
-"list users" → SELECT email, role, is_active, login_count FROM users WHERE is_active = true LIMIT 20
-"user details" → SELECT email, role, is_active, is_blocked, login_count, last_login_at FROM users LIMIT 20
-"show career roles" → SELECT career_role_name, short_description FROM career_roles WHERE is_deleted = false LIMIT 20
-"find java developer" → SELECT career_role_name, short_description FROM career_roles WHERE career_role_name ILIKE '%java%' AND is_deleted = false
-"show courses" → SELECT course_name, notes, compatibility_percentage FROM trait_based_course_details WHERE is_deleted = false LIMIT 20
-"test user exam" → SELECT registrations.full_name, registrations.email, assessment_attempts.status, assessment_attempts.score FROM assessment_attempts JOIN registrations ON assessment_attempts.registration_id = registrations.id LIMIT 20
-"exam results" → SELECT registrations.full_name, registrations.email, assessment_attempts.score, assessment_attempts.status FROM assessment_attempts JOIN registrations ON assessment_attempts.registration_id = registrations.id ORDER BY assessment_attempts.created_at DESC LIMIT 20
-"test result for john" → SELECT registrations.full_name, registrations.email, assessment_attempts.score, assessment_attempts.status, programs.name as program FROM assessment_attempts JOIN registrations ON assessment_attempts.registration_id = registrations.id LEFT JOIN programs ON assessment_attempts.program_id = programs.id WHERE registrations.full_name ILIKE '%john%'
-"assessment summary" → SELECT registrations.full_name, registrations.email, assessment_summary.total_score, assessment_summary.percentile FROM assessment_summary JOIN registrations ON assessment_summary.registration_id = registrations.id LIMIT 20
-"show candidates" → SELECT full_name, email, gender, status, mobile_number FROM registrations WHERE is_deleted = false LIMIT 20
-"count registrations" → SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false
-"list companies" → SELECT company_name, sector_code, total_credits, available_credits FROM corporate_accounts WHERE is_deleted = false
-"show programs" → SELECT code, name, description, is_active FROM programs WHERE is_active = true
-"personality types" → SELECT blended_style_name, blended_style_desc FROM personality_traits WHERE is_active = true
-"find user by email" → SELECT email, role, is_active, is_blocked, login_count FROM users WHERE email ILIKE '%keyword%'
-
-STRICT RULES:
-=============
-1. Return ONLY the SQL query
-2. NEVER use table aliases like u, cr
-3. NEVER include 'id' columns in SELECT - show meaningful data only (email, role, name, etc.)
-4. For career_roles: use career_role_name (NOT name)
-5. Always add LIMIT 20 (except for COUNT)
-6. Use is_deleted = false where column exists
-7. Use ILIKE '%keyword%' for text search
-8. For exam/test queries: JOIN assessment_attempts with registrations
-9. Always include meaningful columns like email, role, name, status, score
-10. For users: always include email, role, is_active at minimum
-
-Question: "${question}"
-
-SQL:`;
-
-        try {
-            const response = await this.getLlm().invoke([new SystemMessage(prompt)]);
-            let sql = response.content.toString().trim();
-
-            sql = sql.replace(/```sql/gi, '').replace(/```/g, '').trim();
-            sql = sql.split('\n')[0].trim();
-
-            const upper = sql.toUpperCase();
-            if (!upper.startsWith('SELECT')) return null;
-            if (['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER'].some(k => upper.includes(k + ' '))) return null;
-
-            return sql;
-        } catch (error) {
-            this.logger.error('SQL generation failed:', error);
-            return null;
-        }
-    }
-
-    /**
-     * Generate Direct Response - No Filler
-     */
-    private async generateDirectResponse(question: string, sqlResult: any, semanticResults: any[], intent: Intent): Promise<QueryResult> {
-        if (!sqlResult.success || !sqlResult.data?.length) {
-            // Try semantic fallback
-            if (semanticResults.length > 0) {
-                return {
-                    answer: this.formatSemanticResponse(semanticResults),
-                    searchType: intent,
-                    sources: { semanticMatches: semanticResults.length },
-                    confidence: 0.6,
-                };
-            }
-
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CAREER REPORT HANDLER - WITH DISAMBIGUATION
+    // ═══════════════════════════════════════════════════════════════════════════
+    private async handleCareerReport(searchTerm: string | null): Promise<QueryResult> {
+        if (!searchTerm) {
             return {
-                answer: `No data found for "${question}". Try: "list users", "show career roles", "exam results"`,
-                searchType: 'none',
-                confidence: 0.1,
+                answer: `**📋 To generate a Career Fitment Report, I need more information:**\n\nPlease specify the person's name, e.g.:\n• "generate career report for Anjaly"\n• "career report for John"\n• "future role readiness for Priya"`,
+                searchType: 'career_report',
+                confidence: 0.3,
             };
         }
 
-        // Direct formatting based on intent
-        const data = sqlResult.data;
-        let answer: string;
+        // Check if user specified a number (e.g., "anjaly #2" or "anjaly 2")
+        const numberMatch = searchTerm.match(/(.+?)\s*[#]?\s*(\d+)$/);
+        let targetIndex = 0;
+        let cleanSearchTerm = searchTerm;
 
-        if (intent === 'COUNT') {
-            const count = data[0]?.count || data.length;
-            answer = `**${count}** records found.`;
-        } else if (intent === 'EXAM_RESULT') {
-            answer = this.formatExamResults(data);
-        } else if (intent === 'LIST' || data.length > 1) {
-            answer = this.formatListResponse(data, question);
-        } else {
-            answer = this.formatDataResponse(data);
+        if (numberMatch) {
+            cleanSearchTerm = numberMatch[1].trim();
+            targetIndex = parseInt(numberMatch[2]) - 1; // Convert to 0-based index
         }
 
-        return {
-            answer,
-            searchType: intent,
-            sources: { sqlRowCount: data.length },
-            confidence: 0.9,
-            intent,
-        };
+        // Fetch ALL matching people (not just one)
+        try {
+            const personData = await this.dataSource.query(`
+                SELECT 
+                    registrations.id,
+                    registrations.full_name,
+                    registrations.gender,
+                    registrations.mobile_number,
+                    users.email,
+                    assessment_attempts.total_score,
+                    personality_traits.blended_style_name as behavioral_style,
+                    personality_traits.blended_style_desc as behavior_description
+                FROM registrations
+                LEFT JOIN users ON registrations.user_id = users.id
+                LEFT JOIN assessment_attempts ON assessment_attempts.registration_id = registrations.id
+                LEFT JOIN personality_traits ON assessment_attempts.dominant_trait_id = personality_traits.id
+                WHERE registrations.full_name ILIKE '%${cleanSearchTerm}%'
+                AND registrations.is_deleted = false
+                ORDER BY registrations.created_at DESC
+                LIMIT 10
+            `);
+
+            if (!personData.length) {
+                return {
+                    answer: `**❌ No candidate found with name "${cleanSearchTerm}"**\n\nPlease check the name and try again.`,
+                    searchType: 'career_report',
+                    confidence: 0.3,
+                };
+            }
+
+            // DISAMBIGUATION: If multiple matches found
+            if (personData.length > 1 && !numberMatch) {
+                let response = `**👥 Multiple candidates found with name "${cleanSearchTerm}":**\n\n`;
+                response += `Please specify which one by number:\n\n`;
+
+                personData.forEach((person: any, index: number) => {
+                    const email = person.email ? ` | ${person.email}` : '';
+                    const mobile = person.mobile_number ? ` | ${person.mobile_number.slice(-4)}` : '';
+                    const score = person.total_score ? ` | Score: ${person.total_score}%` : '';
+                    response += `**${index + 1}.** ${person.full_name}${email}${mobile}${score}\n`;
+                });
+
+                response += `\n**Example:** "career report for ${cleanSearchTerm} #1" or "career report for ${cleanSearchTerm} #2"`;
+
+                return {
+                    answer: response,
+                    searchType: 'disambiguation',
+                    confidence: 0.7,
+                };
+            }
+
+            // Validate index if number was specified
+            if (targetIndex >= personData.length) {
+                return {
+                    answer: `**❌ Invalid selection.** Only ${personData.length} candidate(s) found with name "${cleanSearchTerm}".\n\nPlease use a number between 1 and ${personData.length}.`,
+                    searchType: 'career_report',
+                    confidence: 0.3,
+                };
+            }
+
+            const person = personData[targetIndex];
+
+            // Generate the full Career Fitment Report
+            const report = await this.futureRoleReportService.generateReport({
+                name: person.full_name || searchTerm,
+                currentRole: 'Assessment Candidate',
+                currentJobDescription: 'Completed behavioral and skill assessments through the OriginBI platform.',
+                yearsOfExperience: 0,
+                relevantExperience: 'Based on assessment data',
+                currentIndustry: 'Assessment',
+                expectedFutureRole: 'To be determined based on assessment results',
+                behavioralStyle: person.behavioral_style || undefined,
+                behavioralDescription: person.behavior_description || undefined,
+                agileScore: person.total_score ? parseFloat(person.total_score) : undefined,
+            });
+
+            return {
+                answer: report.fullReportText,
+                searchType: 'career_report',
+                reportId: report.reportId,
+                confidence: 0.95,
+            };
+
+        } catch (error) {
+            this.logger.error(`Career report error: ${error.message}`);
+            return {
+                answer: `**❌ Error generating report:** ${error.message}`,
+                searchType: 'error',
+                confidence: 0,
+            };
+        }
     }
 
-    /**
-     * Format Exam/Assessment Results
-     */
-    private formatExamResults(data: any[]): string {
-        if (!data.length) return 'No exam results found.';
+    // ═══════════════════════════════════════════════════════════════════════════
+    // OVERALL ROLE FITMENT REPORT HANDLER
+    // ═══════════════════════════════════════════════════════════════════════════
+    private async handleOverallReport(user: any): Promise<QueryResult> {
+        try {
+            this.logger.log(`📊 Generating Overall Role Fitment Report`);
 
-        let response = `**Exam Results** (${data.length} records)\n\n`;
+            // Get corporate/group context from user if available
+            const input = {
+                corporateId: user?.corporate_id,
+                title: 'Placement Guidance Report',
+            };
 
-        data.slice(0, 10).forEach((row, i) => {
-            const name = row.full_name || row.email || 'Unknown';
-            const score = row.score !== undefined ? row.score : row.total_score || 'N/A';
-            const status = row.status || '';
-            const program = row.program || row.name || '';
+            const report = await this.overallRoleFitmentService.generateReport(input);
 
-            response += `${i + 1}. **${name}**`;
-            if (score !== 'N/A') response += ` — Score: **${score}**`;
-            if (status) response += ` (${status})`;
-            if (program) response += ` [${program}]`;
+            return {
+                answer: this.overallRoleFitmentService.formatForChat(report),
+                searchType: 'overall_report',
+                reportId: report.reportId,
+                confidence: 0.95,
+            };
+
+        } catch (error) {
+            this.logger.error(`Overall report error: ${error.message}`);
+            return {
+                answer: `**❌ Error generating overall report:** ${error.message}\n\nPlease ensure there are completed assessments with personality data.`,
+                searchType: 'error',
+                confidence: 0,
+            };
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // LLM-POWERED QUERY UNDERSTANDING
+    // ═══════════════════════════════════════════════════════════════════════════
+    private async understandQuery(question: string): Promise<{
+        intent: string;
+        searchTerm: string | null;
+        table: string;
+        includePersonality: boolean;
+    }> {
+        const prompt = `You are a query interpreter for OriginBI assessment platform.
+
+Analyze this user query and extract:
+1. INTENT: What does the user want? (greeting, help, list_users, list_candidates, test_results, person_lookup, best_performer, career_roles, career_report, overall_report, count)
+2. SEARCH_TERM: Any specific name or keyword to search (null if general query)
+3. TABLE: Primary table to query (users, registrations, assessment_attempts, career_roles, programs, none)
+4. INCLUDE_PERSONALITY: Should we include DISC behavioral style and Agile score? (true for test results, person lookups, career reports)
+
+USER QUERY: "${question}"
+
+EXAMPLES:
+"hi" → {"intent":"greeting","searchTerm":null,"table":"none","includePersonality":false}
+"hello" → {"intent":"greeting","searchTerm":null,"table":"none","includePersonality":false}
+"hey" → {"intent":"greeting","searchTerm":null,"table":"none","includePersonality":false}
+"good morning" → {"intent":"greeting","searchTerm":null,"table":"none","includePersonality":false}
+"help" → {"intent":"help","searchTerm":null,"table":"none","includePersonality":false}
+"what can you do" → {"intent":"help","searchTerm":null,"table":"none","includePersonality":false}
+"list all users" → {"intent":"list_users","searchTerm":null,"table":"users","includePersonality":false}
+"show test results" → {"intent":"test_results","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
+"anjaly's score" → {"intent":"person_lookup","searchTerm":"anjaly","table":"assessment_attempts","includePersonality":true}
+"user details" → {"intent":"list_users","searchTerm":null,"table":"users","includePersonality":false}
+"candidates" → {"intent":"list_candidates","searchTerm":null,"table":"registrations","includePersonality":false}
+"best performer" → {"intent":"best_performer","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
+"career roles" → {"intent":"career_roles","searchTerm":null,"table":"career_roles","includePersonality":false}
+"generate career report for anjaly" → {"intent":"career_report","searchTerm":"anjaly","table":"assessment_attempts","includePersonality":true}
+"career report for john" → {"intent":"career_report","searchTerm":"john","table":"assessment_attempts","includePersonality":true}
+"future role readiness for priya" → {"intent":"career_report","searchTerm":"priya","table":"assessment_attempts","includePersonality":true}
+"overall report" → {"intent":"overall_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
+"placement report" → {"intent":"overall_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
+"group role fitment" → {"intent":"overall_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
+"role fitment report" → {"intent":"overall_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
+"how many users" → {"intent":"count","searchTerm":null,"table":"users","includePersonality":false}
+
+Respond with ONLY valid JSON, no explanation:`;
+
+        try {
+            const response = await this.getLlm().invoke([new SystemMessage(prompt)]);
+            const jsonStr = response.content.toString().trim();
+            const parsed = JSON.parse(jsonStr);
+            return {
+                intent: parsed.intent || 'list_users',
+                searchTerm: parsed.searchTerm || null,
+                table: parsed.table || 'users',
+                includePersonality: parsed.includePersonality || false,
+            };
+        } catch (error) {
+            this.logger.warn(`Query interpretation failed, using fallback`);
+            return this.fallbackInterpretation(question);
+        }
+    }
+
+    private fallbackInterpretation(question: string): { intent: string; searchTerm: string | null; table: string; includePersonality: boolean } {
+        const q = question.toLowerCase();
+
+        // Career report generation - CHECK FIRST
+        if (q.match(/career\s*report|future\s*role|role\s*readiness|generate.*report/)) {
+            const name = this.extractName(question);
+            return { intent: 'career_report', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
+        }
+
+        // Best performer
+        if (q.match(/best|top|highest|winner/)) {
+            return { intent: 'best_performer', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+        }
+        // Test/exam results
+        if (q.match(/test|exam|result|score|assessment/) && !q.match(/report/)) {
+            const name = this.extractName(question);
+            return { intent: name ? 'person_lookup' : 'test_results', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
+        }
+        // Users
+        if (q.match(/user/)) {
+            return { intent: 'list_users', searchTerm: null, table: 'users', includePersonality: false };
+        }
+        // Candidates
+        if (q.match(/candidate|registration|student/)) {
+            return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
+        }
+        // Career roles
+        if (q.match(/career|role|job/)) {
+            return { intent: 'career_roles', searchTerm: null, table: 'career_roles', includePersonality: false };
+        }
+        // Count
+        if (q.match(/how many|count/)) {
+            return { intent: 'count', searchTerm: null, table: 'users', includePersonality: false };
+        }
+
+        // Default - try to find a name
+        const name = this.extractName(question);
+        if (name) {
+            return { intent: 'person_lookup', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
+        }
+
+        return { intent: 'list_users', searchTerm: null, table: 'users', includePersonality: false };
+    }
+
+    private extractName(question: string): string | null {
+        const patterns = [
+            /(?:for|about|of)\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)/i,
+            /([A-Za-z]+)'s?\s+(?:test|exam|score|result)/i,
+            /(?:show|get|find)\s+([A-Za-z]+)(?:'s)?/i,
+        ];
+
+        const stopWords = ['test', 'exam', 'score', 'result', 'user', 'all', 'the', 'show', 'get', 'list', 'find', 'best', 'top'];
+
+        for (const pattern of patterns) {
+            const match = question.match(pattern);
+            if (match && match[1] && !stopWords.includes(match[1].toLowerCase())) {
+                return match[1];
+            }
+        }
+        return null;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // QUERY EXECUTION
+    // ═══════════════════════════════════════════════════════════════════════════
+    private async executeQuery(interpretation: { intent: string; searchTerm: string | null; table: string; includePersonality: boolean }): Promise<any[]> {
+        let sql = '';
+
+        switch (interpretation.intent) {
+            case 'list_users':
+                sql = `SELECT email, role, is_active, login_count FROM users ORDER BY login_count DESC LIMIT 15`;
+                break;
+
+            case 'list_candidates':
+                sql = `SELECT full_name, gender, status, mobile_number FROM registrations WHERE is_deleted = false ORDER BY created_at DESC LIMIT 15`;
+                break;
+
+            case 'test_results':
+            case 'best_performer':
+                sql = `
+                    SELECT 
+                        registrations.full_name,
+                        assessment_attempts.total_score,
+                        assessment_attempts.status,
+                        personality_traits.blended_style_name as behavioral_style,
+                        personality_traits.blended_style_desc as behavior_description,
+                        programs.name as program_name
+                    FROM assessment_attempts
+                    JOIN registrations ON assessment_attempts.registration_id = registrations.id
+                    LEFT JOIN personality_traits ON assessment_attempts.dominant_trait_id = personality_traits.id
+                    LEFT JOIN programs ON assessment_attempts.program_id = programs.id
+                    WHERE assessment_attempts.status = 'COMPLETED'
+                    ORDER BY assessment_attempts.total_score DESC
+                    LIMIT 15
+                `;
+                break;
+
+            case 'person_lookup':
+                const name = interpretation.searchTerm || '';
+                sql = `
+                    SELECT 
+                        registrations.full_name,
+                        registrations.gender,
+                        registrations.mobile_number,
+                        assessment_attempts.total_score,
+                        assessment_attempts.status,
+                        personality_traits.blended_style_name as behavioral_style,
+                        personality_traits.blended_style_desc as behavior_description,
+                        programs.name as program_name
+                    FROM registrations
+                    LEFT JOIN assessment_attempts ON assessment_attempts.registration_id = registrations.id
+                    LEFT JOIN personality_traits ON assessment_attempts.dominant_trait_id = personality_traits.id
+                    LEFT JOIN programs ON assessment_attempts.program_id = programs.id
+                    WHERE registrations.full_name ILIKE '%${name}%'
+                    AND registrations.is_deleted = false
+                    LIMIT 10
+                `;
+                break;
+
+            case 'career_roles':
+                sql = `SELECT career_role_name, short_description FROM career_roles WHERE is_deleted = false AND is_active = true LIMIT 15`;
+                break;
+
+            case 'count':
+                if (interpretation.table === 'users') {
+                    sql = `SELECT COUNT(*) as count FROM users`;
+                } else if (interpretation.table === 'registrations') {
+                    sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false`;
+                } else {
+                    sql = `SELECT COUNT(*) as count FROM assessment_attempts WHERE status = 'COMPLETED'`;
+                }
+                break;
+
+            default:
+                sql = `SELECT email, role, is_active FROM users LIMIT 10`;
+        }
+
+        try {
+            this.logger.log(`🔍 SQL: ${sql.substring(0, 80)}...`);
+            return await this.dataSource.query(sql);
+        } catch (error) {
+            this.logger.error(`SQL Error: ${error.message}`);
+            return [];
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // RESPONSE FORMATTING
+    // ═══════════════════════════════════════════════════════════════════════════
+    private formatResponse(interpretation: { intent: string; searchTerm: string | null; includePersonality: boolean }, data: any[]): string {
+        if (!data.length) {
+            return `No results found. Try:\n• "list users"\n• "show test results"\n• "candidates"\n• "[name]'s score"`;
+        }
+
+        switch (interpretation.intent) {
+            case 'test_results':
+            case 'best_performer':
+            case 'person_lookup':
+                return this.formatTestResults(data, interpretation.intent === 'best_performer');
+
+            case 'list_users':
+                return this.formatUserList(data);
+
+            case 'list_candidates':
+                return this.formatCandidateList(data);
+
+            case 'career_roles':
+                return this.formatCareerRoles(data);
+
+            case 'count':
+                return `**Total: ${data[0]?.count || 0}**`;
+
+            default:
+                return this.formatGenericList(data);
+        }
+    }
+
+    private formatTestResults(data: any[], isBestPerformer: boolean): string {
+        let response = isBestPerformer ? '**🏆 Top Performers:**\n\n' : '**📊 Assessment Results:**\n\n';
+
+        data.slice(0, 5).forEach((row, i) => {
+            const name = row.full_name || 'Unknown';
+            const score = row.total_score ? parseFloat(row.total_score).toFixed(0) : 'N/A';
+            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '•';
+
+            response += `${medal} **${name}** - Score: **${score}%**\n`;
+
+            // Behavioral Style (DISC) - FULL description
+            if (row.behavioral_style) {
+                response += `   📋 **Style: ${row.behavioral_style}**\n`;
+                if (row.behavior_description) {
+                    response += `   ${row.behavior_description}\n`;
+                }
+            }
+
+            // Agile Compatibility - with FULL description
+            const scoreNum = parseFloat(score);
+            if (!isNaN(scoreNum)) {
+                const agile = this.getAgileLevel(scoreNum);
+                response += `   🎯 **${agile.name}**: ${agile.desc}\n`;
+            }
+
             response += '\n';
         });
 
-        if (data.length > 10) {
-            response += `\n... and ${data.length - 10} more results.`;
-        }
-
-        return response;
-    }
-
-    /**
-     * Format List Response - Smart Column Selection
-     */
-    private formatListResponse(data: any[], question: string): string {
-        if (!data.length) return 'No results found.';
-
-        // Filter out id columns and internal columns
-        const skipColumns = ['id', 'created_at', 'updated_at', 'is_deleted', 'registration_id', 'program_id', 'career_role_id', 'corporate_account_id'];
-        const allKeys = Object.keys(data[0]);
-        const keys = allKeys.filter(k => !skipColumns.includes(k.toLowerCase()));
-
-        // If all columns were filtered, use original keys minus just 'id'
-        const displayKeys = keys.length > 0 ? keys : allKeys.filter(k => k.toLowerCase() !== 'id');
-
-        let response = `**Found ${data.length} results:**\n\n`;
-
-        data.slice(0, 15).forEach((row, i) => {
-            // Find primary display field (prefer name, email, title)
-            const primaryKey = displayKeys.find(k =>
-                k.includes('name') || k.includes('email') || k.includes('title') || k === 'career_role_name'
-            ) || displayKeys[0];
-
-            const primary = row[primaryKey] || 'N/A';
-
-            // Build detail string from other columns
-            const details: string[] = [];
-            displayKeys.forEach(key => {
-                if (key !== primaryKey && row[key] !== null && row[key] !== undefined) {
-                    const value = row[key];
-                    const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-
-                    // Format based on type
-                    if (typeof value === 'boolean') {
-                        details.push(`${label}: ${value ? 'Yes' : 'No'}`);
-                    } else if (typeof value === 'string' && value.length < 50) {
-                        details.push(`${label}: ${value}`);
-                    } else if (typeof value === 'number') {
-                        details.push(`${label}: ${value}`);
-                    }
-                }
-            });
-
-            response += `${i + 1}. **${primary}**`;
-            if (details.length > 0) {
-                response += `\n   ${details.slice(0, 4).join(' | ')}`;
-            }
-            response += '\n\n';
-        });
-
-        if (data.length > 15) {
-            response += `... and ${data.length - 15} more.`;
+        if (data.length > 5) {
+            response += `*... and ${data.length - 5} more*`;
         }
 
         return response.trim();
     }
 
-    /**
-     * Format Data Response
-     */
-    private formatDataResponse(data: any[]): string {
-        if (!data.length) return 'No data found.';
+    private getAgileLevel(score: number): { name: string; desc: string } {
+        if (score >= 100) return { name: AGILE_LEVELS.naturalist.name, desc: AGILE_LEVELS.naturalist.desc };
+        if (score >= 75) return { name: AGILE_LEVELS.adaptive.name, desc: AGILE_LEVELS.adaptive.desc };
+        if (score >= 50) return { name: AGILE_LEVELS.learner.name, desc: AGILE_LEVELS.learner.desc };
+        return { name: AGILE_LEVELS.resistant.name, desc: AGILE_LEVELS.resistant.desc };
+    }
 
-        const row = data[0];
-        const entries = Object.entries(row).slice(0, 6);
-
-        let response = '';
-        entries.forEach(([key, value]) => {
-            const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-            response += `**${label}:** ${value}\n`;
+    private formatUserList(data: any[]): string {
+        let response = '**👥 Users:**\n\n';
+        data.slice(0, 10).forEach((row, i) => {
+            const status = row.is_active ? '✓' : '✗';
+            response += `${i + 1}. ${row.email} | ${row.role} | ${status} Active | ${row.login_count || 0} logins\n`;
         });
-
+        if (data.length > 10) response += `\n*... and ${data.length - 10} more*`;
         return response;
     }
 
-    /**
-     * Format Semantic Response
-     */
-    private formatSemanticResponse(results: any[]): string {
-        let response = 'Here\'s what I found:\n\n';
-        results.slice(0, 5).forEach((r, i) => {
-            response += `${i + 1}. ${r.content?.slice(0, 150)}...\n`;
+    private formatCandidateList(data: any[]): string {
+        let response = '**📋 Candidates:**\n\n';
+        data.slice(0, 10).forEach((row, i) => {
+            response += `${i + 1}. **${row.full_name}** | ${row.gender || 'N/A'} | ${row.status}\n`;
+        });
+        if (data.length > 10) response += `\n*... and ${data.length - 10} more*`;
+        return response;
+    }
+
+    private formatCareerRoles(data: any[]): string {
+        let response = '**💼 Career Roles:**\n\n';
+        data.forEach((row, i) => {
+            response += `${i + 1}. **${row.career_role_name}**\n`;
+            if (row.short_description) {
+                response += `   ${row.short_description.slice(0, 80)}...\n`;
+            }
         });
         return response;
     }
 
-    /**
-     * Handle Report Generation with Analysis
-     */
-    private async handleReportIntent(question: string, sqlResult: any, user: any): Promise<QueryResult> {
-        // Analyze what report the user wants
-        const reportType = this.analyzeReportType(question);
-
-        // Get relevant data
-        let reportData = sqlResult.data || [];
-        let reportQuery = question;
-
-        // If no data from initial query, try to get relevant data based on report type
-        if (!reportData.length) {
-            const fallbackResult = await this.getReportData(reportType);
-            reportData = fallbackResult.data || [];
-            reportQuery = fallbackResult.query;
-        }
-
-        const reportId = `report_${Date.now()}`;
-        const reportPath = path.join(this.reportsDir, `${reportId}.txt`);
-
-        // Build formatted report
-        let content = this.buildReport(reportType, reportData, question);
-
-        // Save report
-        fs.writeFileSync(reportPath, content);
-
-        const recordCount = reportData.length;
-
-        return {
-            answer: `📊 **${reportType} Report Generated**\n\nReport contains **${recordCount}** records.\n\n📥 **[Download Report](/rag/reports/${reportId})**`,
-            searchType: 'report',
-            sources: { records: recordCount },
-            confidence: 0.95,
-            reportUrl: `/rag/reports/${reportId}`,
-            reportId: reportId,
-            intent: 'REPORT',
-        };
+    private formatGenericList(data: any[]): string {
+        let response = `**Found ${data.length} results:**\n\n`;
+        const keys = Object.keys(data[0]).filter(k => !k.includes('id') && !k.includes('_at'));
+        data.slice(0, 8).forEach((row, i) => {
+            response += `${i + 1}. ${keys.map(k => row[k]).filter(v => v).join(' | ')}\n`;
+        });
+        return response;
     }
 
-    /**
-     * Analyze Report Type
-     */
-    private analyzeReportType(question: string): string {
-        const q = question.toLowerCase();
-
-        if (q.includes('user')) return 'User Report';
-        if (q.includes('exam') || q.includes('test') || q.includes('assessment')) return 'Assessment Report';
-        if (q.includes('career') || q.includes('role')) return 'Career Roles Report';
-        if (q.includes('course')) return 'Courses Report';
-        if (q.includes('candidate') || q.includes('registration')) return 'Candidates Report';
-        if (q.includes('company') || q.includes('corporate')) return 'Corporate Report';
-
-        return 'Data Report';
-    }
-
-    /**
-     * Get Report Data
-     */
-    private async getReportData(reportType: string): Promise<{ data: any[]; query: string }> {
-        let query = '';
-
-        switch (reportType) {
-            case 'User Report':
-                query = 'SELECT id, email, role, is_active, login_count FROM users LIMIT 100';
-                break;
-            case 'Assessment Report':
-                query = `SELECT registrations.full_name, assessment_attempts.score, assessment_attempts.status, programs.name as program 
-                         FROM assessment_attempts 
-                         JOIN registrations ON assessment_attempts.registration_id = registrations.id 
-                         LEFT JOIN programs ON assessment_attempts.program_id = programs.id 
-                         ORDER BY assessment_attempts.created_at DESC LIMIT 100`;
-                break;
-            case 'Career Roles Report':
-                query = 'SELECT career_role_name, short_description FROM career_roles WHERE is_deleted = false LIMIT 100';
-                break;
-            case 'Courses Report':
-                query = 'SELECT course_name, notes, compatibility_percentage FROM trait_based_course_details WHERE is_deleted = false LIMIT 100';
-                break;
-            case 'Candidates Report':
-                query = 'SELECT full_name, email, gender, status FROM registrations WHERE is_deleted = false LIMIT 100';
-                break;
-            default:
-                query = 'SELECT id, email, role FROM users LIMIT 50';
-        }
-
-        try {
-            const data = await this.dataSource.query(query);
-            return { data, query };
-        } catch {
-            return { data: [], query };
-        }
-    }
-
-    /**
-     * Build Formatted Report
-     */
-    private buildReport(reportType: string, data: any[], question: string): string {
-        const divider = '═'.repeat(60);
-        const now = new Date().toLocaleString();
-
-        let content = `
-${divider}
-                    ORIGINBI ${reportType.toUpperCase()}
-${divider}
-
-Generated: ${now}
-Query: ${question}
-Total Records: ${data.length}
-
-${divider}
-                         DATA
-${divider}
-
-`;
-
-        if (data.length === 0) {
-            content += 'No records found matching your criteria.\n';
-        } else {
-            // Get column headers
-            const headers = Object.keys(data[0]);
-
-            // Add header row
-            content += headers.map(h => h.toUpperCase().padEnd(20)).join(' | ') + '\n';
-            content += '-'.repeat(headers.length * 22) + '\n';
-
-            // Add data rows
-            data.forEach(row => {
-                const values = headers.map(h => {
-                    const val = row[h];
-                    return String(val || '').slice(0, 18).padEnd(20);
-                });
-                content += values.join(' | ') + '\n';
-            });
-        }
-
-        content += `
-${divider}
-                      END OF REPORT
-${divider}
-Generated by OriginBI RAG System v6.0
-`;
-
-        return content;
-    }
-
-    /**
-     * Handle Comparison Intent
-     */
-    private async handleCompareIntent(question: string): Promise<QueryResult> {
-        const match = question.match(/compare\s+(.+?)\s+(?:and|vs|versus|with)\s+(.+)/i) ||
-            question.match(/(.+?)\s+vs\s+(.+)/i);
-
-        if (!match) {
-            return {
-                answer: 'Please specify two items to compare. Example: "compare Java Developer and Python Developer"',
-                searchType: 'compare',
-                confidence: 0.3,
-            };
-        }
-
-        const [, entity1, entity2] = match;
-
-        const [result1, result2] = await Promise.all([
-            this.executeSqlQuery(`find ${entity1.trim()}`, 'DATA_QUERY'),
-            this.executeSqlQuery(`find ${entity2.trim()}`, 'DATA_QUERY'),
-        ]);
-
-        let answer = `**Comparison: ${entity1.trim()} vs ${entity2.trim()}**\n\n`;
-
-        if (result1.success && result1.data && result1.data.length > 0) {
-            answer += `**${entity1.trim()}:** Found ${result1.data.length} matches\n`;
-        } else {
-            answer += `**${entity1.trim()}:** No data found\n`;
-        }
-
-        if (result2.success && result2.data && result2.data.length > 0) {
-            answer += `**${entity2.trim()}:** Found ${result2.data.length} matches\n`;
-        } else {
-            answer += `**${entity2.trim()}:** No data found\n`;
-        }
-
-        return {
-            answer,
-            searchType: 'compare',
-            confidence: 0.8,
-        };
-    }
-
-    // ============ Service Methods ============
-
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SERVICE METHODS
+    // ═══════════════════════════════════════════════════════════════════════════
     async getStatus(): Promise<any> {
-        const embeddingStatus = this.embeddingsService.getStatus();
-        const docStats = await this.embeddingsService.getDocumentStats();
         let totalDocs = 0;
         try {
             const r = await this.dataSource.query('SELECT COUNT(*) as count FROM rag_documents');
@@ -577,21 +680,19 @@ Generated by OriginBI RAG System v6.0
 
         return {
             status: 'ok',
-            service: 'rag',
-            version: '6.0.0-production',
-            embeddings: embeddingStatus,
-            knowledgeBase: { totalDocuments: totalDocs, categories: docStats, ready: totalDocs > 0 },
-            capabilities: ['sql_query', 'semantic_search', 'compare', 'report_generation', 'exam_results'],
+            version: '11.0.0-production',
+            features: ['llm_query_understanding', 'disc_personality', 'agile_aci', 'smart_formatting'],
+            knowledgeBase: { documents: totalDocs },
         };
     }
 
-    async seedKnowledgeBase() { return { indexed: 0, note: 'Use SyncService for seeding' }; }
-    async rebuildKnowledgeBase() { return this.seedKnowledgeBase(); }
+    async seedKnowledgeBase() { return { indexed: 0 }; }
+    async rebuildKnowledgeBase() { return { indexed: 0 }; }
     async ingest(req: any) {
         const id = await this.embeddingsService.storeDocument(req.content, req.category, req.metadata, req.sourceTable, req.sourceId);
         return { success: !!id, documentId: id };
     }
     async bulkIngest(docs: any[]) { return this.embeddingsService.bulkStoreDocuments(docs); }
-    async indexExistingData() { return this.seedKnowledgeBase(); }
+    async indexExistingData() { return { indexed: 0 }; }
     async generatePdf(data: any, q: string) { return Buffer.from(`Query: ${q}\n\n${data.answer}`); }
 }

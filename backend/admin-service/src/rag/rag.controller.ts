@@ -10,10 +10,11 @@ import {
     HttpStatus,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsIn, IsArray, ValidateNested } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsIn, IsArray, ValidateNested, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 import { RagService } from './rag.service';
 import { SyncService } from './sync.service';
+import { FutureRoleReportService } from './future-role-report.service';
 
 // DTO for query request
 export class RagQueryDto {
@@ -24,6 +25,48 @@ export class RagQueryDto {
     @IsOptional()
     @IsBoolean()
     generatePdf?: boolean;
+}
+
+// DTO for Career Report
+export class CareerReportDto {
+    @IsString()
+    @IsNotEmpty()
+    name: string;
+
+    @IsString()
+    @IsNotEmpty()
+    currentRole: string;
+
+    @IsString()
+    @IsNotEmpty()
+    currentJobDescription: string;
+
+    @IsNumber()
+    yearsOfExperience: number;
+
+    @IsString()
+    @IsNotEmpty()
+    relevantExperience: string;
+
+    @IsString()
+    @IsNotEmpty()
+    currentIndustry: string;
+
+    @IsString()
+    @IsNotEmpty()
+    expectedFutureRole: string;
+
+    @IsOptional()
+    @IsString()
+    behavioralStyle?: string;
+
+    @IsOptional()
+    @IsString()
+    behavioralDescription?: string;
+
+    @IsOptional()
+    @IsNumber()
+    agileScore?: number;
 }
 
 // DTO for single document ingestion
@@ -73,7 +116,30 @@ export class RagController {
     constructor(
         private readonly ragService: RagService,
         private readonly syncService: SyncService,
+        private readonly futureRoleReportService: FutureRoleReportService,
     ) { }
+
+    /**
+     * POST /rag/career-report
+     * Generate Career Fitment & Future Role Readiness Report
+     */
+    @Post('career-report')
+    async generateCareerReport(@Body() dto: CareerReportDto) {
+        try {
+            const report = await this.futureRoleReportService.generateReport(dto);
+            return {
+                success: true,
+                reportId: report.reportId,
+                report: report.fullReportText,
+                generatedAt: report.generatedAt,
+            };
+        } catch (error) {
+            throw new HttpException(
+                error.message || 'Failed to generate career report',
+                HttpStatus.INTERNAL_SERVER_ERROR,
+            );
+        }
+    }
 
     /**
      * POST /rag/query

@@ -4,6 +4,8 @@ import { RagController } from './rag.controller';
 import { RagService } from './rag.service';
 import { EmbeddingsService } from './embeddings.service';
 import { SyncService } from './sync.service';
+import { FutureRoleReportService } from './future-role-report.service';
+import { OverallRoleFitmentService } from './overall-role-fitment.service';
 import {
     Registration,
     AssessmentAttempt,
@@ -21,7 +23,9 @@ import {
         ]),
     ],
     controllers: [RagController],
-    providers: [RagService, EmbeddingsService, SyncService],
-    exports: [RagService, SyncService],
+    providers: [RagService, EmbeddingsService, SyncService, FutureRoleReportService, OverallRoleFitmentService],
+    exports: [RagService, SyncService, FutureRoleReportService, OverallRoleFitmentService],
 })
 export class RagModule { }
+
+
