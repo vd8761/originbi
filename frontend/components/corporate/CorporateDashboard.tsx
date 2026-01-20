@@ -39,18 +39,18 @@ const CircleArrowUpRightFilled = ({ className = "w-6 h-6" }: { className?: strin
 const MiniStat = ({ label, value, trend, isPositive }: { label: string, value: string, trend?: string, isPositive?: boolean }) => (
     <div className="flex flex-col pr-6 pl-0 sm:px-6 sm:first:pl-0 w-full sm:w-auto flex-1 border-b sm:border-b-0 sm:border-r border-[#E0E0E0] dark:border-white/10 last:border-0 sm:last:border-r-0 h-full justify-between py-4 sm:py-1">
         <div className="flex justify-between items-start gap-3">
-            <span className="text-[clamp(12px,0.73vw,14px)] text-[#19211C] dark:text-white font-normal whitespace-nowrap">{label}</span>
+            <span className="text-[clamp(14px,1vw,16px)] text-[#19211C] dark:text-white font-normal whitespace-nowrap">{label}</span>
             <CircleArrowUpRightFilled className="w-6 h-6" />
         </div>
         <div className="flex flex-row items-baseline gap-3">
-            <span className="text-[clamp(28px,2.3vw,44px)] font-medium text-[#150089] dark:text-white leading-none">{value}</span>
+            <span className="text-[clamp(32px,2.5vw,48px)] font-medium text-[#150089] dark:text-white leading-none">{value}</span>
             {trend && (
                 <div className="flex items-center gap-2">
-                    <span className={`text-[clamp(12px,0.73vw,14px)] font-semibold flex items-center gap-1.5 ${isPositive ? 'text-[#1ED36A]' : 'text-[#FF5457]'}`}>
+                    <span className={`text-[clamp(14px,1vw,16px)] font-semibold flex items-center gap-1.5 ${isPositive ? 'text-[#1ED36A]' : 'text-[#FF5457]'}`}>
                         {trend}
                         {isPositive ? <TrendUpIcon /> : <TrendDownIcon />}
                     </span>
-                    <span className="text-[clamp(10px,0.6vw,12px)] font-normal text-[#19211C] dark:text-white opacity-80 whitespace-nowrap">
+                    <span className="text-[clamp(12px,0.8vw,14px)] font-normal text-[#19211C] dark:text-white opacity-80 whitespace-nowrap">
                         vs last month
                     </span>
                 </div>
@@ -71,7 +71,7 @@ const CreditsCard = ({ credits }: { credits: number }) => (
 
         {/* Watermark Number */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
-            <span className="font-['Haskoy'] font-extrabold text-[clamp(120px,18.2vw,350px)] text-[#19211C] dark:text-white opacity-[0.02] leading-none select-none tracking-normal">
+            <span className="font-['Haskoy'] font-extrabold text-[clamp(140px,20vw,380px)] text-[#19211C] dark:text-white opacity-[0.02] leading-none select-none tracking-normal">
                 {credits}
             </span>
         </div>
@@ -87,7 +87,7 @@ const CreditsCard = ({ credits }: { credits: number }) => (
             <div className="flex-1 flex flex-col justify-center items-center py-4">
                 <div className="flex flex-col items-start">
                     <div className="font-['Haskoy'] font-normal text-[14px] text-[#19211C] dark:text-white mb-4 text-left pl-1 opacity-90">Your balance</div>
-                    <div className="font-['Haskoy'] font-medium text-[clamp(80px,5vw,120px)] text-[#150089] dark:text-white leading-[0.85] tracking-tight">
+                    <div className="font-['Haskoy'] font-medium text-[clamp(90px,6vw,130px)] text-[#150089] dark:text-white leading-[0.85] tracking-tight">
                         {credits}
                     </div>
                 </div>
@@ -95,7 +95,7 @@ const CreditsCard = ({ credits }: { credits: number }) => (
 
             {/* Button - Increased Text Size and Padding */}
             <div className="flex justify-center">
-                <button className="font-['Haskoy'] font-medium text-[clamp(14px,0.83vw,16px)] text-white bg-[#1ED36A] hover:bg-[#16b058] px-12 py-3.5 rounded-full shadow-lg shadow-[#1ED36A]/20 transition-all">
+                <button className="font-['Haskoy'] font-medium text-[clamp(16px,1vw,18px)] text-white bg-[#1ED36A] hover:bg-[#16b058] px-12 py-3.5 rounded-full shadow-lg shadow-[#1ED36A]/20 transition-all">
                     Buy now
                 </button>
             </div>
@@ -126,8 +126,8 @@ const AssessmentBarChart = () => {
     return (
         <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-8 border border-[#E0E0E0] dark:border-white/10 h-full flex flex-col font-['Haskoy'] overflow-visible shadow-sm">
             <div className="flex justify-between items-center mb-8">
-                <h3 className="text-[clamp(16px,1.04vw,20px)] font-semibold text-[#19211C] dark:text-white leading-none">Assessment Insights</h3>
-                <div className="flex gap-4 text-[clamp(10px,0.6vw,12px)] font-medium text-[#19211C] dark:text-white">
+                <h3 className="text-[clamp(18px,1.2vw,22px)] font-semibold text-[#19211C] dark:text-white leading-none">Assessment Insights</h3>
+                <div className="flex gap-4 text-[clamp(12px,0.8vw,14px)] font-medium text-[#19211C] dark:text-white">
                     <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-[#150089] dark:bg-white"></span> Assigned</div>
                     <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-[#1ED36A]"></span> Completed</div>
                 </div>
@@ -135,7 +135,7 @@ const AssessmentBarChart = () => {
 
             <div className="flex-1 flex gap-4">
                 {/* Y Axis */}
-                <div className="flex flex-col justify-between text-[#19211C] dark:text-white font-light text-[clamp(12px,0.8vw,16px)] pb-8 pt-2">
+                <div className="flex flex-col justify-between text-[#19211C] dark:text-white font-light text-[clamp(14px,1vw,17px)] pb-8 pt-2">
                     <span>400</span>
                     <span>300</span>
                     <span>200</span>
@@ -198,7 +198,7 @@ const AssessmentBarChart = () => {
                                     <div className="absolute top-full left-[20%] -translate-x-1/2 border-[6px] border-transparent border-t-[#19211C] dark:border-t-[#1ED36A]/50 drop-shadow-sm"></div>
                                 </div>
                             </div>
-                            <span className="text-[clamp(12px,0.8vw,16px)] font-light text-[#19211C] dark:text-white">{d.label}</span>
+                            <span className="text-[clamp(14px,1vw,17px)] font-light text-[#19211C] dark:text-white">{d.label}</span>
                         </div>
                     ))}
                 </div>
@@ -219,12 +219,12 @@ const RecruitmentOverview = () => {
         <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-8 border border-[#E0E0E0] dark:border-white/10 h-full font-['Haskoy'] flex flex-col shadow-sm">
             {/* Header */}
             <div className="flex justify-between items-center mb-8">
-                <h3 className="text-[clamp(16px,1.04vw,20px)] font-semibold text-[#19211C] dark:text-white leading-none">
+                <h3 className="text-[clamp(18px,1.2vw,22px)] font-semibold text-[#19211C] dark:text-white leading-none">
                     Recruitment Overview
                 </h3>
                 {/* Date Dropdown */}
                 <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#E0E0E0] dark:border-white/10 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                    <span className="text-[clamp(11px,0.73vw,14px)] font-normal text-[#19211C] dark:text-white leading-none whitespace-nowrap">
+                    <span className="text-[clamp(13px,1vw,15px)] font-normal text-[#19211C] dark:text-white leading-none whitespace-nowrap">
                         September 2025
                     </span>
                     <svg className="w-4 h-4 text-[#19211C] dark:text-white opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 9l-7 7-7-7" /></svg>
@@ -236,10 +236,10 @@ const RecruitmentOverview = () => {
                 {items.map((item, i) => (
                     <div key={i} className="flex flex-col gap-3">
                         <div className="flex justify-between items-end">
-                            <span className="text-[clamp(11px,0.73vw,14px)] font-normal text-[#19211C] dark:text-white leading-none">
+                            <span className="text-[clamp(13px,1vw,15px)] font-normal text-[#19211C] dark:text-white leading-none">
                                 {item.label}
                             </span>
-                            <span className="text-[clamp(11px,0.73vw,14px)] font-semibold text-[#19211C] dark:text-white leading-none">
+                            <span className="text-[clamp(13px,1vw,15px)] font-semibold text-[#19211C] dark:text-white leading-none">
                                 {item.val}
                             </span>
                         </div>
@@ -282,8 +282,8 @@ const DonutChart = () => (
 
         {/* Center Text */}
         <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
-            <span className="font-['Haskoy'] font-semibold text-[clamp(18px,1.25vw,24px)] text-[#150089] dark:text-[#1ED36A] leading-tight">200</span>
-            <span className="font-['Haskoy'] font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-tight">Candidates</span>
+            <span className="font-['Haskoy'] font-semibold text-[clamp(20px,1.5vw,26px)] text-[#150089] dark:text-[#1ED36A] leading-tight">200</span>
+            <span className="font-['Haskoy'] font-normal text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white leading-tight">Candidates</span>
         </div>
     </div>
 );
@@ -298,16 +298,16 @@ const PersonalityDistribution = () => {
                         Applicant Personality Distribution
                     </h3>
                     <div className="flex flex-row items-center gap-2 sm:gap-6 whitespace-nowrap">
-                        <span className="font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white">
+                        <span className="font-normal text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white">
                             Total Applicants : <span className="font-semibold">200</span>
                         </span>
-                        <span className="flex items-center gap-1.5 font-semibold text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white">
+                        <span className="flex items-center gap-1.5 font-semibold text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white">
                             <span className="w-3 h-3 rounded-full bg-[#1ED36A]"></span> Top 4
                             <span className="font-normal">traits shown</span>
                         </span>
                     </div>
                 </div>
-                <button className="font-medium text-[clamp(11px,0.73vw,14px)] text-[#1ED36A] hover:underline whitespace-nowrap">
+                <button className="font-medium text-[clamp(13px,1vw,15px)] text-[#1ED36A] hover:underline whitespace-nowrap">
                     Know More
                 </button>
             </div>
@@ -325,33 +325,33 @@ const PersonalityDistribution = () => {
                     <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                             <span className="w-2 h-4 rounded-full bg-[#C2185B]"></span>
-                            <span className="font-medium text-[clamp(18px,1.25vw,24px)] text-[#19211C] dark:text-white leading-none">45</span>
+                            <span className="font-medium text-[clamp(20px,1.5vw,26px)] text-[#19211C] dark:text-white leading-none">45</span>
                         </div>
-                        <span className="font-medium text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none pl-4">Supportive Energizer</span>
+                        <span className="font-medium text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white leading-none pl-4">Supportive Energizer</span>
                     </div>
                     {/* Item 2 */}
                     <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                             <span className="w-2 h-4 rounded-full bg-[#FBC02D]"></span>
-                            <span className="font-medium text-[clamp(18px,1.25vw,24px)] text-[#19211C] dark:text-white leading-none">32</span>
+                            <span className="font-medium text-[clamp(20px,1.5vw,26px)] text-[#19211C] dark:text-white leading-none">32</span>
                         </div>
-                        <span className="font-medium text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none pl-4">Strategic Stabilizer</span>
+                        <span className="font-medium text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white leading-none pl-4">Strategic Stabilizer</span>
                     </div>
                     {/* Item 3 */}
                     <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                             <span className="w-2 h-4 rounded-full bg-[#D4E157]"></span>
-                            <span className="font-medium text-[clamp(18px,1.25vw,24px)] text-[#19211C] dark:text-white leading-none">28</span>
+                            <span className="font-medium text-[clamp(20px,1.5vw,26px)] text-[#19211C] dark:text-white leading-none">28</span>
                         </div>
-                        <span className="font-medium text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none pl-4">Decisive Analyst</span>
+                        <span className="font-medium text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white leading-none pl-4">Decisive Analyst</span>
                     </div>
                     {/* Item 4 */}
                     <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                             <span className="w-2 h-4 rounded-full bg-[#D32F2F]"></span>
-                            <span className="font-medium text-[clamp(18px,1.25vw,24px)] text-[#19211C] dark:text-white leading-none">21</span>
+                            <span className="font-medium text-[clamp(20px,1.5vw,26px)] text-[#19211C] dark:text-white leading-none">21</span>
                         </div>
-                        <span className="font-medium text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none pl-4">Charismatic Leader</span>
+                        <span className="font-medium text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white leading-none pl-4">Charismatic Leader</span>
                     </div>
                 </div>
             </div>
@@ -376,7 +376,7 @@ const ParticipantsTable = ({ participants }: { participants: Participant[] }) =>
                 <h3 className="font-semibold text-[clamp(16px,1.04vw,20px)] text-[#19211C] dark:text-white leading-none">
                     Assessment Participants
                 </h3>
-                <span className="font-medium text-[clamp(11px,0.73vw,14px)] text-[#1ED36A] cursor-pointer hover:underline">
+                <span className="font-medium text-[clamp(13px,1vw,15px)] text-[#1ED36A] cursor-pointer hover:underline">
                     View all
                 </span>
             </div>
@@ -397,10 +397,10 @@ const ParticipantsTable = ({ participants }: { participants: Participant[] }) =>
                     <tbody className="divide-y divide-[#F5F5F5] dark:divide-white/5">
                         {tableData.map((row, i) => (
                             <tr key={i} className="group hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                                <td className="py-3.5 pl-6 pr-4 font-medium text-[clamp(12px,0.83vw,16px)] text-[#19211C] dark:text-white leading-none">
+                                <td className="py-3.5 pl-6 pr-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">
                                     {row.name}
                                 </td>
-                                <td className="py-3.5 px-4 font-medium text-[clamp(12px,0.83vw,16px)] text-[#19211C] dark:text-white leading-none">
+                                <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">
                                     {row.type}
                                 </td>
                                 <td className="py-3.5 px-4 text-center">
@@ -411,10 +411,10 @@ const ParticipantsTable = ({ participants }: { participants: Participant[] }) =>
                                         <div className={`w-[14px] h-[14px] bg-white rounded-full shadow-sm transform transition-transform duration-300 ${row.status ? 'translate-x-[30px]' : 'translate-x-0'} z-10`}></div>
                                     </div>
                                 </td>
-                                <td className="py-3.5 px-4 font-medium text-[clamp(12px,0.83vw,16px)] text-[#19211C] dark:text-white leading-none">
+                                <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">
                                     {row.date}
                                 </td>
-                                <td className="py-3.5 px-4 font-medium text-[clamp(12px,0.83vw,16px)] text-[#19211C] dark:text-white leading-none">
+                                <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">
                                     {row.mobile}
                                 </td>
                                 <td className="py-3.5 pl-4 pr-6 text-center">
@@ -440,7 +440,7 @@ const ProfileResult = () => (
 
             {/* Left: Personality Title */}
             <div className="lg:w-1/4 text-center lg:text-left flex flex-col justify-center pt-8 lg:pt-16">
-                <h2 className="text-[clamp(32px,2.3vw,44px)] font-semibold text-[#150089] dark:text-white leading-[1.1] flex flex-col items-center lg:block">
+                <h2 className="text-[clamp(36px,2.5vw,48px)] font-semibold text-[#150089] dark:text-white leading-[1.1] flex flex-col items-center lg:block">
                     <span>Supportive</span>
                     <span className="lg:ml-16 block">Energizer</span>
                 </h2>
@@ -467,9 +467,9 @@ const ProfileResult = () => (
             <div className="lg:w-5/12 w-full text-left pl-0 lg:pl-4">
                 {/* Header Info */}
                 <div className="mb-8 border-b border-gray-100 dark:border-white/5 pb-6">
-                    <h1 className="text-[clamp(18px,1.25vw,24px)] font-semibold text-[#19211C] dark:text-white mb-2 leading-tight">Pushparaaj</h1>
-                    <div className="text-[clamp(12px,0.8vw,16px)] font-medium text-[#1ED36A] mb-1 leading-snug">B.Tech Information Technology (3rd Year)</div>
-                    <div className="text-[clamp(11px,0.7vw,14px)] font-normal text-[#19211C] dark:text-white opacity-80 leading-snug">Peri Institute of Engineering and Technology</div>
+                    <h1 className="text-[clamp(20px,1.5vw,26px)] font-semibold text-[#19211C] dark:text-white mb-2 leading-tight">Pushparaaj</h1>
+                    <div className="text-[clamp(14px,1.1vw,17px)] font-medium text-[#1ED36A] mb-1 leading-snug">B.Tech Information Technology (3rd Year)</div>
+                    <div className="text-[clamp(13px,1.1vw,16px)] font-normal text-[#19211C] dark:text-white opacity-80 leading-snug">Peri Institute of Engineering and Technology</div>
                 </div>
 
                 {/* Key Strengths Section */}
@@ -485,7 +485,7 @@ const ProfileResult = () => (
 
                     {/* Strength List */}
                     <div>
-                        <h4 className="text-[clamp(14px,0.9vw,18px)] font-semibold text-[#19211C] dark:text-white mb-3">Key Strength</h4>
+                        <h4 className="text-[clamp(16px,1.1vw,20px)] font-semibold text-[#19211C] dark:text-white mb-3">Key Strength</h4>
                         <ul className="space-y-2.5">
                             {[
                                 "Frequently reviews and aligns goals to stay focused and motivated.",
@@ -494,7 +494,7 @@ const ProfileResult = () => (
                                 "Actively seeks constructive feedback from peers and mentors to grow and develop.",
                                 "Adapts strategies to remain effective in changing circumstances."
                             ].map((item, i) => (
-                                <li key={i} className="flex items-start gap-2 text-[clamp(12px,0.8vw,16px)] font-normal text-[#19211C] dark:text-white leading-snug">
+                                <li key={i} className="flex items-start gap-2 text-[clamp(14px,1.1vw,17px)] font-normal text-[#19211C] dark:text-white leading-snug">
                                     <span className="mt-1.5 w-1 h-1 rounded-full bg-[#19211C] dark:bg-white shrink-0"></span>
                                     <span>{item}</span>
                                 </li>
@@ -509,10 +509,10 @@ const ProfileResult = () => (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 bg-[#F9F9F9] dark:bg-white/5 rounded-2xl overflow-hidden mb-8">
             {/* Role Alignment */}
             <div className="p-6 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-white/5">
-                <h5 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(16px,1.25vw,20px)] font-semibold mb-4">Role Alignment</h5>
+                <h5 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(18px,1.4vw,22px)] font-semibold mb-4">Role Alignment</h5>
                 <ul className="space-y-1">
                     {["User Experience (UX) Designer", "IT Business Analyst", "Knowledge Management Specialist"].map(role => (
-                        <li key={role} className="flex items-center gap-1 text-[clamp(12px,0.97vw,15px)] font-normal text-[#19211C] dark:text-white">
+                        <li key={role} className="flex items-center gap-1 text-[clamp(14px,1.1vw,16px)] font-normal text-[#19211C] dark:text-white">
                             <span className="w-2 h-2 bg-gray-400 rounded-full"></span> {role}
                         </li>
                     ))}
@@ -523,7 +523,7 @@ const ProfileResult = () => (
             <div className="p-6">
                 <h5 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(16px,1.25vw,20px)] font-semibold mb-4">Career Growth Tips</h5>
                 <div className="space-y-5">
-                    <p className="text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-relaxed opacity-90 mb-4">
+                    <p className="text-[clamp(16px,1.3vw,19px)] text-[#19211C] dark:text-white leading-relaxed opacity-90 mb-4">
                         The candidate's vibrant personality and optimistic outlook are among his/her greatest assets, but like any strength, these can be overextended. To ensure continued growth, here are some tailored recommendations for the candidate:
                     </p>
                     {[
@@ -534,8 +534,8 @@ const ProfileResult = () => (
                         { title: "Time Management", desc: "With a packed schedule and multiple interests, time management is key. Setting clear timelines and avoiding overcommitment will allow the candidate to balance aspirations with well-being." },
                     ].map((tip, i) => (
                         <div key={i}>
-                            <span className="font-bold text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white block mb-1">{tip.title}</span>
-                            <p className="text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-relaxed font-normal">{tip.desc}</p>
+                            <span className="font-bold text-[clamp(16px,1.3vw,19px)] text-[#19211C] dark:text-white block mb-1">{tip.title}</span>
+                            <p className="text-[clamp(16px,1.3vw,19px)] text-[#19211C] dark:text-white leading-relaxed font-normal">{tip.desc}</p>
                         </div>
                     ))}
                 </div>
@@ -544,15 +544,15 @@ const ProfileResult = () => (
 
         {/* Footer Description */}
         <div className="mt-8 pt-4">
-            <h3 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(20px,1.66vw,28px)] font-semibold mb-2">Pushparaaj is Supportive Energizer</h3>
-            <p className="text-[clamp(12px,0.97vw,15px)] text-[#19211C] dark:text-white leading-relaxed font-normal mb-6">
+            <h3 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(24px,2vw,32px)] font-semibold mb-2">Pushparaaj is Supportive Energizer</h3>
+            <p className="text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white leading-relaxed font-normal mb-6">
                 <span className="font-semibold text-black dark:text-white opacity-90">Description:</span> A warm, empathetic individual who thrives on fostering harmony and collaboration. Your focus on relationships and positivity makes you an invaluable team player and connector.
             </p>
 
             <div className="space-y-6">
                 <div>
-                    <h4 className="text-[clamp(14px,1.1vw,17px)] font-semibold text-[#19211C] dark:text-white mb-2">Key Behaviors:</h4>
-                    <ul className="list-disc pl-5 space-y-1.5 text-[clamp(12px,0.97vw,15px)] text-[#19211C] dark:text-white font-normal">
+                    <h4 className="text-[clamp(16px,1.3vw,19px)] font-semibold text-[#19211C] dark:text-white mb-2">Key Behaviors:</h4>
+                    <ul className="list-disc pl-5 space-y-1.5 text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white font-normal">
                         <li>Builds meaningful relationships and fosters trust within teams.</li>
                         <li>Creates a collaborative environment where everyone feels valued.</li>
                         <li>Acts as a calming presence in high-stress situations.</li>
@@ -565,8 +565,8 @@ const ProfileResult = () => (
                 </div>
 
                 <div>
-                    <h4 className="text-[clamp(14px,1.1vw,17px)] font-semibold text-[#19211C] dark:text-white mb-2">Typical Scenarios:</h4>
-                    <ul className="list-disc pl-5 space-y-1.5 text-[clamp(12px,0.97vw,15px)] text-[#19211C] dark:text-white font-normal">
+                    <h4 className="text-[clamp(16px,1.3vw,19px)] font-semibold text-[#19211C] dark:text-white mb-2">Typical Scenarios:</h4>
+                    <ul className="list-disc pl-5 space-y-1.5 text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white font-normal">
                         <li>Coordinating a team-building initiative to boost morale.</li>
                         <li>Leading a customer success program to improve retention rates.</li>
                         <li>Acting as a mentor to help colleagues achieve their potential.</li>
@@ -672,7 +672,7 @@ const CorporateDashboard: React.FC = () => {
             {/* 4. Search & Report Section */}
             <div>
                 <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-6 sm:p-10 border border-[#E0E0E0] dark:border-white/10 shadow-sm text-center font-['Haskoy'] mb-8">
-                    <h2 className="text-[clamp(24px,1.66vw,32px)] font-semibold text-[#150089] dark:text-white leading-none mb-4">
+                    <h2 className="text-[clamp(26px,1.8vw,34px)] font-semibold text-[#150089] dark:text-white leading-none mb-4">
                         Search Student Report
                     </h2>
                     <p className="text-[clamp(12px,0.83vw,16px)] font-normal text-[#19211C] dark:text-white mb-6 max-w-3xl mx-auto leading-tight">
