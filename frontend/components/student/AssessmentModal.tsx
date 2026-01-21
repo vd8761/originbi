@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useLanguage, Language } from "@/contexts/LanguageContext";
 
 // --- Local Icons ---
 const CustomTimeIcon = ({ className }: { className?: string }) => (
@@ -12,6 +13,39 @@ const CustomQuestionIcon = ({ className }: { className?: string }) => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
 );
+
+const modalTranslations = {
+  ENG: {
+    header: "Every Question Brings You Closer to Your True Strengths",
+    questions: "questions",
+    contains: "The test contains",
+    averageTime: "Average completion time is",
+    minutes: "minutes",
+    readCarefully: "Please Read Carefully",
+    point1: "You can pause and continue anytime.",
+    point2: "Ensure a calm and focused environment before starting.",
+    point3: "You must answer all questions for the test to be scored.",
+    goBack: "Go Back",
+    begin: "Begin Test",
+    continue: "Continue Assessment",
+    pending: "Questions Pending"
+  },
+  TAM: {
+    header: "Ovvoru kelviyum ungal unmaiyaana balathai kandaria uthavum",
+    questions: "kelvigal",
+    contains: "Indha thervil ullathu",
+    averageTime: "Sarasari neram",
+    minutes: "nimidangal",
+    readCarefully: "Dayavu seidhu kavanithu padikkavum",
+    point1: "Neengal eppothu vendumaanalum idai niruthi thodaalam.",
+    point2: "Thervai thodangum mun amaithiyaana suzhalai uruvaakkavum.",
+    point3: "Mathipeedu seiyya anaithu kelvigalukkum bathilalikka vendum.",
+    goBack: "Pin sella",
+    begin: "Thervai Thodanga",
+    continue: "Thodara",
+    pending: "Meedhamulla Kelvigal"
+  }
+};
 
 interface AssessmentData {
   id: string;
@@ -31,9 +65,11 @@ interface AssessmentModalProps {
 }
 
 const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onStart, assessment }) => {
-  const [language, setLanguage] = useState('ENG');
+  const { language, setLanguage } = useLanguage();
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const t = modalTranslations[language] || modalTranslations.ENG;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -56,7 +92,10 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
   const isContinue = assessment.status === 'in-progress';
   const progress = Math.round((assessment.completedQuestions / assessment.totalQuestions) * 100);
 
-  const handleLanguageChange = (lang: string) => {
+  // Extract number from duration string (e.g. "60 minutes" -> "60")
+  const durationVal = assessment.duration ? String(assessment.duration).replace(/minutes?/i, '').trim() : '30';
+
+  const handleLanguageChange = (lang: Language) => {
     setLanguage(lang);
     setIsLangDropdownOpen(false);
   };
@@ -78,7 +117,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
             {/* Header Section */}
             <div className="flex justify-between items-start mb-4">
               <p className="text-[10px] sm:text-xs text-brand-text-light-secondary dark:text-gray-400 font-medium max-w-[200px] leading-relaxed">
-                Every Question Brings You Closer to Your True Strengths
+                {t.header}
               </p>
 
               {/* Language Selector */}
@@ -128,7 +167,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
                   <CustomQuestionIcon className="w-5 h-5 text-white" />
                 </div>
                 <span className="text-[clamp(11px,0.9vw,14px)] font-medium text-brand-text-light-secondary dark:text-gray-300">
-                  The test contains <strong className="text-brand-text-light-primary dark:text-white font-bold">{assessment.totalQuestions} questions</strong>
+                  {t.contains} <strong className="text-brand-text-light-primary dark:text-white font-bold">{assessment.totalQuestions} {t.questions}</strong>
                 </span>
               </div>
 
@@ -140,25 +179,25 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
                   <CustomTimeIcon className="w-5 h-5 text-white" />
                 </div>
                 <span className="text-[clamp(11px,0.9vw,14px)] font-medium text-brand-text-light-secondary dark:text-gray-300">
-                  Average completion time is <strong className="text-brand-text-light-primary dark:text-white font-bold">{assessment.duration || '30 minutes'}</strong>
+                  {t.averageTime} <strong className="text-brand-text-light-primary dark:text-white font-bold">{durationVal} {t.minutes}</strong>
                 </span>
               </div>
 
             </div>
 
-            <h4 className="text-brand-text-light-primary dark:text-white font-semibold mb-2 text-[clamp(12px,1vw,15px)]">Please Read Carefully</h4>
+            <h4 className="text-brand-text-light-primary dark:text-white font-semibold mb-2 text-[clamp(12px,1vw,15px)]">{t.readCarefully}</h4>
             <ul className="space-y-1.5 mb-2">
               <li className="text-[clamp(10px,0.8vw,13px)] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-3">
                 <span className="block w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 mt-1.5 shrink-0"></span>
-                You can pause and continue anytime.
+                {t.point1}
               </li>
               <li className="text-[clamp(10px,0.8vw,13px)] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-3">
                 <span className="block w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 mt-1.5 shrink-0"></span>
-                Ensure a calm and focused environment before starting.
+                {t.point2}
               </li>
               <li className="text-[clamp(10px,0.8vw,13px)] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-3">
                 <span className="block w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 mt-1.5 shrink-0"></span>
-                You must <strong className="text-brand-text-light-primary dark:text-gray-300">answer all questions</strong> for the test to be scored.
+                {t.point3}
               </li>
             </ul>
 
@@ -166,7 +205,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
             {isContinue && (
               <div className="mb-4">
                 <div className="flex justify-between text-[10px] sm:text-xs font-bold mb-2">
-                  <span className="text-brand-green">{assessment.completedQuestions}/{assessment.totalQuestions} Questions Pending</span>
+                  <span className="text-brand-green">{assessment.completedQuestions}/{assessment.totalQuestions} {t.pending}</span>
                   <span className="text-brand-green">{progress}%</span>
                 </div>
                 <div className="h-1.5 w-full bg-brand-light-primary dark:bg-white/10 rounded-full overflow-hidden">
@@ -184,13 +223,13 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
               onClick={onClose}
               className="px-6 py-2 rounded-full border border-brand-light-tertiary dark:border-white/20 text-brand-text-light-primary dark:text-white text-[clamp(11px,0.9vw,14px)] font-bold hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
             >
-              Go Back
+              {t.goBack}
             </button>
             <button
               onClick={onStart}
               className="px-8 py-2 rounded-full bg-brand-green text-white text-[clamp(11px,0.9vw,14px)] font-bold hover:bg-brand-green/90 transition-colors shadow-lg shadow-brand-green/20"
             >
-              {isContinue ? 'Continue Assessment' : 'Begin Test'}
+              {isContinue ? t.continue : t.begin}
             </button>
           </div>
         </div>

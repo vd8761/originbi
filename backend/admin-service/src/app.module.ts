@@ -15,6 +15,8 @@ import { ForgotPasswordModule } from './forgotpassword/forgotpassword.module';
 import { RagModule } from './rag/rag.module';
 import { TestController } from './test/test.controller';
 import { MailAssetsController } from './mail/mail-assets.controller';
+import { HealthController } from './health.controller';
+import { KeepAliveModule } from './keepalive/keepalive.module';
 
 @Module({
   imports: [
@@ -97,7 +99,8 @@ import { MailAssetsController } from './mail/mail-assets.controller';
     CorporateModule,
     ForgotPasswordModule,
     RagModule,
+    KeepAliveModule,
   ],
-  controllers: [TestController, MailAssetsController],
+  controllers: [TestController, MailAssetsController, HealthController],
 })
-export class AppModule {}
+export class AppModule { }

@@ -45,8 +45,7 @@ export class CorporateService {
     private readonly http: HttpService,
   ) {
     this.authServiceBaseUrl =
-      this.configService.get<string>('AUTH_SERVICE_URL') ||
-      'http://localhost:4002';
+      this.configService.get<string>('AUTH_SERVICE_URL') ?? '';
   }
 
   async withRetry<T>(
@@ -120,8 +119,8 @@ export class CorporateService {
         typeof authErr === 'string'
           ? authErr
           : (authErr as { message?: string })?.message ||
-            JSON.stringify(authErr) ||
-            'Failed to create Cognito user';
+          JSON.stringify(authErr) ||
+          'Failed to create Cognito user';
 
       if (status === 429) {
         throw new HttpException(errorMessage, 429);
@@ -727,8 +726,8 @@ export class CorporateService {
       SES: ses, // Uppercase SES for Nodemailer v6
     } as any);
     const ccEmail = process.env.EMAIL_CC || '';
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:4001';
+    const frontendUrl = process.env.FRONTEND_URL ?? '';
+    const backendUrl = process.env.BACKEND_URL ?? '';
 
     const fromName =
       process.env.EMAIL_SEND_FROM_NAME || 'Origin BI (Corporate)';

@@ -9,6 +9,7 @@ import {
   AdminInitiateAuthCommand,
   AdminListGroupsForUserCommand,
   ForgotPasswordCommand,
+  GlobalSignOutCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 
 
@@ -242,6 +243,54 @@ export class CognitoService {
       console.error('[CognitoService] ForgotPassword error:', error);
       throw new InternalServerErrorException(
         `Forgot Password failed: ${error?.message || 'Unknown error'}`,
+      );
+    }
+  }
+  /**
+   * Refresh Token
+   */
+  async refreshToken(refreshToken: string) {
+    try {
+      const command = new AdminInitiateAuthCommand({
+        UserPoolId: this.userPoolId,
+        ClientId: this.clientId,
+        AuthFlow: 'REFRESH_TOKEN_AUTH',
+        AuthParameters: {
+          REFRESH_TOKEN: refreshToken,
+        },
+      });
+
+      const response = await this.cognitoClient.send(command);
+      return {
+        accessToken: response.AuthenticationResult?.AccessToken,
+        idToken: response.AuthenticationResult?.IdToken,
+        expiresIn: response.AuthenticationResult?.ExpiresIn,
+        tokenType: response.AuthenticationResult?.TokenType,
+      };
+    } catch (error: any) {
+      console.error('[CognitoService] RefreshToken error:', error);
+      throw new InternalServerErrorException(
+        `Refresh Token failed: ${error?.message || 'Unknown error'}`,
+      );
+    }
+  }
+
+  /**
+   * Logout (Global Sign Out)
+   * Invalidates all access tokens for the user.
+   */
+  async logout(accessToken: string) {
+    try {
+      const command = new GlobalSignOutCommand({
+        AccessToken: accessToken,
+      });
+
+      await this.cognitoClient.send(command);
+      return { message: 'Logged out successfully' };
+    } catch (error: any) {
+      console.error('[CognitoService] Logout error:', error);
+      throw new InternalServerErrorException(
+        `Logout failed: ${error?.message || 'Unknown error'}`,
       );
     }
   }

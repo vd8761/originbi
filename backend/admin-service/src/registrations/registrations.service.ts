@@ -30,7 +30,7 @@ export class RegistrationsService {
   private readonly logger = new Logger(RegistrationsService.name);
 
   private authServiceBaseUrl =
-    process.env.AUTH_SERVICE_URL || 'http://localhost:4002';
+    process.env.AUTH_SERVICE_URL;
 
   private readonly ADMIN_USER_ID = 1;
 
@@ -683,7 +683,7 @@ export class RegistrationsService {
 
     // Use full URLs for assets ("from application itself")
     // Controller is at /assets/:filename in admin-service (Port 4001)
-    const apiUrl = process.env.API_URL || 'http://localhost:4001';
+    const apiUrl = process.env.API_URL;
 
     const assets = {
       popper: `${apiUrl}/assets/Popper.png`,
@@ -696,7 +696,7 @@ export class RegistrationsService {
       name,
       to,
       pass,
-      process.env.FRONTEND_URL || 'http://localhost:3000',
+      process.env.FRONTEND_URL ?? '',
       assets,
       startDateTime,
       assessmentTitle,

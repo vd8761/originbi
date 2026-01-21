@@ -28,8 +28,7 @@ export class ForgotPasswordService {
     private configService: ConfigService,
   ) {
     this.authServiceUrl =
-      this.configService.get<string>('AUTH_SERVICE_URL') ||
-      'http://localhost:4002';
+      this.configService.get<string>('AUTH_SERVICE_URL') ?? '';
   }
 
   async initiateStudentReset(email: string) {

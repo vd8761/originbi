@@ -32,7 +32,7 @@ import { CreateCandidateDto } from './dto/create-candidate.dto';
 export class CorporateRegistrationsService {
     private readonly logger = new Logger(CorporateRegistrationsService.name);
     private authServiceBaseUrl =
-        process.env.AUTH_SERVICE_URL || 'http://localhost:4002';
+        process.env.AUTH_SERVICE_URL;
 
     async withRetry<T>(operation: () => Promise<T>, retries = 5, delay = 1000): Promise<T> {
         try {
@@ -307,7 +307,7 @@ export class CorporateRegistrationsService {
             } as any);
 
             // Use full URLs for assets ("from application itself")
-            const apiUrl = process.env.API_URL || 'http://localhost:4003';
+            const apiUrl = process.env.API_URL;
 
             const assets = {
                 popper: `${apiUrl}/email-assets/Popper.png`,
@@ -320,7 +320,7 @@ export class CorporateRegistrationsService {
                 name,
                 to,
                 pass,
-                process.env.FRONTEND_URL || 'http://localhost:3000',
+                process.env.FRONTEND_URL,
                 assets,
                 startDateTime,
                 assessmentTitle

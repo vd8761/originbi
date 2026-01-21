@@ -36,7 +36,7 @@ export class TestController {
       'Ariyappan',
       'test@example.com',
       'password123',
-      'http://localhost:3000',
+      process.env.FRONTEND_URL ?? '',
       assets,
       new Date(),
       'Role Match Explorer',
@@ -47,7 +47,7 @@ export class TestController {
 
   @Get('preview-corporate-email')
   previewCorporateEmail(@Res() res: Response) {
-    const baseUrl = process.env.BACKEND_URL || 'http://localhost:4001';
+    const baseUrl = process.env.BACKEND_URL ?? '';
 
     // Mock assets for preview - assuming they work via relative path or need full URL
     // Currently test controller uses base64 for previewEmail but URLs for sendTestEmail
@@ -66,7 +66,7 @@ export class TestController {
       'Touchmark Descience Pvt.Ltd', // companyName
       '999999999', // mobile
       '+91', // countryCode
-      'http://localhost:3000/corporate',
+      `${process.env.FRONTEND_URL ?? ''}/corporate`,
       assets,
     );
 
@@ -97,7 +97,7 @@ export class TestController {
     // Construct public URLs for the assets
     // NOTE: In production, 'localhost:4001' must be replaced with the actual public domain/IP
     // For this test context, we assume the user can access localhost or we use the configured headers
-    const baseUrl = process.env.BACKEND_URL || 'http://localhost:4001';
+    const baseUrl = process.env.BACKEND_URL ?? '';
 
     const assets = {
       popper: `${baseUrl}/assets/Popper.png`,
@@ -110,7 +110,7 @@ export class TestController {
       'Ariyappan',
       email,
       'password123',
-      process.env.FRONTEND_URL || 'http://localhost:3000',
+      process.env.FRONTEND_URL ?? '',
       assets,
       new Date(),
       'Role Match Explorer',
@@ -146,7 +146,7 @@ export class TestController {
   @Post('send-corporate-email')
   async sendCorporateTestEmail(@Body() body: { email: string }) {
     const email = body.email || 'test@example.com';
-    const baseUrl = process.env.BACKEND_URL || 'http://localhost:4001';
+    const baseUrl = process.env.BACKEND_URL ?? '';
 
     const assets = {
       popper: `${baseUrl}/assets/Popper.png`,
@@ -162,7 +162,7 @@ export class TestController {
       'Touchmark Descience Pvt.Ltd',
       '999999999',
       '+91',
-      `${process.env.FRONTEND_URL || 'http://localhost:3000'}/corporate`,
+      `${process.env.FRONTEND_URL ?? ''}/corporate`,
       assets,
     );
 

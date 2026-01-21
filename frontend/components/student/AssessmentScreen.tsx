@@ -406,17 +406,8 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   const [loading, setLoading] = useState(true);
 
   // Dynamic API URL for Mobile Support
-  const getBaseUrl = () => {
-    if (typeof window !== 'undefined') {
-      const { protocol, hostname } = window.location;
-      return `${protocol}//${hostname}:4004`;
-    }
-    return 'http://localhost:4004';
-  };
 
   useEffect(() => {
-    // studentService.API_URL = getBaseUrl(); // Removed: Property does not exist and internal var is const
-
     const fetchProgress = async () => {
       const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
       console.log("Fetching progress for:", email); // Debug log

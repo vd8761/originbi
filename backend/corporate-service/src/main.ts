@@ -11,13 +11,13 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
 
   const allowedOrigins = [
-    'http://localhost:3000',
+    'https://mind.originbi.com',
     'https://originbi.vercel.app',
-    process.env.FRONTEND_URL,
-  ].filter(Boolean);
+    ...(process.env.FRONTEND_URL || '').split(',').map(u => u.trim()).filter(Boolean),
+  ];
 
   app.enableCors({
-    origin: allowedOrigins as string[],
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],

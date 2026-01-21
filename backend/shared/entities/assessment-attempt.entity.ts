@@ -11,6 +11,7 @@ import { AssessmentSession } from './assessment-session.entity';
 import { AssessmentLevel } from './assessment-level.entity';
 import { User } from './user.entity';
 import { Registration } from './registration.entity';
+import { PersonalityTrait } from './personality-trait.entity';
 
 @Entity('assessment_attempts')
 export class AssessmentAttempt {
@@ -102,6 +103,10 @@ export class AssessmentAttempt {
 
     @Column({ name: 'dominant_trait_id', type: 'bigint', nullable: true })
     dominantTraitId: number | null;
+
+    @ManyToOne(() => PersonalityTrait, { nullable: true })
+    @JoinColumn({ name: 'dominant_trait_id' })
+    dominantTrait: PersonalityTrait | null;
 
     @Column({ name: 'metadata', type: 'jsonb', default: () => `'{}'` })
     metadata: any;

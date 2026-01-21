@@ -57,15 +57,13 @@ export class CorporateDashboardService {
         private readonly dataSource: DataSource,
     ) {
         this.authServiceUrl =
-            this.configService.get<string>('AUTH_SERVICE_URL') ||
-            'http://localhost:4002';
+            this.configService.get<string>('AUTH_SERVICE_URL') ?? '';
 
         // Safety check: specific fix for local dev misconfiguration
         if (this.authServiceUrl.includes('4003')) {
             console.warn(
-                `[CorporateDashboardService] AUTH_SERVICE_URL misconfigured to ${this.authServiceUrl}. Forcing http://localhost:4002`,
+                `[CorporateDashboardService] AUTH_SERVICE_URL misconfigured to ${this.authServiceUrl}.`,
             );
-            this.authServiceUrl = 'http://localhost:4002';
         }
 
         this.perCreditCost = parseFloat(
@@ -367,8 +365,7 @@ export class CorporateDashboardService {
                 mobile: dto.mobile,
                 password: dto.password,
                 loginUrl:
-                    this.configService.get<string>('FRONTEND_URL') ||
-                    'http://localhost:3000',
+                    this.configService.get<string>('FRONTEND_URL') ?? '',
             }).catch((emailErr) =>
                 console.error('Failed to send registration email:', emailErr),
             );
@@ -411,14 +408,13 @@ export class CorporateDashboardService {
 
         // Assets (Using public URLs or placeholders similar to Admin Service)
         const serviceUrl =
-            this.configService.get<string>('CORPORATE_SERVICE_URL') ||
-            'http://localhost:4003';
+            this.configService.get<string>('CORPORATE_SERVICE_URL') ?? '';
         // Assets served statically from /assets (via MailAssetsController)
         const assets = {
-            logo: `${serviceUrl}/assets/logo.png`,
-            popper: `${serviceUrl}/assets/Popper.png`,
-            pattern: `${serviceUrl}/assets/Pattern_mask.png`,
-            footer: `${serviceUrl}/assets/Email_Vector.png`,
+            logo: `${serviceUrl}/email-assets/logo.png`,
+            popper: `${serviceUrl}/email-assets/Popper.png`,
+            pattern: `${serviceUrl}/email-assets/Pattern_mask.png`,
+            footer: `${serviceUrl}/email-assets/Email_Vector.png`,
         };
 
         // Use the TS template function
@@ -619,8 +615,7 @@ export class CorporateDashboardService {
                     credits: creditDelta,
                     date: new Date().toLocaleDateString(),
                     dashboardUrl:
-                        this.configService.get<string>('FRONTEND_URL') ||
-                        'http://localhost:3000',
+                        this.configService.get<string>('FRONTEND_URL') ?? '',
                 });
             } catch (emailErr) {
                 console.error('Failed to send payment success email:', emailErr);
@@ -687,14 +682,13 @@ export class CorporateDashboardService {
 
         // Assets (Using public URLs or placeholders similar to Admin Service)
         const serviceUrl =
-            this.configService.get<string>('CORPORATE_SERVICE_URL') ||
-            'http://localhost:4003';
+            this.configService.get<string>('CORPORATE_SERVICE_URL') ?? '';
         // Assets served statically from /assets (via MailAssetsController)
         const assets = {
-            logo: `${serviceUrl}/assets/logo.png`,
-            popper: `${serviceUrl}/assets/Popper.png`,
-            pattern: `${serviceUrl}/assets/Pattern_mask.png`,
-            footer: `${serviceUrl}/assets/Email_Vector.png`,
+            logo: `${serviceUrl}/email-assets/logo.png`,
+            popper: `${serviceUrl}/email-assets/Popper.png`,
+            pattern: `${serviceUrl}/email-assets/Pattern_mask.png`,
+            footer: `${serviceUrl}/email-assets/Email_Vector.png`,
         };
 
         const htmlContent = getPaymentSuccessEmailTemplate(

@@ -11,10 +11,10 @@ import {
 } from "../types";
 
 const API_URL =
-  process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "http://localhost:4001";
+  process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
 
 const CORPORATE_API_URL =
-  process.env.NEXT_PUBLIC_CORPORATE_API_BASE_URL || "http://localhost:4003";
+  process.env.NEXT_PUBLIC_CORPORATE_API_URL;
 
 // DTO for creating a new registration (from frontend form)
 export interface CreateRegistrationDto {
@@ -122,6 +122,25 @@ export const registrationService = {
 
     const body = await res.json();
     // Support both paginated and list response for safety
+    return Array.isArray(body) ? body : (body.data || []);
+  },
+
+  // 🔹 DEPARTMENT DEGREES (Joined: Degree + Dept)
+  async getDepartmentDegrees(): Promise<Department[]> {
+    const token = AuthService.getToken();
+    const res = await fetch(`${API_URL}/admin/departments/degrees`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to fetch department degrees");
+    }
+
+    const body = await res.json();
     return Array.isArray(body) ? body : (body.data || []);
   },
 

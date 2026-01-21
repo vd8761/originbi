@@ -12,6 +12,7 @@ import {
     JobsIcon,
     LockIcon,
     ProfileIcon,
+    BanIcon,
 } from '@/components/icons';
 
 interface AssessmentResultPreviewProps {
@@ -84,16 +85,29 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     const totalMandatoryLevels = levels.length || 4; // fallback
     const currentLvl = (status === 'NOT_STARTED' || status === 'ASSIGNED') ? 0 : (session?.currentLevel || 1);
 
-    // Tab Accessibility - ENABLED BY DEFAULT AS PER USER REQUEST
+    // Tab Accessibility
     const isTabAccessible = (index: number) => {
-        return true; // Always return true to enable tabs
+        if (index === 0) return true; // Report always active
+        if (status === 'COMPLETED') return true;
+
+        // Find the level corresponding to this tab index (1-based index)
+        const level = levels[index - 1];
+        if (!level) return false;
+
+        // Check if there is a COMPLETED attempt for this level
+        const attempt = session?.attempts?.find((a: any) => {
+            const attemptLevelId = a.assessmentLevelId ?? (a.assessmentLevel ? a.assessmentLevel.id : null);
+            return String(attemptLevelId) === String(level.id);
+        });
+
+        return attempt?.status === 'COMPLETED';
     };
 
     // Correctly map data from the fresh session object
     console.log('GroupCandidateAssessmentPreview Session Data:', session);
 
     const displayData = {
-        title: session?.program?.assessment_title || session?.groupAssessment?.program?.assessment_title || 'Assessment',
+        title: session?.program?.assessment_title || session?.program?.assessmentTitle || session?.groupAssessment?.program?.assessment_title || session?.groupAssessment?.program?.assessmentTitle || 'Employee Behavioral & Agility Assessment',
         program: session?.program?.name || session?.groupAssessment?.program?.name || '-',
         type: 'WebApp', // Hardcoded as per request
         startsOn: formatDate(session?.validFrom),
@@ -108,40 +122,66 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     };
 
     // Renderers
-    const renderStatsBar = () => (
-        <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6 grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
-            <div>
-                <p className="text-xs text-gray-400 mb-1">Exam Starts On</p>
-                <p className="text-sm font-semibold">{displayData.startsOn}</p>
+    const renderStatsBar = (attemptData?: any, levelData?: any) => {
+        // Use status from attemptData if available, otherwise fallback to session status
+        const currentStatus = attemptData?.status || status;
+
+        return (
+            <div className={`bg-[#19211C] border border-white/10 rounded-2xl p-6 grid grid-cols-2 md:grid-cols-4 gap-6 mb-6`}>
+                <div>
+                    <p className="text-xs text-gray-400 mb-1">Exam Starts On</p>
+                    <p className="text-sm font-semibold">{formatDate(attemptData?.startedAt) || '-'}</p>
+                </div>
+                <div>
+                    <p className="text-xs text-gray-400 mb-1">
+                        {currentStatus === 'IN_PROGRESS' || currentStatus === 'ON_GOING' ? 'To be completed by' : 'Completed At'}
+                    </p>
+                    <p className="text-sm font-semibold">
+                        {currentStatus === 'IN_PROGRESS' || currentStatus === 'ON_GOING'
+                            ? formatDate(attemptData?.expiresAt) || '-'
+                            : formatDate(attemptData?.completedAt) || '-'}
+                    </p>
+                </div>
+                <div>
+                    <p className="text-xs text-gray-400 mb-1">Total Exam Duration</p>
+                    <p className="text-sm font-semibold">
+                        {levelData?.durationMinutes ? `${levelData.durationMinutes} Minutes` : '--'}
+                    </p>
+                </div>
+                <div>
+                    <p className="text-xs text-gray-400 mb-1">Maximum Score</p>
+                    <p className="text-sm font-semibold">
+                        {levelData?.maxScore ?? '--'}
+                    </p>
+                </div>
+                <div>
+                    <p className="text-xs text-gray-400 mb-1">Sincerity Index</p>
+                    <p className="text-sm font-semibold">
+                        {attemptData?.sincerityIndex || attemptData?.sincerity_index ? `${attemptData.sincerityIndex || attemptData.sincerity_index}%` : '--'}
+                    </p>
+                </div>
+                <div>
+                    <p className="text-xs text-gray-400 mb-1">Sincerity Class</p>
+                    <p className="text-sm font-semibold">
+                        {attemptData?.sincerityClass || attemptData?.sincerity_class || '--'}
+                    </p>
+                </div>
+                <div>
+                    <p className="text-xs text-gray-400 mb-1">Exam Status</p>
+                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold 
+                    ${currentStatus === 'COMPLETED' ? 'bg-[#00B69B] text-white' :
+                            currentStatus === 'IN_PROGRESS' ? 'bg-[#F59E0B] text-black' :
+                                'bg-gray-600 text-gray-200'}`}>
+                        {currentStatus.replace(/_/g, " ")}
+                    </span>
+                </div>
+                <div>
+                    <p className="text-xs text-gray-400 mb-1">Generated Report Trait Code</p>
+                    <p className="text-sm font-semibold">{session?.metadata?.traitCode || '--'}</p>
+                </div>
             </div>
-            <div>
-                <p className="text-xs text-gray-400 mb-1">Exam Ends On</p>
-                <p className="text-sm font-semibold">{displayData.endsOn}</p>
-            </div>
-            {/* Mock Data for now as backend doesn't seem to track duration/questions yet in this object */}
-            <div>
-                <p className="text-xs text-gray-400 mb-1">Total Exam Duration</p>
-                <p className="text-sm font-semibold">--</p>
-            </div>
-            <div>
-                <p className="text-xs text-gray-400 mb-1">Questions Attempted</p>
-                <p className="text-sm font-semibold">--</p>
-            </div>
-            <div>
-                <p className="text-xs text-gray-400 mb-1">Exam Status</p>
-                <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold 
-                    ${status === 'COMPLETED' ? 'bg-[#00B69B] text-white' :
-                        status === 'IN_PROGRESS' ? 'bg-[#F59E0B] text-black' :
-                            'bg-gray-600 text-gray-200'}`}>
-                    {status.replace(/_/g, " ")}
-                </span>
-            </div>
-            <div>
-                <p className="text-xs text-gray-400 mb-1">Generated Report Trait Code</p>
-                <p className="text-sm font-semibold">{session?.metadata?.traitCode || '--'}</p>
-            </div>
-        </div>
-    );
+        );
+    };
 
     const renderBasicInfoCards = () => (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -206,11 +246,11 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
         </div>
     );
 
-    const renderLevelReport = (title: string, breakdown: any[], compatibility: any) => (
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-6">
+    const renderLevelReport = (title: string, breakdown: any[], compatibility: any, levelAttempt?: any, levelData?: any, hideStats: boolean = false) => (
+        <div className={`grid grid-cols-1 ${hideStats ? '' : 'xl:grid-cols-[1fr_300px]'} gap-6`}>
             <div className="flex flex-col gap-6">
                 {/* Re-use stats bar here if needed, or keep it common */}
-                {renderStatsBar()}
+                {!hideStats && renderStatsBar(levelAttempt, levelData)}
 
                 {/* Breakdown Table */}
                 <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6">
@@ -220,7 +260,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                             <thead>
                                 <tr className="bg-[#FFFFFF0D] text-brand-green">
                                     <th className="py-3 px-4 text-left font-medium rounded-l-lg">{title} Value</th>
-                                    <th className="py-3 px-4 text-center font-medium">Score (Out of 25)</th>
+                                    <th className="py-3 px-4 text-center font-medium">Score</th>
                                     <th className="py-3 px-4 text-right font-medium rounded-r-lg">Behavioral Note</th>
                                 </tr>
                             </thead>
@@ -233,11 +273,17 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                     </tr>
                                 ))}
                             </tbody>
-                            <tfoot>
-                                <tr className="bg-[#1ED36A]/20 text-brand-green font-bold">
+                            <tfoot className="bg-[#1ED36A]/20 text-brand-green font-bold">
+                                <tr>
                                     <td className="py-3 px-4 rounded-l-lg" colSpan={3}>
                                         <div className="flex justify-center w-full">
-                                            Total ({title}) – {compatibility.totalScore}
+                                            {levelAttempt?.dominantTrait ? (
+                                                <>
+                                                    {levelAttempt.dominantTrait.code} : {levelAttempt.dominantTrait.blendedStyleName}
+                                                </>
+                                            ) : (
+                                                `Total (${title}) – ${compatibility.totalScore}`
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -246,55 +292,67 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                     </div>
                 </div>
 
-                {/* Compatibility Index */}
-                <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6">
-                    <h3 className="text-sm font-semibold mb-4">{title} – Score Overview</h3>
-                    <div className="overflow-x-auto border border-white/10 rounded-lg">
-                        <table className="w-full text-sm">
-                            {/* ... (Existing table content) ... */}
-                            <thead>
-                                <tr className="bg-[#FFFFFF0D] text-brand-green border-b border-white/10">
-                                    <th className="py-3 px-4 text-left font-medium w-1/3 border-r border-white/10">Parameter</th>
-                                    <th className="py-3 px-4 text-left font-medium">Description</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/10">
-                                <tr>
-                                    <td className="py-4 px-4 border-r border-white/10 text-gray-300">Total Score:</td>
-                                    <td className="py-4 px-4">{compatibility.totalScore}</td>
-                                </tr>
-                                <tr>
-                                    <td className="py-4 px-4 border-r border-white/10 text-gray-300">Level:</td>
-                                    <td className="py-4 px-4">{compatibility.level}</td>
-                                </tr>
-                                <tr>
-                                    <td className="py-4 px-4 border-r border-white/10 text-gray-300">Compatibility Tag:</td>
-                                    <td className="py-4 px-4">{compatibility.tag}</td>
-                                </tr>
-                                <tr>
-                                    <td className="py-4 px-4 border-r border-white/10 text-gray-300">Interpretation:</td>
-                                    <td className="py-4 px-4">{compatibility.interpretation}</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                {/* Compatibility Index - ONLY FOR ACI */}
+                {title === 'ACI' && (
+                    <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6">
+                        <h3 className="text-sm font-semibold mb-4">Agile Compatibility Index (ACI) – Score Overview</h3>
+                        <div className="overflow-x-auto border border-white/10 rounded-lg">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="bg-[#FFFFFF0D] text-brand-green border-b border-white/10">
+                                        <th className="py-3 px-4 text-left font-medium w-1/3 border-r border-white/10">Parameter</th>
+                                        <th className="py-3 px-4 text-left font-medium">Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/10">
+                                    <tr>
+                                        <td className="py-4 px-4 border-r border-white/10 text-gray-300">Total Score:</td>
+                                        <td className="py-4 px-4">{compatibility.totalScore}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="py-4 px-4 border-r border-white/10 text-gray-300">Level:</td>
+                                        <td className="py-4 px-4">{compatibility.level}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="py-4 px-4 border-r border-white/10 text-gray-300">Compatibility Tag:</td>
+                                        <td className="py-4 px-4">{compatibility.tag}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="py-4 px-4 border-r border-white/10 text-gray-300">Interpretation:</td>
+                                        <td className="py-4 px-4">{compatibility.interpretation}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
+
+
             {/* Sidebar for Level Tabs (Same Sidebar) */}
-            <div className="flex flex-col gap-4">
-                <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6 flex flex-col gap-6 h-full">
-                    <SidebarItem label="Assessment Title" value={displayData.title} />
-                    <div className="grid grid-cols-1 gap-4">
-                        <SidebarItem label="Exam Published On" value={displayData.startsOn} />
-                        <SidebarItem label="Exam Expired On" value={displayData.endsOn} />
-                    </div>
-                    <div className="grid grid-cols-1 gap-4">
-                        <SidebarItem label="Program Level" value={displayData.program} />
-                        <SidebarItem label="Exam Type" value={displayData.type} />
+            {!hideStats && (
+                <div className="flex flex-col gap-4">
+                    <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6 flex flex-col gap-6">
+                        <SidebarItem label="Assessment Title" value={displayData.title} />
+
+                        <div className="flex flex-col gap-4">
+                            <SidebarItem label="Candidate Name" value={displayData.studentName} />
+                            <SidebarItem label="Email" value={displayData.email} />
+                            <SidebarItem label="Mobile" value={displayData.mobile} />
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4">
+                            <SidebarItem label="Exam Published On" value={displayData.startsOn} />
+                            <SidebarItem label="Exam Expired On" value={displayData.endsOn} />
+                        </div>
+                        <div className="grid grid-cols-1 gap-4">
+                            <SidebarItem label="Program Level" value={displayData.program} />
+                            <SidebarItem label="Exam Type" value={displayData.type} />
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 
@@ -327,6 +385,23 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
 
 
     const renderOverallReport = () => {
+        // Identify levels and attempts for the overall report view
+        const discLevel = levels.find(l => l.pattern_type === 'DISC' || l.patternType === 'DISC' || l.name.toLowerCase().includes('disc') || l.name === 'Behavioral Insight');
+        const aciLevel = levels.find(l => l.pattern_type === 'ACI' || l.patternType === 'ACI' || l.name === 'ACI');
+
+        const getAttemptForLevel = (lvl: any) => {
+            if (!lvl) return undefined;
+            const lvlId = String(lvl.id);
+            return session?.attempts?.find((a: any) => {
+                const aId = String(a.assessmentLevelId);
+                const alId = a.assessmentLevel ? String(a.assessmentLevel.id) : null;
+                return aId === lvlId || alId === lvlId;
+            });
+        };
+
+        const discAttempt = getAttemptForLevel(discLevel);
+        const aciAttempt = getAttemptForLevel(aciLevel);
+
         return (
             <div className="flex flex-col">
                 {renderBasicInfoCards()}
@@ -351,8 +426,16 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                 ) : (
                     // All Completed
                     <div className="flex flex-col gap-6">
-                        {renderLevelReport('DISC', discBreakdownData, discCompatibilityData)}
-                        {renderLevelReport('ACI', aciBreakdownData, aciCompatibilityData)}
+                        {(() => {
+                            const discData = getDiscData(discAttempt);
+                            const aciData = getAciData(aciAttempt);
+                            return (
+                                <>
+                                    {renderLevelReport('DISC', discData.breakdown, discData.compatibility, discAttempt, discLevel, true)}
+                                    {renderLevelReport('ACI', aciData.breakdown, aciData.compatibility, aciAttempt, aciLevel, true)}
+                                </>
+                            );
+                        })()}
                     </div>
                 )}
             </div>
@@ -383,52 +466,43 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
             {/* Tab Navigation */}
             <div className="flex flex-col lg:flex-row justify-between items-end border-b border-white/10 pb-0 gap-4">
                 <div className="flex items-center gap-8 overflow-x-auto w-full lg:w-auto scrollbar-hide no-scrollbar">
-                    {/* Tabs */}
-                    {['Over All Report', 'Behavioral Insight', 'ACI'].map((tabLabel, idx) => {
-                        const isActive = activeTab === idx;
-
-                        // Logic for Lock Icon
-                        let showLock = false;
-                        if (status === 'COMPLETED') {
-                            showLock = false;
-                        } else if (status === 'NOT_STARTED' || status === 'ASSIGNED') {
-                            if (idx > 0) showLock = true;
-                        } else {
-                            // IN_PROGRESS
-                            if (idx === 1) showLock = false; // Behavioral unlocked
-                            if (idx === 2) showLock = true;  // ACI locked
-                        }
-
-                        // Over All Report (0) never has lock.
-                        if (idx === 0) showLock = false;
-
-                        // Logic for Accessibility (Clickability)
-                        // Per user request: "IF THE EXAM IS NOT STATTED THE DISABLE THE CLICKABLE"
-                        // This implies that if it IS started, we keep it clickable (even if locked, or maybe we just follow the lock?)
-                        // Previous logic was "Always accessible".
-                        // New logic: If NOT_STARTED, disable 1 & 2.
-                        let accessible = true;
-                        if (status === 'NOT_STARTED' || status === 'ASSIGNED') {
-                            if (idx > 0) accessible = false;
-                        }
-                        // Default strictly follows "accessible = true" otherwise.
-
+                    {/* Overall Report Tab - Always Accessible */}
+                    <div
+                        onClick={() => setActiveTab(0)}
+                        className={`flex items-center gap-2 text-sm font-medium pb-4 cursor-pointer transition-colors whitespace-nowrap ${activeTab === 0
+                            ? 'text-brand-green border-b-2 border-brand-green font-bold'
+                            : 'text-gray-400 hover:text-white'
+                            }`}
+                    >
+                        Over All Report
+                        {activeTab === 0 && <span className='bg-brand-green rounded-full p-[1px]'><CheckIcon className="w-2 h-2 text-black" /></span>}
+                    </div>
+                    {/* Level Tabs */}
+                    {levels.map((lvl, idx) => {
+                        const tabIndex = idx + 1;
+                        const accessible = isTabAccessible(tabIndex);
+                        const isActive = activeTab === tabIndex;
                         return (
                             <div
-                                key={idx}
-                                onClick={() => accessible && setActiveTab(idx)}
+                                key={lvl.id}
+                                onClick={() => accessible && setActiveTab(tabIndex)}
                                 className={`flex items-center gap-2 text-sm font-medium pb-4 transition-colors whitespace-nowrap ${isActive
                                     ? 'text-brand-green border-b-2 border-brand-green font-bold cursor-default'
                                     : accessible
                                         ? 'text-gray-400 hover:text-white cursor-pointer'
-                                        : 'text-white/30 cursor-not-allowed'
+                                        : 'text-white/50 cursor-not-allowed'
                                     }`}
                             >
-                                {tabLabel}
+                                {lvl.name}
                                 {isActive ? (
                                     <span className='bg-brand-green rounded-full p-[1px]'><CheckIcon className="w-2 h-2 text-black" /></span>
                                 ) : (
-                                    showLock && <LockIcon className="w-3 h-3 text-white/70" />
+                                    !accessible && (
+                                        <div className="flex items-center gap-1">
+                                            <LockIcon className="w-3 h-3 text-white/70" />
+                                            <BanIcon className="w-3 h-3 text-white/70" />
+                                        </div>
+                                    )
                                 )}
                             </div>
                         );
@@ -441,7 +515,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                     {totalMandatoryLevels > 0 && (
                         <div className="flex items-center gap-2 ml-4">
                             <span>({status === 'COMPLETED' ? totalMandatoryLevels : (status === 'NOT_STARTED' ? 0 : currentLvl)}/{totalMandatoryLevels}) Levels Completed</span>
-                            {levels.map((_, i) => {
+                            {Array.from({ length: totalMandatoryLevels }).map((_, i) => {
                                 const levelNum = i + 1;
                                 let barClass = 'bg-white/20';
                                 if (status === 'COMPLETED') barClass = 'bg-brand-green';
@@ -456,9 +530,32 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
             </div>
 
             {/* Main Content Area */}
-            {activeTab === 0 && renderOverallReport()}
-            {activeTab === 1 && renderLevelReport('DISC', discBreakdownData, discCompatibilityData)}
-            {activeTab === 2 && renderLevelReport('ACI', aciBreakdownData, aciCompatibilityData)}
+            {activeTab === 0 ? renderOverallReport() :
+                // Level Reports
+                (() => {
+                    const levelIndex = activeTab - 1;
+                    const level = levels[levelIndex];
+
+                    // Find the attempt corresponding to this level generically
+                    const attempt = session?.attempts?.find((a: any) => {
+                        const levelId = String(level?.id);
+                        const aId = String(a.assessmentLevelId);
+                        const alId = a.assessmentLevel ? String(a.assessmentLevel.id) : null;
+                        return aId === levelId || alId === levelId;
+                    });
+
+                    // Check for DISC pattern in robust ways: patternType (database), name includes 'disc', or exact name 'Behavioral Insight'
+                    const isDisc = level?.pattern_type === 'DISC' || level?.patternType === 'DISC' || level?.name.toLowerCase().includes('disc') || level?.name === 'Behavioral Insight';
+
+                    if (isDisc) {
+                        const { breakdown, compatibility } = getDiscData(attempt);
+                        return renderLevelReport('DISC', breakdown, compatibility, attempt, level);
+                    } else {
+                        const { breakdown, compatibility } = getAciData(attempt);
+                        return renderLevelReport('ACI', breakdown, compatibility, attempt, level);
+                    }
+                })()
+            }
 
             <div className="flex justify-between items-center text-xs text-gray-500 mt-4 pb-8">
                 <div className="flex gap-4">
@@ -473,6 +570,81 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
 
         </div>
     );
+};
+
+// Helper to extract DISC data
+const getDiscData = (attempt: any) => {
+    let breakdown = [
+        { value: 'Dominance', score: '-', note: 'Direct and decisive.' },
+        { value: 'Influence', score: '-', note: 'Enthusiastic and persuasive.' },
+        { value: 'Steadiness', score: '-', note: 'Patient and reliable.' },
+        { value: 'Compliance', score: '-', note: 'Precise and analytical.' },
+    ];
+    let compatibility = {
+        totalScore: '0 / 125',
+        level: '-',
+        tag: '-',
+        interpretation: '-'
+    };
+
+    if (attempt && attempt.metadata?.disc_scores) {
+        const scores = attempt.metadata.disc_scores;
+        breakdown = [
+            { value: 'Dominance', score: scores['D'] || '-', note: 'Direct and decisive.' },
+            { value: 'Influence', score: scores['I'] || '-', note: 'Enthusiastic and persuasive.' },
+            { value: 'Steadiness', score: scores['S'] || '-', note: 'Patient and reliable.' },
+            { value: 'Compliance', score: scores['C'] || '-', note: 'Precise and analytical.' },
+        ];
+
+        const rawTotal = attempt.totalScore || attempt.metadata.disc_scores?.total || scores['total'] || '0';
+        compatibility = {
+            totalScore: String(rawTotal).includes('/') ? rawTotal : `${rawTotal} / 125`,
+            level: attempt.sincerityClass || '-',
+            tag: '-',
+            interpretation: '-'
+        };
+    }
+    return { breakdown, compatibility };
+};
+
+// Helper to extract ACI data
+const getAciData = (attempt: any) => {
+    let breakdown = [
+        { value: 'Commitment', score: '-', note: 'Deeply dedicated and consistent.' },
+        { value: 'Focus', score: '-', note: 'Exceptionally attentive to detail and priority.' },
+        { value: 'Openness', score: '-', note: 'Learning to adapt and welcome diverse approaches.' },
+        { value: 'Respect', score: '-', note: 'Professional tone with scope to show empathy.' },
+        { value: 'Courage', score: '-', note: 'Honest and principled; leads through integrity.' },
+    ];
+    let compatibility = {
+        totalScore: '0 / 125',
+        level: '-',
+        tag: '-',
+        interpretation: '-'
+    };
+
+    const scores = attempt?.metadata?.agile_scores || attempt?.metadata?.aci_scores || attempt?.metadata?.scores;
+
+    if (attempt && scores) {
+        breakdown = [
+            { value: 'Commitment', score: scores['Commitment'] || scores['commitment'] || '-', note: 'Deeply dedicated and consistent.' },
+            { value: 'Focus', score: scores['Focus'] || scores['focus'] || '-', note: 'Exceptionally attentive to detail and priority.' },
+            { value: 'Openness', score: scores['Openness'] || scores['openness'] || '-', note: 'Learning to adapt and welcome diverse approaches.' },
+            { value: 'Respect', score: scores['Respect'] || scores['respect'] || '-', note: 'Professional tone with scope to show empathy.' },
+            { value: 'Courage', score: scores['Courage'] || scores['courage'] || '-', note: 'Honest and principled; leads through integrity.' },
+        ];
+
+        const rawTotal = scores['total'] || attempt.totalScore || '0';
+        const trait = attempt.dominantTrait;
+
+        compatibility = {
+            totalScore: String(rawTotal).includes('/') ? rawTotal : `${rawTotal} / 125`,
+            level: trait?.blendedStyleName || attempt.sincerityClass || '-',
+            tag: trait?.blendedStyleDesc || '-',
+            interpretation: trait?.metadata?.interpretation || '-'
+        };
+    }
+    return { breakdown, compatibility };
 };
 
 // SidebarItem helper components
