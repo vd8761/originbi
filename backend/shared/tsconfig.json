@@ -18,7 +18,12 @@
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,
         "moduleResolution": "node",
-        "resolveJsonModule": true
+        "baseUrl": "..",
+        "paths": {
+            "typeorm": [
+                "node_modules/typeorm"
+            ]
+        },
     },
     "include": [
         "entities/**/*"
