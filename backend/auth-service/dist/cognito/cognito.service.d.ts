@@ -10,6 +10,7 @@ export declare class CognitoService {
         email: string;
         group: string;
     }>;
+    private executeWithRetry;
     login(email: string, password: string, requiredGroup?: string): Promise<{
         accessToken: string;
         idToken: string;
@@ -18,4 +19,13 @@ export declare class CognitoService {
         tokenType: string;
     }>;
     forgotPassword(email: string): Promise<import("@aws-sdk/client-cognito-identity-provider").ForgotPasswordCommandOutput>;
+    refreshToken(refreshToken: string): Promise<{
+        accessToken: string;
+        idToken: string;
+        expiresIn: number;
+        tokenType: string;
+    }>;
+    logout(accessToken: string): Promise<{
+        message: string;
+    }>;
 }
