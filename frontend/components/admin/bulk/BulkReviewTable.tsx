@@ -44,7 +44,7 @@ export const BulkReviewTable: React.FC<BulkReviewTableProps> = ({ validRows, inv
         const isErrorSource = row.status === 'INVALID' && row.errorMessage && String(row.errorMessage).includes(String(val));
 
         return (
-            <span className={isErrorSource ? "text-red-500 font-medium" : "text-gray-300"}>
+            <span className={isErrorSource ? "text-red-500 font-medium" : "text-gray-600 dark:text-gray-300"}>
                 {val}
             </span>
         );
@@ -52,8 +52,8 @@ export const BulkReviewTable: React.FC<BulkReviewTableProps> = ({ validRows, inv
 
     const renderTable = (rows: any[], isValid: boolean) => (
         <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-gray-400 whitespace-nowrap">
-                <thead className="bg-[#1A1D21] text-xs uppercase text-gray-500">
+            <table className="w-full text-left text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                <thead className="bg-gray-100 dark:bg-[#1A1D21] text-xs uppercase text-gray-500">
                     <tr>
                         <th className="px-4 py-3">S.No</th>
                         <th className="px-4 py-3">Name</th>
@@ -73,7 +73,7 @@ export const BulkReviewTable: React.FC<BulkReviewTableProps> = ({ validRows, inv
                         <th className="px-4 py-3">Send Email</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-[#FFFFFF0D]">
+                <tbody className="divide-y divide-gray-200 dark:divide-[#FFFFFF0D]">
                     {rows.map((row, idx) => {
                         const hasError = row.status === 'INVALID' || row.errorMessage;
 
@@ -83,9 +83,9 @@ export const BulkReviewTable: React.FC<BulkReviewTableProps> = ({ validRows, inv
 
                         return (
                             <React.Fragment key={idx}>
-                                <tr className={`hover:bg-[#FFFFFF05] ${hasError ? 'bg-red-500/5' : ''}`}>
+                                <tr className={`hover:bg-gray-50 dark:hover:bg-[#FFFFFF05] ${hasError ? 'bg-red-500/5' : ''}`}>
                                     <td className="px-4 py-3">{row.rowIndex}</td>
-                                    <td className="px-4 py-3 font-medium text-white">{renderCell(row, ['FullName', 'Name', 'full_name', 'name'])}</td>
+                                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{renderCell(row, ['FullName', 'Name', 'full_name', 'name'])}</td>
                                     <td className="px-4 py-3">{renderCell(row, ['Gender', 'gender'])}</td>
                                     <td className="px-4 py-3">{renderCell(row, ['Email', 'email'])}</td>
                                     <td className="px-4 py-3">
@@ -144,21 +144,21 @@ export const BulkReviewTable: React.FC<BulkReviewTableProps> = ({ validRows, inv
             <div className="flex gap-4">
                 <button
                     onClick={() => setActiveTab('valid')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${activeTab === 'valid' ? 'bg-[#1ED36A]/10 border-[#1ED36A] text-[#1ED36A]' : 'border-transparent text-gray-400'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${activeTab === 'valid' ? 'bg-[#1ED36A]/10 border-[#1ED36A] text-[#1ED36A]' : 'border-transparent text-gray-500 dark:text-gray-400'}`}
                 >
                     <span className="w-2 h-2 rounded-full bg-current" />
                     Valid Records ({validRows.length})
                 </button>
                 <button
                     onClick={() => setActiveTab('invalid')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${activeTab === 'invalid' ? 'bg-red-500/10 border-red-500 text-red-500' : 'border-transparent text-gray-400'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${activeTab === 'invalid' ? 'bg-red-500/10 border-red-500 text-red-500' : 'border-transparent text-gray-500 dark:text-gray-400'}`}
                 >
                     <span className="w-2 h-2 rounded-full bg-current" />
                     Records Needing Attention ({invalidRows.length})
                 </button>
             </div>
 
-            <div className="bg-[#15171A] rounded-xl border border-[#FFFFFF1F] p-4">
+            <div className="bg-white dark:bg-[#15171A] rounded-xl border border-gray-200 dark:border-[#FFFFFF1F] p-4">
                 {activeTab === 'valid' ? renderTable(validRows, true) : renderTable(invalidRows, false)}
             </div>
 
@@ -195,7 +195,7 @@ export const BulkReviewTable: React.FC<BulkReviewTableProps> = ({ validRows, inv
                                 link.click();
                                 document.body.removeChild(link);
                             }}
-                            className="text-xs flex items-center gap-1 text-gray-400 hover:text-white"
+                            className="text-xs flex items-center gap-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white"
                         >
                             Download Error Report
                         </button>
@@ -204,13 +204,13 @@ export const BulkReviewTable: React.FC<BulkReviewTableProps> = ({ validRows, inv
             )}
 
             <div className="flex justify-end gap-4 pt-4">
-                <button onClick={onCancel} className="px-6 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-white/5">Back</button>
+                <button onClick={onCancel} className="px-6 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5">Back</button>
                 <button
                     onClick={handleRegister}
                     className={`px-6 py-2 rounded-lg font-medium transition-all
                         ${(validRows.length > 0)
                             ? 'bg-[#1ED36A] text-white hover:bg-[#1ED36A]/90'
-                            : 'bg-gray-700 text-gray-400 cursor-not-allowed opacity-50'
+                            : 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-50'
                         }`}
                     disabled={!(validRows.length > 0) || isSubmitting}
                 >
