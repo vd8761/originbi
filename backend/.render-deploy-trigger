@@ -1,0 +1,3 @@
+# Deployment trigger file
+# Last deployment: 2026-01-21 17:05
+# Purpose: Re-trigger build with tsconfig baseUrl fix
