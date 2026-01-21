@@ -12,9 +12,11 @@
     "peerDependencies": {
         "typeorm": "^0.3.0"
     },
-    "devDependencies": {
-        "typescript": "^5.3.0",
+    "dependencies": {
         "typeorm": "^0.3.20"
+    },
+    "devDependencies": {
+        "typescript": "^5.3.0"
     },
     "files": [
         "dist",
