@@ -1,12 +1,8 @@
 package service
 
-import (
 	"exam-engine/internal/models"
 	"exam-engine/internal/repository"
-	"log"
 	"time"
-
-	"gorm.io/gorm"
 )
 
 // StartScheduler initializes the background job ticker
