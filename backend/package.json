@@ -2,11 +2,6 @@
     "name": "originbi-backend",
     "version": "1.0.0",
     "private": true,
-    "dependencies": {
-        "typeorm": "^0.3.28",
-        "pg": "^8.11.3",
-        "reflect-metadata": "^0.2.1"
-    },
     "workspaces": [
         "shared",
         "admin-service",
@@ -15,7 +10,7 @@
         "student-service"
     ],
     "dependencies": {
-        "typeorm": "^0.3.20",
+        "typeorm": "^0.3.28",
         "pg": "^8.11.3",
         "reflect-metadata": "^0.2.1"
     },
