@@ -18,14 +18,12 @@
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,
         "moduleResolution": "node",
-        "resolveJsonModule": true,
-        "preserveSymlinks": true,
-        "baseUrl": ".",
+        "baseUrl": "..",
         "paths": {
             "typeorm": [
-                "../node_modules/typeorm"
+                "node_modules/typeorm"
             ]
-        }
+        },
     },
     "include": [
         "entities/**/*"
