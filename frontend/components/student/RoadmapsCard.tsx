@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import { RoadmapItem as RoadmapItemType } from '@/lib/types';
 import { CrossRightArrowIcon } from '@/components/icons';
 
@@ -53,12 +54,12 @@ const RoadmapsCard: React.FC = () => {
                 <h3 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-lg lg:text-[1.25vw]">
                     Your Roadmaps 2027-2035
                 </h3>
-                <a
-                    href="#"
+                <Link
+                    href="/student/roadmaps"
                     className="font-medium font-sans text-brand-green text-xs lg:text-[0.833vw] hover:underline"
                 >
                     View All
-                </a>
+                </Link>
             </div>
             <hr className="border-[#19211C]/10 dark:border-white/10" />
             <div className="px-6 pt-2 pb-2 lg:px-[1.25vw] lg:pt-[0.41vw] lg:pb-[0.41vw] flex-grow">
