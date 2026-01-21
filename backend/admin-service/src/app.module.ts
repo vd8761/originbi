@@ -39,19 +39,28 @@ import { KeepAliveModule } from './keepalive/keepalive.module';
         console.log('DEBUG: DB_HOST is:', config.get('DB_HOST'));
 
         if (databaseUrl) {
-          // Ensure sslmode=require in the URL for production/remote connections
-          const url = databaseUrl.includes('sslmode=')
-            ? databaseUrl
-            : databaseUrl.includes('?')
-              ? `${databaseUrl}&sslmode=require`
-              : `${databaseUrl}?sslmode=require`;
+          const isLocal = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
+
+          let url = databaseUrl;
+          let ssl: any = { rejectUnauthorized: false };
+
+          if (!isLocal) {
+            // Ensure sslmode=require in the URL for production/remote connections
+            url = databaseUrl.includes('sslmode=')
+              ? databaseUrl
+              : databaseUrl.includes('?')
+                ? `${databaseUrl}&sslmode=require`
+                : `${databaseUrl}?sslmode=require`;
+          } else {
+            ssl = false;
+          }
 
           return {
             type: 'postgres',
             url,
             autoLoadEntities: true,
             synchronize: config.get<string>('DB_SYNC') === 'true',
-            ssl: { rejectUnauthorized: false },
+            ssl: ssl,
             schema: 'public',
           };
         }
