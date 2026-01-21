@@ -14,10 +14,9 @@ import { ForgotPasswordModule } from './forgotpassword/forgotpassword.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const isProd = config.get<string>('NODE_ENV') === 'production';
+        const databaseUrl = config.get<string>('DATABASE_URL');
 
-        if (isProd) {
-          const databaseUrl = config.get<string>('DATABASE_URL');
+        if (databaseUrl) {
           return {
             type: 'postgres',
             url: databaseUrl,
@@ -29,11 +28,11 @@ import { ForgotPasswordModule } from './forgotpassword/forgotpassword.module';
 
         return {
           type: 'postgres',
-          host: config.get<string>('DB_HOST'),
+          host: config.get<string>('DB_HOST') || 'localhost',
           port: Number(config.get<string>('DB_PORT') || 5432),
-          username: config.get<string>('DB_USER'),
-          password: config.get<string>('DB_PASS'),
-          database: config.get<string>('DB_NAME'),
+          username: config.get<string>('DB_USER') || 'origin_user',
+          password: config.get<string>('DB_PASS') || '',
+          database: config.get<string>('DB_NAME') || 'originbi',
           autoLoadEntities: true,
           synchronize: false,
           ssl: false,
@@ -44,4 +43,4 @@ import { ForgotPasswordModule } from './forgotpassword/forgotpassword.module';
     ForgotPasswordModule,
   ],
 })
-export class AppModule {}
+export class AppModule { }
