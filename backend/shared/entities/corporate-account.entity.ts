@@ -31,8 +31,8 @@ export class CorporateAccount {
     @Column({ name: 'sector_code', length: 50 })
     sectorCode: string;
 
-    @Column({ name: 'business_locations', type: 'text' })
-    businessLocations: string;
+    @Column({ name: 'business_locations', type: 'text', nullable: true })
+    businessLocations: string | null;
 
     @Column({ name: 'job_title', length: 100, nullable: true })
     jobTitle?: string;
