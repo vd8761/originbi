@@ -130,7 +130,7 @@ const BulkUploadRegistration: React.FC<BulkUploadRegistrationProps> = ({ onCance
         <div className="p-6 bg-[#0B0D0F] min-h-screen">
             <div className="mb-8">
                 <nav className="text-sm text-gray-500 mb-2">
-                    Dashboard &gt; <button onClick={onCancel} className="hover:text-white transition-colors">My Employees</button> &gt; <span className="text-[#1ED36A]">Bulk Upload</span>
+                    Dashboard &gt; <button onClick={onCancel} className="hover:text-white transition-colors">Registrations</button> &gt; <span className="text-[#1ED36A]">Bulk Upload</span>
                     {view === 'review' && " > Review Bulk Upload"}
                 </nav>
                 <h1 className="text-3xl font-bold text-white mb-2">Bulk Upload Registration {view === 'review' ? '– Review & Confirm' : ''}</h1>

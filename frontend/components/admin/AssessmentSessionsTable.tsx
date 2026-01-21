@@ -68,6 +68,12 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
         switch (status) {
             case 'ON_GOING':
             case 'IN_PROGRESS':
+                if (isGroupView) {
+                    return {
+                        label: 'On Going',
+                        color: 'bg-[#00B69B]/20 text-[#00B69B] border-[#00B69B]'
+                    };
+                }
                 return {
                     label: `On Going (${currentLevel || 1}/${totalLevels || '-'})`,
                     color: 'bg-[#00B69B]/20 text-[#00B69B] border-[#00B69B]'
