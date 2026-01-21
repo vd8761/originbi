@@ -19,6 +19,7 @@ exports.CognitoModule = CognitoModule = __decorate([
         imports: [config_1.ConfigModule],
         controllers: [cognito_controller_1.CognitoController],
         providers: [cognito_service_1.CognitoService],
+        exports: [cognito_service_1.CognitoService],
     })
 ], CognitoModule);
 //# sourceMappingURL=cognito.module.js.map
