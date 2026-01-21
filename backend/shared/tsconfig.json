@@ -18,10 +18,10 @@
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,
         "moduleResolution": "node",
-        "baseUrl": "..",
+        "baseUrl": ".",
         "paths": {
             "typeorm": [
-                "node_modules/typeorm"
+                "../node_modules/typeorm"
             ]
         },
     },
