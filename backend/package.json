@@ -9,6 +9,11 @@
         "corporate-service",
         "student-service"
     ],
+    "dependencies": {
+        "typeorm": "^0.3.20",
+        "pg": "^8.11.3",
+        "reflect-metadata": "^0.2.1"
+    },
     "scripts": {
         "build:shared": "cd shared && npm run build",
         "build:all": "npm run build:shared && npm run build:services",
