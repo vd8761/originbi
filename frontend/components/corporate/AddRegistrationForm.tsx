@@ -117,7 +117,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     "text-gray-600 hover:text-black dark:text-gray-300 dark:hover:text-white";
 
   return (
-    <div className="w-full font-sans animate-fade-in pb-12">
+    <div className="w-full font-sans animate-fade-in pb-12 p-4 sm:p-6 lg:p-8">
       <BulkUploadModal
         isOpen={isBulkModalOpen}
         onClose={() => setIsBulkModalOpen(false)}
