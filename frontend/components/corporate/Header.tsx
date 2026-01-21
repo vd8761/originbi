@@ -18,6 +18,7 @@ import {
   OriginDataIcon,
   MyEmployeesIcon,
 } from "@/components/icons";
+import BuyCreditsModal from "./BuyCreditsModal";
 
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -143,6 +144,13 @@ const Header: React.FC<HeaderProps> = ({
   }, []);
 
   const [corporateData, setCorporateData] = useState<any>(null);
+  const [isBuyCreditsOpen, setIsBuyCreditsOpen] = useState(false);
+
+  const handleBuyCredits = (amount: number, cost: number) => {
+    console.log(`Purchasing ${amount} credits for ₹${cost}`);
+    // Implement payment gateway logic here or redirect
+    setIsBuyCreditsOpen(false);
+  };
 
   useEffect(() => {
     if (portalMode === 'corporate') {
@@ -334,22 +342,64 @@ const Header: React.FC<HeaderProps> = ({
 
               {/* 4. Credits Display: h-8 (Laptop) / h-9 (2XL) */}
               {portalMode === "corporate" && (
-                <div
-                  className="hidden md:flex items-center gap-1.5 px-3 py-0 rounded-full border h-8 2xl:h-9"
-                  style={{
-                    backgroundColor: "rgba(252, 210, 39, 0.4)",
-                    borderColor: "#F59E0B",
-                  }}
-                >
-                  <CoinIcon className="w-3.5 h-3.5 2xl:w-4 2xl:h-4" />
-                  <span className="font-bold text-brand-yellow text-[11px] 2xl:text-xs min-w-[20px] text-center">
-                    {corporateData ? (
-                      corporateData.available_credits
-                    ) : (
-                      <div className="h-2.5 w-6 bg-yellow-600/20 dark:bg-yellow-400/20 rounded animate-pulse" />
-                    )}
-                  </span>
-                </div>
+                <>
+                  <div className="relative group hidden md:block">
+                    <div
+                      className="flex items-center gap-1.5 px-3 py-0 rounded-full border h-8 2xl:h-9 cursor-pointer"
+                      style={{
+                        backgroundColor: "rgba(252, 210, 39, 0.4)",
+                        borderColor: "#F59E0B",
+                      }}
+                    >
+                      <CoinIcon className="w-3.5 h-3.5 2xl:w-4 2xl:h-4" />
+                      <span className="font-bold text-brand-yellow text-[11px] 2xl:text-xs min-w-[20px] text-center">
+                        {corporateData ? (
+                          corporateData.available_credits
+                        ) : (
+                          <div className="h-2.5 w-6 bg-yellow-600/20 dark:bg-yellow-400/20 rounded animate-pulse" />
+                        )}
+                      </span>
+                    </div>
+
+                    {/* Credits Hover Popover - Horizontal Layout */}
+                    <div className="absolute top-[80%] left-1/2 -translate-x-1/2 pt-6 min-w-[340px] opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 z-50">
+
+                      {/* Card Content */}
+                      <div className="relative bg-white dark:bg-[#1A1D21] rounded-[20px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-gray-100 dark:border-white/5 p-5 flex items-center justify-between gap-6 text-left font-['Haskoy']">
+
+                        {/* Triangle Arrow - Centered */}
+                        <div className="absolute -top-[7px] left-1/2 -translate-x-1/2 w-4 h-4 bg-white dark:bg-[#1A1D21] rotate-45 border-l border-t border-gray-100 dark:border-white/5 rounded-tl-[2px]"></div>
+
+                        <div className="flex items-center gap-3">
+                          <span
+                            className="font-semibold text-[42px] text-[#150089] dark:text-white leading-none tracking-tight"
+                          >
+                            {corporateData ? Math.floor(parseInt(corporateData.available_credits)) : 0}
+                          </span>
+
+                          <div className="flex flex-col text-[13px] leading-[1.1] text-[#19211C] dark:text-gray-300 font-medium whitespace-nowrap opacity-90">
+                            <span>Credits</span>
+                            <span>available</span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => setIsBuyCreditsOpen(true)}
+                          className="bg-[#1ED36A] hover:bg-[#16b058] text-white px-6 py-2.5 rounded-full font-semibold text-[13px] shadow-[0_4px_14px_rgba(30,211,106,0.25)] transition-all active:scale-[0.98] whitespace-nowrap"
+                        >
+                          Buy Credits
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <BuyCreditsModal
+                    isOpen={isBuyCreditsOpen}
+                    onClose={() => setIsBuyCreditsOpen(false)}
+                    currentBalance={corporateData ? parseInt(corporateData.available_credits) : 0}
+                    onBuy={handleBuyCredits}
+                  />
+                </>
               )}
             </>
           )}

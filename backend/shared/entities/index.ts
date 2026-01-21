@@ -32,6 +32,12 @@ export { AssessmentAnswer } from './assessment-answer.entity';
 // Utility entities
 export { UserActionLog, UserRole, ActionType } from './user-action-log.entity';
 
+// ACI Entities
+export { AciScoreBand } from './aci-score-band.entity';
+export { AciTrait } from './aci-trait.entity';
+export { AciValue } from './aci-value.entity';
+export { AciTraitValueNote } from './aci-trait-value-note.entity';
+
 // ============================================
 // Usage in services:
 //

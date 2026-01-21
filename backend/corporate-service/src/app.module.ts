@@ -18,12 +18,11 @@ import { AssessmentModule } from './assessment/assessment.module';
             imports: [ConfigModule],
             inject: [ConfigService],
             useFactory: (config: ConfigService) => {
-                const isProd = config.get<string>('NODE_ENV') === 'production';
+                const databaseUrl = config.get<string>('DATABASE_URL');
                 // DB_SYNC is now SAFE because all services use @originbi/shared-entities
                 const shouldSync = config.get<string>('DB_SYNC') === 'true';
 
-                if (isProd) {
-                    const databaseUrl = config.get<string>('DATABASE_URL');
+                if (databaseUrl) {
                     return {
                         type: 'postgres',
                         url: databaseUrl,
@@ -35,11 +34,11 @@ import { AssessmentModule } from './assessment/assessment.module';
 
                 return {
                     type: 'postgres',
-                    host: config.get<string>('DB_HOST'),
+                    host: config.get<string>('DB_HOST') || 'localhost',
                     port: Number(config.get<string>('DB_PORT') || 5432),
-                    username: config.get<string>('DB_USER'),
-                    password: config.get<string>('DB_PASS'),
-                    database: config.get<string>('DB_NAME'),
+                    username: config.get<string>('DB_USER') || 'origin_user',
+                    password: config.get<string>('DB_PASS') || '',
+                    database: config.get<string>('DB_NAME') || 'originbi',
                     autoLoadEntities: true,
                     synchronize: shouldSync,
                     ssl: false,

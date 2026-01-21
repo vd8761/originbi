@@ -166,7 +166,7 @@ const Stepper: React.FC<StepperProps> = ({ steps }) => {
                 : "text-brand-text-light-primary dark:text-brand-text-primary"
                 }`}
             >
-              {step.label}
+              {step.status === 'locked' ? "Locked" : step.label}
             </span>
           </div>
         ))}

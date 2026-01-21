@@ -24,30 +24,43 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 		return nil, errors.New("assessment attempt not found or access denied")
 	}
 
-	// 1b. Update Status to IN_PROGRESS if started
-	if attempt.Status == "NOT_STARTED" {
-		now := time.Now()
+	// 1b. Ensure Started State
+	now := time.Now()
 
-		// Update Attempt
+	// Update Attempt to IN_PROGRESS if needed
+	if attempt.Status == "NOT_STARTED" {
 		attempt.Status = "IN_PROGRESS"
 		attempt.StartedAt = &now
 		if err := db.Model(&attempt).Updates(map[string]interface{}{
 			"status":     "IN_PROGRESS",
 			"started_at": now,
 		}).Error; err != nil {
-			return nil, err // Return error or log it? Best to return error to be safe
+			return nil, err
+		}
+	}
+
+	// Update Parent Session and Group Assessment (Always check to ensure consistency)
+	var session models.AssessmentSession
+	if err := db.First(&session, attempt.AssessmentSessionID).Error; err == nil {
+		// 1. Ensure Session is IN_PROGRESS
+		if session.Status == "NOT_STARTED" {
+			db.Model(&session).Updates(map[string]interface{}{
+				"status":     "IN_PROGRESS",
+				"started_at": now,
+			})
 		}
 
-		// Update Parent Session if needed
-		var session models.AssessmentSession
-		if err := db.First(&session, attempt.AssessmentSessionID).Error; err == nil {
-			if session.Status == "NOT_STARTED" {
-				db.Model(&session).Updates(map[string]interface{}{
-					"status":     "IN_PROGRESS",
-					"started_at": now,
-				})
+		// 2. Ensure Group Assessment is IN_PROGRESS
+		if session.GroupID != nil {
+			var groupAssessment models.GroupAssessment
+			// Find the group assessment by group_id AND program_id
+			if err := db.Where("group_id = ? AND program_id = ?", *session.GroupID, session.ProgramID).First(&groupAssessment).Error; err == nil {
+					// Update the GroupAssessment status
+					if groupAssessment.Status != "IN_PROGRESS" && groupAssessment.Status != "COMPLETED" {
+						db.Model(&groupAssessment).Update("status", "IN_PROGRESS")
+					}
+				}
 			}
-		}
 	}
 
 	// 2. Fetch Questions
@@ -334,12 +347,21 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 
 		db.Model(&models.AssessmentAttempt{}).Where("id = ?", answerRecord.AssessmentAttemptID).Updates(updates)
 
+
 		// 5. Next Level Setup (Level 2 Generation)
 		var nextLevel models.AssessmentLevel
-		if err := db.Where("level_number > ?", currentLevel.LevelNumber).Order("level_number ASC").First(&nextLevel).Error; err == nil {
+		hasNextLevel := false
+		
+		// Check if a next level generally exists in the system (Check only MANDATORY levels)
+		if err := db.Where("level_number > ? AND is_mandatory = ?", currentLevel.LevelNumber, true).Order("level_number ASC").First(&nextLevel).Error; err == nil {
+			
+			// Check if this specific user/session HAS an attempt for this next level
 			var nextAttempt models.AssessmentAttempt
 			if err := db.Where("assessment_session_id = ? AND assessment_level_id = ?", answerRecord.AssessmentSessionID, nextLevel.ID).First(&nextAttempt).Error; err == nil {
-
+				
+				// CASE A: Next Level Exists AND User has an attempt for it -> Unlock it
+				hasNextLevel = true
+				
 				unlockAt := now.Add(time.Duration(nextLevel.UnlockAfterHours) * time.Hour)
 				startWindow := 72
 				if nextLevel.StartWithinHours > 0 {
@@ -358,7 +380,6 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 					db.Exec("DELETE FROM assessment_answers WHERE assessment_attempt_id = ?", nextAttempt.ID)
 
 					// 2. Insert new questions based on Trait (Limit 25)
-					// We use ROW_NUMBER() to generate QuestionSequence random 1-25
 					query := `
                         INSERT INTO assessment_answers (
                             assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
@@ -371,6 +392,63 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
                         LIMIT 25
                     `
 					db.Exec(query, nextAttempt.ID, nextAttempt.AssessmentSessionID, nextAttempt.UserID, nextAttempt.RegistrationID, nextAttempt.ProgramID, nextLevel.ID, nextLevel.ID, *traitID)
+				}
+			}
+		}
+
+		// CASE B: No Next Level (System-wide) OR No Attempt for Next Level (Program-specific) -> Mark Completed
+		if !hasNextLevel {
+			// This session is FULLY COMPLETED
+			var session models.AssessmentSession
+			if err := db.First(&session, answerRecord.AssessmentSessionID).Error; err == nil {
+				db.Model(&session).Updates(map[string]interface{}{
+					"status":       "COMPLETED",
+					"completed_at": now,
+				})
+
+				// Update Group Assessment Status
+				if session.GroupID != nil {
+					var groupAssessment models.GroupAssessment
+					db.Where("group_id = ? AND program_id = ?", *session.GroupID, session.ProgramID).First(&groupAssessment)
+
+					var stats struct {
+						Total     int64
+						Started   int64
+						Completed int64
+					}
+
+					// Count sessions in the group for this program
+					db.Model(&models.AssessmentSession{}).
+						Where("group_id = ? AND program_id = ?", *session.GroupID, session.ProgramID).
+						Select("COUNT(*) as total, COUNT(*) FILTER (WHERE status != 'NOT_STARTED') as started, COUNT(*) FILTER (WHERE status = 'COMPLETED') as completed").
+						Scan(&stats)
+
+					newStatus := "NOT_STARTED"
+					isExpired := groupAssessment.ValidTo != nil && groupAssessment.ValidTo.Before(now)
+
+					if stats.Total > 0 {
+						if stats.Completed == stats.Total {
+							newStatus = "COMPLETED"
+						} else if isExpired {
+							if stats.Started > 0 {
+								// Some completed or started but unfinished AND time expired
+								newStatus = "PARTIALLY_EXPIRED"
+							} else {
+								// No one started AND time expired
+								newStatus = "EXPIRED"
+							}
+						} else {
+							// Not Expired
+							if stats.Started > 0 {
+								newStatus = "IN_PROGRESS"
+							}
+						}
+					}
+
+					// Update the GroupAssessment status
+					db.Model(&models.GroupAssessment{}).
+						Where("group_id = ? AND program_id = ?", *session.GroupID, session.ProgramID).
+						Update("status", newStatus)
 				}
 			}
 		}

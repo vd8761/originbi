@@ -21,6 +21,7 @@ let CognitoService = class CognitoService {
         this.clientId = this.config.get('COGNITO_CLIENT_ID');
         const accessKeyId = this.config.get('AWS_ACCESS_KEY_ID');
         const secretAccessKey = this.config.get('AWS_SECRET_ACCESS_KEY');
+        const sessionToken = this.config.get('AWS_SESSION_TOKEN');
         if (!this.userPoolId)
             throw new Error('COGNITO_USER_POOL_ID is not set');
         if (!region)
@@ -33,6 +34,7 @@ let CognitoService = class CognitoService {
             credentials: {
                 accessKeyId,
                 secretAccessKey,
+                sessionToken,
             },
         });
     }
@@ -42,7 +44,7 @@ let CognitoService = class CognitoService {
             let username = email;
             let userSub = null;
             try {
-                const createRes = await this.cognitoClient.send(new client_cognito_identity_provider_1.AdminCreateUserCommand({
+                const createRes = await this.executeWithRetry(() => this.cognitoClient.send(new client_cognito_identity_provider_1.AdminCreateUserCommand({
                     UserPoolId: this.userPoolId,
                     Username: email,
                     UserAttributes: [
@@ -50,7 +52,7 @@ let CognitoService = class CognitoService {
                         { Name: 'email_verified', Value: 'true' },
                     ],
                     MessageAction: 'SUPPRESS',
-                }));
+                })));
                 username = ((_a = createRes.User) === null || _a === void 0 ? void 0 : _a.Username) || email;
                 userSub =
                     ((_d = (_c = (_b = createRes.User) === null || _b === void 0 ? void 0 : _b.Attributes) === null || _c === void 0 ? void 0 : _c.find((a) => a.Name === 'sub')) === null || _d === void 0 ? void 0 : _d.Value) ||
@@ -64,25 +66,25 @@ let CognitoService = class CognitoService {
                     throw err;
                 }
             }
-            await this.cognitoClient.send(new client_cognito_identity_provider_1.AdminSetUserPasswordCommand({
+            await this.executeWithRetry(() => this.cognitoClient.send(new client_cognito_identity_provider_1.AdminSetUserPasswordCommand({
                 UserPoolId: this.userPoolId,
                 Username: username,
                 Password: password,
                 Permanent: true,
-            }));
+            })));
             if (groupName) {
-                await this.cognitoClient.send(new client_cognito_identity_provider_1.AdminAddUserToGroupCommand({
+                await this.executeWithRetry(() => this.cognitoClient.send(new client_cognito_identity_provider_1.AdminAddUserToGroupCommand({
                     UserPoolId: this.userPoolId,
                     Username: username,
                     GroupName: groupName,
-                }));
+                })));
             }
             if (!userSub) {
                 try {
-                    const getUserRes = await this.cognitoClient.send(new client_cognito_identity_provider_1.AdminGetUserCommand({
+                    const getUserRes = await this.executeWithRetry(() => this.cognitoClient.send(new client_cognito_identity_provider_1.AdminGetUserCommand({
                         UserPoolId: this.userPoolId,
                         Username: username,
-                    }));
+                    })));
                     userSub =
                         ((_f = (_e = getUserRes.UserAttributes) === null || _e === void 0 ? void 0 : _e.find((a) => a.Name === 'sub')) === null || _f === void 0 ? void 0 : _f.Value) ||
                             null;
@@ -96,8 +98,33 @@ let CognitoService = class CognitoService {
                 name: error === null || error === void 0 ? void 0 : error.name,
                 message: error === null || error === void 0 ? void 0 : error.message,
             });
+            if ((error === null || error === void 0 ? void 0 : error.name) === 'TooManyRequestsException' || (error === null || error === void 0 ? void 0 : error.name) === 'ThrottlingException') {
+                throw new common_1.HttpException('Too Many Requests - AWS Rate Limit Exceeded. Please wait a moment and try again.', common_1.HttpStatus.TOO_MANY_REQUESTS);
+            }
             throw new common_1.InternalServerErrorException(`Cognito error: ${(error === null || error === void 0 ? void 0 : error.name) || 'Unknown'} - ${(error === null || error === void 0 ? void 0 : error.message) || 'No message'}`);
         }
+    }
+    async executeWithRetry(operation, maxRetries = 10, baseDelay = 2000) {
+        let lastError;
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                return await operation();
+            }
+            catch (error) {
+                lastError = error;
+                const isThrottling = (error === null || error === void 0 ? void 0 : error.name) === 'TooManyRequestsException' ||
+                    (error === null || error === void 0 ? void 0 : error.name) === 'ThrottlingException';
+                if (isThrottling && attempt < maxRetries) {
+                    const delay = baseDelay * Math.pow(2, attempt);
+                    console.warn(`[CognitoService] Throttling detected. Retrying in ${delay}ms (Attempt ${attempt + 1}/${maxRetries})...`);
+                    await new Promise((resolve) => setTimeout(resolve, delay));
+                }
+                else {
+                    throw error;
+                }
+            }
+        }
+        throw lastError;
     }
     async login(email, password, requiredGroup) {
         var _a, _b, _c, _d, _e, _f;
@@ -151,6 +178,43 @@ let CognitoService = class CognitoService {
         catch (error) {
             console.error('[CognitoService] ForgotPassword error:', error);
             throw new common_1.InternalServerErrorException(`Forgot Password failed: ${(error === null || error === void 0 ? void 0 : error.message) || 'Unknown error'}`);
+        }
+    }
+    async refreshToken(refreshToken) {
+        var _a, _b, _c, _d;
+        try {
+            const command = new client_cognito_identity_provider_1.AdminInitiateAuthCommand({
+                UserPoolId: this.userPoolId,
+                ClientId: this.clientId,
+                AuthFlow: 'REFRESH_TOKEN_AUTH',
+                AuthParameters: {
+                    REFRESH_TOKEN: refreshToken,
+                },
+            });
+            const response = await this.cognitoClient.send(command);
+            return {
+                accessToken: (_a = response.AuthenticationResult) === null || _a === void 0 ? void 0 : _a.AccessToken,
+                idToken: (_b = response.AuthenticationResult) === null || _b === void 0 ? void 0 : _b.IdToken,
+                expiresIn: (_c = response.AuthenticationResult) === null || _c === void 0 ? void 0 : _c.ExpiresIn,
+                tokenType: (_d = response.AuthenticationResult) === null || _d === void 0 ? void 0 : _d.TokenType,
+            };
+        }
+        catch (error) {
+            console.error('[CognitoService] RefreshToken error:', error);
+            throw new common_1.InternalServerErrorException(`Refresh Token failed: ${(error === null || error === void 0 ? void 0 : error.message) || 'Unknown error'}`);
+        }
+    }
+    async logout(accessToken) {
+        try {
+            const command = new client_cognito_identity_provider_1.GlobalSignOutCommand({
+                AccessToken: accessToken,
+            });
+            await this.cognitoClient.send(command);
+            return { message: 'Logged out successfully' };
+        }
+        catch (error) {
+            console.error('[CognitoService] Logout error:', error);
+            throw new common_1.InternalServerErrorException(`Logout failed: ${(error === null || error === void 0 ? void 0 : error.message) || 'Unknown error'}`);
         }
     }
 };

@@ -405,3 +405,20 @@ type PersonalityTrait struct {
 	BlendedStyleName string `gorm:"type:varchar(100)" json:"blended_style_name"`
 	BlendedStyleDesc string `gorm:"type:text" json:"blended_style_desc"`
 }
+
+// Table: group_assessments
+type GroupAssessment struct {
+	ID                 int64      `gorm:"primaryKey;autoIncrement" json:"id"`
+	GroupID            int64      `gorm:"not null" json:"group_id"`
+	ProgramID          int64      `gorm:"not null" json:"program_id"`
+	ValidFrom          *time.Time `gorm:"type:timestamp with time zone" json:"valid_from"`
+	ValidTo            *time.Time `gorm:"type:timestamp with time zone" json:"valid_to"`
+	TotalCandidates    int        `gorm:"default:0" json:"total_candidates"`
+	Status             string     `gorm:"type:varchar(50);default:'NOT_STARTED'" json:"status"`
+	CorporateAccountID *int64     `json:"corporate_account_id"`
+	ResellerAccountID  *int64     `json:"reseller_account_id"`
+	CreatedByUserID    *int64     `json:"created_by_user_id"`
+	Metadata           string     `gorm:"type:jsonb;default:'{}'" json:"metadata"`
+	CreatedAt          time.Time  `gorm:"default:now()" json:"created_at"`
+	UpdatedAt          time.Time  `gorm:"default:now()" json:"updated_at"`
+}

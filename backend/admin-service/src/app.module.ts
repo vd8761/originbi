@@ -33,36 +33,18 @@ import { KeepAliveModule } from './keepalive/keepalive.module';
       imports: [ConfigModule], // ✅ important
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const isProd =
-          (config.get<string>('NODE_ENV') || 'development') === 'production';
+        const databaseUrl = config.get<string>('DATABASE_URL');
+        console.log('DEBUG: NODE_ENV is:', config.get('NODE_ENV'));
+        console.log('DEBUG: DATABASE_URL is:', databaseUrl ? 'PRESENT' : 'MISSING');
+        console.log('DEBUG: DB_HOST is:', config.get('DB_HOST'));
 
-        /* if (isProd) {
-          const url = config.get<string>('DATABASE_URL');
-          if (!url)
-            throw new Error(
-              'DATABASE_URL is missing in production environment',
-            );
-
-          return {
-            type: 'postgres',
-            url,
-            autoLoadEntities: true,
-            synchronize: config.get<string>('DB_SYNC') === 'true',
-            ssl: { rejectUnauthorized: false },
-            schema: 'public',
-          };
-        } */
-
-        if (isProd) {
-          const rawUrl = config.get<string>('DATABASE_URL');
-          if (!rawUrl) throw new Error('DATABASE_URL is missing');
-
-          // Ensure sslmode=require in the URL
-          const url = rawUrl.includes('sslmode=')
-            ? rawUrl
-            : rawUrl.includes('?')
-              ? `${rawUrl}&sslmode=require`
-              : `${rawUrl}?sslmode=require`;
+        if (databaseUrl) {
+          // Ensure sslmode=require in the URL for production/remote connections
+          const url = databaseUrl.includes('sslmode=')
+            ? databaseUrl
+            : databaseUrl.includes('?')
+              ? `${databaseUrl}&sslmode=require`
+              : `${databaseUrl}?sslmode=require`;
 
           return {
             type: 'postgres',
@@ -76,11 +58,11 @@ import { KeepAliveModule } from './keepalive/keepalive.module';
 
         return {
           type: 'postgres',
-          host: config.get<string>('DB_HOST'),
+          host: config.get<string>('DB_HOST') || 'localhost',
           port: Number(config.get<string>('DB_PORT') || 5432),
-          username: config.get<string>('DB_USER'),
+          username: config.get<string>('DB_USER') || 'origin_user',
           password: config.get<string>('DB_PASS') || '',
-          database: config.get<string>('DB_NAME'),
+          database: config.get<string>('DB_NAME') || 'originbi',
           autoLoadEntities: true,
           synchronize: config.get<string>('DB_SYNC') === 'true',
           ssl: false,
@@ -103,4 +85,4 @@ import { KeepAliveModule } from './keepalive/keepalive.module';
   ],
   controllers: [TestController, MailAssetsController, HealthController],
 })
-export class AppModule {}
+export class AppModule { }

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { CognitoModule } from './cognito/cognito.module';
 import { AuthModule } from './auth/auth.module';
+import { AppController } from './app.controller';
 
 @Module({
   imports: [
@@ -12,5 +13,6 @@ import { AuthModule } from './auth/auth.module';
     CognitoModule,
     AuthModule,
   ],
+  controllers: [AppController],
 })
 export class AppModule { }
