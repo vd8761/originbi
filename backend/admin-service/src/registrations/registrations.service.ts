@@ -29,8 +29,7 @@ import { SES } from 'aws-sdk';
 export class RegistrationsService {
   private readonly logger = new Logger(RegistrationsService.name);
 
-  private authServiceBaseUrl =
-    process.env.AUTH_SERVICE_URL;
+  private authServiceBaseUrl = process.env.AUTH_SERVICE_URL;
 
   private readonly ADMIN_USER_ID = 1;
 
@@ -46,7 +45,7 @@ export class RegistrationsService {
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
-  ) { }
+  ) {}
 
   async withRetry<T>(
     operation: () => Promise<T>,
@@ -97,7 +96,6 @@ export class RegistrationsService {
       );
       return res.data as { sub?: string };
     } catch (err: unknown) {
-      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
       type AuthErr = {
         response?: { data?: any; status?: number };
         message?: string;
@@ -117,7 +115,6 @@ export class RegistrationsService {
       throw new InternalServerErrorException(
         `Failed to create Cognito user at ${this.authServiceBaseUrl} (Proxy: ${process.env.http_proxy || 'none'}): ${msg}`,
       );
-      /* eslint-enable */
     }
   }
 
@@ -532,7 +529,7 @@ export class RegistrationsService {
   // ---------------------------------------------------------
   // LIST REGISTRATIONS
   // ---------------------------------------------------------
-  /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
+
   async findAll(
     page: number,
     limit: number,
@@ -629,20 +626,18 @@ export class RegistrationsService {
       );
     }
   }
-  /* eslint-enable */
 
   // ---------------------------------------------------------
   // UPDATE STATUS
   // ---------------------------------------------------------
   async updateStatus(id: string, status: string) {
     const reg = await this.regRepo.findOne({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       where: { id: BigInt(id) as any },
     });
     if (!reg) {
       throw new BadRequestException('Registration not found');
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
     reg.status = status as any;
     // If we need to sync with User.isActive, do it here.
     // e.g. if status === 'CANCELLED', user.isActive = false.

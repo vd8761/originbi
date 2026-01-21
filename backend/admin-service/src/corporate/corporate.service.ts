@@ -119,8 +119,8 @@ export class CorporateService {
         typeof authErr === 'string'
           ? authErr
           : (authErr as { message?: string })?.message ||
-          JSON.stringify(authErr) ||
-          'Failed to create Cognito user';
+            JSON.stringify(authErr) ||
+            'Failed to create Cognito user';
 
       if (status === 429) {
         throw new HttpException(errorMessage, 429);
@@ -229,9 +229,8 @@ export class CorporateService {
       };
     } catch (error: any) {
       this.logger.error(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         `findAll Corporate Error: ${error.message}`,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
         error.stack,
       );
       throw new InternalServerErrorException(
@@ -260,7 +259,7 @@ export class CorporateService {
   // ----------------------------------------------------------------
   // UPDATE (General)
   // ----------------------------------------------------------------
-  /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
+
   async update(id: number, dto: any) {
     // Using any for partial update of fields
     const account = await this.corporateRepo.findOne({

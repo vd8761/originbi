@@ -13,7 +13,7 @@ export class DepartmentsService {
     private readonly deptRepo: Repository<Department>,
     @InjectRepository(DepartmentDegree)
     private readonly deptDegreeRepo: Repository<DepartmentDegree>,
-  ) { }
+  ) {}
 
   async findAll() {
     const rows = await this.deptRepo.find({

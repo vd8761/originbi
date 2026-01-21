@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  pgvector-db:
+    image: pgvector/pgvector:pg16
+    container_name: originbi-pgvector
+    environment:
+      POSTGRES_DB: originbi
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 0023
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pgvector_data:

@@ -10,6 +10,8 @@ exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const cognito_module_1 = require("./cognito/cognito.module");
+const auth_module_1 = require("./auth/auth.module");
+const app_controller_1 = require("./app.controller");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -21,7 +23,9 @@ exports.AppModule = AppModule = __decorate([
                 envFilePath: process.env.NODE_ENV === 'production' ? '.env.production' : '.env.local',
             }),
             cognito_module_1.CognitoModule,
+            auth_module_1.AuthModule,
         ],
+        controllers: [app_controller_1.AppController],
     })
 ], AppModule);
 //# sourceMappingURL=app.module.js.map

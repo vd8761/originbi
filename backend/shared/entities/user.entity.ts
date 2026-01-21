@@ -8,7 +8,7 @@ import {
 
 @Entity('users')
 export class User {
-    @PrimaryGeneratedColumn()
+    @PrimaryGeneratedColumn({ type: 'bigint' })
     id: number;
 
     @Column({ name: 'cognito_sub', nullable: true })

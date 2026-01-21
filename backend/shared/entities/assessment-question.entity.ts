@@ -66,6 +66,6 @@ export class AssessmentQuestion {
     @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
     updatedAt: Date;
 
-    @OneToMany(() => AssessmentQuestionOption, (option) => option.questionId)
+    @OneToMany(() => AssessmentQuestionOption, (option: AssessmentQuestionOption) => option.questionId)
     options: AssessmentQuestionOption[];
 }
