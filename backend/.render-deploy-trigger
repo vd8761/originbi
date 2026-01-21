@@ -1,0 +1,3 @@
+# Deployment trigger file
+# Last deployment: 2026-01-21 16:25
+# Purpose: Force Render to rebuild with updated typeorm dependencies
