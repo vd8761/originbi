@@ -127,13 +127,13 @@ const BulkUploadRegistration: React.FC<BulkUploadRegistrationProps> = ({ onCance
     };
 
     return (
-        <div className="p-6 bg-[#0B0D0F] min-h-screen">
+        <div className="p-6 bg-brand-light-primary dark:bg-[#0B0D0F] min-h-screen">
             <div className="mb-8">
-                <nav className="text-sm text-gray-500 mb-2">
-                    Dashboard &gt; <button onClick={onCancel} className="hover:text-white transition-colors">Registrations</button> &gt; <span className="text-[#1ED36A]">Bulk Upload</span>
+                <nav className="text-sm text-gray-500 dark:text-gray-500 mb-2">
+                    Dashboard &gt; <button onClick={onCancel} className="hover:text-gray-900 dark:hover:text-white transition-colors">My Employees</button> &gt; <span className="text-[#1ED36A]">Bulk Upload</span>
                     {view === 'review' && " > Review Bulk Upload"}
                 </nav>
-                <h1 className="text-3xl font-bold text-white mb-2">Bulk Upload Registration {view === 'review' ? '– Review & Confirm' : ''}</h1>
+                <h1 className="text-3xl font-bold text-[#150089] dark:text-white mb-2">Bulk Upload Registration {view === 'review' ? '– Review & Confirm' : ''}</h1>
             </div>
 
             {view === 'upload' && (
@@ -163,8 +163,8 @@ const BulkUploadRegistration: React.FC<BulkUploadRegistrationProps> = ({ onCance
             {view === 'processing' && (
                 <div className="flex flex-col items-center justify-center p-12 h-[400px]">
                     <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#1ED36A] mb-4"></div>
-                    <h3 className="text-xl font-medium text-white">Processing Registrations...</h3>
-                    <p className="text-gray-400 mt-2">This may take a few moments.</p>
+                    <h3 className="text-xl font-medium text-gray-900 dark:text-white">Processing Registrations...</h3>
+                    <p className="text-gray-500 dark:text-gray-400 mt-2">This may take a few moments.</p>
                 </div>
             )}
 
