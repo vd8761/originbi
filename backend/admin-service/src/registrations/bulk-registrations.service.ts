@@ -45,7 +45,7 @@ export class BulkRegistrationsService {
     private groupAssessmentRepo: Repository<GroupAssessment>,
     private dataSource: DataSource,
     private readonly registrationsService: RegistrationsService,
-  ) { }
+  ) {}
 
   /**
    * Phase 1: Preview & Validate
@@ -697,11 +697,11 @@ export class BulkRegistrationsService {
       degreeId: isCollege ? degId : undefined,
       currentYear: isCollege
         ? this.getValue(rawData, [
-          'current_year',
-          'CurrentYear',
-          'Year',
-          'year',
-        ])
+            'current_year',
+            'CurrentYear',
+            'Year',
+            'year',
+          ])
         : undefined,
 
       password: this.getValue(rawData, ['Password', 'password']) || 'Admin@123',

@@ -103,4 +103,4 @@ import { KeepAliveModule } from './keepalive/keepalive.module';
   ],
   controllers: [TestController, MailAssetsController, HealthController],
 })
-export class AppModule { }
+export class AppModule {}

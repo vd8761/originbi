@@ -103,10 +103,28 @@ SELECT id, blended_style_name, blended_style_desc FROM personality_traits WHERE 
 `;
 
 export const QUERY_EXAMPLES = [
-    { question: "List career roles", sql: "SELECT career_role_name, short_description FROM career_roles WHERE is_deleted = false LIMIT 20" },
-    { question: "Show courses", sql: "SELECT course_name FROM trait_based_course_details WHERE is_deleted = false LIMIT 20" },
-    { question: "Find tools for software developer", sql: "SELECT crt.tool_name FROM career_role_tools crt JOIN career_roles cr ON crt.career_role_id = cr.id WHERE cr.career_role_name ILIKE '%software%' AND cr.is_deleted = false" },
-    { question: "How many users", sql: "SELECT COUNT(*) FROM users WHERE is_active = true" },
-    { question: "Show programs", sql: "SELECT name, description FROM programs WHERE is_active = true" },
-    { question: "Find personality traits", sql: "SELECT blended_style_name, blended_style_desc FROM personality_traits WHERE is_active = true" },
+  {
+    question: 'List career roles',
+    sql: 'SELECT career_role_name, short_description FROM career_roles WHERE is_deleted = false LIMIT 20',
+  },
+  {
+    question: 'Show courses',
+    sql: 'SELECT course_name FROM trait_based_course_details WHERE is_deleted = false LIMIT 20',
+  },
+  {
+    question: 'Find tools for software developer',
+    sql: "SELECT crt.tool_name FROM career_role_tools crt JOIN career_roles cr ON crt.career_role_id = cr.id WHERE cr.career_role_name ILIKE '%software%' AND cr.is_deleted = false",
+  },
+  {
+    question: 'How many users',
+    sql: 'SELECT COUNT(*) FROM users WHERE is_active = true',
+  },
+  {
+    question: 'Show programs',
+    sql: 'SELECT name, description FROM programs WHERE is_active = true',
+  },
+  {
+    question: 'Find personality traits',
+    sql: 'SELECT blended_style_name, blended_style_desc FROM personality_traits WHERE is_active = true',
+  },
 ];

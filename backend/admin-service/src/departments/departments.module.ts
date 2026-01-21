@@ -8,9 +8,11 @@ import { DepartmentsService } from './departments.service';
 import { DepartmentsController } from './departments.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Department, DegreeType, DepartmentDegree])],
+  imports: [
+    TypeOrmModule.forFeature([Department, DegreeType, DepartmentDegree]),
+  ],
   providers: [DepartmentsService],
   controllers: [DepartmentsController],
   exports: [DepartmentsService],
 })
-export class DepartmentsModule { }
+export class DepartmentsModule {}

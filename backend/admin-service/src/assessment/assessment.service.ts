@@ -22,7 +22,7 @@ export class AssessmentService {
     private readonly attemptRepo: Repository<AssessmentAttempt>,
     @InjectRepository(GroupAssessment)
     private readonly groupAssessmentRepo: Repository<GroupAssessment>,
-  ) { }
+  ) {}
 
   async findAllSessions(
     page: number,
@@ -271,13 +271,19 @@ export class AssessmentService {
 
   async getSessionDetails(id: number) {
     try {
-      const session = await this.sessionRepo.createQueryBuilder('s')
+      const session = await this.sessionRepo
+        .createQueryBuilder('s')
         .leftJoinAndSelect('s.user', 'u')
         .leftJoinAndSelect('s.registration', 'r')
         .leftJoinAndSelect('s.groupAssessment', 'ga')
         .leftJoinAndSelect('ga.group', 'g')
         .leftJoinAndMapOne('s.program', Program, 'p', 'p.id = s.programId')
-        .leftJoinAndMapOne('ga.program', Program, 'gap', 'gap.id = ga.programId')
+        .leftJoinAndMapOne(
+          'ga.program',
+          Program,
+          'gap',
+          'gap.id = ga.programId',
+        )
         .where('s.id = :id', { id })
         .getOne();
 
@@ -292,7 +298,9 @@ export class AssessmentService {
 
       // Maintain currentAttempt logic for stats bar if needed (usually latest active)
       // If we just sort attempts by ID DESC, the first one is the latest.
-      const currentAttempt = attempts.sort((a, b) => Number(b.id) - Number(a.id))[0];
+      const currentAttempt = attempts.sort(
+        (a, b) => Number(b.id) - Number(a.id),
+      )[0];
 
       // Calculate currentLevel from max level number in attempts
       const currentLevel = attempts.reduce((max, attempt) => {
@@ -304,10 +312,8 @@ export class AssessmentService {
         ...session,
         attempts, // Return full list
         currentAttempt,
-        currentLevel
+        currentLevel,
       };
-
-
     } catch (error) {
       console.error('Error fetching session details:', error);
       throw error;

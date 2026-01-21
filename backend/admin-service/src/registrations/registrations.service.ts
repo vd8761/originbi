@@ -29,8 +29,7 @@ import { SES } from 'aws-sdk';
 export class RegistrationsService {
   private readonly logger = new Logger(RegistrationsService.name);
 
-  private authServiceBaseUrl =
-    process.env.AUTH_SERVICE_URL;
+  private authServiceBaseUrl = process.env.AUTH_SERVICE_URL;
 
   private readonly ADMIN_USER_ID = 1;
 
@@ -46,7 +45,7 @@ export class RegistrationsService {
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
-  ) { }
+  ) {}
 
   async withRetry<T>(
     operation: () => Promise<T>,

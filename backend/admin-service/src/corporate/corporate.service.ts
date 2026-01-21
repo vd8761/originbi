@@ -119,8 +119,8 @@ export class CorporateService {
         typeof authErr === 'string'
           ? authErr
           : (authErr as { message?: string })?.message ||
-          JSON.stringify(authErr) ||
-          'Failed to create Cognito user';
+            JSON.stringify(authErr) ||
+            'Failed to create Cognito user';
 
       if (status === 429) {
         throw new HttpException(errorMessage, 429);

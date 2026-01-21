@@ -1,4 +1,4 @@
-
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Injectable, Logger } from '@nestjs/common';
 import { ChatGroq } from '@langchain/groq';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
@@ -13,135 +13,142 @@ import { SystemMessage, HumanMessage } from '@langchain/core/messages';
  */
 
 export interface ProfileInput {
-    name: string;
-    currentRole: string;
-    currentJobDescription: string;
-    yearsOfExperience: number;
-    relevantExperience: string;
-    currentIndustry: string;
-    expectedFutureRole: string;
-    behavioralStyle?: string;        // From DISC assessment
-    behavioralDescription?: string;  // From personality_traits
-    agileScore?: number;             // From assessment_attempts.total_score
+  name: string;
+  currentRole: string;
+  currentJobDescription: string;
+  yearsOfExperience: number;
+  relevantExperience: string;
+  currentIndustry: string;
+  expectedFutureRole: string;
+  behavioralStyle?: string; // From DISC assessment
+  behavioralDescription?: string; // From personality_traits
+  agileScore?: number; // From assessment_attempts.total_score
 }
 
 export interface FutureRoleReport {
-    reportId: string;
-    generatedAt: Date;
-    profileSnapshot: ProfileSnapshot;
-    behavioralAlignment: string;
-    skillAssessment: SkillCategory[];
-    overallInsight: string;
-    futureRoleReadiness: RoleReadiness;
-    roleFitmentScore: RoleFitment;
-    industrySuitability: IndustrySuitability[];
-    transitionRequirements: string[];
-    executiveInsight: string;
-    fullReportText: string;
+  reportId: string;
+  generatedAt: Date;
+  profileSnapshot: ProfileSnapshot;
+  behavioralAlignment: string;
+  skillAssessment: SkillCategory[];
+  overallInsight: string;
+  futureRoleReadiness: RoleReadiness;
+  roleFitmentScore: RoleFitment;
+  industrySuitability: IndustrySuitability[];
+  transitionRequirements: string[];
+  executiveInsight: string;
+  fullReportText: string;
 }
 
 interface ProfileSnapshot {
-    name: string;
-    currentRole: string;
-    totalExperience: string;
-    relevantExperience: string;
-    currentIndustry: string;
-    expectedFutureRole: string;
+  name: string;
+  currentRole: string;
+  totalExperience: string;
+  relevantExperience: string;
+  currentIndustry: string;
+  expectedFutureRole: string;
 }
 
 interface SkillCategory {
-    category: string;
-    skills: SkillScore[];
+  category: string;
+  skills: SkillScore[];
 }
 
 interface SkillScore {
-    skill: string;
-    score: number;
-    insight: string;
+  skill: string;
+  score: number;
+  insight: string;
 }
 
 interface RoleReadiness {
-    score: number;
-    adjacencyType: string;
-    dimensions: { name: string; alignment: string }[];
+  score: number;
+  adjacencyType: string;
+  dimensions: { name: string; alignment: string }[];
 }
 
 interface RoleFitment {
-    score: number;
-    verdict: string;
-    components: { name: string; weight: number; score: number }[];
+  score: number;
+  verdict: string;
+  components: { name: string; weight: number; score: number }[];
 }
 
 interface IndustrySuitability {
-    industry: string;
-    suitability: string;
-    idealFor: string;
+  industry: string;
+  suitability: string;
+  idealFor: string;
 }
 
 @Injectable()
 export class FutureRoleReportService {
-    private readonly logger = new Logger(FutureRoleReportService.name);
-    private llm: ChatGroq | null = null;
+  private readonly logger = new Logger(FutureRoleReportService.name);
+  private llm: ChatGroq | null = null;
 
-    private getLlm(): ChatGroq {
-        if (!this.llm) {
-            const apiKey = process.env.GROQ_API_KEY;
-            if (!apiKey) throw new Error('GROQ_API_KEY not set');
-            this.llm = new ChatGroq({
-                apiKey,
-                model: 'llama-3.3-70b-versatile',
-                temperature: 0.3,
-            });
-        }
-        return this.llm;
+  private getLlm(): ChatGroq {
+    if (!this.llm) {
+      const apiKey = process.env.GROQ_API_KEY;
+      if (!apiKey) throw new Error('GROQ_API_KEY not set');
+      this.llm = new ChatGroq({
+        apiKey,
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.3,
+      });
     }
+    return this.llm;
+  }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // MAIN REPORT GENERATION
-    // ═══════════════════════════════════════════════════════════════════════════
-    async generateReport(profile: ProfileInput): Promise<FutureRoleReport> {
-        this.logger.log(`📊 Generating Future Role Readiness Report for: ${profile.name}`);
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MAIN REPORT GENERATION
+  // ═══════════════════════════════════════════════════════════════════════════
+  async generateReport(profile: ProfileInput): Promise<FutureRoleReport> {
+    this.logger.log(
+      `📊 Generating Future Role Readiness Report for: ${profile.name}`,
+    );
 
-        const reportId = this.generateReportId(profile.name);
-        const fullReportText = await this.generateFullReportWithAI(profile);
+    const reportId = this.generateReportId(profile.name);
+    const fullReportText = await this.generateFullReportWithAI(profile);
 
-        return {
-            reportId,
-            generatedAt: new Date(),
-            profileSnapshot: {
-                name: profile.name,
-                currentRole: profile.currentRole,
-                totalExperience: `${profile.yearsOfExperience} Years`,
-                relevantExperience: profile.relevantExperience,
-                currentIndustry: profile.currentIndustry,
-                expectedFutureRole: profile.expectedFutureRole,
-            },
-            behavioralAlignment: '',
-            skillAssessment: [],
-            overallInsight: '',
-            futureRoleReadiness: { score: 0, adjacencyType: '', dimensions: [] },
-            roleFitmentScore: { score: 0, verdict: '', components: [] },
-            industrySuitability: [],
-            transitionRequirements: [],
-            executiveInsight: '',
-            fullReportText,
-        };
-    }
+    return {
+      reportId,
+      generatedAt: new Date(),
+      profileSnapshot: {
+        name: profile.name,
+        currentRole: profile.currentRole,
+        totalExperience: `${profile.yearsOfExperience} Years`,
+        relevantExperience: profile.relevantExperience,
+        currentIndustry: profile.currentIndustry,
+        expectedFutureRole: profile.expectedFutureRole,
+      },
+      behavioralAlignment: '',
+      skillAssessment: [],
+      overallInsight: '',
+      futureRoleReadiness: { score: 0, adjacencyType: '', dimensions: [] },
+      roleFitmentScore: { score: 0, verdict: '', components: [] },
+      industrySuitability: [],
+      transitionRequirements: [],
+      executiveInsight: '',
+      fullReportText,
+    };
+  }
 
-    private generateReportId(name: string): string {
-        const date = new Date();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = String(date.getFullYear()).slice(-2);
-        const initials = name.split(' ').map(n => n[0]?.toUpperCase() || '').join('');
-        const seq = String(Math.floor(Math.random() * 99) + 1).padStart(2, '0');
-        return `OBI-G1-${month}/${year}-${initials}-${seq}`;
-    }
+  private generateReportId(name: string): string {
+    const date = new Date();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = String(date.getFullYear()).slice(-2);
+    const initials = name
+      .split(' ')
+      .map((n) => n[0]?.toUpperCase() || '')
+      .join('');
+    const seq = String(Math.floor(Math.random() * 99) + 1).padStart(2, '0');
+    return `OBI-G1-${month}/${year}-${initials}-${seq}`;
+  }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // AI-POWERED REPORT GENERATION
-    // ═══════════════════════════════════════════════════════════════════════════
-    private async generateFullReportWithAI(profile: ProfileInput): Promise<string> {
-        const systemPrompt = `You are an expert HR consultant and career strategist at Origin BI. 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // AI-POWERED REPORT GENERATION
+  // ═══════════════════════════════════════════════════════════════════════════
+  private async generateFullReportWithAI(
+    profile: ProfileInput,
+  ): Promise<string> {
+    const systemPrompt = `You are an expert HR consultant and career strategist at Origin BI. 
 Generate a comprehensive "Career Fitment & Future Role Readiness Report" based on the candidate profile.
 
 OUTPUT FORMAT (Use EXACTLY this structure):
@@ -270,7 +277,7 @@ IMPORTANT RULES:
 6. Do NOT mention assessment methodologies like DISC or Agile ACI
 7. NEVER include any dates in the report - no month, year, or day references`;
 
-        const userPrompt = `Generate a complete Career Fitment & Future Role Readiness Report for:
+    const userPrompt = `Generate a complete Career Fitment & Future Role Readiness Report for:
 
 CANDIDATE PROFILE:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -287,23 +294,23 @@ ${profile.behavioralDescription ? `Behavioral Description: ${profile.behavioralD
 
 Generate the COMPLETE report now:`;
 
-        try {
-            const response = await this.getLlm().invoke([
-                new SystemMessage(systemPrompt),
-                new HumanMessage(userPrompt),
-            ]);
+    try {
+      const response = await this.getLlm().invoke([
+        new SystemMessage(systemPrompt),
+        new HumanMessage(userPrompt),
+      ]);
 
-            return response.content.toString();
-        } catch (error) {
-            this.logger.error(`Report generation failed: ${error.message}`);
-            throw new Error('Failed to generate report');
-        }
+      return response.content.toString();
+    } catch (error) {
+      this.logger.error(`Report generation failed: ${error.message}`);
+      throw new Error('Failed to generate report');
     }
+  }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // FORMAT FOR CHAT DISPLAY
-    // ═══════════════════════════════════════════════════════════════════════════
-    formatForChat(report: FutureRoleReport): string {
-        return `**📊 Career Fitment Report Generated**\n\n**Report ID:** ${report.reportId}\n**Candidate:** ${report.profileSnapshot.name}\n**Generated:** ${report.generatedAt.toLocaleDateString()}\n\n---\n\n${report.fullReportText}`;
-    }
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FORMAT FOR CHAT DISPLAY
+  // ═══════════════════════════════════════════════════════════════════════════
+  formatForChat(report: FutureRoleReport): string {
+    return `**📊 Career Fitment Report Generated**\n\n**Report ID:** ${report.reportId}\n**Candidate:** ${report.profileSnapshot.name}\n**Generated:** ${report.generatedAt.toLocaleDateString()}\n\n---\n\n${report.fullReportText}`;
+  }
 }

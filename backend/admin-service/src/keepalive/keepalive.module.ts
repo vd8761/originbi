@@ -3,7 +3,7 @@ import { HttpModule } from '@nestjs/axios';
 import { KeepAliveService } from './keepalive.service';
 
 @Module({
-    imports: [HttpModule],
-    providers: [KeepAliveService],
+  imports: [HttpModule],
+  providers: [KeepAliveService],
 })
-export class KeepAliveModule { }
+export class KeepAliveModule {}
