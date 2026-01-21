@@ -34,6 +34,9 @@ import { KeepAliveModule } from './keepalive/keepalive.module';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const databaseUrl = config.get<string>('DATABASE_URL');
+        console.log('DEBUG: NODE_ENV is:', config.get('NODE_ENV'));
+        console.log('DEBUG: DATABASE_URL is:', databaseUrl ? 'PRESENT' : 'MISSING');
+        console.log('DEBUG: DB_HOST is:', config.get('DB_HOST'));
 
         if (databaseUrl) {
           // Ensure sslmode=require in the URL for production/remote connections
