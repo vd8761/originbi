@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Edit2, MoreHorizontal, CheckCircle, Clock, Users, Briefcase } from "lucide-react";
 import { TrendUpIcon, TrendDownIcon, CircleArrowUpIcon, EditPencilIcon, DiamondIcon } from "@/components/icons";
+import BuyCreditsModal from "./BuyCreditsModal";
 
 // --- Types ---
 interface DashboardStats {
@@ -59,7 +60,7 @@ const MiniStat = ({ label, value, trend, isPositive }: { label: string, value: s
     </div>
 );
 
-const CreditsCard = ({ credits }: { credits: number }) => (
+const CreditsCard = ({ credits, onBuy }: { credits: number, onBuy: () => void }) => (
     <div className="relative overflow-hidden rounded-[32px] p-8 h-full bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] border border-[#E0E0E0] dark:border-white/10 flex flex-col items-center justify-between shadow-sm">
         {/* Bottom Gradient - CSS Based for Better Visibilty */}
         <div
@@ -95,7 +96,10 @@ const CreditsCard = ({ credits }: { credits: number }) => (
 
             {/* Button - Increased Text Size and Padding */}
             <div className="flex justify-center">
-                <button className="font-['Haskoy'] font-medium text-[clamp(16px,1vw,18px)] text-white bg-[#1ED36A] hover:bg-[#16b058] px-12 py-3.5 rounded-full shadow-lg shadow-[#1ED36A]/20 transition-all">
+                <button
+                    onClick={onBuy}
+                    className="font-['Haskoy'] font-medium text-[clamp(16px,1vw,18px)] text-white bg-[#1ED36A] hover:bg-[#16b058] px-12 py-3.5 rounded-full shadow-lg shadow-[#1ED36A]/20 transition-all"
+                >
                     Buy now
                 </button>
             </div>
@@ -584,6 +588,7 @@ const CorporateDashboard: React.FC = () => {
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [showResult, setShowResult] = useState(false);
+    const [isBuyCreditsOpen, setIsBuyCreditsOpen] = useState(false);
 
     // Mock Participants Data
     const participants: Participant[] = [
@@ -649,7 +654,10 @@ const CorporateDashboard: React.FC = () => {
             {/* 2. Top Grid: Credits, Insights, Recruitment */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
                 <div className="lg:col-span-3">
-                    <CreditsCard credits={stats?.totalCredits || 250} />
+                    <CreditsCard
+                        credits={stats?.availableCredits ?? 0}
+                        onBuy={() => setIsBuyCreditsOpen(true)}
+                    />
                 </div>
                 <div className="lg:col-span-5 relative z-20">
                     <AssessmentBarChart />
@@ -723,7 +731,18 @@ const CorporateDashboard: React.FC = () => {
                     © 2025 Origin BI, Made with ❤️ by <span className="text-[#1ED36A] underline decoration-solid cursor-pointer">Touchmark Descience Pvt. Ltd.</span>
                 </div>
             </div>
-        </div>
+
+            {/* Buy Credits Modal */}
+            <BuyCreditsModal
+                isOpen={isBuyCreditsOpen}
+                onClose={() => setIsBuyCreditsOpen(false)}
+                currentBalance={stats?.availableCredits ?? 0}
+                onBuy={(amount, cost) => {
+                    console.log(`Purchasing ${amount} credits for ₹${cost}`);
+                    setIsBuyCreditsOpen(false);
+                }}
+            />
+        </div >
     );
 };
 

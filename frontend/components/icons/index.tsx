@@ -1106,3 +1106,16 @@ export const BanIcon: React.FC<{ className?: string }> = ({
     />
   </svg>
 );
+export const FlashIcon: React.FC<{ className?: string }> = ({
+  className = "w-[18px] h-[21px]",
+}) => (
+  <svg
+    className={className}
+    viewBox="0 0 18 21"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path fillRule="evenodd" clipRule="evenodd" d="M7.62832 6.58863L6.6416 10.2198L12.2876 6.56822L8.59531 20.3447L12.3448 20.3481L17.7993 0L7.62832 6.58863Z" fill="currentColor" />
+    <path fillRule="evenodd" clipRule="evenodd" d="M1.55228 14.5565L0 20.348H7.6857C7.6857 20.348 10.8293 8.5693 10.8302 8.56592C10.8273 8.5678 1.55228 14.5565 1.55228 14.5565Z" fill="currentColor" />
+  </svg>
+);
