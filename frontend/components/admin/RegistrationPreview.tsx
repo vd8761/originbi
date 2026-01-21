@@ -225,39 +225,44 @@ const RegistrationPreview: React.FC<RegistrationPreviewProps> = ({ registration,
             </div>
 
             {/* Profile Card */}
-            <div className="bg-[#19211C] p-6 rounded-2xl text-white relative">
-                <button className="absolute top-6 right-6 px-4 py-1.5 bg-[#FFFFFF1F] rounded-full text-xs font-medium hover:bg-[#FFFFFF3F] transition-colors flex items-center gap-2">
-                    Edit
-                    {/* Pencil Icon if needed */}
-                </button>
+            <div className="bg-white dark:bg-[#19211C] py-4 px-6 rounded-lg text-gray-900 dark:text-white relative border border-gray-200 dark:border-white/10">
+                {/* Header Row */}
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-sm text-[#150089] dark:text-white font-medium">Profile Summary</h2>
+                    <button className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white transition-colors">
+                        Edit
+                        <svg className="w-3.5 h-3.5 text-brand-green" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                    </button>
+                </div>
 
-                <h2 className="text-sm text-gray-400 mb-6 font-medium">Profile Summary</h2>
-
-                {/* Use grid-cols-6 to fit all items in one row on large screens */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8">
+                {/* Fields Row - Use grid-cols-6 to fit all items in one row on large screens */}
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
                     <div>
-                        <p className="text-xs text-gray-400 mb-1">Full Name</p>
-                        <p className="text-base font-medium">{registration.full_name || 'N/A'}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Full Name</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{registration.full_name || 'N/A'}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-gray-400 mb-1">Gender</p>
-                        <p className="text-base font-medium capitalize">{registration.gender?.toLowerCase() || 'N/A'}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Gender</p>
+                        <p className="text-sm font-medium capitalize text-gray-900 dark:text-white">{registration.gender?.toLowerCase() || 'N/A'}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-gray-400 mb-1">Email Address</p>
-                        <p className="text-base font-medium break-all">{registration.email || 'N/A'}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Email Address</p>
+                        <p className="text-sm font-medium break-all text-gray-900 dark:text-white">{registration.email || 'N/A'}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-gray-400 mb-1">Mobile Number</p>
-                        <p className="text-base font-medium">{registration.mobile_number || 'N/A'}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Mobile Number</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{registration.mobile_number || 'N/A'}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-gray-400 mb-1">Group Name</p>
-                        <p className="text-base font-medium">{(registration as any).groupName || '--'}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Group Name</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{(registration as any).groupName || '--'}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-gray-400 mb-1">Status</p>
-                        <span className={`inline-block px-3 py-1 bg-brand-green/20 text-brand-green rounded text-xs font-semibold border border-brand-green/30`}>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Status</p>
+                        <span className="inline-block px-3 py-0.5 bg-brand-green text-white rounded text-xs font-medium">
                             {registration.status === 'COMPLETED' || registration.status === 'INCOMPLETE' ? 'Active' : registration.status}
                         </span>
                     </div>
@@ -269,9 +274,9 @@ const RegistrationPreview: React.FC<RegistrationPreviewProps> = ({ registration,
                 <div className='flex justify-between items-center mb-4'>
                     <h2 className="text-xl font-semibold text-[#150089] dark:text-white">List of Exams Assigned</h2>
 
-                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                         <span>Showing</span>
-                        <div className="flex items-center bg-[#19211C] rounded px-2 py-1 gap-2">
+                        <div className="flex items-center bg-gray-100 dark:bg-[#19211C] border border-gray-200 dark:border-transparent rounded px-2 py-1 gap-2 text-gray-700 dark:text-white">
                             <span>{Math.min(page * limit, total).toString().padStart(2, '0')}</span>
                             <ChevronDownIcon className="w-3 h-3" />
                         </div>
@@ -281,14 +286,14 @@ const RegistrationPreview: React.FC<RegistrationPreviewProps> = ({ registration,
                             <button
                                 onClick={() => setPage(Math.max(1, page - 1))}
                                 disabled={page === 1}
-                                className="p-1 rounded bg-[#19211C] hover:bg-white/10 disabled:opacity-50"
+                                className="p-1 rounded bg-gray-100 dark:bg-[#19211C] border border-gray-200 dark:border-transparent hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 text-gray-700 dark:text-white"
                             >
                                 <ArrowLeftWithoutLineIcon className="w-2 h-2" />
                             </button>
                             <button
                                 onClick={() => setPage(Math.min(totalPages, page + 1))}
                                 disabled={page === totalPages}
-                                className="p-1 rounded bg-[#19211C] hover:bg-white/10 disabled:opacity-50"
+                                className="p-1 rounded bg-gray-100 dark:bg-[#19211C] border border-gray-200 dark:border-transparent hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 text-gray-700 dark:text-white"
                             >
                                 <ArrowRightWithoutLineIcon className="w-2 h-2" />
                             </button>
