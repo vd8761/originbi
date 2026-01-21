@@ -84,7 +84,7 @@ const RenderContent = ({ content, streaming, onDone, apiUrl }: { content: string
 
     const handleDownload = async (reportPath: string) => {
         try {
-            const baseUrl = apiUrl || process.env.NEXT_PUBLIC_ADMIN_API_URL || 'http://localhost:4001';
+            const baseUrl = apiUrl || process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4001';
             const url = `${baseUrl}${reportPath}`;
             const response = await fetch(url);
             const blob = await response.blob();
@@ -169,7 +169,7 @@ const RenderContent = ({ content, streaming, onDone, apiUrl }: { content: string
 
 export default function ChatAssistant({
     userRole = 'ADMIN',
-    apiUrl = process.env.NEXT_PUBLIC_ADMIN_API_URL || 'http://localhost:4001'
+    apiUrl = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4001'
 }: ChatAssistantProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
