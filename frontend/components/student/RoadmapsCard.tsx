@@ -9,10 +9,10 @@ const RoadmapItem: React.FC<{ item: RoadmapItemType & { id?: string } }> = ({ it
     >
         <div className="flex justify-between items-center py-4 lg:py-[0.833vw]">
             <div className="pr-4">
-                <h4 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-base lg:text-[1.04vw] mb-1 lg:mb-[0.2vw]">
+                <h4 className="font-semibold font-sans text-[#19211C] dark:text-white text-base lg:text-[1.04vw] mb-1 lg:mb-[0.2vw]">
                     {item.title}
                 </h4>
-                <p className="font-normal font-sans text-[#19211C]/60 dark:text-brand-text-secondary text-xs lg:text-[0.729vw]">
+                <p className="font-normal font-sans text-black dark:text-white text-xs lg:text-[0.833vw] leading-tight opacity-90 hover:opacity-100 transition-opacity">
                     {item.description}
                 </p>
             </div>
@@ -58,7 +58,7 @@ const RoadmapsCard: React.FC = () => {
     return (
         <div className="bg-white/20 border border-[#19211C]/12 dark:bg-brand-dark-secondary dark:border-transparent rounded-2xl h-full flex flex-col backdrop-blur-sm">
             <div className="px-6 pt-6 pb-4 lg:px-[1.25vw] lg:pt-[1.25vw] lg:pb-[0.833vw] flex justify-between items-center">
-                <h3 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-lg lg:text-[1.25vw]">
+                <h3 className="font-semibold font-sans text-[#19211C] dark:text-white text-lg lg:text-[1.25vw]">
                     Your Roadmaps 2027-2035
                 </h3>
                 <Link

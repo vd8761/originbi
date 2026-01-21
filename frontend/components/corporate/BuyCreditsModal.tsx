@@ -18,7 +18,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
     currentBalance,
     onBuy,
 }) => {
-    const [credits, setCredits] = useState<number>(10);
+    const [credits, setCredits] = useState<number>(200);
     const [isPricingExpanded, setIsPricingExpanded] = useState(true);
 
     const PER_CREDIT_COST = Number(process.env.NEXT_PUBLIC_PER_CREDIT_COST) || 200;
@@ -34,7 +34,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
     // Reset on open
     useEffect(() => {
         if (isOpen) {
-            setCredits(10);
+            setCredits(200);
             setIsPricingExpanded(true);
         }
     }, [isOpen]);
@@ -135,8 +135,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                                     <defs>
                                         <linearGradient id="tickGradient" x1="0%" y1="0%" x2="100%" y2="0%">
                                             <stop offset="0%" stopColor="#22C55E" /> {/* Green */}
-                                            <stop offset="50%" stopColor="#EAB308" /> {/* Yellow */}
-                                            <stop offset="100%" stopColor="#F97316" /> {/* Orange */}
+                                            <stop offset="100%" stopColor="#4ADE80" /> {/* Lighter Green */}
                                         </linearGradient>
                                     </defs>
 
@@ -200,7 +199,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                         <div className="flex flex-col gap-2">
                             <label className="text-[11px] text-[#19211C] dark:text-gray-400 font-medium">Quick Select</label>
                             <div className="grid grid-cols-5 gap-2">
-                                {[10, 20, 30, 40].map(val => (
+                                {[100, 200, 300, 400].map(val => (
                                     <button
                                         key={val}
                                         onClick={() => handleQuickSelect(val)}
@@ -218,9 +217,9 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                                     <input
                                         type="number"
                                         placeholder="Enter.."
-                                        value={credits > 40 && credits !== 200 && credits <= 1000 ? credits : ''}
+                                        value={credits > 400 && credits <= 1000 ? credits : (credits > 0 && ![100, 200, 300, 400].includes(credits) ? credits : '')}
                                         onChange={handleInputChange}
-                                        onFocus={() => { if (credits <= 40) setCredits(50); }} // Optional visual helper
+                                        onFocus={() => { if (credits < 100) setCredits(100); }}
                                         className="w-full h-[36px] rounded-[8px] bg-[#EAECEF] dark:bg-white/10 text-[13px] px-1 text-center font-medium outline-none focus:ring-1 focus:ring-[#1ED36A] placeholder:text-gray-500 text-[#19211C] dark:text-white transition-all"
                                     />
                                 </div>

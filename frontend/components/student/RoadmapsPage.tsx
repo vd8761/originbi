@@ -163,7 +163,7 @@ const ExploreRoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: strin
                     <h4 className="font-semibold text-[#19211C] dark:text-white text-[16px] mb-1 truncate">
                         {item.title}
                     </h4>
-                    <p className="text-[#19211C]/60 dark:text-[#9CA3AF] text-[13px] leading-relaxed line-clamp-2">
+                    <p className="text-black dark:text-white text-[13px] leading-relaxed line-clamp-2">
                         {item.description}
                     </p>
                 </div>
@@ -195,7 +195,7 @@ const RoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: string) => v
                 <h3 className="font-semibold text-[#19211C] dark:text-brand-text-primary text-[20px] mb-2 lg:mb-[0.4vw]">
                     {item.title}
                 </h3>
-                <p className="text-[#19211C]/60 dark:text-brand-text-secondary text-[16px] leading-relaxed">
+                <p className="text-black dark:text-white text-[16px] leading-relaxed">
                     {item.description}
                 </p>
             </div>
@@ -260,9 +260,9 @@ const RoadmapDetailView: React.FC<{
                             </h2>
                             <div className="space-y-1">
                                 {roadmap.toolsToLearn.map((tool, idx) => (
-                                    <p key={idx} className="text-[16px] text-[#19211C]/80 dark:text-brand-text-secondary">
-                                        <span className="font-medium text-[#19211C] dark:text-brand-text-primary">{tool.name}</span>
-                                        <span className="text-[#19211C]/60 dark:text-brand-text-secondary"> ({tool.category})</span>
+                                    <p key={idx} className="text-[16px] text-black dark:text-white">
+                                        <span className="font-medium text-black dark:text-white">{tool.name}</span>
+                                        <span className="text-black dark:text-white/80"> ({tool.category})</span>
                                     </p>
                                 ))}
                             </div>
@@ -273,7 +273,7 @@ const RoadmapDetailView: React.FC<{
                             <h2 className="text-[18px] font-semibold text-[#19211C] dark:text-brand-text-primary mb-3">
                                 Overview
                             </h2>
-                            <p className="text-[16px] text-[#19211C]/80 dark:text-brand-text-secondary leading-relaxed">
+                            <p className="text-[16px] text-black dark:text-white leading-relaxed">
                                 {roadmap.overview}
                             </p>
                         </section>
@@ -283,7 +283,7 @@ const RoadmapDetailView: React.FC<{
                             <h2 className="text-[18px] font-semibold text-[#19211C] dark:text-brand-text-primary mb-3">
                                 Trait Alignment
                             </h2>
-                            <p className="text-[16px] text-[#19211C]/80 dark:text-brand-text-secondary leading-relaxed">
+                            <p className="text-[16px] text-black dark:text-white leading-relaxed">
                                 {roadmap.traitAlignment}
                             </p>
                         </section>
@@ -297,8 +297,8 @@ const RoadmapDetailView: React.FC<{
                                 {roadmap.roadmapSteps.map((step, idx) => (
                                     <div key={idx} className="flex items-start gap-3">
                                         <span className="w-2 h-2 mt-2 rounded-full bg-brand-green flex-shrink-0"></span>
-                                        <p className="text-[16px] text-[#19211C]/80 dark:text-brand-text-secondary leading-relaxed">
-                                            <span className="font-semibold text-[#19211C] dark:text-brand-text-primary">{step.label}:</span>{' '}
+                                        <p className="text-[16px] text-black dark:text-white leading-relaxed">
+                                            <span className="font-semibold text-black dark:text-white">{step.label}:</span>{' '}
                                             {step.content}
                                         </p>
                                     </div>
@@ -321,7 +321,7 @@ const RoadmapDetailView: React.FC<{
                                             {guideline.points.map((point, pIdx) => (
                                                 <li key={pIdx} className="flex items-start gap-3">
                                                     <span className="w-2 h-2 mt-1.5 rounded-full bg-brand-green flex-shrink-0"></span>
-                                                    <span className="text-[16px] text-[#19211C]/70 dark:text-brand-text-secondary">
+                                                    <span className="text-[16px] text-black dark:text-white">
                                                         {point}
                                                     </span>
                                                 </li>
@@ -337,7 +337,7 @@ const RoadmapDetailView: React.FC<{
                             <h2 className="text-[28px] font-semibold text-[#19211C] dark:text-brand-text-primary mb-4">
                                 Guidance Tip
                             </h2>
-                            <p className="text-[16px] text-[#19211C]/80 dark:text-brand-text-secondary leading-relaxed">
+                            <p className="text-[16px] text-black dark:text-white leading-relaxed">
                                 {roadmap.guidanceTip}
                             </p>
                         </section>
@@ -459,7 +459,7 @@ const RoadmapsPage: React.FC = () => {
                     <h1 className="text-[clamp(18px,1.8vw,28px)] font-semibold text-[#19211C] dark:text-brand-text-primary mb-1">
                         Your Roadmaps 2027-2035
                     </h1>
-                    <p className="text-[#19211C]/60 dark:text-brand-text-secondary text-[clamp(11px,0.8vw,14px)]">
+                    <p className="text-black dark:text-brand-text-secondary text-[clamp(11px,0.8vw,14px)]">
                         Explore paths aligned with your strengths.
                     </p>
                 </div>
