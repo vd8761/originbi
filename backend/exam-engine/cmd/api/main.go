@@ -4,6 +4,7 @@ import (
 	"exam-engine/internal/config"
 	"exam-engine/internal/repository"
 	"exam-engine/internal/routes"
+	"exam-engine/internal/service"
 	"log"
 )
 
@@ -12,6 +13,9 @@ func main() {
 
 	// Initialize Database
 	repository.ConnectDB(cfg)
+
+	// Start Background Scheduler
+	go service.StartScheduler()
 
 	r := routes.SetupRouter()
 
