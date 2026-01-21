@@ -813,7 +813,7 @@ Respond with ONLY valid JSON, no explanation:`;
         'SELECT COUNT(*) as count FROM rag_documents',
       );
       totalDocs = parseInt(r[0].count);
-    } catch { }
+    } catch {}
 
     return {
       status: 'ok',
