@@ -21,7 +21,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 
 interface HeaderProps {
     onLogout: () => void;
-    currentView?: "dashboard" | "assessment";
+    currentView?: "dashboard" | "assessment" | "roadmaps";
     onNavigate?: (view: "dashboard" | "assessment") => void;
     hideNav?: boolean;
     showAssessmentOnly?: boolean;
@@ -181,10 +181,21 @@ const Header: React.FC<HeaderProps> = ({
     const handleLangChange = (lang: Language) => { setLanguage(lang); setLangOpen(false); };
     const handleNotificationClick = () => { setNotificationsOpen((p) => !p); if (hasNotification) setHasNotification(false); };
 
+    const router = useRouter();
+    const pathname = usePathname();
+
     const handleNavClick = (view: "dashboard" | "assessment") => {
         onNavigate?.(view);
         setMobileMenuOpen(false);
     };
+
+    const handleRoadmapClick = () => {
+        router.push('/student/roadmaps');
+        setMobileMenuOpen(false);
+    };
+
+    // Determine if roadmaps is active based on pathname
+    const isRoadmapsActive = pathname?.includes('/student/roadmaps') || currentView === 'roadmaps';
 
     const notifications = [
         { icon: <RoadmapIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />, title: "New Roadmap Unlocked!", time: "2 hours ago", isNew: true },
@@ -220,7 +231,7 @@ const Header: React.FC<HeaderProps> = ({
                     isMobile={isMobile}
                     onClick={() => handleNavClick("assessment")}
                 />
-                <NavItem icon={<RoadmapIcon />} label="Road Map" isMobile={isMobile} />
+                <NavItem icon={<RoadmapIcon />} label="Road Map" active={isRoadmapsActive} isMobile={isMobile} onClick={handleRoadmapClick} />
                 <NavItem icon={<VideosIcon />} label="Videos" isMobile={isMobile} />
                 <NavItem icon={<ProfileIcon />} label="Profile" isMobile={isMobile} />
                 <NavItem icon={<SettingsIcon />} label="Settings" isMobile={isMobile} />
