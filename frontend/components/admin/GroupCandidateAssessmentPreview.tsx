@@ -21,13 +21,13 @@ interface AssessmentResultPreviewProps {
 }
 
 const InfoItem = ({ icon: Icon, label, value }: { icon: any, label: string, value: string | React.ReactNode }) => (
-    <div className="flex items-center gap-3 p-3 bg-black/20 rounded-xl border border-white/5">
-        <div className="p-2 bg-white/5 rounded-lg">
-            <Icon className="w-4 h-4 text-gray-400" />
+    <div className="flex items-center gap-3 p-3 bg-gray-100 dark:bg-black/20 rounded-xl border border-gray-200 dark:border-white/5">
+        <div className="p-2 bg-gray-200 dark:bg-white/5 rounded-lg">
+            <Icon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
         </div>
         <div>
             <p className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</p>
-            <p className="text-xs font-semibold text-gray-200 mt-0.5">{value}</p>
+            <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 mt-0.5">{value}</p>
         </div>
     </div>
 );
@@ -127,47 +127,47 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
         const currentStatus = attemptData?.status || status;
 
         return (
-            <div className={`bg-[#19211C] border border-white/10 rounded-2xl p-6 grid grid-cols-2 md:grid-cols-4 gap-6 mb-6`}>
+            <div className={`bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-6 grid grid-cols-2 md:grid-cols-4 gap-6 mb-6`}>
                 <div>
-                    <p className="text-xs text-gray-400 mb-1">Exam Starts On</p>
-                    <p className="text-sm font-semibold">{formatDate(attemptData?.startedAt) || '-'}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Exam Starts On</p>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-white">{formatDate(attemptData?.startedAt) || '-'}</p>
                 </div>
                 <div>
-                    <p className="text-xs text-gray-400 mb-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                         {currentStatus === 'IN_PROGRESS' || currentStatus === 'ON_GOING' ? 'To be completed by' : 'Completed At'}
                     </p>
-                    <p className="text-sm font-semibold">
+                    <p className="text-sm font-semibold text-gray-800 dark:text-white">
                         {currentStatus === 'IN_PROGRESS' || currentStatus === 'ON_GOING'
                             ? formatDate(attemptData?.expiresAt) || '-'
                             : formatDate(attemptData?.completedAt) || '-'}
                     </p>
                 </div>
                 <div>
-                    <p className="text-xs text-gray-400 mb-1">Total Exam Duration</p>
-                    <p className="text-sm font-semibold">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Exam Duration</p>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-white">
                         {levelData?.durationMinutes ? `${levelData.durationMinutes} Minutes` : '--'}
                     </p>
                 </div>
                 <div>
-                    <p className="text-xs text-gray-400 mb-1">Maximum Score</p>
-                    <p className="text-sm font-semibold">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Maximum Score</p>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-white">
                         {levelData?.maxScore ?? '--'}
                     </p>
                 </div>
                 <div>
-                    <p className="text-xs text-gray-400 mb-1">Sincerity Index</p>
-                    <p className="text-sm font-semibold">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Sincerity Index</p>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-white">
                         {attemptData?.sincerityIndex || attemptData?.sincerity_index ? `${attemptData.sincerityIndex || attemptData.sincerity_index}%` : '--'}
                     </p>
                 </div>
                 <div>
-                    <p className="text-xs text-gray-400 mb-1">Sincerity Class</p>
-                    <p className="text-sm font-semibold">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Sincerity Class</p>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-white">
                         {attemptData?.sincerityClass || attemptData?.sincerity_class || '--'}
                     </p>
                 </div>
                 <div>
-                    <p className="text-xs text-gray-400 mb-1">Exam Status</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Exam Status</p>
                     <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold 
                     ${currentStatus === 'COMPLETED' ? 'bg-[#00B69B] text-white' :
                             currentStatus === 'IN_PROGRESS' ? 'bg-[#F59E0B] text-black' :
@@ -176,8 +176,8 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                     </span>
                 </div>
                 <div>
-                    <p className="text-xs text-gray-400 mb-1">Generated Report Trait Code</p>
-                    <p className="text-sm font-semibold">{session?.metadata?.traitCode || '--'}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Generated Report Trait Code</p>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-white">{session?.metadata?.traitCode || '--'}</p>
                 </div>
             </div>
         );
@@ -186,8 +186,8 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     const renderBasicInfoCards = () => (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             {/* Assessment Details */}
-            <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6 flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-2">
+            <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-6 flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-gray-200 dark:border-white/10 pb-4 mb-2">
                     <h3 className="text-sm font-semibold">Assessment Details</h3>
                     <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${status === 'IN_PROGRESS' || status === 'ON_GOING' ? 'bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/20' : status === 'COMPLETED' ? 'bg-brand-green/10 text-brand-green border-brand-green/20' : 'bg-gray-600/10 text-gray-400 border-gray-600/20'}`}>
                         {status?.replace(/_/g, ' ') || 'Unknown'}
@@ -207,8 +207,8 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
             </div>
 
             {/* Candidate & Report */}
-            <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6 flex flex-col gap-4">
-                <h3 className="text-sm font-semibold border-b border-white/10 pb-4 mb-2">Candidate & Report</h3>
+            <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-6 flex flex-col gap-4">
+                <h3 className="text-sm font-semibold border-b border-gray-200 dark:border-white/10 pb-4 mb-2">Candidate & Report</h3>
                 <div className="flex flex-col gap-3">
                     <div className="grid grid-cols-2 gap-3">
                         <InfoItem icon={ProfileIcon} label="Student Name" value={displayData.studentName} />
@@ -246,115 +246,178 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
         </div>
     );
 
-    const renderLevelReport = (title: string, breakdown: any[], compatibility: any, levelAttempt?: any, levelData?: any, hideStats: boolean = false) => (
-        <div className={`grid grid-cols-1 ${hideStats ? '' : 'xl:grid-cols-[1fr_300px]'} gap-6`}>
-            <div className="flex flex-col gap-6">
-                {/* Re-use stats bar here if needed, or keep it common */}
-                {!hideStats && renderStatsBar(levelAttempt, levelData)}
+    const renderLevelReport = (title: string, breakdown: any[], compatibility: any, levelAttempt?: any, levelData?: any, hideStats: boolean = false) => {
+        // Use status from levelAttempt if available, otherwise fallback to session status
+        const currentStatus = levelAttempt?.status || status;
 
-                {/* Breakdown Table */}
-                <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6">
-                    <h3 className="text-sm font-semibold mb-4">{title} Value-wise Breakdown</h3>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="bg-[#FFFFFF0D] text-brand-green">
-                                    <th className="py-3 px-4 text-left font-medium rounded-l-lg">{title} Value</th>
-                                    <th className="py-3 px-4 text-center font-medium">Score</th>
-                                    <th className="py-3 px-4 text-right font-medium rounded-r-lg">Behavioral Note</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                                {breakdown.map((item, idx) => (
-                                    <tr key={idx} className="hover:bg-white/5 transition-colors">
-                                        <td className="py-4 px-4">{item.value}</td>
-                                        <td className="py-4 px-4 text-center">{item.score}</td>
-                                        <td className="py-4 px-4 text-right text-gray-300">{item.note}</td>
+        return (
+            <div className={`grid grid-cols-1 ${hideStats ? '' : 'xl:grid-cols-[1fr_300px]'} gap-6`}>
+                {/* Left Section - Combined Stats + Breakdown in single container */}
+                <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-6 flex flex-col gap-6">
+                    {/* Stats Section (inline, not separate container) */}
+                    {!hideStats && (
+                        <>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Exam Starts On</p>
+                                    <p className="text-sm font-semibold text-gray-800 dark:text-white">{formatDate(levelAttempt?.startedAt) || '-'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                        {currentStatus === 'IN_PROGRESS' || currentStatus === 'ON_GOING' ? 'To be completed by' : 'Completed At'}
+                                    </p>
+                                    <p className="text-sm font-semibold text-gray-800 dark:text-white">
+                                        {currentStatus === 'IN_PROGRESS' || currentStatus === 'ON_GOING'
+                                            ? formatDate(levelAttempt?.expiresAt) || '-'
+                                            : formatDate(levelAttempt?.completedAt) || '-'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Exam Duration</p>
+                                    <p className="text-sm font-semibold text-gray-800 dark:text-white">
+                                        {levelData?.durationMinutes ? `${levelData.durationMinutes} Minutes` : '--'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Maximum Score</p>
+                                    <p className="text-sm font-semibold text-gray-800 dark:text-white">
+                                        {levelData?.maxScore ?? '--'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Sincerity Index</p>
+                                    <p className="text-sm font-semibold text-gray-800 dark:text-white">
+                                        {levelAttempt?.sincerityIndex || levelAttempt?.sincerity_index ? `${levelAttempt.sincerityIndex || levelAttempt.sincerity_index}%` : '--'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Sincerity Class</p>
+                                    <p className="text-sm font-semibold text-gray-800 dark:text-white">
+                                        {levelAttempt?.sincerityClass || levelAttempt?.sincerity_class || '--'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Exam Status</p>
+                                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold 
+                                    ${currentStatus === 'COMPLETED' ? 'bg-[#00B69B] text-white' :
+                                            currentStatus === 'IN_PROGRESS' ? 'bg-[#F59E0B] text-black' :
+                                                'bg-gray-600 text-gray-200'}`}>
+                                        {currentStatus.replace(/_/g, " ")}
+                                    </span>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Generated Report Trait Code</p>
+                                    <p className="text-sm font-semibold text-gray-800 dark:text-white">{session?.metadata?.traitCode || '--'}</p>
+                                </div>
+                            </div>
+                            {/* Horizontal divider between stats and breakdown */}
+                            <div className="border-t border-gray-200 dark:border-white/10" />
+                        </>
+                    )}
+
+                    {/* Breakdown Table Section */}
+                    <div>
+                        <h3 className="text-sm font-semibold text-[#150089] dark:text-white mb-4">{title} Value-wise Breakdown</h3>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="bg-brand-green/10 dark:bg-[#FFFFFF0D] text-black dark:text-brand-green">
+                                        <th className="py-3 px-4 text-left font-medium rounded-l-lg">{title} Value</th>
+                                        <th className="py-3 px-4 text-center font-medium">Score (out of 25)</th>
+                                        <th className="py-3 px-4 text-right font-medium rounded-r-lg">Behavioral Note</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                            <tfoot className="bg-[#1ED36A]/20 text-brand-green font-bold">
-                                <tr>
-                                    <td className="py-3 px-4 rounded-l-lg" colSpan={3}>
-                                        <div className="flex justify-center w-full">
-                                            {levelAttempt?.dominantTrait ? (
-                                                <>
-                                                    {levelAttempt.dominantTrait.code} : {levelAttempt.dominantTrait.blendedStyleName}
-                                                </>
-                                            ) : (
-                                                `Total (${title}) – ${compatibility.totalScore}`
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tfoot>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                                    {breakdown.map((item, idx) => (
+                                        <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                            <td className="py-4 px-4 text-black dark:text-white font-medium">{item.value}</td>
+                                            <td className="py-4 px-4 text-center text-black dark:text-white">{item.score}</td>
+                                            <td className="py-4 px-4 text-right text-gray-500 dark:text-gray-300">{item.note}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr className="bg-brand-green text-black font-bold">
+                                        <td className="py-3 px-4 rounded-l-lg rounded-r-lg" colSpan={3}>
+                                            <div className="flex justify-center w-full">
+                                                {levelAttempt?.dominantTrait ? (
+                                                    <>
+                                                        {levelAttempt.dominantTrait.code} : {levelAttempt.dominantTrait.blendedStyleName}
+                                                    </>
+                                                ) : (
+                                                    `Total (${title}) – ${compatibility.totalScore}`
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
-                {/* Compatibility Index - ONLY FOR ACI */}
+                {/* Compatibility Index - ONLY FOR ACI (separate container) */}
                 {title === 'ACI' && (
-                    <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6">
-                        <h3 className="text-sm font-semibold mb-4">Agile Compatibility Index (ACI) – Score Overview</h3>
-                        <div className="overflow-x-auto border border-white/10 rounded-lg">
+                    <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-6">
+                        <h3 className="text-sm font-semibold text-[#150089] dark:text-white mb-4">Agile Compatibility Index (ACI) – Score Overview</h3>
+                        <div className="overflow-x-auto border border-gray-200 dark:border-white/10 rounded-lg">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="bg-[#FFFFFF0D] text-brand-green border-b border-white/10">
-                                        <th className="py-3 px-4 text-left font-medium w-1/3 border-r border-white/10">Parameter</th>
+                                    <tr className="bg-brand-green/10 dark:bg-[#FFFFFF0D] text-black dark:text-brand-green border-b border-gray-200 dark:border-white/10">
+                                        <th className="py-3 px-4 text-left font-medium w-1/3 border-r border-gray-200 dark:border-white/10">Parameter</th>
                                         <th className="py-3 px-4 text-left font-medium">Description</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-white/10">
+                                <tbody className="divide-y divide-gray-100 dark:divide-white/10">
                                     <tr>
-                                        <td className="py-4 px-4 border-r border-white/10 text-gray-300">Total Score:</td>
-                                        <td className="py-4 px-4">{compatibility.totalScore}</td>
+                                        <td className="py-4 px-4 border-r border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-300">Total Score:</td>
+                                        <td className="py-4 px-4 text-black dark:text-white">{compatibility.totalScore}</td>
                                     </tr>
                                     <tr>
-                                        <td className="py-4 px-4 border-r border-white/10 text-gray-300">Level:</td>
-                                        <td className="py-4 px-4">{compatibility.level}</td>
+                                        <td className="py-4 px-4 border-r border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-300">Level:</td>
+                                        <td className="py-4 px-4 text-black dark:text-white">{compatibility.level}</td>
                                     </tr>
                                     <tr>
-                                        <td className="py-4 px-4 border-r border-white/10 text-gray-300">Compatibility Tag:</td>
-                                        <td className="py-4 px-4">{compatibility.tag}</td>
+                                        <td className="py-4 px-4 border-r border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-300">Compatibility Tag:</td>
+                                        <td className="py-4 px-4 text-black dark:text-white">{compatibility.tag}</td>
                                     </tr>
                                     <tr>
-                                        <td className="py-4 px-4 border-r border-white/10 text-gray-300">Interpretation:</td>
-                                        <td className="py-4 px-4">{compatibility.interpretation}</td>
+                                        <td className="py-4 px-4 border-r border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-300">Interpretation:</td>
+                                        <td className="py-4 px-4 text-black dark:text-white">{compatibility.interpretation}</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 )}
-            </div>
 
+                {/* Right Sidebar with horizontal separators */}
+                {!hideStats && (
+                    <div className="flex flex-col gap-4">
+                        <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-6 flex flex-col gap-0 h-full">
+                            <SidebarItem label="Assessment Title" value={displayData.title} />
 
+                            {/* Horizontal separator */}
+                            <div className="border-t border-gray-200 dark:border-white/10 my-4" />
 
-            {/* Sidebar for Level Tabs (Same Sidebar) */}
-            {!hideStats && (
-                <div className="flex flex-col gap-4">
-                    <div className="bg-[#19211C] border border-white/10 rounded-2xl p-6 flex flex-col gap-6">
-                        <SidebarItem label="Assessment Title" value={displayData.title} />
+                            <div className="flex flex-col gap-4">
+                                <SidebarItem label="Exam Published On" value={displayData.startsOn} />
+                                <SidebarItem label="Exam Expired On" value={displayData.endsOn} />
+                            </div>
 
-                        <div className="flex flex-col gap-4">
-                            <SidebarItem label="Candidate Name" value={displayData.studentName} />
-                            <SidebarItem label="Email" value={displayData.email} />
-                            <SidebarItem label="Mobile" value={displayData.mobile} />
-                        </div>
+                            {/* Horizontal separator */}
+                            <div className="border-t border-gray-200 dark:border-white/10 my-4" />
 
-                        <div className="grid grid-cols-1 gap-4">
-                            <SidebarItem label="Exam Published On" value={displayData.startsOn} />
-                            <SidebarItem label="Exam Expired On" value={displayData.endsOn} />
-                        </div>
-                        <div className="grid grid-cols-1 gap-4">
-                            <SidebarItem label="Program Level" value={displayData.program} />
-                            <SidebarItem label="Exam Type" value={displayData.type} />
+                            <div className="flex flex-col gap-4">
+                                <SidebarItem label="Program Level" value={displayData.program} />
+                                <SidebarItem label="Exam Type" value={displayData.type} />
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
-    );
+                )}
+            </div>
+        );
+    };
 
     // Mock Data for Reports (Replace with Real Data later)
     const aciBreakdownData = [
@@ -408,20 +471,20 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
 
                 {/* Conditional State Message */}
                 {status === 'NOT_STARTED' || status === 'ASSIGNED' ? (
-                    <div className="bg-[#19211C] border border-white/10 rounded-2xl p-12 flex flex-col items-center justify-center text-center">
-                        <LockIcon className="w-12 h-12 text-gray-600 mb-4" />
-                        <h3 className="text-lg font-semibold text-gray-200">Exam is not yet started</h3>
-                        <p className="text-gray-400 text-sm mt-2">The assessment has not been initiated by the candidate.</p>
+                    <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-12 flex flex-col items-center justify-center text-center">
+                        <LockIcon className="w-12 h-12 text-gray-400 dark:text-gray-600 mb-4" />
+                        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Exam is not yet started</h3>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm mt-2">The assessment has not been initiated by the candidate.</p>
                     </div>
                 ) : status === 'EXPIRED' ? (
-                    <div className="bg-[#19211C] border border-white/10 rounded-2xl p-12 flex flex-col items-center justify-center text-center">
+                    <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-12 flex flex-col items-center justify-center text-center">
                         <h3 className="text-lg font-semibold text-red-400">Exam has been expired</h3>
                     </div>
                 ) : !allLevelsCompleted ? (
-                    <div className="bg-[#19211C] border border-white/10 rounded-2xl p-12 flex flex-col items-center justify-center text-center">
+                    <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-12 flex flex-col items-center justify-center text-center">
                         <ClockIcon className="w-12 h-12 text-brand-green mb-4 animate-pulse" />
-                        <h3 className="text-lg font-semibold text-gray-200">Assessment in Progress</h3>
-                        <p className="text-gray-400 text-sm mt-2">Please wait until all levels are finished to view the comprehensive report.</p>
+                        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Assessment in Progress</h3>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm mt-2">Please wait until all levels are finished to view the comprehensive report.</p>
                     </div>
                 ) : (
                     // All Completed
@@ -443,7 +506,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     };
 
     return (
-        <div className="flex flex-col gap-6 w-full h-full font-sans text-white">
+        <div className="flex flex-col gap-6 w-full h-full font-sans text-gray-900 dark:text-white">
             {/* Header */}
             <div>
                 <div className="flex items-center text-xs text-black dark:text-white mb-2 font-normal flex-wrap">
@@ -464,14 +527,14 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
             </div>
 
             {/* Tab Navigation */}
-            <div className="flex flex-col lg:flex-row justify-between items-end border-b border-white/10 pb-0 gap-4">
+            <div className="flex flex-col lg:flex-row justify-between items-end border-b border-gray-200 dark:border-white/10 pb-0 gap-4">
                 <div className="flex items-center gap-8 overflow-x-auto w-full lg:w-auto scrollbar-hide no-scrollbar">
                     {/* Overall Report Tab - Always Accessible */}
                     <div
                         onClick={() => setActiveTab(0)}
                         className={`flex items-center gap-2 text-sm font-medium pb-4 cursor-pointer transition-colors whitespace-nowrap ${activeTab === 0
                             ? 'text-brand-green border-b-2 border-brand-green font-bold'
-                            : 'text-gray-400 hover:text-white'
+                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                             }`}
                     >
                         Over All Report
@@ -489,8 +552,8 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                 className={`flex items-center gap-2 text-sm font-medium pb-4 transition-colors whitespace-nowrap ${isActive
                                     ? 'text-brand-green border-b-2 border-brand-green font-bold cursor-default'
                                     : accessible
-                                        ? 'text-gray-400 hover:text-white cursor-pointer'
-                                        : 'text-white/50 cursor-not-allowed'
+                                        ? 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white cursor-pointer'
+                                        : 'text-gray-400 dark:text-white/50 cursor-not-allowed'
                                     }`}
                             >
                                 {lvl.name}
@@ -499,8 +562,8 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                 ) : (
                                     !accessible && (
                                         <div className="flex items-center gap-1">
-                                            <LockIcon className="w-3 h-3 text-white/70" />
-                                            <BanIcon className="w-3 h-3 text-white/70" />
+                                            <LockIcon className="w-3 h-3 text-gray-400 dark:text-white/70" />
+                                            <BanIcon className="w-3 h-3 text-gray-400 dark:text-white/70" />
                                         </div>
                                     )
                                 )}
@@ -510,14 +573,14 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                 </div>
 
                 {/* Progress Indicator */}
-                <div className="flex items-center gap-4 text-xs font-medium text-gray-400 flex-shrink-0">
+                <div className="flex items-center gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">
                     {/* Only show progress if levels fetched */}
                     {totalMandatoryLevels > 0 && (
                         <div className="flex items-center gap-2 ml-4">
                             <span>({status === 'COMPLETED' ? totalMandatoryLevels : (status === 'NOT_STARTED' ? 0 : currentLvl)}/{totalMandatoryLevels}) Levels Completed</span>
                             {Array.from({ length: totalMandatoryLevels }).map((_, i) => {
                                 const levelNum = i + 1;
-                                let barClass = 'bg-white/20';
+                                let barClass = 'bg-gray-200 dark:bg-white/20';
                                 if (status === 'COMPLETED') barClass = 'bg-brand-green';
                                 else if (isStarted && levelNum < currentLvl) barClass = 'bg-brand-green';
                                 else if (isStarted && levelNum === currentLvl) barClass = 'bg-[#F59E0B]'; // Current active
@@ -650,8 +713,8 @@ const getAciData = (attempt: any) => {
 // SidebarItem helper components
 const SidebarItem = ({ label, value, small }: { label: string, value: string, small?: boolean }) => (
     <div>
-        <p className={`text-xs text-gray-400 mb-1`}>{label}</p>
-        <p className={`${small ? 'text-xs' : 'text-sm'} font-medium text-gray-200 break-all`}>{value}</p>
+        <p className={`text-xs text-gray-500 dark:text-gray-400 mb-1`}>{label}</p>
+        <p className={`${small ? 'text-xs' : 'text-sm'} font-medium text-gray-800 dark:text-gray-200 break-all`}>{value}</p>
     </div>
 );
 
