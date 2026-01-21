@@ -9,9 +9,6 @@
         "watch": "tsc --watch",
         "prepublishOnly": "npm run build"
     },
-    "peerDependencies": {
-        "typeorm": "^0.3.0"
-    },
     "dependencies": {
         "typeorm": "^0.3.28"
     },
