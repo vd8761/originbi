@@ -46,6 +46,9 @@ export class AssessmentSession {
   @Column({ name: 'is_report_ready', type: 'boolean', default: false })
   isReportReady: boolean;
 
+  @Column({ name: 'group_assessment_id', type: 'bigint', nullable: true })
+  groupAssessmentId: number | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
