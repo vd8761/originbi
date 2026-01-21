@@ -1,0 +1,35 @@
+OriginBI Report
+==================================================
+Generated: 2026-01-14T09:13:37.034Z
+Query: generate report for all users
+
+Data Results (3 records):
+[
+  {
+    "id": "1",
+    "email": "ariyappan@touchmarkdes.com",
+    "role": "ADMIN",
+    "is_active": true,
+    "is_blocked": false,
+    "login_count": 0,
+    "last_login_at": null
+  },
+  {
+    "id": "31",
+    "email": "anjaly@touchmarkdes.com",
+    "role": "STUDENT",
+    "is_active": true,
+    "is_blocked": false,
+    "login_count": 0,
+    "last_login_at": null
+  },
+  {
+    "id": "32",
+    "email": "jayakrishna0023@gmail.com",
+    "role": "STUDENT",
+    "is_active": true,
+    "is_blocked": false,
+    "login_count": 0,
+    "last_login_at": null
+  }
+]

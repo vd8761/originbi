@@ -20,7 +20,7 @@ export class AssessmentGenerationService {
     private questionRepo: Repository<AssessmentQuestion>,
     @InjectRepository(OpenQuestion)
     private openQuestionRepo: Repository<OpenQuestion>,
-  ) { }
+  ) {}
 
   /**
    * Generates Level 1 questions following the 2:1 pattern (2 Main : 1 Open).
@@ -88,7 +88,8 @@ export class AssessmentGenerationService {
     const selectedSet: number = sets[Math.floor(Math.random() * sets.length)];
 
     this.logger.log(
-      `Selected Set ${selectedSet} (from [${sets.join(', ')}]) for Attempt ${attempt.id
+      `Selected Set ${selectedSet} (from [${sets.join(', ')}]) for Attempt ${
+        attempt.id
       } (Level ${isLevel1 ? '1' : 'Other'})`,
     );
 

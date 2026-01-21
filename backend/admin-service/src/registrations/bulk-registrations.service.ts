@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   Injectable,
@@ -45,7 +45,7 @@ export class BulkRegistrationsService {
     private groupAssessmentRepo: Repository<GroupAssessment>,
     private dataSource: DataSource,
     private readonly registrationsService: RegistrationsService,
-  ) { }
+  ) {}
 
   /**
    * Phase 1: Preview & Validate
@@ -697,11 +697,11 @@ export class BulkRegistrationsService {
       degreeId: isCollege ? degId : undefined,
       currentYear: isCollege
         ? this.getValue(rawData, [
-          'current_year',
-          'CurrentYear',
-          'Year',
-          'year',
-        ])
+            'current_year',
+            'CurrentYear',
+            'Year',
+            'year',
+          ])
         : undefined,
 
       password: this.getValue(rawData, ['Password', 'password']) || 'Admin@123',

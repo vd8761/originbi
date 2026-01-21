@@ -22,7 +22,7 @@ export class AdminController {
   getDashboard(@Req() req: AdminRequest) {
     return {
       message: 'Admin dashboard data',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
       adminName: req.user?.fullName,
     };
   }

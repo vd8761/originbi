@@ -5,6 +5,7 @@
     "workspaces": [
         "shared",
         "admin-service",
+        "auth-service",
         "corporate-service",
         "student-service"
     ],
