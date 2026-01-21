@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { CrossRightArrowIcon } from '@/components/icons';
+import { useSearchParams } from 'next/navigation';
+import { ArrowUpRightIcon, ArrowRightWithoutLineIcon } from '@/components/icons';
 
 interface RoadmapCardData {
     id: string;
@@ -148,59 +149,61 @@ for (let i = 3; i <= 7; i++) {
 }
 
 // Small card for "Explore Other Roadmaps" section
-const ExploreRoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: string) => void; isActive?: boolean }> = ({ item, onSelect, isActive }) => (
-    <div
-        className={`group relative rounded-xl p-4 lg:p-[0.9vw] transition-all duration-300 cursor-pointer ${isActive
-            ? 'bg-brand-green/20 border border-brand-green/40'
-            : 'bg-white/30 dark:bg-brand-dark-tertiary/60 border border-transparent hover:border-brand-green/30'
-            }`}
-        onClick={() => onSelect(item.id)}
-    >
-        <div className="flex justify-between items-start gap-3">
-            <div className="flex-1 min-w-0">
-                <h4 className="font-semibold text-[#19211C] dark:text-brand-text-primary text-[clamp(12px,0.9vw,14px)] mb-1 truncate">
-                    {item.title}
-                </h4>
-                <p className="text-[#19211C]/60 dark:text-brand-text-secondary text-[clamp(10px,0.7vw,12px)] leading-relaxed line-clamp-2">
-                    {item.description}
-                </p>
+const ExploreRoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: string) => void; isActive?: boolean; isLast?: boolean }> = ({ item, onSelect, isActive, isLast }) => (
+    <div className="relative">
+        <div
+            className={`group relative rounded-xl p-4 transition-all duration-300 cursor-pointer ${isActive
+                ? 'bg-[#19211C]/5 dark:bg-white/10' // Active: Light gray in light mode, translucent white in dark mode
+                : 'bg-transparent hover:bg-[#19211C]/5 dark:hover:bg-white/5' // Inactive: Transparent with hover effect
+                }`}
+            onClick={undefined} // Interaction only on button as per previous instruction, but user might want card click. Sticking to button only for nav as previously requested unless implied otherwise. The SS implies a card look. I'll stick to button triggers nav to be safe, or allow card click if user previous req was "only arrow clicked". User said "it has to redirect only if the arrow part is clicked" in Step 67. I WILL KEEP THIS.
+        >
+            <div className="flex justify-between items-start gap-3">
+                <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-[#19211C] dark:text-white text-[16px] mb-1 truncate">
+                        {item.title}
+                    </h4>
+                    <p className="text-[#19211C]/60 dark:text-[#9CA3AF] text-[13px] leading-relaxed line-clamp-2">
+                        {item.description}
+                    </p>
+                </div>
+                <button
+                    className="bg-brand-green hover:bg-brand-green/90 text-white w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 hover:scale-110 shadow-md shadow-brand-green/20 cursor-pointer"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onSelect(item.id);
+                    }}
+                >
+                    <ArrowUpRightIcon className="w-4 h-4" />
+                </button>
             </div>
-            <button
-                className="bg-brand-green hover:bg-brand-green/90 text-white w-7 h-7 lg:w-[1.8vw] lg:h-[1.8vw] lg:min-w-[28px] lg:min-h-[28px] rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 group-hover:scale-110 shadow-md shadow-brand-green/20"
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onSelect(item.id);
-                }}
-            >
-                <CrossRightArrowIcon className="w-3.5 h-3.5 lg:w-[0.85vw] lg:h-[0.85vw] lg:min-w-[14px] lg:min-h-[14px]" />
-            </button>
         </div>
+        {/* Separator Line for Inactive items (unless it's the last one) - Placed outside the padding */}
+        {!isActive && !isLast && (
+            <div className="mx-4 h-px bg-[#19211C]/10 dark:bg-white/10 my-2"></div>
+        )}
     </div>
 );
 
 // Main roadmap card for grid view
 const RoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: string) => void }> = ({ item, onSelect }) => (
     <div
-        className="group relative bg-white/40 dark:bg-brand-dark-secondary border border-[#19211C]/12 dark:border-brand-dark-tertiary hover:border-brand-green/40 dark:hover:border-brand-green/40 rounded-2xl p-5 lg:p-[1.25vw] transition-all duration-300 hover:shadow-lg hover:shadow-brand-green/5 backdrop-blur-sm cursor-pointer"
-        onClick={() => onSelect(item.id)}
+        className="group relative bg-white/40 dark:bg-brand-dark-secondary border border-[#19211C]/12 dark:border-brand-dark-tertiary hover:border-brand-green/40 dark:hover:border-brand-green/40 rounded-2xl p-5 lg:p-[1.25vw] transition-all duration-300 hover:shadow-lg hover:shadow-brand-green/5 backdrop-blur-sm"
     >
         <div className="flex justify-between items-start gap-4">
             <div className="flex-1">
-                <h3 className="font-semibold text-[#19211C] dark:text-brand-text-primary text-[clamp(13px,1.1vw,16px)] mb-2 lg:mb-[0.4vw]">
+                <h3 className="font-semibold text-[#19211C] dark:text-brand-text-primary text-[20px] mb-2 lg:mb-[0.4vw]">
                     {item.title}
                 </h3>
-                <p className="text-[#19211C]/60 dark:text-brand-text-secondary text-[clamp(11px,0.8vw,13px)] leading-relaxed">
+                <p className="text-[#19211C]/60 dark:text-brand-text-secondary text-[16px] leading-relaxed">
                     {item.description}
                 </p>
             </div>
             <button
-                className="bg-brand-green hover:bg-brand-green/90 text-white w-9 h-9 lg:w-[2.2vw] lg:h-[2.2vw] lg:min-w-[36px] lg:min-h-[36px] rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 group-hover:scale-110 shadow-lg shadow-brand-green/20"
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onSelect(item.id);
-                }}
+                className="bg-brand-green hover:bg-brand-green/90 text-white w-9 h-9 lg:w-[2.2vw] lg:h-[2.2vw] lg:min-w-[36px] lg:min-h-[36px] rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 hover:scale-110 shadow-lg shadow-brand-green/20 cursor-pointer"
+                onClick={() => onSelect(item.id)}
             >
-                <CrossRightArrowIcon className="w-4 h-4 lg:w-[1vw] lg:h-[1vw] lg:min-w-[16px] lg:min-h-[16px]" />
+                <ArrowUpRightIcon className="w-4 h-4 lg:w-[1vw] lg:h-[1vw] lg:min-w-[16px] lg:min-h-[16px]" />
             </button>
         </div>
     </div>
@@ -215,28 +218,28 @@ const RoadmapDetailView: React.FC<{
 }> = ({ roadmap, allRoadmaps, onBack, onSelectRoadmap }) => {
     return (
         <div className="min-h-screen bg-[url('/Background_Light_Theme.svg')] bg-cover bg-center bg-no-repeat bg-fixed dark:bg-none dark:bg-brand-dark-primary">
-            <div className="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-12 lg:py-10 max-w-[1600px] mx-auto">
+            <div className="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-12 lg:py-10">
                 {/* Breadcrumb */}
                 <nav className="mb-6 lg:mb-[1.5vw]">
                     <ol className="flex items-center flex-wrap gap-2 text-[clamp(11px,0.75vw,13px)]">
                         <li>
                             <Link
                                 href="/student/dashboard"
-                                className="text-[#19211C]/60 dark:text-brand-text-secondary hover:text-brand-green transition-colors"
+                                className="text-[#19211C]/60 dark:text-brand-text-secondary hover:text-[#19211C] dark:hover:text-brand-text-primary transition-colors"
                             >
                                 Dashboard
                             </Link>
                         </li>
-                        <li className="text-[#19211C]/40 dark:text-brand-text-secondary">&gt;</li>
+                        <li className="text-[#19211C]/40 dark:text-brand-text-secondary"><ArrowRightWithoutLineIcon className="w-3 h-3" /></li>
                         <li>
                             <button
                                 onClick={onBack}
-                                className="text-[#19211C]/60 dark:text-brand-text-secondary hover:text-brand-green transition-colors"
+                                className="text-[#19211C]/60 dark:text-brand-text-secondary hover:text-[#19211C] dark:hover:text-brand-text-primary transition-colors"
                             >
                                 Your Roadmap
                             </button>
                         </li>
-                        <li className="text-[#19211C]/40 dark:text-brand-text-secondary">&gt;</li>
+                        <li className="text-[#19211C]/40 dark:text-brand-text-secondary"><ArrowRightWithoutLineIcon className="w-3 h-3" /></li>
                         <li className="text-brand-green font-medium">{roadmap.category}</li>
                     </ol>
                 </nav>
@@ -331,7 +334,7 @@ const RoadmapDetailView: React.FC<{
 
                         {/* Guidance Tip */}
                         <section className="mt-8 lg:mt-12 pt-6 lg:pt-8 border-t border-[#19211C]/10 dark:border-white/10">
-                            <h2 className="text-[28px] font-semibold text-[#19211C] dark:text-brand-text-primary mb-4 italic">
+                            <h2 className="text-[28px] font-semibold text-[#19211C] dark:text-brand-text-primary mb-4">
                                 Guidance Tip
                             </h2>
                             <p className="text-[16px] text-[#19211C]/80 dark:text-brand-text-secondary leading-relaxed">
@@ -342,17 +345,21 @@ const RoadmapDetailView: React.FC<{
 
                     {/* Right Sidebar - Explore Other Roadmaps */}
                     <aside className="w-full lg:w-[340px] xl:w-[380px] 2xl:w-[420px] flex-shrink-0">
-                        <div className="bg-white/30 dark:bg-brand-dark-secondary border border-[#19211C]/12 dark:border-brand-dark-tertiary rounded-2xl p-5 lg:p-6 backdrop-blur-sm sticky top-[100px]">
-                            <h3 className="text-[18px] font-semibold text-[#19211C] dark:text-brand-text-primary mb-4">
-                                Explore Other Roadmaps
-                            </h3>
-                            <div className="space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto pr-1 custom-scrollbar">
-                                {allRoadmaps.map((item) => (
+                        <div className="bg-white/30 dark:bg-brand-dark-secondary border border-[#19211C]/12 dark:border-[#2A3530] rounded-2xl p-0 backdrop-blur-sm sticky top-[100px] overflow-hidden">
+                            <div className="p-6 pb-4">
+                                <h3 className="text-[18px] font-semibold text-[#19211C] dark:text-white mb-4">
+                                    Explore Other Roadmaps
+                                </h3>
+                                <div className="h-px w-full bg-[#19211C]/10 dark:bg-white/10"></div>
+                            </div>
+                            <div className="space-y-1 max-h-[calc(100vh-200px)] overflow-y-auto px-2 pb-4 custom-scrollbar">
+                                {allRoadmaps.map((item, index) => (
                                     <ExploreRoadmapCard
                                         key={item.id}
                                         item={item}
                                         onSelect={onSelectRoadmap}
                                         isActive={item.id === roadmap.id}
+                                        isLast={index === allRoadmaps.length - 1}
                                     />
                                 ))}
                             </div>
@@ -366,6 +373,14 @@ const RoadmapDetailView: React.FC<{
 
 const RoadmapsPage: React.FC = () => {
     const [selectedRoadmapId, setSelectedRoadmapId] = useState<string | null>(null);
+    const searchParams = useSearchParams();
+
+    useEffect(() => {
+        const id = searchParams.get('id');
+        if (id && roadmapDetails[id]) {
+            setSelectedRoadmapId(id);
+        }
+    }, [searchParams]);
 
     // Hardcoded roadmaps data
     const roadmaps: RoadmapCardData[] = [
@@ -422,19 +437,19 @@ const RoadmapsPage: React.FC = () => {
     // Otherwise, show the grid view
     return (
         <div className="min-h-screen bg-[url('/Background_Light_Theme.svg')] bg-cover bg-center bg-no-repeat bg-fixed dark:bg-none dark:bg-brand-dark-primary">
-            <div className="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-12 lg:py-10 max-w-[1600px] mx-auto">
+            <div className="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-12 lg:py-10">
                 {/* Breadcrumb */}
                 <nav className="mb-6 lg:mb-[1.5vw]">
                     <ol className="flex items-center space-x-2 text-[clamp(11px,0.75vw,13px)]">
                         <li>
                             <Link
                                 href="/student/dashboard"
-                                className="text-[#19211C]/60 dark:text-brand-text-secondary hover:text-brand-green transition-colors"
+                                className="text-[#19211C]/60 dark:text-brand-text-secondary hover:text-[#19211C] dark:hover:text-brand-text-primary transition-colors"
                             >
                                 Dashboard
                             </Link>
                         </li>
-                        <li className="text-[#19211C]/40 dark:text-brand-text-secondary">&gt;</li>
+                        <li className="text-[#19211C]/40 dark:text-brand-text-secondary"><ArrowRightWithoutLineIcon className="w-3 h-3" /></li>
                         <li className="text-brand-green font-medium">Your Roadmaps</li>
                     </ol>
                 </nav>
@@ -455,8 +470,8 @@ const RoadmapsPage: React.FC = () => {
                         <RoadmapCard key={roadmap.id} item={roadmap} onSelect={handleSelectRoadmap} />
                     ))}
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };
 

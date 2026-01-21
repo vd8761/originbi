@@ -61,3 +61,5 @@ Thumbs.db
 
 # Binaries
 backend/exam-engine/exam-engine
+
+run-all.sh 

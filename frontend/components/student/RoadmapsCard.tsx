@@ -3,46 +3,53 @@ import Link from 'next/link';
 import { RoadmapItem as RoadmapItemType } from '@/lib/types';
 import { CrossRightArrowIcon } from '@/components/icons';
 
-const RoadmapItem: React.FC<{ item: RoadmapItemType }> = ({ item }) => (
-    <a
-        href="#"
-        className="block -mx-6 px-6 lg:-mx-[1.25vw] lg:px-[1.25vw] even:bg-white/5 hover:bg-white/10 dark:hover:bg-brand-dark-tertiary transition-colors duration-200 group"
+const RoadmapItem: React.FC<{ item: RoadmapItemType & { id?: string } }> = ({ item }) => (
+    <div
+        className="block -mx-6 px-6 lg:-mx-[1.25vw] lg:px-[1.25vw] even:bg-white/5 hover:bg-white/10 dark:hover:bg-brand-dark-tertiary transition-colors duration-200 group relative"
     >
         <div className="flex justify-between items-center py-4 lg:py-[0.833vw]">
             <div className="pr-4">
                 <h4 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-base lg:text-[1.04vw] mb-1 lg:mb-[0.2vw]">
                     {item.title}
                 </h4>
-                <p className="font-regular font-sans text-[#19211C]/60 dark:text-brand-text-secondary text-xs lg:text-[0.729vw]">
+                <p className="font-normal font-sans text-[#19211C]/60 dark:text-brand-text-secondary text-xs lg:text-[0.729vw]">
                     {item.description}
                 </p>
             </div>
-            <div className="bg-brand-green text-white w-8 h-8 lg:w-[1.66vw] lg:h-[1.66vw] rounded-full flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110">
+            <Link
+                href={item.id ? `/student/roadmaps?id=${item.id}` : '#'}
+                className="bg-brand-green text-white w-8 h-8 lg:w-[1.66vw] lg:h-[1.66vw] rounded-full flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110"
+            >
                 <CrossRightArrowIcon className="w-5 h-5 lg:w-[1.04vw] lg:h-[1.04vw]" />
-            </div>
+            </Link>
         </div>
-    </a>
+    </div>
 );
 
 const RoadmapsCard: React.FC = () => {
-    const roadmaps: RoadmapItemType[] = [
+    const roadmaps: (RoadmapItemType & { id: string })[] = [
         {
+            id: '1',
             title: 'UX/UI Designer',
             description: 'Design intuitive and beautiful digital products',
         },
         {
+            id: '2',
             title: 'Product Manager',
             description: 'Lead cross-functional teams to build impactful products',
         },
         {
+            id: '3',
             title: 'UX/UI Designer',
             description: 'Deepen your skills in user research and interaction design',
         },
         {
+            id: '4',
             title: 'Product Manager',
             description: 'Own product strategy from discovery to delivery',
         },
         {
+            id: '5',
             title: 'UX/UI Designer',
             description: 'Grow into a senior creative leadership role',
         },
