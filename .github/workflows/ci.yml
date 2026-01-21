@@ -33,7 +33,11 @@ jobs:
 
       - name: Install Dependencies
         working-directory: ./backend
-        run: npm ci
+        run: |
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm ci
 
       - name: Lint
         working-directory: ./backend/${{ matrix.service }}
@@ -63,7 +67,11 @@ jobs:
 
       - name: Install Dependencies
         working-directory: ./frontend
-        run: npm ci
+        run: |
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm ci
 
       - name: Lint
         working-directory: ./frontend
