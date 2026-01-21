@@ -17,12 +17,13 @@ import { ForgotPasswordModule } from './forgotpassword/forgotpassword.module';
         const databaseUrl = config.get<string>('DATABASE_URL');
 
         if (databaseUrl) {
+          const isLocal = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
           return {
             type: 'postgres',
             url: databaseUrl,
             autoLoadEntities: true,
             synchronize: false,
-            ssl: { rejectUnauthorized: false },
+            ssl: isLocal ? false : { rejectUnauthorized: false },
           };
         }
 
