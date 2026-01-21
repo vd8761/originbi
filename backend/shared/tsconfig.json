@@ -19,6 +19,13 @@
         "emitDecoratorMetadata": true,
         "moduleResolution": "node",
         "resolveJsonModule": true,
+        "preserveSymlinks": true,
+        "baseUrl": ".",
+        "paths": {
+            "typeorm": [
+                "../node_modules/typeorm"
+            ]
+        }
     },
     "include": [
         "entities/**/*"
