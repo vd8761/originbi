@@ -340,7 +340,7 @@ const AddCorporateRegistrationForm: React.FC<
               </button>
 
               {isSectorOpen && (
-                <div className="absolute z-30 mt-1 w-full bg-white dark:bg-[#1A1D21] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg p-2">
+                <div className="absolute z-30 mt-1 w-full bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg p-2">
                   <input
                     type="text"
                     value={sectorSearch}

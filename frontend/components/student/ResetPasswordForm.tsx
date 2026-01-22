@@ -106,7 +106,7 @@ const ResetPasswordForm: React.FC = () => {
                 </div>
 
                 {/* 2. Main Content Card - The "Premium" Container */}
-                <div className="relative z-10 w-full max-w-[440px] bg-white/80 dark:bg-[#1A1D21]/90 backdrop-blur-xl border border-white/20 dark:border-white/5 rounded-3xl shadow-2xl p-8 md:p-10 flex flex-col items-center text-center space-y-8 transform transition-all duration-500 hover:scale-[1.02]">
+                <div className="relative z-10 w-full max-w-[440px] bg-white/80 dark:bg-[#19211C]/90 backdrop-blur-xl border border-white/20 dark:border-white/5 rounded-3xl shadow-2xl p-8 md:p-10 flex flex-col items-center text-center space-y-8 transform transition-all duration-500 hover:scale-[1.02]">
 
                     {/* Logo - Compact & Centered */}
                     <div className="transform transition-transform hover:scale-105 duration-500">

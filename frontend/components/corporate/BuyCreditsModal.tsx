@@ -82,7 +82,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
             />
 
             {/* Modal Container */}
-            <div className="relative bg-white dark:bg-[#1A1D21] w-full max-w-[550px] rounded-[32px] shadow-2xl flex flex-col max-h-[95vh] mx-4 overflow-hidden font-['Haskoy']">
+            <div className="relative bg-white dark:bg-[#19211C] w-full max-w-[550px] rounded-[32px] shadow-2xl flex flex-col max-h-[95vh] mx-4 overflow-hidden font-['Haskoy']">
 
                 {/* Header */}
                 <div className="px-4 sm:px-6 py-4 flex items-center justify-between border-b border-gray-100 dark:border-white/10 relative min-h-[64px]">
@@ -160,7 +160,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                                     className="absolute top-1/2 -translate-y-[calc(50%)] -translate-x-1/2 z-20 pointer-events-none"
                                     style={{ left: `${percentage}%` }}
                                 >
-                                    <div className="bg-[#1ED36A] text-white text-[14px] font-bold py-1 px-3.5 rounded-full shadow-[0_4px_12px_rgba(30,211,106,0.3)] border-[3px] border-white dark:border-[#1A1D21] min-w-[62px] text-center whitespace-nowrap transform transition-transform group-active:scale-105">
+                                    <div className="bg-[#1ED36A] text-white text-[14px] font-bold py-1 px-3.5 rounded-full shadow-[0_4px_12px_rgba(30,211,106,0.3)] border-[3px] border-white dark:border-[#19211C] min-w-[62px] text-center whitespace-nowrap transform transition-transform group-active:scale-105">
                                         {credits}
                                     </div>
                                 </div>
@@ -259,7 +259,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                 </div>
 
                 {/* Footer Fixed at Bottom */}
-                <div className="p-6 pt-3 pb-6 bg-white dark:bg-[#1A1D21]">
+                <div className="p-6 pt-3 pb-6 bg-white dark:bg-[#19211C]">
                     <button
                         onClick={handleBuy}
                         className="w-full bg-[#1ED36A] hover:bg-[#16b058] text-white font-bold text-[16px] py-3 rounded-full shadow-[0_8px_20px_rgba(30,211,106,0.3)] hover:shadow-[0_10px_25px_rgba(30,211,106,0.4)] transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 tracking-wide"

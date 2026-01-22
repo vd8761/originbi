@@ -31,9 +31,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       {/* CONTENT CONTAINER (Centered / Max Width) */}
       <div className="relative z-10 w-full max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-12 lg:h-screen min-h-[100dvh] px-[clamp(24px,8.33vw,160px)]">
         {/* Left Column: Grid Layout [Header, Content, Footer] */}
-        <div className="order-1 lg:col-span-5 flex flex-col justify-start gap-4 lg:h-full h-auto py-[clamp(16px,2vw,32px)] px-1 relative lg:overflow-y-auto z-10 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+        <div className="order-1 lg:col-span-5 flex flex-col justify-center gap-[clamp(16px,2vw,32px)] h-full py-[clamp(16px,2vw,32px)] px-1 relative lg:overflow-y-auto z-10 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
           {/* Header */}
-          <header className="w-full max-w-[clamp(360px,30vw,640px)] self-start flex items-center justify-between shrink-0 mb-8">
+          <header className="w-full max-w-[clamp(360px,30vw,640px)] self-start flex items-center justify-between shrink-0">
             <div className="w-[clamp(100px,7vw,130px)]">
               <Logo className="w-full h-auto object-contain" />
             </div>
@@ -41,7 +41,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           </header>
 
           {/* Main Content */}
-          <div className="w-full max-w-[clamp(360px,30vw,640px)] self-start flex flex-col justify-center my-auto">
+          <div className="w-full max-w-[clamp(360px,30vw,640px)] self-start flex flex-col justify-center">
             <div className="text-left w-full mb-[clamp(16px,2vw,32px)]">
               <h1 className="font-sans font-semibold text-brand-text-light-primary dark:text-brand-text-primary tracking-[0%] leading-none mb-2 text-[clamp(24px,2.5vw,40px)]">
                 Login to your account
@@ -55,7 +55,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           </div>
 
           {/* Footer */}
-          <footer className="w-full max-w-[clamp(360px,30vw,640px)] self-start flex flex-col-reverse sm:flex-row items-center justify-between text-[clamp(11px,0.8vw,14px)] font-medium leading-none tracking-[0px] text-brand-green gap-4 mt-auto shrink-0">
+          <footer className="w-full max-w-[clamp(360px,30vw,640px)] self-start flex flex-col-reverse sm:flex-row items-center justify-between text-[clamp(11px,0.8vw,14px)] font-medium leading-none tracking-[0px] text-brand-green gap-4 shrink-0 mt-8">
             <div className="flex items-center gap-4">
               <a href="#" className="hover:text-brand-green/80 transition-colors text-right underline decoration-solid decoration-0 underline-offset-2">Privacy Policy</a>
               <span className="border-r border-brand-light-tertiary dark:border-white/20 h-3 hidden sm:block"></span>

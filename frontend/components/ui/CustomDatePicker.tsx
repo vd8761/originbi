@@ -333,7 +333,7 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
             className="absolute inset-0 bg-black/50 dark:bg-black/80 backdrop-blur-sm"
             onClick={() => setIsOpen(false)}
           />
-          <div className="relative w-full max-w-[740px] bg-white dark:bg-[#1A1D21] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-fade-in max-h-[90vh]">
+          <div className="relative w-full max-w-[740px] bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-fade-in max-h-[90vh]">
             <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-white/5 shrink-0">
               <h3 className="text-brand-text-light-primary dark:text-white font-bold text-sm">
                 Select Date and Time
@@ -347,7 +347,7 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
             </div>
 
             <div className="flex flex-col md:flex-row overflow-y-auto custom-scrollbar">
-              <div className="p-4 sm:p-6 md:border-r border-gray-200 dark:border-white/5 flex-1 bg-white dark:bg-[#1A1D21] min-w-[320px]">
+              <div className="p-4 sm:p-6 md:border-r border-gray-200 dark:border-white/5 flex-1 bg-white dark:bg-[#19211C] min-w-[320px]">
                 <div className="flex justify-between items-center mb-6 bg-brand-light-secondary dark:bg-[#24272B] p-1.5 rounded-lg border border-gray-200 dark:border-white/5">
                   <button
                     type="button"

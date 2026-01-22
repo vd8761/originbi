@@ -331,7 +331,7 @@ const RegistrationPreview: React.FC<RegistrationPreviewProps> = ({ registration,
                             </button>
 
                             {showStatusDropdown && (
-                                <div className="absolute top-full left-0 mt-2 w-48 bg-brand-light-secondary dark:bg-[#1A1D21] border border-brand-light-tertiary dark:border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
+                                <div className="absolute top-full left-0 mt-2 w-48 bg-brand-light-secondary dark:bg-[#19211C] border border-brand-light-tertiary dark:border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
                                     <div className="py-1">
                                         {statusOptions.map((option) => (
                                             <button
