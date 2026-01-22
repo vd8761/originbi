@@ -69,7 +69,7 @@ export class StudentService {
       user = this.userRepo.create({
         email: 'demo@originbi.com',
         role: 'STUDENT',
-        metadata: { fullName: 'Demo User' },
+        metadata: { fullName: 'Demo User', hasChangedPassword: true },
         createdAt: new Date(),
       });
       await this.userRepo.save(user);
@@ -82,6 +82,20 @@ export class StudentService {
         isAssessmentMode: false,
         status: 'USER_NOT_FOUND',
         debug: { step: 'Find User', result: 'Not Found' },
+      };
+    }
+
+    // First Login Logic (No DB Schema Identity)
+    // If loginCount is low (<=1) and we haven't recorded a password change yet.
+    const isFirstLogin = (user.loginCount <= 1) && !user.metadata?.hasChangedPassword;
+
+    if (isFirstLogin) {
+      this.logger.log(`User ${email} requires mandatory password reset (First Login).`);
+      return {
+        redirectUrl: '/student/first-time-reset',
+        isAssessmentMode: false,
+        status: 'FIRST_LOGIN',
+        debug: { step: 'Check First Login', result: 'Mandatory Reset' },
       };
     }
 
@@ -440,5 +454,14 @@ export class StudentService {
       `Created Demo Session ${savedSession.id} with Attempts for ${levels.length} Levels.`,
     );
     return savedSession;
+  }
+
+  async completeFirstLogin(email: string) {
+    const user = await this.userRepo.findOne({ where: { email: ILike(email) } });
+    if (user) {
+      user.metadata = { ...user.metadata, hasChangedPassword: true };
+      await this.userRepo.save(user);
+      this.logger.log(`Updated hasChangedPassword metadata for user: ${email}`);
+    }
   }
 }
