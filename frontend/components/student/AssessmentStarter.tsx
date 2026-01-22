@@ -376,18 +376,40 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
         // Initialize Answers Map from API Data
         const initialAnswers: Record<string, string> = {};
 
-        // Detect Level 2 (Last Level) from response data if available
-        // User said: "active 2 levels". If data.level_number exists and is >= 2, we assume last.
-        // If not explicit, we check if title contains "Level 2" or "ACI".
-        // The API response `data` might contain `level_number` or `assessment_level_id`.
-        if (data.level_number === 2 || data.id === 2 || (data.name && String(data.name).toLowerCase().includes('level 2'))) {
-          setIsLastLevel(true);
-        } else {
-          // Fallback: If we can't detect, default to false (Level 1 behaviour) 
-          // BUT if user specifically is testing the Last Level now, they might want this forced.
-          // However safer to rely on data. Let's assume standard response has level info.
-          // Since `data.data` is the array of answers, `data` itself usually holds session/attempt context.
+        // Check if this is the Last Level
+        // Default Logic (Partial Fallback)
+        let isFinalLevel = false;
+        const nameScore = String(data.name || data.title || '').toLowerCase();
+
+        if (
+          data.level_number >= 2 ||
+          data.id === 2 ||
+          data.assessment_level_id === 2 ||
+          nameScore.includes('level 2') ||
+          nameScore.includes('aci')
+        ) {
+          isFinalLevel = true;
         }
+
+        // Dynamic Logic via API
+        try {
+          const progressData = await studentService.getAssessmentProgress(email);
+          if (Array.isArray(progressData) && progressData.length > 0) {
+            // Filter for mandatory levels
+            const mandatoryLevels = progressData.filter((l: any) => l.is_mandatory !== false);
+            if (mandatoryLevels.length > 0) {
+              const maxLevel = Math.max(...mandatoryLevels.map((l: any) => Number(l.level_number || l.id || 0)));
+              const currentLevel = Number(data.level_number || data.id || 0);
+              // If current level matches or exceeds the max mandatory level, it's the last one.
+              if (maxLevel > 0) {
+                isFinalLevel = currentLevel >= maxLevel;
+              }
+            }
+          }
+        } catch (lvlErr) {
+          console.warn("Failed to determine last level dynamically:", lvlErr);
+        }
+        setIsLastLevel(isFinalLevel);
 
         // Map API response to UI Question format
         const mappedQuestions: Question[] = apiAnswers.map((ans) => {

@@ -10,6 +10,7 @@ interface BuyCreditsModalProps {
     onClose: () => void;
     currentBalance: number;
     onBuy: (amount: number, cost: number) => void;
+    perCreditCost?: number;
 }
 
 const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
@@ -17,11 +18,12 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
     onClose,
     currentBalance,
     onBuy,
+    perCreditCost,
 }) => {
     const [credits, setCredits] = useState<number>(200);
     const [isPricingExpanded, setIsPricingExpanded] = useState(true);
 
-    const PER_CREDIT_COST = Number(process.env.NEXT_PUBLIC_PER_CREDIT_COST) || 200;
+    const PER_CREDIT_COST = perCreditCost || Number(process.env.NEXT_PUBLIC_PER_CREDIT_COST) || 200;
     const totalCost = credits * PER_CREDIT_COST;
 
     const [mounted, setMounted] = useState(false);
@@ -45,7 +47,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
     const CONTAINER_WIDTH = 100; // %
     const INPUT_MIN = 10;
     const INPUT_MAX = 1000;
-    const quickSelectValues = [100, 200, 300, 400];
+    const quickSelectValues = [10, 50, 100, 200];
 
     // Calculate position for the thumb
     // We need to map the credit value (MIN-MAX) to a percentage (0-100)
@@ -211,7 +213,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                                     <input
                                         type="number"
                                         placeholder="Enter.."
-                                        value={credits === 0 ? '' : (credits > 0 && ![100, 200, 300, 400].includes(credits) ? credits : '')}
+                                        value={credits === 0 ? '' : (credits > 0 && ![10, 50, 100, 200].includes(credits) ? credits : '')}
                                         onChange={(e) => {
                                             const val = e.target.value === '' ? 0 : Number(e.target.value);
                                             if (!isNaN(val) && val <= INPUT_MAX) {
