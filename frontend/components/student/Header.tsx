@@ -49,14 +49,14 @@ const NavItem: React.FC<NavItemProps> = ({
     // Mobile specific spacing + alignment
     const mobileClasses = isMobile
         ? "justify-start px-4 h-12 w-full gap-3 text-base"
-        : "justify-center gap-0 lg:gap-1 2xl:gap-2 lg:h-8 2xl:h-9 px-2.5 2xl:px-4 text-xs 2xl:text-sm";
+        : "justify-center gap-0 lg:gap-1 2xl:gap-2 h-8 lg:h-8 2xl:h-9 px-2.5 2xl:px-4 text-xs 2xl:text-sm";
 
     return (
         <div className={`relative group ${isMobile ? "w-full" : ""}`}>
             <button
                 onClick={onClick}
                 className={`flex items-center rounded-full transition-all duration-200 cursor-pointer ${mobileClasses} ${active
-                    ? "bg-[#1ED36A] text-white shadow-[0_4px_14px_0_rgba(30,211,106,0.25)] border-none"
+                    ? "bg-[#1ED36A] text-white shadow-[0_4px_14px_0_rgba(30,211,106,0.25)] border border-transparent"
                     : "bg-white border border-gray-200 text-[#19211C] hover:bg-gray-50 hover:text-black hover:border-gray-300 dark:bg-black/20 dark:border-white/5 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
                     }`}
             >

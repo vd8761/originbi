@@ -152,11 +152,11 @@ for (let i = 3; i <= 7; i++) {
 const ExploreRoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: string) => void; isActive?: boolean; isLast?: boolean }> = ({ item, onSelect, isActive, isLast }) => (
     <div className="relative">
         <div
-            className={`group relative rounded-xl p-4 transition-all duration-300 cursor-pointer ${isActive
+            className={`group relative py-4 px-6 transition-all duration-300 cursor-pointer ${isActive
                 ? 'bg-[#19211C]/5 dark:bg-white/10' // Active: Light gray in light mode, translucent white in dark mode
-                : 'bg-transparent hover:bg-[#19211C]/5 dark:hover:bg-black/20' // Inactive: Transparent with hover effect
+                : 'bg-transparent hover:bg-[#19211C]/5 dark:hover:bg-white/5' // Inactive: Transparent with hover effect
                 }`}
-            onClick={undefined} // Interaction only on button as per previous instruction, but user might want card click. Sticking to button only for nav as previously requested unless implied otherwise. The SS implies a card look. I'll stick to button triggers nav to be safe, or allow card click if user previous req was "only arrow clicked". User said "it has to redirect only if the arrow part is clicked" in Step 67. I WILL KEEP THIS.
+            onClick={() => onSelect(item.id)} // Allowing card click to select as it's more intuitive for a sidebar list item
         >
             <div className="flex justify-between items-center gap-3">
                 <div className="flex-1 min-w-0">
@@ -180,7 +180,7 @@ const ExploreRoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: strin
         </div>
         {/* Separator Line for Inactive items (unless it's the last one) - Placed outside the padding */}
         {!isActive && !isLast && (
-            <div className="mx-4 h-px bg-[#19211C]/10 dark:bg-white/10 my-2"></div>
+            <div className="mx-6 h-px bg-[#19211C]/10 dark:bg-white/10"></div>
         )}
     </div>
 );
@@ -188,14 +188,14 @@ const ExploreRoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: strin
 // Main roadmap card for grid view
 const RoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: string) => void }> = ({ item, onSelect }) => (
     <div
-        className="group relative bg-white/40 dark:bg-black/20 border border-[#19211C]/12 dark:border-white/5 hover:border-brand-green/40 dark:hover:border-brand-green/40 rounded-2xl p-5 lg:p-[1.25vw] transition-all duration-300 hover:shadow-lg hover:shadow-brand-green/5 backdrop-blur-sm"
+        className="group relative bg-white/40 dark:bg-black/20 border border-white/20 dark:border-white/10 hover:bg-white/60 dark:hover:bg-white/5 hover:border-white/40 dark:hover:border-white/20 rounded-2xl p-5 lg:p-[1.25vw] transition-all duration-300 hover:shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] dark:hover:shadow-none backdrop-blur-md"
     >
         <div className="flex justify-between items-center gap-4">
             <div className="flex-1">
-                <h3 className="font-semibold text-[#19211C] dark:text-brand-text-primary text-[20px] mb-2 lg:mb-[0.4vw]">
+                <h3 className="font-semibold text-[#19211C] dark:text-white text-[20px] mb-2 lg:mb-[0.4vw]">
                     {item.title}
                 </h3>
-                <p className="text-black dark:text-white text-[16px] leading-relaxed">
+                <p className="text-[#19211C]/80 dark:text-white/70 text-[16px] leading-relaxed">
                     {item.description}
                 </p>
             </div>
@@ -352,7 +352,7 @@ const RoadmapDetailView: React.FC<{
                                 </h3>
                                 <div className="h-px w-full bg-[#19211C]/10 dark:bg-white/10"></div>
                             </div>
-                            <div className="space-y-1 max-h-[calc(100vh-200px)] overflow-y-auto px-2 pb-4 custom-scrollbar">
+                            <div className="space-y-0.5 max-h-[calc(100vh-200px)] overflow-y-auto pb-4 custom-scrollbar">
                                 {allRoadmaps.map((item, index) => (
                                     <ExploreRoadmapCard
                                         key={item.id}

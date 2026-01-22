@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { CheckCircleIcon, StepperUpArrowIcon, StepperDownArrowIcon, StepperPendingDotIcon, QuestionMarkIcon, TimeIcon } from '@/components/icons';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { studentService } from "@/lib/services/student.service";
-import AssessmentModal from "./AssessmentModal";
 
 // --- Interfaces ---
 
@@ -59,6 +58,44 @@ interface AssessmentRunnerProps {
 }
 
 // --- Success Modal Component ---
+const SuccessModal: React.FC<{
+  onBack: () => void;
+  onDashboard: () => void;
+}> = ({ onBack, onDashboard }) => (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 animate-fade-in">
+    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" />
+    <div className="relative bg-white dark:bg-[#1A1D21] rounded-3xl p-8 max-w-md w-full shadow-2xl border border-brand-light-tertiary dark:border-white/10 text-center flex flex-col items-center">
+      <div className="w-20 h-20 bg-brand-green/10 rounded-full flex items-center justify-center mb-6 border border-brand-green/20">
+        <div className="w-12 h-12 bg-brand-green rounded-full flex items-center justify-center shadow-lg shadow-brand-green/30">
+          <CheckCircleIcon className="w-6 h-6 text-white" />
+        </div>
+      </div>
+
+      <h2 className="text-2xl font-bold text-brand-text-light-primary dark:text-white mb-2">
+        Assessment Completed!
+      </h2>
+      <p className="text-brand-text-light-secondary dark:text-gray-400 mb-8 text-sm">
+        Great job! You've successfully completed the assessment. Your results
+        are being processed.
+      </p>
+
+      <div className="flex flex-col gap-3 w-full">
+        <button
+          onClick={onDashboard}
+          className="w-full py-3.5 rounded-full bg-brand-green text-white font-bold text-sm hover:bg-brand-green/90 transition-colors shadow-lg shadow-brand-green/20"
+        >
+          Go to Dashboard
+        </button>
+        <button
+          onClick={onBack}
+          className="w-full py-3.5 rounded-full border border-brand-light-tertiary dark:border-white/20 text-brand-text-light-primary dark:text-white font-bold text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+        >
+          Back to Assessments
+        </button>
+      </div>
+    </div>
+  </div>
+);
 
 
 // --- VerticalStepper Component ---
@@ -516,19 +553,9 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
   return (
     <div className="flex justify-center bg-transparent w-full h-full max-w-[2000px] mx-auto px-4 lg:px-[4%] 2xl:px-[5%]">
       {isCompleted && (
-        <AssessmentModal
-          isOpen={true}
-          onClose={onBack}
-          onStart={() => onGoToDashboard && onGoToDashboard()}
-          assessment={{
-            id: attemptId || "",
-            title: "Assessment Completed!",
-            description: "Great job! You've successfully completed the assessment. Your results are being processed.",
-            totalQuestions: totalQuestions,
-            completedQuestions: totalQuestions,
-            status: 'completed',
-            duration: "90 minutes"
-          }}
+        <SuccessModal
+          onBack={onBack}
+          onDashboard={() => onGoToDashboard && onGoToDashboard()}
         />
       )}
 
