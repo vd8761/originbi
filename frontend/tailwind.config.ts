@@ -14,7 +14,7 @@ const config: Config = {
           "radial-gradient(circle at 80% 20%, rgba(237, 51, 51, 0.3), transparent 70%)"
       },
       colors: {
-        "brand-dark-primary": "#1A1D21",
+        "brand-dark-primary": "#19211C",
         "brand-dark-secondary": "#24272B",
         "brand-dark-tertiary": "#303438",
         "brand-light-primary": "#FFFFFF",

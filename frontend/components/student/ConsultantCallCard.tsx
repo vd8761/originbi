@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { SessionItem as SessionItemType } from '@/lib/types';
+import SessionProgressModal from './SessionProgressModal';
 
 const SemiCircularProgress: React.FC<{ progress: number }> = ({ progress }) => {
     const radius = 100;
@@ -65,7 +66,10 @@ const SessionItem: React.FC<{ session: SessionItemType }> = ({ session }) => (
 );
 
 const ConsultantCallCard: React.FC = () => {
-    const sessions: SessionItemType[] = [
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
+    // Sessions shown in preview (2 items)
+    const previewSessions: SessionItemType[] = [
         {
             title: 'Free Session',
             duration: '2 Hrs',
@@ -80,38 +84,90 @@ const ConsultantCallCard: React.FC = () => {
         },
     ];
 
+    // All sessions for the modal (full list)
+    const allSessions: SessionItemType[] = [
+        {
+            title: 'Free Session',
+            duration: '2 Hrs',
+            date: '12 July 2025',
+            time: '08:30 AM - 10:30 AM',
+        },
+        {
+            title: 'Free Session',
+            duration: '2 Hrs',
+            date: '12 July 2025',
+            time: '08:30 AM - 10:30 AM',
+        },
+        {
+            title: 'Free Session',
+            duration: '2 Hrs',
+            date: '12 July 2025',
+            time: '08:30 AM - 10:30 AM',
+        },
+        {
+            title: 'Free Session',
+            duration: '2 Hrs',
+            date: '12 July 2025',
+            time: '08:30 AM - 10:30 AM',
+        },
+        {
+            title: 'Free Session',
+            duration: '2 Hrs',
+            date: '12 July 2025',
+            time: '08:30 AM - 10:30 AM',
+        },
+        {
+            title: 'Free Session',
+            duration: '2 Hrs',
+            date: '12 July 2025',
+            time: '08:30 AM - 10:30 AM',
+        },
+    ];
+
     return (
-        <div className="bg-white/20 border border-[#19211C]/12 dark:bg-brand-dark-secondary dark:border-transparent p-6 lg:p-[1.25vw] rounded-2xl h-auto lg:h-full flex flex-col backdrop-blur-sm">
-            <h3 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-lg lg:text-[1.25vw] mb-4 lg:mb-[0.8vw]">
-                Consultant Call
-            </h3>
+        <>
+            <div className="bg-white/20 border border-[#19211C]/12 dark:bg-brand-dark-secondary dark:border-transparent p-6 lg:p-[1.25vw] rounded-2xl h-auto lg:h-full flex flex-col backdrop-blur-sm">
+                <h3 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-lg lg:text-[1.25vw] mb-4 lg:mb-[0.8vw]">
+                    Consultant Call
+                </h3>
 
-            <div className="flex-grow flex justify-center items-center my-4 lg:my-[0.8vw]">
-                <div className="w-full max-w-[320px] lg:max-w-[18vw]">
-                    <SemiCircularProgress progress={50} />
+                <div className="flex-grow flex justify-center items-center my-4 lg:my-[0.8vw]">
+                    <div className="w-full max-w-[320px] lg:max-w-[18vw]">
+                        <SemiCircularProgress progress={50} />
+                    </div>
+                </div>
+
+                <div className="mt-4 lg:mt-[0.8vw]">
+                    <div className="flex justify-between items-center mb-3 lg:mb-[0.6vw]">
+                        <h4 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-base lg:text-[1.25vw]">
+                            Recent Sessions
+                        </h4>
+                        <button
+                            onClick={() => setIsModalOpen(true)}
+                            className="font-medium font-sans text-brand-green text-xs lg:text-[0.833vw] hover:underline cursor-pointer bg-transparent border-none"
+                        >
+                            View All
+                        </button>
+                    </div>
+                    <div className="space-y-3 lg:space-y-[0.6vw] border-t border-brand-light-tertiary dark:border-white/10 pt-4 lg:pt-[0.833vw]">
+                        {previewSessions.map((session, index) => (
+                            <SessionItem key={index} session={session} />
+                        ))}
+                    </div>
                 </div>
             </div>
 
-            <div className="mt-4 lg:mt-[0.8vw]">
-                <div className="flex justify-between items-center mb-3 lg:mb-[0.6vw]">
-                    <h4 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-base lg:text-[1.25vw]">
-                        Recent Sessions
-                    </h4>
-                    <a
-                        href="#"
-                        className="font-medium font-sans text-brand-green text-xs lg:text-[0.833vw] hover:underline"
-                    >
-                        View All
-                    </a>
-                </div>
-                <div className="space-y-3 lg:space-y-[0.6vw] border-t border-brand-light-tertiary dark:border-white/10 pt-4 lg:pt-[0.833vw]">
-                    {sessions.map((session, index) => (
-                        <SessionItem key={index} session={session} />
-                    ))}
-                </div>
-            </div>
-        </div>
+            {/* Session Progress Modal */}
+            <SessionProgressModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                sessions={allSessions}
+                completedSessions={5}
+                totalSessions={10}
+            />
+        </>
     );
 };
 
 export default ConsultantCallCard;
+

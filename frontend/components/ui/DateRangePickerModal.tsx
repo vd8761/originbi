@@ -252,7 +252,7 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
             <div className="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm" onClick={onClose} />
             
-            <div className="relative bg-white dark:bg-[#1A1D21] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden animate-fade-in flex flex-col">
+            <div className="relative bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden animate-fade-in flex flex-col">
                 {/* Header - Fixed */}
                 <div className="flex justify-between items-center p-5 border-b border-gray-200 dark:border-white/5 shrink-0">
                     <h2 className="text-lg font-bold text-brand-text-light-primary dark:text-white">Select Date Range</h2>
@@ -296,7 +296,7 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
                     </div>
 
                     {/* Calendars Area */}
-                    <div className="flex-1 p-6 bg-white dark:bg-[#1A1D21]">
+                    <div className="flex-1 p-6 bg-white dark:bg-[#19211C]">
                         <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
                             <div className="flex-1">
                                 {renderCalendar(currentMonthLeft)}

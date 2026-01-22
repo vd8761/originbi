@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { CheckCircleIcon, StepperUpArrowIcon, StepperDownArrowIcon, StepperPendingDotIcon } from '@/components/icons';
+import { CheckCircleIcon, StepperUpArrowIcon, StepperDownArrowIcon, StepperPendingDotIcon, QuestionMarkIcon, TimeIcon } from '@/components/icons';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { studentService } from "@/lib/services/student.service";
 
@@ -101,6 +101,7 @@ const SuccessModal: React.FC<{
   </div>
 );
 
+
 // --- VerticalStepper Component ---
 const VerticalStepper: React.FC<{
   currentStep: number;
@@ -143,13 +144,13 @@ const VerticalStepper: React.FC<{
                 text-[clamp(11px,1.1vw,15px)]
                 ${isCompleted
                 ? "bg-[#1ED36A] text-white border border-[#1ED36A]" // Completed
-                : "bg-white dark:bg-[#24272B] border border-brand-light-tertiary dark:border-white/10 text-brand-text-light-secondary dark:text-[#718096]" // Active & Upcoming (Container Style)
+                : "bg-white dark:bg-[#24272B] border border-brand-light-tertiary dark:border-white/10 text-brand-text-light-secondary dark:text-white" // Active & Upcoming (Container Style)
               } 
               `}
           >
             {/* Render Content */}
             {isActive ? (
-              <div className="w-2.5 h-2.5 rounded-full bg-[#1ED36A] shadow-[0_0_10px_1px_rgba(30,211,106,0.8)]" />
+              <div className="w-2.5 h-2.5 rounded-full bg-[#1ED36A]" />
             ) : (
               <span className="relative z-10">{i}</span>
             )}
@@ -610,7 +611,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
       <div className="w-full h-full grid grid-cols-12">
 
         {/* Column 1: Vertical Stepper */}
-        <div className="hidden lg:flex col-span-1 justify-center border-brand-light-tertiary/20 dark:border-white/5 h-full pt-2 lg:pt-4 pb-10">
+        <div className="hidden lg:flex col-span-1 justify-center border-brand-light-tertiary/20 dark:border-white/5 h-full pt-[clamp(20px,4vw,60px)] pb-10">
           <VerticalStepper
             currentStep={currentNumber}
             totalSteps={totalQuestions}
@@ -618,19 +619,20 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
         </div>
 
         {/* Columns 2-11: Main Content */}
-        <div className="col-span-12 lg:col-span-10 relative h-full flex flex-col px-4 lg:px-[clamp(20px,3vw,60px)]">
+        <div className="col-span-12 lg:col-span-10 relative h-full flex flex-col px-2 sm:px-4 lg:px-[clamp(20px,3vw,60px)]">
 
           {/* Progress for Mobile */}
-          <div className="lg:hidden flex justify-end mb-1 pr-1 pt-4">
-            <CircularProgress current={currentNumber} total={totalQuestions} className="w-[clamp(70px,7vw,90px)] h-[clamp(70px,7vw,90px)]" />
+          <div className="lg:hidden flex justify-end mb-4 pr-2 pt-10">
+            <CircularProgress current={currentNumber} total={totalQuestions} className="w-[80px] h-[80px]" />
           </div>
 
+
           {/* Content Area - Fluid Scaling */}
-          <div className="flex-grow flex flex-col justify-start w-full pt-[clamp(10px,2vw,30px)]">
+          <div className="flex-grow flex flex-col justify-start w-full pt-4 lg:pt-[clamp(20px,4vw,60px)]">
             <div className="flex flex-col w-full">
 
               {/* Text Section - Aligned with designs */}
-              <div className="mb-4 lg:mb-6 animate-fade-in relative flex flex-col justify-start items-start gap-4">
+              <div className="mb-6 lg:mb-10 animate-fade-in relative flex flex-col justify-start items-start gap-4">
                 <div className="flex-grow">
                   {/* Context Text Display */}
                   {displayContextText && (
@@ -640,7 +642,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
                   )}
 
                   {/* Question Text Display */}
-                  <h1 className="text-[clamp(18px,2vw,32px)] font-semibold text-brand-text-light-primary dark:text-white leading-tight">
+                  <h1 className="text-[18px] sm:text-[clamp(18px,2vw,32px)] font-semibold text-brand-text-light-primary dark:text-white leading-snug">
                     {displayQuestionText}
                   </h1>
                 </div>
@@ -648,7 +650,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
 
               {/* Options Section */}
               <div
-                className="space-y-[clamp(8px,1vw,16px)] animate-fade-in w-full"
+                className="space-y-[clamp(12px,1.5vw,24px)] animate-fade-in w-full"
                 style={{ animationDelay: "100ms" }}
               >
                 {currentQuestion.options.map((option) => {
@@ -693,10 +695,10 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
           </div>
 
           {/* Navigation Actions */}
-          <div className="sticky bottom-0 w-full flex justify-between items-center mt-auto py-4 lg:pb-10 shrink-0 z-30 bg-brand-light-primary/95 dark:bg-brand-dark-primary/95 backdrop-blur-md border-t border-brand-light-tertiary/20 dark:border-white/5 -mx-4 px-4 lg:-mx-0 lg:px-0">
+          <div className="sticky bottom-0 w-full flex justify-between items-center mt-auto py-4 lg:pb-10 shrink-0 z-30 bg-brand-light-primary/95 dark:bg-transparent border-t border-brand-light-tertiary/20 dark:border-white/5 mx-0 px-4 sm:px-6 lg:px-0">
             <button
               onClick={handlePrevious}
-              className="px-[clamp(20px,2vw,32px)] py-[clamp(6px,0.8vw,12px)] rounded-full border border-brand-light-tertiary dark:border-[#303438] text-brand-text-light-secondary dark:text-white transition-colors hover:bg-gray-100 dark:hover:bg-[#24272B] text-[clamp(11px,0.9vw,15px)] font-medium cursor-pointer"
+              className="px-5 sm:px-[clamp(20px,2vw,32px)] py-2.5 sm:py-[clamp(6px,0.8vw,12px)] rounded-full border border-brand-light-tertiary dark:border-[#303438] text-brand-text-light-secondary dark:text-white transition-colors hover:bg-gray-100 dark:hover:bg-[#24272B] text-[13px] sm:text-[clamp(11px,0.9vw,15px)] font-medium cursor-pointer"
             >
               {currentNumber === 1 ? "Back" : "Previous"}
             </button>
@@ -705,9 +707,9 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
               onClick={handleNext}
               disabled={!selectedOption}
               className={`
-                px-[clamp(24px,2.5vw,40px)] py-[clamp(6px,0.8vw,12px)] rounded-full text-white transition-all shadow-lg text-[clamp(11px,0.9vw,15px)] font-medium
+                px-6 sm:px-[clamp(24px,2.5vw,40px)] py-2.5 sm:py-[clamp(6px,0.8vw,12px)] rounded-full text-white transition-all text-[13px] sm:text-[clamp(11px,0.9vw,15px)] font-medium
                 ${selectedOption
-                  ? "bg-[#1ED36A] hover:bg-[#1ED36A]/90 shadow-[#1ED36A]/20 cursor-pointer transform hover:-translate-y-0.5"
+                  ? "bg-[#1ED36A] hover:bg-[#1ED36A]/90 cursor-pointer transform hover:-translate-y-0.5"
                   : "bg-gray-300 dark:bg-[#303438] text-gray-500 dark:text-[#718096] cursor-not-allowed"
                 }
               `}
@@ -717,10 +719,11 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
                 : "Next Question"}
             </button>
           </div>
+
         </div>
 
         {/* Column 12: Progress Circle (Aligned with Header Row) */}
-        <div className="hidden lg:flex col-span-1 justify-end items-start pt-0 pr-2 lg:pr-4">
+        <div className="hidden lg:flex col-span-1 justify-end items-start pt-[clamp(20px,4vw,60px)] pr-2 lg:pr-4">
           <CircularProgress
             current={currentNumber}
             total={totalQuestions}

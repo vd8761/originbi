@@ -46,7 +46,7 @@ const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ isOpen, onClose, onSu
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
             <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose}></div>
-            <div className="relative bg-[#1A1D21] border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-fade-in">
+            <div className="relative bg-[#19211C] border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-fade-in">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
                         <BulkUploadIcon className="w-5 h-5 text-brand-green" />
