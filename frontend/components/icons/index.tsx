@@ -584,7 +584,7 @@ export const StepperPendingDotIcon: React.FC<{ className?: string }> = ({
       cx="20"
       cy="20"
       r="20"
-      className="fill-brand-light-primary dark:fill-[#1A1D21]"
+      className="fill-brand-light-primary dark:fill-[#19211C]"
     />
     <circle
       cx="20"

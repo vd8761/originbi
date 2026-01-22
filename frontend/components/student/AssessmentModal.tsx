@@ -111,7 +111,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
       />
 
       {/* Modal Content - Compact Layout */}
-      <div className="relative w-full max-w-3xl bg-white dark:bg-[#1A1D21] rounded-3xl shadow-2xl border border-brand-light-tertiary dark:border-white/10 flex flex-col max-h-[90vh] animate-fade-in overflow-hidden transition-colors duration-300 font-sans">
+      <div className="relative w-full max-w-3xl bg-white dark:bg-[#19211C] rounded-3xl shadow-2xl border border-brand-light-tertiary dark:border-white/10 flex flex-col max-h-[90vh] animate-fade-in overflow-hidden transition-colors duration-300 font-sans">
 
         {/* Scrollable Body - Reduced Padding/Margins to prevent scroll */}
         <div className="overflow-y-auto custom-scrollbar flex-1">
@@ -221,7 +221,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
         </div>
 
         {/* Footer Actions */}
-        <div className="p-5 sm:p-7 border-t border-brand-light-tertiary dark:border-white/10 bg-white dark:bg-[#1A1D21]">
+        <div className="p-5 sm:p-7 border-t border-brand-light-tertiary dark:border-white/10 bg-white dark:bg-[#19211C]">
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 sm:gap-4">
             <button
               onClick={onClose}

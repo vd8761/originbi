@@ -6,7 +6,7 @@
 /* 2. Define Your Theme & Colors (Replaces tailwind.config.ts) */
 @theme {
   /* Colors */
-  --color-brand-dark-primary: #1A1D21;
+  --color-brand-dark-primary: #19211C;
   --color-brand-dark-secondary: #24272B;
   --color-brand-dark-tertiary: #303438;
 

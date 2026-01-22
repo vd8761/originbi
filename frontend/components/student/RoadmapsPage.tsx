@@ -154,11 +154,11 @@ const ExploreRoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: strin
         <div
             className={`group relative rounded-xl p-4 transition-all duration-300 cursor-pointer ${isActive
                 ? 'bg-[#19211C]/5 dark:bg-white/10' // Active: Light gray in light mode, translucent white in dark mode
-                : 'bg-transparent hover:bg-[#19211C]/5 dark:hover:bg-white/5' // Inactive: Transparent with hover effect
+                : 'bg-transparent hover:bg-[#19211C]/5 dark:hover:bg-black/20' // Inactive: Transparent with hover effect
                 }`}
             onClick={undefined} // Interaction only on button as per previous instruction, but user might want card click. Sticking to button only for nav as previously requested unless implied otherwise. The SS implies a card look. I'll stick to button triggers nav to be safe, or allow card click if user previous req was "only arrow clicked". User said "it has to redirect only if the arrow part is clicked" in Step 67. I WILL KEEP THIS.
         >
-            <div className="flex justify-between items-start gap-3">
+            <div className="flex justify-between items-center gap-3">
                 <div className="flex-1 min-w-0">
                     <h4 className="font-semibold text-[#19211C] dark:text-white text-[16px] mb-1 truncate">
                         {item.title}
@@ -188,9 +188,9 @@ const ExploreRoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: strin
 // Main roadmap card for grid view
 const RoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: string) => void }> = ({ item, onSelect }) => (
     <div
-        className="group relative bg-white/40 dark:bg-brand-dark-secondary border border-[#19211C]/12 dark:border-brand-dark-tertiary hover:border-brand-green/40 dark:hover:border-brand-green/40 rounded-2xl p-5 lg:p-[1.25vw] transition-all duration-300 hover:shadow-lg hover:shadow-brand-green/5 backdrop-blur-sm"
+        className="group relative bg-white/40 dark:bg-black/20 border border-[#19211C]/12 dark:border-white/5 hover:border-brand-green/40 dark:hover:border-brand-green/40 rounded-2xl p-5 lg:p-[1.25vw] transition-all duration-300 hover:shadow-lg hover:shadow-brand-green/5 backdrop-blur-sm"
     >
-        <div className="flex justify-between items-start gap-4">
+        <div className="flex justify-between items-center gap-4">
             <div className="flex-1">
                 <h3 className="font-semibold text-[#19211C] dark:text-brand-text-primary text-[20px] mb-2 lg:mb-[0.4vw]">
                     {item.title}
@@ -345,7 +345,7 @@ const RoadmapDetailView: React.FC<{
 
                     {/* Right Sidebar - Explore Other Roadmaps */}
                     <aside className="w-full lg:w-[340px] xl:w-[380px] 2xl:w-[420px] flex-shrink-0">
-                        <div className="bg-white/30 dark:bg-brand-dark-secondary border border-[#19211C]/12 dark:border-[#2A3530] rounded-2xl p-0 backdrop-blur-sm sticky top-[100px] overflow-hidden">
+                        <div className="bg-white/30 dark:bg-black/20 border border-[#19211C]/12 dark:border-white/5 rounded-2xl p-0 backdrop-blur-sm sticky top-[100px] overflow-hidden">
                             <div className="p-6 pb-4">
                                 <h3 className="text-[18px] font-semibold text-[#19211C] dark:text-white mb-4">
                                     Explore Other Roadmaps

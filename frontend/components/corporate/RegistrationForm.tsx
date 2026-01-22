@@ -381,7 +381,7 @@ const RegistrationForm: React.FC = () => {
                                         placeholder="Search country..."
                                         value={countrySearch}
                                         onChange={(e) => setCountrySearch(e.target.value)}
-                                        className="w-full bg-gray-50 dark:bg-[#1A1D21] text-black dark:text-white text-xs rounded-lg px-3 py-2 outline-none"
+                                        className="w-full bg-gray-50 dark:bg-[#19211C] text-black dark:text-white text-xs rounded-lg px-3 py-2 outline-none"
                                     />
                                 </div>
                                 <div className="overflow-y-auto custom-scrollbar flex-1">
@@ -458,7 +458,7 @@ const RegistrationForm: React.FC = () => {
                             value={sectorSearch}
                             onChange={(e) => setSectorSearch(e.target.value)}
                             placeholder="Search..."
-                            className="w-full mb-2 px-3 py-2 rounded-lg text-sm bg-gray-50 dark:bg-[#1A1D21] text-black dark:text-white outline-none"
+                            className="w-full mb-2 px-3 py-2 rounded-lg text-sm bg-gray-50 dark:bg-[#19211C] text-black dark:text-white outline-none"
                             autoFocus
                         />
                         <div className="overflow-y-auto custom-scrollbar flex-1">

@@ -378,7 +378,7 @@ const AssessmentCard: React.FC<AssessmentCardProps> = ({
             <rect width="100%" height="100%" fill="url(#pattern-circles)" />
           </svg>
 
-          <div className="relative z-20 w-16 h-16 mb-4 rounded-3xl bg-gray-100 dark:bg-[#1A1D21] flex items-center justify-center shadow-lg border border-gray-200 dark:border-white/5">
+          <div className="relative z-20 w-16 h-16 mb-4 rounded-3xl bg-gray-100 dark:bg-[#19211C] flex items-center justify-center shadow-lg border border-gray-200 dark:border-white/5">
             <CustomLockIcon className="w-6 h-8 text-gray-400 dark:text-[#9CA3AF]" />
           </div>
 
