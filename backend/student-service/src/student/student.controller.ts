@@ -3,7 +3,7 @@ import { StudentService } from './student.service';
 
 @Controller('student')
 export class StudentController {
-  constructor(private readonly studentService: StudentService) {}
+  constructor(private readonly studentService: StudentService) { }
 
   @Post('profile')
   async getProfile(@Body() body: { email: string }) {
@@ -31,5 +31,11 @@ export class StudentController {
   @Post('progress')
   async getAssessmentProgress(@Body() body: { email: string }) {
     return this.studentService.getAssessmentProgress(body.email);
+  }
+
+  @Post('complete-first-login')
+  async completeFirstLogin(@Body() body: { email: string }) {
+    await this.studentService.completeFirstLogin(body.email);
+    return { success: true };
   }
 }

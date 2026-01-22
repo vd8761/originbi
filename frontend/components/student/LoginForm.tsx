@@ -166,6 +166,10 @@ const LoginForm: React.FC<LoginFormProps> = ({
             sessionStorage.setItem('isAssessmentMode', 'true');
             router.push(data.redirectUrl);
             return; // Early exit, do not call default success
+          } else if (data.status === 'FIRST_LOGIN' && data.redirectUrl) {
+            sessionStorage.removeItem('isAssessmentMode');
+            router.push(data.redirectUrl);
+            return;
           } else {
             sessionStorage.removeItem('isAssessmentMode');
           }
