@@ -5,6 +5,7 @@ import (
 	"errors"
 	"exam-engine/internal/models"
 	"exam-engine/internal/repository"
+	"fmt"
 	"sort"
 	"time"
 )
@@ -405,6 +406,96 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 					"status":       "COMPLETED",
 					"completed_at": now,
 				})
+
+				// --- 🟢 GENERATE ASSESSMENT REPORT ---
+				var existingReport models.AssessmentReports
+				if err := db.Where("assessment_session_id = ?", session.ID).First(&existingReport).Error; err != nil {
+					// Report does not exist, create it
+
+					// 1. Fetch Program Code
+					var program models.Program
+					db.First(&program, session.ProgramID)
+
+					// 2. Fetch Group (if applicable)
+					groupIDStr := ""
+					if session.GroupID != nil {
+						groupIDStr = fmt.Sprintf("G%d-", *session.GroupID)
+					}
+
+					// 3. Generate Report Number Prefix
+					// Format: OBI-G{group_id}-{Month/Year}-{Program code}-
+					dateStr := now.Format("01/06") // Month/Year (e.g., 06/25)
+					reportPrefix := fmt.Sprintf("OBI-%s%s-%s-", groupIDStr, dateStr, program.Code)
+
+					// 4. Calculate Sequence Number
+					var count int64
+					db.Model(&models.AssessmentReports{}).Where("report_number LIKE ?", reportPrefix+"%").Count(&count)
+					seqNum := count + 1
+					reportNumber := fmt.Sprintf("%s%03d", reportPrefix, seqNum)
+
+					// 5. Aggregate Data from Attempts
+					var attempts []models.AssessmentAttempt
+					db.Where("assessment_session_id = ?", session.ID).Find(&attempts)
+
+					discScores := "{}"
+					agileScores := "{}"
+					level3Scores := "{}"
+					level4Scores := "{}"
+					var overallSincerity float64
+					var dominantTraitID *int64
+
+					// Loop attempts to extract scores based on level
+					for _, att := range attempts {
+						// Parse Level Info
+						var level models.AssessmentLevel
+						db.First(&level, att.AssessmentLevelID)
+
+						// Attempt Metadata
+						var meta map[string]interface{}
+						if att.Metadata != "" && att.Metadata != "{}" {
+							json.Unmarshal([]byte(att.Metadata), &meta)
+						}
+
+						if level.LevelNumber == 1 || level.Name == "Level 1" || level.PatternType == "DISC" {
+							// DISC Scores
+							if val, ok := meta["disc_scores"]; ok {
+								bytes, _ := json.Marshal(val)
+								discScores = string(bytes)
+							}
+							overallSincerity = att.SincerityIndex
+							dominantTraitID = att.DominantTraitID
+						} else if level.LevelNumber == 2 || level.Name == "Level 2" {
+							// Agile Scores
+							if val, ok := meta["agile_scores"]; ok {
+								bytes, _ := json.Marshal(val)
+								agileScores = string(bytes)
+							}
+						}
+					}
+
+					fmt.Printf("DEBUG: Generating Report -> Prefix: %s, Number: %s\n", reportPrefix, reportNumber)
+
+					// Create Report Record
+					newReport := models.AssessmentReports{
+						AssessmentSessionID: session.ID,
+						ReportNumber:        reportNumber,
+						GeneratedAt:         now,
+						DiscScores:          discScores,
+						AgileScores:         agileScores,
+						Level3Scores:        level3Scores,
+						Level4Scores:        level4Scores,
+						OverallSincerity:    overallSincerity,
+						DominantTraitID:     dominantTraitID,
+						Metadata:            "{}",
+					}
+					
+					// Save
+					if err := db.Create(&newReport).Error; err != nil {
+						fmt.Printf("ERROR: Failed to create Assessment Report: %v\n", err)
+					} else {
+						fmt.Printf("SUCCESS: Assessment Report Created. ID: %d\n", newReport.ID)
+					}
+				}
 
 				// Update Group Assessment Status
 				if session.GroupID != nil {
