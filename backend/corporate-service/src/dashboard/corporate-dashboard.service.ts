@@ -126,6 +126,7 @@ export class CorporateDashboardService {
             totalCredits: corporate.totalCredits,
             studentsRegistered,
             isActive: corporate.isActive,
+            perCreditCost: this.perCreditCost,
         };
     }
 
