@@ -553,7 +553,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   }
 
   return (
-    <div className="flex flex-col gap-4 w-full px-4 md:px-8 lg:px-[80px] pb-10 max-w-[1920px] mx-auto pt-6 lg:pt-10">
+    <div className="flex flex-col gap-4 w-full px-10 md:px-20 lg:px-[230px] xl:px-[300px] pb-10 max-w-[1920px] mx-auto pt-6 lg:pt-10">
       <div className="mb-6 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-hide md:overflow-visible md:pb-0 md:mx-0 md:px-0">
         <Stepper overallProgress={overallPercentage} steps={stepperSteps} />
       </div>
