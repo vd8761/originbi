@@ -28,7 +28,8 @@ const modalTranslations = {
     goBack: "Go Back",
     begin: "Begin Test",
     continue: "Continue Assessment",
-    pending: "Questions Pending"
+    pending: "Questions Pending",
+    completed: "Assessment Completed"
   },
   TAM: {
     header: "Ovvoru kelviyum ungal unmaiyaana balathai kandaria uthavum",
@@ -43,7 +44,8 @@ const modalTranslations = {
     goBack: "Pin sella",
     begin: "Thervai Thodanga",
     continue: "Thodara",
-    pending: "Meedhamulla Kelvigal"
+    pending: "Meedhamulla Kelvigal",
+    completed: "Thervu Mudindhadhu"
   }
 };
 
@@ -229,9 +231,14 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
             </button>
             <button
               onClick={onStart}
-              className="w-full sm:w-auto sm:min-w-[140px] h-[40px] sm:h-[44px] px-6 sm:px-8 rounded-full bg-brand-green text-white text-[13px] sm:text-[14px] font-medium hover:bg-brand-green/90 transition-all shadow-lg shadow-brand-green/10 flex items-center justify-center whitespace-nowrap"
+              disabled={assessment.status === 'completed'}
+              className={`w-full sm:w-auto sm:min-w-[140px] h-[40px] sm:h-[44px] px-6 sm:px-8 rounded-full text-[13px] sm:text-[14px] font-medium transition-all flex items-center justify-center whitespace-nowrap
+                ${assessment.status === 'completed'
+                  ? "bg-[#2A2E33] text-gray-400 cursor-not-allowed"
+                  : "bg-brand-green text-white hover:bg-brand-green/90 shadow-lg shadow-brand-green/10"
+                }`}
             >
-              {isContinue ? t.continue : t.begin}
+              {assessment.status === 'completed' ? t.completed : (isContinue ? t.continue : t.begin)}
             </button>
           </div>
         </div>

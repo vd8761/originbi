@@ -13,13 +13,16 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 const AssessmentLayout: React.FC<AssessmentLayoutProps> = ({ onLogout, children, hideNav, showAssessmentOnly }) => {
   return (
     <div className="bg-brand-light-primary dark:bg-brand-dark-primary h-screen w-screen overflow-hidden flex flex-col relative">
-      {/* Green Glow Effect - Dark Mode Only - Bottom Full Width */}
+      {/* Green Glow Effect - Dark Mode Only - Bottom Full Width - Large Ambient */}
       <div
-        className="hidden dark:block absolute bottom-0 left-0 right-0 h-[500px] pointer-events-none z-10"
+        className="hidden dark:block absolute bottom-0 left-0 right-0 h-[65vh] pointer-events-none z-0"
         style={{
-          background: 'radial-gradient(ellipse 100% 70% at 50% 100%, rgba(30, 211, 106, 0.5) 0%, rgba(30, 211, 106, 0.25) 25%, rgba(30, 211, 106, 0.1) 50%, transparent 75%)',
+          background: 'radial-gradient(ellipse 130% 100% at 50% 100%, rgba(30, 211, 106, 0.22) 0%, rgba(30, 211, 106, 0.15) 30%, rgba(30, 211, 106, 0.08) 55%, rgba(30, 211, 106, 0.01) 80%, transparent 100%)',
+          filter: 'blur(60px)',
         }}
       />
+
+
 
 
 
