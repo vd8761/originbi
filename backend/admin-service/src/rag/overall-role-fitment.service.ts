@@ -423,7 +423,7 @@ export class OverallRoleFitmentService {
   private readonly logger = new Logger(OverallRoleFitmentService.name);
   private llm: ChatGroq | null = null;
 
-  constructor(private dataSource: DataSource) {}
+  constructor(private dataSource: DataSource) { }
 
   private getLlm(): ChatGroq {
     if (!this.llm) {
@@ -670,8 +670,6 @@ Origin BI # Page ${pageNum++}
     }
 
     report += `
-═══════════════════════════════════════════════════════════════════════════════
-                              Powered by Origin BI
 ═══════════════════════════════════════════════════════════════════════════════
 `;
 

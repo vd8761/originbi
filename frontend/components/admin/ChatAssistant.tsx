@@ -447,7 +447,7 @@ export default function ChatAssistant({
                         </button>
                     </div>
                     <p className="text-center text-[10px] sm:text-xs text-gray-400 mt-2 sm:mt-3 hidden sm:block">
-                        OriginBI Assistant can make mistakes. Verify important information.
+                        OriginBI Assistant
                     </p>
                 </div>
             </div>

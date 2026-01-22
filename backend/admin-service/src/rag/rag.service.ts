@@ -227,7 +227,7 @@ export class RagService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // CAREER REPORT HANDLER - WITH DISAMBIGUATION
+  // CAREER REPORT HANDLER - WITH SMART DEDUPLICATION & EMAIL MATCHING
   // ═══════════════════════════════════════════════════════════════════════════
   private async handleCareerReport(
     searchTerm: string | null,
@@ -250,10 +250,34 @@ export class RagService {
       targetIndex = parseInt(numberMatch[2]) - 1; // Convert to 0-based index
     }
 
-    // Fetch ALL matching people (not just one)
+    // Extract email if present in the search term (e.g., "anjaly anjaly@email.com")
+    const emailMatch = cleanSearchTerm.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+    let emailSearch = '';
+    let nameSearch = cleanSearchTerm;
+
+    if (emailMatch) {
+      emailSearch = emailMatch[1];
+      // Remove email from name search to get just the name
+      nameSearch = cleanSearchTerm.replace(emailMatch[1], '').trim();
+    }
+
+    // Fetch UNIQUE people - deduplicated by registration ID with BEST score
     try {
+      // Build smart WHERE clause
+      let whereClause = '';
+      if (emailSearch) {
+        // If email is provided, prioritize exact email match
+        whereClause = `(users.email ILIKE '%${emailSearch}%')`;
+        if (nameSearch) {
+          whereClause += ` OR (registrations.full_name ILIKE '%${nameSearch}%')`;
+        }
+      } else {
+        // Search by name, also check if the search term looks like an email
+        whereClause = `(registrations.full_name ILIKE '%${nameSearch}%' OR users.email ILIKE '%${nameSearch}%')`;
+      }
+
       const personData = await this.dataSource.query(`
-                SELECT 
+                SELECT DISTINCT ON (registrations.id)
                     registrations.id,
                     registrations.full_name,
                     registrations.gender,
@@ -261,28 +285,33 @@ export class RagService {
                     users.email,
                     assessment_attempts.total_score,
                     personality_traits.blended_style_name as behavioral_style,
-                    personality_traits.blended_style_desc as behavior_description
+                    personality_traits.blended_style_desc as behavior_description,
+                    (SELECT MAX(aa.total_score) FROM assessment_attempts aa WHERE aa.registration_id = registrations.id) as best_score,
+                    (SELECT COUNT(*) FROM assessment_attempts aa WHERE aa.registration_id = registrations.id AND aa.status = 'COMPLETED') as attempt_count
                 FROM registrations
                 LEFT JOIN users ON registrations.user_id = users.id
                 LEFT JOIN assessment_attempts ON assessment_attempts.registration_id = registrations.id
                 LEFT JOIN personality_traits ON assessment_attempts.dominant_trait_id = personality_traits.id
-                WHERE registrations.full_name ILIKE '%${cleanSearchTerm}%'
+                WHERE (${whereClause})
                 AND registrations.is_deleted = false
-                ORDER BY registrations.created_at DESC
+                ORDER BY registrations.id, assessment_attempts.total_score DESC NULLS LAST
                 LIMIT 10
             `);
 
       if (!personData.length) {
         return {
-          answer: `**❌ No candidate found with name "${cleanSearchTerm}"**\n\nPlease check the name and try again.`,
+          answer: `**❌ No candidate found matching "${cleanSearchTerm}"**\n\nPlease check the name or email and try again.`,
           searchType: 'career_report',
           confidence: 0.3,
         };
       }
 
-      // DISAMBIGUATION: If multiple matches found
-      if (personData.length > 1 && !numberMatch) {
-        let response = `**👥 Multiple candidates found with name "${cleanSearchTerm}":**\n\n`;
+      // If email was provided and exactly one match found, skip disambiguation
+      const exactEmailMatch = emailSearch && personData.length === 1;
+
+      // DISAMBIGUATION: If multiple UNIQUE people found (truly different registrations)
+      if (personData.length > 1 && !numberMatch && !exactEmailMatch) {
+        let response = `**👥 Multiple candidates found matching "${cleanSearchTerm}":**\n\n`;
         response += `Please specify which one by number:\n\n`;
 
         personData.forEach((person: any, index: number) => {
@@ -290,10 +319,13 @@ export class RagService {
           const mobile = person.mobile_number
             ? ` | ${person.mobile_number.slice(-4)}`
             : '';
-          const score = person.total_score
-            ? ` | Score: ${person.total_score}%`
+          const bestScore = person.best_score
+            ? ` | Best Score: ${parseFloat(person.best_score).toFixed(1)}%`
             : '';
-          response += `**${index + 1}.** ${person.full_name}${email}${mobile}${score}\n`;
+          const attempts = person.attempt_count > 1
+            ? ` (${person.attempt_count} attempts)`
+            : '';
+          response += `**${index + 1}.** ${person.full_name}${email}${mobile}${bestScore}${attempts}\n`;
         });
 
         response += `\n**Example:** "career report for ${cleanSearchTerm} #1" or "career report for ${cleanSearchTerm} #2"`;
@@ -308,13 +340,16 @@ export class RagService {
       // Validate index if number was specified
       if (targetIndex >= personData.length) {
         return {
-          answer: `**❌ Invalid selection.** Only ${personData.length} candidate(s) found with name "${cleanSearchTerm}".\n\nPlease use a number between 1 and ${personData.length}.`,
+          answer: `**❌ Invalid selection.** Only ${personData.length} candidate(s) found matching "${cleanSearchTerm}".\n\nPlease use a number between 1 and ${personData.length}.`,
           searchType: 'career_report',
           confidence: 0.3,
         };
       }
 
       const person = personData[targetIndex];
+
+      // Use best_score for report generation if available
+      const scoreToUse = person.best_score || person.total_score;
 
       // Generate the full Career Fitment Report
       const report = await this.futureRoleReportService.generateReport({
@@ -328,8 +363,8 @@ export class RagService {
         expectedFutureRole: 'To be determined based on assessment results',
         behavioralStyle: person.behavioral_style || undefined,
         behavioralDescription: person.behavior_description || undefined,
-        agileScore: person.total_score
-          ? parseFloat(person.total_score)
+        agileScore: scoreToUse
+          ? parseFloat(scoreToUse)
           : undefined,
       });
 
@@ -348,6 +383,7 @@ export class RagService {
       };
     }
   }
+
 
   // ═══════════════════════════════════════════════════════════════════════════
   // OVERALL ROLE FITMENT REPORT HANDLER
@@ -813,7 +849,7 @@ Respond with ONLY valid JSON, no explanation:`;
         'SELECT COUNT(*) as count FROM rag_documents',
       );
       totalDocs = parseInt(r[0].count);
-    } catch {}
+    } catch { }
 
     return {
       status: 'ok',
