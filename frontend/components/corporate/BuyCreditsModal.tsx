@@ -49,7 +49,8 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
     // Calculate position for the thumb
     // We need to map the credit value (MIN-MAX) to a percentage (0-100)
     // However, since we want 5 (MIN) to be at the very start, we treat MIN as 0%
-    const percentage = ((credits - INPUT_MIN) / (INPUT_MAX - INPUT_MIN)) * 100;
+    const rawPercentage = ((credits - INPUT_MIN) / (INPUT_MAX - INPUT_MIN)) * 100;
+    const percentage = Math.min(100, Math.max(0, rawPercentage));
 
 
     const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,99 +81,90 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
             />
 
             {/* Modal Container */}
-            <div className="relative bg-white dark:bg-[#1A1D21] w-full max-w-[420px] rounded-[32px] shadow-2xl flex flex-col max-h-[95vh] mx-4 overflow-hidden font-['Haskoy']">
+            <div className="relative bg-white dark:bg-[#1A1D21] w-full max-w-[550px] rounded-[32px] shadow-2xl flex flex-col max-h-[95vh] mx-4 overflow-hidden font-['Haskoy']">
 
                 {/* Header */}
-                <div className="px-6 pt-5 pb-0 flex items-center justify-between">
-                    <h2 className="text-[22px] font-bold text-[#150089] dark:text-white leading-none tracking-tight">Buy Credits</h2>
+                <div className="px-4 sm:px-6 py-4 flex items-center justify-between border-b border-gray-100 dark:border-white/10 relative min-h-[64px]">
+                    <h2 className="text-[17px] sm:text-[18px] font-bold text-[#150089] dark:text-white leading-none tracking-tight truncate max-w-[100px] xs:max-w-none">Buy Credits</h2>
 
-                    <div className="flex items-center gap-3">
-                        {/* Badge */}
-                        <div className="flex items-center gap-1.5 bg-[#FFF8E6] dark:bg-yellow-500/10 px-3 py-1.5 rounded-[8px] border border-[#FBEFCA] dark:border-yellow-500/20">
-                            <div className="w-1.5 h-1.5 bg-[#FBC02D] rounded-full"></div>
-                            <span className="text-[12px] font-medium text-[#19211C] dark:text-white whitespace-nowrap">
-                                <span className="text-gray-500 dark:text-gray-400">Current Balance</span> <span className="text-[#1ED36A] font-bold">{currentBalance} Credits</span>
-                            </span>
-                        </div>
-
-                        <button
-                            onClick={onClose}
-                            className="w-8 h-8 rounded-full bg-[#1ED36A] flex items-center justify-center hover:bg-[#16b058] transition-colors shadow-none group"
-                        >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="group-hover:rotate-90 transition-transform duration-300">
-                                <path d="M18 6L6 18M6 6L18 18" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                        </button>
+                    {/* Centered Badge - Responsive for mobile and desktop */}
+                    <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5 sm:gap-2 bg-[#F8F9FB] dark:bg-white/10 pl-2 pr-3 py-1.5 rounded-[8px] whitespace-nowrap border border-gray-50 dark:border-white/5">
+                        <CoinIcon className="w-4 h-4 sm:w-5 sm:h-5 text-[#FBC02D] drop-shadow-sm" />
+                        <span className="text-[11px] sm:text-[13px] font-medium text-[#19211C] dark:text-white">
+                            <span className="text-gray-500 dark:text-gray-400">Current Balance</span> <span className="text-[#1ED36A] font-bold ml-0.5 sm:ml-1">{currentBalance} <span className="hidden xs:inline">Credits</span></span>
+                        </span>
                     </div>
+
+                    <button
+                        onClick={onClose}
+                        className="w-8 h-8 rounded-full bg-[#1ED36A] hover:bg-[#16b058] flex items-center justify-center transition-all shadow-md group active:scale-95 shrink-0"
+                    >
+                        <X className="w-4 h-4 text-white transition-transform duration-300 group-hover:rotate-90" strokeWidth={3} />
+                    </button>
                 </div>
 
                 {/* Price Display */}
-                <div className="text-center pt-3 pb-2">
-                    <div className="text-[13px] text-[#19211C] dark:text-gray-400 font-medium mb-0.5">
-                        <span className="font-bold">₹{PER_CREDIT_COST}</span> Per Credit (Taxes Extra, If Applicable)
+                <div className="text-center pt-6 pb-4 px-4">
+                    <div className="text-[13px] sm:text-[14px] text-[#19211C] dark:text-gray-400 font-medium mb-1">
+                        <span className="font-bold text-[#150089] dark:text-white line-clamp-1">₹{PER_CREDIT_COST} Per Credit (Taxes Extra, If Applicable)</span>
                     </div>
-                    <div className="text-[34px] font-bold text-[#150089] dark:text-[#1ED36A] leading-none tracking-tight">
-                        ₹{totalCost.toLocaleString()} <span className="text-[22px] text-[#150089] dark:text-white font-medium">for {credits} Credits</span>
+                    <div className="flex flex-wrap items-baseline justify-center gap-x-2 leading-none">
+                        <span className="text-[32px] sm:text-[40px] font-bold text-[#150089] dark:text-[#1ED36A] tracking-tight">₹{totalCost.toLocaleString()}</span>
+                        <span className="text-[20px] sm:text-[24px] text-[#150089] dark:text-white font-medium whitespace-nowrap">for {credits} Credits</span>
                     </div>
                 </div>
 
                 {/* Scrollable Content Area */}
-                <div className="overflow-y-auto no-scrollbar flex-1 px-6 pb-2 space-y-3">
+                <div className="overflow-y-auto no-scrollbar flex-1 px-4 sm:px-6 pb-2 space-y-3">
 
                     {/* Main Card: Credits To Purchase */}
-                    <div className="bg-[#F8F9FB] dark:bg-white/5 rounded-[24px] p-4 pt-5">
-                        <div className="text-center text-[15px] font-semibold text-[#19211C] dark:text-white mb-6">Credits To Purchase</div>
+                    <div className="bg-[#F8F9FB] dark:bg-white/5 rounded-[24px] p-6">
+                        <div className="text-center text-[16px] font-semibold text-[#19211C] dark:text-white mb-8">Credits To Purchase</div>
 
                         {/* Slider Section */}
-                        <div className="mb-8 px-1">
-                            <div className="flex justify-between text-[11px] font-medium text-[#19211C] dark:text-gray-400 mb-5">
+                        <div className="px-2 mb-4 relative">
+                            {/* Labels */}
+                            <div className="flex justify-between text-[12px] font-medium text-gray-500 dark:text-gray-400 mb-4">
                                 <span>Select Credits</span>
                             </div>
 
-                            <div className="relative w-full h-10 flex items-center mb-1 select-none">
-                                {/* SVG Track Background (Unfilled Gradient Ticks) */}
-                                <svg className="absolute w-full h-full pointer-events-none z-0" height="40" width="100%">
-                                    <defs>
-                                        <linearGradient id="tickGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                            <stop offset="0%" stopColor="#22C55E" /> {/* Green */}
-                                            <stop offset="100%" stopColor="#4ADE80" /> {/* Lighter Green */}
-                                        </linearGradient>
-                                    </defs>
+                            {/* Slider Component */}
+                            <div className="relative w-full h-14 flex items-center select-none touch-none group">
 
-                                    {/* Generate ticks */}
-                                    {Array.from({ length: 50 }).map((_, i) => {
-                                        const x = `${(i / 49) * 100}%`;
-                                        return (
-                                            <rect
-                                                key={i}
-                                                x={x}
-                                                y="12"
-                                                width="2"
-                                                height="8"
-                                                rx="1"
-                                                fill="url(#tickGradient)"
-                                            />
-                                        );
-                                    })}
-                                </svg>
+                                {/* 1. Inactive Ticks Layer (Gradient Background with Mask) */}
+                                <div className="absolute inset-x-0 h-[10px] rounded-full overflow-hidden pointer-events-none opacity-80">
+                                    <div
+                                        className="w-full h-full"
+                                        style={{
+                                            background: 'linear-gradient(90deg, #4ADE80 0%, #EAB308 100%)',
+                                            maskImage: 'repeating-linear-gradient(90deg, black 0, black 2px, transparent 2px, transparent 8px)',
+                                            WebkitMaskImage: 'repeating-linear-gradient(90deg, black 0, black 2px, transparent 2px, transparent 8px)'
+                                        }}
+                                    />
+                                </div>
 
-                                {/* Active Fill Line (Solid Green Overlay covers the ticks) */}
+                                {/* 2. Active Solid Bar Layer (Green) */}
                                 <div
-                                    className="absolute h-[10px] bg-[#1ED36A] rounded-full left-0 top-1/2 -translate-y-[calc(50%-2px)] pointer-events-none z-10"
-                                    style={{ width: `${percentage}%` }}
+                                    className="absolute left-0 h-[16px] bg-[#1ED36A] rounded-l-full pointer-events-none shadow-sm z-10"
+                                    style={{
+                                        width: `${percentage}%`,
+                                        // Slight rounding fix for when it's full width
+                                        borderTopRightRadius: percentage > 98 ? '999px' : '0',
+                                        borderBottomRightRadius: percentage > 98 ? '999px' : '0',
+                                    }}
                                 ></div>
 
-                                {/* Thumb */}
+                                {/* 3. Thumb Layer */}
                                 <div
-                                    className="absolute top-1/2 -translate-y-[calc(50%-2px)] -translate-x-1/2 z-20 pointer-events-none"
+                                    className="absolute top-1/2 -translate-y-[calc(50%)] -translate-x-1/2 z-20 pointer-events-none"
                                     style={{ left: `${percentage}%` }}
                                 >
-                                    <div className="bg-[#1ED36A] text-white text-[14px] font-bold py-1.5 px-4 rounded-full shadow-[0_4px_15px_rgba(30,211,106,0.6)] border-[4px] border-white dark:border-[#1A1D21] min-w-[60px] text-center whitespace-nowrap transform scale-110">
+                                    <div className="bg-[#1ED36A] text-white text-[14px] font-bold py-1 px-3.5 rounded-full shadow-[0_4px_12px_rgba(30,211,106,0.3)] border-[3px] border-white dark:border-[#1A1D21] min-w-[62px] text-center whitespace-nowrap transform transition-transform group-active:scale-105">
                                         {credits}
                                     </div>
                                 </div>
 
-                                {/* Input */}
+                                {/* 4. Input - Cover full area for functionality */}
                                 <input
                                     type="range"
                                     min={INPUT_MIN}
@@ -182,31 +174,32 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                                     className="absolute w-full h-full opacity-0 cursor-pointer z-30"
                                 />
                             </div>
-                            <div className="flex justify-between text-[11px] font-medium text-[#19211C] dark:text-gray-400 mt-2">
+
+                            <div className="flex justify-between text-[12px] font-medium text-gray-400 mt-[-4px]">
                                 <span>0</span>
                                 <span>1000</span>
                             </div>
                         </div>
 
-                        {/* OR Divider */}
-                        <div className="flex items-center gap-4 my-5 opacity-40">
-                            <div className="h-[1px] bg-gray-400 dark:bg-white/20 flex-1"></div>
-                            <span className="text-[12px] font-medium text-[#19211C] dark:text-gray-400">OR</span>
-                            <div className="h-[1px] bg-gray-400 dark:bg-white/20 flex-1"></div>
+                        {/* OR Divider - Darkened */}
+                        <div className="flex items-center gap-4 my-4">
+                            <div className="h-[1px] bg-gray-200 dark:bg-white/20 flex-1"></div>
+                            <span className="text-[12px] font-bold text-gray-400 dark:text-gray-500 tracking-wide">OR</span>
+                            <div className="h-[1px] bg-gray-200 dark:bg-white/20 flex-1"></div>
                         </div>
 
                         {/* Quick Select Buttons */}
-                        <div className="flex flex-col gap-2">
-                            <label className="text-[11px] text-[#19211C] dark:text-gray-400 font-medium">Quick Select</label>
+                        <div className="flex flex-col gap-3">
+                            <label className="text-[12px] font-medium text-gray-500 dark:text-gray-400">Quick Select</label>
                             <div className="grid grid-cols-5 gap-2">
                                 {[100, 200, 300, 400].map(val => (
                                     <button
                                         key={val}
                                         onClick={() => handleQuickSelect(val)}
-                                        className={`h-[36px] rounded-[8px] text-[14px] font-medium transition-all
+                                        className={`h-[42px] rounded-[10px] text-[15px] font-bold transition-all border
                                             ${credits === val
-                                                ? 'bg-[#E0F8E9] text-[#19211C] border border-[#1ED36A] shadow-sm'
-                                                : 'bg-[#EAECEF] dark:bg-white/10 text-[#19211C] dark:text-white border border-transparent hover:bg-gray-200'
+                                                ? 'bg-[#E0F8E9] text-[#19211C] border-[#1ED36A] shadow-sm'
+                                                : 'bg-[#F3F4F6] dark:bg-white/5 text-[#19211C] dark:text-white border-transparent hover:bg-gray-200'
                                             }`}
                                     >
                                         {val}
@@ -217,10 +210,14 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                                     <input
                                         type="number"
                                         placeholder="Enter.."
-                                        value={credits > 400 && credits <= 1000 ? credits : (credits > 0 && ![100, 200, 300, 400].includes(credits) ? credits : '')}
-                                        onChange={handleInputChange}
-                                        onFocus={() => { if (credits < 100) setCredits(100); }}
-                                        className="w-full h-[36px] rounded-[8px] bg-[#EAECEF] dark:bg-white/10 text-[13px] px-1 text-center font-medium outline-none focus:ring-1 focus:ring-[#1ED36A] placeholder:text-gray-500 text-[#19211C] dark:text-white transition-all"
+                                        value={credits === 0 ? '' : (credits > 0 && ![100, 200, 300, 400].includes(credits) ? credits : '')}
+                                        onChange={(e) => {
+                                            const val = e.target.value === '' ? 0 : Number(e.target.value);
+                                            if (!isNaN(val) && val <= INPUT_MAX) {
+                                                setCredits(val);
+                                            }
+                                        }}
+                                        className="w-full h-[42px] rounded-[10px] bg-[#F3F4F6] dark:bg-white/5 text-[14px] px-1 text-center font-bold outline-none focus:ring-2 focus:ring-[#1ED36A] focus:bg-white placeholder:text-gray-400 text-[#19211C] dark:text-white transition-all border border-transparent"
                                     />
                                 </div>
                             </div>
@@ -228,9 +225,9 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                     </div>
 
                     {/* Pricing Summary - Accordion Style */}
-                    <div className="bg-[#F8F9FB] dark:bg-white/5 rounded-[16px] px-5 py-3 cursor-pointer transition-all border border-transparent hover:border-gray-200 dark:hover:border-white/10" onClick={() => setIsPricingExpanded(!isPricingExpanded)}>
+                    <div className="bg-[#F8F9FB] dark:bg-white/5 rounded-[16px] px-5 py-4 cursor-pointer transition-all border border-transparent hover:border-gray-200 dark:hover:border-white/10" onClick={() => setIsPricingExpanded(!isPricingExpanded)}>
                         <div className="flex justify-between items-center">
-                            <h4 className="font-medium text-[14px] text-[#19211C] dark:text-white">Pricing Summary</h4>
+                            <h4 className="font-bold text-[16px] text-[#19211C] dark:text-white">Pricing Summary</h4>
                             <svg
                                 className={`w-4 h-4 text-gray-500 transition-transform duration-300 ${isPricingExpanded ? '-rotate-180' : ''}`}
                                 fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -241,18 +238,18 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
 
                         <div className={`grid transition-all duration-300 ease-in-out ${isPricingExpanded ? 'grid-rows-[1fr] opacity-100 mt-2' : 'grid-rows-[0fr] opacity-0 mt-0'}`}>
                             <div className="overflow-hidden">
-                                <div className="space-y-2 border-t border-dashed border-gray-300 dark:border-white/10 pt-3">
-                                    <div className="flex justify-between text-[12px] text-[#19211C] dark:text-gray-300">
+                                <div className="flex flex-col pt-1">
+                                    <div className="flex justify-between text-[14px] font-medium text-[#19211C] dark:text-gray-400 py-3 border-t border-gray-200 dark:border-white/10">
                                         <span>Credits</span>
-                                        <span className="font-semibold">{credits}</span>
+                                        <span className="font-bold text-[#19211C] dark:text-white">{credits}</span>
                                     </div>
-                                    <div className="flex justify-between text-[12px] text-[#19211C] dark:text-gray-300">
+                                    <div className="flex justify-between text-[14px] font-medium text-[#19211C] dark:text-gray-400 py-3 border-t border-gray-200 dark:border-white/10">
                                         <span>Price Per Credit</span>
-                                        <span className="font-semibold">₹{PER_CREDIT_COST}</span>
+                                        <span className="font-bold text-[#19211C] dark:text-white">₹{PER_CREDIT_COST}</span>
                                     </div>
-                                    <div className="flex justify-between text-[14px] text-[#19211C] dark:text-white font-bold pt-1">
+                                    <div className="flex justify-between text-[14px] font-medium text-[#19211C] dark:text-gray-400 py-3 border-t border-gray-200 dark:border-white/10">
                                         <span>Total Amount</span>
-                                        <span>₹{totalCost.toLocaleString()}</span>
+                                        <span className="font-bold text-[#19211C] dark:text-white">₹{totalCost.toLocaleString()}</span>
                                     </div>
                                 </div>
                             </div>
