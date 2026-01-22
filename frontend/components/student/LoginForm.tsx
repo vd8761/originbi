@@ -192,7 +192,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
   const isPasswordInvalid = touched.password && !!errors.password;
 
   return (
-    <form className="flex flex-col gap-[clamp(16px,2.5vw,48px)]" onSubmit={handleSubmit} noValidate>
+    <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
 
       {generalError && (
         <div className="flex items-center gap-2 px-1 animate-fade-in text-red-500 dark:text-red-400">
@@ -300,7 +300,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
         type="submit"
         disabled={isSubmitting}
         style={{ padding: 'clamp(14px,1vw,20px)' }}
-        className="w-full text-white bg-brand-green cursor-pointer hover:bg-brand-green/90 focus:ring-4 focus:outline-none focus:ring-brand-green/30 font-sans font-semibold rounded-full text-[clamp(16px,1vw,20px)] leading-none tracking-[0px] text-center transition-colors duration-300 disabled:bg-brand-green/50 disabled:cursor-not-allowed flex justify-center items-center" aria-busy={isSubmitting}
+        className="w-full mt-4 text-white bg-brand-green cursor-pointer hover:bg-brand-green/90 focus:ring-4 focus:outline-none focus:ring-brand-green/30 font-sans font-semibold rounded-full text-[clamp(16px,1vw,20px)] leading-none tracking-[0px] text-center transition-colors duration-300 disabled:bg-brand-green/50 disabled:cursor-not-allowed flex justify-center items-center" aria-busy={isSubmitting}
       >
         {isSubmitting ? (
           <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

@@ -188,7 +188,7 @@ const ExploreRoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: strin
 // Main roadmap card for grid view
 const RoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: string) => void }> = ({ item, onSelect }) => (
     <div
-        className="group relative bg-white/40 dark:bg-black/20 border border-white/20 dark:border-white/10 hover:bg-white/60 dark:hover:bg-white/5 hover:border-white/40 dark:hover:border-white/20 rounded-2xl p-5 lg:p-[1.25vw] transition-all duration-300 hover:shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] dark:hover:shadow-none backdrop-blur-md"
+        className="group relative bg-white/40 dark:bg-black/20 border border-white/20 dark:border-white/10 hover:bg-white/90 dark:hover:bg-white/10 hover:border-white/60 dark:hover:border-white/50 rounded-2xl p-5 lg:p-[1.25vw] transition-all duration-300 hover:shadow-[0_8px_32px_0_rgba(31,38,135,0.12)] dark:hover:shadow-none backdrop-blur-md"
     >
         <div className="flex justify-between items-center gap-4">
             <div className="flex-1">
