@@ -81,7 +81,8 @@ jobs:
         uses: 'vercel/repository-dispatch/actions/status@v1'
         with:
           name: 'Vercel - originbi: lint'
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
         working-directory: ./frontend
@@ -91,4 +92,5 @@ jobs:
         uses: 'vercel/repository-dispatch/actions/status@v1'
         with:
           name: 'Vercel - originbi: build'
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
