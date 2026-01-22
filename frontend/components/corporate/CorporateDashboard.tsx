@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import { Search, Edit2, MoreHorizontal, CheckCircle, Clock, Users, Briefcase } from "lucide-react";
 import { TrendUpIcon, TrendDownIcon, CircleArrowUpIcon, EditPencilIcon, DiamondIcon } from "@/components/icons";
 import BuyCreditsModal from "./BuyCreditsModal";
+import { corporateDashboardService } from "@/lib/services";
 
 // --- Types ---
 interface DashboardStats {
@@ -11,6 +12,7 @@ interface DashboardStats {
     totalCredits: number;
     studentsRegistered: number;
     isActive: boolean;
+    perCreditCost: number;
 }
 
 interface Participant {
@@ -737,10 +739,64 @@ const CorporateDashboard: React.FC = () => {
                 isOpen={isBuyCreditsOpen}
                 onClose={() => setIsBuyCreditsOpen(false)}
                 currentBalance={stats?.availableCredits ?? 0}
-                onBuy={(amount, cost) => {
-                    console.log(`Purchasing ${amount} credits for ₹${cost}`);
-                    setIsBuyCreditsOpen(false);
+                onBuy={async (amount, cost) => {
+                    const email = sessionStorage.getItem("userEmail");
+                    if (!email || !stats) return;
+
+                    try {
+                        // 1. Create Order
+                        const order = await corporateDashboardService.createOrder(email, amount, "Dashboard Top-up");
+
+                        const options = {
+                            key: order.key,
+                            amount: order.amount,
+                            currency: order.currency,
+                            name: "Origin BI",
+                            description: "Credit Purchase",
+                            order_id: order.orderId,
+                            handler: async function (response: any) {
+                                try {
+                                    // 2. Verify Payment
+                                    await corporateDashboardService.verifyPayment(email, {
+                                        razorpay_order_id: response.razorpay_order_id,
+                                        razorpay_payment_id: response.razorpay_payment_id,
+                                        razorpay_signature: response.razorpay_signature
+                                    });
+
+                                    // 3. Update UI
+                                    setStats(prev => prev ? ({
+                                        ...prev,
+                                        availableCredits: prev.availableCredits + amount,
+                                        totalCredits: prev.totalCredits + amount
+                                    }) : null);
+
+                                    setIsBuyCreditsOpen(false);
+                                    alert("Payment successful! Credits added.");
+                                } catch (e) {
+                                    console.error("Verification failed", e);
+                                    alert("Payment verification failed.");
+                                }
+                            },
+                            prefill: {
+                                email: email,
+                                name: stats.companyName,
+                            },
+                            theme: { color: "#1ED36A" }
+                        };
+
+                        const rzp = new (window as any).Razorpay(options);
+                        rzp.on('payment.failed', async function (response: any) {
+                            await corporateDashboardService.recordPaymentFailure(order.orderId, response.error.description);
+                            alert(`Payment Failed: ${response.error.description}`);
+                        });
+                        rzp.open();
+
+                    } catch (error) {
+                        console.error("Order creation failed", error);
+                        alert("Failed to initiate payment");
+                    }
                 }}
+                perCreditCost={stats?.perCreditCost}
             />
         </div >
     );
