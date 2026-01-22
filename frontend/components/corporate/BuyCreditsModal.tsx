@@ -45,6 +45,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
     const CONTAINER_WIDTH = 100; // %
     const INPUT_MIN = 10;
     const INPUT_MAX = 1000;
+    const quickSelectValues = [100, 200, 300, 400];
 
     // Calculate position for the thumb
     // We need to map the credit value (MIN-MAX) to a percentage (0-100)
@@ -192,14 +193,14 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                         <div className="flex flex-col gap-3">
                             <label className="text-[12px] font-medium text-gray-500 dark:text-gray-400">Quick Select</label>
                             <div className="grid grid-cols-5 gap-2">
-                                {[100, 200, 300, 400].map(val => (
+                                {quickSelectValues.map((val: number) => (
                                     <button
                                         key={val}
                                         onClick={() => handleQuickSelect(val)}
                                         className={`h-[42px] rounded-[10px] text-[15px] font-bold transition-all border
                                             ${credits === val
                                                 ? 'bg-[#E0F8E9] text-[#19211C] border-[#1ED36A] shadow-sm'
-                                                : 'bg-[#F3F4F6] dark:bg-white/5 text-[#19211C] dark:text-white border-transparent hover:bg-gray-200'
+                                                : 'bg-[#F3F4F6] dark:bg-white/5 text-[#19211C] dark:text-white border-transparent hover:bg-gray-200 dark:hover:bg-[#2A2D31]'
                                             }`}
                                     >
                                         {val}
@@ -217,7 +218,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                                                 setCredits(val);
                                             }
                                         }}
-                                        className="w-full h-[42px] rounded-[10px] bg-[#F3F4F6] dark:bg-white/5 text-[14px] px-1 text-center font-bold outline-none focus:ring-2 focus:ring-[#1ED36A] focus:bg-white placeholder:text-gray-400 text-[#19211C] dark:text-white transition-all border border-transparent"
+                                        className="w-full h-[42px] rounded-[10px] bg-[#F3F4F6] dark:bg-white/5 text-[14px] px-1 text-center font-bold outline-none border-2 border-transparent focus:border-[#1ED36A] focus:bg-white dark:focus:bg-[#24272C] placeholder:text-gray-400 text-[#19211C] dark:text-white transition-all"
                                     />
                                 </div>
                             </div>
