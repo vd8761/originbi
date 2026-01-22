@@ -31,4 +31,7 @@ export class User {
     default: () => 'CURRENT_TIMESTAMP',
   })
   createdAt: Date;
+
+  @Column({ name: 'login_count', default: 0 })
+  loginCount: number;
 }
