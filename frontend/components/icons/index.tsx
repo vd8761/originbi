@@ -143,6 +143,23 @@ export const ChevronDownIcon: React.FC<{ className?: string }> = ({
   </svg>
 );
 
+export const ChevronRightIcon: React.FC<{ className?: string }> = ({
+  className = "w-4 h-4",
+}) => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 20 20"
+    fill="currentColor"
+  >
+    <path
+      fillRule="evenodd"
+      d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+      clipRule="evenodd"
+    />
+  </svg>
+);
+
 export const ClockIcon: React.FC<{ className?: string }> = ({
   className = "w-3 h-3",
 }) => (
@@ -567,7 +584,7 @@ export const StepperPendingDotIcon: React.FC<{ className?: string }> = ({
       cx="20"
       cy="20"
       r="20"
-      className="fill-brand-light-primary dark:fill-[#1A1D21]"
+      className="fill-brand-light-primary dark:fill-[#19211C]"
     />
     <circle
       cx="20"
@@ -1117,5 +1134,24 @@ export const FlashIcon: React.FC<{ className?: string }> = ({
   >
     <path fillRule="evenodd" clipRule="evenodd" d="M7.62832 6.58863L6.6416 10.2198L12.2876 6.56822L8.59531 20.3447L12.3448 20.3481L17.7993 0L7.62832 6.58863Z" fill="currentColor" />
     <path fillRule="evenodd" clipRule="evenodd" d="M1.55228 14.5565L0 20.348H7.6857C7.6857 20.348 10.8293 8.5693 10.8302 8.56592C10.8273 8.5678 1.55228 14.5565 1.55228 14.5565Z" fill="currentColor" />
+  </svg>
+);
+
+export const ArrowUpRightIcon: React.FC<{ className?: string }> = ({
+  className = "w-6 h-6",
+}) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M7 17L17 7M17 7H7M17 7V17"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 );

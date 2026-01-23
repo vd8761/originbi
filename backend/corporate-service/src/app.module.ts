@@ -23,12 +23,13 @@ import { AssessmentModule } from './assessment/assessment.module';
                 const shouldSync = config.get<string>('DB_SYNC') === 'true';
 
                 if (databaseUrl) {
+                    const isLocal = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
                     return {
                         type: 'postgres',
                         url: databaseUrl,
                         autoLoadEntities: true,
                         synchronize: shouldSync,
-                        ssl: { rejectUnauthorized: false },
+                        ssl: isLocal ? false : { rejectUnauthorized: false },
                     };
                 }
 

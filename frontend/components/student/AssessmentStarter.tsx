@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { CheckCircleIcon, StepperUpArrowIcon, StepperDownArrowIcon, StepperPendingDotIcon } from '@/components/icons';
+import { CheckCircleIcon, StepperUpArrowIcon, StepperDownArrowIcon, StepperPendingDotIcon, QuestionMarkIcon, TimeIcon } from '@/components/icons';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { studentService } from "@/lib/services/student.service";
 
@@ -61,7 +61,8 @@ interface AssessmentRunnerProps {
 const SuccessModal: React.FC<{
   onBack: () => void;
   onDashboard: () => void;
-}> = ({ onBack, onDashboard }) => (
+  isLastLevel?: boolean;
+}> = ({ onBack, onDashboard, isLastLevel = false }) => (
   <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 animate-fade-in">
     <div className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" />
     <div className="relative bg-white dark:bg-[#1A1D21] rounded-3xl p-8 max-w-md w-full shadow-2xl border border-brand-light-tertiary dark:border-white/10 text-center flex flex-col items-center">
@@ -80,22 +81,26 @@ const SuccessModal: React.FC<{
       </p>
 
       <div className="flex flex-col gap-3 w-full">
-        <button
-          onClick={onDashboard}
-          className="w-full py-3.5 rounded-full bg-brand-green text-white font-bold text-sm hover:bg-brand-green/90 transition-colors shadow-lg shadow-brand-green/20"
-        >
-          Go to Dashboard
-        </button>
-        <button
-          onClick={onBack}
-          className="w-full py-3.5 rounded-full border border-brand-light-tertiary dark:border-white/20 text-brand-text-light-primary dark:text-white font-bold text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-        >
-          Back to Assessments
-        </button>
+        {isLastLevel ? (
+          <button
+            onClick={onDashboard}
+            className="w-full py-3.5 rounded-full bg-brand-green text-white font-bold text-sm hover:bg-brand-green/90 transition-colors shadow-lg shadow-brand-green/20"
+          >
+            Go to Dashboard
+          </button>
+        ) : (
+          <button
+            onClick={onBack}
+            className="w-full py-3.5 rounded-full border border-brand-light-tertiary dark:border-white/20 text-brand-text-light-primary dark:text-white font-bold text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+          >
+            Back to Assessments
+          </button>
+        )}
       </div>
     </div>
   </div>
 );
+
 
 // --- VerticalStepper Component ---
 const VerticalStepper: React.FC<{
@@ -139,13 +144,13 @@ const VerticalStepper: React.FC<{
                 text-[clamp(11px,1.1vw,15px)]
                 ${isCompleted
                 ? "bg-[#1ED36A] text-white border border-[#1ED36A]" // Completed
-                : "bg-white dark:bg-[#24272B] border border-brand-light-tertiary dark:border-white/10 text-brand-text-light-secondary dark:text-[#718096]" // Active & Upcoming (Container Style)
+                : "bg-white dark:bg-[#24272B] border border-brand-light-tertiary dark:border-white/10 text-brand-text-light-secondary dark:text-white" // Active & Upcoming (Container Style)
               } 
               `}
           >
             {/* Render Content */}
             {isActive ? (
-              <div className="w-2.5 h-2.5 rounded-full bg-[#1ED36A] shadow-[0_0_10px_1px_rgba(30,211,106,0.8)]" />
+              <div className="w-2.5 h-2.5 rounded-full bg-[#1ED36A]" />
             ) : (
               <span className="relative z-10">{i}</span>
             )}
@@ -296,6 +301,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
 
   const [isCompleted, setIsCompleted] = useState(false);
   const [changeCount, setChangeCount] = useState(0);
+  const [isLastLevel, setIsLastLevel] = useState(false);
 
   // Language Context
   const { language } = useLanguage();
@@ -370,6 +376,41 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
 
         // Initialize Answers Map from API Data
         const initialAnswers: Record<string, string> = {};
+
+        // Check if this is the Last Level
+        // Default Logic (Partial Fallback)
+        let isFinalLevel = false;
+        const nameScore = String(data.name || data.title || '').toLowerCase();
+
+        if (
+          data.level_number >= 2 ||
+          data.id === 2 ||
+          data.assessment_level_id === 2 ||
+          nameScore.includes('level 2') ||
+          nameScore.includes('aci')
+        ) {
+          isFinalLevel = true;
+        }
+
+        // Dynamic Logic via API
+        try {
+          const progressData = await studentService.getAssessmentProgress(email);
+          if (Array.isArray(progressData) && progressData.length > 0) {
+            // Filter for mandatory levels
+            const mandatoryLevels = progressData.filter((l: any) => l.is_mandatory !== false);
+            if (mandatoryLevels.length > 0) {
+              const maxLevel = Math.max(...mandatoryLevels.map((l: any) => Number(l.level_number || l.id || 0)));
+              const currentLevel = Number(data.level_number || data.id || 0);
+              // If current level matches or exceeds the max mandatory level, it's the last one.
+              if (maxLevel > 0) {
+                isFinalLevel = currentLevel >= maxLevel;
+              }
+            }
+          }
+        } catch (lvlErr) {
+          console.warn("Failed to determine last level dynamically:", lvlErr);
+        }
+        setIsLastLevel(isFinalLevel);
 
         // Map API response to UI Question format
         const mappedQuestions: Question[] = apiAnswers.map((ans) => {
@@ -549,12 +590,42 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
     );
   }
 
+  // Determine if this is the last level (Currently hardcoded assumption or derived from props/api)
+  // For now, let's assume if it's Level 2, it is the last level.
+  // We can fetch this info from API if needed, but for now we check displayQuestionText or similar context if available.
+  // We can check if attemptId indicates level 2 or higher if we had that mapping.
+  // Assuming Level 2 is the last one based on "currently active 2 levels".
+
+  // ... (inside fetchQuestions useEffect)
+  // const data = await response.json();
+  // if (data.level_number === 2 || data.is_last_level) setIsLastLevel(true);
+
+  // Since we can't easily change the hook body without re-writing the whole function, let's look at where we can hook this in.
+  // I will add the state and update the SuccessModal first, then inject the check logic in the next step or same step if possible.
+
+  // Actually, I'll modify the SuccessModal usage site to use a robust check.
+  // Since I don't have level info in `questions` state explicitly, I might need to rely on the attemptId query or existing context.
+
+  // A better temporary fix is to always hide "Back to Assessments" if we are finished, 
+  // OR rely on the User's specific request "remove the button back to assessments because it is the last level".
+  // User implies "if student is going to finish the last level".
+
+  // Let's modify the `fetchQuestions` to try and capture level info if possible, or just default to true if we can't determine, 
+  // but that might affect Level 1.
+
+  // User said: "For the student service and exam-engine, we have currently active 2 levels".
+  // So Level 2 is the last.
+
+  // I will update the component to accept a prop or check data.
+  // Let's see `AssessmentRunner` props.
+
   return (
     <div className="flex justify-center bg-transparent w-full h-full max-w-[2000px] mx-auto px-4 lg:px-[4%] 2xl:px-[5%]">
       {isCompleted && (
         <SuccessModal
           onBack={onBack}
           onDashboard={() => onGoToDashboard && onGoToDashboard()}
+          isLastLevel={isLastLevel}
         />
       )}
 
@@ -562,7 +633,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
       <div className="w-full h-full grid grid-cols-12">
 
         {/* Column 1: Vertical Stepper */}
-        <div className="hidden lg:flex col-span-1 justify-center border-brand-light-tertiary/20 dark:border-white/5 h-full pt-2 lg:pt-4 pb-10">
+        <div className="hidden lg:flex col-span-1 justify-center border-brand-light-tertiary/20 dark:border-white/5 h-full pt-[clamp(20px,4vw,60px)] pb-10">
           <VerticalStepper
             currentStep={currentNumber}
             totalSteps={totalQuestions}
@@ -570,19 +641,20 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
         </div>
 
         {/* Columns 2-11: Main Content */}
-        <div className="col-span-12 lg:col-span-10 relative h-full flex flex-col px-4 lg:px-[clamp(20px,3vw,60px)]">
+        <div className="col-span-12 lg:col-span-10 relative h-full flex flex-col px-2 sm:px-4 lg:px-[clamp(20px,3vw,60px)]">
 
           {/* Progress for Mobile */}
-          <div className="lg:hidden flex justify-end mb-1 pr-1 pt-4">
-            <CircularProgress current={currentNumber} total={totalQuestions} className="w-[clamp(70px,7vw,90px)] h-[clamp(70px,7vw,90px)]" />
+          <div className="lg:hidden flex justify-end mb-4 pr-2 pt-10">
+            <CircularProgress current={currentNumber} total={totalQuestions} className="w-[80px] h-[80px]" />
           </div>
 
+
           {/* Content Area - Fluid Scaling */}
-          <div className="flex-grow flex flex-col justify-start w-full pt-[clamp(10px,2vw,30px)]">
+          <div className="flex-grow flex flex-col justify-start w-full pt-4 lg:pt-[clamp(20px,4vw,60px)]">
             <div className="flex flex-col w-full">
 
               {/* Text Section - Aligned with designs */}
-              <div className="mb-4 lg:mb-6 animate-fade-in relative flex flex-col justify-start items-start gap-4">
+              <div className="mb-6 lg:mb-10 animate-fade-in relative flex flex-col justify-start items-start gap-4">
                 <div className="flex-grow">
                   {/* Context Text Display */}
                   {displayContextText && (
@@ -592,7 +664,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
                   )}
 
                   {/* Question Text Display */}
-                  <h1 className="text-[clamp(18px,2vw,32px)] font-semibold text-brand-text-light-primary dark:text-white leading-tight">
+                  <h1 className="text-[18px] sm:text-[clamp(18px,2vw,32px)] font-semibold text-brand-text-light-primary dark:text-white leading-snug">
                     {displayQuestionText}
                   </h1>
                 </div>
@@ -600,7 +672,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
 
               {/* Options Section */}
               <div
-                className="space-y-[clamp(8px,1vw,16px)] animate-fade-in w-full"
+                className="space-y-[clamp(12px,1.5vw,24px)] animate-fade-in w-full"
                 style={{ animationDelay: "100ms" }}
               >
                 {currentQuestion.options.map((option) => {
@@ -645,10 +717,10 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
           </div>
 
           {/* Navigation Actions */}
-          <div className="sticky bottom-0 w-full flex justify-between items-center mt-auto py-4 lg:pb-10 shrink-0 z-30 bg-brand-light-primary/95 dark:bg-brand-dark-primary/95 backdrop-blur-md border-t border-brand-light-tertiary/20 dark:border-white/5 -mx-4 px-4 lg:-mx-0 lg:px-0">
+          <div className="sticky bottom-0 w-full flex justify-between items-center mt-auto py-4 lg:pb-10 shrink-0 z-30 bg-brand-light-primary/95 dark:bg-transparent border-t border-brand-light-tertiary/20 dark:border-white/5 mx-0 px-4 sm:px-6 lg:px-0">
             <button
               onClick={handlePrevious}
-              className="px-[clamp(20px,2vw,32px)] py-[clamp(6px,0.8vw,12px)] rounded-full border border-brand-light-tertiary dark:border-[#303438] text-brand-text-light-secondary dark:text-white transition-colors hover:bg-gray-100 dark:hover:bg-[#24272B] text-[clamp(11px,0.9vw,15px)] font-medium cursor-pointer"
+              className="px-5 sm:px-[clamp(20px,2vw,32px)] py-2.5 sm:py-[clamp(6px,0.8vw,12px)] rounded-full border border-brand-light-tertiary dark:border-[#303438] text-brand-text-light-secondary dark:text-white transition-colors hover:bg-gray-100 dark:hover:bg-[#24272B] text-[13px] sm:text-[clamp(11px,0.9vw,15px)] font-medium cursor-pointer"
             >
               {currentNumber === 1 ? "Back" : "Previous"}
             </button>
@@ -657,9 +729,9 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
               onClick={handleNext}
               disabled={!selectedOption}
               className={`
-                px-[clamp(24px,2.5vw,40px)] py-[clamp(6px,0.8vw,12px)] rounded-full text-white transition-all shadow-lg text-[clamp(11px,0.9vw,15px)] font-medium
+                px-6 sm:px-[clamp(24px,2.5vw,40px)] py-2.5 sm:py-[clamp(6px,0.8vw,12px)] rounded-full text-white transition-all text-[13px] sm:text-[clamp(11px,0.9vw,15px)] font-medium
                 ${selectedOption
-                  ? "bg-[#1ED36A] hover:bg-[#1ED36A]/90 shadow-[#1ED36A]/20 cursor-pointer transform hover:-translate-y-0.5"
+                  ? "bg-[#1ED36A] hover:bg-[#1ED36A]/90 cursor-pointer transform hover:-translate-y-0.5"
                   : "bg-gray-300 dark:bg-[#303438] text-gray-500 dark:text-[#718096] cursor-not-allowed"
                 }
               `}
@@ -669,10 +741,11 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
                 : "Next Question"}
             </button>
           </div>
+
         </div>
 
         {/* Column 12: Progress Circle (Aligned with Header Row) */}
-        <div className="hidden lg:flex col-span-1 justify-end items-start pt-0 pr-2 lg:pr-4">
+        <div className="hidden lg:flex col-span-1 justify-end items-start pt-[clamp(20px,4vw,60px)] pr-2 lg:pr-4">
           <CircularProgress
             current={currentNumber}
             total={totalQuestions}

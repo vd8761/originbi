@@ -53,7 +53,7 @@ export const BulkReviewTable: React.FC<BulkReviewTableProps> = ({ validRows, inv
     const renderTable = (rows: any[], isValid: boolean) => (
         <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                <thead className="bg-gray-100 dark:bg-[#1A1D21] text-xs uppercase text-gray-500">
+                <thead className="bg-gray-100 dark:bg-[#19211C] text-xs uppercase text-gray-500">
                     <tr>
                         <th className="px-4 py-3">S.No</th>
                         <th className="px-4 py-3">Name</th>

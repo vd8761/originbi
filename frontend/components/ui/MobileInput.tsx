@@ -136,7 +136,7 @@ const MobileInput: React.FC<MobileInputProps> = ({
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="
-                    w-full bg-gray-50 dark:bg-[#1A1D21]
+                    w-full bg-gray-50 dark:bg-[#19211C]
                     text-black dark:text-white text-xs
                     rounded-lg px-3 py-2
                     focus:outline-none border border-transparent

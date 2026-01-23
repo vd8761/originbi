@@ -365,10 +365,10 @@ const Header: React.FC<HeaderProps> = ({
                     <div className="absolute top-[80%] left-1/2 -translate-x-1/2 pt-6 min-w-[340px] opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 z-50">
 
                       {/* Card Content */}
-                      <div className="relative bg-white dark:bg-[#1A1D21] rounded-[20px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-gray-100 dark:border-white/5 p-5 flex items-center justify-between gap-6 text-left font-['Haskoy']">
+                      <div className="relative bg-white dark:bg-[#19211C] rounded-[20px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-gray-100 dark:border-white/5 p-5 flex items-center justify-between gap-6 text-left font-['Haskoy']">
 
                         {/* Triangle Arrow - Centered */}
-                        <div className="absolute -top-[7px] left-1/2 -translate-x-1/2 w-4 h-4 bg-white dark:bg-[#1A1D21] rotate-45 border-l border-t border-gray-100 dark:border-white/5 rounded-tl-[2px]"></div>
+                        <div className="absolute -top-[7px] left-1/2 -translate-x-1/2 w-4 h-4 bg-white dark:bg-[#19211C] rotate-45 border-l border-t border-gray-100 dark:border-white/5 rounded-tl-[2px]"></div>
 
                         <div className="flex items-center gap-3">
                           <span
