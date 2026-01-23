@@ -152,7 +152,7 @@ for (let i = 3; i <= 7; i++) {
 const ExploreRoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: string) => void; isActive?: boolean; isLast?: boolean }> = ({ item, onSelect, isActive, isLast }) => (
     <div className="relative">
         <div
-            className={`group relative py-4 px-6 transition-all duration-300 cursor-pointer ${isActive
+            className={`group relative py-3 px-4 transition-all duration-300 cursor-pointer ${isActive
                 ? 'bg-[#19211C]/5 dark:bg-white/10' // Active: Light gray in light mode, translucent white in dark mode
                 : 'bg-transparent hover:bg-[#19211C]/5 dark:hover:bg-white/5' // Inactive: Transparent with hover effect
                 }`}
@@ -160,27 +160,27 @@ const ExploreRoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: strin
         >
             <div className="flex justify-between items-center gap-3">
                 <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-[#19211C] dark:text-white text-[16px] mb-1 truncate">
+                    <h4 className="font-semibold text-[#19211C] dark:text-white text-[14px] mb-0.5 truncate">
                         {item.title}
                     </h4>
-                    <p className="text-black dark:text-white text-[13px] leading-relaxed line-clamp-2">
+                    <p className="text-black dark:text-white text-[12px] leading-snug line-clamp-2">
                         {item.description}
                     </p>
                 </div>
                 <button
-                    className="bg-brand-green hover:bg-brand-green/90 text-white w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 hover:scale-110 shadow-md shadow-brand-green/20 cursor-pointer"
+                    className="bg-brand-green hover:bg-brand-green/90 text-white w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 hover:scale-110 shadow-md shadow-brand-green/20 cursor-pointer"
                     onClick={(e) => {
                         e.stopPropagation();
                         onSelect(item.id);
                     }}
                 >
-                    <ArrowUpRightIcon className="w-4 h-4" />
+                    <ArrowUpRightIcon className="w-3.5 h-3.5" />
                 </button>
             </div>
         </div>
         {/* Separator Line for Inactive items (unless it's the last one) - Placed outside the padding */}
         {!isActive && !isLast && (
-            <div className="mx-6 h-px bg-[#19211C]/10 dark:bg-white/10"></div>
+            <div className="mx-4 h-px bg-[#19211C]/10 dark:bg-white/10"></div>
         )}
     </div>
 );
@@ -188,22 +188,22 @@ const ExploreRoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: strin
 // Main roadmap card for grid view
 const RoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: string) => void }> = ({ item, onSelect }) => (
     <div
-        className="group relative bg-white/40 dark:bg-black/20 border border-white/20 dark:border-white/10 hover:bg-white/90 dark:hover:bg-white/10 hover:border-white/60 dark:hover:border-white/50 rounded-2xl p-5 lg:p-[1.25vw] transition-all duration-300 hover:shadow-[0_8px_32px_0_rgba(31,38,135,0.12)] dark:hover:shadow-none backdrop-blur-md"
+        className="group relative bg-white/40 dark:bg-black/20 border border-white/20 dark:border-white/10 hover:bg-white/90 dark:hover:bg-white/10 hover:border-white/60 dark:hover:border-white/50 rounded-2xl p-4 lg:p-5 transition-all duration-300 hover:shadow-[0_8px_32px_0_rgba(31,38,135,0.12)] dark:hover:shadow-none backdrop-blur-md"
     >
         <div className="flex justify-between items-center gap-4">
             <div className="flex-1">
-                <h3 className="font-semibold text-[#19211C] dark:text-white text-[20px] mb-2 lg:mb-[0.4vw]">
+                <h3 className="font-semibold text-[#19211C] dark:text-white text-[16px] mb-1">
                     {item.title}
                 </h3>
-                <p className="text-[#19211C]/80 dark:text-white/70 text-[16px] leading-relaxed">
+                <p className="text-[#19211C]/80 dark:text-white/70 text-[12px] leading-relaxed">
                     {item.description}
                 </p>
             </div>
             <button
-                className="bg-brand-green hover:bg-brand-green/90 text-white w-9 h-9 lg:w-[2.2vw] lg:h-[2.2vw] lg:min-w-[36px] lg:min-h-[36px] rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 hover:scale-110 shadow-lg shadow-brand-green/20 cursor-pointer"
+                className="bg-brand-green hover:bg-brand-green/90 text-white w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 hover:scale-110 shadow-lg shadow-brand-green/20 cursor-pointer"
                 onClick={() => onSelect(item.id)}
             >
-                <ArrowUpRightIcon className="w-4 h-4 lg:w-[1vw] lg:h-[1vw] lg:min-w-[16px] lg:min-h-[16px]" />
+                <ArrowUpRightIcon className="w-4 h-4" />
             </button>
         </div>
     </div>
@@ -249,7 +249,7 @@ const RoadmapDetailView: React.FC<{
                     {/* Left Content - Detail Section */}
                     <div className="flex-1 min-w-0">
                         {/* Title */}
-                        <h1 className="text-[28px] font-bold text-[#19211C] dark:text-brand-text-primary mb-6 lg:mb-8">
+                        <h1 className="text-[18px] font-bold text-[#19211C] dark:text-brand-text-primary mb-6 lg:mb-8">
                             {roadmap.title}
                         </h1>
 
@@ -334,7 +334,7 @@ const RoadmapDetailView: React.FC<{
 
                         {/* Guidance Tip */}
                         <section className="mt-8 lg:mt-12 pt-6 lg:pt-8 border-t border-[#19211C]/10 dark:border-white/10">
-                            <h2 className="text-[28px] font-semibold text-[#19211C] dark:text-brand-text-primary mb-4">
+                            <h2 className="text-[18px] font-semibold text-[#19211C] dark:text-brand-text-primary mb-4">
                                 Guidance Tip
                             </h2>
                             <p className="text-[16px] text-black dark:text-white leading-relaxed">
@@ -344,10 +344,10 @@ const RoadmapDetailView: React.FC<{
                     </div>
 
                     {/* Right Sidebar - Explore Other Roadmaps */}
-                    <aside className="w-full lg:w-[340px] xl:w-[380px] 2xl:w-[420px] flex-shrink-0">
+                    <aside className="w-full lg:w-[280px] xl:w-[320px] 2xl:w-[360px] flex-shrink-0">
                         <div className="bg-white/30 dark:bg-black/20 border border-[#19211C]/12 dark:border-white/5 rounded-2xl p-0 backdrop-blur-sm sticky top-[100px] overflow-hidden">
-                            <div className="p-6 pb-4">
-                                <h3 className="text-[18px] font-semibold text-[#19211C] dark:text-white mb-4">
+                            <div className="p-4 pb-3">
+                                <h3 className="text-[18px] font-semibold text-[#19211C] dark:text-white mb-3">
                                     Explore Other Roadmaps
                                 </h3>
                                 <div className="h-px w-full bg-[#19211C]/10 dark:bg-white/10"></div>
@@ -456,7 +456,7 @@ const RoadmapsPage: React.FC = () => {
 
                 {/* Header */}
                 <div className="mb-6 lg:mb-[1.5vw]">
-                    <h1 className="text-[clamp(18px,1.8vw,28px)] font-semibold text-[#19211C] dark:text-brand-text-primary mb-1">
+                    <h1 className="text-[18px] font-semibold text-[#19211C] dark:text-brand-text-primary mb-1">
                         Your Roadmaps 2027-2035
                     </h1>
                     <p className="text-black dark:text-brand-text-secondary text-[clamp(11px,0.8vw,14px)]">
