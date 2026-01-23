@@ -63,3 +63,5 @@ Thumbs.db
 backend/exam-engine/exam-engine
 
 run-all.sh 
+*.override.yml
+run-all-private.ps1

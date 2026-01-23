@@ -111,14 +111,14 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
       />
 
       {/* Modal Content - Compact Layout */}
-      <div className="relative w-full max-w-3xl bg-white dark:bg-[#19211C] rounded-3xl shadow-2xl border border-brand-light-tertiary dark:border-white/10 flex flex-col max-h-[90vh] animate-fade-in overflow-hidden transition-colors duration-300 font-sans">
+      <div className="relative w-full max-w-2xl bg-white dark:bg-[#19211C] rounded-3xl shadow-2xl border border-brand-light-tertiary dark:border-white/10 flex flex-col max-h-[90vh] animate-fade-in overflow-hidden transition-colors duration-300 font-sans">
 
         {/* Scrollable Body - Reduced Padding/Margins to prevent scroll */}
         <div className="overflow-y-auto custom-scrollbar flex-1">
-          <div className="p-5 sm:p-6">
+          <div className="p-5 sm:p-5">
             {/* Header Section */}
-            <div className="flex justify-between items-start mb-4">
-              <p className="text-[14px] sm:text-[24px] text-brand-text-light-secondary dark:text-gray-400 font-light max-w-[200px] sm:max-w-[400px] leading-tight">
+            <div className="flex justify-between items-start mb-3">
+              <p className="text-[14px] sm:text-[16px] text-brand-text-light-secondary dark:text-gray-400 font-light max-w-[200px] sm:max-w-[380px] leading-tight">
                 {t.header}
               </p>
 
@@ -154,53 +154,53 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
               </div>
             </div>
 
-            <div className="h-px w-full bg-brand-light-tertiary dark:bg-white/10 mb-6 sm:mb-8" />
+            <div className="h-px w-full bg-brand-light-tertiary dark:bg-white/10 mb-5 sm:mb-6" />
 
-            <h2 className="text-[24px] sm:text-[clamp(28px,4vw,44px)] font-semibold text-brand-text-light-primary dark:text-white mb-3 sm:mb-4 leading-tight tracking-tight">{assessment.title}</h2>
+            <h2 className="text-[20px] sm:text-[26px] font-semibold text-brand-text-light-primary dark:text-white mb-2 sm:mb-3 leading-tight tracking-tight">{assessment.title}</h2>
 
-            <p className="text-brand-text-light-secondary dark:text-gray-400 text-[13px] sm:text-[clamp(14px,1.2vw,18px)] leading-relaxed mb-5 sm:mb-6">
+            <p className="text-brand-text-light-secondary dark:text-gray-400 text-[13px] sm:text-[15px] leading-relaxed mb-4 sm:mb-5">
               {assessment.description}
             </p>
 
             {/* Meta Info Box */}
-            <div className="bg-brand-light-primary dark:bg-white/5 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-8 border border-brand-light-tertiary dark:border-white/5 mb-6 sm:mb-8">
+            <div className="bg-brand-light-primary dark:bg-white/5 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 border border-brand-light-tertiary dark:border-white/5 mb-5 sm:mb-6">
 
               {/* Questions */}
               <div className="flex items-center gap-3 sm:gap-4 flex-1 w-full sm:w-auto">
-                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-brand-green flex items-center justify-center shrink-0`}>
-                  <CustomQuestionIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-brand-green flex items-center justify-center shrink-0`}>
+                  <CustomQuestionIcon className="w-5 h-5 sm:w-5 sm:h-5 text-white" />
                 </div>
-                <span className="text-[14px] sm:text-[18px] font-medium text-brand-text-light-secondary dark:text-gray-300 leading-tight">
+                <span className="text-[14px] sm:text-[16px] font-medium text-brand-text-light-secondary dark:text-gray-300 leading-tight">
                   {t.contains} <strong className="text-brand-text-light-primary dark:text-white font-bold block sm:inline">{assessment.totalQuestions} {t.questions}</strong>
                 </span>
               </div>
 
-              <div className="w-full h-px sm:w-px sm:h-12 bg-brand-light-tertiary dark:bg-white/10 block"></div>
+              <div className="w-full h-px sm:w-px sm:h-10 bg-brand-light-tertiary dark:bg-white/10 block"></div>
 
               {/* Time */}
               <div className="flex items-center gap-3 sm:gap-4 flex-1 w-full sm:w-auto">
-                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-brand-green flex items-center justify-center shrink-0`}>
-                  <CustomTimeIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-brand-green flex items-center justify-center shrink-0`}>
+                  <CustomTimeIcon className="w-5 h-5 sm:w-5 sm:h-5 text-white" />
                 </div>
-                <span className="text-[14px] sm:text-[18px] font-medium text-brand-text-light-secondary dark:text-gray-300 leading-tight">
+                <span className="text-[14px] sm:text-[16px] font-medium text-brand-text-light-secondary dark:text-gray-300 leading-tight">
                   {t.averageTime} <strong className="text-brand-text-light-primary dark:text-white font-bold block sm:inline">{durationVal} {t.minutes}</strong>
                 </span>
               </div>
 
             </div>
 
-            <h4 className="text-brand-text-light-primary dark:text-white font-semibold mb-3 sm:mb-4 text-[16px] sm:text-[20px]">{t.readCarefully}</h4>
-            <ul className="space-y-2 sm:space-y-3 mb-6 sm:mb-8">
-              <li className="text-[12px] sm:text-[16px] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-3 sm:gap-4">
-                <span className="block w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-400 dark:bg-gray-500 mt-1.5 sm:mt-2 shrink-0"></span>
+            <h4 className="text-brand-text-light-primary dark:text-white font-semibold mb-2 sm:mb-3 text-[14px] sm:text-[16px]">{t.readCarefully}</h4>
+            <ul className="space-y-1 sm:space-y-2 mb-5 sm:mb-6">
+              <li className="text-[12px] sm:text-[14px] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-3 sm:gap-4">
+                <span className="block w-1.5 h-1.5 sm:w-1.5 sm:h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 mt-1.5 sm:mt-1.5 shrink-0"></span>
                 {t.point1}
               </li>
-              <li className="text-[12px] sm:text-[16px] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-3 sm:gap-4">
-                <span className="block w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-400 dark:bg-gray-500 mt-1.5 sm:mt-2 shrink-0"></span>
+              <li className="text-[12px] sm:text-[14px] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-3 sm:gap-4">
+                <span className="block w-1.5 h-1.5 sm:w-1.5 sm:h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 mt-1.5 sm:mt-1.5 shrink-0"></span>
                 {t.point2}
               </li>
-              <li className="text-[12px] sm:text-[16px] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-3 sm:gap-4">
-                <span className="block w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-400 dark:bg-gray-500 mt-1.5 sm:mt-2 shrink-0"></span>
+              <li className="text-[12px] sm:text-[14px] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-3 sm:gap-4">
+                <span className="block w-1.5 h-1.5 sm:w-1.5 sm:h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 mt-1.5 sm:mt-1.5 shrink-0"></span>
                 {t.point3}
               </li>
             </ul>
@@ -221,18 +221,18 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
         </div>
 
         {/* Footer Actions */}
-        <div className="p-5 sm:p-7 border-t border-brand-light-tertiary dark:border-white/10 bg-white dark:bg-[#19211C]">
-          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 sm:gap-4">
+        <div className="p-4 sm:p-5 border-t border-brand-light-tertiary dark:border-white/10 bg-white dark:bg-[#19211C]">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
             <button
               onClick={onClose}
-              className="w-full sm:w-auto sm:min-w-[120px] h-[40px] sm:h-[44px] px-6 sm:px-8 rounded-full border border-brand-light-tertiary dark:border-white/40 text-brand-text-light-primary dark:text-white text-[13px] sm:text-[14px] font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-all flex items-center justify-center whitespace-nowrap"
+              className="w-full sm:w-auto sm:min-w-[100px] h-[36px] sm:h-[40px] px-5 sm:px-6 rounded-full border border-brand-light-tertiary dark:border-white/40 text-brand-text-light-primary dark:text-white text-[12px] sm:text-[13px] font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-all flex items-center justify-center whitespace-nowrap"
             >
               {t.goBack}
             </button>
             <button
               onClick={onStart}
               disabled={assessment.status === 'completed'}
-              className={`w-full sm:w-auto sm:min-w-[140px] h-[40px] sm:h-[44px] px-6 sm:px-8 rounded-full text-[13px] sm:text-[14px] font-medium transition-all flex items-center justify-center whitespace-nowrap
+              className={`w-full sm:w-auto sm:min-w-[120px] h-[36px] sm:h-[40px] px-5 sm:px-6 rounded-full text-[12px] sm:text-[13px] font-medium transition-all flex items-center justify-center whitespace-nowrap
                 ${assessment.status === 'completed'
                   ? "bg-[#2A2E33] text-gray-400 cursor-not-allowed"
                   : "bg-brand-green text-white hover:bg-brand-green/90 shadow-lg shadow-brand-green/10"
