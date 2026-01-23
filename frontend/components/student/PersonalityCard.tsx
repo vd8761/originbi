@@ -2,7 +2,7 @@ import React from 'react';
 
 const PersonalityCard: React.FC = () => {
     return (
-        <div className="rounded-2xl relative w-full h-full min-h-[300px] overflow-hidden group bg-[#8B1A1A]">
+        <div className="rounded-2xl relative w-full h-full min-h-[300px] overflow-hidden group">
             {/* Base Background - Dark Red Gradient */}
             {/* Concentric Circles Effect - Centered relative to the character */}
             {/* Using vw units for the circles to scale with the screen as requested */}
@@ -19,7 +19,7 @@ const PersonalityCard: React.FC = () => {
                 <img
                     src="/Analytical_Leader.png"
                     alt="Analytical Leader"
-                    className="h-[105%] w-auto object-contain translate-x-4 translate-y-4 transition-transform duration-700 group-hover:scale-105"
+                    className="h-full w-full transition-transform duration-700 group-hover:scale-105"
                 />
             </div>
 
