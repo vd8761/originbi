@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { Search, Edit2, MoreHorizontal, CheckCircle, Clock, Users, Briefcase } from "lucide-react";
 import { TrendUpIcon, TrendDownIcon, CircleArrowUpIcon, EditPencilIcon, DiamondIcon } from "@/components/icons";
@@ -637,6 +638,11 @@ const CorporateDashboard: React.FC = () => {
     return (
         <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-hidden p-4 sm:p-6 lg:p-8">
             {/* 1. Header Section */}
+            <Script
+                id="razorpay-checkout-js"
+                src="https://checkout.razorpay.com/v1/checkout.js"
+                strategy="lazyOnload"
+            />
             <div className="flex flex-col xl:flex-row justify-between items-start mb-10 gap-6">
                 <div>
                     <div className="text-[clamp(12px,0.73vw,14px)] text-[#19211C] dark:text-white font-normal mb-1">Welcome Back!!</div>
@@ -784,6 +790,10 @@ const CorporateDashboard: React.FC = () => {
                             theme: { color: "#1ED36A" }
                         };
 
+                        if (!(window as any).Razorpay) {
+                            alert("Razorpay SDK not loaded. Please try again in a moment.");
+                            return;
+                        }
                         const rzp = new (window as any).Razorpay(options);
                         rzp.on('payment.failed', async function (response: any) {
                             await corporateDashboardService.recordPaymentFailure(order.orderId, response.error.description);
