@@ -241,7 +241,7 @@ const Header: React.FC<HeaderProps> = ({
 
     return (
         <header className="fixed top-0 left-0 right-0 w-full bg-[url('/Background_Light_Theme.svg')] bg-cover bg-center bg-no-repeat bg-fixed dark:bg-none dark:bg-[#19211C] z-50 border-b border-gray-200 dark:border-white/5 shadow-sm dark:shadow-none">
-            <div className="w-full max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 2xl:px-12 py-2.5 sm:py-3.5 flex items-center justify-between h-full">
+            <div className="w-full max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 2xl:px-12 py-3 sm:py-4 flex items-center justify-between h-full">
                 <div className="flex items-center gap-2 lg:gap-2 2xl:gap-4">
                     {!hideNav && (
                         <button
@@ -258,7 +258,7 @@ const Header: React.FC<HeaderProps> = ({
                     <img src="/Origin-BI-white-logo.png" alt="OriginBI Logo" className="h-5 lg:h-6 2xl:h-7 w-auto hidden dark:block" />
 
                     {!hideNav && (
-                        <nav className="hidden md:flex items-center space-x-2 lg:space-x-3 2xl:space-x-4 ml-4 lg:ml-6 2xl:ml-8">
+                        <nav className="hidden md:flex items-center space-x-1 lg:space-x-1 2xl:space-x-2 ml-2 lg:ml-2 2xl:ml-6">
                             {renderNavItems(false)}
                         </nav>
                     )}
@@ -277,7 +277,7 @@ const Header: React.FC<HeaderProps> = ({
                     <div className="relative hidden sm:block" ref={langMenuRef}>
                         <button
                             onClick={() => setLangOpen((p) => !p)}
-                            className="bg-white border border-brand-green text-[#19211C] hover:bg-gray-50 dark:bg-black/20 dark:border-white/5 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white flex items-center justify-center space-x-2 px-4 h-8 2xl:h-9 rounded-full font-semibold text-[11px] 2xl:text-xs transition-all cursor-pointer"
+                            className="bg-white border border-brand-green text-[#19211C] hover:bg-gray-50 dark:bg-black/20 dark:border-white/5 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white flex items-center justify-center space-x-2 px-3 h-8 2xl:h-9 rounded-full font-semibold text-xs 2xl:text-sm transition-all cursor-pointer"
                         >
                             <span>{language}</span>
                             <ChevronDownIcon className="w-3 h-3 opacity-60" />
@@ -317,13 +317,13 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
 
 
-                    <div className="w-px h-6 lg:h-6 2xl:h-8 bg-gray-300 dark:bg-[#2D3136] hidden lg:block mx-1 2xl:mx-2"></div>
+                    <div className="w-px h-6 lg:h-6 2xl:h-8 bg-gray-300 dark:bg-[#2D3136] hidden lg:block mx-2 2xl:mx-3"></div>
 
                     {/* User Profile Section */}
                     <div className="relative" ref={profileMenuRef}>
                         <button
                             onClick={() => setProfileOpen((prev) => !prev)}
-                            className="flex items-center gap-2 sm:gap-3 focus:outline-none text-left cursor-pointer dark:bg-black/20 dark:border-white/5 dark:hover:bg-white/5 border border-transparent rounded-full px-2 py-1 transition-all"
+                            className="flex items-center gap-2 sm:gap-3 focus:outline-none text-left cursor-pointer"
                         >
                             {!user ? (
                                 <div className="w-7 h-7 2xl:w-8 2xl:h-8 rounded-full bg-gray-200 dark:bg-gray-800 animate-pulse flex-shrink-0"></div>
@@ -331,7 +331,7 @@ const Header: React.FC<HeaderProps> = ({
                                 <img
                                     src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'Student')}&background=1ED36A&color=fff`}
                                     alt="User Avatar"
-                                    className="w-7 h-7 2xl:w-8 2xl:h-8 rounded-full border border-white/10"
+                                    className="w-9 h-9 2xl:w-10 2xl:h-10 rounded-full border border-white/10"
                                 />
                             )}
                             <div className="hidden lg:block text-left mr-1">
@@ -342,10 +342,10 @@ const Header: React.FC<HeaderProps> = ({
                                     </div>
                                 ) : (
                                     <>
-                                        <p className="font-semibold text-[11px] 2xl:text-xs leading-tight text-[#19211C] dark:text-white">
+                                        <p className="font-semibold text-sm 2xl:text-base leading-tight text-[#19211C] dark:text-white">
                                             {user.name || 'Student'}
                                         </p>
-                                        <p className="text-[9px] 2xl:text-[10px] text-[#19211C]/60 dark:text-gray-400 leading-tight">
+                                        <p className="text-xs 2xl:text-sm text-[#19211C]/60 dark:text-gray-400 leading-tight">
                                             {user.email || ''}
                                         </p>
                                     </>
