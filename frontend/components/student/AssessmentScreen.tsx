@@ -15,15 +15,15 @@ const translations = {
     noAssessments: "No Assessments Found."
   },
   TAM: {
-    hello: "Vanakkam",
-    subtitle: "Thodarungal, ungal aalumai payanathai mudikka oru padi nerungiyulleergal.",
-    overall: "Motha Niraivu",
-    unlocksIn: "Thirakkum Neram",
-    completed: "Mudindhadhu",
-    start: "Mathippeetai Thodanga",
-    resume: "Thodara",
-    finish: "Mudikka",
-    noAssessments: "Mathippeedugal Illai."
+    hello: "வணக்கம்",
+    subtitle: "தொடருங்கள்! உங்கள் ஆளுமைப் பயணத்தை நிறைவு செய்ய ஒரு படி நெருங்கி விட்டீர்கள்.",
+    overall: "மொத்த நிறைவு",
+    unlocksIn: "திறக்கும் நேரம்",
+    completed: "முடிந்தது",
+    start: "மதிப்பீட்டைத் தொடங்க",
+    resume: "தொடர",
+    finish: "முடிக்க",
+    noAssessments: "மதிப்பீடுகள் இல்லை."
   }
 };
 
@@ -553,8 +553,8 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   }
 
   return (
-    <div className="flex flex-col gap-4 w-full px-10 md:px-20 lg:px-[230px] xl:px-[300px] pb-10 max-w-[1920px] mx-auto pt-6 lg:pt-10">
-      <div className="mb-6 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-hide md:overflow-visible md:pb-0 md:mx-0 md:px-0">
+    <div className="flex flex-col gap-4 w-full px-10 pb-10 max-w-[1920px] mx-auto pt-6 lg:pt-10">
+      <div className="mb-4 overflow-x-auto pb-4 px-4 scrollbar-hide md:overflow-visible md:pb-0 md:mx-0 md:px-0">
         <Stepper overallProgress={overallPercentage} steps={stepperSteps} />
       </div>
 
