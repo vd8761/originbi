@@ -288,8 +288,8 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
         type="button"
         onClick={() => onChange("AM")}
         className={`px-3 text-[11px] font-bold transition-colors flex items-center justify-center ${period === "AM"
-            ? "bg-brand-green text-white"
-            : "text-gray-500 hover:text-brand-text-light-primary dark:hover:text-gray-300"
+          ? "bg-brand-green text-white"
+          : "text-gray-500 hover:text-brand-text-light-primary dark:hover:text-gray-300"
           }`}
       >
         AM
@@ -299,8 +299,8 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
         type="button"
         onClick={() => onChange("PM")}
         className={`px-3 text-[11px] font-bold transition-colors flex items-center justify-center ${period === "PM"
-            ? "bg-brand-green text-white"
-            : "text-gray-500 hover:text-brand-text-light-primary dark:hover:text-gray-300"
+          ? "bg-brand-green text-white"
+          : "text-gray-500 hover:text-brand-text-light-primary dark:hover:text-gray-300"
           }`}
       >
         PM
@@ -404,7 +404,7 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
                   <label className="text-xs text-gray-500 dark:text-gray-300 font-bold flex gap-1">
                     From <span className="text-red-500">*</span>
                   </label>
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
                     <DateDropdown date={startDate} />
                     <div className="flex items-center gap-2 shrink-0">
                       <TimeInput
@@ -432,7 +432,7 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
                   <label className="text-xs text-gray-500 dark:text-gray-300 font-bold flex gap-1">
                     To <span className="text-red-500">*</span>
                   </label>
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
                     <DateDropdown date={endDate} />
                     <div className="flex items-center gap-2 shrink-0">
                       <TimeInput
