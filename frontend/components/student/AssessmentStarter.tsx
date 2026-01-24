@@ -140,8 +140,8 @@ const VerticalStepper: React.FC<{
           <div
             className={`
                 rounded-full flex items-center justify-center font-semibold transition-all duration-300 relative
-                w-[clamp(32px,2.4vw,44px)] h-[clamp(32px,2.4vw,44px)]
-                text-[clamp(11px,1.1vw,15px)]
+                w-[clamp(32px,2.4vw,36px)] h-[clamp(32px,2.4vw,36px)]
+                text-[clamp(11px,1.1vw,14px)]
                 ${isCompleted
                 ? "bg-[#1ED36A] text-white border border-[#1ED36A]" // Completed
                 : "bg-white dark:bg-[#24272B] border border-brand-light-tertiary dark:border-white/10 text-brand-text-light-secondary dark:text-[#718096]" // Active & Upcoming (Container Style)
@@ -177,7 +177,7 @@ const VerticalStepper: React.FC<{
   return (
     <div className="flex flex-col items-center h-full justify-start shrink-0 select-none relative z-0 pt-2">
       <button className="flex items-center justify-center hover:opacity-80 transition-opacity z-20 group cursor-pointer">
-        <div className="w-[clamp(32px,2.4vw,44px)] h-[clamp(32px,2.4vw,44px)] rounded-full bg-white dark:bg-[#1A3A2C] border border-[#1ED36A] flex items-center justify-center group-hover:bg-[#1ED36A] transition-colors">
+        <div className="w-[clamp(32px,2.4vw,36px)] h-[clamp(32px,2.4vw,36px)] rounded-full bg-white dark:bg-[#1A3A2C] border border-[#1ED36A] flex items-center justify-center group-hover:bg-[#1ED36A] transition-colors">
           <StepperUpArrowIcon className="w-[35%] h-[20%] dark:text-[#FFFFFF] text-[#1ED36A] group-hover:text-white transition-colors" />
         </div>
       </button>
@@ -195,7 +195,7 @@ const VerticalStepper: React.FC<{
       />
 
       <button className="flex items-center justify-center hover:opacity-80 transition-opacity z-20 group cursor-pointer">
-        <div className="w-[clamp(32px,2.4vw,44px)] h-[clamp(32px,2.4vw,44px)] rounded-full bg-white dark:bg-[#1A3A2C] border border-[#1ED36A] flex items-center justify-center group-hover:bg-[#1ED36A] transition-colors">
+        <div className="w-[clamp(32px,2.4vw,36px)] h-[clamp(32px,2.4vw,36px)] rounded-full bg-white dark:bg-[#1A3A2C] border border-[#1ED36A] flex items-center justify-center group-hover:bg-[#1ED36A] transition-colors">
           <StepperDownArrowIcon className="w-[35%] h-[22%] dark:text-[#FFFFFF] text-[#1ED36A] group-hover:text-white transition-colors" />
         </div>
       </button>
@@ -260,7 +260,7 @@ const CircularProgress: React.FC<{
         </svg>
         <div className="absolute flex flex-col items-center justify-center text-right py-1">
           <span
-            className="text-[clamp(20px,2.5vmin,32px)] font-semibold text-brand-text-light-primary dark:text-white tracking-tight"
+            className="text-xl font-semibold text-brand-text-light-primary dark:text-white tracking-tight"
             style={{
               fontFamily: "'Haskoy', 'Inter', sans-serif",
               fontWeight: 600,
@@ -270,7 +270,7 @@ const CircularProgress: React.FC<{
             {percentage}%
           </span>
           <span
-            className="text-[clamp(11px,1.2vmin,15px)] text-brand-text-light-secondary dark:text-white/70 font-normal mt-[clamp(2px,0.4vmin,6px)]"
+            className="text-xs text-brand-text-light-secondary dark:text-white/70 font-normal mt-1"
             style={{
               fontFamily: "'Haskoy', 'Inter', sans-serif",
               fontWeight: 400,

@@ -113,7 +113,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
 
         {/* Scrollable Body - Reduced Padding/Margins to prevent scroll */}
         <div className="overflow-y-auto custom-scrollbar flex-1">
-          <div className="p-5 sm:p-6">
+          <div className="p-5 sm:p-5">
             {/* Header Section */}
             <div className="flex justify-between items-start mb-4">
               <p className="text-[10px] sm:text-xs text-brand-text-light-secondary dark:text-gray-400 font-medium max-w-[200px] leading-relaxed">

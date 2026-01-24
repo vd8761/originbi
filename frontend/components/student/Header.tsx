@@ -270,7 +270,7 @@ const Header: React.FC<HeaderProps> = ({
                     <img src="/Origin-BI-white-logo.png" alt="OriginBI Logo" className="h-5 lg:h-6 2xl:h-7 w-auto hidden dark:block" />
 
                     {!hideNav && (
-                        <nav className="hidden md:flex items-center space-x-2 lg:space-x-3 2xl:space-x-4 ml-4 lg:ml-6 2xl:ml-8">
+                        <nav className="hidden md:flex items-center space-x-1 lg:space-x-1 2xl:space-x-2 ml-2 lg:ml-2 2xl:ml-6">
                             {renderNavItems(false)}
                         </nav>
                     )}
