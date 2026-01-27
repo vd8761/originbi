@@ -6,26 +6,24 @@ import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { EmbeddingsService } from './embeddings.service';
 import { FutureRoleReportService } from './future-role-report.service';
 import { OverallRoleFitmentService } from './overall-role-fitment.service';
+import { ConversationService } from './conversation.service';
+import { OriIntelligenceService } from './ori-intelligence.service';
+import { ORI_PERSONA, getRandomResponse, getSignOff } from './ori-persona';
 import * as fs from 'fs';
 import * as path from 'path';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
- * ║           PRODUCTION RAG v11.0 - ENTERPRISE GRADE                         ║
+ * ║                          🤖 ORI v2.0 - JARVIS EDITION                     ║
+ * ║              OriginBI Intelligent - Your Career Guide                    ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
- * ║                                                                           ║
- * ║  ARCHITECTURE:                                                            ║
- * ║  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌────────────┐ ║
- * ║  │   QUERY     │ → │    LLM      │ → │    SQL      │ → │  RESPONSE  │ ║
- * ║  │ UNDERSTAND  │    │ INTERPRET   │    │  EXECUTE    │    │  FORMAT    │ ║
- * ║  └─────────────┘    └─────────────┘    └─────────────┘    └────────────┘ ║
- * ║                                                                           ║
  * ║  FEATURES:                                                                ║
- * ║  • LLM-powered query understanding (handles typos, variations)            ║
- * ║  • Personality insights (DISC + Agile ACI)                                ║
- * ║  • Smart SQL generation                                                   ║
- * ║  • Professional response formatting                                       ║
- * ║                                                                           ║
+ * ║  • Personalized career guidance based on your personality                 ║
+ * ║  • Job eligibility analysis with reasoning                                ║
+ * ║  • Higher studies recommendations                                         ║
+ * ║  • Emotional AI - friendly, supportive mentor                             ║
+ * ║  • Answers ANY question intelligently                                     ║
+ * ║  • Remembers your preferences and context                                 ║
  * ╚═══════════════════════════════════════════════════════════════════════════╝
  */
 
@@ -113,7 +111,7 @@ const AGILE_LEVELS = {
 
 @Injectable()
 export class RagService {
-  private readonly logger = new Logger(RagService.name);
+  private readonly logger = new Logger('ORI');
   private llm: ChatGroq | null = null;
   private reportsDir: string;
 
@@ -122,11 +120,14 @@ export class RagService {
     private embeddingsService: EmbeddingsService,
     private futureRoleReportService: FutureRoleReportService,
     private overallRoleFitmentService: OverallRoleFitmentService,
+    private conversationService: ConversationService,
+    private oriIntelligence: OriIntelligenceService,
   ) {
     this.reportsDir = path.join(process.cwd(), 'reports');
     if (!fs.existsSync(this.reportsDir)) {
       fs.mkdirSync(this.reportsDir, { recursive: true });
     }
+    this.logger.log('🤖 ORI v2.0 initialized - Your intelligent career guide!');
   }
 
   private getLlm(): ChatGroq {
@@ -167,11 +168,11 @@ export class RagService {
       this.logger.log(`🔍 Search: ${interpretation.searchTerm || 'general'}`);
 
       // ═══════════════════════════════════════════════════════════════
-      // SPECIAL HANDLERS: GREETING & HELP
+      // ORI GREETING & HELP - Jarvis-like personality
       // ═══════════════════════════════════════════════════════════════
       if (interpretation.intent === 'greeting') {
         return {
-          answer: `**👋 Hello!** I'm the OriginBI Assistant.\n\nI can help you with:\n• **Users & Candidates** - "list users", "show candidates"\n• **Test Results** - "test results", "[name]'s score"\n• **Career Reports** - "career report for [name]"\n• **Overall Reports** - "overall report", "placement report"\n• **Best Performers** - "top performer", "best score"\n• **Career Roles** - "show career roles"\n• **Counts** - "how many users"\n\nWhat would you like to know?`,
+          answer: getRandomResponse(ORI_PERSONA.greetings),
           searchType: 'greeting',
           confidence: 1.0,
         };
@@ -179,7 +180,7 @@ export class RagService {
 
       if (interpretation.intent === 'help') {
         return {
-          answer: `**🤖 OriginBI Assistant - Help**\n\n**Available Commands:**\n\n📊 **Data Queries:**\n• "list users" - Show all system users\n• "show candidates" - List registered candidates\n• "test results" - View assessment results\n• "career roles" - Available career paths\n\n👤 **Person-Specific:**\n• "[name]'s score" - Individual test results\n• "career report for [name]" - Full career fitment report\n• "show [name]'s results" - Assessment details\n\n📋 **Group Reports:**\n• "overall report" - Group role fitment by personality\n• "placement report" - Placement guidance for all students\n• "role fitment report" - Roles mapped to personality types\n\n🏆 **Analytics:**\n• "best performer" - Top scoring candidates\n• "how many users" - User counts\n• "total candidates" - Registration stats\n\n**Tips:**\n• If multiple people share a name, I'll ask you to pick one\n• Career reports include personality insights and role fitment analysis`,
+          answer: ORI_PERSONA.help,
           searchType: 'help',
           confidence: 1.0,
         };
@@ -200,10 +201,131 @@ export class RagService {
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // STEP 2: EXECUTE QUERY
+      // 🧠 JARVIS-LIKE INTELLIGENT HANDLERS
+      // Personal career guidance, job eligibility, higher studies, etc.
+      // ═══════════════════════════════════════════════════════════════
+      const q = question.toLowerCase();
+      const userId = user?.id || user?.user_id || 0;
+      const userEmail = user?.email || user?.sub || '';
+
+      // Get user profile for personalization (using email if userId not available)
+      const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
+
+      this.logger.log(`👤 User: ${userProfile?.name || 'Anonymous'} (${userEmail || 'no email'})`);
+
+      // Store any facts the user shares
+      if (userId || userEmail) {
+        this.oriIntelligence.extractAndStoreFacts(userProfile?.userId || userId, question);
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // PERSONAL QUESTIONS: "what is my name", "my profile", etc.
+      // ═══════════════════════════════════════════════════════════════
+      const personalAnswer = this.oriIntelligence.answerPersonalQuestion(question, userProfile);
+      if (personalAnswer) {
+        this.logger.log('🎯 Detected: Personal question');
+        return {
+          answer: personalAnswer,
+          searchType: 'personal_info',
+          confidence: 0.98,
+        };
+      }
+
+      // Questions about job eligibility
+      if (q.includes('eligible') || q.includes('jobs for me') || q.includes('suitable') ||
+        q.includes('what jobs') || q.includes('fit for') || q.includes('career for me')) {
+        this.logger.log('🎯 Detected: Career eligibility question');
+        const answer = await this.oriIntelligence.generateCareerGuidance(question, userProfile);
+        return {
+          answer,
+          searchType: 'career_guidance',
+          confidence: 0.95,
+        };
+      }
+
+      // Questions about specific jobs ("can I try...", "can I become...")
+      if ((q.includes('can i') || q.includes('should i')) &&
+        (q.includes('try') || q.includes('apply') || q.includes('become') || q.includes('work as'))) {
+        this.logger.log('🎯 Detected: Job compatibility question');
+        const answer = await this.oriIntelligence.generateCareerGuidance(question, userProfile);
+        return {
+          answer,
+          searchType: 'job_analysis',
+          confidence: 0.95,
+        };
+      }
+
+      // Higher studies questions
+      if (q.includes('higher studies') || q.includes('masters') || q.includes('mba') ||
+        q.includes('further studies') || q.includes('education') || q.includes('degree') ||
+        q.includes('university') || q.includes('phd')) {
+        this.logger.log('🎯 Detected: Higher studies question');
+        const answer = await this.oriIntelligence.generateCareerGuidance(question, userProfile);
+        return {
+          answer,
+          searchType: 'higher_studies',
+          confidence: 0.95,
+        };
+      }
+
+      // Personal questions about themselves or career advice
+      if ((q.includes('my ') || q.includes('i am') || q.includes("i'm") || q.includes('me')) &&
+        (q.includes('career') || q.includes('future') || q.includes('path') || q.includes('advice') ||
+          q.includes('suggest') || q.includes('recommend') || q.includes('help me'))) {
+        this.logger.log('🎯 Detected: Personal career advice question');
+        const context = this.oriIntelligence.getConversationContext(userProfile?.userId || userId);
+        const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, context);
+        return {
+          answer,
+          searchType: 'personal_advice',
+          confidence: 0.9,
+        };
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // 🧠 GENERAL QUESTIONS - Route to LLM (courses, learning, how-to)
+      // These should NOT search the database
+      // ═══════════════════════════════════════════════════════════════
+      const isGeneralQuestion =
+        q.includes('what is') || q.includes('what are') || q.includes('how to') ||
+        q.includes('how do') || q.includes('how can') || q.includes('best way') ||
+        q.includes('course') || q.includes('learn') || q.includes('study') ||
+        q.includes('become a') || q.includes('become an') || q.includes('best ') ||
+        q.includes('which') || q.includes('should i') || q.includes('can you') ||
+        q.includes('tell me about') || q.includes('explain') || q.includes('difference between') ||
+        q.includes('compare') || q.includes('vs') || q.includes('versus') ||
+        q.includes('tips') || q.includes('advice') || q.includes('recommend') ||
+        q.includes('certification') || q.includes('skill') || q.includes('path');
+
+      // Don't go to DB for general questions - use LLM directly
+      if (isGeneralQuestion && !['list_users', 'list_candidates', 'test_results', 'career_roles', 'count'].includes(interpretation.intent)) {
+        this.logger.log('🧠 Detected: General question - using LLM');
+        const context = this.oriIntelligence.getConversationContext(userProfile?.userId || userId);
+        const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, context);
+        return {
+          answer,
+          searchType: 'intelligent_response',
+          confidence: 0.9,
+        };
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // STEP 2: EXECUTE QUERY (only for specific data queries)
       // ═══════════════════════════════════════════════════════════════
       const data = await this.executeQuery(interpretation);
       this.logger.log(`📊 Results: ${data.length} rows`);
+
+      // If no data found, ALWAYS use LLM for intelligent response
+      if (data.length === 0) {
+        this.logger.log('🧠 No data found, using intelligent LLM response');
+        const context = this.oriIntelligence.getConversationContext(userProfile?.userId || userId);
+        const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, context);
+        return {
+          answer,
+          searchType: 'intelligent_response',
+          confidence: 0.85,
+        };
+      }
 
       // ═══════════════════════════════════════════════════════════════
       // STEP 3: FORMAT RESPONSE
@@ -319,13 +441,10 @@ export class RagService {
           const mobile = person.mobile_number
             ? ` | ${person.mobile_number.slice(-4)}`
             : '';
-          const bestScore = person.best_score
-            ? ` | Best Score: ${parseFloat(person.best_score).toFixed(1)}%`
-            : '';
           const attempts = person.attempt_count > 1
             ? ` (${person.attempt_count} attempts)`
             : '';
-          response += `**${index + 1}.** ${person.full_name}${email}${mobile}${bestScore}${attempts}\n`;
+          response += `**${index + 1}.** ${person.full_name}${email}${mobile}${attempts}\n`;
         });
 
         response += `\n**Example:** "career report for ${cleanSearchTerm} #1" or "career report for ${cleanSearchTerm} #2"`;
@@ -741,12 +860,9 @@ Respond with ONLY valid JSON, no explanation:`;
 
     data.slice(0, 5).forEach((row, i) => {
       const name = row.full_name || 'Unknown';
-      const score = row.total_score
-        ? parseFloat(row.total_score).toFixed(0)
-        : 'N/A';
       const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '•';
 
-      response += `${medal} **${name}** - Score: **${score}%**\n`;
+      response += `${medal} **${name}**\n`;
 
       // Behavioral Style (DISC) - FULL description
       if (row.behavioral_style) {
@@ -756,8 +872,8 @@ Respond with ONLY valid JSON, no explanation:`;
         }
       }
 
-      // Agile Compatibility - with FULL description
-      const scoreNum = parseFloat(score);
+      // Agile Compatibility - with FULL description (but don't show score)
+      const scoreNum = row.total_score ? parseFloat(row.total_score) : NaN;
       if (!isNaN(scoreNum)) {
         const agile = this.getAgileLevel(scoreNum);
         response += `   🎯 **${agile.name}**: ${agile.desc}\n`;
@@ -819,7 +935,7 @@ Respond with ONLY valid JSON, no explanation:`;
     data.forEach((row, i) => {
       response += `${i + 1}. **${row.career_role_name}**\n`;
       if (row.short_description) {
-        response += `   ${row.short_description.slice(0, 80)}...\n`;
+        response += `   ${row.short_description}\n`;
       }
     });
     return response;
@@ -853,12 +969,18 @@ Respond with ONLY valid JSON, no explanation:`;
 
     return {
       status: 'ok',
-      version: '11.0.0-production',
+      name: 'ORI',
+      version: '2.0.0-jarvis',
+      description: 'OriginBI Intelligent - Your Career Guide (JARVIS Edition)',
       features: [
-        'llm_query_understanding',
-        'disc_personality',
-        'agile_aci',
-        'smart_formatting',
+        'personalized_career_guidance',
+        'job_eligibility_analysis',
+        'higher_studies_recommendations',
+        'emotional_ai_responses',
+        'user_memory',
+        'any_question_intelligent',
+        'conversation_context',
+        'llm_powered',
       ],
       knowledgeBase: { documents: totalDocs },
     };
