@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"sort"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type ExamService struct{}
@@ -29,7 +31,8 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 	now := time.Now()
 
 	// Update Attempt to IN_PROGRESS if needed
-	if attempt.Status == "NOT_STARTED" {
+	// Fix: Handle both "NOT_STARTED" (Default) and "NOT_YET_STARTED" (Legacy/Seeded)
+	if attempt.Status == "NOT_STARTED" || attempt.Status == "NOT_YET_STARTED" {
 		attempt.Status = "IN_PROGRESS"
 		attempt.StartedAt = &now
 		if err := db.Model(&attempt).Updates(map[string]interface{}{
@@ -44,24 +47,26 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 	var session models.AssessmentSession
 	if err := db.First(&session, attempt.AssessmentSessionID).Error; err == nil {
 		// 1. Ensure Session is IN_PROGRESS
-		if session.Status == "NOT_STARTED" {
+		if session.Status == "NOT_STARTED" || session.Status == "NOT_YET_STARTED" {
 			db.Model(&session).Updates(map[string]interface{}{
 				"status":     "IN_PROGRESS",
 				"started_at": now,
 			})
 		}
 
+		// ... (Logic continues in next chunk or I can include it if small enough, but avoiding giant replacement) ...
+
 		// 2. Ensure Group Assessment is IN_PROGRESS
 		if session.GroupID != nil {
 			var groupAssessment models.GroupAssessment
 			// Find the group assessment by group_id AND program_id
 			if err := db.Where("group_id = ? AND program_id = ?", *session.GroupID, session.ProgramID).First(&groupAssessment).Error; err == nil {
-					// Update the GroupAssessment status
-					if groupAssessment.Status != "IN_PROGRESS" && groupAssessment.Status != "COMPLETED" {
-						db.Model(&groupAssessment).Update("status", "IN_PROGRESS")
-					}
+				// Update the GroupAssessment status
+				if groupAssessment.Status != "IN_PROGRESS" && groupAssessment.Status != "COMPLETED" {
+					db.Model(&groupAssessment).Update("status", "IN_PROGRESS")
 				}
 			}
+		}
 	}
 
 	// 2. Fetch Questions
@@ -87,13 +92,37 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 
 	// 1. Find the answer record
 	var answerRecord models.AssessmentAnswer
+	var query *gorm.DB
 
-	// Query by AttemptID and (MainQuestionID OR OpenQuestionID)
-	query := db.Where("assessment_attempt_id = ? AND (main_question_id = ? OR open_question_id = ?)", req.AttemptID, req.QuestionID, req.QuestionID).First(&answerRecord)
+	// DEFINITIVE FIX: Use Primary Key of assessment_answers if available (Precision Update)
+	if req.AssessmentAnswerID > 0 {
+		query = db.First(&answerRecord, req.AssessmentAnswerID)
+	} else {
+		// Fallback Logic (Legacy)
+		// Improve Precision: Use QuestionSource if available
+		if req.QuestionSource != "" {
+			if req.QuestionSource == "OPEN" {
+				query = db.Where("assessment_attempt_id = ? AND open_question_id = ?", req.AttemptID, req.QuestionID)
+			} else {
+				// Assume MAIN if not OPEN (or explicit MAIN)
+				query = db.Where("assessment_attempt_id = ? AND main_question_id = ?", req.AttemptID, req.QuestionID)
+			}
+		} else {
+			// Fallback for legacy requests (Potentially ambiguous)
+			query = db.Where("assessment_attempt_id = ? AND (main_question_id = ? OR open_question_id = ?)", req.AttemptID, req.QuestionID, req.QuestionID)
+		}
+
+		query = query.First(&answerRecord)
+	}
 
 	if query.Error != nil {
+		fmt.Printf("[SubmitAnswer] ERROR: Record not found. AttemptID=%d QuestionID=%d AnswerID=%d Source=%s Error=%v\n",
+			req.AttemptID, req.QuestionID, req.AssessmentAnswerID, req.QuestionSource, query.Error)
 		return errors.New("question not found for this attempt")
 	}
+
+	fmt.Printf("[SubmitAnswer] DEBUG: Found Record ID=%d Status=%s. ReqQuestionID=%d MainQ=%v OpenQ=%v\n",
+		answerRecord.ID, answerRecord.Status, req.QuestionID, answerRecord.MainQuestionID, answerRecord.OpenQuestionID)
 
 	// 2. Update the record
 	if answerRecord.MainQuestionID != nil && *answerRecord.MainQuestionID == req.QuestionID {
@@ -147,15 +176,45 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 		answerRecord.SincerityFlag = 2
 	}
 
+	// Self-Healing: If Attempt Status is still NOT_STARTED (e.g. initial start race condition), force it to IN_PROGRESS
+	// We do this asynchronously or simply fire-and-forget update
+	go func(attemptID int64) {
+		repoDB := repository.GetDB()
+		var att models.AssessmentAttempt
+		if err := repoDB.First(&att, attemptID).Error; err == nil {
+			if att.Status == "NOT_STARTED" || att.Status == "NOT_YET_STARTED" {
+				repoDB.Model(&att).Updates(map[string]interface{}{
+					"status":     "IN_PROGRESS",
+					"started_at": time.Now(),
+				})
+				// Also update Session if needed (Simplified)
+				var sess models.AssessmentSession
+				if err := repoDB.First(&sess, att.AssessmentSessionID).Error; err == nil {
+					if sess.Status == "NOT_STARTED" || sess.Status == "NOT_YET_STARTED" {
+						repoDB.Model(&sess).Updates(map[string]interface{}{
+							"status":     "IN_PROGRESS",
+							"started_at": time.Now(),
+						})
+					}
+				}
+			}
+		}
+	}(req.AttemptID)
+
 	// Update fields
 	answerRecord.TimeSpentSeconds += req.TimeTaken
 	answerRecord.AnswerChangeCount = req.AnswerChangeCount
 	answerRecord.Status = "ANSWERED"
 	answerRecord.UpdatedAt = time.Now() // Ensure UpdatedAt is set
 
+	fmt.Printf("[SubmitAnswer] DEBUG: Saving Record ID=%d Status=%s MainOption=%v OpenOption=%v\n",
+		answerRecord.ID, answerRecord.Status, answerRecord.MainOptionID, answerRecord.OpenOptionID)
+
 	if err := db.Save(&answerRecord).Error; err != nil {
+		fmt.Printf("[SubmitAnswer] ERROR: Save Failed for ID=%d Error=%v\n", answerRecord.ID, err)
 		return err
 	}
+	fmt.Printf("[SubmitAnswer] SUCCESS: Saved Answer ID=%d\n", answerRecord.ID)
 
 	// Check if this was the last question
 	var totalCounts int64
@@ -348,21 +407,20 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 
 		db.Model(&models.AssessmentAttempt{}).Where("id = ?", answerRecord.AssessmentAttemptID).Updates(updates)
 
-
 		// 5. Next Level Setup (Level 2 Generation)
 		var nextLevel models.AssessmentLevel
 		hasNextLevel := false
-		
+
 		// Check if a next level generally exists in the system (Check only MANDATORY levels)
 		if err := db.Where("level_number > ? AND is_mandatory = ?", currentLevel.LevelNumber, true).Order("level_number ASC").First(&nextLevel).Error; err == nil {
-			
+
 			// Check if this specific user/session HAS an attempt for this next level
 			var nextAttempt models.AssessmentAttempt
 			if err := db.Where("assessment_session_id = ? AND assessment_level_id = ?", answerRecord.AssessmentSessionID, nextLevel.ID).First(&nextAttempt).Error; err == nil {
-				
+
 				// CASE A: Next Level Exists AND User has an attempt for it -> Unlock it
 				hasNextLevel = true
-				
+
 				unlockAt := now.Add(time.Duration(nextLevel.UnlockAfterHours) * time.Hour)
 				startWindow := 72
 				if nextLevel.StartWithinHours > 0 {
@@ -488,7 +546,7 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 						DominantTraitID:     dominantTraitID,
 						Metadata:            "{}",
 					}
-					
+
 					// Save
 					if err := db.Create(&newReport).Error; err != nil {
 						fmt.Printf("ERROR: Failed to create Assessment Report: %v\n", err)
@@ -546,4 +604,37 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 	}
 
 	return nil
+}
+
+func (s *ExamService) IsLastLevel(attemptID int64) (bool, error) {
+	db := repository.GetDB()
+
+	var attempt models.AssessmentAttempt
+	if err := db.First(&attempt, attemptID).Error; err != nil {
+		return false, err
+	}
+
+	if attempt.AssessmentLevelID == nil {
+		return false, errors.New("level id is nil")
+	}
+
+	var currentLevel models.AssessmentLevel
+	if err := db.First(&currentLevel, *attempt.AssessmentLevelID).Error; err != nil {
+		return false, err
+	}
+
+	// Check count of attempts in same session with higher level number
+	var count int64
+	// Filter out CANCELLED or other invalid statuses if necessary, but mainly just check existence
+	err := db.Table("assessment_attempts").
+		Joins("JOIN assessment_levels ON assessment_levels.id = assessment_attempts.assessment_level_id").
+		Where("assessment_attempts.assessment_session_id = ? AND assessment_attempts.status != 'CANCELLED' AND assessment_levels.level_number > ?",
+			attempt.AssessmentSessionID, currentLevel.LevelNumber).
+		Count(&count).Error
+
+	if err != nil {
+		return false, err
+	}
+
+	return count == 0, nil
 }

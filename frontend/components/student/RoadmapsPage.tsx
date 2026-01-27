@@ -4,25 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ArrowUpRightIcon, ArrowRightWithoutLineIcon } from '@/components/icons';
-
-interface RoadmapCardData {
-    id: string;
-    title: string;
-    description: string;
-    category?: string;
-}
-
-interface RoadmapDetailData {
-    id: string;
-    title: string;
-    category: string;
-    toolsToLearn: { name: string; category: string }[];
-    overview: string;
-    traitAlignment: string;
-    roadmapSteps: { label: string; type: 'foundation' | 'action' | 'advancement' | 'career'; content: string }[];
-    guidelines: { title: string; points: string[] }[];
-    guidanceTip: string;
-}
+import { RoadmapCardData, RoadmapDetailData } from '@/lib/types';
+import RoadmapDetailView from './RoadmapDetailView';
 
 // Hardcoded detailed roadmap data for demonstration
 const roadmapDetails: Record<string, RoadmapDetailData> = {
@@ -148,228 +131,33 @@ for (let i = 3; i <= 7; i++) {
     };
 }
 
-// Small card for "Explore Other Roadmaps" section
-const ExploreRoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: string) => void; isActive?: boolean; isLast?: boolean }> = ({ item, onSelect, isActive, isLast }) => (
-    <div className="relative">
-        <div
-            className={`group relative py-3 px-4 transition-all duration-300 cursor-pointer ${isActive
-                ? 'bg-[#19211C]/5 dark:bg-white/10' // Active: Light gray in light mode, translucent white in dark mode
-                : 'bg-transparent hover:bg-[#19211C]/5 dark:hover:bg-white/5' // Inactive: Transparent with hover effect
-                }`}
-            onClick={() => onSelect(item.id)} // Allowing card click to select as it's more intuitive for a sidebar list item
-        >
-            <div className="flex justify-between items-center gap-3">
-                <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-[#19211C] dark:text-white text-[14px] mb-0.5 truncate">
-                        {item.title}
-                    </h4>
-                    <p className="text-black dark:text-white text-[12px] leading-snug line-clamp-2">
-                        {item.description}
-                    </p>
-                </div>
-                <button
-                    className="bg-brand-green hover:bg-brand-green/90 text-white w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 hover:scale-110 shadow-md shadow-brand-green/20 cursor-pointer"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onSelect(item.id);
-                    }}
-                >
-                    <ArrowUpRightIcon className="w-3.5 h-3.5" />
-                </button>
-            </div>
-        </div>
-        {/* Separator Line for Inactive items (unless it's the last one) - Placed outside the padding */}
-        {!isActive && !isLast && (
-            <div className="mx-4 h-px bg-[#19211C]/10 dark:bg-white/10"></div>
-        )}
-    </div>
-);
-
 // Main roadmap card for grid view
 const RoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: string) => void }> = ({ item, onSelect }) => (
     <div
-        className="group relative bg-white/40 dark:bg-black/20 border border-white/20 dark:border-white/10 hover:bg-white/90 dark:hover:bg-white/10 hover:border-white/60 dark:hover:border-white/50 rounded-2xl p-4 lg:p-5 transition-all duration-300 hover:shadow-[0_8px_32px_0_rgba(31,38,135,0.12)] dark:hover:shadow-none backdrop-blur-md"
+        className="group relative bg-white dark:bg-white/[0.08] border border-[#E2E8F0] dark:border-white/[0.08] hover:border-brand-green dark:hover:border-brand-green hover:bg-white/5 dark:hover:bg-white/[0.12] rounded-[12px] p-5 lg:p-6 transition-all duration-300 hover:shadow-lg dark:hover:shadow-none backdrop-blur-sm flex flex-col justify-center min-h-[120px] lg:min-h-[124px] cursor-pointer"
+        onClick={() => onSelect(item.id)}
     >
         <div className="flex justify-between items-center gap-4">
             <div className="flex-1">
-                <h3 className="font-semibold text-[#19211C] dark:text-white text-[16px] mb-1">
+                <h3 className="font-semibold text-[#19211C] dark:text-white text-[clamp(16px,1.1vw,22px)] mb-2 leading-tight font-sans">
                     {item.title}
                 </h3>
-                <p className="text-[#19211C]/80 dark:text-white/70 text-[12px] leading-relaxed">
+                <p className="text-[#19211C]/70 dark:text-white/80 text-[clamp(13px,0.85vw,17px)] leading-relaxed line-clamp-2 font-normal font-sans">
                     {item.description}
                 </p>
             </div>
             <button
-                className="bg-brand-green hover:bg-brand-green/90 text-white w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 hover:scale-110 shadow-lg shadow-brand-green/20 cursor-pointer"
-                onClick={() => onSelect(item.id)}
+                className="bg-brand-green hover:bg-brand-green/90 text-white w-8 h-8 lg:w-9 lg:h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 hover:scale-110 shadow-md shadow-brand-green/20 cursor-pointer"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onSelect(item.id);
+                }}
             >
-                <ArrowUpRightIcon className="w-4 h-4" />
+                <ArrowUpRightIcon className="w-4 h-4 lg:w-5 lg:h-5" />
             </button>
         </div>
     </div>
 );
-
-// Roadmap Detail View Component
-const RoadmapDetailView: React.FC<{
-    roadmap: RoadmapDetailData;
-    allRoadmaps: RoadmapCardData[];
-    onBack: () => void;
-    onSelectRoadmap: (id: string) => void;
-}> = ({ roadmap, allRoadmaps, onBack, onSelectRoadmap }) => {
-    return (
-        <div className="min-h-screen bg-[url('/Background_Light_Theme.svg')] bg-cover bg-center bg-no-repeat bg-fixed dark:bg-none dark:bg-brand-dark-primary">
-            <div className="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-12 lg:py-10">
-                {/* Breadcrumb */}
-                <nav className="mb-6 lg:mb-[1.5vw]">
-                    <ol className="flex items-center flex-wrap gap-2 text-[clamp(11px,0.75vw,13px)]">
-                        <li>
-                            <Link
-                                href="/student/dashboard"
-                                className="text-[#19211C]/60 dark:text-brand-text-secondary hover:text-[#19211C] dark:hover:text-brand-text-primary transition-colors"
-                            >
-                                Dashboard
-                            </Link>
-                        </li>
-                        <li className="text-[#19211C]/40 dark:text-brand-text-secondary"><ArrowRightWithoutLineIcon className="w-3 h-3" /></li>
-                        <li>
-                            <button
-                                onClick={onBack}
-                                className="text-[#19211C]/60 dark:text-brand-text-secondary hover:text-[#19211C] dark:hover:text-brand-text-primary transition-colors"
-                            >
-                                Your Roadmap
-                            </button>
-                        </li>
-                        <li className="text-[#19211C]/40 dark:text-brand-text-secondary"><ArrowRightWithoutLineIcon className="w-3 h-3" /></li>
-                        <li className="text-brand-green font-medium">{roadmap.category}</li>
-                    </ol>
-                </nav>
-
-                {/* Main Content Grid */}
-                <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
-                    {/* Left Content - Detail Section */}
-                    <div className="flex-1 min-w-0">
-                        {/* Title */}
-                        <h1 className="text-[18px] font-bold text-[#19211C] dark:text-brand-text-primary mb-6 lg:mb-8">
-                            {roadmap.title}
-                        </h1>
-
-                        {/* Tools to Learn */}
-                        <section className="mb-6 lg:mb-8">
-                            <h2 className="text-[18px] font-semibold text-[#19211C] dark:text-brand-text-primary mb-3">
-                                Tools to Learn
-                            </h2>
-                            <div className="space-y-1">
-                                {roadmap.toolsToLearn.map((tool, idx) => (
-                                    <p key={idx} className="text-[16px] text-black dark:text-white">
-                                        <span className="font-medium text-black dark:text-white">{tool.name}</span>
-                                        <span className="text-black dark:text-white/80"> ({tool.category})</span>
-                                    </p>
-                                ))}
-                            </div>
-                        </section>
-
-                        {/* Overview */}
-                        <section className="mb-6 lg:mb-8">
-                            <h2 className="text-[18px] font-semibold text-[#19211C] dark:text-brand-text-primary mb-3">
-                                Overview
-                            </h2>
-                            <p className="text-[16px] text-black dark:text-white leading-relaxed">
-                                {roadmap.overview}
-                            </p>
-                        </section>
-
-                        {/* Trait Alignment */}
-                        <section className="mb-6 lg:mb-8">
-                            <h2 className="text-[18px] font-semibold text-[#19211C] dark:text-brand-text-primary mb-3">
-                                Trait Alignment
-                            </h2>
-                            <p className="text-[16px] text-black dark:text-white leading-relaxed">
-                                {roadmap.traitAlignment}
-                            </p>
-                        </section>
-
-                        {/* Roadmap & Fundamental Learning */}
-                        <section className="mb-6 lg:mb-8">
-                            <h2 className="text-[18px] font-semibold text-[#19211C] dark:text-brand-text-primary mb-4">
-                                Roadmap & Fundamental Learning
-                            </h2>
-                            <div className="space-y-3">
-                                {roadmap.roadmapSteps.map((step, idx) => (
-                                    <div key={idx} className="flex items-start gap-3">
-                                        <span className="w-2 h-2 mt-2 rounded-full bg-brand-green flex-shrink-0"></span>
-                                        <p className="text-[16px] text-black dark:text-white leading-relaxed">
-                                            <span className="font-semibold text-black dark:text-white">{step.label}:</span>{' '}
-                                            {step.content}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
-
-                        {/* Detailed Guidelines */}
-                        <section className="mb-6 lg:mb-8">
-                            <h2 className="text-[18px] font-semibold text-[#19211C] dark:text-brand-text-primary mb-4">
-                                Detailed Guidelines
-                            </h2>
-                            <div className="space-y-6">
-                                {roadmap.guidelines.map((guideline, gIdx) => (
-                                    <div key={gIdx}>
-                                        <h3 className="text-[16px] font-semibold text-[#19211C] dark:text-brand-text-primary mb-3">
-                                            {gIdx + 1}. {guideline.title}
-                                        </h3>
-                                        <ul className="space-y-2 ml-1">
-                                            {guideline.points.map((point, pIdx) => (
-                                                <li key={pIdx} className="flex items-start gap-3">
-                                                    <span className="w-2 h-2 mt-1.5 rounded-full bg-brand-green flex-shrink-0"></span>
-                                                    <span className="text-[16px] text-black dark:text-white">
-                                                        {point}
-                                                    </span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
-
-                        {/* Guidance Tip */}
-                        <section className="mt-8 lg:mt-12 pt-6 lg:pt-8 border-t border-[#19211C]/10 dark:border-white/10">
-                            <h2 className="text-[18px] font-semibold text-[#19211C] dark:text-brand-text-primary mb-4">
-                                Guidance Tip
-                            </h2>
-                            <p className="text-[16px] text-black dark:text-white leading-relaxed">
-                                {roadmap.guidanceTip}
-                            </p>
-                        </section>
-                    </div>
-
-                    {/* Right Sidebar - Explore Other Roadmaps */}
-                    <aside className="w-full lg:w-[280px] xl:w-[320px] 2xl:w-[360px] flex-shrink-0">
-                        <div className="bg-white/30 dark:bg-black/20 border border-[#19211C]/12 dark:border-white/5 rounded-2xl p-0 backdrop-blur-sm sticky top-[100px] overflow-hidden">
-                            <div className="p-4 pb-3">
-                                <h3 className="text-[18px] font-semibold text-[#19211C] dark:text-white mb-3">
-                                    Explore Other Roadmaps
-                                </h3>
-                                <div className="h-px w-full bg-[#19211C]/10 dark:bg-white/10"></div>
-                            </div>
-                            <div className="space-y-0.5 max-h-[calc(100vh-200px)] overflow-y-auto pb-4 custom-scrollbar">
-                                {allRoadmaps.map((item, index) => (
-                                    <ExploreRoadmapCard
-                                        key={item.id}
-                                        item={item}
-                                        onSelect={onSelectRoadmap}
-                                        isActive={item.id === roadmap.id}
-                                        isLast={index === allRoadmaps.length - 1}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    </aside>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 const RoadmapsPage: React.FC = () => {
     const [selectedRoadmapId, setSelectedRoadmapId] = useState<string | null>(null);
@@ -437,35 +225,37 @@ const RoadmapsPage: React.FC = () => {
     // Otherwise, show the grid view
     return (
         <div className="min-h-screen bg-[url('/Background_Light_Theme.svg')] bg-cover bg-center bg-no-repeat bg-fixed dark:bg-none dark:bg-brand-dark-primary">
-            <div className="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-12 lg:py-10">
+            <div className="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-12 lg:py-10 max-w-[1920px] mx-auto">
                 {/* Breadcrumb */}
-                <nav className="mb-6 lg:mb-[1.5vw]">
-                    <ol className="flex items-center space-x-2 text-[clamp(11px,0.75vw,13px)]">
+                <nav className="mb-6">
+                    <ol className="flex items-center gap-2 text-[clamp(12px,0.73vw,14px)]">
                         <li>
                             <Link
                                 href="/student/dashboard"
-                                className="text-[#19211C]/60 dark:text-brand-text-secondary hover:text-[#19211C] dark:hover:text-brand-text-primary transition-colors"
+                                className="text-gray-500 dark:text-white hover:text-gray-700 dark:hover:text-[#1ED36A] transition-colors font-normal font-sans"
                             >
                                 Dashboard
                             </Link>
                         </li>
-                        <li className="text-[#19211C]/40 dark:text-brand-text-secondary"><ArrowRightWithoutLineIcon className="w-3 h-3" /></li>
-                        <li className="text-brand-green font-medium">Your Roadmaps</li>
+                        <li className="flex items-center justify-center text-gray-400 dark:text-gray-600">
+                            <ArrowRightWithoutLineIcon className="w-3 h-3" />
+                        </li>
+                        <li className="text-brand-green font-normal font-sans">Your Roadmaps</li>
                     </ol>
                 </nav>
 
                 {/* Header */}
-                <div className="mb-6 lg:mb-[1.5vw]">
-                    <h1 className="text-[18px] font-semibold text-[#19211C] dark:text-brand-text-primary mb-1">
+                <div className="mb-6 lg:mb-8">
+                    <h1 className="text-[clamp(20px,1.46vw,28px)] font-semibold text-[#19211C] dark:text-white mb-2 font-sans tracking-tight leading-none">
                         Your Roadmaps 2027-2035
                     </h1>
-                    <p className="text-black dark:text-brand-text-secondary text-[clamp(11px,0.8vw,14px)]">
+                    <p className="text-[#19211C]/70 dark:text-white text-[clamp(14px,0.94vw,14px)] font-normal font-sans leading-none">
                         Explore paths aligned with your strengths.
                     </p>
                 </div>
 
                 {/* Roadmaps Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-5 xl:gap-6">
                     {roadmaps.map((roadmap) => (
                         <RoadmapCard key={roadmap.id} item={roadmap} onSelect={handleSelectRoadmap} />
                     ))}

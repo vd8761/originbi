@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { RoadmapItem as RoadmapItemType } from '@/lib/types';
-import { CrossRightArrowIcon } from '@/components/icons';
+import { ArrowUpRightIcon } from '@/components/icons';
 
 const RoadmapItem: React.FC<{ item: RoadmapItemType & { id?: string } }> = ({ item }) => (
     <div
@@ -20,7 +20,7 @@ const RoadmapItem: React.FC<{ item: RoadmapItemType & { id?: string } }> = ({ it
                 href={item.id ? `/student/roadmaps?id=${item.id}` : '#'}
                 className="bg-brand-green text-white w-8 h-8 lg:w-[1.66vw] lg:h-[1.66vw] rounded-full flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110"
             >
-                <CrossRightArrowIcon className="w-5 h-5 lg:w-[1.04vw] lg:h-[1.04vw]" />
+                <ArrowUpRightIcon className="w-5 h-5 lg:w-[1.04vw] lg:h-[1.04vw]" />
             </Link>
         </div>
     </div>
