@@ -52,10 +52,13 @@ func (h *ExamHandler) StartExam(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, models.ServiceResponse{
-		Status:  "success",
-		Message: "Exam started",
-		Data:    questions, // Return the list of questions
+	isLast, _ := h.service.IsLastLevel(req.ExamID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":        "success",
+		"message":       "Exam started",
+		"data":          questions,
+		"is_last_level": isLast,
 	})
 }
 

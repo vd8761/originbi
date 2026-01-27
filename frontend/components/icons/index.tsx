@@ -1142,16 +1142,15 @@ export const ArrowUpRightIcon: React.FC<{ className?: string }> = ({
 }) => (
   <svg
     className={className}
-    viewBox="0 0 24 24"
+    viewBox="0 0 29 29"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
   >
     <path
-      d="M7 17L17 7M17 7H7M17 7V17"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M10.3621 8.83903C10.3621 8.37881 10.7353 8.00569 11.1955 8.0057L19.4451 8.00571C19.9053 8.00571 20.2784 8.37882 20.2784 8.83903L20.2784 17.0886C20.2784 17.5488 19.9053 17.9219 19.4451 17.9219C18.9848 17.9219 18.6117 17.5488 18.6117 17.0886L18.6117 10.8509L9.42771 20.0349C9.10228 20.3603 8.57465 20.3603 8.2492 20.0349C7.92376 19.7094 7.92377 19.1818 8.2492 18.8564L17.4332 9.67236L11.1955 9.67236C10.7353 9.67235 10.3622 9.29925 10.3621 8.83903Z"
+      fill="currentColor"
     />
   </svg>
 );
