@@ -3,11 +3,13 @@ import {
   Post,
   Body,
   Get,
+  Query,
   Res,
   Req,
   Param,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
 import {
@@ -24,6 +26,7 @@ import { Type } from 'class-transformer';
 import { RagService } from './rag.service';
 import { SyncService } from './sync.service';
 import { FutureRoleReportService } from './future-role-report.service';
+import { OverallRoleFitmentService } from './overall-role-fitment.service';
 
 // DTO for query request
 export class RagQueryDto {
@@ -121,6 +124,32 @@ export class BulkIngestDto {
   documents: IngestDocumentDto[];
 }
 
+// DTO for Overall Report
+export class OverallReportDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  groupId?: number;
+
+  @IsOptional()
+  @IsString()
+  groupCode?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  programId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  corporateId?: number;
+
+  @IsOptional()
+  @IsString()
+  title?: string;
+}
+
 // Response interface
 export interface RagResponse {
   answer: string;
@@ -132,6 +161,7 @@ export interface RagResponse {
   sources?: any[];
   searchType?: string;
   sql?: string;
+  confidence?: number;
 }
 
 @Controller('rag')
@@ -140,7 +170,8 @@ export class RagController {
     private readonly ragService: RagService,
     private readonly syncService: SyncService,
     private readonly futureRoleReportService: FutureRoleReportService,
-  ) {}
+    private readonly overallRoleFitmentService: OverallRoleFitmentService,
+  ) { }
 
   /**
    * POST /rag/career-report
@@ -159,6 +190,32 @@ export class RagController {
     } catch (error) {
       throw new HttpException(
         error.message || 'Failed to generate career report',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * GET /rag/overall-report/pdf
+   * Generate Overall Role Fitment Report PDF
+   */
+  @Get('overall-report/pdf')
+  async generateOverallReportPdf(
+    @Query() dto: OverallReportDto,
+    @Res() res: Response,
+  ) {
+    try {
+      const pdfBuffer = await this.overallRoleFitmentService.generatePdf(dto);
+
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'attachment; filename="overall-role-fitment.pdf"',
+        'Content-Length': pdfBuffer.length,
+      });
+      res.send(pdfBuffer);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to generate overall report PDF',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

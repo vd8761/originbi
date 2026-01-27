@@ -3,8 +3,8 @@ import { Injectable, Logger } from '@nestjs/common';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
- * ║                    ORI CONVERSATION SERVICE                               ║
- * ║           Intelligent Memory & Context Management for ORI                ║
+ * ║                    MITHRA CONVERSATION SERVICE                            ║
+ * ║           Intelligent Memory & Context Management for MITHRA             ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
  * ║  FEATURES:                                                                ║
  * ║  • Session-based conversation memory                                      ║
@@ -15,7 +15,7 @@ import { Injectable, Logger } from '@nestjs/common';
  */
 
 interface ConversationMessage {
-    role: 'user' | 'ori';
+    role: 'user' | 'mithra';
     content: string;
     timestamp: Date;
     intent?: string;
@@ -129,13 +129,13 @@ export class ConversationService {
     }
 
     /**
-     * Add ORI's response to the session
+     * Add MITHRA's response to the session
      */
-    addOriResponse(sessionId: string, content: string, intent?: string): void {
+    addMithraResponse(sessionId: string, content: string, intent?: string): void {
         const session = this.getSession(sessionId);
 
         session.messages.push({
-            role: 'ori',
+            role: 'mithra',
             content,
             timestamp: new Date(),
             intent,
@@ -215,7 +215,7 @@ export class ConversationService {
 
         let context = 'Previous conversation:\n';
         recentMessages.forEach(msg => {
-            const role = msg.role === 'user' ? 'User' : 'ORI';
+            const role = msg.role === 'user' ? 'User' : 'MITHRA';
             const shortContent = msg.content.length > 200
                 ? msg.content.substring(0, 200) + '...'
                 : msg.content;

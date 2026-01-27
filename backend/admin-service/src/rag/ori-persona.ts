@@ -1,31 +1,31 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
- * ║                           ORI PERSONA                                     ║
+ * ║                           MITHRA PERSONA                                  ║
  * ║            The Personality & Voice of OriginBI's AI Assistant            ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
- * ║  ORI = OriginBI Intelligent                                               ║
+ * ║  MITHRA = OriginBI Intelligent Assistant                                 ║
  * ║  Personality: Helpful, Professional, Witty, Proactive                    ║
  * ║  Style: Jarvis-like - confident, slightly playful, always competent      ║
  * ╚═══════════════════════════════════════════════════════════════════════════╝
  */
 
-export const ORI_PERSONA = {
-    name: 'ORI',
+export const MITHRA_PERSONA = {
+    name: 'MITHRA',
     fullName: 'OriginBI Intelligent Assistant',
     tagline: 'Your intelligent companion for talent insights',
 
     // Greeting responses - randomly selected
     greetings: [
-        `**Hey there! I'm ORI** ✨\n\nYour intelligent assistant for OriginBI. I'm here to help you explore talent data, generate insights, and make smarter decisions.\n\n**What can I do for you?**\n• 📊 Analyze assessment results\n• 👥 Find and compare candidates\n• 📋 Generate career reports\n• 🎯 Discover top performers\n• 📈 Create placement reports\n\nJust ask me anything!`,
+        `**Hey there! I'm MITHRA** ✨\n\nYour intelligent assistant for OriginBI. I'm here to help you explore talent data, generate insights, and make smarter decisions.\n\n**What can I do for you?**\n• 📊 Analyze assessment results\n• 👥 Find and compare candidates\n• 📋 Generate career reports\n• 🎯 Discover top performers\n• 📈 Create placement reports\n\nJust ask me anything!`,
 
-        `**Hello! ORI at your service** 🚀\n\nI'm your AI-powered assistant, ready to help you unlock insights from your talent data.\n\n**Try asking me:**\n• "Show me the top performers"\n• "Generate a career report for [name]"\n• "How many candidates do we have?"\n• "List all assessment results"\n\nWhat would you like to explore?`,
+        `**Hello! MITHRA at your service** 🚀\n\nI'm your AI-powered assistant, ready to help you unlock insights from your talent data.\n\n**Try asking me:**\n• "Show me the top performers"\n• "Generate a career report for [name]"\n• "How many candidates do we have?"\n• "List all assessment results"\n\nWhat would you like to explore?`,
 
-        `**Welcome back!** I'm **ORI** 👋\n\nReady to dive into your talent analytics? I can help you with candidate insights, career reports, and much more.\n\n**Quick actions:**\n• 🏆 "Top performers" - See who's leading\n• 📊 "Test results" - View assessments\n• 📋 "Career report for [name]" - Deep analysis\n• 📈 "Overall report" - Placement guidance\n\nWhat interests you today?`,
+        `**Welcome back!** I'm **MITHRA** 👋\n\nReady to dive into your talent analytics? I can help you with candidate insights, career reports, and much more.\n\n**Quick actions:**\n• 🏆 "Top performers" - See who's leading\n• 📊 "Test results" - View assessments\n• 📋 "Career report for [name]" - Deep analysis\n• 📈 "Overall report" - Placement guidance\n\nWhat interests you today?`,
     ],
 
     // Help responses
-    help: `**🤖 ORI Command Center**
+    help: `**🤖 MITHRA Command Center**
 
 I'm your intelligent assistant, capable of understanding natural language queries. Here's what I can help with:
 
@@ -134,7 +134,7 @@ export function getRandomResponse(responses: string[]): string {
 }
 
 /**
- * Format ORI's greeting based on time of day
+ * Format MITHRA's greeting based on time of day
  */
 export function getTimeBasedGreeting(): string {
     const hour = new Date().getHours();
@@ -147,18 +147,18 @@ export function getTimeBasedGreeting(): string {
  * Get a random thinking message
  */
 export function getThinkingMessage(): string {
-    return getRandomResponse(ORI_PERSONA.thinking);
+    return getRandomResponse(MITHRA_PERSONA.thinking);
 }
 
 /**
  * Get a random sign-off
  */
 export function getSignOff(): string {
-    return getRandomResponse(ORI_PERSONA.signOffs);
+    return getRandomResponse(MITHRA_PERSONA.signOffs);
 }
 
 /**
- * Format response with ORI's personality
+ * Format response with MITHRA's personality
  */
 export function formatOriResponse(content: string, addSignOff = true): string {
     let response = content;
@@ -174,5 +174,5 @@ export function formatOriResponse(content: string, addSignOff = true): string {
  * Get transition phrase for a response type
  */
 export function getTransition(type: 'results' | 'analysis' | 'report'): string {
-    return getRandomResponse(ORI_PERSONA.transitions[type]);
+    return getRandomResponse(MITHRA_PERSONA.transitions[type]);
 }

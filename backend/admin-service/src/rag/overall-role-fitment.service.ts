@@ -2,6 +2,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ChatGroq } from '@langchain/groq';
+import { PdfService } from '../common/pdf/pdf.service';
+import { OverallReportData } from '../common/pdf/overall-fitment-report';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 
 /**
@@ -423,7 +425,10 @@ export class OverallRoleFitmentService {
   private readonly logger = new Logger(OverallRoleFitmentService.name);
   private llm: ChatGroq | null = null;
 
-  constructor(private dataSource: DataSource) { }
+  constructor(
+    private dataSource: DataSource,
+    private pdfService: PdfService
+  ) { }
 
   private getLlm(): ChatGroq {
     if (!this.llm) {
@@ -465,6 +470,25 @@ export class OverallRoleFitmentService {
       personalityGroups,
       fullReportText,
     };
+  }
+
+  async generatePdf(input: GroupReportInput): Promise<Buffer> {
+    const report = await this.generateReport(input);
+
+    const pdfData: OverallReportData = {
+      reportId: report.reportId,
+      title: report.title,
+      generatedAt: report.generatedAt,
+      totalStudents: report.totalStudents,
+      personalityGroups: report.personalityGroups.map(g => ({
+        ...g,
+        // Explicitly map if needed, but structure is compatible
+        eligibleRoles: g.eligibleRoles // Ensure logic for eligibleroles matches
+      })),
+      fullReportText: report.fullReportText
+    };
+
+    return this.pdfService.generateOverallReport(pdfData);
   }
 
   private async fetchStudentsByPersonality(

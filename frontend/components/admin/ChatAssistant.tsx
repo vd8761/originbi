@@ -91,7 +91,11 @@ const RenderContent = ({ content, streaming, onDone, apiUrl }: { content: string
             const downloadUrl = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = downloadUrl;
-            a.download = `${reportPath.split('/').pop()}.txt`;
+            // Determine extension based on content type
+            const contentType = response.headers.get('content-type') || '';
+            const ext = contentType.includes('pdf') ? '.pdf' : contentType.includes('text') ? '.txt' : '';
+            const filename = reportPath.split('/').pop()?.split('?')[0] || 'report';
+            a.download = `${filename}${ext}`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -245,7 +249,7 @@ export default function ChatAssistant({
     const clearChat = () => setMessages([]);
 
     const suggestions = [
-        { icon: '👋', text: 'Say hello to ORI' },
+        { icon: '👋', text: 'Say hello to MITHRA' },
         { icon: '🏆', text: 'Show top performers' },
         { icon: '📊', text: 'Generate career report' },
         { icon: '👥', text: 'List all candidates' },
@@ -263,7 +267,7 @@ export default function ChatAssistant({
                         <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-cyan-400 rounded-full border-2 border-white dark:border-[#0f1115]" />
                     </div>
                     <div className="min-w-0">
-                        <h1 className="text-gray-900 dark:text-white font-bold text-sm sm:text-base truncate">ORI</h1>
+                        <h1 className="text-gray-900 dark:text-white font-bold text-sm sm:text-base truncate">MITHRA</h1>
                         <div className="flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
                             <span className="text-gray-400 text-[9px] sm:text-[10px] font-medium">Intelligent Assistant</span>
@@ -297,7 +301,7 @@ export default function ChatAssistant({
                         </div>
 
                         <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-3 tracking-tight text-center">
-                            Hello, I'm <span className="bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">ORI</span>
+                            Hello, I'm <span className="bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">MITHRA</span>
                         </h2>
                         <p className="text-gray-500 dark:text-gray-400 text-center max-w-md mb-6 sm:mb-10 text-sm sm:text-base px-4">
                             Your intelligent companion for talent insights. Ask me anything about your data!
@@ -405,7 +409,7 @@ export default function ChatAssistant({
                                             <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                                             <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                                         </div>
-                                        <span className="text-gray-400 dark:text-gray-300 text-sm ml-1">ORI is thinking...</span>
+                                        <span className="text-gray-400 dark:text-gray-300 text-sm ml-1">MITHRA is thinking...</span>
                                     </div>
                                 </div>
                             </div>
@@ -430,7 +434,7 @@ export default function ChatAssistant({
                                     handleSend();
                                 }
                             }}
-                            placeholder="Ask ORI anything..."
+                            placeholder="Ask MITHRA anything..."
                             rows={1}
                             className="flex-1 bg-transparent px-2 sm:px-3 py-2 sm:py-2.5 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 resize-none focus:outline-none text-sm sm:text-[15px]"
                             disabled={loading}
@@ -448,7 +452,7 @@ export default function ChatAssistant({
                         </button>
                     </div>
                     <p className="text-center text-[10px] sm:text-xs text-gray-400 mt-2 sm:mt-3 hidden sm:block">
-                        <span className="font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">ORI</span> • OriginBI Intelligent Assistant
+                        <span className="font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">MITHRA</span> • OriginBI Intelligent Assistant
                     </p>
                 </div>
             </div>

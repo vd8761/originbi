@@ -6,7 +6,7 @@ import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
- * ║                    ORI INTELLIGENCE SERVICE                               ║
+ * ║                    MITHRA INTELLIGENCE SERVICE                            ║
  * ║         Advanced AI Brain - Like JARVIS for Career Guidance              ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
  * ║  CAPABILITIES:                                                            ║
@@ -43,7 +43,7 @@ interface CareerSuitability {
 
 interface UserMemory {
     userId: number;
-    facts: Map<string, string>; // Things ORI learned about the user
+    facts: Map<string, string>; // Things MITHRA learned about the user
     preferences: Map<string, string>;
     conversationHistory: string[];
     lastInteraction: Date;
@@ -51,7 +51,7 @@ interface UserMemory {
 
 @Injectable()
 export class OriIntelligenceService {
-    private readonly logger = new Logger('ORI-Intelligence');
+    private readonly logger = new Logger('MITHRA-Intelligence');
     private llm: ChatGroq | null = null;
     private userMemories: Map<number, UserMemory> = new Map();
 
@@ -126,7 +126,7 @@ export class OriIntelligenceService {
     };
 
     constructor(private dataSource: DataSource) {
-        this.logger.log('🧠 ORI Intelligence Service activated');
+        this.logger.log('🧠 MITHRA Intelligence Service activated');
     }
 
     private getLlm(): ChatGroq {
@@ -365,7 +365,7 @@ export class OriIntelligenceService {
 
         // Use LLM to provide nuanced advice
         const prompt = `
-You are ORI, a friendly career advisor. A user with ${profile.personalityStyle || 'undetermined'} personality style (Agile score: ${profile.agileScore || 'N/A'}) wants to know if they can try "${jobTitle}".
+You are MITHRA, a friendly career advisor. A user with ${profile.personalityStyle || 'undetermined'} personality style (Agile score: ${profile.agileScore || 'N/A'}) wants to know if they can try "${jobTitle}".
 
 Be encouraging but honest. If it's a stretch, suggest how they can work towards it. 
 Keep response under 100 words. Be warm and supportive like a mentor.
@@ -399,7 +399,7 @@ Keep response under 100 words. Be warm and supportive like a mentor.
         const personality = profile?.personalityStyle || 'not assessed yet';
         const score = profile?.agileScore ? `${profile.agileScore.toFixed(0)}%` : 'pending';
 
-        const systemPrompt = `You are ORI (OriginBI Intelligent), a JARVIS-like AI assistant. You're an expert in careers, technology, learning paths, and professional development.
+        const systemPrompt = `You are MITHRA (OriginBI Intelligent), a JARVIS-like AI assistant. You're an expert in careers, technology, learning paths, and professional development.
 
 **User Profile:**
 - Name: ${userName}

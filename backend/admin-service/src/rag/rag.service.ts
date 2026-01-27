@@ -8,13 +8,14 @@ import { FutureRoleReportService } from './future-role-report.service';
 import { OverallRoleFitmentService } from './overall-role-fitment.service';
 import { ConversationService } from './conversation.service';
 import { OriIntelligenceService } from './ori-intelligence.service';
-import { ORI_PERSONA, getRandomResponse, getSignOff } from './ori-persona';
+
+import { MITHRA_PERSONA, getRandomResponse, getSignOff } from './ori-persona';
 import * as fs from 'fs';
 import * as path from 'path';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
- * ║                          🤖 ORI v2.0 - JARVIS EDITION                     ║
+ * ║                          🤖 MITHRA v2.0 - JARVIS EDITION                  ║
  * ║              OriginBI Intelligent - Your Career Guide                    ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
  * ║  FEATURES:                                                                ║
@@ -111,7 +112,7 @@ const AGILE_LEVELS = {
 
 @Injectable()
 export class RagService {
-  private readonly logger = new Logger('ORI');
+  private readonly logger = new Logger('MITHRA');
   private llm: ChatGroq | null = null;
   private reportsDir: string;
 
@@ -127,7 +128,7 @@ export class RagService {
     if (!fs.existsSync(this.reportsDir)) {
       fs.mkdirSync(this.reportsDir, { recursive: true });
     }
-    this.logger.log('🤖 ORI v2.0 initialized - Your intelligent career guide!');
+    this.logger.log('🤖 MITHRA v2.0 initialized - Your intelligent career guide!');
   }
 
   private getLlm(): ChatGroq {
@@ -172,7 +173,7 @@ export class RagService {
       // ═══════════════════════════════════════════════════════════════
       if (interpretation.intent === 'greeting') {
         return {
-          answer: getRandomResponse(ORI_PERSONA.greetings),
+          answer: getRandomResponse(MITHRA_PERSONA.greetings),
           searchType: 'greeting',
           confidence: 1.0,
         };
@@ -180,7 +181,7 @@ export class RagService {
 
       if (interpretation.intent === 'help') {
         return {
-          answer: ORI_PERSONA.help,
+          answer: MITHRA_PERSONA.help,
           searchType: 'help',
           confidence: 1.0,
         };
@@ -505,24 +506,27 @@ export class RagService {
 
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // OVERALL ROLE FITMENT REPORT HANDLER
+  // HANDLER: OVERALL ROLE FITMENT
   // ═══════════════════════════════════════════════════════════════════════════
   private async handleOverallReport(user: any): Promise<QueryResult> {
     try {
       this.logger.log(`📊 Generating Overall Role Fitment Report`);
 
-      // Get corporate/group context from user if available
+      const reportTitle = 'Placement Guidance Report';
+      const downloadUrl = `/rag/overall-report/pdf?title=${encodeURIComponent(reportTitle)}`;
+
+
       const input = {
         corporateId: user?.corporate_id,
-        title: 'Placement Guidance Report',
+        title: reportTitle,
       };
 
       const report = await this.overallRoleFitmentService.generateReport(input);
 
       return {
-        answer: this.overallRoleFitmentService.formatForChat(report),
+        answer: `I've generated the **Overall Role Fitment Report** for you. \n\n📄 **[Click here to download the PDF Report](${downloadUrl})**\n\nSince I can't display the full graphical report here, please download the PDF for the complete analysis including charts and tables.\n\nSummary:\n${this.overallRoleFitmentService.formatForChat(report)}`,
         searchType: 'overall_report',
-        reportId: report.reportId,
+        // reportId: report.reportId, // Not in RagResponse interface usually
         confidence: 0.95,
       };
     } catch (error) {
@@ -969,7 +973,7 @@ Respond with ONLY valid JSON, no explanation:`;
 
     return {
       status: 'ok',
-      name: 'ORI',
+      name: 'MITHRA',
       version: '2.0.0-jarvis',
       description: 'OriginBI Intelligent - Your Career Guide (JARVIS Edition)',
       features: [
@@ -1010,5 +1014,20 @@ Respond with ONLY valid JSON, no explanation:`;
   }
   async generatePdf(data: any, q: string) {
     return Buffer.from(`Query: ${q}\n\n${data.answer}`);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HANDLER: OVERALL ROLE FITMENT
+  // ═══════════════════════════════════════════════════════════════════════════
+  private async handleOverallReport_Unused(user: any): Promise<any> {
+    const reportTitle = 'Placement Guidance Report';
+    // Link relative to API root (Frontend should proxy or handle this)
+    const downloadUrl = `${process.env.API_BASE_URL || 'http://localhost:3001/api/admin'}/rag/overall-report/pdf?groupId=1&title=${encodeURIComponent(reportTitle)}`;
+
+    return {
+      answer: `I've generated the **Overall Role Fitment Report** for you. \n\nThis report analyzes student data to identify personality groups and recommend suitable career paths.\n\n📄 **[Click here to download the PDF Report](${downloadUrl})**`,
+      searchType: 'overall_report',
+      confidence: 1.0,
+    };
   }
 }

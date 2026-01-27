@@ -14,6 +14,7 @@ import {
   AssessmentSession,
   User,
 } from '@originbi/shared-entities';
+import { PdfModule } from '../common/pdf/pdf.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import {
       AssessmentSession,
       User,
     ]),
+    PdfModule,
   ],
   controllers: [RagController],
   providers: [
