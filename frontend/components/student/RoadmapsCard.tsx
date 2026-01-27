@@ -58,7 +58,7 @@ const RoadmapsCard: React.FC = () => {
     return (
         <div className="bg-white/20 border border-[#19211C]/12 dark:bg-brand-dark-secondary dark:border-transparent rounded-2xl h-full flex flex-col backdrop-blur-sm">
             <div className="px-6 pt-6 pb-4 lg:px-[1.25vw] lg:pt-[1.25vw] lg:pb-[0.833vw] flex justify-between items-center">
-                <h3 className="font-semibold font-sans text-[#19211C] dark:text-white text-lg lg:text-[1.25vw]">
+                <h3 className="font-semibold font-sans text-[#19211C] dark:text-white text-[18px]">
                     Your Roadmaps 2027-2035
                 </h3>
                 <Link

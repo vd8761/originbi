@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeftWithoutLineIcon, ArrowRightWithoutLineIcon} from '@/components/icons';
+import { ArrowLeftWithoutLineIcon, ArrowRightWithoutLineIcon } from '@/components/icons';
 
 type DatePreset = 'All' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'Last 30 Days' | 'This Month' | 'Last Month' | 'Custom Range';
 
@@ -23,16 +23,16 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
     if (!isOpen) return null;
 
     const [activePreset, setActivePreset] = useState<DatePreset>('Today');
-    
+
     // Defaulting to current month for left calendar
-    const [currentMonthLeft, setCurrentMonthLeft] = useState(new Date()); 
+    const [currentMonthLeft, setCurrentMonthLeft] = useState(new Date());
     // Right calendar is always next month
     const [currentMonthRight, setCurrentMonthRight] = useState(() => {
         const d = new Date();
         d.setMonth(d.getMonth() + 1);
         return d;
     });
-    
+
     const [startDate, setStartDate] = useState<Date | null>(null);
     const [endDate, setEndDate] = useState<Date | null>(null);
 
@@ -92,7 +92,7 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
         for (let d = 1; d <= daysInMonth; d++) {
             const date = new Date(year, month, d);
             const dateTimestamp = date.getTime();
-            
+
             // Logic for restrictions and highlighting
             const isFuture = dateTimestamp > today.getTime();
             const isToday = dateTimestamp === today.getTime();
@@ -154,7 +154,7 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
                         </button>
                     ) : <div className="w-8"></div>}
                 </div>
-                
+
                 <div className="grid grid-cols-7 mb-3">
                     {weekDays.map(d => (
                         <div key={d} className="h-8 w-8 flex items-center justify-center text-[10px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wider">
@@ -181,10 +181,10 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
 
     const handleDateClick = (date: Date) => {
         setActivePreset('Custom Range');
-        
+
         // Normalize date to midnight
         const clickedDate = new Date(date);
-        clickedDate.setHours(0,0,0,0);
+        clickedDate.setHours(0, 0, 0, 0);
 
         if (!startDate || (startDate && endDate)) {
             // New selection start
@@ -205,7 +205,7 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
     const handlePresetClick = (preset: DatePreset) => {
         setActivePreset(preset);
         const now = new Date();
-        now.setHours(0,0,0,0);
+        now.setHours(0, 0, 0, 0);
 
         if (preset === 'Today') {
             setStartDate(now);
@@ -251,7 +251,7 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
             <div className="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm" onClick={onClose} />
-            
+
             <div className="relative bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden animate-fade-in flex flex-col">
                 {/* Header - Fixed */}
                 <div className="flex justify-between items-center p-5 border-b border-gray-200 dark:border-white/5 shrink-0">
@@ -269,26 +269,24 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
                                 <button
                                     key={preset}
                                     onClick={() => handlePresetClick(preset)}
-                                    className={`text-left px-4 py-3 rounded-lg text-sm font-medium transition-all ${
-                                        activePreset === preset
-                                        ? 'bg-white dark:bg-[#24272B] text-brand-text-light-primary dark:text-white shadow-sm' 
-                                        : 'text-gray-500 dark:text-gray-400 hover:text-brand-text-light-primary dark:hover:text-white hover:bg-white dark:hover:bg-white/5'
-                                    }`}
+                                    className={`text-left px-4 py-3 rounded-lg text-sm font-medium transition-all ${activePreset === preset
+                                            ? 'bg-white dark:bg-[#24272B] text-brand-text-light-primary dark:text-white shadow-sm'
+                                            : 'text-gray-500 dark:text-gray-400 hover:text-brand-text-light-primary dark:hover:text-white hover:bg-white dark:hover:bg-white/5'
+                                        }`}
                                 >
                                     {preset}
                                 </button>
                             ))}
                         </div>
-                        
+
                         {/* Custom Range Button at Bottom */}
                         <div className="pt-4 border-t border-gray-200 dark:border-white/5 mt-2">
                             <button
                                 onClick={() => setActivePreset('Custom Range')}
-                                className={`w-full text-center px-4 py-3 rounded-lg text-sm font-bold transition-all ${
-                                    activePreset === 'Custom Range'
-                                    ? 'bg-brand-green text-white shadow-lg shadow-brand-green/20' 
-                                    : 'bg-brand-green/10 text-brand-green hover:bg-brand-green/20'
-                                }`}
+                                className={`w-full text-center px-4 py-3 rounded-lg text-sm font-bold transition-all ${activePreset === 'Custom Range'
+                                        ? 'bg-brand-green text-white shadow-lg shadow-brand-green/20'
+                                        : 'bg-brand-green/10 text-brand-green hover:bg-brand-green/20'
+                                    }`}
                             >
                                 Custom Range
                             </button>
@@ -317,28 +315,27 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
                         <button onClick={onClose} className="flex-1 sm:flex-none px-6 py-2.5 rounded-full border border-gray-300 dark:border-white/10 text-brand-text-light-primary dark:text-white text-sm font-medium hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
                             Clear
                         </button>
-                        <button 
+                        <button
                             onClick={() => {
                                 if (startDate) {
                                     let finalStart = startDate;
-                                    let finalEnd = endDate || startDate; 
-                                    
+                                    let finalEnd = endDate || startDate;
+
                                     if (finalEnd < finalStart) {
                                         const temp = finalStart;
                                         finalStart = finalEnd;
                                         finalEnd = temp;
                                     }
-                                    
+
                                     onApply(finalStart, finalEnd, activePreset);
                                     onClose();
                                 }
                             }}
                             disabled={!startDate}
-                            className={`flex-1 sm:flex-none px-8 py-2.5 rounded-full text-white text-sm font-bold shadow-lg transition-colors ${
-                                startDate 
-                                ? 'bg-brand-green hover:bg-brand-green/90 shadow-brand-green/20' 
-                                : 'bg-brand-green/50 cursor-not-allowed opacity-50'
-                            }`}
+                            className={`flex-1 sm:flex-none px-8 py-2.5 rounded-full text-white text-sm font-bold shadow-lg transition-colors ${startDate
+                                    ? 'bg-brand-green hover:bg-brand-green/90 shadow-brand-green/20'
+                                    : 'bg-brand-green/50 cursor-not-allowed opacity-50'
+                                }`}
                         >
                             Apply changes
                         </button>

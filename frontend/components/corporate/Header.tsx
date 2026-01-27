@@ -18,6 +18,8 @@ import {
   OriginDataIcon,
   MyEmployeesIcon,
 } from "@/components/icons";
+import { corporateDashboardService } from "@/lib/services";
+import Script from "next/script";
 import BuyCreditsModal from "./BuyCreditsModal";
 
 import { useTheme } from "@/contexts/ThemeContext";
@@ -146,10 +148,62 @@ const Header: React.FC<HeaderProps> = ({
   const [corporateData, setCorporateData] = useState<any>(null);
   const [isBuyCreditsOpen, setIsBuyCreditsOpen] = useState(false);
 
-  const handleBuyCredits = (amount: number, cost: number) => {
-    console.log(`Purchasing ${amount} credits for ₹${cost}`);
-    // Implement payment gateway logic here or redirect
-    setIsBuyCreditsOpen(false);
+  const handleBuyCredits = async (amount: number, cost: number) => {
+    if (!corporateData || !corporateData.email) return;
+
+    try {
+      const order = await corporateDashboardService.createOrder(corporateData.email, amount, "Top-up via Header");
+
+      const options = {
+        key: order.key,
+        amount: order.amount,
+        currency: order.currency,
+        name: "Origin BI",
+        description: "Credit Purchase",
+        order_id: order.orderId,
+        handler: async function (response: any) {
+          try {
+            await corporateDashboardService.verifyPayment(corporateData.email, {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature
+            });
+
+            // Update local state
+            setCorporateData((prev: any) => ({
+              ...prev,
+              available_credits: (parseFloat(prev.available_credits) + amount).toString()
+            }));
+
+            setIsBuyCreditsOpen(false);
+            alert("Payment successful! Credits added.");
+          } catch (e) {
+            console.error("Verification failed", e);
+            alert("Payment verification failed.");
+          }
+        },
+        prefill: {
+          email: corporateData.email,
+          name: corporateData.full_name,
+        },
+        theme: { color: "#1ED36A" }
+      };
+
+      if (!(window as any).Razorpay) {
+        alert("Razorpay SDK not loaded. Please try again in a moment.");
+        return;
+      }
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', async function (response: any) {
+        await corporateDashboardService.recordPaymentFailure(order.orderId, response.error.description);
+        alert(`Payment Failed: ${response.error.description}`);
+      });
+      rzp.open();
+
+    } catch (e) {
+      console.error("Order failed", e);
+      alert("Failed to initiate payment");
+    }
   };
 
   useEffect(() => {
@@ -258,6 +312,11 @@ const Header: React.FC<HeaderProps> = ({
     <header
       className="fixed top-0 left-0 right-0 w-full z-50 transition-all duration-300 bg-transparent dark:bg-white/[0.08] backdrop-blur-xl border-b border-[#E0E0E0] dark:border-white/10 shadow-none"
     >
+      <Script
+        id="razorpay-checkout-js-header"
+        src="https://checkout.razorpay.com/v1/checkout.js"
+        strategy="lazyOnload"
+      />
       <div className="w-full max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 2xl:px-12 py-3 sm:py-4 flex items-center justify-between h-full">
         <div className="flex items-center gap-2 lg:gap-2 2xl:gap-4">
           {!hideNav && (

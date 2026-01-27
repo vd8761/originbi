@@ -3,7 +3,7 @@
 import React, { Suspense } from 'react';
 import Logo from '@/components/ui/Logo';
 import FirstTimeResetForm from '@/components/student/FirstTimeResetForm';
-import ForgotPasswordHero from '@/components/student/ForgotPasswordHero';
+import SetNewPasswordHero from '@/components/student/SetNewPasswordHero'; // Correct import
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import { useTheme } from '@/contexts/ThemeContext';
 
@@ -65,7 +65,7 @@ const FirstTimeReset: React.FC = () => {
                 {/* Right Column: Testimonial/Hero Image - Reusing variant 'reset' for similar look */}
                 <div className="order-2 lg:col-span-7 hidden lg:flex h-full p-[clamp(16px,2vw,32px)] items-center justify-center">
                     <div className="w-full h-full rounded-[clamp(1.5rem,2.5vw,2.5rem)] overflow-hidden relative shadow-2xl">
-                        <ForgotPasswordHero variant="reset" />
+                        <SetNewPasswordHero />
                     </div>
                 </div>
 

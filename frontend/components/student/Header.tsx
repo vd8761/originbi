@@ -46,18 +46,17 @@ const NavItem: React.FC<NavItemProps> = ({
     // COMPACT on LG/XL to prevent overlap. ROBUST on 2XL.
     const showDesktopText = "hidden lg:inline";
 
-    // Mobile specific spacing + alignment
-    const mobileClasses = isMobile
+    const spacingClass = isMobile
         ? "justify-start px-4 h-12 w-full gap-3 text-base"
-        : "justify-center gap-0 lg:gap-1 2xl:gap-2 h-8 lg:h-8 2xl:h-9 px-2.5 2xl:px-4 text-xs 2xl:text-sm";
+        : "justify-center gap-1 lg:gap-2 2xl:gap-3";
 
     return (
         <div className={`relative group ${isMobile ? "w-full" : ""}`}>
             <button
                 onClick={onClick}
-                className={`flex items-center rounded-full transition-all duration-200 cursor-pointer ${mobileClasses} ${active
+                className={`flex items-center rounded-full transition-all duration-200 cursor-pointer ${spacingClass} ${isMobile ? "" : "h-8 lg:h-8 2xl:h-9 px-2.5 2xl:px-4"} ${active
                     ? "bg-[#1ED36A] text-white shadow-[0_4px_14px_0_rgba(30,211,106,0.25)] border border-transparent"
-                    : "bg-white border border-gray-200 text-[#19211C] hover:bg-gray-50 hover:text-black hover:border-gray-300 dark:bg-black/20 dark:border-white/5 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
+                    : "bg-white border border-gray-200 text-[#19211C] hover:bg-gray-50 hover:text-black hover:border-gray-300 dark:bg-transparent dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
                     }`}
             >
                 <div className={`${active ? "text-white" : "text-[#1ED36A] dark:text-gray-400 group-hover:dark:text-white"}`}>
@@ -106,7 +105,21 @@ const NotificationItem: React.FC<{
     </div>
 );
 
-import { useLanguage, Language } from "@/contexts/LanguageContext";
+
+
+import { useLanguage } from "@/contexts/LanguageContext";
+
+// ... existing imports
+
+interface HeaderProps {
+    onLogout: () => void;
+    currentView?: "dashboard" | "assessment" | "roadmaps";
+    onNavigate?: (view: "dashboard" | "assessment") => void;
+    hideNav?: boolean;
+    showAssessmentOnly?: boolean;
+}
+
+// ... NavItem and NotificationItem components ...
 
 const Header: React.FC<HeaderProps> = ({
     onLogout,
@@ -116,12 +129,11 @@ const Header: React.FC<HeaderProps> = ({
     showAssessmentOnly = false,
 }) => {
     const { theme, toggleTheme } = useTheme();
-    const { language, setLanguage } = useLanguage();
+    const { language, setLanguage } = useLanguage(); // Use Global Context
     const [isProfileOpen, setProfileOpen] = useState(false);
     const [isLangOpen, setLangOpen] = useState(false);
     const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [isNotificationsOpen, setNotificationsOpen] = useState(false);
-    // const [language, setLanguage] = useState("ENG"); // Removed
     const [hasNotification, setHasNotification] = useState(true);
 
     const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -178,7 +190,7 @@ const Header: React.FC<HeaderProps> = ({
         return () => { document.removeEventListener("mousedown", handleClickOutside); };
     }, [isMobileMenuOpen]);
 
-    const handleLangChange = (lang: Language) => { setLanguage(lang); setLangOpen(false); };
+    const handleLangChange = (lang: "ENG" | "TAM") => { setLanguage(lang); setLangOpen(false); };
     const handleNotificationClick = () => { setNotificationsOpen((p) => !p); if (hasNotification) setHasNotification(false); };
 
     const router = useRouter();
@@ -240,8 +252,8 @@ const Header: React.FC<HeaderProps> = ({
     };
 
     return (
-        <header className="fixed top-0 left-0 right-0 w-full bg-[url('/Background_Light_Theme.svg')] bg-cover bg-center bg-no-repeat bg-fixed dark:bg-none dark:bg-[#19211C] z-50 border-b border-gray-200 dark:border-white/5 shadow-sm dark:shadow-none">
-            <div className="w-full max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 2xl:px-12 py-2.5 sm:py-3.5 flex items-center justify-between h-full">
+        <header className="fixed top-0 left-0 right-0 w-full bg-white dark:bg-brand-dark-secondary z-50 border-b border-gray-200 dark:border-white/5 shadow-sm dark:shadow-none">
+            <div className="w-full max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 2xl:px-12 py-3 sm:py-4 flex items-center justify-between h-full">
                 <div className="flex items-center gap-2 lg:gap-2 2xl:gap-4">
                     {!hideNav && (
                         <button
@@ -258,15 +270,14 @@ const Header: React.FC<HeaderProps> = ({
                     <img src="/Origin-BI-white-logo.png" alt="OriginBI Logo" className="h-5 lg:h-6 2xl:h-7 w-auto hidden dark:block" />
 
                     {!hideNav && (
-                        <nav className="hidden md:flex items-center space-x-2 lg:space-x-3 2xl:space-x-4 ml-4 lg:ml-6 2xl:ml-8">
+                        <nav className="hidden md:flex items-center space-x-1 lg:space-x-1 2xl:space-x-2 ml-2 lg:ml-2 2xl:ml-6">
                             {renderNavItems(false)}
                         </nav>
                     )}
                 </div>
 
                 <div className="flex items-center gap-1 sm:gap-2 lg:gap-2 2xl:gap-4">
-                    <div className="hidden sm:block">
-                        {/* Theme Toggle: Scale to h-8 (Laptop) / h-9 (2XL) */}
+                    <div>
                         <div className="scale-90 lg:scale-100 2xl:scale-110 origin-right">
                             <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
                         </div>
@@ -274,10 +285,10 @@ const Header: React.FC<HeaderProps> = ({
 
 
                     {/* 2. Language: h-8 (Laptop) / h-9 (2XL) - VISIBLE ALWAYS */}
-                    <div className="relative hidden sm:block" ref={langMenuRef}>
+                    <div className="relative" ref={langMenuRef}>
                         <button
                             onClick={() => setLangOpen((p) => !p)}
-                            className="bg-white border border-brand-green text-[#19211C] hover:bg-gray-50 dark:bg-black/20 dark:border-white/5 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white flex items-center justify-center space-x-2 px-4 h-8 2xl:h-9 rounded-full font-semibold text-[11px] 2xl:text-xs transition-all cursor-pointer"
+                            className="bg-white border border-gray-200 text-[#19211C] hover:bg-gray-50 hover:border-gray-300 dark:bg-transparent dark:border-white/10 dark:text-white/80 dark:hover:bg-white/5 dark:hover:text-white flex items-center justify-center space-x-2 px-2 sm:px-3 lg:px-4 h-8 2xl:h-9 rounded-full font-semibold text-[11px] 2xl:text-xs transition-all cursor-pointer"
                         >
                             <span>{language}</span>
                             <ChevronDownIcon className="w-3 h-3 opacity-60" />
@@ -317,42 +328,42 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
 
 
-                    <div className="w-px h-6 lg:h-6 2xl:h-8 bg-gray-300 dark:bg-[#2D3136] hidden lg:block mx-1 2xl:mx-2"></div>
+                    <div className="w-px h-6 lg:h-6 2xl:h-8 bg-gray-300 dark:bg-[#2D3136] hidden lg:block mx-2 2xl:mx-3"></div>
 
                     {/* User Profile Section */}
                     <div className="relative" ref={profileMenuRef}>
                         <button
                             onClick={() => setProfileOpen((prev) => !prev)}
-                            className="flex items-center gap-2 sm:gap-3 focus:outline-none text-left cursor-pointer dark:bg-black/20 dark:border-white/5 dark:hover:bg-white/5 border border-transparent rounded-full px-2 py-1 transition-all"
+                            className="flex items-center gap-2 sm:gap-3 focus:outline-none text-left cursor-pointer"
                         >
                             {!user ? (
-                                <div className="w-7 h-7 2xl:w-8 2xl:h-8 rounded-full bg-gray-200 dark:bg-gray-800 animate-pulse flex-shrink-0"></div>
+                                <div className="w-9 h-9 2xl:w-10 2xl:h-10 rounded-full bg-gray-200 dark:bg-gray-800 animate-pulse flex-shrink-0"></div>
                             ) : (
                                 <img
                                     src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'Student')}&background=1ED36A&color=fff`}
                                     alt="User Avatar"
-                                    className="w-7 h-7 2xl:w-8 2xl:h-8 rounded-full border border-white/10"
+                                    className="w-9 h-9 2xl:w-10 2xl:h-10 rounded-full border border-brand-light-tertiary dark:border-white/10"
                                 />
                             )}
-                            <div className="hidden lg:block text-left mr-1">
+                            <div className="hidden xl:block text-left mr-1">
                                 {!user ? (
                                     <div className="flex flex-col gap-1">
-                                        <span className="h-3 w-20 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></span>
-                                        <span className="h-2 w-14 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></span>
+                                        <span className="h-4 w-24 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></span>
+                                        <span className="h-3 w-16 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></span>
                                     </div>
                                 ) : (
                                     <>
-                                        <p className="font-semibold text-[11px] 2xl:text-xs leading-tight text-[#19211C] dark:text-white">
+                                        <p className="font-semibold text-sm 2xl:text-base leading-tight text-[#19211C] dark:text-white">
                                             {user.name || 'Student'}
                                         </p>
-                                        <p className="text-[9px] 2xl:text-[10px] text-[#19211C]/60 dark:text-gray-400 leading-tight">
+                                        <p className="text-xs 2xl:text-sm text-[#19211C]/60 dark:text-gray-400 leading-tight">
                                             {user.email || ''}
                                         </p>
                                     </>
                                 )}
                             </div>
                             <ChevronDownIcon
-                                className={`w-3 h-3 text-brand-text-light-secondary dark:text-gray-500 transition-transform hidden sm:block ${isProfileOpen ? "rotate-180" : ""
+                                className={`w-3 h-3 2xl:w-4 2xl:h-4 text-brand-text-light-secondary dark:text-gray-500 transition-transform hidden sm:block ${isProfileOpen ? "rotate-180" : ""
                                     }`}
                             />
                         </button>
