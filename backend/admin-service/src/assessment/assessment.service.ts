@@ -21,7 +21,7 @@ export class AssessmentService {
     private readonly attemptRepo: Repository<AssessmentAttempt>,
     @InjectRepository(GroupAssessment)
     private readonly groupAssessmentRepo: Repository<GroupAssessment>,
-  ) {}
+  ) { }
 
   async findAllSessions(
     page: number,
@@ -206,13 +206,16 @@ export class AssessmentService {
       let currentLevelsMap: Record<number, number> = {};
       if (rows.length > 0) {
         const sessionIds = rows.map((r) => r.id);
-        // Get Max Level attempted for each session using attemptRepo
+
+        // Get Max Level started/completed
+        // Logic: Show "2/2" only if Level 2 is actually started. If Level 1 is done but Level 2 is NOT_STARTED, show "1/2".
         const rawLevels = await this.attemptRepo
           .createQueryBuilder('aa')
           .select('aa.assessmentSessionId', 'sid')
           .addSelect('MAX(al.levelNumber)', 'maxLvl')
           .leftJoin('aa.assessmentLevel', 'al')
           .where('aa.assessmentSessionId IN (:...ids)', { ids: sessionIds })
+          .andWhere("aa.status NOT IN ('NOT_STARTED', 'NOT_YET_STARTED')") // Exclude unstarted
           .groupBy('aa.assessmentSessionId')
           .getRawMany();
 

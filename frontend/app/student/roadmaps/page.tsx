@@ -40,7 +40,7 @@ export default function StudentRoadmapsPage() {
                 </div>
 
                 {/* Content Area with Top Padding for Fixed Header */}
-                <main className="flex-1 pt-[72px] sm:pt-[80px] lg:pt-[88px]">
+                <main className="flex-1 pt-[65px] sm:pt-[68px] lg:pt-[50px]">
                     <RoadmapsPage />
                 </main>
             </div>

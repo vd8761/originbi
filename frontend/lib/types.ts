@@ -219,10 +219,27 @@ export interface CountryCode {
 }
 
 // Mood/Roadmap items (Frontend UI only)
-export interface RoadmapItem {
+export interface RoadmapCardData {
+  id: string;
   title: string;
   description: string;
+  category?: string;
 }
+
+export interface RoadmapDetailData {
+  id: string;
+  title: string;
+  category: string;
+  toolsToLearn: { name: string; category: string }[];
+  overview: string;
+  traitAlignment: string;
+  roadmapSteps: { label: string; type: 'foundation' | 'action' | 'advancement' | 'career'; content: string }[];
+  guidelines: { title: string; points: string[] }[];
+  guidanceTip: string;
+}
+
+// Keeping RoadmapItem for backward compatibility if needed, or aliasing it
+export type RoadmapItem = Omit<RoadmapCardData, 'id'> & { id?: string };
 
 export type MoodTag = "Feeling Happy" | "Need Motivation" | "Morning Boost" | string;
 
