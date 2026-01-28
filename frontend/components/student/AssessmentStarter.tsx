@@ -33,6 +33,8 @@ interface APIAssessmentAnswer {
   main_option_id?: number | string; // From Backend
   open_option_id?: number | string; // From Backend
   status?: string;
+  question_source?: string;
+  open_question_id?: number | string;
 }
 
 interface Option {
@@ -49,6 +51,7 @@ interface Question {
   textTa?: string;
   options: Option[];
   assessmentAnswerId: string;
+  source?: string;
 }
 
 interface AssessmentRunnerProps {
@@ -316,7 +319,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
       const currentQ = questions[currentQIndex];
       if (currentQ) {
         // Retrieve saved answer
-        const savedAnswer = answers[String(currentQ.id)];
+        const savedAnswer = answers[String(currentQ.assessmentAnswerId)];
         if (savedAnswer) {
           setSelectedOption(savedAnswer);
         } else {
@@ -378,11 +381,16 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
         const initialAnswers: Record<string, string> = {};
 
         // Calculate if Last Level (Heuristic based on ID or Name)
-        const aTitle = (data.title || data.name || data.exam_name || '').toLowerCase();
-        const aLevel = Number(data.level_number || data.id || 0);
-        // Assuming Level 2 is final for now as per requirements
-        if (aLevel >= 2 || aTitle.includes('level 2') || aTitle.includes('final')) {
-          setIsLastLevel(true);
+        // Check if Last Level (Backend Flag preferred, Fallback to Heuristic)
+        if (typeof data.is_last_level === 'boolean') {
+          setIsLastLevel(data.is_last_level);
+        } else {
+          // Heuristic Fallback
+          const aTitle = (data.title || data.name || data.exam_name || '').toLowerCase();
+          const aLevel = Number(data.level_number || data.id || 0);
+          if (aLevel >= 4 || aTitle.includes('level 4') || aTitle.includes('final')) {
+            setIsLastLevel(true);
+          }
         }
 
         // Map API response to UI Question format
@@ -394,20 +402,23 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
               id: ans.id,
               textEn: "Error loading question",
               options: [],
-              assessmentAnswerId: ans.id
+              assessmentAnswerId: ans.id,
+              source: "MAIN"
             };
           }
 
           const qId = String(qData.id);
+          const ansAtomicId = String(ans.id); // Unique ID for this answer slot
 
           // Check if already answered in DB (Only if Status is Confirm ANSWERED)
           const isAnswered = ans.status && String(ans.status).toUpperCase() === 'ANSWERED';
 
           if (isAnswered) {
+            // Store using Unique ID, not Question ID
             if (ans.main_option_id) {
-              initialAnswers[qId] = String(ans.main_option_id);
+              initialAnswers[ansAtomicId] = String(ans.main_option_id);
             } else if (ans.open_option_id) {
-              initialAnswers[qId] = String(ans.open_option_id);
+              initialAnswers[ansAtomicId] = String(ans.open_option_id);
             }
           }
 
@@ -423,6 +434,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
               textTa: opt.option_text_ta,
             })) || [],
             assessmentAnswerId: ans.id,
+            source: ans.question_source || (ans.open_question_id ? "OPEN" : "MAIN") // Map Source
           };
         });
 
@@ -477,55 +489,85 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
   const displayQuestionText = currentQuestion ? getDisplayText(currentQuestion.textEn, currentQuestion.textTa) : "";
   const displayContextText = currentQuestion ? (language === "TAM" && currentQuestion.contextTextTa ? currentQuestion.contextTextTa : currentQuestion.contextTextEn) : null;
 
-  // Handle Option Select
-  const handleOptionSelect = (id: string) => {
-    if (selectedOption && selectedOption !== id) {
-      setChangeCount((prev) => prev + 1);
+  // Helper: Submit Answer to Backend
+  const submitAnswer = async (
+    question: Question,
+    optionId: string,
+    timeSpent: number,
+    changes: number
+  ) => {
+    try {
+      const payload = {
+        attempt_id: Number(attemptId),
+        question_id: Number(question.id),
+        selected_option: Number(optionId),
+        time_taken: timeSpent,
+        answer_change_count: changes,
+        question_source: question.source || "MAIN",
+        assessment_answer_id: Number(question.assessmentAnswerId),
+      };
+
+      const examApiUrl = process.env.NEXT_PUBLIC_EXAM_ENGINE_API_URL;
+      await fetch(`${examApiUrl}/api/v1/exam/answer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      console.error("[Assessment] Save failed:", err);
     }
-    // Update Persistent State
+  };
+
+  // Handle Option Select (Auto-Save)
+  const handleOptionSelect = (id: string) => {
+    // Unique key for local state
+    const uniqueKey = String(currentQuestion.assessmentAnswerId);
+
+    // Calculate changes
+    let newChanges = changeCount;
+    if (selectedOption && selectedOption !== id) {
+      newChanges = changeCount + 1;
+      setChangeCount(newChanges);
+    }
+
+    // Update Persistent State (Local)
     if (currentQuestion) {
-      setAnswers(prev => ({
+      setAnswers((prev) => ({
         ...prev,
-        [String(currentQuestion.id)]: id
+        [uniqueKey]: id,
       }));
     }
     setSelectedOption(id);
+
+    // AUTO-SAVE to Backend
+    // We use the current time elapsed for this intermediary save
+    const timeSpent = Math.floor((Date.now() - startTimeRef.current) / 1000);
+    submitAnswer(currentQuestion, id, timeSpent, newChanges);
   };
 
   // Submit Answer & Next
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!currentQuestion || !selectedOption) return;
 
     const timeSpent = Math.floor((Date.now() - startTimeRef.current) / 1000);
 
-    const payload = {
-      attempt_id: Number(attemptId),
-      question_id: Number(currentQuestion.id),
-      selected_option: Number(selectedOption),
-      time_taken: timeSpent,
-      answer_change_count: changeCount,
-    };
+    // Final Save before moving (Ensure strictly awaited if we want to guarantee save before nav, 
+    // but for speed we often fire-and-forget or await in background. 
+    // Given the refresh issue, let's await it to be safe or rely on the previous auto-save).
+    // We'll await it to ensure the "Next" action definitely commits the state before UI change if possible,
+    // OR just fire it. Since we added Auto-Save in handleOptionSelect, this is a redundant "confirmation" save
+    // which is good for capturing final timeSpent.
+    await submitAnswer(currentQuestion, selectedOption, timeSpent, changeCount);
 
-    // Optimistic Update: Switch to next question immediately
+    // Optimistic Update: Switch to next question
     if (currentNumber < totalQuestions) {
       setCurrentQIndex((prev) => prev + 1);
-      // setSelectedOption handled by useEffect
+      // setSelectedOption handled by useEffect via 'answers' map or reset
       setChangeCount(0);
       startTimeRef.current = Date.now();
     } else {
       setIsCompleted(true);
     }
-
-    // Send Answer in Background
-    const examApiUrl = process.env.NEXT_PUBLIC_EXAM_ENGINE_API_URL;
-    fetch(`${examApiUrl}/api/v1/exam/answer`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    }).catch((err) => {
-      console.error("Failed to submit answer (background):", err);
-      // TODO: Implement retry logic or offline queue if needed
-    });
   };
 
   const handlePrevious = () => {
