@@ -118,14 +118,42 @@ export class BaseReport {
     protected readonly COLOR_BRIGHT_GREEN = '#19D36A';
     protected readonly COLOR_BLACK = '#000000';
 
-    // Assets Path - relative to project root (admin-service)
-    protected readonly ASSETS_PATH = path.join(__dirname, 'assets');
+    // Assets Path - resolved in constructor
+    protected ASSETS_PATH: string;
+
+    private static findAssetsPath(): string {
+        // Get the directory of this file
+        const thisFile = __filename;
+        const thisDir = path.dirname(thisFile);
+        
+        // Try multiple paths to find assets
+        const possiblePaths = [
+            path.join(thisDir, 'assets'),                                             // Relative to this file
+            path.join(process.cwd(), 'src', 'common', 'pdf', 'assets'),               // From project root (dev)
+            path.join(process.cwd(), 'dist', 'common', 'pdf', 'assets'),              // From project root (prod)
+            path.resolve(thisDir, '..', '..', '..', 'src', 'common', 'pdf', 'assets'), // Navigate from dist to src
+        ];
+
+        for (const p of possiblePaths) {
+            // Check if directory exists and contains expected files
+            const testFile = path.join(p, 'Handbook_Cover_Default.jpg');
+            if (fs.existsSync(testFile)) {
+                return p;
+            }
+        }
+
+        // Default fallback to CWD-based path
+        return path.join(process.cwd(), 'src', 'common', 'pdf', 'assets');
+    }
 
     // State
     protected _currentBackground: string | null = null;
     protected _useStdMargins = false;
 
     constructor() {
+        // Resolve assets path first
+        this.ASSETS_PATH = BaseReport.findAssetsPath();
+        
         this.doc = new PDFDocument({
             size: 'A4',
             margin: 0,

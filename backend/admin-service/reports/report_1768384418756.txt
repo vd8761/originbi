@@ -1,9 +1,0 @@
-OriginBI Report
-==================================================
-Generated: 2026-01-14T09:53:38.756Z
-Query: Generate summary report
-
-Data Results (1 records):
-[
-  {}
-]

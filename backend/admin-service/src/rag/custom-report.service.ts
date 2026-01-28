@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import {
     Registration,
     AssessmentAttempt,
@@ -8,6 +8,30 @@ import {
     PersonalityTrait,
 } from '@originbi/shared-entities';
 import Groq from 'groq-sdk';
+
+// Agile ACI Score Interpretation (0-125 scale from totalScore)
+const AGILE_LEVELS = {
+    naturalist: {
+        min: 100, max: 125,
+        name: 'Agile Naturalist',
+        desc: 'Lives the Agile mindset naturally with balance between speed, empathy, and accountability.',
+    },
+    adaptive: {
+        min: 75, max: 99,
+        name: 'Agile Adaptive',
+        desc: 'Works well in dynamic situations and motivates others through enthusiasm.',
+    },
+    learner: {
+        min: 50, max: 74,
+        name: 'Agile Learner',
+        desc: 'Open to Agile ideas but may need guidance for consistency.',
+    },
+    resistant: {
+        min: 0, max: 49,
+        name: 'Agile Resistant',
+        desc: 'Prefers structure and predictability. Needs gradual exposure to flexibility.',
+    },
+};
 
 // Report Types
 export type CustomReportType = 'career_fitment' | 'skill_gap' | 'team_analysis';
@@ -33,6 +57,14 @@ export interface DiscProfile {
     scoreI: number;
     scoreS: number;
     scoreC: number;
+}
+
+// Agile Profile (from real assessment data)
+export interface AgileProfile {
+    rawScore: number;       // 0-125 from total_score
+    level: string;          // Naturalist, Adaptive, Learner, Resistant
+    levelDescription: string;
+    percentage: number;     // Normalized 0-100%
 }
 
 // Skill Category with individual skills and scores
@@ -79,6 +111,7 @@ export interface CareerFitmentReportData {
     generatedDate: Date;
     profile: CareerProfileData;
     discProfile: DiscProfile;
+    agileProfile: AgileProfile;        // NEW: Real Agile data
     behavioralSummary: string;
     skillCategories: SkillCategory[];
     overallSkillInsight: {
@@ -106,6 +139,7 @@ export class CustomReportService {
         private readonly userRepo: Repository<User>,
         @InjectRepository(PersonalityTrait)
         private readonly traitRepo: Repository<PersonalityTrait>,
+        private readonly dataSource: DataSource,  // ADD: for raw SQL queries
     ) {
         this.groqClient = new Groq({
             apiKey: process.env.GROQ_API_KEY,
@@ -130,83 +164,115 @@ export class CustomReportService {
     }
 
     /**
-     * Generate Career Fitment Report Data for a user
+     * Generate Career Fitment Report Data for a user - USES REAL DB DATA
      */
     async generateCareerFitmentData(userId: number): Promise<CareerFitmentReportData> {
         this.logger.log(`Generating Career Fitment Report for user ${userId}`);
 
-        // 1. Fetch user and registration data
-        const user = await this.userRepo.findOne({
-            where: { id: userId },
-        });
-        if (!user) {
-            throw new NotFoundException(`User ${userId} not found`);
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 1: Fetch REAL assessment data using SQL query
+        // Same pattern as overall-role-fitment.service.ts
+        // ═══════════════════════════════════════════════════════════════
+        const assessmentQuery = `
+            SELECT 
+                r.id as registration_id,
+                r.full_name,
+                r.metadata as reg_metadata,
+                u.email,
+                u.metadata as user_metadata,
+                aa.total_score as agile_score,
+                aa.sincerity_index,
+                aa.sincerity_class,
+                aa.metadata as attempt_metadata,
+                aa.completed_at,
+                pt.code as disc_code,
+                pt.blended_style_name as disc_type,
+                pt.blended_style_desc as disc_description,
+                g.name as group_name
+            FROM registrations r
+            JOIN users u ON r.user_id = u.id
+            LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id AND aa.status = 'COMPLETED'
+            LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+            LEFT JOIN groups g ON r.group_id = g.id
+            WHERE r.user_id = $1 AND r.is_deleted = false
+            ORDER BY aa.completed_at DESC NULLS LAST
+            LIMIT 1
+        `;
+
+        const [assessmentData] = await this.dataSource.query(assessmentQuery, [userId]);
+
+        if (!assessmentData) {
+            throw new NotFoundException(`No registration found for user ${userId}`);
         }
 
-        const registration = await this.registrationRepo.findOne({
-            where: { userId },
-            order: { createdAt: 'DESC' },
-        });
-        if (!registration) {
-            throw new NotFoundException(`Registration for user ${userId} not found`);
-        }
+        this.logger.log(`📊 Found assessment data: DISC=${assessmentData.disc_type}, Agile=${assessmentData.agile_score}`);
 
-        // 2. Fetch latest completed assessment attempt
-        const attempt = await this.attemptRepo.findOne({
-            where: { userId, status: 'COMPLETED' },
-            relations: ['dominantTrait'],
-            order: { completedAt: 'DESC' },
-        });
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 2: Extract metadata from JSONB fields
+        // ═══════════════════════════════════════════════════════════════
+        const regMetadata = assessmentData.reg_metadata || {};
+        const userMetadata = assessmentData.user_metadata || {};
+        const attemptMetadata = assessmentData.attempt_metadata || {};
 
-        // 3. Build profile from DB data
-        const metadata = registration.metadata || {};
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 3: Build Profile from REAL data
+        // ═══════════════════════════════════════════════════════════════
         const profile: CareerProfileData = {
-            fullName: registration.fullName || user.metadata?.fullName || 'Unknown',
-            email: user.email,
-            currentRole: metadata.currentRole || 'Not Specified',
-            currentJobDescription: metadata.currentJobDescription || '',
-            yearsOfExperience: metadata.yearsOfExperience || 0,
-            relevantExperience: metadata.relevantExperience || '',
-            currentIndustry: metadata.currentIndustry || 'Not Specified',
-            expectedFutureRole: metadata.expectedFutureRole || 'Not Specified',
-            expectedIndustry: metadata.expectedIndustry || '',
+            fullName: assessmentData.full_name || userMetadata.fullName || 'Unknown',
+            email: assessmentData.email || '',
+            currentRole: regMetadata.currentRole || attemptMetadata.currentRole || 'Not Specified',
+            currentJobDescription: regMetadata.currentJobDescription || attemptMetadata.jobDescription || '',
+            yearsOfExperience: regMetadata.yearsOfExperience || attemptMetadata.yearsOfExperience || 0,
+            relevantExperience: regMetadata.relevantExperience || '',
+            currentIndustry: regMetadata.currentIndustry || assessmentData.group_name || 'Not Specified',
+            expectedFutureRole: regMetadata.expectedFutureRole || 'Not Specified',
+            expectedIndustry: regMetadata.expectedIndustry || '',
         };
 
-        // 4. Build DISC profile
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 4: Build DISC Profile from REAL personality_traits data
+        // ═══════════════════════════════════════════════════════════════
         const discProfile: DiscProfile = {
-            dominantTrait: attempt?.dominantTrait?.blendedStyleName || 'Not Assessed',
-            traitDescription: attempt?.dominantTrait?.blendedStyleDesc || '',
-            scoreD: metadata.scoreD || attempt?.metadata?.scoreD || 0,
-            scoreI: metadata.scoreI || attempt?.metadata?.scoreI || 0,
-            scoreS: metadata.scoreS || attempt?.metadata?.scoreS || 0,
-            scoreC: metadata.scoreC || attempt?.metadata?.scoreC || 0,
+            dominantTrait: assessmentData.disc_type || 'Not Assessed',
+            traitDescription: assessmentData.disc_description || '',
+            // Extract D,I,S,C scores if stored in metadata (optional)
+            scoreD: attemptMetadata.scoreD || attemptMetadata.d_score || 0,
+            scoreI: attemptMetadata.scoreI || attemptMetadata.i_score || 0,
+            scoreS: attemptMetadata.scoreS || attemptMetadata.s_score || 0,
+            scoreC: attemptMetadata.scoreC || attemptMetadata.c_score || 0,
         };
 
-        // 5. Generate AI-based skill scores and insights
-        const skillCategories = await this.generateSkillScores(profile, discProfile);
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 5: Build AGILE Profile from REAL total_score (0-125)
+        // ═══════════════════════════════════════════════════════════════
+        const rawAgileScore = parseFloat(assessmentData.agile_score) || 0;
+        const agileProfile = this.getAgileProfile(rawAgileScore);
 
-        // 6. Generate behavioral summary via AI
-        const behavioralSummary = await this.generateBehavioralSummary(profile, discProfile);
+        this.logger.log(`📈 Agile Profile: ${agileProfile.level} (${agileProfile.rawScore}/125 = ${agileProfile.percentage}%)`);
 
-        // 7. Calculate Future Role Readiness
-        const futureRoleReadiness = this.calculateFutureRoleReadiness(profile, discProfile, skillCategories);
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 6: Generate AI-based insights using REAL data
+        // ═══════════════════════════════════════════════════════════════
+        const skillCategories = await this.generateSkillScores(profile, discProfile, agileProfile);
+        const behavioralSummary = await this.generateBehavioralSummary(profile, discProfile, agileProfile);
 
-        // 8. Calculate Role Fitment Score
-        const roleFitmentScore = this.calculateRoleFitmentScore(profile, discProfile, skillCategories, futureRoleReadiness);
-
-        // 9. Determine Industry Suitability
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 7: Calculate scores using REAL assessment data
+        // ═══════════════════════════════════════════════════════════════
+        const futureRoleReadiness = this.calculateFutureRoleReadiness(profile, discProfile, skillCategories, agileProfile);
+        const roleFitmentScore = this.calculateRoleFitmentScore(profile, discProfile, skillCategories, futureRoleReadiness, agileProfile);
         const industrySuitability = this.determineIndustrySuitability(profile, discProfile);
 
-        // 10. Generate transition requirements
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 8: Generate AI-powered insights
+        // ═══════════════════════════════════════════════════════════════
         const transitionRequirements = await this.generateTransitionRequirements(profile);
-
-        // 11. Generate executive insight
-        const executiveInsight = await this.generateExecutiveInsight(profile, roleFitmentScore, futureRoleReadiness);
-
-        // 12. Extract skill insights
+        const executiveInsight = await this.generateExecutiveInsight(profile, roleFitmentScore, futureRoleReadiness, agileProfile);
         const overallSkillInsight = this.extractSkillInsights(skillCategories);
 
-        // 13. Generate report ID
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 9: Generate report ID
+        // ═══════════════════════════════════════════════════════════════
         const reportId = `OBI-G1-${new Date().getMonth() + 1}/${new Date().getFullYear().toString().slice(2)}-${profile.fullName.split(' ')[0].toUpperCase().slice(0, 2)}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
 
         return {
@@ -214,6 +280,7 @@ export class CustomReportService {
             generatedDate: new Date(),
             profile,
             discProfile,
+            agileProfile,  // NEW: Real Agile data from total_score
             behavioralSummary,
             skillCategories,
             overallSkillInsight,
@@ -226,9 +293,31 @@ export class CustomReportService {
     }
 
     /**
+     * Get Agile Profile Level from raw score (0-125)
+     */
+    private getAgileProfile(rawScore: number): AgileProfile {
+        let level = AGILE_LEVELS.resistant;
+
+        if (rawScore >= AGILE_LEVELS.naturalist.min) {
+            level = AGILE_LEVELS.naturalist;
+        } else if (rawScore >= AGILE_LEVELS.adaptive.min) {
+            level = AGILE_LEVELS.adaptive;
+        } else if (rawScore >= AGILE_LEVELS.learner.min) {
+            level = AGILE_LEVELS.learner;
+        }
+
+        return {
+            rawScore,
+            level: level.name,
+            levelDescription: level.desc,
+            percentage: Math.round((rawScore / 125) * 100),
+        };
+    }
+
+    /**
      * Generate AI-based skill scores for the user
      */
-    private async generateSkillScores(profile: CareerProfileData, disc: DiscProfile): Promise<SkillCategory[]> {
+    private async generateSkillScores(profile: CareerProfileData, disc: DiscProfile, agile: AgileProfile): Promise<SkillCategory[]> {
         const prompt = `Based on this employee profile, generate realistic skill scores (1-5 scale) with brief insights.
 
 Profile:
@@ -237,6 +326,7 @@ Profile:
 - Industry: ${profile.currentIndustry}
 - Expected Future Role: ${profile.expectedFutureRole}
 - DISC Profile: Dominant ${disc.dominantTrait}
+- Agile Level: ${agile.level} (Score: ${agile.percentage}%)
 
 Generate JSON with this EXACT structure (no markdown, just JSON):
 {
@@ -306,7 +396,7 @@ Make scores realistic based on role/experience. Adapt skill categories to the pe
     /**
      * Generate behavioral summary via AI
      */
-    private async generateBehavioralSummary(profile: CareerProfileData, disc: DiscProfile): Promise<string> {
+    private async generateBehavioralSummary(profile: CareerProfileData, disc: DiscProfile, agile: AgileProfile): Promise<string> {
         const prompt = `Write a 3-4 sentence professional behavioral alignment summary for this person targeting their future role.
 
 Current Role: ${profile.currentRole}
@@ -370,6 +460,7 @@ Return ONLY the JSON array, no other text.`;
         profile: CareerProfileData,
         fitment: RoleFitmentScore,
         readiness: FutureRoleReadiness,
+        agile: AgileProfile,
     ): Promise<string> {
         const prompt = `Write a 3-4 sentence executive closing insight for a career fitment report.
 
@@ -378,6 +469,7 @@ Target Role: ${profile.expectedFutureRole}
 Role Fitment Score: ${fitment.totalScore}%
 Readiness Score: ${readiness.readinessScore}%
 Adjacency: ${readiness.adjacencyType}
+Agile Level: ${agile.level} (${agile.percentage}%)
 
 Summarize their potential, key strengths, and what they need to focus on. Be encouraging but realistic. End with actionable positioning advice.`;
 
@@ -402,6 +494,7 @@ Summarize their potential, key strengths, and what they need to focus on. Be enc
         profile: CareerProfileData,
         disc: DiscProfile,
         skills: SkillCategory[],
+        agile: AgileProfile,
     ): FutureRoleReadiness {
         // Calculate average skill score
         let totalScore = 0;
@@ -446,6 +539,7 @@ Summarize their potential, key strengths, and what they need to focus on. Be enc
         disc: DiscProfile,
         skills: SkillCategory[],
         readiness: FutureRoleReadiness,
+        agile: AgileProfile,
     ): RoleFitmentScore {
         // Calculate component scores
         const behavioralScore = disc.dominantTrait ? 34 : 25; // out of 40

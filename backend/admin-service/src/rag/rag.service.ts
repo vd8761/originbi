@@ -115,6 +115,10 @@ export class RagService {
   private readonly logger = new Logger('MITHRA');
   private llm: ChatGroq | null = null;
   private reportsDir: string;
+  
+  // Simple cache for query understanding to improve performance
+  private queryCache = new Map<string, any>();
+  private readonly CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes
 
   constructor(
     private dataSource: DataSource,
@@ -139,6 +143,7 @@ export class RagService {
         apiKey,
         model: 'llama-3.3-70b-versatile',
         temperature: 0,
+        timeout: 15000, // 15 second timeout for LLM calls
       });
     }
     return this.llm;
@@ -148,7 +153,12 @@ export class RagService {
   // MAIN QUERY ENTRY POINT
   // ═══════════════════════════════════════════════════════════════════════════
   async query(question: string, user: any): Promise<QueryResult> {
+    this.logger.log(`🚀 RAG Query Started at ${new Date().toISOString()}`);
+    this.logger.log(`📝 Input Question: "${question}"`);
+    this.logger.log(`👤 User:`, JSON.stringify(user));
+
     if (!question?.trim()) {
+      this.logger.log(`❌ Empty question detected`);
       return {
         answer: 'Please ask a question.',
         searchType: 'none',
@@ -161,8 +171,32 @@ export class RagService {
     this.logger.log(`📝 Query: "${question}"`);
 
     try {
+      // Quick bypass for common greetings - avoid LLM call
+      const normalizedQ = question.toLowerCase().trim();
+      this.logger.log(`🔍 DEBUG: Normalized query = "${normalizedQ}"`);
+      
+      if (['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'].includes(normalizedQ)) {
+        this.logger.log('🎯 Intent: greeting (bypassed LLM)');
+        return {
+          answer: getRandomResponse(MITHRA_PERSONA.greetings),
+          searchType: 'greeting',
+          confidence: 1.0,
+        };
+      }
+
+      if (['help', 'what can you do', 'what can you help me with'].includes(normalizedQ)) {
+        this.logger.log('🎯 Intent: help (bypassed LLM)');
+        return {
+          answer: MITHRA_PERSONA.help,
+          searchType: 'help',
+          confidence: 1.0,
+        };
+      }
+
+      this.logger.log('🔄 No bypass match, proceeding to LLM understanding...');
+
       // ═══════════════════════════════════════════════════════════════
-      // STEP 1: LLM QUERY UNDERSTANDING
+      // STEP 1: LLM QUERY UNDERSTANDING (for complex queries only)
       // ═══════════════════════════════════════════════════════════════
       const interpretation = await this.understandQuery(question);
       this.logger.log(`🎯 Intent: ${interpretation.intent}`);
@@ -212,7 +246,7 @@ export class RagService {
       // 🧠 JARVIS-LIKE INTELLIGENT HANDLERS
       // Personal career guidance, job eligibility, higher studies, etc.
       // ═══════════════════════════════════════════════════════════════
-      const q = question.toLowerCase();
+      const qLower = question.toLowerCase();
       const userId = user?.id || user?.user_id || 0;
       const userEmail = user?.email || user?.sub || '';
 
@@ -240,8 +274,8 @@ export class RagService {
       }
 
       // Questions about job eligibility
-      if (q.includes('eligible') || q.includes('jobs for me') || q.includes('suitable') ||
-        q.includes('what jobs') || q.includes('fit for') || q.includes('career for me')) {
+      if (qLower.includes('eligible') || qLower.includes('jobs for me') || qLower.includes('suitable') ||
+        qLower.includes('what jobs') || qLower.includes('fit for') || qLower.includes('career for me')) {
         this.logger.log('🎯 Detected: Career eligibility question');
         const answer = await this.oriIntelligence.generateCareerGuidance(question, userProfile);
         return {
@@ -252,8 +286,8 @@ export class RagService {
       }
 
       // Questions about specific jobs ("can I try...", "can I become...")
-      if ((q.includes('can i') || q.includes('should i')) &&
-        (q.includes('try') || q.includes('apply') || q.includes('become') || q.includes('work as'))) {
+      if ((qLower.includes('can i') || qLower.includes('should i')) &&
+        (qLower.includes('try') || qLower.includes('apply') || qLower.includes('become') || qLower.includes('work as'))) {
         this.logger.log('🎯 Detected: Job compatibility question');
         const answer = await this.oriIntelligence.generateCareerGuidance(question, userProfile);
         return {
@@ -264,9 +298,9 @@ export class RagService {
       }
 
       // Higher studies questions
-      if (q.includes('higher studies') || q.includes('masters') || q.includes('mba') ||
-        q.includes('further studies') || q.includes('education') || q.includes('degree') ||
-        q.includes('university') || q.includes('phd')) {
+      if (qLower.includes('higher studies') || qLower.includes('masters') || qLower.includes('mba') ||
+        qLower.includes('further studies') || qLower.includes('education') || qLower.includes('degree') ||
+        qLower.includes('university') || qLower.includes('phd')) {
         this.logger.log('🎯 Detected: Higher studies question');
         const answer = await this.oriIntelligence.generateCareerGuidance(question, userProfile);
         return {
@@ -277,9 +311,9 @@ export class RagService {
       }
 
       // Personal questions about themselves or career advice
-      if ((q.includes('my ') || q.includes('i am') || q.includes("i'm") || q.includes('me')) &&
-        (q.includes('career') || q.includes('future') || q.includes('path') || q.includes('advice') ||
-          q.includes('suggest') || q.includes('recommend') || q.includes('help me'))) {
+      if ((qLower.includes('my ') || qLower.includes('i am') || qLower.includes("i'm") || qLower.includes('me')) &&
+        (qLower.includes('career') || qLower.includes('future') || qLower.includes('path') || qLower.includes('advice') ||
+          qLower.includes('suggest') || qLower.includes('recommend') || qLower.includes('help me'))) {
         this.logger.log('🎯 Detected: Personal career advice question');
         const context = this.oriIntelligence.getConversationContext(userProfile?.userId || userId);
         const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, context);
@@ -295,15 +329,15 @@ export class RagService {
       // These should NOT search the database
       // ═══════════════════════════════════════════════════════════════
       const isGeneralQuestion =
-        q.includes('what is') || q.includes('what are') || q.includes('how to') ||
-        q.includes('how do') || q.includes('how can') || q.includes('best way') ||
-        q.includes('course') || q.includes('learn') || q.includes('study') ||
-        q.includes('become a') || q.includes('become an') || q.includes('best ') ||
-        q.includes('which') || q.includes('should i') || q.includes('can you') ||
-        q.includes('tell me about') || q.includes('explain') || q.includes('difference between') ||
-        q.includes('compare') || q.includes('vs') || q.includes('versus') ||
-        q.includes('tips') || q.includes('advice') || q.includes('recommend') ||
-        q.includes('certification') || q.includes('skill') || q.includes('path');
+        qLower.includes('what is') || qLower.includes('what are') || qLower.includes('how to') ||
+        qLower.includes('how do') || qLower.includes('how can') || qLower.includes('best way') ||
+        qLower.includes('course') || qLower.includes('learn') || qLower.includes('study') ||
+        qLower.includes('become a') || qLower.includes('become an') || qLower.includes('best ') ||
+        qLower.includes('which') || qLower.includes('should i') || qLower.includes('can you') ||
+        qLower.includes('tell me about') || qLower.includes('explain') || qLower.includes('difference between') ||
+        qLower.includes('compare') || qLower.includes('vs') || qLower.includes('versus') ||
+        qLower.includes('tips') || qLower.includes('advice') || qLower.includes('recommend') ||
+        qLower.includes('certification') || qLower.includes('skill') || qLower.includes('path');
 
       // Don't go to DB for general questions - use LLM directly
       if (isGeneralQuestion && !['list_users', 'list_candidates', 'test_results', 'career_roles', 'count'].includes(interpretation.intent)) {
@@ -407,21 +441,22 @@ export class RagService {
       }
 
       const personData = await this.dataSource.query(`
-                SELECT DISTINCT ON (registrations.id)
-                    registrations.id,
-                    registrations.full_name,
-                    registrations.gender,
-                    registrations.mobile_number,
-                    users.email,
-                    assessment_attempts.total_score,
-                    personality_traits.blended_style_name as behavioral_style,
-                    personality_traits.blended_style_desc as behavior_description,
-                    (SELECT MAX(aa.total_score) FROM assessment_attempts aa WHERE aa.registration_id = registrations.id) as best_score,
-                    (SELECT COUNT(*) FROM assessment_attempts aa WHERE aa.registration_id = registrations.id AND aa.status = 'COMPLETED') as attempt_count
-                FROM registrations
-                LEFT JOIN users ON registrations.user_id = users.id
-                LEFT JOIN assessment_attempts ON assessment_attempts.registration_id = registrations.id
-                LEFT JOIN personality_traits ON assessment_attempts.dominant_trait_id = personality_traits.id
+                SELECT 
+                    r.id,
+                    r.full_name,
+                    r.gender,
+                    r.mobile_number,
+                    u.email,
+                    aa.total_score,
+                    pt.blended_style_name as behavioral_style,
+                    pt.blended_style_desc as behavior_description,
+                    (SELECT MAX(aa2.total_score) FROM assessment_attempts aa2 WHERE aa2.registration_id = r.id) as best_score,
+                    (SELECT COUNT(*) FROM assessment_attempts aa3 WHERE aa3.registration_id = r.id AND aa3.status = 'COMPLETED') as attempt_count
+                FROM registrations r
+                LEFT JOIN users u ON r.user_id = u.id
+                LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id 
+                    AND aa.id = (SELECT id FROM assessment_attempts WHERE registration_id = r.id ORDER BY completed_at DESC LIMIT 1)
+                LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
                 WHERE (${whereClause})
                 AND registrations.is_deleted = false
                 ORDER BY registrations.id, assessment_attempts.total_score DESC NULLS LAST
@@ -520,13 +555,23 @@ export class RagService {
       this.logger.log(`📊 Generating Overall Role Fitment Report`);
 
       const reportTitle = 'Placement Guidance Report';
-      const downloadUrl = `/rag/overall-report/pdf?title=${encodeURIComponent(reportTitle)}`;
-
-
-      const input = {
-        corporateId: user?.corporate_id,
+      
+      // Build input - only include groupId if user has one
+      // If no groupId, the service will fetch ALL registrations (not filter by group)
+      const input: any = {
         title: reportTitle,
       };
+
+      // Only filter by group if the user has a group
+      if (user?.group_id) {
+        input.groupId = user.group_id;
+      }
+      
+      // Build download URL - include groupId only if available
+      let downloadUrl = `/rag/overall-report/pdf?title=${encodeURIComponent(reportTitle)}`;
+      if (user?.group_id) {
+        downloadUrl = `/rag/overall-report/pdf?groupId=${user.group_id}&title=${encodeURIComponent(reportTitle)}`;
+      }
 
       const report = await this.overallRoleFitmentService.generateReport(input);
 
@@ -572,7 +617,7 @@ export class RagService {
           LIMIT 1
         `;
 
-        const results = await this.dataSource.query(lookupSql, [`%${targetName.toLowerCase()}%`]);
+        const results = await this.executeDatabaseQuery(lookupSql, [`%${targetName.toLowerCase()}%`]);
 
         if (results && results.length > 0) {
           targetUserId = parseInt(results[0].user_id);
@@ -586,9 +631,12 @@ export class RagService {
           };
         }
       } else {
-        // Fallback to logged-in user
-        targetUserId = user?.id || user?.user_id || 0;
-        targetName = user?.name || 'You';
+        // No name provided - require explicit name for custom reports
+        return {
+          answer: `**⚠️ Please specify a name for the report.** \n\nExample:\n- "Generate career fitment report for Anjaly"\n- "Custom report for John Smith"`,
+          searchType: 'error',
+          confidence: 0,
+        };
       }
 
       if (!targetUserId) {
@@ -618,15 +666,35 @@ export class RagService {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // LLM-POWERED QUERY UNDERSTANDING
-  // ═══════════════════════════════════════════════════════════════════════════
+  private async executeDatabaseQuery(sql: string, params: any[] = []): Promise<any[]> {
+    const startTime = Date.now();
+    try {
+      const result = await this.dataSource.query(sql, params);
+      const elapsed = Date.now() - startTime;
+      if (elapsed > 1000) {
+        this.logger.warn(`Slow query detected: ${elapsed}ms`);
+      }
+      return result;
+    } catch (error) {
+      const elapsed = Date.now() - startTime;
+      this.logger.error(`Query failed after ${elapsed}ms: ${error.message}`);
+      throw error;
+    }
+  }
   private async understandQuery(question: string): Promise<{
     intent: string;
     searchTerm: string | null;
     table: string;
     includePersonality: boolean;
   }> {
+    // Check cache first to avoid repeated LLM calls
+    const cacheKey = question.toLowerCase().trim();
+    const cached = this.queryCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < this.CACHE_EXPIRY) {
+      this.logger.log('📋 Using cached query understanding');
+      return cached.result;
+    }
+
     const prompt = `You are a query interpreter for OriginBI assessment platform.
 
 Analyze this user query and extract:
@@ -671,18 +739,45 @@ EXAMPLES:
 Respond with ONLY valid JSON, no explanation:`;
 
     try {
+      const startTime = Date.now();
       const response = await this.getLlm().invoke([new SystemMessage(prompt)]);
+      const elapsed = Date.now() - startTime;
+      
+      this.logger.log(`🤖 LLM query understanding took ${elapsed}ms`);
+      
       const jsonStr = response.content.toString().trim();
       const parsed = JSON.parse(jsonStr);
-      return {
+      const result = {
         intent: parsed.intent || 'list_users',
         searchTerm: parsed.searchTerm || null,
         table: parsed.table || 'users',
         includePersonality: parsed.includePersonality || false,
       };
+
+      // Cache the result
+      this.queryCache.set(cacheKey, {
+        result,
+        timestamp: Date.now(),
+      });
+
+      // Clean old cache entries periodically
+      if (this.queryCache.size > 100) {
+        this.cleanCache();
+      }
+
+      return result;
     } catch (error) {
-      this.logger.warn(`Query interpretation failed, using fallback`);
+      this.logger.warn(`Query interpretation failed: ${error.message}, using fallback`);
       return this.fallbackInterpretation(question);
+    }
+  }
+
+  private cleanCache(): void {
+    const now = Date.now();
+    for (const [key, value] of this.queryCache.entries()) {
+      if (now - value.timestamp >= this.CACHE_EXPIRY) {
+        this.queryCache.delete(key);
+      }
     }
   }
 
@@ -692,11 +787,11 @@ Respond with ONLY valid JSON, no explanation:`;
     table: string;
     includePersonality: boolean;
   } {
-    const q = question.toLowerCase();
+    const qLowerUniq = question.toLowerCase();
 
     // Custom report (career fitment, personalized) - CHECK FIRST
     if (
-      q.match(/career\s*fitment|custom\s*report|my\s*fitment|personalized\s*report/)
+      qLowerUniq.match(/career\s*fitment|custom\s*report|my\s*fitment|personalized\s*report/)
     ) {
       return {
         intent: 'custom_report',
@@ -708,7 +803,7 @@ Respond with ONLY valid JSON, no explanation:`;
 
     // Career report generation for specific person
     if (
-      q.match(/career\s*report|future\s*role|role\s*readiness|generate.*report/)
+      qLowerUniq.match(/career\s*report|future\s*role|role\s*readiness|generate.*report/)
     ) {
       const name = this.extractName(question);
       return {
@@ -720,7 +815,7 @@ Respond with ONLY valid JSON, no explanation:`;
     }
 
     // Best performer
-    if (q.match(/best|top|highest|winner/)) {
+    if (qLowerUniq.match(/best|top|highest|winner/)) {
       return {
         intent: 'best_performer',
         searchTerm: null,
@@ -729,7 +824,7 @@ Respond with ONLY valid JSON, no explanation:`;
       };
     }
     // Test/exam results
-    if (q.match(/test|exam|result|score|assessment/) && !q.match(/report/)) {
+    if (qLowerUniq.match(/test|exam|result|score|assessment/) && !qLowerUniq.match(/report/)) {
       const name = this.extractName(question);
       return {
         intent: name ? 'person_lookup' : 'test_results',
@@ -739,7 +834,7 @@ Respond with ONLY valid JSON, no explanation:`;
       };
     }
     // Users
-    if (q.match(/user/)) {
+    if (qLowerUniq.match(/user/)) {
       return {
         intent: 'list_users',
         searchTerm: null,
@@ -748,7 +843,7 @@ Respond with ONLY valid JSON, no explanation:`;
       };
     }
     // Candidates
-    if (q.match(/candidate|registration|student/)) {
+    if (qLowerUniq.match(/candidate|registration|student/)) {
       return {
         intent: 'list_candidates',
         searchTerm: null,
@@ -757,7 +852,7 @@ Respond with ONLY valid JSON, no explanation:`;
       };
     }
     // Career roles
-    if (q.match(/career|role|job/)) {
+    if (qLowerUniq.match(/career|role|job/)) {
       return {
         intent: 'career_roles',
         searchTerm: null,
@@ -766,7 +861,7 @@ Respond with ONLY valid JSON, no explanation:`;
       };
     }
     // Count
-    if (q.match(/how many|count/)) {
+    if (qLowerUniq.match(/how many|count/)) {
       return {
         intent: 'count',
         searchTerm: null,
@@ -908,7 +1003,7 @@ Respond with ONLY valid JSON, no explanation:`;
 
     try {
       this.logger.log(`🔍 SQL: ${sql.substring(0, 80)}...`);
-      return await this.dataSource.query(sql);
+      return await this.executeDatabaseQuery(sql);
     } catch (error) {
       this.logger.error(`SQL Error: ${error.message}`);
       return [];
@@ -1064,7 +1159,7 @@ Respond with ONLY valid JSON, no explanation:`;
   async getStatus(): Promise<any> {
     let totalDocs = 0;
     try {
-      const r = await this.dataSource.query(
+      const r = await this.executeDatabaseQuery(
         'SELECT COUNT(*) as count FROM rag_documents',
       );
       totalDocs = parseInt(r[0].count);
@@ -1130,3 +1225,6 @@ Respond with ONLY valid JSON, no explanation:`;
     };
   }
 }
+  
+ 
+ 

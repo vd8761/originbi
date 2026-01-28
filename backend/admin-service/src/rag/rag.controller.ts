@@ -274,9 +274,14 @@ export class RagController {
     @Body() queryDto: RagQueryDto,
     @Req() req: any,
   ): Promise<RagResponse> {
+    console.log(`🎯 RAG CONTROLLER: POST /query received at ${new Date().toISOString()}`);
+    console.log(`📝 Request body:`, queryDto);
+    console.log(`👤 Request user:`, req.user);
+    
     try {
       const question = queryDto?.question;
       if (!question) {
+        console.log(`❌ No question provided`);
         throw new Error('Question is required');
       }
 
@@ -286,8 +291,12 @@ export class RagController {
         corporateId: null,
       };
 
-      return await this.ragService.query(question, user);
+      console.log(`🔄 Calling ragService.query with question: "${question}"`);
+      const result = await this.ragService.query(question, user);
+      console.log(`✅ RAG Service returned result`);
+      return result;
     } catch (error) {
+      console.log(`❌ RAG Controller error:`, error);
       throw new HttpException(
         error.message || 'Failed to process query',
         HttpStatus.INTERNAL_SERVER_ERROR,
