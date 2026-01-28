@@ -202,6 +202,13 @@ export class RagService {
       }
 
       // ═══════════════════════════════════════════════════════════════
+      // SPECIAL HANDLER: CUSTOM REPORT (Career Fitment, etc.)
+      // ═══════════════════════════════════════════════════════════════
+      if (interpretation.intent === 'custom_report') {
+        return await this.handleCustomReport(user, interpretation.searchTerm, question);
+      }
+
+      // ═══════════════════════════════════════════════════════════════
       // 🧠 JARVIS-LIKE INTELLIGENT HANDLERS
       // Personal career guidance, job eligibility, higher studies, etc.
       // ═══════════════════════════════════════════════════════════════
@@ -540,6 +547,78 @@ export class RagService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // HANDLER: CUSTOM REPORT (Career Fitment, etc.)
+  // ═══════════════════════════════════════════════════════════════════════════
+  private async handleCustomReport(user: any, searchTerm: string | null, question: string): Promise<QueryResult> {
+    try {
+      let targetUserId: number | null = null;
+      let targetName = searchTerm;
+
+      // If no searchTerm, try to extract name from question
+      if (!targetName) {
+        targetName = this.extractName(question);
+      }
+
+      // If we have a name, lookup the user
+      if (targetName) {
+        this.logger.log(`🔍 Looking up user by name: "${targetName}"`);
+
+        const lookupSql = `
+          SELECT r.user_id, r.full_name
+          FROM registrations r
+          WHERE LOWER(r.full_name) LIKE $1
+          AND r.is_deleted = false
+          ORDER BY r.created_at DESC
+          LIMIT 1
+        `;
+
+        const results = await this.dataSource.query(lookupSql, [`%${targetName.toLowerCase()}%`]);
+
+        if (results && results.length > 0) {
+          targetUserId = parseInt(results[0].user_id);
+          targetName = results[0].full_name;
+          this.logger.log(`✅ Found user: ${targetName} (ID: ${targetUserId})`);
+        } else {
+          return {
+            answer: `**⚠️ User "${targetName}" not found.** Please check the name and try again.\n\nYou can ask:\n- "Generate career fitment report for [full name]"\n- "Custom report for [person name]"`,
+            searchType: 'error',
+            confidence: 0,
+          };
+        }
+      } else {
+        // Fallback to logged-in user
+        targetUserId = user?.id || user?.user_id || 0;
+        targetName = user?.name || 'You';
+      }
+
+      if (!targetUserId) {
+        return {
+          answer: `**⚠️ No user specified.** Please provide a name to generate the report for.\n\nExample: "Generate career fitment report for Anjaly"`,
+          searchType: 'error',
+          confidence: 0,
+        };
+      }
+
+      this.logger.log(`📊 Generating Custom Career Fitment Report for ${targetName} (userId: ${targetUserId})`);
+
+      const downloadUrl = `/rag/custom-report/pdf?userId=${targetUserId}&type=career_fitment`;
+
+      return {
+        answer: `I'm ready to generate **${targetName}'s Career Fitment & Future Role Readiness Report**! 🎯\n\n📄 **[Click here to download the personalized PDF Report](${downloadUrl})**\n\nThis report includes:\n- Profile Snapshot\n- Behavioral Alignment Summary\n- Skill Assessment with AI-generated scores\n- Future Role Readiness Mapping\n- Role Fitment Score\n- Industry Suitability Analysis\n- Transition Requirements\n- Executive Insights\n\nDownload the PDF for the complete analysis!`,
+        searchType: 'custom_report',
+        confidence: 0.95,
+      };
+    } catch (error) {
+      this.logger.error(`Custom report error: ${error.message}`);
+      return {
+        answer: `**❌ Error generating custom report:** ${error.message}`,
+        searchType: 'error',
+        confidence: 0,
+      };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // LLM-POWERED QUERY UNDERSTANDING
   // ═══════════════════════════════════════════════════════════════════════════
   private async understandQuery(question: string): Promise<{
@@ -551,7 +630,7 @@ export class RagService {
     const prompt = `You are a query interpreter for OriginBI assessment platform.
 
 Analyze this user query and extract:
-1. INTENT: What does the user want? (greeting, help, list_users, list_candidates, test_results, person_lookup, best_performer, career_roles, career_report, overall_report, count)
+1. INTENT: What does the user want? (greeting, help, list_users, list_candidates, test_results, person_lookup, best_performer, career_roles, career_report, overall_report, custom_report, count)
 2. SEARCH_TERM: Any specific name or keyword to search (null if general query)
 3. TABLE: Primary table to query (users, registrations, assessment_attempts, career_roles, programs, none)
 4. INCLUDE_PERSONALITY: Should we include DISC behavioral style and Agile score? (true for test results, person lookups, career reports)
@@ -579,6 +658,14 @@ EXAMPLES:
 "placement report" → {"intent":"overall_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
 "group role fitment" → {"intent":"overall_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
 "role fitment report" → {"intent":"overall_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
+"generate my career fitment report" → {"intent":"custom_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
+"career fitment report" → {"intent":"custom_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
+"custom report" → {"intent":"custom_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
+"my fitment report" → {"intent":"custom_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
+"personalized report" → {"intent":"custom_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
+"custom report for anjaly" → {"intent":"custom_report","searchTerm":"anjaly","table":"assessment_attempts","includePersonality":true}
+"generate career fitment report for john" → {"intent":"custom_report","searchTerm":"john","table":"assessment_attempts","includePersonality":true}
+"fitment report for priya" → {"intent":"custom_report","searchTerm":"priya","table":"assessment_attempts","includePersonality":true}
 "how many users" → {"intent":"count","searchTerm":null,"table":"users","includePersonality":false}
 
 Respond with ONLY valid JSON, no explanation:`;
@@ -607,7 +694,19 @@ Respond with ONLY valid JSON, no explanation:`;
   } {
     const q = question.toLowerCase();
 
-    // Career report generation - CHECK FIRST
+    // Custom report (career fitment, personalized) - CHECK FIRST
+    if (
+      q.match(/career\s*fitment|custom\s*report|my\s*fitment|personalized\s*report/)
+    ) {
+      return {
+        intent: 'custom_report',
+        searchTerm: null,
+        table: 'assessment_attempts',
+        includePersonality: true,
+      };
+    }
+
+    // Career report generation for specific person
     if (
       q.match(/career\s*report|future\s*role|role\s*readiness|generate.*report/)
     ) {

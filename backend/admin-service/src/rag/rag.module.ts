@@ -6,6 +6,7 @@ import { EmbeddingsService } from './embeddings.service';
 import { SyncService } from './sync.service';
 import { FutureRoleReportService } from './future-role-report.service';
 import { OverallRoleFitmentService } from './overall-role-fitment.service';
+import { CustomReportService } from './custom-report.service';
 import { ConversationService } from './conversation.service';
 import { OriIntelligenceService } from './ori-intelligence.service';
 import {
@@ -13,6 +14,7 @@ import {
   AssessmentAttempt,
   AssessmentSession,
   User,
+  PersonalityTrait,
 } from '@originbi/shared-entities';
 import { PdfModule } from '../common/pdf/pdf.module';
 
@@ -23,6 +25,7 @@ import { PdfModule } from '../common/pdf/pdf.module';
       AssessmentAttempt,
       AssessmentSession,
       User,
+      PersonalityTrait,
     ]),
     PdfModule,
   ],
@@ -33,6 +36,7 @@ import { PdfModule } from '../common/pdf/pdf.module';
     SyncService,
     FutureRoleReportService,
     OverallRoleFitmentService,
+    CustomReportService,
     ConversationService,
     OriIntelligenceService,
   ],
@@ -41,9 +45,9 @@ import { PdfModule } from '../common/pdf/pdf.module';
     SyncService,
     FutureRoleReportService,
     OverallRoleFitmentService,
+    CustomReportService,
     ConversationService,
     OriIntelligenceService,
   ],
 })
 export class RagModule { }
-

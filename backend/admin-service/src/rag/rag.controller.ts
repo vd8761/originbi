@@ -27,6 +27,8 @@ import { RagService } from './rag.service';
 import { SyncService } from './sync.service';
 import { FutureRoleReportService } from './future-role-report.service';
 import { OverallRoleFitmentService } from './overall-role-fitment.service';
+import { CustomReportService } from './custom-report.service';
+import { PdfService } from '../common/pdf/pdf.service';
 
 // DTO for query request
 export class RagQueryDto {
@@ -171,6 +173,8 @@ export class RagController {
     private readonly syncService: SyncService,
     private readonly futureRoleReportService: FutureRoleReportService,
     private readonly overallRoleFitmentService: OverallRoleFitmentService,
+    private readonly customReportService: CustomReportService,
+    private readonly pdfService: PdfService,
   ) { }
 
   /**
@@ -217,6 +221,46 @@ export class RagController {
       throw new HttpException(
         error.message || 'Failed to generate overall report PDF',
         HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * GET /rag/custom-report/pdf
+   * Generate Custom Report PDF (e.g., Career Fitment)
+   */
+  @Get('custom-report/pdf')
+  async generateCustomReportPdf(
+    @Query('userId') userId: string,
+    @Query('type') reportType: string = 'career_fitment',
+    @Res() res: Response,
+  ) {
+    try {
+      if (!userId) {
+        throw new HttpException('userId is required', HttpStatus.BAD_REQUEST);
+      }
+
+      // Currently supporting career_fitment report
+      if (reportType !== 'career_fitment') {
+        throw new HttpException(`Report type '${reportType}' not supported yet`, HttpStatus.BAD_REQUEST);
+      }
+
+      // Generate report data
+      const reportData = await this.customReportService.generateCareerFitmentData(parseInt(userId));
+
+      // Generate PDF
+      const pdfBuffer = await this.pdfService.generateCareerFitmentReport(reportData);
+
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="career-fitment-report-${reportData.reportId}.pdf"`,
+        'Content-Length': pdfBuffer.length,
+      });
+      res.send(pdfBuffer);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to generate custom report PDF',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
