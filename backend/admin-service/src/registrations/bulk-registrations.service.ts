@@ -284,24 +284,30 @@ export class BulkRegistrationsService {
     const job = await this.bulkImportRepo.findOne({ where: { id: jobId } });
     if (!job) throw new NotFoundException('Job not found');
 
-    const failedCount = await this.bulkImportRowRepo.count({
+    const failed = await this.bulkImportRowRepo.count({
       where: { importId: jobId, status: 'FAILED' },
     });
 
-    const successCount = await this.bulkImportRowRepo.count({
+    const success = await this.bulkImportRowRepo.count({
       where: { importId: jobId, status: 'SUCCESS' },
+    });
+
+    const latestFailure = await this.bulkImportRowRepo.findOne({
+      where: { importId: jobId, status: 'FAILED' },
+      order: { rowIndex: 'ASC' },
     });
 
     return {
       status: job.status,
       total: job.totalRecords,
       processed: job.processedCount,
-      success: successCount,
-      failed: failedCount,
+      success,
+      failed,
       progress:
         job.totalRecords > 0
           ? Math.round((job.processedCount / job.totalRecords) * 100)
           : 0,
+      lastError: latestFailure?.errorMessage,
     };
   }
 
@@ -489,11 +495,50 @@ export class BulkRegistrationsService {
           groupAssessmentId = Number(savedGA.id);
           this.logger.log(`Created GroupAssessment ID: ${groupAssessmentId}`);
         } else {
+          // Fallback: Find any active program
           this.logger.warn(
-            `Skipping GroupAssessment creation: No programType found in batch`,
+            `Program ID not found in batch template. Attempting to use default active program.`,
           );
+          const defaultProgram = allPrograms.find((p) => p.isActive);
+
+          if (defaultProgram) {
+            this.logger.log(
+              `Using Default Program: ${defaultProgram.name} (ID: ${defaultProgram.id})`,
+            );
+            const validFrom = examStart ? new Date(examStart) : new Date();
+            const validTo = examEnd ? new Date(examEnd) : null;
+
+            const groupAssessment = this.groupAssessmentRepo.create({
+              groupId: Number(group.id),
+              programId: Number(defaultProgram.id),
+              validFrom,
+              validTo,
+              totalCandidates: batch.rows.length,
+              status: 'NOT_STARTED',
+              createdByUserId: job.createdById,
+              metadata: {
+                importId: jobId,
+                source: 'BULK_UPLOAD',
+                note: 'Used default program',
+              },
+            });
+            const savedGA = await this.groupAssessmentRepo.save(groupAssessment);
+            groupAssessmentId = Number(savedGA.id);
+
+            // Important: Update the DTOs in this batch to use this program ID, 
+            // otherwise registrationsService.create might look for null
+            for (const d of batch.dtos) {
+              if (!d.programType) d.programType = defaultProgram.id;
+            }
+          } else {
+            this.logger.error(
+              `CRITICAL: No programType in CSV and no default active program found.`,
+            );
+            // This will fall through to the "Group Assessment ID is missing" check and fail rows individually/gracefully
+          }
         }
       } catch (err) {
+        // ... error logging ...
         this.logger.error(
           `CRITICAL: Failed to create Group/Assessment Header for batch ${batch.groupName}. Stopping batch processing.`,
           err,
@@ -508,16 +553,21 @@ export class BulkRegistrationsService {
         }
         await this.bulkImportRowRepo.save(batch.rows);
 
-        // Continue to next batch? Or stop entire job?
-        // "stop the process immediately" usually refers to the current atomic operation.
-        // I will skip to next batch.
+        // Update processed count for failed batch
+        await this.bulkImportRepo.increment(
+          { id: jobId },
+          'processedCount',
+          batch.rows.length,
+        );
+
         continue;
       }
 
       // C. Process Rows
+      let batchProcessedCount = 0;
       for (let i = 0; i < batch.rows.length; i++) {
         // Throttle to prevent Cognito 429 errors (approx 5 requests/second)
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        // await new Promise((resolve) => setTimeout(resolve, 100)); // Reduced throttle
 
         const row = batch.rows[i];
         const dto = batch.dtos[i];
@@ -551,6 +601,7 @@ export class BulkRegistrationsService {
           successCount++;
           await this.bulkImportRowRepo.save(row);
         } catch (err: any) {
+          console.error(`Row ${row.rowIndex} failed execution:`, err); // FORCE LOG
           this.logger.error(`Row ${row.rowIndex} failed execution`, err);
           row.status = 'FAILED';
           row.errorMessage = err.message || 'Unknown error';
@@ -558,14 +609,29 @@ export class BulkRegistrationsService {
           failCount++;
           await this.bulkImportRowRepo.save(row);
         }
+
+        // Increment local counter
+        batchProcessedCount++;
+
+        // Update Job Progress every 5 rows
+        if (batchProcessedCount % 5 === 0) {
+          await this.bulkImportRepo.increment(
+            { id: jobId },
+            'processedCount',
+            5,
+          );
+        }
       }
 
-      // Update Progress
-      await this.bulkImportRepo.increment(
-        { id: jobId },
-        'processedCount',
-        batch.rows.length,
-      );
+      // Update remaining progress for this batch
+      const remaining = batchProcessedCount % 5;
+      if (remaining > 0) {
+        await this.bulkImportRepo.increment(
+          { id: jobId },
+          'processedCount',
+          remaining,
+        );
+      }
     }
 
     job.status = 'COMPLETED';
