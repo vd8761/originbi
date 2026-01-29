@@ -66,7 +66,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, currentView
             </div>
 
             {/* Content Area with Top Padding for Fixed Header */}
-            <main className="flex-1 pt-[72px] sm:pt-[80px] lg:pt-[88px] relative">
+            <main className="flex-1 pt-[72px] sm:pt-[80px] lg:pt-[65px] relative">
                 <div className="w-full h-full px-4 py-4 sm:px-6 sm:py-6 lg:px-[1.666vw] lg:py-[1.666vw] max-w-[2000px] mx-auto">
                     {children ? children : <Dashboard />}
                 </div>

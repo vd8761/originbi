@@ -2,11 +2,13 @@ package models
 
 // StudentAnswer represents the payload for submitting an answer
 type StudentAnswer struct {
-	AttemptID         int64 `json:"attempt_id" binding:"required"`
-	QuestionID        int64 `json:"question_id" binding:"required"`
-	SelectedOption    int64 `json:"selected_option" binding:"required"`
-	TimeTaken         int   `json:"time_taken"` // in seconds
-	AnswerChangeCount int   `json:"answer_change_count"`
+	AttemptID          int64  `json:"attempt_id" binding:"required"`
+	QuestionID         int64  `json:"question_id" binding:"required"`
+	SelectedOption     int64  `json:"selected_option" binding:"required"`
+	TimeTaken          int    `json:"time_taken"` // in seconds
+	AnswerChangeCount  int    `json:"answer_change_count"`
+	QuestionSource     string `json:"question_source"`      // MAIN or OPEN
+	AssessmentAnswerID int64  `json:"assessment_answer_id"` // PK of assessment_answers table
 }
 
 // ExamStartRequest represents the request to start an exam
