@@ -16,14 +16,14 @@ interface ChatAssistantProps {
     apiUrl?: string;
 }
 
-// Stable typewriter effect - FAST, works even when tab is in background
+// Stable typewriter effect - OPTIMIZED for smooth animation
 const TypeWriter = memo(({ text, speed = 2, onDone }: { text: string; speed?: number; onDone?: () => void }) => {
     const [display, setDisplay] = useState('');
     const onDoneRef = useRef(onDone);
     const textRef = useRef(text);
     const hasCompletedRef = useRef(false);
-    const startTimeRef = useRef<number>(0);
-    const animationRef = useRef<number>(0);
+    const indexRef = useRef(0);
+    const frameRef = useRef<number>(0);
 
     // Update refs when props change
     useEffect(() => {
@@ -35,35 +35,31 @@ const TypeWriter = memo(({ text, speed = 2, onDone }: { text: string; speed?: nu
         if (textRef.current !== text) {
             textRef.current = text;
             hasCompletedRef.current = false;
-            startTimeRef.current = 0;
+            indexRef.current = 0;
         }
     }, [text]);
 
     useEffect(() => {
         if (hasCompletedRef.current) return;
 
-        // Use requestAnimationFrame with timestamps - works when tab is in background
-        const animate = (timestamp: number) => {
-            if (!startTimeRef.current) startTimeRef.current = timestamp;
-
-            const elapsed = timestamp - startTimeRef.current;
-            const charsToShow = Math.min(Math.floor(elapsed / speed), text.length);
-
-            if (charsToShow < text.length) {
-                setDisplay(text.slice(0, charsToShow + 1));
-                animationRef.current = requestAnimationFrame(animate);
+        const charsPerFrame = 3; // Faster typing - 3 chars per frame
+        
+        const animate = () => {
+            if (indexRef.current < text.length) {
+                indexRef.current = Math.min(indexRef.current + charsPerFrame, text.length);
+                setDisplay(text.slice(0, indexRef.current));
+                frameRef.current = requestAnimationFrame(animate);
             } else {
-                setDisplay(text);
                 hasCompletedRef.current = true;
                 onDoneRef.current?.();
             }
         };
 
-        animationRef.current = requestAnimationFrame(animate);
+        frameRef.current = requestAnimationFrame(animate);
 
         return () => {
-            if (animationRef.current) {
-                cancelAnimationFrame(animationRef.current);
+            if (frameRef.current) {
+                cancelAnimationFrame(frameRef.current);
             }
         };
     }, [text, speed]);
@@ -72,7 +68,7 @@ const TypeWriter = memo(({ text, speed = 2, onDone }: { text: string; speed?: nu
         <>
             {display}
             {display.length < text.length && (
-                <span className="inline-block w-0.5 h-4 ml-0.5 bg-cyan-500 animate-pulse" />
+                <span className="inline-block w-0.5 h-4 ml-0.5 bg-cyan-500 animate-[blink_0.8s_infinite]" />
             )}
         </>
     );

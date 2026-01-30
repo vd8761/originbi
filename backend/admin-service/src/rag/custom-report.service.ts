@@ -354,8 +354,6 @@ Profile:
 - Years of Experience: ${profile.yearsOfExperience}
 - Industry: ${profile.currentIndustry}
 - Expected Future Role: ${profile.expectedFutureRole}
-- DISC Profile: Dominant ${disc.dominantTrait}
-- Agile Level: ${agile.level} (Score: ${agile.percentage}%)
 
 Generate JSON with this EXACT structure (no markdown, just JSON):
 {
@@ -1039,7 +1037,7 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
 
             discProfile = {
                 dominantTrait: 'NOT ASSESSED',
-                traitDescription: 'User has not completed the behavioral assessment. Please complete the Origin BI assessment to get accurate DISC profile.',
+                traitDescription: 'User has not completed the behavioral assessment. Please complete the Origin BI assessment for accurate behavioral profiling.',
                 scoreD: 0,
                 scoreI: 0,
                 scoreS: 0,
@@ -1049,7 +1047,7 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
             agileProfile = {
                 level: 'NOT ASSESSED',
                 percentage: 0,
-                description: 'User has not completed the agility assessment. Please complete the Origin BI assessment to get accurate agility scores.',
+                description: 'User has not completed the agility assessment. Please complete the Origin BI assessment for accurate profiling.',
             };
 
             // Create empty skill categories with "NOT ASSESSED" message
@@ -1153,9 +1151,9 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
     private getNotAssessedBehavioralSummary(profile: CareerProfileData): string {
         return `⚠️ ASSESSMENT NOT COMPLETED
 
-${profile.fullName} has not completed the Origin BI behavioral and agility assessment. Without assessment data, we cannot provide accurate behavioral analysis, DISC profile, or skill scores.
+${profile.fullName} has not completed the Origin BI behavioral and agility assessment. Without assessment data, we cannot provide accurate behavioral analysis or skill evaluation.
 
-To receive a comprehensive Career Fitment Report with accurate scores and insights, please:
+To receive a comprehensive Career Fitment Report with accurate insights, please:
 1. Register on the Origin BI platform
 2. Complete the full behavioral and agility assessment
 3. Request a new report after assessment completion
@@ -1221,13 +1219,13 @@ This report was generated based on profile information provided via chat for ${p
 
 RECOMMENDATION: Before making any career transition decisions regarding the move from ${profile.currentRole} to ${profile.expectedFutureRole}, we strongly recommend:
 
-1. Complete the Origin BI Assessment: This will provide accurate DISC behavioral profiling and Agility assessment.
+1. Complete the Origin BI Assessment: This will provide accurate behavioral profiling and agility assessment.
 
 2. Receive Comprehensive Analysis: With assessment data, we can provide detailed skill gap analysis, behavioral alignment insights, and accurate fitment evaluation.
 
 3. Data-Driven Career Planning: Our AI-powered insights are only as good as the assessment data. Real assessment results will enable personalized recommendations.
 
-The current profile indicates ${profile.yearsOfExperience} years of experience in ${profile.currentIndustry}, which provides a foundation for career transition planning. However, without standardized assessment scores, any fitment analysis would be speculative.
+The current profile indicates ${profile.yearsOfExperience} years of experience in ${profile.currentIndustry}, which provides a foundation for career transition planning. However, without standardized assessment, any fitment analysis would be speculative.
 
 Contact your administrator or visit the Origin BI platform to complete your assessment.`;
     }
@@ -1236,7 +1234,7 @@ Contact your administrator or visit the Origin BI platform to complete your asse
      * Generate behavioral summary for chat-based profile (with real assessment data)
      */
     private async generateChatBehavioralSummary(profile: CareerProfileData, discProfile: DiscProfile, agileProfile: AgileProfile): Promise<string> {
-        const prompt = `Based on this professional profile and REAL assessment data, generate a 2-3 paragraph behavioral summary:
+        const prompt = `Based on this professional profile, generate a 2-3 paragraph behavioral summary:
 
 Profile:
 - Name: ${profile.fullName}
@@ -1247,18 +1245,18 @@ Profile:
 - Current Industry: ${profile.currentIndustry}
 - Expected Future Role: ${profile.expectedFutureRole}
 
-REAL Assessment Data (from Origin BI Assessment):
-- DISC Profile: ${discProfile.dominantTrait}
-- Agility Level: ${agileProfile.level}
-
 Write a professional behavioral summary that:
-1. Analyzes their behavioral traits based on their DISC profile type
-2. Discusses how their agility level (${agileProfile.level}) impacts their readiness for the target role
-3. Identifies behavioral strengths based on actual assessment and potential development areas
+1. Analyzes their behavioral traits based on their professional experience and role
+2. Discusses their readiness and adaptability for the target role
+3. Identifies behavioral strengths and potential development areas based on their career trajectory
 
-IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, or external training programs.
+IMPORTANT RULES:
+- Do NOT mention any DISC profile, DISC type, D/I/S/C categories, or DISC scores
+- Do NOT mention any Agile/Agility scores, percentages, or specific agility levels
+- Do NOT recommend any courses, certifications, Coursera, edX, Udemy, or external training programs
+- Focus on professional behavioral insights derived from their experience and role
 
-Write in third person, professional tone. Reference the actual assessment results. No bullet points, just flowing paragraphs.`;
+Write in third person, professional tone. No bullet points, just flowing paragraphs.`;
 
         try {
             const response = await this.groqClient.chat.completions.create({
@@ -1279,7 +1277,7 @@ Write in third person, professional tone. Reference the actual assessment result
      * Default behavioral summary for assessed profiles
      */
     private getDefaultAssessedBehavioralSummary(profile: CareerProfileData, discProfile: DiscProfile, agileProfile: AgileProfile): string {
-        return `Based on the Origin BI assessment, ${profile.fullName} demonstrates a ${discProfile.dominantTrait} behavioral profile with ${profile.yearsOfExperience} years of experience as ${profile.currentRole} in the ${profile.currentIndustry} industry. The assessment reveals an Agility profile of ${agileProfile.level}, indicating ${agileProfile.percentage >= 70 ? 'strong' : agileProfile.percentage >= 50 ? 'moderate' : 'developing'} adaptability to change and new challenges.
+        return `Based on the Origin BI assessment, ${profile.fullName} demonstrates strong professional capabilities with ${profile.yearsOfExperience} years of experience as ${profile.currentRole} in the ${profile.currentIndustry} industry. The assessment reveals strong adaptability to change and new challenges, indicating ${agileProfile.percentage >= 70 ? 'excellent' : agileProfile.percentage >= 50 ? 'good' : 'developing'} readiness for career transitions.
 
 The behavioral assessment suggests ${discProfile.traitDescription || 'a balanced approach to work and leadership'}. Combined with their career trajectory toward ${profile.expectedFutureRole}, this indicates ${agileProfile.percentage >= 60 ? 'readiness for strategic leadership challenges' : 'potential for growth with focused development'}.`;
     }

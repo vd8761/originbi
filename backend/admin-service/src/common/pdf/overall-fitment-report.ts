@@ -509,27 +509,22 @@ export class OverallFitmentReport extends BaseReport {
         // 7. Industry Suitability
         this.ensureSpace(120);
         this.h2('7. Industry-Specific Suitability');
+        this.doc.moveDown(0.2);
 
-        candidate.industrySuitability.forEach(ind => {
-            this.doc
-                .font(this.FONT_SORA_SEMIBOLD)
-                .fontSize(11)
-                .fillColor(this.COLOR_DEEP_BLUE)
-                .text(ind.industry);
+        // Create table for consistent layout
+        const industryRows = candidate.industrySuitability.map(ind => [
+            ind.industry,
+            ind.suitability,
+            ind.description
+        ]);
 
-            this.doc
-                .font(this.FONT_REGULAR)
-                .fontSize(10)
-                .fillColor(this.COLOR_BLACK)
-                .text(`Suitability: ${ind.suitability}`);
-
-            this.doc
-                .font(this.FONT_REGULAR)
-                .fontSize(10)
-                .fillColor('#555555')
-                .text(`Ideal for: ${ind.description}`);
-
-            this.doc.moveDown(0.5);
+        this.table(['Industry', 'Suitability', 'Ideal For'], industryRows, {
+            colWidths: [180, 70, 250],
+            headerColor: this.COLOR_DEEP_BLUE,
+            headerTextColor: '#FFFFFF',
+            fontSize: 9,
+            headerFontSize: 10,
+            cellPadding: 8
         });
 
         this.doc.moveDown(0.5);
