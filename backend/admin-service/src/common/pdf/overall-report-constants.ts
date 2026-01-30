@@ -6,7 +6,7 @@ export const OVERALL_REPORT_TOC = [
     'Behavioral Alignment Analysis',
     'Skill-wise Capability Assessment',
     'Future Role Readiness Mapping',
-    'Role Fitment Score Analysis',
+    'Role Fitment Analysis',
     'Industry-Specific Suitability',
     'Transition Requirements',
     'Origin BI Executive Insights',
@@ -15,20 +15,20 @@ export const OVERALL_REPORT_TOC = [
 
 export const READINESS_LEGEND = [
     {
-        range: '80% - 100%',
-        label: 'High Readiness (Green) - Ready for immediate transition',
+        range: 'High',
+        label: 'High Readiness - Ready for immediate transition',
         color: '#e6ffe6',
         textColor: '#006400'
     },
     {
-        range: '60% - 79%',
-        label: 'Moderate Readiness (Amber) - Transitionable with support',
+        range: 'Moderate',
+        label: 'Moderate Readiness - Transitionable with support',
         color: '#fff5e6',
         textColor: '#cc7000'
     },
     {
-        range: '0% - 59%',
-        label: 'Low Readiness (Red) - Significant gaps exist',
+        range: 'Low',
+        label: 'Low Readiness - Significant gaps exist',
         color: '#ffe6e6',
         textColor: '#8b0000'
     }
@@ -36,22 +36,22 @@ export const READINESS_LEGEND = [
 
 export const FITMENT_SCORE_LEGEND = [
     {
-        range: '85% - 100%',
+        range: 'Strong',
         label: 'Strong Fit - Highly recommended for role',
         color: '#e6ffe6'
     },
     {
-        range: '70% - 84%',
+        range: 'Conditional Strong',
         label: 'Conditional Strong Fit - Recommended with minor development',
         color: '#e6f7ff'
     },
     {
-        range: '55% - 69%',
+        range: 'Moderate',
         label: 'Moderate Fit - Possible with significant development',
         color: '#fff5e6'
     },
     {
-        range: '0% - 54%',
+        range: 'Weak',
         label: 'Weak Fit - Not recommended without major changes',
         color: '#ffe6e6'
     }

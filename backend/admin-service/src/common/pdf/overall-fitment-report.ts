@@ -83,18 +83,18 @@ const TOC_ITEMS = [
     'Behavioral Alignment Analysis',
     'Skill-wise Capability Assessment',
     'Future Role Readiness Mapping',
-    'Role Fitment Score Analysis',
+    'Role Fitment Analysis',
     'Industry-Specific Suitability',
     'Key Transition Requirements',
     'Origin BI Executive Insights',
-    'Appendix & Score Legend'
+    'Appendix & Legend'
 ];
 
 // Readiness Legend Data
 const READINESS_LEGEND = [
-    { range: '80% - 100%', label: 'High Readiness (Green) - Ready for immediate transition', color: '#e6ffe6' },
-    { range: '60% - 79%', label: 'Moderate Readiness (Amber) - Transitionable with support', color: '#fff5e6' },
-    { range: '0% - 59%', label: 'Low Readiness (Red) - Significant gaps exist', color: '#ffe6e6' }
+    { range: 'High', label: 'High Readiness - Ready for immediate transition', color: '#e6ffe6' },
+    { range: 'Moderate', label: 'Moderate Readiness - Transitionable with support', color: '#fff5e6' },
+    { range: 'Low', label: 'Low Readiness - Significant gaps exist', color: '#ffe6e6' }
 ];
 
 export class OverallFitmentReport extends BaseReport {
@@ -110,7 +110,7 @@ export class OverallFitmentReport extends BaseReport {
         this.generateCoverPage();
 
         // 2. Table of Contents
-        this._currentBackground = 'Watermark_Background.jpg';
+        this._currentBackground = 'Content_Background.jpg';
         this._useStdMargins = false;
         this.doc.addPage();
         this.generateTableOfContents();
@@ -122,6 +122,7 @@ export class OverallFitmentReport extends BaseReport {
         this.generateExecutiveSummary();
 
         // 4. Individual Candidate Profiles
+        this._currentBackground = 'Watermark_Background.jpg';
         this.data.candidates.forEach((candidate, index) => {
             this.doc.addPage();
             this.generateCandidateProfile(candidate, index + 1);
@@ -155,48 +156,44 @@ export class OverallFitmentReport extends BaseReport {
             this.doc.rect(0, 0, this.PAGE_WIDTH, this.PAGE_HEIGHT).fill('#F0F8FF');
         }
 
-        // Title - Top Left Area
-        const titleStartY = 50;
+        // Title - Top Left Area (aligned with template)
+        const titleStartY = 60;
         this.doc
             .font(this.FONT_SORA_BOLD)
-            .fontSize(32)
+            .fontSize(30)
             .fillColor(this.COLOR_DEEP_BLUE)
-            .text('Career Fitment &', 40, titleStartY, { align: 'left' })
-            .text('Future Role Readiness', 40, titleStartY + 42, { align: 'left' })
-            .text('Report', 40, titleStartY + 84, { align: 'left' });
+            .text('Career Fitment &', 30, titleStartY, { align: 'left' })
+            .text('Future Role Readiness', 30, titleStartY + 48, { align: 'left' })
+            .text('Report', 30, titleStartY + 96, { align: 'left' });
 
-        // Origin BI Logo - Top Right
-        const logoPath = this.getAssetPath('Origin-BI-Logo-01.png');
-        if (fs.existsSync(logoPath)) {
-            this.doc.image(logoPath, this.PAGE_WIDTH - 160, 40, { width: 130 });
-        }
+        // Note: Logo removed as per template requirements
 
-        // Rotated Reference Number on Right Edge
+        // Rotated Reference Number on Right Edge (Top)
         this.doc.save();
-        this.doc.rotate(-90, { origin: [this.PAGE_WIDTH - 25, 200] });
+        this.doc.rotate(-90, { origin: [this.PAGE_WIDTH - 20, 60] });
         this.doc
             .font('Helvetica')
             .fontSize(7)
             .fillColor('#AAAAAA')
-            .opacity(0.6)
-            .text(`OBI-${this.data.reportId}`, this.PAGE_WIDTH - 200, 200 - 10);
+            .opacity(0.5)
+            .text(`OBI-${this.data.reportId}`, this.PAGE_WIDTH - 200, 60 - 10);
         this.doc.restore();
         this.doc.opacity(1);
 
-        // Bottom Section - Company & Date Info
-        const bottomY = this.PAGE_HEIGHT - 130;
+        // Bottom Section - Company & Date Info (aligned with template)
+        const bottomY = this.PAGE_HEIGHT - 150;
 
         this.doc
             .font(this.FONT_SORA_BOLD)
-            .fontSize(18)
+            .fontSize(20)
             .fillColor(this.COLOR_DEEP_BLUE)
-            .text(this.data.subTitle || 'Organization Report', 40, bottomY);
+            .text(this.data.subTitle || 'Organization Report', 50, bottomY);
 
         this.doc
             .font(this.FONT_REGULAR)
             .fontSize(14)
             .fillColor(this.COLOR_BLACK)
-            .text('Future Role Readiness', 40, bottomY + 28);
+            .text('Future Role Readiness Assessment', 50, bottomY + 32);
 
         const dateStr = this.data.generatedAt.toLocaleDateString('en-GB', {
             day: 'numeric',
@@ -205,17 +202,17 @@ export class OverallFitmentReport extends BaseReport {
         });
         this.doc
             .font(this.FONT_REGULAR)
-            .fontSize(12)
+            .fontSize(11)
             .fillColor('#666666')
-            .text(dateStr, 40, bottomY + 50);
+            .text(dateStr, 50, bottomY + 58);
 
         // Candidate Count Badge - Bottom Right
         this.doc
             .font(this.FONT_SORA_BOLD)
-            .fontSize(14)
+            .fontSize(13)
             .fillColor(this.COLOR_DEEP_BLUE)
-            .text(`${this.data.candidates.length} Candidates`, this.PAGE_WIDTH - 200, bottomY + 30, {
-                width: 160,
+            .text(`${this.data.candidates.length} Candidates Assessed`, this.PAGE_WIDTH - 220, bottomY + 40, {
+                width: 180,
                 align: 'right'
             });
     }
@@ -224,46 +221,50 @@ export class OverallFitmentReport extends BaseReport {
     // TABLE OF CONTENTS
     // ═══════════════════════════════════════════════════════════════════════════
     private generateTableOfContents(): void {
-        const headerX = 15 * this.MM;
+        // Header positioned for Content_Background.jpg
+        const headerX = 20 * this.MM;
+        const headerY = 25 * this.MM;
 
         this.doc
             .font(this.FONT_SORA_BOLD)
-            .fontSize(38)
+            .fontSize(32)
             .fillColor(this.COLOR_DEEP_BLUE)
-            .text('Table of Contents', headerX, headerX);
+            .text('Table of Contents', headerX, headerY);
 
-        let currentY = 50 * this.MM;
-        const circleCenterX = 25 * this.MM;
+        let currentY = 55 * this.MM;
+        const circleCenterX = 28 * this.MM;
+        const circleRadius = 4.5 * this.MM;
 
         TOC_ITEMS.forEach((item, index) => {
-            const circleY = currentY + 5 * this.MM;
+            const circleY = currentY + circleRadius;
 
-            // Circle with number
+            // Circle with number - filled circle style
             this.doc
-                .lineWidth(0.4 * this.MM)
+                .lineWidth(0.5 * this.MM)
                 .strokeColor(this.COLOR_BRIGHT_GREEN)
-                .circle(circleCenterX, circleY, 5 * this.MM)
+                .circle(circleCenterX, circleY, circleRadius)
                 .stroke();
 
+            // Number inside circle
             this.doc
-                .font(this.FONT_SORA_REGULAR)
-                .fontSize(12)
+                .font(this.FONT_SORA_BOLD)
+                .fontSize(11)
                 .fillColor(this.COLOR_DEEP_BLUE)
-                .text((index + 1).toString(), 20 * this.MM, circleY - 6, {
-                    width: 10 * this.MM,
+                .text((index + 1).toString(), circleCenterX - 4, circleY - 5, {
+                    width: 8,
                     align: 'center'
                 });
 
-            // TOC Item Text
+            // TOC Item Text - right of circle
             this.doc
                 .font(this.FONT_SORA_SEMIBOLD)
-                .fontSize(16)
+                .fontSize(14)
                 .fillColor(this.COLOR_BLACK)
-                .text(item, 35 * this.MM, currentY + 1.5 * this.MM, {
-                    width: this.PAGE_WIDTH - 60 * this.MM
+                .text(item, 40 * this.MM, currentY, {
+                    width: this.PAGE_WIDTH - 55 * this.MM
                 });
 
-            currentY = this.doc.y + 8 * this.MM;
+            currentY = currentY + 16 * this.MM;
         });
     }
 
@@ -272,14 +273,15 @@ export class OverallFitmentReport extends BaseReport {
     // ═══════════════════════════════════════════════════════════════════════════
     private generateExecutiveSummary(): void {
         this.h1('Executive Summary & Report Index');
-        this.doc.moveDown(0.5);
+        this.doc.moveDown(0.3);
 
         // Introduction Text
         this.p('This report provides a comprehensive analysis of candidate readiness for future roles within the organization. The assessment evaluates behavioral alignment, skill capabilities, and transition potential.');
-        this.doc.moveDown(0.5);
+        this.doc.moveDown(0.4);
 
         // Summary Statistics
         this.h2('Assessment Overview');
+        this.doc.moveDown(0.2);
 
         const totalCandidates = this.data.candidates.length;
         const highReadiness = this.data.candidates.filter(c => c.futureRoleReadinessScore >= 80).length;
@@ -288,27 +290,28 @@ export class OverallFitmentReport extends BaseReport {
 
         const statsData = [
             ['Total Candidates Assessed', totalCandidates.toString()],
-            ['High Readiness (≥80%)', highReadiness.toString()],
-            ['Moderate Readiness (60-79%)', moderateReadiness.toString()],
-            ['Requires Development (<60%)', lowReadiness.toString()]
+            ['High Readiness', highReadiness.toString()],
+            ['Moderate Readiness', moderateReadiness.toString()],
+            ['Requires Development', lowReadiness.toString()]
         ];
 
         this.table(['Metric', 'Count'], statsData, {
-            colWidths: [300, 150],
+            colWidths: [320, 130],
             headerColor: this.COLOR_DEEP_BLUE,
             headerTextColor: '#FFFFFF',
-            fontSize: 11,
-            headerFontSize: 11
+            fontSize: 10,
+            headerFontSize: 10,
+            cellPadding: 8
         });
 
-        this.doc.moveDown(1);
+        this.doc.moveDown(0.8);
 
         // Candidate Index Table
         this.h2('Candidate Index');
-        this.doc.moveDown(0.3);
+        this.doc.moveDown(0.2);
 
         const tableHeaders = ['#', 'Name', 'Current Role', 'Experience', 'Target Role', 'Readiness'];
-        const colWidths = [30, 100, 110, 60, 100, 70];
+        const colWidths = [25, 95, 115, 55, 105, 65];
 
         const rows = this.data.candidates.map((c, i) => [
             (i + 1).toString(),
@@ -316,7 +319,7 @@ export class OverallFitmentReport extends BaseReport {
             c.currentRole,
             c.totalExperience,
             c.expectedFutureRole,
-            `${c.futureRoleReadinessScore}%`
+            c.readinessStatus
         ]);
 
         this.table(tableHeaders, rows, {
@@ -325,13 +328,13 @@ export class OverallFitmentReport extends BaseReport {
             headerTextColor: '#FFFFFF',
             fontSize: 9,
             headerFontSize: 9,
-            cellPadding: 6
+            cellPadding: 5
         });
 
         this.doc.moveDown(1);
 
         // Readiness Legend
-        this.h3('Score Interpretation Legend');
+        this.h3('Readiness Interpretation Legend');
         this.drawReadinessLegend();
     }
 
@@ -348,20 +351,21 @@ export class OverallFitmentReport extends BaseReport {
 
         this.doc
             .font(this.FONT_SORA_BOLD)
-            .fontSize(24)
+            .fontSize(22)
             .fillColor(this.COLOR_DEEP_BLUE)
-            .text(candidate.name, this.MARGIN_STD, this.doc.y + 5);
+            .text(candidate.name, this.MARGIN_STD, this.doc.y + 4);
 
         this.doc
             .font(this.FONT_SORA_SEMIBOLD)
-            .fontSize(12)
+            .fontSize(11)
             .fillColor(this.COLOR_BLACK)
-            .text(`Target Role: ${candidate.expectedFutureRole}`, this.MARGIN_STD, this.doc.y + 8);
+            .text(`Target Role: ${candidate.expectedFutureRole}`, this.MARGIN_STD, this.doc.y + 6);
 
-        this.doc.moveDown(1.5);
+        this.doc.moveDown(1.2);
 
         // 1. Profile Snapshot
         this.h2('1. Profile Snapshot');
+        this.doc.moveDown(0.2);
 
         const snapshotData = [
             ['Name', candidate.name],
@@ -370,32 +374,35 @@ export class OverallFitmentReport extends BaseReport {
             ['Relevant Experience', candidate.relevantExperience],
             ['Current Industry', candidate.currentIndustry],
             ['Expected Future Role', candidate.expectedFutureRole],
-            ['Future Role Readiness Score', `${candidate.futureRoleReadinessScore}%`],
             ['Readiness Status', candidate.readinessStatus]
         ];
 
         this.table(['Profile Attribute', 'Details'], snapshotData, {
-            colWidths: [180, 320],
-            headerColor: '#E8E8E8',
-            headerTextColor: this.COLOR_BLACK,
+            colWidths: [170, 330],
+            headerColor: this.COLOR_DEEP_BLUE,
+            headerTextColor: '#FFFFFF',
             fontSize: 10,
-            headerFontSize: 10
+            headerFontSize: 10,
+            cellPadding: 6
         });
 
-        this.doc.moveDown(1);
+        this.doc.moveDown(0.8);
 
         // 2. Behavioral Alignment
         this.h2('2. Behavioral Alignment Summary');
+        this.doc.moveDown(0.2);
         this.pHtml(candidate.behavioralSummary);
-        this.doc.moveDown(0.5);
+        this.doc.moveDown(0.4);
 
         // 3. Skill Assessment
         this.ensureSpace(200);
         this.h2('3. Skill-wise Capability Assessment (Score out of 5)');
+        this.doc.moveDown(0.2);
 
         candidate.skillCategories.forEach(cat => {
             this.ensureSpace(100);
             this.h3(cat.category);
+            this.doc.moveDown(0.1);
 
             const skillRows = cat.skills.map(s => [
                 s.name,
@@ -404,14 +411,15 @@ export class OverallFitmentReport extends BaseReport {
             ]);
 
             this.table(['Skill', 'Score', 'Insight'], skillRows, {
-                colWidths: [150, 60, 290],
+                colWidths: [140, 55, 305],
                 fontSize: 9,
                 headerFontSize: 9,
                 cellPadding: 5,
-                headerColor: '#F0F0F0'
+                headerColor: this.COLOR_DEEP_BLUE,
+                headerTextColor: '#FFFFFF'
             });
 
-            this.doc.moveDown(0.5);
+            this.doc.moveDown(0.4);
         });
 
         // Skill Radar Chart (Visual)
@@ -423,6 +431,7 @@ export class OverallFitmentReport extends BaseReport {
         // 4. Overall Skill Insight
         this.ensureSpace(120);
         this.h2('4. Overall Skill Coverage Insight');
+        this.doc.moveDown(0.2);
 
         this.h3('High Strength Areas:');
         this.list(candidate.overallSkillInsight.strengths, { indent: 20 });
@@ -430,26 +439,28 @@ export class OverallFitmentReport extends BaseReport {
         this.h3('Developable Areas:');
         this.list(candidate.overallSkillInsight.developable, { indent: 20 });
 
-        this.doc.moveDown(0.5);
+        this.doc.moveDown(0.4);
 
         // 5. Readiness Mapping
         this.ensureSpace(150);
-        this.h2(`5. Future Role Readiness Mapping (${candidate.currentRole} → ${candidate.expectedFutureRole})`);
+        const showMapping = candidate.currentRole !== 'Aspiring Professional' && candidate.expectedFutureRole !== 'Next Level Role';
+        const headerText = showMapping
+            ? `5. Future Role Readiness Mapping (${candidate.currentRole} -> ${candidate.expectedFutureRole})`
+            : `5. Future Role Readiness Mapping`;
+
+        this.h2(headerText);
+        this.doc.moveDown(0.2);
 
         const readinessRows = candidate.readinessDimensions.map(d => [d.dimension, d.alignment]);
         this.table(['Dimension', 'Alignment Level'], readinessRows, {
             colWidths: [250, 250],
-            headerColor: '#E8E8E8',
-            fontSize: 10
+            headerColor: this.COLOR_DEEP_BLUE,
+            headerTextColor: '#FFFFFF',
+            fontSize: 10,
+            cellPadding: 6
         });
 
-        this.doc.moveDown(0.5);
-
-        this.doc
-            .font(this.FONT_SORA_BOLD)
-            .fontSize(12)
-            .fillColor(this.COLOR_DEEP_BLUE)
-            .text(`Future Role Readiness Score: ${candidate.futureRoleReadinessScore}%`);
+        this.doc.moveDown(0.4);
 
         this.doc
             .font(this.FONT_REGULAR)
@@ -461,7 +472,8 @@ export class OverallFitmentReport extends BaseReport {
 
         // 6. Role Fitment Score
         this.ensureSpace(180);
-        this.h2(`6. Role Fitment Score - ${candidate.expectedFutureRole} (Out of 100)`);
+        this.h2(`6. Role Fitment Analysis - ${candidate.expectedFutureRole}`);
+        this.doc.moveDown(0.2);
 
         const fitmentRows = candidate.fitmentComponents.map(fc => [
             fc.component,
@@ -470,18 +482,14 @@ export class OverallFitmentReport extends BaseReport {
         ]);
 
         this.table(['Component', 'Weight', 'Score'], fitmentRows, {
-            colWidths: [220, 100, 100],
-            headerColor: '#E8E8E8',
-            fontSize: 10
+            colWidths: [230, 120, 150],
+            headerColor: this.COLOR_DEEP_BLUE,
+            headerTextColor: '#FFFFFF',
+            fontSize: 10,
+            cellPadding: 6
         });
 
-        this.doc.moveDown(0.5);
-
-        this.doc
-            .font(this.FONT_SORA_BOLD)
-            .fontSize(14)
-            .fillColor(this.COLOR_DEEP_BLUE)
-            .text(`Final Role Fitment Score: ${candidate.roleFitmentScore}%`);
+        this.doc.moveDown(0.4);
 
         this.doc.moveDown(0.3);
 
@@ -553,23 +561,23 @@ export class OverallFitmentReport extends BaseReport {
     // APPENDIX
     // ═══════════════════════════════════════════════════════════════════════════
     private generateAppendix(): void {
-        this.h1('Appendix & Score Legend');
+        this.h1('Appendix & Legend');
         this.doc.moveDown(0.5);
 
         // Readiness Score Legend
-        this.h2('Future Role Readiness Score Interpretation');
+        this.h2('Future Role Readiness Interpretation');
         this.drawReadinessLegend();
 
         this.doc.moveDown(1);
 
         // Fitment Score Legend
-        this.h2('Role Fitment Score Interpretation');
+        this.h2('Role Fitment Interpretation');
 
         const fitmentLegend = [
-            { range: '85% - 100%', label: 'Strong Fit - Highly recommended for role', color: '#e6ffe6' },
-            { range: '70% - 84%', label: 'Conditional Strong Fit - Recommended with minor development', color: '#e6f7ff' },
-            { range: '55% - 69%', label: 'Moderate Fit - Possible with significant development', color: '#fff5e6' },
-            { range: '0% - 54%', label: 'Weak Fit - Not recommended without major changes', color: '#ffe6e6' }
+            { range: 'Strong', label: 'Strong Fit - Highly recommended for role', color: '#e6ffe6' },
+            { range: 'Conditional Strong', label: 'Conditional Strong Fit - Recommended with minor development', color: '#e6f7ff' },
+            { range: 'Moderate', label: 'Moderate Fit - Possible with significant development', color: '#fff5e6' },
+            { range: 'Weak', label: 'Weak Fit - Not recommended without major changes', color: '#ffe6e6' }
         ];
 
         this.drawLegendTable(fitmentLegend);
@@ -579,7 +587,7 @@ export class OverallFitmentReport extends BaseReport {
         // Methodology Note
         this.h2('Assessment Methodology');
         this.doc.moveDown(0.3);
-        
+
         this.doc
             .font(this.FONT_REGULAR)
             .fontSize(11)

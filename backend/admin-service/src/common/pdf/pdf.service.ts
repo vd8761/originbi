@@ -23,7 +23,7 @@ export class PdfService {
                     resolve(pdfData);
                 });
 
-                report.doc.on('error', (err) => {
+                report.doc.on('error', (err: Error) => {
                     this.logger.error(`❌ Error generating PDF: ${err.message}`, err.stack);
                     reject(err);
                 });
@@ -31,9 +31,9 @@ export class PdfService {
                 // Trigger generation
                 report.generate();
 
-            } catch (error) {
+            } catch (error: unknown) {
                 this.logger.error('Failed to initiate PDF generation', error);
-                reject(error);
+                reject(error instanceof Error ? error : new Error(String(error)));
             }
         });
     }
@@ -54,7 +54,7 @@ export class PdfService {
                     resolve(pdfData);
                 });
 
-                report.doc.on('error', (err) => {
+                report.doc.on('error', (err: Error) => {
                     this.logger.error(`❌ Error generating Career Fitment PDF: ${err.message}`, err.stack);
                     reject(err);
                 });
@@ -62,9 +62,9 @@ export class PdfService {
                 // Trigger generation
                 report.generate();
 
-            } catch (error) {
+            } catch (error: unknown) {
                 this.logger.error('Failed to initiate Career Fitment PDF generation', error);
-                reject(error);
+                reject(error instanceof Error ? error : new Error(String(error)));
             }
         });
     }

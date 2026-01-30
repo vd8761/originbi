@@ -115,7 +115,7 @@ export class RagService {
   private readonly logger = new Logger('MITHRA');
   private llm: ChatGroq | null = null;
   private reportsDir: string;
-  
+
   // Simple cache for query understanding to improve performance
   private queryCache = new Map<string, any>();
   private readonly CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes
@@ -174,7 +174,7 @@ export class RagService {
       // Quick bypass for common greetings - avoid LLM call
       const normalizedQ = question.toLowerCase().trim();
       this.logger.log(`🔍 DEBUG: Normalized query = "${normalizedQ}"`);
-      
+
       if (['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'].includes(normalizedQ)) {
         this.logger.log('🎯 Intent: greeting (bypassed LLM)');
         return {
@@ -233,6 +233,14 @@ export class RagService {
       // ═══════════════════════════════════════════════════════════════
       if (interpretation.intent === 'overall_report') {
         return await this.handleOverallReport(user);
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // SPECIAL HANDLER: CHAT-BASED CUSTOM REPORT (User-provided profile)
+      // Detects when user provides profile details in chat
+      // ═══════════════════════════════════════════════════════════════
+      if (interpretation.intent === 'chat_profile_report') {
+        return await this.handleChatProfileReport(question);
       }
 
       // ═══════════════════════════════════════════════════════════════
@@ -555,7 +563,7 @@ export class RagService {
       this.logger.log(`📊 Generating Overall Role Fitment Report`);
 
       const reportTitle = 'Placement Guidance Report';
-      
+
       // Build input - only include groupId if user has one
       // If no groupId, the service will fetch ALL registrations (not filter by group)
       const input: any = {
@@ -566,7 +574,7 @@ export class RagService {
       if (user?.group_id) {
         input.groupId = user.group_id;
       }
-      
+
       // Build download URL - include groupId only if available
       let downloadUrl = `/rag/overall-report/pdf?title=${encodeURIComponent(reportTitle)}`;
       if (user?.group_id) {
@@ -649,7 +657,9 @@ export class RagService {
 
       this.logger.log(`📊 Generating Custom Career Fitment Report for ${targetName} (userId: ${targetUserId})`);
 
-      const downloadUrl = `/rag/custom-report/pdf?userId=${targetUserId}&type=career_fitment`;
+      // Use the name parameter for better matching (handles users with incomplete assessments)
+      const encodedName = encodeURIComponent(targetName || '');
+      const downloadUrl = `/rag/custom-report/pdf?name=${encodedName}&type=career_fitment`;
 
       return {
         answer: `I'm ready to generate **${targetName}'s Career Fitment & Future Role Readiness Report**! 🎯\n\n📄 **[Click here to download the personalized PDF Report](${downloadUrl})**\n\nThis report includes:\n- Profile Snapshot\n- Behavioral Alignment Summary\n- Skill Assessment with AI-generated scores\n- Future Role Readiness Mapping\n- Role Fitment Score\n- Industry Suitability Analysis\n- Transition Requirements\n- Executive Insights\n\nDownload the PDF for the complete analysis!`,
@@ -663,6 +673,139 @@ export class RagService {
         searchType: 'error',
         confidence: 0,
       };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HANDLER: CHAT-BASED PROFILE REPORT (User provides profile data in chat)
+  // ═══════════════════════════════════════════════════════════════════════════
+  private async handleChatProfileReport(question: string): Promise<QueryResult> {
+    try {
+      this.logger.log('📋 Processing chat-based profile for custom report generation');
+
+      // Parse profile from chat message
+      const profileData = this.parseProfileFromChat(question);
+
+      if (!profileData) {
+        return {
+          answer: `**📝 I detected you want to generate a custom report!**\n\nPlease provide the following details in your message:\n\n\`\`\`\nName: [Full Name]\nCurrent Role: [Your current job title]\nCurrent Job Description: [Brief description of responsibilities]\nYears of Experience: [Number]\nRelevant Experience: [Key focus areas]\nCurrent Industry: [Industry name]\nExpected Future Role: [Target role you aspire to]\n\`\`\`\n\n**Example:**\n\`\`\`\nName: Anjaly\nCurrent Role: VP- Sales and Marketing\nCurrent Job Description: Driving revenue growth and brand positioning\nYears of Experience: 15\nRelevant Experience: 10 years in Retail industry\nCurrent Industry: IT\nExpected Future Role: CTO for Aerospace/BFSI\n\`\`\`\n\nOnce you provide these details, I'll generate a personalized Career Fitment Report for you!`,
+          searchType: 'chat_profile_request',
+          confidence: 0.9,
+        };
+      }
+
+      // Encode the profile data as base64 for the URL
+      const reportPayload = {
+        name: profileData.name,
+        currentRole: profileData.currentRole,
+        currentJobDescription: profileData.currentJobDescription,
+        yearsOfExperience: profileData.yearsOfExperience,
+        relevantExperience: profileData.relevantExperience,
+        currentIndustry: profileData.currentIndustry,
+        expectedFutureRole: profileData.expectedFutureRole,
+        expectedIndustry: profileData.expectedIndustry || '',
+      };
+
+      const encodedProfile = Buffer.from(JSON.stringify(reportPayload)).toString('base64');
+      const downloadUrl = `/rag/chat-report/download?profile=${encodedProfile}`;
+
+      return {
+        answer: `**✅ Profile Captured Successfully for ${profileData.name}!** 🎯\n\n📊 **Profile Summary:**\n- **Name:** ${profileData.name}\n- **Current Role:** ${profileData.currentRole}\n- **Experience:** ${profileData.yearsOfExperience} years\n- **Industry:** ${profileData.currentIndustry}\n- **Target Role:** ${profileData.expectedFutureRole}\n\n📄 **[Click here to download your personalized Career Fitment Report](${downloadUrl})**`,
+        searchType: 'chat_profile_report',
+        confidence: 0.95,
+        reportUrl: downloadUrl,
+      };
+    } catch (error) {
+      this.logger.error(`Chat profile report error: ${error.message}`);
+      return {
+        answer: `**❌ Error processing profile:** ${error.message}\n\nPlease make sure you've provided all required details (Name, Current Role, Years of Experience, Current Industry, Expected Future Role).`,
+        searchType: 'error',
+        confidence: 0,
+      };
+    }
+  }
+
+  /**
+   * Parse profile data from a chat message
+   */
+  private parseProfileFromChat(chatMessage: string): {
+    name: string;
+    currentRole: string;
+    currentJobDescription: string;
+    yearsOfExperience: number;
+    relevantExperience: string;
+    currentIndustry: string;
+    expectedFutureRole: string;
+    expectedIndustry?: string;
+  } | null {
+    try {
+      const extractField = (patterns: RegExp[]): string => {
+        for (const pattern of patterns) {
+          const match = chatMessage.match(pattern);
+          if (match && match[1]) {
+            return match[1].trim();
+          }
+        }
+        return '';
+      };
+
+      const name = extractField([
+        /name[:\s]*([^\n]+)/i,
+        /(?:my name is|i am|i'm)\s+([^\n,]+)/i,
+      ]);
+
+      const currentRole = extractField([
+        /current\s*role[:\s]*([^\n]+)/i,
+        /(?:working as|position|designation)[:\s]*([^\n]+)/i,
+      ]);
+
+      const currentJobDescription = extractField([
+        /(?:current\s*)?job\s*description[:\s]*([^\n]+(?:\n(?![A-Z][a-z]*:)[^\n]+)*)/i,
+        /responsibilities[:\s]*([^\n]+)/i,
+      ]);
+
+      const yearsStr = extractField([
+        /years?\s*of\s*experience[:\s]*(\d+)/i,
+        /(\d+)\s*years?\s*(?:of\s*)?experience/i,
+        /experience[:\s]*(\d+)/i,
+      ]);
+      const yearsOfExperience = parseInt(yearsStr) || 0;
+
+      const relevantExperience = extractField([
+        /relevant\s*experience[:\s\(]*([^\n\)]+)/i,
+        /key\s*focus\s*areas?[:\s]*([^\n]+)/i,
+      ]);
+
+      const currentIndustry = extractField([
+        /current\s*industry[:\s]*([^\n]+)/i,
+        /industry[:\s]*([^\n]+)/i,
+      ]);
+
+      const expectedFutureRole = extractField([
+        /expected\s*future\s*role[:\s]*([^\n]+)/i,
+        /future\s*role[:\s]*([^\n]+)/i,
+        /target\s*role[:\s]*([^\n]+)/i,
+      ]);
+
+      // Require at least name to proceed
+      if (!name) {
+        this.logger.warn('❌ Missing required field: name');
+        return null;
+      }
+
+      return {
+        name,
+        currentRole: currentRole || 'Not Specified',
+        currentJobDescription: currentJobDescription || '',
+        yearsOfExperience,
+        relevantExperience: relevantExperience || '',
+        currentIndustry: currentIndustry || 'Not Specified',
+        expectedFutureRole: expectedFutureRole || 'Not Specified',
+        expectedIndustry: '',
+      };
+    } catch (error) {
+      this.logger.error(`Failed to parse profile: ${error.message}`);
+      return null;
     }
   }
 
@@ -698,10 +841,12 @@ export class RagService {
     const prompt = `You are a query interpreter for OriginBI assessment platform.
 
 Analyze this user query and extract:
-1. INTENT: What does the user want? (greeting, help, list_users, list_candidates, test_results, person_lookup, best_performer, career_roles, career_report, overall_report, custom_report, count)
+1. INTENT: What does the user want? (greeting, help, list_users, list_candidates, test_results, person_lookup, best_performer, career_roles, career_report, overall_report, custom_report, chat_profile_report, count)
 2. SEARCH_TERM: Any specific name or keyword to search (null if general query)
 3. TABLE: Primary table to query (users, registrations, assessment_attempts, career_roles, programs, none)
 4. INCLUDE_PERSONALITY: Should we include DISC behavioral style and Agile score? (true for test results, person lookups, career reports)
+
+IMPORTANT: Use "chat_profile_report" when user provides their profile details (Name, Current Role, Experience, Industry, Future Role) in the message.
 
 USER QUERY: "${question}"
 
@@ -734,6 +879,9 @@ EXAMPLES:
 "custom report for anjaly" → {"intent":"custom_report","searchTerm":"anjaly","table":"assessment_attempts","includePersonality":true}
 "generate career fitment report for john" → {"intent":"custom_report","searchTerm":"john","table":"assessment_attempts","includePersonality":true}
 "fitment report for priya" → {"intent":"custom_report","searchTerm":"priya","table":"assessment_attempts","includePersonality":true}
+"Name: Anjaly Current Role: VP-Sales..." → {"intent":"chat_profile_report","searchTerm":null,"table":"none","includePersonality":false}
+"generate report: Name: John, Current Role: Manager..." → {"intent":"chat_profile_report","searchTerm":null,"table":"none","includePersonality":false}
+"custom: Name: Priya, Years of Experience: 10..." → {"intent":"chat_profile_report","searchTerm":null,"table":"none","includePersonality":false}
 "how many users" → {"intent":"count","searchTerm":null,"table":"users","includePersonality":false}
 
 Respond with ONLY valid JSON, no explanation:`;
@@ -742,9 +890,9 @@ Respond with ONLY valid JSON, no explanation:`;
       const startTime = Date.now();
       const response = await this.getLlm().invoke([new SystemMessage(prompt)]);
       const elapsed = Date.now() - startTime;
-      
+
       this.logger.log(`🤖 LLM query understanding took ${elapsed}ms`);
-      
+
       const jsonStr = response.content.toString().trim();
       const parsed = JSON.parse(jsonStr);
       const result = {
@@ -788,6 +936,23 @@ Respond with ONLY valid JSON, no explanation:`;
     includePersonality: boolean;
   } {
     const qLowerUniq = question.toLowerCase();
+
+    // Chat-based profile report - when user provides profile details directly
+    // Check for patterns like "Name:", "Current Role:", "Years of Experience:", etc.
+    const hasProfilePattern = qLowerUniq.match(/name[:\s]/i) && 
+      (qLowerUniq.match(/current\s*role[:\s]/i) || 
+       qLowerUniq.match(/experience[:\s]/i) || 
+       qLowerUniq.match(/industry[:\s]/i) ||
+       qLowerUniq.match(/future\s*role[:\s]/i));
+    
+    if (hasProfilePattern || qLowerUniq.match(/^custom:\s*name/i)) {
+      return {
+        intent: 'chat_profile_report',
+        searchTerm: null,
+        table: 'none',
+        includePersonality: false,
+      };
+    }
 
     // Custom report (career fitment, personalized) - CHECK FIRST
     if (
@@ -1225,6 +1390,3 @@ Respond with ONLY valid JSON, no explanation:`;
     };
   }
 }
-  
- 
- 

@@ -203,34 +203,32 @@ export class ConversationService {
     /**
      * Get conversation context for LLM
      */
-    getContextForLLM(sessionId: string): string {
+    /**
+     * Get conversation context formatted for LLM Prompt
+     */
+    getHistoryForLLM(sessionId: string): string {
         const session = this.getSession(sessionId);
 
         if (session.messages.length === 0) {
             return '';
         }
 
-        // Get last few exchanges
-        const recentMessages = session.messages.slice(-6);
+        // Get last 10 messages for deeper context
+        const recentMessages = session.messages.slice(-10);
 
-        let context = 'Previous conversation:\n';
+        let history = '--- CONVERSATION HISTORY ---\n';
         recentMessages.forEach(msg => {
-            const role = msg.role === 'user' ? 'User' : 'MITHRA';
-            const shortContent = msg.content.length > 200
-                ? msg.content.substring(0, 200) + '...'
-                : msg.content;
-            context += `${role}: ${shortContent}\n`;
+            const roleLabel = msg.role === 'user' ? 'User' : 'MITHRA';
+            // Clean content to avoid massive prompts if message is huge (e.g. previous report)
+            let content = msg.content;
+            if (content.length > 500) {
+                content = content.substring(0, 500) + '... [content truncated]';
+            }
+            history += `${roleLabel}: ${content}\n`;
         });
+        history += '--- CURRENT INTERACTION ---\n';
 
-        // Add current context info
-        if (session.currentContext.lastPersonMentioned) {
-            context += `\nLast person discussed: ${session.currentContext.lastPersonMentioned}`;
-        }
-        if (session.currentContext.lastReportType) {
-            context += `\nLast report type: ${session.currentContext.lastReportType}`;
-        }
-
-        return context;
+        return history;
     }
 
     /**
