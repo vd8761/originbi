@@ -659,7 +659,7 @@ const getAciData = (attempt: any) => {
         { value: 'Respect', score: '-', note: '-' },
         { value: 'Courage', score: '-', note: '-' },
     ];
-    let compatibility = {
+    const compatibility = {
         totalScore: '0 / 125',
         level: '-',
         tag: '-',
