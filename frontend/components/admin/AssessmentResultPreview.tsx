@@ -353,7 +353,32 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                     </div>
                 </div>
 
-                {/* Compatibility Index - ONLY FOR ACI (separate container) */}
+                {/* Right Sidebar with horizontal separators */}
+                {!hideStats && (
+                    <div className="flex flex-col gap-4">
+                        <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-6 flex flex-col gap-0 h-full">
+                            <SidebarItem label="Assessment Title" value={displayData.title} />
+
+                            {/* Horizontal separator */}
+                            <div className="border-t border-gray-200 dark:border-white/10 my-4" />
+
+                            <div className="flex flex-col gap-4">
+                                <SidebarItem label="Exam Published On" value={displayData.startsOn} />
+                                <SidebarItem label="Exam Expired On" value={displayData.endsOn} />
+                            </div>
+
+                            {/* Horizontal separator */}
+                            <div className="border-t border-gray-200 dark:border-white/10 my-4" />
+
+                            <div className="flex flex-col gap-4">
+                                <SidebarItem label="Program Level" value={displayData.program} />
+                                <SidebarItem label="Exam Type" value={displayData.type} />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Compatibility Index - ONLY FOR ACI (separate container) - Moved to bottom/left */}
                 {title === 'ACI' && (
                     <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-6">
                         <h3 className="text-sm font-semibold text-[#150089] dark:text-white mb-4">Agile Compatibility Index (ACI) – Score Overview</h3>
@@ -387,55 +412,17 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                         </div>
                     </div>
                 )}
-
-                {/* Right Sidebar with horizontal separators */}
-                {!hideStats && (
-                    <div className="flex flex-col gap-4">
-                        <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-6 flex flex-col gap-0 h-full">
-                            <SidebarItem label="Assessment Title" value={displayData.title} />
-
-                            {/* Horizontal separator */}
-                            <div className="border-t border-gray-200 dark:border-white/10 my-4" />
-
-                            <div className="flex flex-col gap-4">
-                                <SidebarItem label="Exam Published On" value={displayData.startsOn} />
-                                <SidebarItem label="Exam Expired On" value={displayData.endsOn} />
-                            </div>
-
-                            {/* Horizontal separator */}
-                            <div className="border-t border-gray-200 dark:border-white/10 my-4" />
-
-                            <div className="flex flex-col gap-4">
-                                <SidebarItem label="Program Level" value={displayData.program} />
-                                <SidebarItem label="Exam Type" value={displayData.type} />
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div>
         );
     };
 
     // Mock Data for Reports (Replace with Real Data later)
-    const aciBreakdownData = [
-        { value: 'Commitment', score: '24', note: 'Deeply dedicated and consistent.' },
-        { value: 'Focus', score: '22', note: 'Exceptionally attentive to detail and priority.' },
-        { value: 'Openness', score: '18', note: 'Learning to adapt and welcome diverse approaches.' },
-        { value: 'Respect', score: '19', note: 'Professional tone with scope to show empathy.' },
-        { value: 'Courage', score: '23', note: 'Honest and principled; leads through integrity.' },
-    ];
     const discBreakdownData = [
         { value: 'Dominance', score: '30', note: 'Direct and decisive.' },
         { value: 'Influence', score: '28', note: 'Enthusiastic and persuasive.' },
         { value: 'Steadiness', score: '22', note: 'Patient and reliable.' },
         { value: 'Compliance', score: '20', note: 'Precise and analytical.' },
     ];
-    const aciCompatibilityData = {
-        totalScore: '106 / 125',
-        level: 'Agile Naturalist',
-        tag: 'Embodies agility instinctively; thrives in collaboration and adapts with ease.',
-        interpretation: 'You combine discipline with flexibility — upholding standards while remaining open to change.'
-    };
     const discCompatibilityData = {
         totalScore: '100 / 125',
         level: 'Influential Leader',
@@ -664,41 +651,92 @@ const getDiscData = (attempt: any) => {
 
 // Helper to extract ACI data
 const getAciData = (attempt: any) => {
+    // Default structure with placeholders
     let breakdown = [
-        { value: 'Commitment', score: '-', note: 'Deeply dedicated and consistent.' },
-        { value: 'Focus', score: '-', note: 'Exceptionally attentive to detail and priority.' },
-        { value: 'Openness', score: '-', note: 'Learning to adapt and welcome diverse approaches.' },
-        { value: 'Respect', score: '-', note: 'Professional tone with scope to show empathy.' },
-        { value: 'Courage', score: '-', note: 'Honest and principled; leads through integrity.' },
+        { value: 'Commitment', score: '-', note: '-' },
+        { value: 'Focus', score: '-', note: '-' },
+        { value: 'Openness', score: '-', note: '-' },
+        { value: 'Respect', score: '-', note: '-' },
+        { value: 'Courage', score: '-', note: '-' },
     ];
-    let compatibility = {
+    const compatibility = {
         totalScore: '0 / 125',
         level: '-',
         tag: '-',
         interpretation: '-'
     };
 
-    const scores = attempt?.metadata?.agile_scores || attempt?.metadata?.aci_scores || attempt?.metadata?.scores;
+    if (attempt) {
+        // 1. Resolve Scores
+        // Try multiple sources for scores
+        const meta = attempt.metadata || {};
+        const scores = meta.agile_scores || meta.aci_scores || meta.scores || {};
 
-    if (attempt && scores) {
+        // 2. Resolve Total Score
+        // specific score total OR attempt column OR metadata total
+        const rawTotal = scores['total'] || attempt.totalScore || meta.total_score || '0';
+        compatibility.totalScore = String(rawTotal).includes('/') ? rawTotal : `${rawTotal} / 125`;
+
+        // 3. Resolve Compatibility Info using Backend Enriched Data (Preferred)
+        if (attempt.aciBand) {
+            compatibility.level = attempt.aciBand.levelName || '-';
+            compatibility.tag = attempt.aciBand.compatibilityTag || '-';
+            compatibility.interpretation = attempt.aciBand.interpretation || '-';
+        } else {
+            // Fallback: Manual Calculation
+            const totalScoreVal = parseInt(String(rawTotal).split('/')[0], 10) || 0;
+            if (totalScoreVal >= 100) {
+                compatibility.level = 'Agile Naturalist';
+                compatibility.tag = 'Embodies agility instinctively; thrives in collaboration and adapts with ease.';
+                compatibility.interpretation = 'You live the Agile mindset naturally — showing balance between speed, empathy, and integrity.';
+            } else if (totalScoreVal >= 75) {
+                compatibility.level = 'Agile Adaptive';
+                compatibility.tag = 'Shows strong energy, adaptability, and creative courage with growing consistency.';
+                compatibility.interpretation = 'You’re quick to learn and adjust to change. You work well in dynamic situations but can refine your focus.';
+            } else if (totalScoreVal >= 50) {
+                compatibility.level = 'Agile Learner';
+                compatibility.tag = 'Understands Agile values conceptually but applies them inconsistently.';
+                compatibility.interpretation = 'You show openness to Agile ideas and collaboration but may need guidance on consistent application.';
+            } else {
+                compatibility.level = 'Agile Resistant';
+                compatibility.tag = 'Prefers control and predictability; finds comfort in fixed systems and routines.';
+                compatibility.interpretation = 'You may feel uncertain when faced with change or fast-moving teamwork. This is a growth area for you.';
+            }
+        }
+
+        // 4. Resolve Breakdown and Notes
+        // Use enriched notes from backend if available (checking metadata as fallback)
+        const notes = attempt.aciNotes || attempt.metadata?.aciNotes || {};
+
         breakdown = [
-            { value: 'Commitment', score: scores['Commitment'] || scores['commitment'] || '-', note: 'Deeply dedicated and consistent.' },
-            { value: 'Focus', score: scores['Focus'] || scores['focus'] || '-', note: 'Exceptionally attentive to detail and priority.' },
-            { value: 'Openness', score: scores['Openness'] || scores['openness'] || '-', note: 'Learning to adapt and welcome diverse approaches.' },
-            { value: 'Respect', score: scores['Respect'] || scores['respect'] || '-', note: 'Professional tone with scope to show empathy.' },
-            { value: 'Courage', score: scores['Courage'] || scores['courage'] || '-', note: 'Honest and principled; leads through integrity.' },
+            {
+                value: 'Commitment',
+                score: scores['Commitment'] || scores['commitment'] || '-',
+                note: notes['Commitment'] || '-'
+            },
+            {
+                value: 'Focus',
+                score: scores['Focus'] || scores['focus'] || '-',
+                note: notes['Focus'] || '-'
+            },
+            {
+                value: 'Openness',
+                score: scores['Openness'] || scores['openness'] || '-',
+                note: notes['Openness'] || '-'
+            },
+            {
+                value: 'Respect',
+                score: scores['Respect'] || scores['respect'] || '-',
+                note: notes['Respect'] || '-'
+            },
+            {
+                value: 'Courage',
+                score: scores['Courage'] || scores['courage'] || '-',
+                note: notes['Courage'] || '-'
+            },
         ];
-
-        const rawTotal = scores['total'] || attempt.totalScore || '0';
-        const trait = attempt.dominantTrait;
-
-        compatibility = {
-            totalScore: String(rawTotal).includes('/') ? rawTotal : `${rawTotal} / 125`,
-            level: trait?.blendedStyleName || attempt.sincerityClass || '-',
-            tag: trait?.blendedStyleDesc || '-',
-            interpretation: trait?.metadata?.interpretation || '-'
-        };
     }
+
     return { breakdown, compatibility };
 };
 
