@@ -16,14 +16,14 @@ interface ChatAssistantProps {
     apiUrl?: string;
 }
 
-// Stable typewriter effect - FAST, works even when tab is in background
+// Stable typewriter effect - OPTIMIZED for smooth animation
 const TypeWriter = memo(({ text, speed = 2, onDone }: { text: string; speed?: number; onDone?: () => void }) => {
     const [display, setDisplay] = useState('');
     const onDoneRef = useRef(onDone);
     const textRef = useRef(text);
     const hasCompletedRef = useRef(false);
-    const startTimeRef = useRef<number>(0);
-    const animationRef = useRef<number>(0);
+    const indexRef = useRef(0);
+    const frameRef = useRef<number>(0);
 
     // Update refs when props change
     useEffect(() => {
@@ -35,35 +35,31 @@ const TypeWriter = memo(({ text, speed = 2, onDone }: { text: string; speed?: nu
         if (textRef.current !== text) {
             textRef.current = text;
             hasCompletedRef.current = false;
-            startTimeRef.current = 0;
+            indexRef.current = 0;
         }
     }, [text]);
 
     useEffect(() => {
         if (hasCompletedRef.current) return;
 
-        // Use requestAnimationFrame with timestamps - works when tab is in background
-        const animate = (timestamp: number) => {
-            if (!startTimeRef.current) startTimeRef.current = timestamp;
-
-            const elapsed = timestamp - startTimeRef.current;
-            const charsToShow = Math.min(Math.floor(elapsed / speed), text.length);
-
-            if (charsToShow < text.length) {
-                setDisplay(text.slice(0, charsToShow + 1));
-                animationRef.current = requestAnimationFrame(animate);
+        const charsPerFrame = 3; // Faster typing - 3 chars per frame
+        
+        const animate = () => {
+            if (indexRef.current < text.length) {
+                indexRef.current = Math.min(indexRef.current + charsPerFrame, text.length);
+                setDisplay(text.slice(0, indexRef.current));
+                frameRef.current = requestAnimationFrame(animate);
             } else {
-                setDisplay(text);
                 hasCompletedRef.current = true;
                 onDoneRef.current?.();
             }
         };
 
-        animationRef.current = requestAnimationFrame(animate);
+        frameRef.current = requestAnimationFrame(animate);
 
         return () => {
-            if (animationRef.current) {
-                cancelAnimationFrame(animationRef.current);
+            if (frameRef.current) {
+                cancelAnimationFrame(frameRef.current);
             }
         };
     }, [text, speed]);
@@ -72,7 +68,7 @@ const TypeWriter = memo(({ text, speed = 2, onDone }: { text: string; speed?: nu
         <>
             {display}
             {display.length < text.length && (
-                <span className="inline-block w-0.5 h-4 ml-0.5 bg-emerald-500 animate-pulse" />
+                <span className="inline-block w-0.5 h-4 ml-0.5 bg-cyan-500 animate-[blink_0.8s_infinite]" />
             )}
         </>
     );
@@ -91,7 +87,11 @@ const RenderContent = ({ content, streaming, onDone, apiUrl }: { content: string
             const downloadUrl = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = downloadUrl;
-            a.download = `${reportPath.split('/').pop()}.txt`;
+            // Determine extension based on content type
+            const contentType = response.headers.get('content-type') || '';
+            const ext = contentType.includes('pdf') ? '.pdf' : contentType.includes('text') ? '.txt' : '';
+            const filename = reportPath.split('/').pop()?.split('?')[0] || 'report';
+            a.download = `${filename}${ext}`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -113,7 +113,7 @@ const RenderContent = ({ content, streaming, onDone, apiUrl }: { content: string
                         <button
                             key={i}
                             onClick={() => handleDownload(linkUrl)}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl font-medium text-sm transition-all shadow-md shadow-emerald-500/20 hover:shadow-lg"
+                            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:from-cyan-600 hover:via-blue-600 hover:to-indigo-700 text-white rounded-xl font-medium text-sm transition-all shadow-md shadow-blue-500/25 hover:shadow-lg"
                         >
                             <Download className="w-4 h-4" />
                             {linkText.replace(/\[|\]/g, '')}
@@ -127,7 +127,7 @@ const RenderContent = ({ content, streaming, onDone, apiUrl }: { content: string
                 if (line.includes('**')) {
                     processed = line.split(/(\*\*[^*]+\*\*)/g).map((part, j) =>
                         part.startsWith('**') ? (
-                            <strong key={j} className="font-semibold text-gray-900">{part.slice(2, -2)}</strong>
+                            <strong key={j} className="font-semibold text-gray-900 dark:text-white">{part.slice(2, -2)}</strong>
                         ) : part
                     );
                 }
@@ -137,7 +137,7 @@ const RenderContent = ({ content, streaming, onDone, apiUrl }: { content: string
                     return (
                         <div key={i} className="flex items-start gap-2.5 pl-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 flex-shrink-0" />
-                            <span className="text-gray-700">{typeof processed === 'string' ? processed.replace(/^[-•]\s*/, '') : processed}</span>
+                            <span className="text-gray-700 dark:text-gray-200">{typeof processed === 'string' ? processed.replace(/^[-•]\s*/, '') : processed}</span>
                         </div>
                     );
                 }
@@ -147,10 +147,10 @@ const RenderContent = ({ content, streaming, onDone, apiUrl }: { content: string
                 if (numMatch) {
                     return (
                         <div key={i} className="flex items-start gap-2.5 pl-1">
-                            <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-medium flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-medium flex items-center justify-center flex-shrink-0 mt-0.5">
                                 {numMatch[1]}
                             </span>
-                            <span className="text-gray-700">{line.replace(/^\d+\.\s/, '')}</span>
+                            <span className="text-gray-700 dark:text-gray-200">{line.replace(/^\d+\.\s/, '')}</span>
                         </div>
                     );
                 }
@@ -161,7 +161,7 @@ const RenderContent = ({ content, streaming, onDone, apiUrl }: { content: string
                 }
 
                 if (!line.trim()) return <div key={i} className="h-1.5" />;
-                return <p key={i} className="text-gray-700">{processed}</p>;
+                return <p key={i} className="text-gray-700 dark:text-gray-200">{processed}</p>;
             }).filter(Boolean)}
         </div>
     );
@@ -245,28 +245,28 @@ export default function ChatAssistant({
     const clearChat = () => setMessages([]);
 
     const suggestions = [
-        { icon: '👥', text: 'How many users?' },
-        { icon: '📝', text: 'Show exam results' },
-        { icon: '💼', text: 'List career roles' },
-        { icon: '📊', text: 'Generate user report' },
+        { icon: '👋', text: 'Say hello to MITHRA' },
+        { icon: '🏆', text: 'Show top performers' },
+        { icon: '📊', text: 'Generate career report' },
+        { icon: '👥', text: 'List all candidates' },
     ];
 
     return (
-        <div className="flex flex-col h-full w-full bg-white overflow-hidden">
+        <div className="flex flex-col h-full w-full bg-white dark:bg-[#0f1115] overflow-hidden">
             {/* Compact Header - Responsive */}
-            <div className="flex items-center justify-between px-3 sm:px-4 md:px-6 py-2 sm:py-3 bg-white border-b border-gray-100 flex-shrink-0">
+            <div className="flex items-center justify-between px-3 sm:px-4 md:px-6 py-2 sm:py-3 bg-white dark:bg-[#0f1115] border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     <div className="relative flex-shrink-0">
-                        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 flex items-center justify-center shadow-md shadow-emerald-500/20">
+                        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30 animate-pulse">
                             <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
                         </div>
-                        <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-emerald-400 rounded-full border-2 border-white" />
+                        <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-cyan-400 rounded-full border-2 border-white dark:border-[#0f1115]" />
                     </div>
                     <div className="min-w-0">
-                        <h1 className="text-gray-900 font-semibold text-xs sm:text-sm truncate">OriginBI Assistant</h1>
+                        <h1 className="text-gray-900 dark:text-white font-bold text-sm sm:text-base truncate">MITHRA</h1>
                         <div className="flex items-center gap-1">
-                            <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
-                            <span className="text-gray-400 text-[9px] sm:text-[10px] font-medium">Online</span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                            <span className="text-gray-400 text-[9px] sm:text-[10px] font-medium">Intelligent Assistant</span>
                         </div>
                     </div>
                 </div>
@@ -274,7 +274,7 @@ export default function ChatAssistant({
                     {messages.length > 0 && (
                         <button
                             onClick={clearChat}
-                            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all text-[10px] sm:text-xs font-medium"
+                            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all text-[10px] sm:text-xs font-medium"
                         >
                             <Trash2 className="w-3 h-3" />
                             <span className="hidden sm:inline">Clear</span>
@@ -287,19 +287,20 @@ export default function ChatAssistant({
             </div>
 
             {/* Chat Area */}
-            <div className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-50/50 to-white">
+            <div className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-50/50 to-white dark:from-[#0f1115] dark:to-[#0f1115]">
                 {messages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-12">
                         {/* Welcome Section */}
-                        <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-2xl sm:rounded-[1.5rem] md:rounded-[2rem] bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 flex items-center justify-center mb-6 sm:mb-8 shadow-2xl shadow-emerald-500/30">
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-2xl sm:rounded-[1.5rem] md:rounded-[2rem] bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 flex items-center justify-center mb-6 sm:mb-8 shadow-2xl shadow-blue-500/40 relative">
                             <Bot className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-white" />
+                            <div className="absolute inset-0 rounded-2xl sm:rounded-[1.5rem] md:rounded-[2rem] bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 animate-pulse opacity-50" />
                         </div>
 
-                        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-2 sm:mb-3 tracking-tight text-center">
-                            How can I help you?
+                        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-3 tracking-tight text-center">
+                            Hello, I'm <span className="bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">MITHRA</span>
                         </h2>
-                        <p className="text-gray-500 text-center max-w-md mb-6 sm:mb-10 text-sm sm:text-base px-4">
-                            Ask questions about your data, generate reports, or explore insights from your database.
+                        <p className="text-gray-500 dark:text-gray-400 text-center max-w-md mb-6 sm:mb-10 text-sm sm:text-base px-4">
+                            Your intelligent companion for talent insights. Ask me anything about your data!
                         </p>
 
                         {/* Suggestion Cards - Responsive Grid */}
@@ -308,21 +309,21 @@ export default function ChatAssistant({
                                 <button
                                     key={i}
                                     onClick={() => setInput(s.text)}
-                                    className="group flex items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-white hover:bg-emerald-50 border border-gray-100 hover:border-emerald-200 text-left transition-all duration-200 shadow-sm hover:shadow-md"
+                                    className="group flex items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-white dark:bg-gray-800/50 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 border border-gray-100 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-600 text-left transition-all duration-200 shadow-sm hover:shadow-md hover:shadow-cyan-500/10"
                                 >
                                     <span className="text-xl sm:text-2xl">{s.icon}</span>
-                                    <span className="text-gray-600 group-hover:text-gray-900 text-xs sm:text-sm font-medium">{s.text}</span>
+                                    <span className="text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white text-xs sm:text-sm font-medium">{s.text}</span>
                                 </button>
                             ))}
                         </div>
 
                         {/* Feature Pills */}
                         <div className="flex items-center gap-2 mt-6 sm:mt-10">
-                            <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 bg-gray-100 rounded-full text-[10px] sm:text-xs text-gray-500 font-medium">
+                            <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 bg-gray-100 dark:bg-gray-800 rounded-full text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium">
                                 <Zap className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                                 Fast Responses
                             </div>
-                            <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 bg-gray-100 rounded-full text-[10px] sm:text-xs text-gray-500 font-medium">
+                            <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 bg-gray-100 dark:bg-gray-800 rounded-full text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium">
                                 <MessageSquare className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                                 Natural Language
                             </div>
@@ -335,7 +336,7 @@ export default function ChatAssistant({
                                 {/* Avatar */}
                                 <div className={`flex-shrink-0 ${m.role === 'user' ? 'mt-1' : ''}`}>
                                     {m.role === 'assistant' ? (
-                                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-md shadow-emerald-500/20">
+                                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/25">
                                             <Bot className="w-5 h-5 text-white" />
                                         </div>
                                     ) : (
@@ -348,8 +349,8 @@ export default function ChatAssistant({
                                 {/* Message Bubble */}
                                 <div className={`group flex flex-col max-w-[80%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
                                     <div className={`rounded-2xl px-4 py-3 ${m.role === 'user'
-                                        ? 'bg-white border border-gray-100 shadow-sm'
-                                        : 'bg-white border border-gray-100 shadow-sm'
+                                        ? 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm'
+                                        : 'bg-white dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 shadow-sm'
                                         }`}>
                                         {m.role === 'assistant' ? (
                                             <RenderContent
@@ -359,7 +360,7 @@ export default function ChatAssistant({
                                                 apiUrl={apiUrl}
                                             />
                                         ) : (
-                                            <p className="text-[15px] text-gray-900">{m.content}</p>
+                                            <p className="text-[15px] text-gray-900 dark:text-gray-100">{m.content}</p>
                                         )}
                                     </div>
 
@@ -397,14 +398,14 @@ export default function ChatAssistant({
                                 <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-md shadow-emerald-500/20">
                                     <Bot className="w-5 h-5 text-white" />
                                 </div>
-                                <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 shadow-sm">
+                                <div className="bg-white dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-2xl px-4 py-3 shadow-sm">
                                     <div className="flex items-center gap-2">
                                         <div className="flex gap-1">
-                                            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                            <span className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                            <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                            <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                                         </div>
-                                        <span className="text-gray-400 text-sm ml-1">Analyzing...</span>
+                                        <span className="text-gray-400 dark:text-gray-300 text-sm ml-1">MITHRA is thinking...</span>
                                     </div>
                                 </div>
                             </div>
@@ -416,9 +417,9 @@ export default function ChatAssistant({
             </div>
 
             {/* Input Area - Responsive */}
-            <div className="bg-white px-3 sm:px-4 md:px-6 py-3 sm:py-4 flex-shrink-0 border-t border-gray-50">
+            <div className="bg-white dark:bg-[#0f1115] px-3 sm:px-4 md:px-6 py-3 sm:py-4 flex-shrink-0 border-t border-gray-50 dark:border-gray-800">
                 <div className="max-w-4xl mx-auto">
-                    <div className="flex items-end gap-2 sm:gap-3 p-1.5 sm:p-2 bg-gray-50 rounded-xl sm:rounded-2xl border border-gray-200 focus-within:border-emerald-300 focus-within:bg-white focus-within:shadow-lg focus-within:shadow-emerald-500/5 transition-all duration-200">
+                    <div className="flex items-end gap-2 sm:gap-3 p-1.5 sm:p-2 bg-gray-50 dark:bg-gray-800/50 rounded-xl sm:rounded-2xl border border-gray-200 dark:border-gray-700 focus-within:border-cyan-400 dark:focus-within:border-cyan-500 focus-within:bg-white dark:focus-within:bg-gray-800 focus-within:shadow-lg focus-within:shadow-cyan-500/10 transition-all duration-200">
                         <textarea
                             ref={inputRef}
                             value={input}
@@ -429,15 +430,15 @@ export default function ChatAssistant({
                                     handleSend();
                                 }
                             }}
-                            placeholder="Ask anything about your data..."
+                            placeholder="Ask MITHRA anything..."
                             rows={1}
-                            className="flex-1 bg-transparent px-2 sm:px-3 py-2 sm:py-2.5 text-gray-900 placeholder-gray-400 resize-none focus:outline-none text-sm sm:text-[15px]"
+                            className="flex-1 bg-transparent px-2 sm:px-3 py-2 sm:py-2.5 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 resize-none focus:outline-none text-sm sm:text-[15px]"
                             disabled={loading}
                         />
                         <button
                             onClick={handleSend}
                             disabled={loading || !input.trim()}
-                            className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:from-gray-200 disabled:to-gray-200 rounded-lg sm:rounded-xl text-white disabled:text-gray-400 transition-all duration-200 shadow-md shadow-emerald-500/20 disabled:shadow-none"
+                            className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:from-cyan-600 hover:via-blue-600 hover:to-indigo-700 disabled:from-gray-200 disabled:to-gray-200 rounded-lg sm:rounded-xl text-white disabled:text-gray-400 transition-all duration-200 shadow-md shadow-blue-500/25 disabled:shadow-none"
                         >
                             {loading ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -447,7 +448,7 @@ export default function ChatAssistant({
                         </button>
                     </div>
                     <p className="text-center text-[10px] sm:text-xs text-gray-400 mt-2 sm:mt-3 hidden sm:block">
-                        OriginBI Assistant can make mistakes. Verify important information.
+                        <span className="font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">MITHRA</span> • OriginBI Intelligent Assistant
                     </p>
                 </div>
             </div>

@@ -3,11 +3,13 @@ import {
   Post,
   Body,
   Get,
+  Query,
   Res,
   Req,
   Param,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
 import {
@@ -24,6 +26,9 @@ import { Type } from 'class-transformer';
 import { RagService } from './rag.service';
 import { SyncService } from './sync.service';
 import { FutureRoleReportService } from './future-role-report.service';
+import { OverallRoleFitmentService } from './overall-role-fitment.service';
+import { CustomReportService } from './custom-report.service';
+import { PdfService } from '../common/pdf/pdf.service';
 
 // DTO for query request
 export class RagQueryDto {
@@ -121,6 +126,32 @@ export class BulkIngestDto {
   documents: IngestDocumentDto[];
 }
 
+// DTO for Overall Report
+export class OverallReportDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  groupId?: number;
+
+  @IsOptional()
+  @IsString()
+  groupCode?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  programId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  corporateId?: number;
+
+  @IsOptional()
+  @IsString()
+  title?: string;
+}
+
 // Response interface
 export interface RagResponse {
   answer: string;
@@ -132,15 +163,21 @@ export interface RagResponse {
   sources?: any[];
   searchType?: string;
   sql?: string;
+  confidence?: number;
 }
 
 @Controller('rag')
 export class RagController {
+  private readonly logger = new Logger(RagController.name);
+
   constructor(
     private readonly ragService: RagService,
     private readonly syncService: SyncService,
     private readonly futureRoleReportService: FutureRoleReportService,
-  ) {}
+    private readonly overallRoleFitmentService: OverallRoleFitmentService,
+    private readonly customReportService: CustomReportService,
+    private readonly pdfService: PdfService,
+  ) { }
 
   /**
    * POST /rag/career-report
@@ -165,6 +202,179 @@ export class RagController {
   }
 
   /**
+   * GET /rag/overall-report/pdf
+   * Generate Overall Role Fitment Report PDF
+   */
+  @Get('overall-report/pdf')
+  async generateOverallReportPdf(
+    @Query() dto: OverallReportDto,
+    @Res() res: Response,
+  ) {
+    try {
+      const pdfBuffer = await this.overallRoleFitmentService.generatePdf(dto);
+
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'attachment; filename="overall-role-fitment.pdf"',
+        'Content-Length': pdfBuffer.length,
+      });
+      res.send(pdfBuffer);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to generate overall report PDF',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+    /**
+   * GET /rag/custom-report/pdf
+   * Generate Custom Report PDF (e.g., Career Fitment)
+   * Fetches user by ID, looks up their name, and generates report with available assessment data
+   */
+  @Get('custom-report/pdf')
+  async generateCustomReportPdf(
+    @Query('userId') userId: string,
+    @Query('name') userName: string,
+    @Query('type') reportType: string = 'career_fitment',
+    @Res() res: Response,
+  ) {
+    try {
+      if (!userId && !userName) {
+        throw new HttpException('userId or name is required', HttpStatus.BAD_REQUEST);
+      }
+
+      // Currently supporting career_fitment report
+      if (reportType !== 'career_fitment') {
+        throw new HttpException(`Report type '${reportType}' not supported yet`, HttpStatus.BAD_REQUEST);
+      }
+
+      let reportData;
+
+      // If we have a userName, use the chat-based method (more flexible, handles incomplete data)
+      if (userName) {
+        this.logger.log(`📊 Generating report by name: ${userName}`);
+        reportData = await this.customReportService.generateChatBasedReport({
+          name: userName,
+          currentRole: 'Not Specified',
+          currentJobDescription: '',
+          yearsOfExperience: 0,
+          relevantExperience: '',
+          currentIndustry: 'Not Specified',
+          expectedFutureRole: 'Not Specified',
+          expectedIndustry: '',
+        });
+      } else {
+        // Fallback to userId lookup - first get the user's name, then use chat-based method
+        this.logger.log(`📊 Generating report by userId: ${userId}`);
+
+        // Lookup user name from registration
+        const userLookupQuery = `
+          SELECT r.full_name, r.metadata 
+          FROM registrations r 
+          WHERE r.user_id = $1 AND r.is_deleted = false 
+          ORDER BY r.created_at DESC 
+          LIMIT 1
+        `;
+        const lookupResult = await this.customReportService['dataSource'].query(userLookupQuery, [parseInt(userId)]);
+
+        if (!lookupResult || lookupResult.length === 0) {
+          throw new HttpException(`User with ID ${userId} not found`, HttpStatus.NOT_FOUND);
+        }
+
+        const registration = lookupResult[0];
+        const regMetadata = registration.metadata || {};
+
+        // Use the chat-based method with the user's name and any metadata we have
+        reportData = await this.customReportService.generateChatBasedReport({
+          name: registration.full_name,
+          currentRole: regMetadata.currentRole || 'Not Specified',
+          currentJobDescription: regMetadata.currentJobDescription || '',
+          yearsOfExperience: regMetadata.yearsOfExperience || 0,
+          relevantExperience: regMetadata.relevantExperience || '',
+          currentIndustry: regMetadata.currentIndustry || 'Not Specified',
+          expectedFutureRole: regMetadata.expectedFutureRole || 'Not Specified',
+          expectedIndustry: regMetadata.expectedIndustry || '',
+        });
+      }
+
+      // Generate PDF
+      const pdfBuffer = await this.pdfService.generateCareerFitmentReport(reportData);
+
+      // Sanitize filename - remove all special characters that could break HTTP headers
+      const safeFilename = `career-fitment-report-${reportData.reportId.replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`;
+
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${safeFilename}"`,
+        'Content-Length': pdfBuffer.length,
+      });
+      res.send(pdfBuffer);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to generate custom report PDF',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * POST /rag/chat-report/pdf
+   * Generate Custom Report PDF from chat-provided profile data
+   * Does NOT require user to be in database - uses AI to generate report from user input
+   */
+  @Post('chat-report/pdf')
+  async generateChatBasedReportPdf(
+    @Body() profileData: {
+      name: string;
+      currentRole: string;
+      currentJobDescription?: string;
+      yearsOfExperience: number;
+      relevantExperience?: string;
+      currentIndustry: string;
+      expectedFutureRole: string;
+      expectedIndustry?: string;
+    },
+    @Res() res: Response,
+  ) {
+    try {
+      if (!profileData.name) {
+        throw new HttpException('Name is required', HttpStatus.BAD_REQUEST);
+      }
+
+      // Generate report data from chat input
+      const reportData = await this.customReportService.generateChatBasedReport({
+        name: profileData.name,
+        currentRole: profileData.currentRole || 'Not Specified',
+        currentJobDescription: profileData.currentJobDescription || '',
+        yearsOfExperience: profileData.yearsOfExperience || 0,
+        relevantExperience: profileData.relevantExperience || '',
+        currentIndustry: profileData.currentIndustry || 'Not Specified',
+        expectedFutureRole: profileData.expectedFutureRole || 'Not Specified',
+        expectedIndustry: profileData.expectedIndustry || '',
+      });
+
+      // Generate PDF
+      const pdfBuffer = await this.pdfService.generateCareerFitmentReport(reportData);
+
+      // Sanitize filename - remove all special characters that could break HTTP headers
+      const safeFilename = `chat-career-report-${reportData.reportId.replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`;
+
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${safeFilename}"`,
+        'Content-Length': pdfBuffer.length,
+      });
+      res.send(pdfBuffer);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to generate chat-based report PDF',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
    * POST /rag/query
    * Main endpoint for RAG queries (Hybrid: Semantic + SQL)
    */
@@ -173,9 +383,14 @@ export class RagController {
     @Body() queryDto: RagQueryDto,
     @Req() req: any,
   ): Promise<RagResponse> {
+    console.log(`🎯 RAG CONTROLLER: POST /query received at ${new Date().toISOString()}`);
+    console.log(`📝 Request body:`, queryDto);
+    console.log(`👤 Request user:`, req.user);
+
     try {
       const question = queryDto?.question;
       if (!question) {
+        console.log(`❌ No question provided`);
         throw new Error('Question is required');
       }
 
@@ -185,8 +400,12 @@ export class RagController {
         corporateId: null,
       };
 
-      return await this.ragService.query(question, user);
+      console.log(`🔄 Calling ragService.query with question: "${question}"`);
+      const result = await this.ragService.query(question, user);
+      console.log(`✅ RAG Service returned result`);
+      return result;
     } catch (error) {
+      console.log(`❌ RAG Controller error:`, error);
       throw new HttpException(
         error.message || 'Failed to process query',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -381,6 +600,54 @@ export class RagController {
       throw new HttpException(
         error.message || 'Report not found',
         HttpStatus.NOT_FOUND,
+      );
+    }
+  }
+
+  /**
+   * GET /rag/chat-report/download
+   * Download a chat-based career fitment report as PDF
+   * Profile data is passed as base64-encoded JSON in query param
+   */
+  @Get('chat-report/download')
+  async downloadChatReport(
+    @Query('profile') encodedProfile: string,
+    @Res() res: Response,
+  ) {
+    try {
+      if (!encodedProfile) {
+        throw new HttpException(
+          'Profile data is required',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Decode the base64 profile data
+      const profileJson = Buffer.from(encodedProfile, 'base64').toString('utf-8');
+      const profileData = JSON.parse(profileJson);
+
+      this.logger.log(`📄 Generating chat-based report for: ${profileData.name}`);
+
+      // Generate the report data using CustomReportService
+      const reportData = await this.customReportService.generateChatBasedReport(profileData);
+
+      // Generate PDF using PdfService
+      const pdfBuffer = await this.pdfService.generateCareerFitmentReport(reportData);
+
+      // Sanitize filename - remove all special characters that could break HTTP headers
+      const safeFilename = `${profileData.name.replace(/[^a-zA-Z0-9-_]/g, '_')}_Career_Fitment_Report.pdf`;
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${safeFilename}"`,
+        'Content-Length': pdfBuffer.length,
+      });
+
+      res.send(pdfBuffer);
+    } catch (error) {
+      this.logger.error(`Chat report download error: ${error.message}`);
+      throw new HttpException(
+        error.message || 'Failed to generate report',
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }

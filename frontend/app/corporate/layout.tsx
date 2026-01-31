@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Header from '@/components/corporate/Header';
+import FloatingChatBot from '@/components/admin/FloatingChatBot';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut } from 'aws-amplify/auth';
 import { configureAmplify } from '@/lib/aws-amplify-config';
@@ -110,6 +111,9 @@ export default function CorporateLayout({
                                 {children}
                             </div>
                         </div>
+
+                        {/* Floating AI Chat Bot */}
+                        <FloatingChatBot userRole="CORPORATE" />
                     </RequireCorporate>
                 ) : (
                     /* --- PUBLIC LAYOUT (No Header, No Guard) --- */

@@ -265,8 +265,6 @@ To move from [CURRENT ROLE] → [TARGET ROLE], the following shifts are required
 [2-3 paragraph personalized executive summary with actionable recommendations]
 
 ═══════════════════════════════════════════════════════════════════════════════
-                              Powered by Origin BI
-═══════════════════════════════════════════════════════════════════════════════
 
 IMPORTANT RULES:
 1. Be specific and analytical - use real insights based on the role transition

@@ -21,7 +21,7 @@ export class EmbeddingsService implements OnModuleInit {
   private readonly BATCH_SIZE = 10; // Process 10 at a time
   private readonly MAX_RETRIES = 3;
 
-  constructor(private dataSource: DataSource) {}
+  constructor(private dataSource: DataSource) { }
 
   async onModuleInit() {
     this.jinaApiKey = process.env.JINA_API_KEY || null;
@@ -62,6 +62,13 @@ export class EmbeddingsService implements OnModuleInit {
 
     for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
       try {
+        // Create AbortController for timeout handling
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          this.logger.warn(`Single embedding request timeout after 20 seconds (attempt ${attempt})`);
+        }, 20000); // 20 second timeout
+
         const response = await fetch('https://api.jina.ai/v1/embeddings', {
           method: 'POST',
           headers: {
@@ -74,12 +81,21 @@ export class EmbeddingsService implements OnModuleInit {
             dimensions: 1024,
             input: [text.slice(0, 8000)], // Limit text length
           }),
+          signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
 
         if (response.status === 429) {
           // Rate limited - wait and retry
           await this.sleep(1000 * attempt);
           continue;
+        }
+
+        if (response.status === 401 || response.status === 403) {
+          this.logger.error('❌ Jina API Key Invalid/Expired (401/403). disabling embeddings.');
+          this.jinaApiKey = null; // Disable for future calls to fail fast
+          return null;
         }
 
         if (!response.ok) {
@@ -120,37 +136,58 @@ export class EmbeddingsService implements OnModuleInit {
         .slice(i, i + this.BATCH_SIZE)
         .map((t) => t.slice(0, 8000));
 
-      try {
-        const response = await fetch('https://api.jina.ai/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.jinaApiKey}`,
-          },
-          body: JSON.stringify({
-            model: 'jina-embeddings-v3',
-            task: 'retrieval.passage',
-            dimensions: 1024,
-            input: batch,
-          }),
-        });
+      // Add retry logic for batch requests
+      for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
+        try {
+          // Create AbortController for timeout handling
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => {
+            controller.abort();
+            this.logger.warn(`Batch request timeout after 30 seconds (attempt ${attempt})`);
+          }, 30000); // 30 second timeout
 
-        if (!response.ok) {
-          this.logger.warn(`Batch failed with status ${response.status}`);
-          continue;
+          const response = await fetch('https://api.jina.ai/v1/embeddings', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${this.jinaApiKey}`,
+            },
+            body: JSON.stringify({
+              model: 'jina-embeddings-v3',
+              task: 'retrieval.passage',
+              dimensions: 1024,
+              input: batch,
+            }),
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            if (attempt === this.MAX_RETRIES) {
+              this.logger.warn(`Batch failed with status ${response.status} after ${attempt} attempts`);
+            }
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          data.data.forEach((item: any, idx: number) => {
+            results[i + idx] = item.embedding;
+          });
+          
+          // Successfully processed batch, break retry loop
+          break;
+        } catch (error) {
+          if (attempt === this.MAX_RETRIES) {
+            this.logger.error('Batch embedding error:');
+            this.logger.error(error);
+            // Continue to next batch instead of failing completely
+            break;
+          } else {
+            this.logger.warn(`Batch attempt ${attempt} failed, retrying in ${attempt * 1000}ms...`);
+            await this.sleep(attempt * 1000); // Progressive backoff
+          }
         }
-
-        const data = await response.json();
-        data.data.forEach((item: any, idx: number) => {
-          results[i + idx] = item.embedding;
-        });
-
-        // Rate limit protection
-        if (i + this.BATCH_SIZE < texts.length) {
-          await this.sleep(200);
-        }
-      } catch (error) {
-        this.logger.error('Batch embedding error:', error);
       }
     }
 
