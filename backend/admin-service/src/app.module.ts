@@ -58,6 +58,15 @@ import { KeepAliveModule } from './keepalive/keepalive.module';
             synchronize: config.get<string>('DB_SYNC') === 'true',
             ssl: isLocal ? false : { rejectUnauthorized: false },
             schema: 'public',
+            // Connection pooling for better performance
+            extra: {
+              max: 20,                    // Maximum number of connections in pool
+              min: 5,                     // Minimum number of connections in pool
+              acquire: 30000,             // Maximum time (ms) to try getting connection
+              idle: 10000,                // Maximum time (ms) a connection can be idle
+              connectionTimeoutMillis: 5000,  // Connection timeout
+              query_timeout: 30000,       // Query timeout
+            },
           };
         }
 
@@ -72,6 +81,15 @@ import { KeepAliveModule } from './keepalive/keepalive.module';
           synchronize: config.get<string>('DB_SYNC') === 'true',
           ssl: false,
           schema: 'public',
+          // Connection pooling for better performance
+          extra: {
+            max: 20,                    // Maximum number of connections in pool
+            min: 5,                     // Minimum number of connections in pool
+            acquire: 30000,             // Maximum time (ms) to try getting connection
+            idle: 10000,                // Maximum time (ms) a connection can be idle
+            connectionTimeoutMillis: 5000,  // Connection timeout
+            query_timeout: 30000,       // Query timeout
+          },
         };
       },
     }),

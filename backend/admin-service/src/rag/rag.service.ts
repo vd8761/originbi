@@ -6,26 +6,25 @@ import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { EmbeddingsService } from './embeddings.service';
 import { FutureRoleReportService } from './future-role-report.service';
 import { OverallRoleFitmentService } from './overall-role-fitment.service';
+import { ConversationService } from './conversation.service';
+import { OriIntelligenceService } from './ori-intelligence.service';
+
+import { MITHRA_PERSONA, getRandomResponse, getSignOff } from './ori-persona';
 import * as fs from 'fs';
 import * as path from 'path';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
- * ║           PRODUCTION RAG v11.0 - ENTERPRISE GRADE                         ║
+ * ║                          🤖 MITHRA v2.0 - JARVIS EDITION                  ║
+ * ║              OriginBI Intelligent - Your Career Guide                    ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
- * ║                                                                           ║
- * ║  ARCHITECTURE:                                                            ║
- * ║  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌────────────┐ ║
- * ║  │   QUERY     │ → │    LLM      │ → │    SQL      │ → │  RESPONSE  │ ║
- * ║  │ UNDERSTAND  │    │ INTERPRET   │    │  EXECUTE    │    │  FORMAT    │ ║
- * ║  └─────────────┘    └─────────────┘    └─────────────┘    └────────────┘ ║
- * ║                                                                           ║
  * ║  FEATURES:                                                                ║
- * ║  • LLM-powered query understanding (handles typos, variations)            ║
- * ║  • Personality insights (DISC + Agile ACI)                                ║
- * ║  • Smart SQL generation                                                   ║
- * ║  • Professional response formatting                                       ║
- * ║                                                                           ║
+ * ║  • Personalized career guidance based on your personality                 ║
+ * ║  • Job eligibility analysis with reasoning                                ║
+ * ║  • Higher studies recommendations                                         ║
+ * ║  • Emotional AI - friendly, supportive mentor                             ║
+ * ║  • Answers ANY question intelligently                                     ║
+ * ║  • Remembers your preferences and context                                 ║
  * ╚═══════════════════════════════════════════════════════════════════════════╝
  */
 
@@ -113,20 +112,27 @@ const AGILE_LEVELS = {
 
 @Injectable()
 export class RagService {
-  private readonly logger = new Logger(RagService.name);
+  private readonly logger = new Logger('MITHRA');
   private llm: ChatGroq | null = null;
   private reportsDir: string;
+
+  // Simple cache for query understanding to improve performance
+  private queryCache = new Map<string, any>();
+  private readonly CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes
 
   constructor(
     private dataSource: DataSource,
     private embeddingsService: EmbeddingsService,
     private futureRoleReportService: FutureRoleReportService,
     private overallRoleFitmentService: OverallRoleFitmentService,
+    private conversationService: ConversationService,
+    private oriIntelligence: OriIntelligenceService,
   ) {
     this.reportsDir = path.join(process.cwd(), 'reports');
     if (!fs.existsSync(this.reportsDir)) {
       fs.mkdirSync(this.reportsDir, { recursive: true });
     }
+    this.logger.log('🤖 MITHRA v2.0 initialized - Your intelligent career guide!');
   }
 
   private getLlm(): ChatGroq {
@@ -137,6 +143,7 @@ export class RagService {
         apiKey,
         model: 'llama-3.3-70b-versatile',
         temperature: 0,
+        timeout: 15000, // 15 second timeout for LLM calls
       });
     }
     return this.llm;
@@ -146,7 +153,12 @@ export class RagService {
   // MAIN QUERY ENTRY POINT
   // ═══════════════════════════════════════════════════════════════════════════
   async query(question: string, user: any): Promise<QueryResult> {
+    this.logger.log(`🚀 RAG Query Started at ${new Date().toISOString()}`);
+    this.logger.log(`📝 Input Question: "${question}"`);
+    this.logger.log(`👤 User:`, JSON.stringify(user));
+
     if (!question?.trim()) {
+      this.logger.log(`❌ Empty question detected`);
       return {
         answer: 'Please ask a question.',
         searchType: 'none',
@@ -159,19 +171,43 @@ export class RagService {
     this.logger.log(`📝 Query: "${question}"`);
 
     try {
+      // Quick bypass for common greetings - avoid LLM call
+      const normalizedQ = question.toLowerCase().trim();
+      this.logger.log(`🔍 DEBUG: Normalized query = "${normalizedQ}"`);
+
+      if (['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'].includes(normalizedQ)) {
+        this.logger.log('🎯 Intent: greeting (bypassed LLM)');
+        return {
+          answer: getRandomResponse(MITHRA_PERSONA.greetings),
+          searchType: 'greeting',
+          confidence: 1.0,
+        };
+      }
+
+      if (['help', 'what can you do', 'what can you help me with'].includes(normalizedQ)) {
+        this.logger.log('🎯 Intent: help (bypassed LLM)');
+        return {
+          answer: MITHRA_PERSONA.help,
+          searchType: 'help',
+          confidence: 1.0,
+        };
+      }
+
+      this.logger.log('🔄 No bypass match, proceeding to LLM understanding...');
+
       // ═══════════════════════════════════════════════════════════════
-      // STEP 1: LLM QUERY UNDERSTANDING
+      // STEP 1: LLM QUERY UNDERSTANDING (for complex queries only)
       // ═══════════════════════════════════════════════════════════════
       const interpretation = await this.understandQuery(question);
       this.logger.log(`🎯 Intent: ${interpretation.intent}`);
       this.logger.log(`🔍 Search: ${interpretation.searchTerm || 'general'}`);
 
       // ═══════════════════════════════════════════════════════════════
-      // SPECIAL HANDLERS: GREETING & HELP
+      // ORI GREETING & HELP - Jarvis-like personality
       // ═══════════════════════════════════════════════════════════════
       if (interpretation.intent === 'greeting') {
         return {
-          answer: `**👋 Hello!** I'm the OriginBI Assistant.\n\nI can help you with:\n• **Users & Candidates** - "list users", "show candidates"\n• **Test Results** - "test results", "[name]'s score"\n• **Career Reports** - "career report for [name]"\n• **Overall Reports** - "overall report", "placement report"\n• **Best Performers** - "top performer", "best score"\n• **Career Roles** - "show career roles"\n• **Counts** - "how many users"\n\nWhat would you like to know?`,
+          answer: getRandomResponse(MITHRA_PERSONA.greetings),
           searchType: 'greeting',
           confidence: 1.0,
         };
@@ -179,7 +215,7 @@ export class RagService {
 
       if (interpretation.intent === 'help') {
         return {
-          answer: `**🤖 OriginBI Assistant - Help**\n\n**Available Commands:**\n\n📊 **Data Queries:**\n• "list users" - Show all system users\n• "show candidates" - List registered candidates\n• "test results" - View assessment results\n• "career roles" - Available career paths\n\n👤 **Person-Specific:**\n• "[name]'s score" - Individual test results\n• "career report for [name]" - Full career fitment report\n• "show [name]'s results" - Assessment details\n\n📋 **Group Reports:**\n• "overall report" - Group role fitment by personality\n• "placement report" - Placement guidance for all students\n• "role fitment report" - Roles mapped to personality types\n\n🏆 **Analytics:**\n• "best performer" - Top scoring candidates\n• "how many users" - User counts\n• "total candidates" - Registration stats\n\n**Tips:**\n• If multiple people share a name, I'll ask you to pick one\n• Career reports include personality insights and role fitment analysis`,
+          answer: MITHRA_PERSONA.help,
           searchType: 'help',
           confidence: 1.0,
         };
@@ -200,10 +236,146 @@ export class RagService {
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // STEP 2: EXECUTE QUERY
+      // SPECIAL HANDLER: CHAT-BASED CUSTOM REPORT (User-provided profile)
+      // Detects when user provides profile details in chat
+      // ═══════════════════════════════════════════════════════════════
+      if (interpretation.intent === 'chat_profile_report') {
+        return await this.handleChatProfileReport(question);
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // SPECIAL HANDLER: CUSTOM REPORT (Career Fitment, etc.)
+      // ═══════════════════════════════════════════════════════════════
+      if (interpretation.intent === 'custom_report') {
+        return await this.handleCustomReport(user, interpretation.searchTerm, question);
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // 🧠 JARVIS-LIKE INTELLIGENT HANDLERS
+      // Personal career guidance, job eligibility, higher studies, etc.
+      // ═══════════════════════════════════════════════════════════════
+      const qLower = question.toLowerCase();
+      const userId = user?.id || user?.user_id || 0;
+      const userEmail = user?.email || user?.sub || '';
+
+      // Get user profile for personalization (using email if userId not available)
+      const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
+
+      this.logger.log(`👤 User: ${userProfile?.name || 'Anonymous'} (${userEmail || 'no email'})`);
+
+      // Store any facts the user shares
+      if (userId || userEmail) {
+        this.oriIntelligence.extractAndStoreFacts(userProfile?.userId || userId, question);
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // PERSONAL QUESTIONS: "what is my name", "my profile", etc.
+      // ═══════════════════════════════════════════════════════════════
+      const personalAnswer = this.oriIntelligence.answerPersonalQuestion(question, userProfile);
+      if (personalAnswer) {
+        this.logger.log('🎯 Detected: Personal question');
+        return {
+          answer: personalAnswer,
+          searchType: 'personal_info',
+          confidence: 0.98,
+        };
+      }
+
+      // Questions about job eligibility
+      if (qLower.includes('eligible') || qLower.includes('jobs for me') || qLower.includes('suitable') ||
+        qLower.includes('what jobs') || qLower.includes('fit for') || qLower.includes('career for me')) {
+        this.logger.log('🎯 Detected: Career eligibility question');
+        const answer = await this.oriIntelligence.generateCareerGuidance(question, userProfile);
+        return {
+          answer,
+          searchType: 'career_guidance',
+          confidence: 0.95,
+        };
+      }
+
+      // Questions about specific jobs ("can I try...", "can I become...")
+      if ((qLower.includes('can i') || qLower.includes('should i')) &&
+        (qLower.includes('try') || qLower.includes('apply') || qLower.includes('become') || qLower.includes('work as'))) {
+        this.logger.log('🎯 Detected: Job compatibility question');
+        const answer = await this.oriIntelligence.generateCareerGuidance(question, userProfile);
+        return {
+          answer,
+          searchType: 'job_analysis',
+          confidence: 0.95,
+        };
+      }
+
+      // Higher studies questions
+      if (qLower.includes('higher studies') || qLower.includes('masters') || qLower.includes('mba') ||
+        qLower.includes('further studies') || qLower.includes('education') || qLower.includes('degree') ||
+        qLower.includes('university') || qLower.includes('phd')) {
+        this.logger.log('🎯 Detected: Higher studies question');
+        const answer = await this.oriIntelligence.generateCareerGuidance(question, userProfile);
+        return {
+          answer,
+          searchType: 'higher_studies',
+          confidence: 0.95,
+        };
+      }
+
+      // Personal questions about themselves or career advice
+      if ((qLower.includes('my ') || qLower.includes('i am') || qLower.includes("i'm") || qLower.includes('me')) &&
+        (qLower.includes('career') || qLower.includes('future') || qLower.includes('path') || qLower.includes('advice') ||
+          qLower.includes('suggest') || qLower.includes('recommend') || qLower.includes('help me'))) {
+        this.logger.log('🎯 Detected: Personal career advice question');
+        const context = this.oriIntelligence.getConversationContext(userProfile?.userId || userId);
+        const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, context);
+        return {
+          answer,
+          searchType: 'personal_advice',
+          confidence: 0.9,
+        };
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // 🧠 GENERAL QUESTIONS - Route to LLM (courses, learning, how-to)
+      // These should NOT search the database
+      // ═══════════════════════════════════════════════════════════════
+      const isGeneralQuestion =
+        qLower.includes('what is') || qLower.includes('what are') || qLower.includes('how to') ||
+        qLower.includes('how do') || qLower.includes('how can') || qLower.includes('best way') ||
+        qLower.includes('course') || qLower.includes('learn') || qLower.includes('study') ||
+        qLower.includes('become a') || qLower.includes('become an') || qLower.includes('best ') ||
+        qLower.includes('which') || qLower.includes('should i') || qLower.includes('can you') ||
+        qLower.includes('tell me about') || qLower.includes('explain') || qLower.includes('difference between') ||
+        qLower.includes('compare') || qLower.includes('vs') || qLower.includes('versus') ||
+        qLower.includes('tips') || qLower.includes('advice') || qLower.includes('recommend') ||
+        qLower.includes('certification') || qLower.includes('skill') || qLower.includes('path');
+
+      // Don't go to DB for general questions - use LLM directly
+      if (isGeneralQuestion && !['list_users', 'list_candidates', 'test_results', 'career_roles', 'count'].includes(interpretation.intent)) {
+        this.logger.log('🧠 Detected: General question - using LLM');
+        const context = this.oriIntelligence.getConversationContext(userProfile?.userId || userId);
+        const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, context);
+        return {
+          answer,
+          searchType: 'intelligent_response',
+          confidence: 0.9,
+        };
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // STEP 2: EXECUTE QUERY (only for specific data queries)
       // ═══════════════════════════════════════════════════════════════
       const data = await this.executeQuery(interpretation);
       this.logger.log(`📊 Results: ${data.length} rows`);
+
+      // If no data found, ALWAYS use LLM for intelligent response
+      if (data.length === 0) {
+        this.logger.log('🧠 No data found, using intelligent LLM response');
+        const context = this.oriIntelligence.getConversationContext(userProfile?.userId || userId);
+        const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, context);
+        return {
+          answer,
+          searchType: 'intelligent_response',
+          confidence: 0.85,
+        };
+      }
 
       // ═══════════════════════════════════════════════════════════════
       // STEP 3: FORMAT RESPONSE
@@ -227,7 +399,7 @@ export class RagService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // CAREER REPORT HANDLER - WITH DISAMBIGUATION
+  // CAREER REPORT HANDLER - WITH SMART DEDUPLICATION & EMAIL MATCHING
   // ═══════════════════════════════════════════════════════════════════════════
   private async handleCareerReport(
     searchTerm: string | null,
@@ -250,39 +422,69 @@ export class RagService {
       targetIndex = parseInt(numberMatch[2]) - 1; // Convert to 0-based index
     }
 
-    // Fetch ALL matching people (not just one)
+    // Extract email if present in the search term (e.g., "anjaly anjaly@email.com")
+    const emailMatch = cleanSearchTerm.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+    let emailSearch = '';
+    let nameSearch = cleanSearchTerm;
+
+    if (emailMatch) {
+      emailSearch = emailMatch[1];
+      // Remove email from name search to get just the name
+      nameSearch = cleanSearchTerm.replace(emailMatch[1], '').trim();
+    }
+
+    // Fetch UNIQUE people - deduplicated by registration ID with BEST score
     try {
+      // Build smart WHERE clause
+      let whereClause = '';
+      if (emailSearch) {
+        // If email is provided, prioritize exact email match
+        whereClause = `(users.email ILIKE '%${emailSearch}%')`;
+        if (nameSearch) {
+          whereClause += ` OR (registrations.full_name ILIKE '%${nameSearch}%')`;
+        }
+      } else {
+        // Search by name, also check if the search term looks like an email
+        whereClause = `(registrations.full_name ILIKE '%${nameSearch}%' OR users.email ILIKE '%${nameSearch}%')`;
+      }
+
       const personData = await this.dataSource.query(`
                 SELECT 
-                    registrations.id,
-                    registrations.full_name,
-                    registrations.gender,
-                    registrations.mobile_number,
-                    users.email,
-                    assessment_attempts.total_score,
-                    personality_traits.blended_style_name as behavioral_style,
-                    personality_traits.blended_style_desc as behavior_description
-                FROM registrations
-                LEFT JOIN users ON registrations.user_id = users.id
-                LEFT JOIN assessment_attempts ON assessment_attempts.registration_id = registrations.id
-                LEFT JOIN personality_traits ON assessment_attempts.dominant_trait_id = personality_traits.id
-                WHERE registrations.full_name ILIKE '%${cleanSearchTerm}%'
+                    r.id,
+                    r.full_name,
+                    r.gender,
+                    r.mobile_number,
+                    u.email,
+                    aa.total_score,
+                    pt.blended_style_name as behavioral_style,
+                    pt.blended_style_desc as behavior_description,
+                    (SELECT MAX(aa2.total_score) FROM assessment_attempts aa2 WHERE aa2.registration_id = r.id) as best_score,
+                    (SELECT COUNT(*) FROM assessment_attempts aa3 WHERE aa3.registration_id = r.id AND aa3.status = 'COMPLETED') as attempt_count
+                FROM registrations r
+                LEFT JOIN users u ON r.user_id = u.id
+                LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id 
+                    AND aa.id = (SELECT id FROM assessment_attempts WHERE registration_id = r.id ORDER BY completed_at DESC LIMIT 1)
+                LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+                WHERE (${whereClause})
                 AND registrations.is_deleted = false
-                ORDER BY registrations.created_at DESC
+                ORDER BY registrations.id, assessment_attempts.total_score DESC NULLS LAST
                 LIMIT 10
             `);
 
       if (!personData.length) {
         return {
-          answer: `**❌ No candidate found with name "${cleanSearchTerm}"**\n\nPlease check the name and try again.`,
+          answer: `**❌ No candidate found matching "${cleanSearchTerm}"**\n\nPlease check the name or email and try again.`,
           searchType: 'career_report',
           confidence: 0.3,
         };
       }
 
-      // DISAMBIGUATION: If multiple matches found
-      if (personData.length > 1 && !numberMatch) {
-        let response = `**👥 Multiple candidates found with name "${cleanSearchTerm}":**\n\n`;
+      // If email was provided and exactly one match found, skip disambiguation
+      const exactEmailMatch = emailSearch && personData.length === 1;
+
+      // DISAMBIGUATION: If multiple UNIQUE people found (truly different registrations)
+      if (personData.length > 1 && !numberMatch && !exactEmailMatch) {
+        let response = `**👥 Multiple candidates found matching "${cleanSearchTerm}":**\n\n`;
         response += `Please specify which one by number:\n\n`;
 
         personData.forEach((person: any, index: number) => {
@@ -290,10 +492,10 @@ export class RagService {
           const mobile = person.mobile_number
             ? ` | ${person.mobile_number.slice(-4)}`
             : '';
-          const score = person.total_score
-            ? ` | Score: ${person.total_score}%`
+          const attempts = person.attempt_count > 1
+            ? ` (${person.attempt_count} attempts)`
             : '';
-          response += `**${index + 1}.** ${person.full_name}${email}${mobile}${score}\n`;
+          response += `**${index + 1}.** ${person.full_name}${email}${mobile}${attempts}\n`;
         });
 
         response += `\n**Example:** "career report for ${cleanSearchTerm} #1" or "career report for ${cleanSearchTerm} #2"`;
@@ -308,13 +510,16 @@ export class RagService {
       // Validate index if number was specified
       if (targetIndex >= personData.length) {
         return {
-          answer: `**❌ Invalid selection.** Only ${personData.length} candidate(s) found with name "${cleanSearchTerm}".\n\nPlease use a number between 1 and ${personData.length}.`,
+          answer: `**❌ Invalid selection.** Only ${personData.length} candidate(s) found matching "${cleanSearchTerm}".\n\nPlease use a number between 1 and ${personData.length}.`,
           searchType: 'career_report',
           confidence: 0.3,
         };
       }
 
       const person = personData[targetIndex];
+
+      // Use best_score for report generation if available
+      const scoreToUse = person.best_score || person.total_score;
 
       // Generate the full Career Fitment Report
       const report = await this.futureRoleReportService.generateReport({
@@ -328,8 +533,8 @@ export class RagService {
         expectedFutureRole: 'To be determined based on assessment results',
         behavioralStyle: person.behavioral_style || undefined,
         behavioralDescription: person.behavior_description || undefined,
-        agileScore: person.total_score
-          ? parseFloat(person.total_score)
+        agileScore: scoreToUse
+          ? parseFloat(scoreToUse)
           : undefined,
       });
 
@@ -349,25 +554,39 @@ export class RagService {
     }
   }
 
+
   // ═══════════════════════════════════════════════════════════════════════════
-  // OVERALL ROLE FITMENT REPORT HANDLER
+  // HANDLER: OVERALL ROLE FITMENT
   // ═══════════════════════════════════════════════════════════════════════════
   private async handleOverallReport(user: any): Promise<QueryResult> {
     try {
       this.logger.log(`📊 Generating Overall Role Fitment Report`);
 
-      // Get corporate/group context from user if available
-      const input = {
-        corporateId: user?.corporate_id,
-        title: 'Placement Guidance Report',
+      const reportTitle = 'Placement Guidance Report';
+
+      // Build input - only include groupId if user has one
+      // If no groupId, the service will fetch ALL registrations (not filter by group)
+      const input: any = {
+        title: reportTitle,
       };
+
+      // Only filter by group if the user has a group
+      if (user?.group_id) {
+        input.groupId = user.group_id;
+      }
+
+      // Build download URL - include groupId only if available
+      let downloadUrl = `/rag/overall-report/pdf?title=${encodeURIComponent(reportTitle)}`;
+      if (user?.group_id) {
+        downloadUrl = `/rag/overall-report/pdf?groupId=${user.group_id}&title=${encodeURIComponent(reportTitle)}`;
+      }
 
       const report = await this.overallRoleFitmentService.generateReport(input);
 
       return {
-        answer: this.overallRoleFitmentService.formatForChat(report),
+        answer: `I've generated the **Overall Role Fitment Report** for you. \n\n📄 **[Click here to download the PDF Report](${downloadUrl})**\n\nSince I can't display the full graphical report here, please download the PDF for the complete analysis including charts and tables.\n\nSummary:\n${this.overallRoleFitmentService.formatForChat(report)}`,
         searchType: 'overall_report',
-        reportId: report.reportId,
+        // reportId: report.reportId, // Not in RagResponse interface usually
         confidence: 0.95,
       };
     } catch (error) {
@@ -381,21 +600,253 @@ export class RagService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // LLM-POWERED QUERY UNDERSTANDING
+  // HANDLER: CUSTOM REPORT (Career Fitment, etc.)
   // ═══════════════════════════════════════════════════════════════════════════
+  private async handleCustomReport(user: any, searchTerm: string | null, question: string): Promise<QueryResult> {
+    try {
+      let targetUserId: number | null = null;
+      let targetName = searchTerm;
+
+      // If no searchTerm, try to extract name from question
+      if (!targetName) {
+        targetName = this.extractName(question);
+      }
+
+      // If we have a name, lookup the user
+      if (targetName) {
+        this.logger.log(`🔍 Looking up user by name: "${targetName}"`);
+
+        const lookupSql = `
+          SELECT r.user_id, r.full_name
+          FROM registrations r
+          WHERE LOWER(r.full_name) LIKE $1
+          AND r.is_deleted = false
+          ORDER BY r.created_at DESC
+          LIMIT 1
+        `;
+
+        const results = await this.executeDatabaseQuery(lookupSql, [`%${targetName.toLowerCase()}%`]);
+
+        if (results && results.length > 0) {
+          targetUserId = parseInt(results[0].user_id);
+          targetName = results[0].full_name;
+          this.logger.log(`✅ Found user: ${targetName} (ID: ${targetUserId})`);
+        } else {
+          return {
+            answer: `**⚠️ User "${targetName}" not found.** Please check the name and try again.\n\nYou can ask:\n- "Generate career fitment report for [full name]"\n- "Custom report for [person name]"`,
+            searchType: 'error',
+            confidence: 0,
+          };
+        }
+      } else {
+        // No name provided - require explicit name for custom reports
+        return {
+          answer: `**⚠️ Please specify a name for the report.** \n\nExample:\n- "Generate career fitment report for Anjaly"\n- "Custom report for John Smith"`,
+          searchType: 'error',
+          confidence: 0,
+        };
+      }
+
+      if (!targetUserId) {
+        return {
+          answer: `**⚠️ No user specified.** Please provide a name to generate the report for.\n\nExample: "Generate career fitment report for Anjaly"`,
+          searchType: 'error',
+          confidence: 0,
+        };
+      }
+
+      this.logger.log(`📊 Generating Custom Career Fitment Report for ${targetName} (userId: ${targetUserId})`);
+
+      // Use the name parameter for better matching (handles users with incomplete assessments)
+      const encodedName = encodeURIComponent(targetName || '');
+      const downloadUrl = `/rag/custom-report/pdf?name=${encodedName}&type=career_fitment`;
+
+      return {
+        answer: `I'm ready to generate **${targetName}'s Career Fitment & Future Role Readiness Report**! 🎯\n\n📄 **[Click here to download the personalized PDF Report](${downloadUrl})**\n\nThis report includes:\n- Profile Snapshot\n- Behavioral Alignment Summary\n- Skill Assessment with AI-generated scores\n- Future Role Readiness Mapping\n- Role Fitment Score\n- Industry Suitability Analysis\n- Transition Requirements\n- Executive Insights\n\nDownload the PDF for the complete analysis!`,
+        searchType: 'custom_report',
+        confidence: 0.95,
+      };
+    } catch (error) {
+      this.logger.error(`Custom report error: ${error.message}`);
+      return {
+        answer: `**❌ Error generating custom report:** ${error.message}`,
+        searchType: 'error',
+        confidence: 0,
+      };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HANDLER: CHAT-BASED PROFILE REPORT (User provides profile data in chat)
+  // ═══════════════════════════════════════════════════════════════════════════
+  private async handleChatProfileReport(question: string): Promise<QueryResult> {
+    try {
+      this.logger.log('📋 Processing chat-based profile for custom report generation');
+
+      // Parse profile from chat message
+      const profileData = this.parseProfileFromChat(question);
+
+      if (!profileData) {
+        return {
+          answer: `**📝 I detected you want to generate a custom report!**\n\nPlease provide the following details in your message:\n\n\`\`\`\nName: [Full Name]\nCurrent Role: [Your current job title]\nCurrent Job Description: [Brief description of responsibilities]\nYears of Experience: [Number]\nRelevant Experience: [Key focus areas]\nCurrent Industry: [Industry name]\nExpected Future Role: [Target role you aspire to]\n\`\`\`\n\n**Example:**\n\`\`\`\nName: Anjaly\nCurrent Role: VP- Sales and Marketing\nCurrent Job Description: Driving revenue growth and brand positioning\nYears of Experience: 15\nRelevant Experience: 10 years in Retail industry\nCurrent Industry: IT\nExpected Future Role: CTO for Aerospace/BFSI\n\`\`\`\n\nOnce you provide these details, I'll generate a personalized Career Fitment Report for you!`,
+          searchType: 'chat_profile_request',
+          confidence: 0.9,
+        };
+      }
+
+      // Encode the profile data as base64 for the URL
+      const reportPayload = {
+        name: profileData.name,
+        currentRole: profileData.currentRole,
+        currentJobDescription: profileData.currentJobDescription,
+        yearsOfExperience: profileData.yearsOfExperience,
+        relevantExperience: profileData.relevantExperience,
+        currentIndustry: profileData.currentIndustry,
+        expectedFutureRole: profileData.expectedFutureRole,
+        expectedIndustry: profileData.expectedIndustry || '',
+      };
+
+      const encodedProfile = Buffer.from(JSON.stringify(reportPayload)).toString('base64');
+      const downloadUrl = `/rag/chat-report/download?profile=${encodedProfile}`;
+
+      return {
+        answer: `**✅ Profile Captured Successfully for ${profileData.name}!** 🎯\n\n📊 **Profile Summary:**\n- **Name:** ${profileData.name}\n- **Current Role:** ${profileData.currentRole}\n- **Experience:** ${profileData.yearsOfExperience} years\n- **Industry:** ${profileData.currentIndustry}\n- **Target Role:** ${profileData.expectedFutureRole}\n\n📄 **[Click here to download your personalized Career Fitment Report](${downloadUrl})**`,
+        searchType: 'chat_profile_report',
+        confidence: 0.95,
+        reportUrl: downloadUrl,
+      };
+    } catch (error) {
+      this.logger.error(`Chat profile report error: ${error.message}`);
+      return {
+        answer: `**❌ Error processing profile:** ${error.message}\n\nPlease make sure you've provided all required details (Name, Current Role, Years of Experience, Current Industry, Expected Future Role).`,
+        searchType: 'error',
+        confidence: 0,
+      };
+    }
+  }
+
+  /**
+   * Parse profile data from a chat message
+   */
+  private parseProfileFromChat(chatMessage: string): {
+    name: string;
+    currentRole: string;
+    currentJobDescription: string;
+    yearsOfExperience: number;
+    relevantExperience: string;
+    currentIndustry: string;
+    expectedFutureRole: string;
+    expectedIndustry?: string;
+  } | null {
+    try {
+      const extractField = (patterns: RegExp[]): string => {
+        for (const pattern of patterns) {
+          const match = chatMessage.match(pattern);
+          if (match && match[1]) {
+            return match[1].trim();
+          }
+        }
+        return '';
+      };
+
+      const name = extractField([
+        /name[:\s]*([^\n]+)/i,
+        /(?:my name is|i am|i'm)\s+([^\n,]+)/i,
+      ]);
+
+      const currentRole = extractField([
+        /current\s*role[:\s]*([^\n]+)/i,
+        /(?:working as|position|designation)[:\s]*([^\n]+)/i,
+      ]);
+
+      const currentJobDescription = extractField([
+        /(?:current\s*)?job\s*description[:\s]*([^\n]+(?:\n(?![A-Z][a-z]*:)[^\n]+)*)/i,
+        /responsibilities[:\s]*([^\n]+)/i,
+      ]);
+
+      const yearsStr = extractField([
+        /years?\s*of\s*experience[:\s]*(\d+)/i,
+        /(\d+)\s*years?\s*(?:of\s*)?experience/i,
+        /experience[:\s]*(\d+)/i,
+      ]);
+      const yearsOfExperience = parseInt(yearsStr) || 0;
+
+      const relevantExperience = extractField([
+        /relevant\s*experience[:\s\(]*([^\n\)]+)/i,
+        /key\s*focus\s*areas?[:\s]*([^\n]+)/i,
+      ]);
+
+      const currentIndustry = extractField([
+        /current\s*industry[:\s]*([^\n]+)/i,
+        /industry[:\s]*([^\n]+)/i,
+      ]);
+
+      const expectedFutureRole = extractField([
+        /expected\s*future\s*role[:\s]*([^\n]+)/i,
+        /future\s*role[:\s]*([^\n]+)/i,
+        /target\s*role[:\s]*([^\n]+)/i,
+      ]);
+
+      // Require at least name to proceed
+      if (!name) {
+        this.logger.warn('❌ Missing required field: name');
+        return null;
+      }
+
+      return {
+        name,
+        currentRole: currentRole || 'Not Specified',
+        currentJobDescription: currentJobDescription || '',
+        yearsOfExperience,
+        relevantExperience: relevantExperience || '',
+        currentIndustry: currentIndustry || 'Not Specified',
+        expectedFutureRole: expectedFutureRole || 'Not Specified',
+        expectedIndustry: '',
+      };
+    } catch (error) {
+      this.logger.error(`Failed to parse profile: ${error.message}`);
+      return null;
+    }
+  }
+
+  private async executeDatabaseQuery(sql: string, params: any[] = []): Promise<any[]> {
+    const startTime = Date.now();
+    try {
+      const result = await this.dataSource.query(sql, params);
+      const elapsed = Date.now() - startTime;
+      if (elapsed > 1000) {
+        this.logger.warn(`Slow query detected: ${elapsed}ms`);
+      }
+      return result;
+    } catch (error) {
+      const elapsed = Date.now() - startTime;
+      this.logger.error(`Query failed after ${elapsed}ms: ${error.message}`);
+      throw error;
+    }
+  }
   private async understandQuery(question: string): Promise<{
     intent: string;
     searchTerm: string | null;
     table: string;
     includePersonality: boolean;
   }> {
+    // Check cache first to avoid repeated LLM calls
+    const cacheKey = question.toLowerCase().trim();
+    const cached = this.queryCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < this.CACHE_EXPIRY) {
+      this.logger.log('📋 Using cached query understanding');
+      return cached.result;
+    }
+
     const prompt = `You are a query interpreter for OriginBI assessment platform.
 
 Analyze this user query and extract:
-1. INTENT: What does the user want? (greeting, help, list_users, list_candidates, test_results, person_lookup, best_performer, career_roles, career_report, overall_report, count)
+1. INTENT: What does the user want? (greeting, help, list_users, list_candidates, test_results, person_lookup, best_performer, career_roles, career_report, overall_report, custom_report, chat_profile_report, count)
 2. SEARCH_TERM: Any specific name or keyword to search (null if general query)
 3. TABLE: Primary table to query (users, registrations, assessment_attempts, career_roles, programs, none)
 4. INCLUDE_PERSONALITY: Should we include DISC behavioral style and Agile score? (true for test results, person lookups, career reports)
+
+IMPORTANT: Use "chat_profile_report" when user provides their profile details (Name, Current Role, Experience, Industry, Future Role) in the message.
 
 USER QUERY: "${question}"
 
@@ -420,23 +871,61 @@ EXAMPLES:
 "placement report" → {"intent":"overall_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
 "group role fitment" → {"intent":"overall_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
 "role fitment report" → {"intent":"overall_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
+"generate my career fitment report" → {"intent":"custom_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
+"career fitment report" → {"intent":"custom_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
+"custom report" → {"intent":"custom_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
+"my fitment report" → {"intent":"custom_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
+"personalized report" → {"intent":"custom_report","searchTerm":null,"table":"assessment_attempts","includePersonality":true}
+"custom report for anjaly" → {"intent":"custom_report","searchTerm":"anjaly","table":"assessment_attempts","includePersonality":true}
+"generate career fitment report for john" → {"intent":"custom_report","searchTerm":"john","table":"assessment_attempts","includePersonality":true}
+"fitment report for priya" → {"intent":"custom_report","searchTerm":"priya","table":"assessment_attempts","includePersonality":true}
+"Name: Anjaly Current Role: VP-Sales..." → {"intent":"chat_profile_report","searchTerm":null,"table":"none","includePersonality":false}
+"generate report: Name: John, Current Role: Manager..." → {"intent":"chat_profile_report","searchTerm":null,"table":"none","includePersonality":false}
+"custom: Name: Priya, Years of Experience: 10..." → {"intent":"chat_profile_report","searchTerm":null,"table":"none","includePersonality":false}
 "how many users" → {"intent":"count","searchTerm":null,"table":"users","includePersonality":false}
 
 Respond with ONLY valid JSON, no explanation:`;
 
     try {
+      const startTime = Date.now();
       const response = await this.getLlm().invoke([new SystemMessage(prompt)]);
+      const elapsed = Date.now() - startTime;
+
+      this.logger.log(`🤖 LLM query understanding took ${elapsed}ms`);
+
       const jsonStr = response.content.toString().trim();
       const parsed = JSON.parse(jsonStr);
-      return {
+      const result = {
         intent: parsed.intent || 'list_users',
         searchTerm: parsed.searchTerm || null,
         table: parsed.table || 'users',
         includePersonality: parsed.includePersonality || false,
       };
+
+      // Cache the result
+      this.queryCache.set(cacheKey, {
+        result,
+        timestamp: Date.now(),
+      });
+
+      // Clean old cache entries periodically
+      if (this.queryCache.size > 100) {
+        this.cleanCache();
+      }
+
+      return result;
     } catch (error) {
-      this.logger.warn(`Query interpretation failed, using fallback`);
+      this.logger.warn(`Query interpretation failed: ${error.message}, using fallback`);
       return this.fallbackInterpretation(question);
+    }
+  }
+
+  private cleanCache(): void {
+    const now = Date.now();
+    for (const [key, value] of this.queryCache.entries()) {
+      if (now - value.timestamp >= this.CACHE_EXPIRY) {
+        this.queryCache.delete(key);
+      }
     }
   }
 
@@ -446,11 +935,40 @@ Respond with ONLY valid JSON, no explanation:`;
     table: string;
     includePersonality: boolean;
   } {
-    const q = question.toLowerCase();
+    const qLowerUniq = question.toLowerCase();
 
-    // Career report generation - CHECK FIRST
+    // Chat-based profile report - when user provides profile details directly
+    // Check for patterns like "Name:", "Current Role:", "Years of Experience:", etc.
+    const hasProfilePattern = qLowerUniq.match(/name[:\s]/i) && 
+      (qLowerUniq.match(/current\s*role[:\s]/i) || 
+       qLowerUniq.match(/experience[:\s]/i) || 
+       qLowerUniq.match(/industry[:\s]/i) ||
+       qLowerUniq.match(/future\s*role[:\s]/i));
+    
+    if (hasProfilePattern || qLowerUniq.match(/^custom:\s*name/i)) {
+      return {
+        intent: 'chat_profile_report',
+        searchTerm: null,
+        table: 'none',
+        includePersonality: false,
+      };
+    }
+
+    // Custom report (career fitment, personalized) - CHECK FIRST
     if (
-      q.match(/career\s*report|future\s*role|role\s*readiness|generate.*report/)
+      qLowerUniq.match(/career\s*fitment|custom\s*report|my\s*fitment|personalized\s*report/)
+    ) {
+      return {
+        intent: 'custom_report',
+        searchTerm: null,
+        table: 'assessment_attempts',
+        includePersonality: true,
+      };
+    }
+
+    // Career report generation for specific person
+    if (
+      qLowerUniq.match(/career\s*report|future\s*role|role\s*readiness|generate.*report/)
     ) {
       const name = this.extractName(question);
       return {
@@ -462,7 +980,7 @@ Respond with ONLY valid JSON, no explanation:`;
     }
 
     // Best performer
-    if (q.match(/best|top|highest|winner/)) {
+    if (qLowerUniq.match(/best|top|highest|winner/)) {
       return {
         intent: 'best_performer',
         searchTerm: null,
@@ -471,7 +989,7 @@ Respond with ONLY valid JSON, no explanation:`;
       };
     }
     // Test/exam results
-    if (q.match(/test|exam|result|score|assessment/) && !q.match(/report/)) {
+    if (qLowerUniq.match(/test|exam|result|score|assessment/) && !qLowerUniq.match(/report/)) {
       const name = this.extractName(question);
       return {
         intent: name ? 'person_lookup' : 'test_results',
@@ -481,7 +999,7 @@ Respond with ONLY valid JSON, no explanation:`;
       };
     }
     // Users
-    if (q.match(/user/)) {
+    if (qLowerUniq.match(/user/)) {
       return {
         intent: 'list_users',
         searchTerm: null,
@@ -490,7 +1008,7 @@ Respond with ONLY valid JSON, no explanation:`;
       };
     }
     // Candidates
-    if (q.match(/candidate|registration|student/)) {
+    if (qLowerUniq.match(/candidate|registration|student/)) {
       return {
         intent: 'list_candidates',
         searchTerm: null,
@@ -499,7 +1017,7 @@ Respond with ONLY valid JSON, no explanation:`;
       };
     }
     // Career roles
-    if (q.match(/career|role|job/)) {
+    if (qLowerUniq.match(/career|role|job/)) {
       return {
         intent: 'career_roles',
         searchTerm: null,
@@ -508,7 +1026,7 @@ Respond with ONLY valid JSON, no explanation:`;
       };
     }
     // Count
-    if (q.match(/how many|count/)) {
+    if (qLowerUniq.match(/how many|count/)) {
       return {
         intent: 'count',
         searchTerm: null,
@@ -650,7 +1168,7 @@ Respond with ONLY valid JSON, no explanation:`;
 
     try {
       this.logger.log(`🔍 SQL: ${sql.substring(0, 80)}...`);
-      return await this.dataSource.query(sql);
+      return await this.executeDatabaseQuery(sql);
     } catch (error) {
       this.logger.error(`SQL Error: ${error.message}`);
       return [];
@@ -705,12 +1223,9 @@ Respond with ONLY valid JSON, no explanation:`;
 
     data.slice(0, 5).forEach((row, i) => {
       const name = row.full_name || 'Unknown';
-      const score = row.total_score
-        ? parseFloat(row.total_score).toFixed(0)
-        : 'N/A';
       const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '•';
 
-      response += `${medal} **${name}** - Score: **${score}%**\n`;
+      response += `${medal} **${name}**\n`;
 
       // Behavioral Style (DISC) - FULL description
       if (row.behavioral_style) {
@@ -720,8 +1235,8 @@ Respond with ONLY valid JSON, no explanation:`;
         }
       }
 
-      // Agile Compatibility - with FULL description
-      const scoreNum = parseFloat(score);
+      // Agile Compatibility - with FULL description (but don't show score)
+      const scoreNum = row.total_score ? parseFloat(row.total_score) : NaN;
       if (!isNaN(scoreNum)) {
         const agile = this.getAgileLevel(scoreNum);
         response += `   🎯 **${agile.name}**: ${agile.desc}\n`;
@@ -783,7 +1298,7 @@ Respond with ONLY valid JSON, no explanation:`;
     data.forEach((row, i) => {
       response += `${i + 1}. **${row.career_role_name}**\n`;
       if (row.short_description) {
-        response += `   ${row.short_description.slice(0, 80)}...\n`;
+        response += `   ${row.short_description}\n`;
       }
     });
     return response;
@@ -809,20 +1324,26 @@ Respond with ONLY valid JSON, no explanation:`;
   async getStatus(): Promise<any> {
     let totalDocs = 0;
     try {
-      const r = await this.dataSource.query(
+      const r = await this.executeDatabaseQuery(
         'SELECT COUNT(*) as count FROM rag_documents',
       );
       totalDocs = parseInt(r[0].count);
-    } catch {}
+    } catch { }
 
     return {
       status: 'ok',
-      version: '11.0.0-production',
+      name: 'MITHRA',
+      version: '2.0.0-jarvis',
+      description: 'OriginBI Intelligent - Your Career Guide (JARVIS Edition)',
       features: [
-        'llm_query_understanding',
-        'disc_personality',
-        'agile_aci',
-        'smart_formatting',
+        'personalized_career_guidance',
+        'job_eligibility_analysis',
+        'higher_studies_recommendations',
+        'emotional_ai_responses',
+        'user_memory',
+        'any_question_intelligent',
+        'conversation_context',
+        'llm_powered',
       ],
       knowledgeBase: { documents: totalDocs },
     };
@@ -852,5 +1373,20 @@ Respond with ONLY valid JSON, no explanation:`;
   }
   async generatePdf(data: any, q: string) {
     return Buffer.from(`Query: ${q}\n\n${data.answer}`);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HANDLER: OVERALL ROLE FITMENT
+  // ═══════════════════════════════════════════════════════════════════════════
+  private async handleOverallReport_Unused(user: any): Promise<any> {
+    const reportTitle = 'Placement Guidance Report';
+    // Link relative to API root (Frontend should proxy or handle this)
+    const downloadUrl = `${process.env.API_BASE_URL || 'http://localhost:3001/api/admin'}/rag/overall-report/pdf?groupId=1&title=${encodeURIComponent(reportTitle)}`;
+
+    return {
+      answer: `I've generated the **Overall Role Fitment Report** for you. \n\nThis report analyzes student data to identify personality groups and recommend suitable career paths.\n\n📄 **[Click here to download the PDF Report](${downloadUrl})**`,
+      searchType: 'overall_report',
+      confidence: 1.0,
+    };
   }
 }
