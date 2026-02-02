@@ -128,7 +128,7 @@ export default function CounsellingSessionListPage({ params }: { params: { id: s
                                 sessions.map((session) => {
                                     let details = session.studentDetails || session.student_details || {};
                                     if (typeof details === 'string') {
-                                        try { details = JSON.parse(details); } catch (e) { }
+                                        try { details = JSON.parse(details); } catch { /* ignore */ }
                                     }
 
                                     const d = details; // short alias
