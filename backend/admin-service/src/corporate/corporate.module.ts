@@ -8,6 +8,7 @@ import {
   CorporateAccount,
   CorporateCreditLedger,
   User as AdminUser,
+  CorporateCounsellingAccess,
 } from '@originbi/shared-entities';
 
 @Module({
@@ -16,6 +17,7 @@ import {
       CorporateAccount,
       CorporateCreditLedger,
       AdminUser,
+      CorporateCounsellingAccess,
     ]),
     HttpModule,
   ],
@@ -23,4 +25,4 @@ import {
   providers: [CorporateService],
   exports: [CorporateService],
 })
-export class CorporateModule {}
+export class CorporateModule { }

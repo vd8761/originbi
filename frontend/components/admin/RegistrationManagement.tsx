@@ -72,16 +72,9 @@ const RegistrationManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
 
   // Date Filter State
-  const [dateRangeLabel, setDateRangeLabel] = useState<string>("This Month");
-  const [startDate, setStartDate] = useState<Date | null>(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
-  const [endDate, setEndDate] = useState<Date | null>(() => {
-    const now = new Date();
-    // Set to last day of the current month
-    return new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-  });
+  const [dateRangeLabel, setDateRangeLabel] = useState<string>("All");
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
 
   // Sorting

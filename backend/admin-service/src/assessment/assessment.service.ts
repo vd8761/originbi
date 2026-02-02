@@ -8,6 +8,9 @@ import {
   AssessmentAttempt,
   GroupAssessment,
   Groups,
+  AciTraitValueNote,
+  AciTrait,
+  AciValue,
 } from '@originbi/shared-entities';
 
 @Injectable()
@@ -21,6 +24,12 @@ export class AssessmentService {
     private readonly attemptRepo: Repository<AssessmentAttempt>,
     @InjectRepository(GroupAssessment)
     private readonly groupAssessmentRepo: Repository<GroupAssessment>,
+    @InjectRepository(AciTraitValueNote)
+    private readonly aciNoteRepo: Repository<AciTraitValueNote>,
+    @InjectRepository(AciTrait)
+    private readonly aciTraitRepo: Repository<AciTrait>,
+    @InjectRepository(AciValue)
+    private readonly aciValueRepo: Repository<AciValue>,
   ) { }
 
   async findAllSessions(
@@ -297,6 +306,65 @@ export class AssessmentService {
         relations: ['assessmentLevel', 'dominantTrait'],
         order: { assessmentLevelId: 'ASC' },
       });
+
+      // --- DYNAMIC ACI NOTES ENRICHMENT ---
+      const aciAttempt = attempts.find(
+        (a) =>
+          a.assessmentLevel?.patternType === 'ACI' ||
+          a.assessmentLevel?.name?.includes('ACI'),
+      );
+
+      if (aciAttempt) {
+        // Try to find trait code from metadata
+        const traitCode =
+          aciAttempt.metadata?.traitCode || session.metadata?.traitCode;
+
+        if (traitCode) {
+          // Find the trait entity (try code first, then title)
+          let trait = await this.aciTraitRepo.findOne({
+            where: { traitCode: traitCode },
+          });
+          if (!trait) {
+            trait = await this.aciTraitRepo.findOne({
+              where: { traitTitle: traitCode },
+            });
+          }
+
+          if (trait) {
+            // Get all values to map IDs to Names
+            const aciValues = await this.aciValueRepo.find();
+            const valueMap = new Map<number, string>();
+            aciValues.forEach((v) => valueMap.set(v.id, v.valueName));
+
+            // Get the notes
+            const notes = await this.aciNoteRepo.find({
+              where: { aciTraitId: trait.id },
+            });
+
+            // Construct the map
+            const notesMap: Record<string, string> = {};
+            notes.forEach((n) => {
+              const valName = valueMap.get(n.aciValueId);
+              if (valName) {
+                notesMap[valName] = n.behavioralNote;
+              }
+            });
+
+            // Attach to attempt (as ad-hoc property)
+            (aciAttempt as any).aciNotes = notesMap;
+            // Also update 'aciBand' if missing, but 'trait' entity has info?
+            // AciTrait has 'traitTitle' which is the Band/Level Name usually.
+            if (!(aciAttempt as any).aciBand) {
+              (aciAttempt as any).aciBand = {
+                levelName: trait.traitTitle,
+                compatibilityTag: trait.shortSummary, // Mapping summary to tag?
+                interpretation: trait.personalizedInsight
+              };
+            }
+          }
+        }
+      }
+      // ------------------------------------
 
       // Maintain currentAttempt logic for stats bar if needed (usually latest active)
       // If we just sort attempts by ID DESC, the first one is the latest.

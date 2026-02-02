@@ -42,6 +42,9 @@ export default function AdminLayout({
             case 'registrations':
                 router.push('/admin/registrations');
                 break;
+            case 'counselling':
+                router.push('/admin/counselling');
+                break;
             default:
                 router.push(`/admin/${view}`);
         }

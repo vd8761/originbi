@@ -35,17 +35,10 @@ const RegistrationPreview: React.FC<RegistrationPreviewProps> = ({ registration,
     const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
 
     // Filters
-    const [dateRangeLabel, setDateRangeLabel] = useState<string>("This Month");
-    const [startDate, setStartDate] = useState<Date | null>(() => {
-        const now = new Date();
-        return new Date(now.getFullYear(), now.getMonth(), 1);
-    });
-    const [endDate, setEndDate] = useState<Date | null>(() => {
-        return new Date(); // Or today? Default filter logic suggests This Month usually means '1st to Now' or '1st to EndOfMonth'. Let's default to today for end if it's 'This Month' up to now, or just null if open ended. 
-        // Screenshot shows range. Let's start with 1st of month.
-        // Actually, let's keep it simple: Start of Month to Today.
-        return new Date();
-    });
+    // Filters
+    const [dateRangeLabel, setDateRangeLabel] = useState<string>("All");
+    const [startDate, setStartDate] = useState<Date | null>(null);
+    const [endDate, setEndDate] = useState<Date | null>(null);
     const [isDateModalOpen, setIsDateModalOpen] = useState(false);
     const [statusFilter, setStatusFilter] = useState<string | null>(null);
     const [statusLabel, setStatusLabel] = useState<string>("All"); // UI Label

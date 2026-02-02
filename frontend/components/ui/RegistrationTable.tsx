@@ -1,6 +1,6 @@
 import React from 'react';
-import { Registration } from '../../lib/types';
-import { COUNTRY_CODES } from '../../lib/countryCodes';
+import { Registration } from '@/lib/types';
+import { COUNTRY_CODES } from '@/lib/countryCodes';
 import ReactCountryFlag from "react-country-flag";
 import { EyeSolidIcon, SortIcon } from '@/components/icons';
 import ToggleSwitch from '@/components/ui/ToggleSwitch';

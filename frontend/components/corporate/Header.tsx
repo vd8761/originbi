@@ -259,6 +259,7 @@ const Header: React.FC<HeaderProps> = ({
     if (pathname.includes('/dashboard')) return 'dashboard';
     if (pathname.includes('/registrations')) return 'registrations';
     if (pathname.includes('/jobs')) return 'jobs';
+    if (pathname.includes('/counselling')) return 'counselling';
     if (pathname.includes('/origindata')) return 'origindata';
     if (pathname.includes('/settings')) return 'settings';
     return currentView;
@@ -290,6 +291,7 @@ const Header: React.FC<HeaderProps> = ({
           <NavItem icon={<DashboardIcon className="w-4 h-4" />} label="Dashboard" active={activeView === "dashboard"} isMobile={isMobile} onClick={() => handleNavClick("dashboard")} />
           <NavItem icon={<MyEmployeesIcon className="w-4 h-4" />} label="My Employees" active={activeView === "registrations"} isMobile={isMobile} onClick={() => handleNavClick("registrations")} />
           <NavItem icon={<JobsIcon className="w-4 h-4" />} label="Jobs" active={activeView === "jobs"} isMobile={isMobile} onClick={() => handleNavClick("jobs")} />
+          <NavItem icon={<RoadmapIcon className="w-4 h-4" />} label="Counselling" active={activeView === "counselling"} isMobile={isMobile} onClick={() => handleNavClick("counselling")} />
           <NavItem icon={<OriginDataIcon className="w-4 h-4" />} label="Origin Data" active={activeView === "origindata"} isMobile={isMobile} onClick={() => handleNavClick("origindata")} />
           <NavItem icon={<SettingsIcon className="w-4 h-4" />} label="Settings" active={activeView === "settings"} isMobile={isMobile} onClick={() => handleNavClick("settings")} />
         </>

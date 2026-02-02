@@ -196,6 +196,7 @@ export interface CreateCorporateRegistrationDto {
   linkedinUrl?: string;
   status: boolean;
   sendEmail?: boolean;
+  counsellingAccess?: number[];
 }
 
 // Common Shared Types
