@@ -65,6 +65,10 @@ const config: Config = {
                     "100%": {
                         transform: "translate(0px, 0px) scale(1)"
                     }
+                },
+                blink: {
+                    "0%, 50%": { opacity: "1" },
+                    "51%, 100%": { opacity: "0" }
                 }
             }
         }
