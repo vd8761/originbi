@@ -41,6 +41,7 @@
     "**/*.mts",
     "src/**/*.ts",
     "src/**/*.tsx",
+    "components",
     "next.config.mjs"
   ],
   "exclude": [
