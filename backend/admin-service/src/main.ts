@@ -10,6 +10,7 @@ async function bootstrap() {
   const allowedOrigins = [
     'https://mind.originbi.com',
     'https://originbi.vercel.app',
+    'http://localhost:3000',
     ...(process.env.FRONTEND_URL || '')
       .split(',')
       .map((u) => u.trim())

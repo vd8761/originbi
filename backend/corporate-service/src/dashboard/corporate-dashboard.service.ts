@@ -26,6 +26,10 @@ import { AssessmentSession } from '@originbi/shared-entities';
 import { Program } from '@originbi/shared-entities';
 import { GroupAssessment } from '@originbi/shared-entities';
 import { Groups } from '@originbi/shared-entities';
+import { CorporateCounsellingAccess } from '@originbi/shared-entities';
+import { CounsellingType } from '@originbi/shared-entities';
+import { CounsellingSession } from '@originbi/shared-entities';
+import { CounsellingResponse } from '@originbi/shared-entities';
 
 @Injectable()
 export class CorporateDashboardService {
@@ -52,6 +56,14 @@ export class CorporateDashboardService {
         private readonly groupAssessmentRepo: Repository<GroupAssessment>,
         @InjectRepository(Groups)
         private readonly groupRepo: Repository<Groups>,
+        @InjectRepository(CorporateCounsellingAccess)
+        private readonly accessRepo: Repository<CorporateCounsellingAccess>,
+        @InjectRepository(CounsellingType)
+        private readonly typeRepo: Repository<CounsellingType>,
+        @InjectRepository(CounsellingSession)
+        private readonly counsellingSessionRepo: Repository<CounsellingSession>,
+        @InjectRepository(CounsellingResponse)
+        private readonly counsellingResponseRepo: Repository<CounsellingResponse>,
         private httpService: HttpService,
         private configService: ConfigService,
         private readonly dataSource: DataSource,
@@ -498,9 +510,10 @@ export class CorporateDashboardService {
                 key: this.configService.get<string>('RAZORPAY_KEY_ID'),
                 perCreditCost: this.perCreditCost,
             };
-        } catch (error) {
-            console.error('Razorpay Error:', error);
-            throw new InternalServerErrorException('Failed to create payment order');
+        } catch (error: any) {
+            console.error('Razorpay Error:', JSON.stringify(error, null, 2));
+            const msg = error?.error?.description || error.message || 'Failed to create payment order';
+            throw new BadRequestException(msg); // Return specific error to frontend
         }
     }
 
@@ -1071,4 +1084,115 @@ export class CorporateDashboardService {
             limit,
         };
     }
+    async getCounsellingAccess(email: string) {
+        const { ILike, In } = require('typeorm');
+        const user = await this.userRepo.findOne({ where: { email: ILike(email) } });
+        if (!user) throw new NotFoundException('User not found');
+
+        let corporate = await this.corporateRepo.findOne({ where: { userId: user.id } });
+        if (!corporate && user.corporateId) {
+            corporate = await this.corporateRepo.findOne({ where: { id: Number(user.corporateId) } });
+        }
+        if (!corporate) throw new NotFoundException('Corporate account not found');
+
+        const accessRecords = await this.accessRepo.find({
+            where: { corporateAccountId: corporate.id, isEnabled: true }
+        });
+
+        if (accessRecords.length === 0) {
+            return { data: [] };
+        }
+
+        const typeIds = accessRecords.map(a => a.counsellingTypeId);
+        const types = await this.typeRepo.find({
+            where: { id: In(typeIds), isActive: true, isDeleted: false }
+        });
+
+        return { data: types };
+    }
+
+    async getCounsellingSessions(
+        email: string,
+        typeId: number,
+        page = 1,
+        limit = 10,
+        search = '',
+        status = ''
+    ) {
+        const { ILike } = require('typeorm');
+        const user = await this.userRepo.findOne({ where: { email: ILike(email) } });
+        if (!user) throw new NotFoundException('User not found');
+
+        let corporate = await this.corporateRepo.findOne({ where: { userId: user.id } });
+        if (!corporate && user.corporateId) {
+            corporate = await this.corporateRepo.findOne({ where: { id: Number(user.corporateId) } });
+        }
+        if (!corporate) throw new NotFoundException('Corporate account not found');
+
+        const qb = this.counsellingSessionRepo.createQueryBuilder('cs')
+            .leftJoinAndSelect('cs.counsellingType', 'ct')
+            .where('cs.corporateAccountId = :corpId', { corpId: corporate.id })
+            .andWhere('cs.counsellingTypeId = :typeId', { typeId });
+
+        if (status && status !== 'All') {
+            qb.andWhere('cs.status = :status', { status });
+        }
+
+        if (search) {
+            const s = `%${search.toLowerCase()}%`;
+            qb.andWhere('(LOWER(cs.mobileNumber) LIKE :s OR LOWER(cs.email) LIKE :s)', { s });
+        }
+
+        qb.orderBy('cs.createdAt', 'DESC');
+
+        const [data, total] = await qb
+            .skip((page - 1) * limit)
+            .take(limit)
+            .getManyAndCount();
+
+        return {
+            data: data || [],
+            total: total || 0,
+            page,
+            limit,
+        };
+    }
+
+    async getCounsellingSessionById(email: string, id: number) {
+        const { ILike } = require('typeorm');
+        const user = await this.userRepo.findOne({ where: { email: ILike(email) } });
+        if (!user) throw new NotFoundException('User not found');
+
+        let corporate = await this.corporateRepo.findOne({ where: { userId: user.id } });
+        if (!corporate && user.corporateId) {
+            corporate = await this.corporateRepo.findOne({ where: { id: Number(user.corporateId) } });
+        }
+        if (!corporate) throw new NotFoundException('Corporate account not found');
+
+        const session = await this.counsellingSessionRepo.findOne({
+            where: { id, corporateAccountId: corporate.id },
+            relations: ['counsellingType']
+        });
+
+        if (!session) throw new NotFoundException('Session not found or access denied');
+
+        return session;
+    }
+
+    async getSessionResponses(sessionId: number) {
+        const responses = await this.counsellingResponseRepo.find({
+            where: { sessionId: sessionId },
+            relations: ['question', 'selectedOption'],
+            order: { questionId: 'ASC' }
+        });
+
+        return responses.map(r => ({
+            id: r.id,
+            question: r.question.questionTextEn,
+            question_ta: r.question.questionTextTa,
+            selected_option: r.selectedOption.optionTextEn,
+            selected_option_ta: r.selectedOption.optionTextTa
+        }));
+    }
 }
+

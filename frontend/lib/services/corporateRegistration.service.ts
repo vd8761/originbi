@@ -2,7 +2,7 @@ import { CorporateAccount, CreateCorporateRegistrationDto, PaginatedResponse } f
 import { AuthService } from "./auth.service";
 
 const API_URL =
-    process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
+    process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4001';
 
 export const corporateRegistrationService = {
     // List registrations with pagination + search

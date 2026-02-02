@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Query,
+  Param,
   BadRequestException,
 } from '@nestjs/common';
 import { CorporateDashboardService } from './corporate-dashboard.service';
@@ -65,8 +66,12 @@ export class CorporateDashboardController {
     @Body('reason') reason: string,
   ) {
     if (!email) throw new BadRequestException('Email is required');
-    if (!creditCount || creditCount <= 0)
-      throw new BadRequestException('Valid credit count is required');
+
+    // Minimum Credit Validation
+    const minCredit = Number(process.env.MIN_CREDIT_PURCHASE) || 100;
+    if (!creditCount || creditCount < minCredit)
+      throw new BadRequestException(`Minimum credit purchase is ${minCredit}`);
+
     return this.dashboardService.createOrder(email, creditCount, reason);
   }
 
@@ -135,5 +140,36 @@ export class CorporateDashboardController {
       userId,
       type
     );
+  }
+
+  @Get('counselling-access')
+  getCounsellingAccess(@Query('email') email: string) {
+    if (!email) throw new BadRequestException('Email is required');
+    return this.dashboardService.getCounsellingAccess(email);
+  }
+
+  @Get('counselling-sessions')
+  getCounsellingSessions(
+    @Query('email') email: string,
+    @Query('typeId') typeId: number,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    if (!email) throw new BadRequestException('Email is required');
+    if (!typeId) throw new BadRequestException('Type ID is required');
+    return this.dashboardService.getCounsellingSessions(email, typeId, page, limit, search, status);
+  }
+
+  @Get('counselling-session/:id')
+  getCounsellingSessionById(@Query('email') email: string, @Query('id') id: number) {
+    if (!email) throw new BadRequestException('Email is required');
+    return this.dashboardService.getCounsellingSessionById(email, id);
+  }
+
+  @Get('counselling/responses/:sessionId')
+  getSessionResponses(@Param('sessionId') sessionId: number) {
+    return this.dashboardService.getSessionResponses(sessionId);
   }
 }

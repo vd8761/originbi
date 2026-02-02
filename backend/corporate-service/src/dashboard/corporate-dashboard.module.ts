@@ -15,6 +15,12 @@ import {
   Program,
   GroupAssessment,
   Groups,
+  CorporateCounsellingAccess,
+  CounsellingType,
+  CounsellingQuestion,
+  CounsellingQuestionOption,
+  CounsellingSession,
+  CounsellingResponse,
 } from '@originbi/shared-entities';
 
 @Module({
@@ -29,6 +35,12 @@ import {
       Program,
       GroupAssessment,
       Groups,
+      CorporateCounsellingAccess,
+      CounsellingType,
+      CounsellingQuestion,
+      CounsellingQuestionOption,
+      CounsellingSession,
+      CounsellingResponse,
     ]),
     HttpModule,
   ],
