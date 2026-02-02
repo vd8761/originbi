@@ -1,10 +1,62 @@
 @import "tailwindcss";
 
 /* 1. Define the Manual Dark Mode Variant */
-
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* 2. Define Your Theme & Colors (Replaces tailwind.config.ts) */
-/* Theme configuration is handled in tailwind.config.ts */
+@theme {
+  /* Colors */
+  --color-brand-dark-primary: #19211C;
+  --color-brand-dark-secondary: #24272B;
+  --color-brand-dark-tertiary: #303438;
+
+  --color-brand-light-primary: #FFFFFF;
+  --color-brand-light-secondary: #F7FAFC;
+  --color-brand-light-tertiary: #E2E8F0;
+
+  --color-brand-green: #1ED36A;
+  --color-brand-dark-green: #1A3A2C;
+  --color-brand-red: #C63232;
+
+  --color-brand-text-primary: #FFFFFF;
+  --color-brand-text-secondary: #A0AEC0;
+  --color-brand-text-light-primary: #2D3748;
+  --color-brand-text-light-secondary: #718096;
+
+  /* Fonts */
+  --font-sans: 'Haskoy', 'Manrope', sans-serif;
+
+  /* Animations */
+  --animate-fade-in: fade-in 0.8s ease-in-out forwards;
+
+  @keyframes fade-in {
+    0% {
+      opacity: 0.5;
+      transform: scale(1.05);
+    }
+
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes blink {
+
+    0%,
+    50% {
+      opacity: 1;
+    }
+
+    51%,
+    100% {
+      opacity: 0;
+    }
+  }
+
+  /* Background Images */
+  --background-image-personality-gradient: radial-gradient(circle at 80% 20%, rgba(237, 51, 51, 0.3), transparent 70%);
+}
 
 @font-face {
   font-family: 'Haskoy';
