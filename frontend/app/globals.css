@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* 1. Define the Manual Dark Mode Variant */
-@custom-variant dark (&:where(.dark, .dark *));
+
 
 /* 2. Define Your Theme & Colors (Replaces tailwind.config.ts) */
 /* Theme configuration is handled in tailwind.config.ts */
