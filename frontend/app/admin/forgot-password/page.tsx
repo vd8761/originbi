@@ -2,7 +2,7 @@
 
 import React from 'react';
 import ForgotPasswordForm from '../../../components/admin/ForgotPasswordForm';
-import AdminAuthLayout from '@/components/admin/AdminAuthLayout';
+import AdminAuthLayout from '../../../components/admin/AdminAuthLayout';
 
 export default function AdminForgotPasswordPage() {
     return (
