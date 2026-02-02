@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
-import { Send, Bot, User, Loader2, Copy, Check, Trash2, Sparkles, MessageSquare, Zap, Download } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Send, Bot, User, Loader2, Copy, Check, Trash2, Sparkles, MessageSquare, Zap, Download, ArrowLeft } from 'lucide-react';
 
 interface Message {
     id: string;
@@ -171,12 +172,16 @@ export default function ChatAssistant({
     userRole = 'ADMIN',
     apiUrl = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL
 }: ChatAssistantProps) {
+    const router = useRouter();
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const [copied, setCopied] = useState<string | null>(null);
+    const [showHeader, setShowHeader] = useState(true);
     const scrollRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+    const chatAreaRef = useRef<HTMLDivElement>(null);
+    const lastScrollY = useRef(0);
 
     useEffect(() => {
         scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -184,6 +189,32 @@ export default function ChatAssistant({
 
     useEffect(() => {
         inputRef.current?.focus();
+    }, []);
+
+    // Handle scroll to show/hide header
+    useEffect(() => {
+        const chatArea = chatAreaRef.current;
+        if (!chatArea) return;
+
+        const handleScroll = () => {
+            const currentScrollY = chatArea.scrollTop;
+            
+            if (currentScrollY <= 0) {
+                // At the top, always show header
+                setShowHeader(true);
+            } else if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
+                // Scrolling down, hide header
+                setShowHeader(false);
+            } else if (currentScrollY < lastScrollY.current) {
+                // Scrolling up, show header
+                setShowHeader(true);
+            }
+            
+            lastScrollY.current = currentScrollY;
+        };
+
+        chatArea.addEventListener('scroll', handleScroll, { passive: true });
+        return () => chatArea.removeEventListener('scroll', handleScroll);
     }, []);
 
     const copyText = (text: string, id: string) => {
@@ -252,10 +283,19 @@ export default function ChatAssistant({
     ];
 
     return (
-        <div className="flex flex-col h-full w-full bg-white dark:bg-[#0f1115] overflow-hidden">
-            {/* Compact Header - Responsive */}
-            <div className="flex items-center justify-between px-3 sm:px-4 md:px-6 py-2 sm:py-3 bg-white dark:bg-[#0f1115] border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+        <div className="relative h-full w-full bg-white dark:bg-[#0f1115] overflow-hidden">
+            {/* Compact Header - Responsive with scroll animation */}
+            <div className={`absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-3 sm:px-4 md:px-6 py-2 sm:py-3 bg-white dark:bg-[#0f1115] border-b border-gray-100 dark:border-gray-800 transition-transform duration-300 ease-in-out ${
+                showHeader ? 'translate-y-0' : '-translate-y-full'
+            }`}>
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <button
+                        onClick={() => router.back()}
+                        className="flex-shrink-0 p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                        title="Go back"
+                    >
+                        <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </button>
                     <div className="relative flex-shrink-0">
                         <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30 animate-pulse">
                             <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
@@ -286,8 +326,9 @@ export default function ChatAssistant({
                 </div>
             </div>
 
-            {/* Chat Area */}
-            <div className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-50/50 to-white dark:from-[#0f1115] dark:to-[#0f1115]">
+            {/* Chat Area - Full height */}
+            <div ref={chatAreaRef} className="absolute inset-0 overflow-y-auto bg-gradient-to-b from-gray-50/50 to-white dark:from-[#0f1115] dark:to-[#0f1115]">
+                <div className={`min-h-full transition-all duration-300 ${showHeader ? 'pt-[52px] sm:pt-[56px]' : 'pt-0'} pb-[100px] sm:pb-[110px]`}>
                 {messages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-12">
                         {/* Welcome Section */}
@@ -414,10 +455,11 @@ export default function ChatAssistant({
                         <div ref={scrollRef} />
                     </div>
                 )}
+                </div>
             </div>
 
             {/* Input Area - Responsive */}
-            <div className="bg-white dark:bg-[#0f1115] px-3 sm:px-4 md:px-6 py-3 sm:py-4 flex-shrink-0 border-t border-gray-50 dark:border-gray-800">
+            <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-[#0f1115] px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-t border-gray-50 dark:border-gray-800 z-10">
                 <div className="max-w-4xl mx-auto">
                     <div className="flex items-end gap-2 sm:gap-3 p-1.5 sm:p-2 bg-gray-50 dark:bg-gray-800/50 rounded-xl sm:rounded-2xl border border-gray-200 dark:border-gray-700 focus-within:border-cyan-400 dark:focus-within:border-cyan-500 focus-within:bg-white dark:focus-within:bg-gray-800 focus-within:shadow-lg focus-within:shadow-cyan-500/10 transition-all duration-200">
                         <textarea
