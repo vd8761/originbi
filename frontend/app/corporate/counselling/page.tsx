@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { corporateDashboardService } from '../../../lib/services';
-import { RoadmapIcon } from '../../../components/icons';
+import { corporateDashboardService } from '@/lib/services';
+import { RoadmapIcon } from '@/components/icons';
 
 export default function CorporateCounsellingPage() {
     const [accessList, setAccessList] = useState<any[]>([]);

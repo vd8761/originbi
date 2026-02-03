@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { CheckCircleIcon, StepperUpArrowIcon, StepperDownArrowIcon, StepperPendingDotIcon } from '@/components/icons';
-import { useLanguage } from "../../contexts/LanguageContext";
-import { studentService } from "../../lib/services/student.service";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { studentService } from "@/lib/services/student.service";
 
 // --- Interfaces ---
 

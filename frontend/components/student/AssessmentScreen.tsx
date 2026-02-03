@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useLanguage } from "../../contexts/LanguageContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const translations = {
   ENG: {
@@ -27,7 +27,7 @@ const translations = {
   }
 };
 
-import { studentService } from "../../lib/services/student.service";
+import { studentService } from "@/lib/services/student.service";
 import { Spinner } from "../icons";
 import AssessmentModal from "./AssessmentModal";
 
