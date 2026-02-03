@@ -1,4 +1,3 @@
-```typescript
 import { Program, PaginatedResponse } from "../types";
 import { AuthService } from "./auth.service";
 
@@ -26,10 +25,10 @@ export const programService = {
 
     const token = AuthService.getToken();
 
-    const res = await fetch(`${ API_URL } /admin/programs ? ${ params.toString() } `, {
+    const res = await fetch(`${API_URL} /admin/programs ? ${params.toString()} `, {
       headers: {
         "Content-Type": "application/json",
-        Authorization: token ? `Bearer ${ token } ` : "",
+        Authorization: token ? `Bearer ${token} ` : "",
       },
       cache: "no-store",
     });
@@ -56,11 +55,11 @@ export const programService = {
   async createProgram(data: Omit<Program, "id" | "created_at" | "updated_at">): Promise<Program> {
     const token = AuthService.getToken();
 
-    const res = await fetch(`${ API_URL } /admin/programs`, {
+    const res = await fetch(`${API_URL} /admin/programs`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: token ? `Bearer ${ token } ` : "",
+        Authorization: token ? `Bearer ${token} ` : "",
       },
       body: JSON.stringify(data),
     });
@@ -79,11 +78,11 @@ export const programService = {
   ): Promise<void> {
     const token = AuthService.getToken();
 
-    const res = await fetch(`${ API_URL } /admin/programs / ${ id } `, {
+    const res = await fetch(`${API_URL} /admin/programs / ${id} `, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        Authorization: token ? `Bearer ${ token } ` : "",
+        Authorization: token ? `Bearer ${token} ` : "",
       },
       body: JSON.stringify(data),
     });
@@ -97,32 +96,32 @@ export const programService = {
   async toggleStatus(id: string, status: boolean): Promise<void> {
     const token = AuthService.getToken();
 
-    const res = await fetch(`${ API_URL } /admin/programs / ${ id }/status`, {
-method: "PATCH",
-  headers: {
-  "Content-Type": "application/json",
-    Authorization: token ? `Bearer ${token}` : "",
+    const res = await fetch(`${API_URL} /admin/programs / ${id}/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : "",
       },
-body: JSON.stringify({ is_active: status }),
+      body: JSON.stringify({ is_active: status }),
     });
 
-if (!res.ok) {
-  throw new Error("Failed to update program status");
-}
+    if (!res.ok) {
+      throw new Error("Failed to update program status");
+    }
   },
 
-  async deleteProgram(id: string): Promise < void> {
-  const token = AuthService.getToken();
+  async deleteProgram(id: string): Promise<void> {
+    const token = AuthService.getToken();
 
-  const res = await fetch(`${API_URL}/admin/programs/${id}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: token ? `Bearer ${token}` : "",
-    },
-  });
+    const res = await fetch(`${API_URL}/admin/programs/${id}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+    });
 
-  if(!res.ok) {
-  throw new Error("Failed to delete program");
-}
+    if (!res.ok) {
+      throw new Error("Failed to delete program");
+    }
   },
 };
