@@ -6,7 +6,7 @@ import MobileInput from "../ui/MobileInput";
 import CustomSelect from "../ui/CustomSelect";
 import CustomDatePicker from "../ui/CustomDatePicker";
 import { corporateRegistrationService } from "../../lib/services/corporateRegistration.service";
-import { CreateRegistrationDto } from "../../lib/services/registration.service";
+import { registrationService, CreateRegistrationDto } from "../../lib/services/registration.service";
 import { BulkUploadModal } from "../ui/BulkUploadModal";
 
 interface AddRegistrationFormProps {
@@ -91,7 +91,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     }
     setIsLoading(true);
     try {
-      await corporateRegistrationService.createRegistration(formData);
+      await registrationService.createRegistration(formData);
       onRegister();
     } catch (err: any) {
       setError(err.message || "Failed to create registration.");
