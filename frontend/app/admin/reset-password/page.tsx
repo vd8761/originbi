@@ -1,8 +1,8 @@
 'use client';
 
 import React, { Suspense } from 'react';
-import ResetPasswordForm from '../../../components/admin/ResetPasswordForm';
-import AdminAuthLayout from '../../../components/admin/AdminAuthLayout';
+import ResetPasswordForm from '@/components/admin/ResetPasswordForm';
+import AdminAuthLayout from '@/components/admin/AdminAuthLayout';
 
 export default function AdminResetPasswordPage() {
     return (

@@ -44,13 +44,6 @@ const nextConfig = {
       },
     ];
   },
-  webpack: (config) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@': path.resolve(path.dirname(fileURLToPath(import.meta.url))),
-    };
-    return config;
-  },
 };
 
 export default nextConfig;
