@@ -25,7 +25,7 @@ const config: Config = {
                 "brand-text-light-secondary": "#718096",
             },
             fontFamily: {
-                sans: ['Haskoy', 'Manrope', 'sans-serif'],
+                sans: ['Haskoy', 'sans-serif'],
             },
             animation: {
                 "fade-in": "fade-in 0.8s ease-in-out forwards",

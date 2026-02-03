@@ -115,56 +115,56 @@
 /* Custom Fonts */
 @font-face {
   font-family: 'Haskoy';
-  src: url('/fonts/Haskoy-Thin.otf') format('opentype');
+  src: url('/fonts/Haskoy-Thin.otf');
   font-weight: 100;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Haskoy';
-  src: url('/fonts/Haskoy-ExtraLight.otf') format('opentype');
+  src: url('/fonts/Haskoy-ExtraLight.otf');
   font-weight: 200;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Haskoy';
-  src: url('/fonts/Haskoy-Light.otf') format('opentype');
+  src: url('/fonts/Haskoy-Light.otf');
   font-weight: 300;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Haskoy';
-  src: url('/fonts/Haskoy-Regular.otf') format('opentype');
+  src: url('/fonts/Haskoy-Regular.otf');
   font-weight: 400;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Haskoy';
-  src: url('/fonts/Haskoy-Medium.otf') format('opentype');
+  src: url('/fonts/Haskoy-Medium.otf');
   font-weight: 500;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Haskoy';
-  src: url('/fonts/Haskoy-SemiBold.otf') format('opentype');
+  src: url('/fonts/Haskoy-SemiBold.otf');
   font-weight: 600;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Haskoy';
-  src: url('/fonts/Haskoy-Bold.otf') format('opentype');
+  src: url('/fonts/Haskoy-Bold.otf');
   font-weight: 700;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Haskoy';
-  src: url('/fonts/Haskoy-ExtraBold.otf') format('opentype');
+  src: url('/fonts/Haskoy-ExtraBold.otf');
   font-weight: 800;
   font-style: normal;
 }
