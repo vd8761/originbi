@@ -91,7 +91,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     }
     setIsLoading(true);
     try {
-      await corporateRegistrationService.createCorporateRegistration(formData);
+      await corporateRegistrationService.createRegistration(formData);
       onRegister();
     } catch (err: any) {
       setError(err.message || "Failed to create registration.");
