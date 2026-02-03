@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import CounsellingTypesTable from './CounsellingTypesTable';
 import AddCounsellingTypeModal from './AddCounsellingTypeModal';
-import { PlusIcon, ChevronDownIcon, ArrowLeftWithoutLineIcon, ArrowRightWithoutLineIcon, ArrowRightIcon } from '../../components/icons';
-// import { adminCounsellingService } from '../../lib/services.ts'; // Mock service removed for direct fetch
+import { PlusIcon, ChevronDownIcon, ArrowLeftWithoutLineIcon, ArrowRightWithoutLineIcon, ArrowRightIcon } from '../icons';
+// import { adminCounsellingService } from '@/lib/services.ts'; // Mock service removed for direct fetch
 
 interface CounsellingType {
     id: number;

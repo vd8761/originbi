@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeftWithoutLineIcon, ArrowRightWithoutLineIcon } from "../icons";
+import { ArrowLeftWithoutLineIcon, ArrowRightWithoutLineIcon } from '../icons';
 
 type DatePreset = 'All' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'Last 30 Days' | 'This Month' | 'Last Month' | 'Custom Range';
 
@@ -270,8 +270,8 @@ h - 9 w - 9 text - xs font - medium rounded - full flex items - center justify -
                                     key={preset}
                                     onClick={() => handlePresetClick(preset)}
                                     className={`text - left px - 4 py - 3 rounded - lg text - sm font - medium transition - all ${activePreset === preset
-                                            ? 'bg-white dark:bg-[#24272B] text-brand-text-light-primary dark:text-white shadow-sm'
-                                            : 'text-gray-500 dark:text-gray-400 hover:text-brand-text-light-primary dark:hover:text-white hover:bg-white dark:hover:bg-white/5'
+                                        ? 'bg-white dark:bg-[#24272B] text-brand-text-light-primary dark:text-white shadow-sm'
+                                        : 'text-gray-500 dark:text-gray-400 hover:text-brand-text-light-primary dark:hover:text-white hover:bg-white dark:hover:bg-white/5'
                                         } `}
                                 >
                                     {preset}
@@ -284,8 +284,8 @@ h - 9 w - 9 text - xs font - medium rounded - full flex items - center justify -
                             <button
                                 onClick={() => setActivePreset('Custom Range')}
                                 className={`w - full text - center px - 4 py - 3 rounded - lg text - sm font - bold transition - all ${activePreset === 'Custom Range'
-                                        ? 'bg-brand-green text-white shadow-lg shadow-brand-green/20'
-                                        : 'bg-brand-green/10 text-brand-green hover:bg-brand-green/20'
+                                    ? 'bg-brand-green text-white shadow-lg shadow-brand-green/20'
+                                    : 'bg-brand-green/10 text-brand-green hover:bg-brand-green/20'
                                     } `}
                             >
                                 Custom Range
@@ -333,8 +333,8 @@ h - 9 w - 9 text - xs font - medium rounded - full flex items - center justify -
                             }}
                             disabled={!startDate}
                             className={`flex - 1 sm: flex - none px - 8 py - 2.5 rounded - full text - white text - sm font - bold shadow - lg transition - colors ${startDate
-                                    ? 'bg-brand-green hover:bg-brand-green/90 shadow-brand-green/20'
-                                    : 'bg-brand-green/50 cursor-not-allowed opacity-50'
+                                ? 'bg-brand-green hover:bg-brand-green/90 shadow-brand-green/20'
+                                : 'bg-brand-green/50 cursor-not-allowed opacity-50'
                                 } `}
                         >
                             Apply changes

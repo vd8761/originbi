@@ -1,10 +1,10 @@
 'use client';
 
 import React, { Suspense } from 'react';
-import Logo from '../../components/ui/Logo';
-import FirstTimeResetForm from '../../components/student/FirstTimeResetForm';
-import SetNewPasswordHero from '../../components/student/SetNewPasswordHero'; // Correct import
-import ThemeToggle from '../../components/ui/ThemeToggle';
+import Logo from '../ui/Logo';
+import FirstTimeResetForm from './FirstTimeResetForm';
+import SetNewPasswordHero from './SetNewPasswordHero'; // Correct import
+import ThemeToggle from '../ui/ThemeToggle';
 import { useTheme } from '../../contexts/ThemeContext';
 
 const FirstTimeReset: React.FC = () => {

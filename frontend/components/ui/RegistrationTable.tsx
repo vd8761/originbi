@@ -1,9 +1,9 @@
 import React from 'react';
-import { Registration } from "../../lib/types";
-import { COUNTRY_CODES } from "../../lib/countryCodes";
+import { Registration } from '../../lib/types';
+import { COUNTRY_CODES } from '../../lib/countryCodes';
 import ReactCountryFlag from "react-country-flag";
-import { EyeSolidIcon, SortIcon } from "../icons";
-import ToggleSwitch from "../ui/ToggleSwitch";
+import { EyeSolidIcon, SortIcon } from '../icons';
+import ToggleSwitch from './ToggleSwitch';
 
 interface RegistrationTableProps {
     users: Registration[];

@@ -11,7 +11,7 @@ import {
     ProfileIcon,
     JobsIcon,
     ClockIcon
-} from '../../components/icons';
+} from '../icons';
 
 interface AssessmentResultPreviewProps {
     session: AssessmentSession | null;

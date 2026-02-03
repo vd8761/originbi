@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import type { TestimonialData } from '../../lib/types';
-import { QuoteIcon, ArrowLeftIcon, ArrowRightIcon } from '../../components/icons';
+import { QuoteIcon, ArrowLeftIcon, ArrowRightIcon } from '../icons';
 
 const testimonials: TestimonialData[] = [
     {

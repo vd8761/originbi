@@ -1,270 +1,170 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* 1. Define the Manual Dark Mode Variant */
-@custom-variant dark (&:where(.dark, .dark *));
-
-/* 2. Define Your Theme & Colors (Replaces tailwind.config.ts) */
-@theme {
-  /* Colors */
-  --color-brand-dark-primary: #19211C;
-  --color-brand-dark-secondary: #24272B;
-  --color-brand-dark-tertiary: #303438;
-
-  --color-brand-light-primary: #FFFFFF;
-  --color-brand-light-secondary: #F7FAFC;
-  --color-brand-light-tertiary: #E2E8F0;
-
-  --color-brand-green: #1ED36A;
-  --color-brand-dark-green: #1A3A2C;
-  --color-brand-red: #C63232;
-
-  --color-brand-text-primary: #FFFFFF;
-  --color-brand-text-secondary: #A0AEC0;
-  --color-brand-text-light-primary: #2D3748;
-  --color-brand-text-light-secondary: #718096;
-
-  /* Fonts */
-  --font-sans: 'Haskoy', 'Manrope', sans-serif;
-
-  /* Animations */
-  --animate-fade-in: fade-in 0.8s ease-in-out forwards;
-  --animate-blob: blob 7s infinite;
-  --animate-pulse-slow: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  --animate-ping-slow: ping 3s cubic-bezier(0, 0, 0.2, 1) infinite;
-  --animate-progress-bar: progress 5s linear forwards;
-  --animate-spin-slow: spin 15s linear infinite;
-  --animate-spin-slow-reverse: spin-reverse 15s linear infinite;
-
-  @keyframes fade-in {
-    0% {
-      opacity: 0.5;
-      transform: scale(1.05);
-    }
-
-    100% {
-      opacity: 1;
-      transform: scale(1);
-    }
+@layer base {
+  body {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 300ms;
   }
-
-  @keyframes blob {
-    0% {
-      transform: translate(0px, 0px) scale(1);
-    }
-
-    33% {
-      transform: translate(30px, -50px) scale(1.1);
-    }
-
-    66% {
-      transform: translate(-20px, 20px) scale(0.9);
-    }
-
-    100% {
-      transform: translate(0px, 0px) scale(1);
-    }
-  }
-
-  @keyframes progress {
-    0% {
-      width: 0%;
-    }
-
-    100% {
-      width: 100%;
-    }
-  }
-
-  @keyframes spin-reverse {
-    to {
-      transform: rotate(-360deg);
-    }
-  }
-
-  @keyframes blink {
-
-    0%,
-    50% {
-      opacity: 1;
-    }
-
-    51%,
-    100% {
-      opacity: 0;
-    }
-  }
-
-  /* Background Images */
-  --background-image-personality-gradient: radial-gradient(circle at 80% 20%, rgba(237, 51, 51, 0.3), transparent 70%);
 }
 
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+    /* Chrome, Safari and Opera */
+  }
+
+  /* --- FONT SIZE VW CLASSES (Based on 1920px width) --- */
+  .text-48vw {
+    font-size: 2.5vw;
+  }
+
+  .text-32vw {
+    font-size: 1.666vw;
+  }
+
+  .text-24vw {
+    font-size: 1.25vw;
+  }
+
+  .text-20vw {
+    font-size: 1.04vw;
+  }
+
+  .text-18vw {
+    font-size: 0.9375vw;
+  }
+
+  .text-16vw {
+    font-size: 0.833vw;
+  }
+
+  .text-14vw {
+    font-size: 0.729vw;
+  }
+
+  .text-12vw {
+    font-size: 0.625vw;
+  }
+
+  .text-10vw {
+    font-size: 0.52vw;
+  }
+
+  /* --- TOGGLE DIMENSION VW CLASSES --- */
+  .h-24vw {
+    height: 1.25vw;
+  }
+
+  .w-48vw {
+    width: 2.5vw;
+  }
+
+  .w-16vw {
+    width: 0.833vw;
+  }
+
+  .h-16vw {
+    height: 0.833vw;
+  }
+
+  /* --- TOGGLE TRANSLATION VW CLASSES --- */
+  .translate-x-32vw {
+    transform: translateX(1.66vw);
+  }
+
+  .translate-x-4vw {
+    transform: translateX(0.2vw);
+  }
+
+  /* Custom scrollbar for modern look */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(30, 211, 106, 0.3) transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(30, 211, 106, 0.3);
+    border-radius: 3px;
+    transition: background 0.2s;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(30, 211, 106, 0.5);
+  }
+}
+
+/* Custom Fonts */
 @font-face {
   font-family: 'Haskoy';
-  src: url('/fonts/Haskoy-Thin.otf') format('opentype');
+  src: url('/fonts/Haskoy-Thin.otf');
   font-weight: 100;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Haskoy';
-  src: url('/fonts/Haskoy-ExtraLight.otf') format('opentype');
+  src: url('/fonts/Haskoy-ExtraLight.otf');
   font-weight: 200;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Haskoy';
-  src: url('/fonts/Haskoy-Light.otf') format('opentype');
+  src: url('/fonts/Haskoy-Light.otf');
   font-weight: 300;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Haskoy';
-  src: url('/fonts/Haskoy-Regular.otf') format('opentype');
+  src: url('/fonts/Haskoy-Regular.otf');
   font-weight: 400;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Haskoy';
-  src: url('/fonts/Haskoy-Medium.otf') format('opentype');
+  src: url('/fonts/Haskoy-Medium.otf');
   font-weight: 500;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Haskoy';
-  src: url('/fonts/Haskoy-SemiBold.otf') format('opentype');
+  src: url('/fonts/Haskoy-SemiBold.otf');
   font-weight: 600;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Haskoy';
-  src: url('/fonts/Haskoy-Bold.otf') format('opentype');
+  src: url('/fonts/Haskoy-Bold.otf');
   font-weight: 700;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Haskoy';
-  src: url('/fonts/Haskoy-ExtraBold.otf') format('opentype');
+  src: url('/fonts/Haskoy-ExtraBold.otf');
   font-weight: 800;
   font-style: normal;
-}
-
-body {
-  /* We use standard CSS syntax here, NO @apply to avoid errors */
-  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 300ms;
-}
-
-/* Hide scrollbar but keep scrollability */
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-
-/* --- FONT SIZE VW CLASSES (Based on 1920px width) --- */
-/* Uses max() to ensure text doesn't become illegible on smaller screens (e.g. 1280px) */
-.text-48vw {
-  font-size: 2.5vw;
-}
-
-.text-32vw {
-  font-size: 1.666vw;
-}
-
-.text-24vw {
-  font-size: 1.25vw;
-}
-
-.text-20vw {
-  font-size: 1.04vw;
-}
-
-.text-18vw {
-  font-size: 0.9375vw;
-}
-
-.text-16vw {
-  font-size: 0.833vw;
-}
-
-.text-14vw {
-  font-size: 0.729vw;
-}
-
-.text-12vw {
-  font-size: 0.625vw;
-}
-
-/* ~12px */
-.text-10vw {
-  font-size: 0.52vw;
-}
-
-/* ~10px */
-
-/* --- TOGGLE DIMENSION VW CLASSES (Based on 1920px width) --- */
-.h-24vw {
-  height: 1.25vw;
-  /* Track Height (~24px) */
-}
-
-.w-48vw {
-  width: 2.5vw;
-  /* Track Width (~48px) */
-}
-
-.w-16vw {
-  width: 0.833vw;
-  /* Thumb Width/Height (~16px) */
-}
-
-.h-16vw {
-  height: 0.833vw;
-  /* Thumb Width/Height (~16px) */
-}
-
-/* --- TOGGLE TRANSLATION VW CLASSES --- */
-.translate-x-32vw {
-  /* Calculated ON position (Track width - Thumb width - margin) / 1920 * 100 */
-  transform: translateX(1.66vw);
-}
-
-.translate-x-4vw {
-  /* Small starting margin for the OFF position */
-  transform: translateX(0.2vw);
-}
-
-/* Custom scrollbar for modern look */
-.custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(30, 211, 106, 0.3) transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-  border-radius: 3px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(30, 211, 106, 0.3);
-  border-radius: 3px;
-  transition: background 0.2s;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(30, 211, 106, 0.5);
 }

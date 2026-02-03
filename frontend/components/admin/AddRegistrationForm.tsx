@@ -6,13 +6,13 @@ import {
   ArrowRightWithoutLineIcon,
   EyeVisibleIcon,
   EyeOffIcon,
-} from "../icons";
-import CustomDatePicker from "../ui/CustomDatePicker";
-import CustomSelect from "../ui/CustomSelect";
-import MobileInput from "../ui/MobileInput";
-import { registrationService } from "../../lib/services";
-import { CreateRegistrationDto } from "../../lib/services/registration.service";
-import { Program, Department } from "../../lib/types";
+} from '../icons';
+import CustomDatePicker from '../ui/CustomDatePicker';
+import CustomSelect from '../ui/CustomSelect';
+import MobileInput from '../ui/MobileInput';
+import { registrationService } from '../../lib/services';
+import { CreateRegistrationDto } from '../../lib/services/registration.service';
+import { Program, Department } from '../../lib/types';
 import BulkUploadRegistration from "./BulkUploadRegistration";
 
 interface AddRegistrationFormProps {

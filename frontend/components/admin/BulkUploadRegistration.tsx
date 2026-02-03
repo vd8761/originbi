@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { registrationService } from "../../lib/services/registration.service";
+import { registrationService } from '../../lib/services/registration.service';
 import { BulkUploadDropzone } from "./bulk/BulkUploadDropzone";
 import { BulkReviewTable } from "./bulk/BulkReviewTable";
 import { BulkSuccessSummary } from "./bulk/BulkSuccessSummary";

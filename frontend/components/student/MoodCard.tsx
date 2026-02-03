@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MoodItem as MoodItemType, MoodTag } from '../../lib/types';
-import { ClockIcon } from '../../components/icons';
+import { ClockIcon } from '../icons';
 
 const getTagClasses = (tag: MoodTag | string): string => {
     switch (tag) {
