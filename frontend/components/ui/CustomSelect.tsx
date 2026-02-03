@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDownIcon } from '@/components/icons';
+import { ChevronDownIcon } from '../icons';
 
 interface Option {
     value: string;
@@ -64,8 +64,8 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ options, value, onChange, p
                                 type="button"
                                 onClick={() => handleSelect(option.value)}
                                 className={`w-full text-left px-4 py-3 text-sm transition-colors font-medium border-b border-gray-100 dark:border-white/5 last:border-0 ${value === option.value
-                                        ? 'bg-brand-green text-white'
-                                        : 'text-brand-text-light-primary dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
+                                    ? 'bg-brand-green text-white'
+                                    : 'text-brand-text-light-primary dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
                                     }`}
                             >
                                 {option.label}
