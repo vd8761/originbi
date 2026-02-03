@@ -1,11 +1,8 @@
 @import "tailwindcss";
 
-/* 1. Define the Manual Dark Mode Variant */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* 2. Define Your Theme & Colors (Replaces tailwind.config.ts) */
 @theme {
-  /* Colors */
   --color-brand-dark-primary: #19211C;
   --color-brand-dark-secondary: #24272B;
   --color-brand-dark-tertiary: #303438;
@@ -23,10 +20,8 @@
   --color-brand-text-light-primary: #2D3748;
   --color-brand-text-light-secondary: #718096;
 
-  /* Fonts */
   --font-sans: 'Haskoy', 'Manrope', sans-serif;
 
-  /* Animations */
   --animate-fade-in: fade-in 0.8s ease-in-out forwards;
   --animate-blob: blob 7s infinite;
   --animate-pulse-slow: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
@@ -81,23 +76,6 @@
     transform: rotate(-360deg);
   }
 }
-
-@keyframes blink {
-
-  0%,
-  50% {
-    opacity: 1;
-  }
-
-  51%,
-  100% {
-    opacity: 0;
-  }
-}
-
-/* Background Images */
-/* --background-image-personality-gradient: radial-gradient(circle at 80% 20%, rgba(237, 51, 51, 0.3), transparent 70%); */
-
 
 @font-face {
   font-family: 'Haskoy';
@@ -156,13 +134,11 @@
 }
 
 body {
-  /* We use standard CSS syntax here, NO @apply to avoid errors */
   transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 300ms;
 }
 
-/* Hide scrollbar but keep scrollability */
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -172,8 +148,6 @@ body {
   display: none;
 }
 
-/* --- FONT SIZE VW CLASSES (Based on 1920px width) --- */
-/* Uses max() to ensure text doesn't become illegible on smaller screens (e.g. 1280px) */
 .text-48vw {
   font-size: 2.5vw;
 }
@@ -206,46 +180,34 @@ body {
   font-size: 0.625vw;
 }
 
-/* ~12px */
 .text-10vw {
   font-size: 0.52vw;
 }
 
-/* ~10px */
-
-/* --- TOGGLE DIMENSION VW CLASSES (Based on 1920px width) --- */
 .h-24vw {
   height: 1.25vw;
-  /* Track Height (~24px) */
 }
 
 .w-48vw {
   width: 2.5vw;
-  /* Track Width (~48px) */
 }
 
 .w-16vw {
   width: 0.833vw;
-  /* Thumb Width/Height (~16px) */
 }
 
 .h-16vw {
   height: 0.833vw;
-  /* Thumb Width/Height (~16px) */
 }
 
-/* --- TOGGLE TRANSLATION VW CLASSES --- */
 .translate-x-32vw {
-  /* Calculated ON position (Track width - Thumb width - margin) / 1920 * 100 */
   transform: translateX(1.66vw);
 }
 
 .translate-x-4vw {
-  /* Small starting margin for the OFF position */
   transform: translateX(0.2vw);
 }
 
-/* Custom scrollbar for modern look */
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: rgba(30, 211, 106, 0.3) transparent;
