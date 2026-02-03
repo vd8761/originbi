@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import Logo from '../../components/ui/Logo';
-import ThemeToggle from '../../components/ui/ThemeToggle';
+import Logo from '../ui/Logo';
+import ThemeToggle from '../ui/ThemeToggle';
 import { useTheme } from '../../contexts/ThemeContext';
 
 interface AdminAuthLayoutProps {

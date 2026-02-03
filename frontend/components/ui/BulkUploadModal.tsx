@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
-import { BulkUploadIcon, ExcelIcon } from "../icons";
-import { registrationService } from "../../lib/services";
+import { BulkUploadIcon, ExcelIcon } from '../icons';
+import { registrationService } from '../../lib/services';
 
 interface BulkUploadModalProps {
     isOpen: boolean;

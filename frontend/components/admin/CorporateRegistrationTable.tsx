@@ -1,8 +1,8 @@
 import React from "react";
-import { CorporateAccount } from "../../lib/types";
-import ToggleSwitch from "../ui/ToggleSwitch";
-import { EyeVisibleIcon, SortIcon, EditIcon } from "../icons";
-import { COUNTRY_CODES } from "../../lib/countryCodes";
+import { CorporateAccount } from '../../lib/types';
+import ToggleSwitch from '../ui/ToggleSwitch';
+import { EyeVisibleIcon, SortIcon, EditIcon } from '../icons';
+import { COUNTRY_CODES } from '../../lib/countryCodes';
 
 // Extend CorporateAccount to include user details if they are separate in types.ts
 // But typically for table display we might need a joined type.

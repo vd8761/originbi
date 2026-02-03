@@ -4,8 +4,8 @@ import React, { useState, FormEvent, useEffect, useRef } from 'react';
 import { confirmResetPassword } from 'aws-amplify/auth';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { EyeIcon, EyeOffIcon } from '../../components/icons';
-import Logo from '../../components/ui/Logo';
+import { EyeIcon, EyeOffIcon } from '../icons';
+import Logo from '../ui/Logo';
 
 const ResetPasswordForm: React.FC = () => {
     const searchParams = useSearchParams();

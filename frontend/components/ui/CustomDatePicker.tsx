@@ -6,7 +6,7 @@ import {
   ChevronDownIcon,
   ArrowLeftWithoutLineIcon,
   ArrowRightWithoutLineIcon,
-} from "../icons";
+} from '../icons';
 
 interface CustomDatePickerProps {
   value?: { start: string; end: string };

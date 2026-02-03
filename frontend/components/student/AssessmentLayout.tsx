@@ -8,7 +8,7 @@ interface AssessmentLayoutProps {
   showAssessmentOnly?: boolean;
 }
 
-import { LanguageProvider } from "../../contexts/LanguageContext";
+import { LanguageProvider } from '../../contexts/LanguageContext';
 
 const AssessmentLayout: React.FC<AssessmentLayoutProps> = ({ onLogout, children, hideNav, showAssessmentOnly }) => {
   return (
@@ -21,11 +21,6 @@ const AssessmentLayout: React.FC<AssessmentLayoutProps> = ({ onLogout, children,
           filter: 'blur(60px)',
         }}
       />
-
-
-
-
-
       <Header
         onLogout={onLogout}
         currentView="assessment"

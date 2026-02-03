@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter, usePathname } from 'next/navigation';
-import ThemeToggle from "../ui/ThemeToggle";
+import ThemeToggle from '../ui/ThemeToggle';
 import {
   NotificationWithDotIcon,
   NotificationIcon,
@@ -17,13 +17,13 @@ import {
   CoinIcon,
   OriginDataIcon,
   MyEmployeesIcon,
-} from "../icons";
-import { corporateDashboardService } from "../../lib/services";
-import { CorporateAccount } from "../../lib/types";
+} from '../icons';
+import { corporateDashboardService } from '../../lib/services';
+import { CorporateAccount } from '../../lib/types';
 import Script from "next/script";
 import BuyCreditsModal from "./BuyCreditsModal";
 
-import { useTheme } from "../../contexts/ThemeContext";
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface HeaderProps {
   onLogout: () => void;

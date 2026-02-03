@@ -1,8 +1,8 @@
-import { CorporateAccount, CreateCorporateRegistrationDto, PaginatedResponse } from "../types";
+import { CorporateAccount, CreateCorporateRegistrationDto, PaginatedResponse } from '../types';
 import { AuthService } from "./auth.service";
 
 const API_URL =
-    process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4001';
+    process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
 
 export const corporateRegistrationService = {
     // List registrations with pagination + search

@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
-import { BulkUploadIcon, ArrowRightWithoutLineIcon, EyeIcon, EyeOffIcon } from "../icons";
-import MobileInput from "../ui/MobileInput";
-import CustomSelect from "../ui/CustomSelect";
-import CustomDatePicker from "../ui/CustomDatePicker";
-import { corporateRegistrationService } from "../../lib/services/corporateRegistration.service";
-import { registrationService, CreateRegistrationDto } from "../../lib/services/registration.service";
-import { BulkUploadModal } from "../ui/BulkUploadModal";
+import { BulkUploadIcon, ArrowRightWithoutLineIcon, EyeIcon, EyeOffIcon } from '../icons';
+import MobileInput from '../ui/MobileInput';
+import CustomSelect from '../ui/CustomSelect';
+import CustomDatePicker from '../ui/CustomDatePicker';
+import { corporateRegistrationService } from '../../lib/services/corporateRegistration.service';
+import { registrationService, CreateRegistrationDto } from '../../lib/services/registration.service';
+import { BulkUploadModal } from '../ui/BulkUploadModal';
 
 interface AddRegistrationFormProps {
   onCancel: () => void;
