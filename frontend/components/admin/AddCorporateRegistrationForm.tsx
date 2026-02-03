@@ -1,15 +1,17 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import MobileInput from "@/components/ui/MobileInput";
+import MobileInput from "../ui/MobileInput";
 import {
+  XIcon,
+  BulkUploadIcon,
   ArrowRightWithoutLineIcon,
   EyeVisibleIcon,
-  EyeOffIcon,
-} from "@/components/icons";
-import { corporateRegistrationService } from "@/lib/services";
-import type { CreateCorporateRegistrationDto } from "@/lib/types";
-import { SECTOR_OPTIONS, SectorCode } from "@/lib/sectors";
+  EyeOffIcon
+} from "../icons";
+import { corporateRegistrationService } from "../../lib/services";
+import type { CreateCorporateRegistrationDto } from "../../lib/types";
+import { SECTOR_OPTIONS, SectorCode } from "../../lib/sectors";
 
 interface AddCorporateRegistrationFormProps {
   onCancel: () => void;

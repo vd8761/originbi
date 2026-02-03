@@ -7,21 +7,21 @@ import {
   ChevronDownIcon,
   ArrowLeftWithoutLineIcon,
   ArrowRightWithoutLineIcon,
-} from "@/components/icons";
-import AddRegistrationForm from "@/components/corporate/AddRegistrationForm";
+} from "../icons";
+import AddRegistrationForm from "./AddRegistrationForm";
 import DateRangeFilter, {
-  DateRangeOption,
-} from "@/components/ui/DateRangeFilter";
-import DateRangePickerModal from "@/components/ui/DateRangePickerModal";
-import ExcelExportButton from "@/components/ui/ExcelExportButton";
-import RegistrationTable from "@/components/ui/RegistrationTable";
-import AssessmentSessionsTable from "@/components/corporate/AssessmentSessionsTable";
-import GroupAssessmentPreview from "@/components/corporate/GroupAssessmentPreview";
-import GroupCandidateAssessmentPreview from "@/components/corporate/GroupCandidateAssessmentPreview";
+  DateRangeOption
+} from "../ui/DateRangeFilter";
+import DateRangePickerModal from "../ui/DateRangePickerModal";
+import ExcelExportButton from "../ui/ExcelExportButton";
+import RegistrationTable from "../ui/RegistrationTable";
+import AssessmentSessionsTable from "./AssessmentSessionsTable";
+import GroupAssessmentPreview from "./GroupAssessmentPreview";
+import GroupCandidateAssessmentPreview from "./GroupCandidateAssessmentPreview";
 
-import { Registration } from "@/lib/types";
-import { corporateRegistrationService } from "@/lib/services/corporate-registration.service";
-import { assessmentService, AssessmentSession } from "@/lib/services/assessment.service";
+import { Registration } from "../../lib/types";
+import { corporateRegistrationService } from "../../lib/services/corporate-registration.service";
+import { assessmentService, AssessmentSession } from "../../lib/services/assessment.service";
 
 // Debounce utility
 const useDebounce = (value: string, delay: number) => {

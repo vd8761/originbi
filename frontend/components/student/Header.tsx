@@ -1,8 +1,8 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter, usePathname } from 'next/navigation';
-import ThemeToggle from "@/components/ui/ThemeToggle";
-import { studentService } from "@/lib/services/student.service";
+import ThemeToggle from "../ui/ThemeToggle";
+import { studentService } from "../../lib/services/student.service";
 import {
     NotificationWithDotIcon,
     NotificationIcon,
@@ -15,9 +15,9 @@ import {
     SettingsIcon,
     LogoutIcon,
     MenuIcon,
-} from "@/components/icons";
+} from "../icons";
 
-import { useTheme } from "@/contexts/ThemeContext";
+import { useTheme } from "../../contexts/ThemeContext";
 
 interface HeaderProps {
     onLogout: () => void;
@@ -112,7 +112,7 @@ const NotificationItem: React.FC<{
 
 
 
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 // ... existing imports
 

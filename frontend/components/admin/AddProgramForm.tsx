@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { ArrowRightWithoutLineIcon } from "@/components/icons";
-import { Program } from "@/lib/types";
-import { programService } from "@/lib/services";
+import { ArrowRightWithoutLineIcon } from "../icons";
+import { Program } from "../../lib/types";
+import { programService } from "../../lib/services";
 
 interface AddProgramFormProps {
   onCancel: () => void;

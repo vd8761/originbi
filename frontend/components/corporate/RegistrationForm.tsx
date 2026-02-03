@@ -4,8 +4,8 @@ import React, { useState, useRef, useEffect, useMemo, FormEvent, FocusEvent } fr
 import Link from 'next/link';
 import { EyeIcon, EyeOffIcon, ChevronDownIcon } from '@/components/icons';
 import ReactCountryFlag from "react-country-flag";
-import { SECTOR_OPTIONS, SectorCode } from "@/lib/sectors";
-import { COUNTRY_CODES } from "@/lib/countryCodes";
+import { SECTOR_OPTIONS, SectorCode } from "../../lib/sectors";
+import { COUNTRY_CODES } from "../../lib/countryCodes";
 
 // Reusing Error Icon from LoginForm style
 const ErrorMessage = ({ message }: { message: string }) => {

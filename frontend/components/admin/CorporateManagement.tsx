@@ -7,12 +7,12 @@ import {
   ChevronDownIcon,
   ArrowLeftWithoutLineIcon,
   ArrowRightWithoutLineIcon,
-} from "@/components/icons";
-import CorporateRegistrationTable from "@/components/admin/CorporateRegistrationTable";
-import AddCorporateRegistrationForm from "@/components/admin/AddCorporateRegistrationForm";
-import CorporateDetailsView from "@/components/admin/CorporateDetailsView";
-import { CorporateAccount } from "@/lib/types";
-import { corporateRegistrationService } from "@/lib/services";
+} from "../icons";
+import CorporateRegistrationTable from "./CorporateRegistrationTable";
+import AddCorporateRegistrationForm from "./AddCorporateRegistrationForm";
+import CorporateDetailsView from "./CorporateDetailsView";
+import { CorporateAccount } from "../../lib/types";
+import { corporateRegistrationService } from "../../lib/services";
 
 // Debounce utility (same as Programs)
 const useDebounce = (value: string, delay: number) => {

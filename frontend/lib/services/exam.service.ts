@@ -1,4 +1,4 @@
-import { AssessmentQuestion } from "@/lib/types";
+import { AssessmentQuestion } from "../types";
 import { AuthService } from "./auth.service";
 
 const API_URL =

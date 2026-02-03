@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import MyEmployees from "@/components/corporate/MyEmployees";
+import MyEmployees from '../../../components/corporate/MyEmployees';
 
 export default function RegistrationsPage() {
   return (
