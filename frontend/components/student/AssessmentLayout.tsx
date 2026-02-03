@@ -8,7 +8,7 @@ interface AssessmentLayoutProps {
   showAssessmentOnly?: boolean;
 }
 
-import { LanguageProvider } from '@/contexts/LanguageContext';
+import { LanguageProvider } from '../../contexts/LanguageContext';
 
 const AssessmentLayout: React.FC<AssessmentLayoutProps> = ({ onLogout, children, hideNav, showAssessmentOnly }) => {
   return (
