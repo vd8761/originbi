@@ -8,7 +8,7 @@ import {
   ArrowLeftWithoutLineIcon,
   ArrowRightWithoutLineIcon,
   FilterFunnelIcon,
-} from "@/components/icons/index";
+} from "@/components/icons";
 import AddRegistrationForm from "./AddRegistrationForm";
 import BulkUploadRegistration from "./BulkUploadRegistration"; // Import
 import DateRangeFilter, {

@@ -6,11 +6,11 @@ import {
   ChevronDownIcon,
   ArrowLeftWithoutLineIcon,
   ArrowRightWithoutLineIcon,
-} from "@/components/icons/index";
+} from "@/components/icons";
 import ProgramsTable from "./ProgramsTable";
 import AddProgramForm from "./AddProgramForm";
 import { Program } from "@/lib/types";
-import { programService } from "@/lib/services/index";
+import { programService } from "@/lib/services";
 
 // Debounce utility (same pattern as Corporate)
 const useDebounce = (value: string, delay: number) => {

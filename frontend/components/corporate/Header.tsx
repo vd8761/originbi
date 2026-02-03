@@ -17,8 +17,8 @@ import {
   CoinIcon,
   OriginDataIcon,
   MyEmployeesIcon,
-} from "@/components/icons/index";
-import { corporateDashboardService } from "@/lib/services/index";
+} from "@/components/icons";
+import { corporateDashboardService } from "@/lib/services";
 import { CorporateAccount } from "@/lib/types";
 import Script from "next/script";
 import BuyCreditsModal from "./BuyCreditsModal";
@@ -221,7 +221,7 @@ const Header: React.FC<HeaderProps> = ({
         }
       } catch (e) { /* empty */ }
 
-      import('@/lib/services/index').then(({ corporateDashboardService }) => {
+      import('@/lib/services').then(({ corporateDashboardService }) => {
         const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
         let queryEmail = email;
         if (!queryEmail) {

@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { ArrowRightWithoutLineIcon, ArrowUpRightIcon } from '@/components/icons/index';
+import { ArrowRightWithoutLineIcon, ArrowUpRightIcon } from '@/components/icons';
 import { RoadmapDetailData, RoadmapCardData } from '@/lib/types';
 
 // Small card for "Explore Other Roadmaps" section

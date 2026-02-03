@@ -28,7 +28,7 @@ const translations = {
 };
 
 import { studentService } from "@/lib/services/student.service";
-import { Spinner } from "@/components/icons/index";
+import { Spinner } from "@/components/icons";
 import AssessmentModal from "./AssessmentModal";
 
 // --- Custom Lock Icon ---

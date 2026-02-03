@@ -1,12 +1,12 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { corporateDashboardService } from "@/lib/services/index";
+import { corporateDashboardService } from "../../../../lib/services";
 import { useRouter } from "next/navigation";
 import {
     SearchIcon,
     ChevronRightIcon,
     ArrowLeftIcon,
-} from "@/components/icons/index";
+} from "../../../../components/icons";
 import CounsellingPreviewModal from "@/components/corporate/CounsellingPreviewModal";
 import { Clipboard as ClipboardIcon, Check as CheckIcon } from "lucide-react";
 
