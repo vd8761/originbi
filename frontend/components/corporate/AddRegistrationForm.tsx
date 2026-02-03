@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
-import { BulkUploadIcon, ArrowRightWithoutLineIcon, EyeIcon, EyeOffIcon } from "@/components/icons";
-import MobileInput from "@/components/ui/MobileInput";
-import CustomSelect from "@/components/ui/CustomSelect";
-import CustomDatePicker from "@/components/ui/CustomDatePicker";
-import { corporateRegistrationService } from "@/lib/services/corporate-registration.service";
-import { CreateRegistrationDto } from "@/lib/services/registration.service";
-import { BulkUploadModal } from "@/components/ui/BulkUploadModal";
+import { BulkUploadIcon, ArrowRightWithoutLineIcon, EyeIcon, EyeOffIcon } from "../icons";
+import MobileInput from "../ui/MobileInput";
+import CustomSelect from "../ui/CustomSelect";
+import CustomDatePicker from "../ui/CustomDatePicker";
+import { corporateRegistrationService } from "../../lib/services/corporateRegistration.service";
+import { registrationService, CreateRegistrationDto } from "../../lib/services/registration.service";
+import { BulkUploadModal } from "../ui/BulkUploadModal";
 
 interface AddRegistrationFormProps {
   onCancel: () => void;
@@ -91,7 +91,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     }
     setIsLoading(true);
     try {
-      await corporateRegistrationService.createCorporateRegistration(formData);
+      await registrationService.createRegistration(formData);
       onRegister();
     } catch (err: any) {
       setError(err.message || "Failed to create registration.");

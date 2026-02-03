@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { studentService } from "@/lib/services/student.service";
-import Header from "@/components/student/Header";
-import Dashboard from "@/components/student/Dashboard";
+import { studentService } from "../../lib/services/student.service";
+import Header from "./Header";
+import Dashboard from "./Dashboard";
 
 interface DashboardLayoutProps {
     onLogout: () => void;

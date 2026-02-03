@@ -8,23 +8,23 @@ import {
   ArrowLeftWithoutLineIcon,
   ArrowRightWithoutLineIcon,
   FilterFunnelIcon,
-} from "@/components/icons";
-import AddRegistrationForm from "@/components/admin/AddRegistrationForm";
-import BulkUploadRegistration from "@/components/admin/BulkUploadRegistration"; // Import
+} from "../../components/icons";
+import AddRegistrationForm from "./AddRegistrationForm";
+import BulkUploadRegistration from "./BulkUploadRegistration"; // Import
 import DateRangeFilter, {
   DateRangeOption,
-} from "@/components/ui/DateRangeFilter";
-import DateRangePickerModal from "@/components/ui/DateRangePickerModal";
-import ExcelExportButton from "@/components/ui/ExcelExportButton";
-import RegistrationTable from "@/components/ui/RegistrationTable";
-import AssessmentSessionsTable from "@/components/admin/AssessmentSessionsTable"; // Import
-import RegistrationPreview from "@/components/admin/RegistrationPreview"; // Import
-import AssessmentResultPreview from "@/components/admin/AssessmentResultPreview"; // Import
+} from "../../components/ui/DateRangeFilter";
+import DateRangePickerModal from "../../components/ui/DateRangePickerModal";
+import ExcelExportButton from "../../components/ui/ExcelExportButton";
+import RegistrationTable from "../../components/ui/RegistrationTable";
+import AssessmentSessionsTable from "./AssessmentSessionsTable"; // Import
+import RegistrationPreview from "./RegistrationPreview"; // Import
+import AssessmentResultPreview from "./AssessmentResultPreview"; // Import
 import GroupAssessmentPreview from './GroupAssessmentPreview';
 import GroupCandidateAssessmentPreview from './GroupCandidateAssessmentPreview'; // Import
-import { Registration } from "@/lib/types";
-import { registrationService } from "@/lib/services/registration.service";
-import { assessmentService, AssessmentSession } from "@/lib/services/assessment.service";
+import { Registration } from "../../lib/types";
+import { registrationService } from "../../lib/services/registration.service";
+import { assessmentService, AssessmentSession } from "../../lib/services/assessment.service";
 
 // Debounce utility
 const useDebounce = (value: string, delay: number) => {

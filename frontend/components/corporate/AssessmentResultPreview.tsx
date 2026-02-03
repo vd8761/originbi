@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { AssessmentSession, assessmentService } from '@/lib/services/assessment.service';
+import { AssessmentSession, assessmentService } from '../../lib/services/assessment.service';
 import {
     ArrowLeftWithoutLineIcon,
     ArrowRightWithoutLineIcon,
@@ -11,7 +11,7 @@ import {
     ProfileIcon,
     JobsIcon,
     ClockIcon
-} from '@/components/icons';
+} from '../../components/icons';
 
 interface AssessmentResultPreviewProps {
     session: AssessmentSession | null;

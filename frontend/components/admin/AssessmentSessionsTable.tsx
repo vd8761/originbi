@@ -1,6 +1,6 @@
 import React from 'react';
-import { AssessmentSession } from '@/lib/services/assessment.service';
-import { EyeSolidIcon, SortIcon } from '@/components/icons';
+import { AssessmentSession } from '../../lib/services/assessment.service';
+import { EyeSolidIcon, SortIcon } from '../../components/icons';
 
 interface AssessmentSessionsTableProps {
     sessions: AssessmentSession[];

@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter, usePathname } from 'next/navigation';
-import ThemeToggle from "@/components/ui/ThemeToggle";
+import ThemeToggle from "../ui/ThemeToggle";
 import {
     NotificationWithDotIcon,
     NotificationIcon,
@@ -17,9 +17,9 @@ import {
     CoinIcon,
     OriginDataIcon,
     MyEmployeesIcon,
-} from "@/components/icons";
-
-import { useTheme } from "@/contexts/ThemeContext";
+} from "../../components/icons";
+import Script from "next/script";
+import { useTheme } from "../../contexts/ThemeContext";
 
 interface HeaderProps {
     onLogout: () => void;
@@ -151,7 +151,7 @@ const Header: React.FC<HeaderProps> = ({
                 }
             } catch (e) { /* empty */ }
 
-            import('@/lib/services').then(({ corporateDashboardService }) => {
+            import('../../lib/services').then(({ corporateDashboardService }) => {
                 const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
                 let queryEmail = email;
                 if (!queryEmail) {
