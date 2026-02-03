@@ -151,7 +151,7 @@ const Header: React.FC<HeaderProps> = ({
                 }
             } catch (e) { /* empty */ }
 
-            import('@/lib/services').then(({ corporateDashboardService }) => {
+            import('../../lib/services').then(({ corporateDashboardService }) => {
                 const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
                 let queryEmail = email;
                 if (!queryEmail) {
