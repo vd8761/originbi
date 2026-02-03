@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { corporateRegistrationService } from '@/lib/services/corporateRegistration.service';
+import { corporateRegistrationService } from '../../lib/services/corporateRegistration.service';
 import * as XLSX from 'xlsx';
 import { toast } from 'react-hot-toast';
-import { CreateCorporateRegistrationDto } from '@/lib/types';
+import { CreateCorporateRegistrationDto } from '../../lib/types';
 import { BulkUploadDropzone } from "./bulk/BulkUploadDropzone";
 import { BulkReviewTable } from "./bulk/BulkReviewTable";
 import { BulkSuccessSummary } from "./bulk/BulkSuccessSummary";
-import { ArrowRightWithoutLineIcon } from '@/components/icons';
+import { ArrowRightWithoutLineIcon } from '../icons';
 
 interface BulkUploadRegistrationProps {
     onCancel: () => void;

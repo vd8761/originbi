@@ -1,7 +1,7 @@
-import { CorporateCreditLedger } from '@/lib/types';
-import { corporateDashboardService } from '@/lib/services';
+import { CorporateCreditLedger } from '../../lib/types';
+import { corporateDashboardService } from '../../lib/services';
 import React, { useEffect, useState } from 'react';
-import TopUpModal from '@/components/admin/TopUpModal'; // Reuse TopUpModal from admin or move to shared
+import TopUpModal from '../admin/TopUpModal'; // Reuse TopUpModal from admin or move to shared
 // Assuming TopUpModal is reuseable. If it's in admin folder, checking path.
 // It is in ../admin/TopUpModal relative to this file? 
 // No, this file is in components/corporate. Admin is in components/admin.
