@@ -17,6 +17,7 @@ import { TestController } from './test/test.controller';
 import { MailAssetsController } from './mail/mail-assets.controller';
 import { HealthController } from './health.controller';
 import { KeepAliveModule } from './keepalive/keepalive.module';
+import { AdministratorCounsellingModule } from './counselling/counselling.module';
 
 @Module({
   imports: [
@@ -105,6 +106,7 @@ import { KeepAliveModule } from './keepalive/keepalive.module';
     ForgotPasswordModule,
     RagModule,
     KeepAliveModule,
+    AdministratorCounsellingModule,
   ],
   controllers: [TestController, MailAssetsController, HealthController],
 })

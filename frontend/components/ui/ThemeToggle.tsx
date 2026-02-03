@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { LightModeIcon, DarkModeIcon } from '@/components/icons';
+import { LightModeIcon, DarkModeIcon } from "../icons";
 
 interface ThemeToggleProps {
   theme: 'dark' | 'light';

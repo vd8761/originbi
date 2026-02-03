@@ -1,11 +1,11 @@
 'use client';
 
 import React from "react";
-import Logo from "@/components/ui/Logo";
-import RegistrationForm from "@/components/corporate/RegistrationForm";
-import CorporateTestimonial from "@/components/corporate/CorporateTestimonial";
-import ThemeToggle from "@/components/ui/ThemeToggle";
-import { useTheme } from "@/contexts/ThemeContext";
+import Logo from "../ui/Logo";
+import RegistrationForm from "./RegistrationForm";
+import CorporateTestimonial from "./CorporateTestimonial";
+import ThemeToggle from "../ui/ThemeToggle";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const CorporateRegistration: React.FC = () => {
     const { theme, toggleTheme } = useTheme();

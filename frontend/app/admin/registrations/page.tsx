@@ -1,6 +1,6 @@
 "use client";
 
-import RegistrationManagement from "@/components/admin/RegistrationManagement";
+import RegistrationManagement from "../../../components/admin/RegistrationManagement";
 
 export default function RegistrationsPage() {
   return (

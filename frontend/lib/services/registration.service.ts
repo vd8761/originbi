@@ -1,4 +1,4 @@
-import { AuthService } from "@/lib/services/auth.service";
+import { AuthService } from "./auth.service";
 import {
   Registration,
   Program,

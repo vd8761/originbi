@@ -1,15 +1,17 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import MobileInput from "@/components/ui/MobileInput";
+import MobileInput from "../ui/MobileInput";
 import {
+  XIcon,
+  BulkUploadIcon,
   ArrowRightWithoutLineIcon,
   EyeVisibleIcon,
-  EyeOffIcon,
-} from "@/components/icons";
-import { corporateRegistrationService } from "@/lib/services";
-import type { CreateCorporateRegistrationDto } from "@/lib/types";
-import { SECTOR_OPTIONS, SectorCode } from "@/lib/sectors";
+  EyeOffIcon
+} from "../icons";
+import { corporateRegistrationService } from "../../lib/services";
+import type { CreateCorporateRegistrationDto } from "../../lib/types";
+import { SECTOR_OPTIONS, SectorCode } from "../../lib/sectors";
 
 interface AddCorporateRegistrationFormProps {
   onCancel: () => void;
@@ -25,23 +27,52 @@ const AddCorporateRegistrationForm: React.FC<
   const [formData, setFormData] = useState<
     CreateCorporateRegistrationDto & { avatar?: string }
   >({
-    name: initialData?.full_name || "",
+    // List fallback vs Detail keys
+    name: initialData?.name || initialData?.full_name || "",
     gender: initialData?.gender || "FEMALE",
     avatar: "",
     email: initialData?.email || "",
-    countryCode: initialData?.country_code || "+91",
-    mobile: initialData?.mobile_number || "",
-    companyName: initialData?.company_name || "",
-    jobTitle: initialData?.job_title || "",
-    employeeCode: initialData?.employee_ref_id || "",
-    linkedinUrl: initialData?.linkedin_url || "",
-    sector: initialData?.sector_code || "IT_SOFTWARE",
+    countryCode: initialData?.countryCode || initialData?.country_code || "+91",
+    mobile: initialData?.mobile || initialData?.mobileNumber || initialData?.mobile_number || "",
+    companyName: initialData?.companyName || initialData?.company_name || "",
+    jobTitle: initialData?.jobTitle || initialData?.job_title || "",
+    employeeCode: initialData?.employeeRefId || initialData?.employee_ref_id || "",
+    linkedinUrl: initialData?.linkedinUrl || initialData?.linkedin_url || "",
+    sector: initialData?.sectorCode || initialData?.sector_code || "IT_SOFTWARE",
     password: "", // Don't prefill password
-    credits: initialData?.available_credits, // Or handled via different UI for credits? Form says "Credits (Optional)".
-    status: initialData?.is_active ?? true,
-    businessLocations: initialData?.business_locations || "",
+    credits: (initialData?.availableCredits !== undefined) ? initialData?.availableCredits : initialData?.available_credits,
+    status: (initialData?.isActive !== undefined) ? initialData?.isActive : (initialData?.is_active ?? true),
+    businessLocations: initialData?.businessLocations || initialData?.business_locations || "",
     sendEmail: true,
+    counsellingAccess: initialData?.counsellingAccess || [],
   });
+
+  useEffect(() => {
+    console.log("AddCorporateRegistrationForm initialData:", initialData);
+    if (initialData) {
+      setFormData({
+        name: initialData?.name || initialData?.full_name || "",
+        gender: initialData?.gender || "FEMALE",
+        avatar: "",
+        email: initialData?.email || "",
+        countryCode: initialData?.countryCode || initialData?.country_code || "+91",
+        mobile: initialData?.mobile || initialData?.mobileNumber || initialData?.mobile_number || "",
+        companyName: initialData?.companyName || initialData?.company_name || "",
+        jobTitle: initialData?.jobTitle || initialData?.job_title || "",
+        employeeCode: initialData?.employeeRefId || initialData?.employee_ref_id || "",
+        linkedinUrl: initialData?.linkedinUrl || initialData?.linkedin_url || "",
+        sector: initialData?.sectorCode || initialData?.sector_code || "IT_SOFTWARE",
+        password: "",
+        credits: (initialData?.availableCredits !== undefined) ? initialData?.availableCredits : initialData?.available_credits,
+        status: (initialData?.isActive !== undefined) ? initialData?.isActive : (initialData?.is_active ?? true),
+        businessLocations: initialData?.businessLocations || initialData?.business_locations || "",
+        sendEmail: true,
+        counsellingAccess: initialData?.counsellingAccess || [],
+      });
+    }
+  }, [initialData]);
+
+  const [availableTypes, setAvailableTypes] = useState<{ id: number; name: string }[]>([]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +93,27 @@ const AddCorporateRegistrationForm: React.FC<
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
+  }, []);
+
+  // Fetch Counselling Types
+  useEffect(() => {
+    const fetchTypes = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${process.env.NEXT_PUBLIC_ADMIN_SERVICE_URL || 'http://localhost:4001'}/admin/counselling/types`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          // Filter valid types if needed, though backend currently filters deleted
+          const items = Array.isArray(data) ? data : (data.data || []);
+          setAvailableTypes(items);
+        }
+      } catch (err) {
+        console.error("Failed to fetch counselling types", err);
+      }
+    };
+    fetchTypes();
   }, []);
 
   const handleInputChange = <K extends keyof CreateCorporateRegistrationDto>(
@@ -500,6 +552,65 @@ const AddCorporateRegistrationForm: React.FC<
               className={baseTextAreaClasses}
               required
             />
+          </div>
+        </div>
+
+        {/* Row 5 – Counselling Access */}
+        <div className="mt-8 pt-6 border-t border-gray-100 dark:border-white/5">
+          <h3 className="text-sm font-bold text-brand-text-light-primary dark:text-white mb-4">
+            Counselling Services Access
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {availableTypes.length === 0 ? (
+              <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary italic">
+                No active counselling types found.
+              </p>
+            ) : (
+              availableTypes.map((type) => {
+                // Safely compare IDs as numbers
+                const isChecked = formData.counsellingAccess?.some(id => Number(id) === Number(type.id));
+                return (
+                  <label
+                    key={type.id}
+                    className={`flex items-center space-x-3 p-3 rounded-xl border cursor-pointer transition-all duration-200 ${isChecked
+                      ? "bg-brand-green/5 border-brand-green dark:bg-brand-green/20"
+                      : "bg-gray-50 dark:bg-white/5 border-transparent hover:border-gray-200 dark:hover:border-white/10"
+                      }`}
+                  >
+                    <div className="relative flex items-center">
+                      <input
+                        type="checkbox"
+                        className="peer appearance-none w-5 h-5 border-2 border-gray-300 dark:border-gray-500 rounded-md checked:bg-brand-green checked:border-brand-green transition-all"
+                        checked={isChecked || false}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setFormData(prev => {
+                            const current = prev.counsellingAccess || [];
+                            const updated = checked
+                              ? [...current, Number(type.id)]
+                              : current.filter(id => Number(id) !== Number(type.id));
+                            return { ...prev, counsellingAccess: updated };
+                          });
+                        }}
+                      />
+                      <svg
+                        className="absolute w-3.5 h-3.5 text-white pointer-events-none opacity-0 peer-checked:opacity-100 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-opacity"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <span className={`text-sm font-medium ${isChecked ? "text-brand-green dark:text-brand-green" : "text-gray-700 dark:text-gray-300"
+                      }`}>
+                      {type.name}
+                    </span>
+                  </label>
+                );
+              })
+            )}
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import ClientProviders from '@/app/ClientProvider';
+import ClientProviders from './ClientProvider';
 
 export const metadata: Metadata = {
   title: 'OriginBI Login',
