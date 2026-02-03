@@ -17,7 +17,7 @@ import {
     CoinIcon,
     OriginDataIcon,
     MyEmployeesIcon,
-} from "../icons";
+} from "@/components/icons/index";
 import Script from "next/script";
 import { useTheme } from "../../contexts/ThemeContext";
 
@@ -151,7 +151,7 @@ const Header: React.FC<HeaderProps> = ({
                 }
             } catch (e) { /* empty */ }
 
-            import('@/lib/services').then(({ corporateDashboardService }) => {
+            import('@/lib/services/index').then(({ corporateDashboardService }) => {
                 const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
                 let queryEmail = email;
                 if (!queryEmail) {

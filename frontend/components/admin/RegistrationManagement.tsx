@@ -8,23 +8,23 @@ import {
   ArrowLeftWithoutLineIcon,
   ArrowRightWithoutLineIcon,
   FilterFunnelIcon,
-} from "../icons";
+} from "@/components/icons/index";
 import AddRegistrationForm from "./AddRegistrationForm";
 import BulkUploadRegistration from "./BulkUploadRegistration"; // Import
 import DateRangeFilter, {
   DateRangeOption,
-} from "../ui/DateRangeFilter";
-import DateRangePickerModal from "../ui/DateRangePickerModal";
-import ExcelExportButton from "../ui/ExcelExportButton";
-import RegistrationTable from "../ui/RegistrationTable";
+} from "@/components/ui/DateRangeFilter";
+import DateRangePickerModal from "@/components/ui/DateRangePickerModal";
+import ExcelExportButton from "@/components/ui/ExcelExportButton";
+import RegistrationTable from "@/components/ui/RegistrationTable";
 import AssessmentSessionsTable from "./AssessmentSessionsTable"; // Import
 import RegistrationPreview from "./RegistrationPreview"; // Import
 import AssessmentResultPreview from "./AssessmentResultPreview"; // Import
 import GroupAssessmentPreview from './GroupAssessmentPreview';
 import GroupCandidateAssessmentPreview from './GroupCandidateAssessmentPreview'; // Import
-import { Registration } from "../../lib/types";
-import { registrationService } from "../../lib/services/registration.service";
-import { assessmentService, AssessmentSession } from "../../lib/services/assessment.service";
+import { Registration } from "@/lib/types";
+import { registrationService } from "@/lib/services/registration.service";
+import { assessmentService, AssessmentSession } from "@/lib/services/assessment.service";
 
 // Debounce utility
 const useDebounce = (value: string, delay: number) => {

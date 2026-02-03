@@ -25,23 +25,14 @@
     "baseUrl": ".",
     "paths": {
       "@/*": [
-        "./*"
-      ],
-      "@src/*": [
-        "./src/*"
+        "*"
       ]
     }
   },
   "include": [
-    "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    "**/*.mts",
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "components",
     "next.config.mjs"
   ],
   "exclude": [

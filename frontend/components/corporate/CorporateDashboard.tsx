@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Search, Edit2, MoreHorizontal, CheckCircle, Clock, Users, Briefcase } from "lucide-react";
 import { TrendUpIcon, TrendDownIcon, CircleArrowUpIcon, EditPencilIcon, DiamondIcon } from "@/components/icons/index";
 import { CorporateAccount } from "@/lib/types";
-import { corporateDashboardService } from "@/lib/services";
+import { corporateDashboardService } from "@/lib/services/index";
 import { ToastContainer, ToastMessage } from "@/components/ui/Toast";
 import BuyCreditsModal from "@/components/corporate/BuyCreditsModal";
 

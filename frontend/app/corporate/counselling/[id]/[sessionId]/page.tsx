@@ -1,7 +1,7 @@
 
 "use client";
 import React, { useEffect, useState } from "react";
-import { corporateDashboardService } from "@/lib/services";
+import { corporateDashboardService } from "@/lib/services/index";
 import { useRouter } from "next/navigation";
 import { ArrowLeftIcon } from "@/components/icons/index";
 import { User, FileText, Mail, Phone, Globe, Calendar } from "lucide-react";

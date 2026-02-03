@@ -1,5 +1,5 @@
 import { CorporateCreditLedger } from '@/lib/types';
-import { corporateDashboardService } from '@/lib/services';
+import { corporateDashboardService } from '@/lib/services/index';
 import React, { useEffect, useState } from 'react';
 import TopUpModal from '../admin/TopUpModal'; // Reuse TopUpModal from admin or move to shared
 // Assuming TopUpModal is reuseable. If it's in admin folder, checking path.

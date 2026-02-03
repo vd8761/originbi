@@ -1,5 +1,5 @@
 import { CorporateAccount, CorporateCreditLedger } from '@/lib/types';
-import { corporateRegistrationService } from '@/lib/services';
+import { corporateRegistrationService } from '@/lib/services/index';
 import React, { useEffect, useState } from 'react';
 import TopUpModal from './TopUpModal';
 
