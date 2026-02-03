@@ -2,7 +2,7 @@
 'use client';
 
 import React from 'react';
-import Login from '@/components/admin/AdminLogin';
+import Login from '../../../components/admin/AdminLogin';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
