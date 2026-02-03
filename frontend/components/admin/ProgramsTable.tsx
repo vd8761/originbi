@@ -1,7 +1,7 @@
 import React from 'react';
-import { Program } from '@/lib/types';
-import ToggleSwitch from '@/components/ui/ToggleSwitch';
-import { EditIcon, DeleteIcon, SortIcon, CheckIcon } from '@/components/icons';
+import { Program } from '../../lib/types';
+import ToggleSwitch from '../ui/ToggleSwitch';
+import { EditIcon, DeleteIcon, SortIcon, CheckIcon } from '../icons';
 
 interface ProgramsTableProps {
     programs: Program[];

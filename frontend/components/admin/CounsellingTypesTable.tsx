@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
-import { EditIcon, DeleteIcon, CheckIcon } from '@/components/icons';
-import ToggleSwitch from '@/components/ui/ToggleSwitch';
+import { EditIcon, DeleteIcon, CheckIcon } from '../icons';
+import ToggleSwitch from '../ui/ToggleSwitch';
 
 interface CounsellingType {
     id: number;
