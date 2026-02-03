@@ -157,25 +157,26 @@ export default function CounsellingRunner() {
         } catch (e) {
             console.error("Save failed", e);
         }
+    };
 
-        // Auto-advance after small delay
-        setTimeout(async () => {
-            if (currentQuestionIndex < questions.length - 1) {
-                setCurrentQuestionIndex(prev => prev + 1);
-            } else {
-                // Mark as completed in backend
-                try {
-                    await fetch(`${process.env.NEXT_PUBLIC_STUDENT_API_URL || 'http://localhost:3002'}/public/counselling/complete`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ session_id: sessionData.session_id })
-                    });
-                } catch (e) {
-                    console.error("Completion save failed", e);
-                }
-                setCompleted(true);
+    const handleNext = async () => {
+        if (currentQuestionIndex < questions.length - 1) {
+            setCurrentQuestionIndex(prev => prev + 1);
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+            // Mark as completed in backend
+            try {
+                await fetch(`${process.env.NEXT_PUBLIC_STUDENT_API_URL || 'http://localhost:3002'}/public/counselling/complete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionData.session_id })
+                });
+            } catch (e) {
+                console.error("Completion save failed", e);
             }
-        }, 300);
+            setCompleted(true);
+        }
     };
 
     if (loading || verifying) {
@@ -311,9 +312,9 @@ export default function CounsellingRunner() {
     if (!currentQuestion) return null;
 
     return (
-        <div className="min-h-screen bg-[#F0F4F8] font-sans flex flex-col">
+        <div className="h-screen bg-[#F0F4F8] font-sans flex flex-col overflow-hidden">
             {/* Header */}
-            <header className="bg-white px-6 py-4 shadow-sm flex justify-between items-center sticky top-0 z-10">
+            <header className="bg-white px-6 py-4 shadow-sm flex justify-between items-center flex-shrink-0 z-10">
                 <div className="flex items-center gap-3">
                     <img
                         src="/Origin-BI-Logo-01.png"
@@ -335,7 +336,7 @@ export default function CounsellingRunner() {
             </header>
 
             {/* Progress Bar */}
-            <div className="h-1 bg-gray-200">
+            <div className="h-1 bg-gray-200 flex-shrink-0">
                 <div
                     className="h-full bg-[#1ED36A] transition-all duration-300 ease-out"
                     style={{ width: `${((currentQuestionIndex) / questions.length) * 100}%` }}
@@ -343,36 +344,39 @@ export default function CounsellingRunner() {
             </div>
 
             {/* Main Content */}
-            <main className="flex-1 flex items-center justify-center p-4">
+            <main className="flex-1 flex flex-col items-center justify-start px-4 py-5 overflow-y-auto">
                 <div
                     key={currentQuestion.id}
-                    className="w-full max-w-3xl animate-in fade-in slide-in-from-bottom-4 duration-500"
+                    className="w-full max-w-4xl lg:max-w-5xl animate-in fade-in slide-in-from-bottom-4 duration-500"
+                    style={{ zoom: '90%' }}
                 >
-                    <h2 className="text-2xl md:text-3xl font-medium text-[#2D3748] text-center mb-10 leading-snug">
+                    <h2 className="text-2xl md:text-3xl font-medium text-[#2D3748] text-left mb-6 leading-snug sticky top-0 z-10 bg-[#F0F4F8] pb-4">
                         {currentQuestion.text_en}
                         {currentQuestion.text_ta && (
                             <span className="block text-lg text-gray-500 mt-2 font-normal">{currentQuestion.text_ta}</span>
                         )}
                     </h2>
 
-                    <div className="space-y-4">
+                    <div className="space-y-4 mb-4">
                         {currentQuestion.options.map((option) => (
                             <button
                                 key={option.id}
                                 onClick={() => handleOptionSelect(currentQuestion.id, option.id)}
                                 className={`w-full p-5 rounded-xl border-2 text-left transition-all duration-200 flex items-center justify-between group
                                     ${answers[currentQuestion.id] === option.id
-                                        ? 'border-[#1ED36A] bg-[#1ED36A] text-white shadow-lg transform scale-[1.02]'
-                                        : 'border-white bg-white hover:border-[#1ED36A] hover:shadow-md text-[#4A5568]'
+                                        ? 'border-[#1ED36A] bg-[#1ED36A] text-white shadow-lg transform scale-[1.01]'
+                                        : 'border-white bg-white hover:border-[#1ED36A] hover:bg-green-50/20 hover:shadow-md text-[#4A5568]'
                                     }`}
                             >
-                                <span className="text-lg font-medium">
+                                <span className="text-lg font-medium pr-4">
                                     {option.text_en}
-                                    {option.text_ta && <span className="text-sm opacity-80 ml-2">({option.text_ta})</span>}
+                                    {option.text_ta && <span className={`text-base ml-2 inline-block ${answers[currentQuestion.id] === option.id ? 'text-green-50' : 'text-gray-500'}`}>({option.text_ta})</span>}
                                 </span>
 
-                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center
-                                    ${answers[currentQuestion.id] === option.id ? 'border-white bg-white' : 'border-gray-300'}`}>
+                                <div className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors
+                                    ${answers[currentQuestion.id] === option.id
+                                        ? 'border-white bg-white'
+                                        : 'border-gray-300 group-hover:border-[#1ED36A]'}`}>
                                     {answers[currentQuestion.id] === option.id && (
                                         <div className="w-3 h-3 rounded-full bg-[#1ED36A]" />
                                     )}
@@ -380,11 +384,25 @@ export default function CounsellingRunner() {
                             </button>
                         ))}
                     </div>
+
+                    <div className="flex justify-center">
+                        <button
+                            onClick={handleNext}
+                            disabled={!answers[currentQuestion.id]}
+                            className={`px-10 py-3 rounded-full text-lg font-semibold transition-all duration-300 shadow-md
+                                ${!answers[currentQuestion.id]
+                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    : 'bg-[#1ED36A] text-white hover:bg-[#16b058] hover:shadow-lg transform hover:-translate-y-0.5'
+                                }`}
+                        >
+                            {currentQuestionIndex < questions.length - 1 ? 'Next Question' : 'Finish Assessment'}
+                        </button>
+                    </div>
                 </div>
             </main>
 
             {/* Footer */}
-            <footer className="p-6 text-center text-xs text-gray-400">
+            <footer className="p-4 text-center text-xs text-gray-400 flex-shrink-0">
                 <p>Your responses are private and secure.</p>
             </footer>
         </div>
