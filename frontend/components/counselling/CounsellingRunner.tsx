@@ -37,6 +37,8 @@ export default function CounsellingRunner() {
     const [verifyError, setVerifyError] = useState('');
     const [verifyingAccess, setVerifyingAccess] = useState(false);
 
+    const [errorInfo, setErrorInfo] = useState<string | null>(null);
+
     // Initial Load: Validate Token
     useEffect(() => {
         if (!token) {
@@ -70,7 +72,7 @@ export default function CounsellingRunner() {
 
             } catch (err) {
                 console.error(err);
-                alert('Invalid or expired link.');
+                // alert('Invalid or expired link.'); // Removed alert to rely on UI
                 setLoading(false);
             } finally {
                 setVerifying(false);
@@ -85,6 +87,7 @@ export default function CounsellingRunner() {
                 setLoading(false);
             } catch (e) {
                 console.error("Failed to load questions", e);
+                setErrorInfo("Failed to load questions. Please refresh.");
             }
         };
 
@@ -142,6 +145,7 @@ export default function CounsellingRunner() {
     const handleOptionSelect = async (questionId: number, optionId: number) => {
         // Save locally
         setAnswers(prev => ({ ...prev, [questionId]: optionId }));
+        setErrorInfo(null);
 
         // Auto-save to backend
         try {
@@ -156,10 +160,12 @@ export default function CounsellingRunner() {
             });
         } catch (e) {
             console.error("Save failed", e);
+            setErrorInfo("Connection error: Response not saved. Please check your internet.");
         }
     };
 
     const handleNext = async () => {
+        setErrorInfo(null);
         if (currentQuestionIndex < questions.length - 1) {
             setCurrentQuestionIndex(prev => prev + 1);
             // Scroll to top
@@ -167,15 +173,17 @@ export default function CounsellingRunner() {
         } else {
             // Mark as completed in backend
             try {
-                await fetch(`${process.env.NEXT_PUBLIC_STUDENT_API_URL || 'http://localhost:3002'}/public/counselling/complete`, {
+                const res = await fetch(`${process.env.NEXT_PUBLIC_STUDENT_API_URL || 'http://localhost:3002'}/public/counselling/complete`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ session_id: sessionData.session_id })
                 });
+                if (!res.ok) throw new Error("Completion failed");
+                setCompleted(true);
             } catch (e) {
                 console.error("Completion save failed", e);
+                setErrorInfo("Network error: Could not complete assessment. Please try again.");
             }
-            setCompleted(true);
         }
     };
 
@@ -384,6 +392,12 @@ export default function CounsellingRunner() {
                             </button>
                         ))}
                     </div>
+
+                    {errorInfo && (
+                        <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-center text-sm border border-red-200">
+                            {errorInfo}
+                        </div>
+                    )}
 
                     <div className="flex justify-center">
                         <button
