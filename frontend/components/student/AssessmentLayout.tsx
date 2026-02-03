@@ -21,11 +21,6 @@ const AssessmentLayout: React.FC<AssessmentLayoutProps> = ({ onLogout, children,
           filter: 'blur(60px)',
         }}
       />
-
-
-
-
-
       <Header
         onLogout={onLogout}
         currentView="assessment"

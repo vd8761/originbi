@@ -1,11 +1,11 @@
 'use client';
 
 import React from 'react';
-import Logo from '@/components/ui/Logo';
-import LoginForm from '@/components/student/LoginForm';
-import Testimonial from '@/components/student/Testimonial';
-import ThemeToggle from '@/components/ui/ThemeToggle';
-import { useTheme } from '@/contexts/ThemeContext';
+import Logo from '../ui/Logo';
+import LoginForm from './LoginForm';
+import Testimonial from './Testimonial';
+import ThemeToggle from '../ui/ThemeToggle';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface LoginProps {
   onLoginSuccess: () => void;

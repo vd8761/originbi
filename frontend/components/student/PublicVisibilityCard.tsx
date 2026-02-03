@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import ToggleSwitch from '@/components/ui/ToggleSwitch';
+import ToggleSwitch from '../ui/ToggleSwitch';
 
 interface VisibilityItemProps {
     title: string;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { studentService } from '@/lib/services/student.service';
+import { studentService } from '../../lib/services/student.service';
 import Header from "./Header";
 import Dashboard from "./Dashboard";
 
