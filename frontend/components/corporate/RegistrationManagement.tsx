@@ -20,7 +20,7 @@ import GroupAssessmentPreview from "./GroupAssessmentPreview";
 import GroupCandidateAssessmentPreview from "./GroupCandidateAssessmentPreview";
 
 import { Registration } from "../../lib/types";
-import { corporateRegistrationService } from "../../lib/services/corporate-registration.service";
+import { corporateRegistrationService } from "../../lib/services/corporateRegistration.service";
 import { assessmentService, AssessmentSession } from "../../lib/services/assessment.service";
 
 // Debounce utility

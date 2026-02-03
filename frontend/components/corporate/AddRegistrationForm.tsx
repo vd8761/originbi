@@ -5,7 +5,7 @@ import { BulkUploadIcon, ArrowRightWithoutLineIcon, EyeIcon, EyeOffIcon } from "
 import MobileInput from "../ui/MobileInput";
 import CustomSelect from "../ui/CustomSelect";
 import CustomDatePicker from "../ui/CustomDatePicker";
-import { corporateRegistrationService } from "../../lib/services/corporate-registration.service";
+import { corporateRegistrationService } from "../../lib/services/corporateRegistration.service";
 import { CreateRegistrationDto } from "../../lib/services/registration.service";
 import { BulkUploadModal } from "../ui/BulkUploadModal";
 
