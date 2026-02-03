@@ -6,7 +6,7 @@ import { CreateCorporateRegistrationDto } from "@/lib/types";
 import { BulkUploadDropzone } from "./bulk/BulkUploadDropzone";
 import { BulkReviewTable } from "./bulk/BulkReviewTable";
 import { BulkSuccessSummary } from "./bulk/BulkSuccessSummary";
-import { ArrowRightWithoutLineIcon } from "@/components/icons";
+import { ArrowRightWithoutLineIcon } from "@/components/icons/index";
 
 interface BulkUploadRegistrationProps {
     onCancel: () => void;

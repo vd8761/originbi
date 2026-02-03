@@ -15,7 +15,7 @@ import {
     SettingsIcon,
     LogoutIcon,
     MenuIcon,
-} from "@/components/icons";
+} from "@/components/icons/index";
 
 import { useTheme } from "@/contexts/ThemeContext";
 

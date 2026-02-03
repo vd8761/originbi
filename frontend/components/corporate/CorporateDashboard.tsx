@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { Search, Edit2, MoreHorizontal, CheckCircle, Clock, Users, Briefcase } from "lucide-react";
-import { TrendUpIcon, TrendDownIcon, CircleArrowUpIcon, EditPencilIcon, DiamondIcon } from "@/components/icons";
+import { TrendUpIcon, TrendDownIcon, CircleArrowUpIcon, EditPencilIcon, DiamondIcon } from "@/components/icons/index";
 import { CorporateAccount } from "@/lib/types";
 import { corporateDashboardService } from "@/lib/services";
 import { ToastContainer, ToastMessage } from "@/components/ui/Toast";

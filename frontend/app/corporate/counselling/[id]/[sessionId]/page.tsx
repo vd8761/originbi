@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { corporateDashboardService } from "@/lib/services";
 import { useRouter } from "next/navigation";
-import { ArrowLeftIcon } from "@/components/icons";
+import { ArrowLeftIcon } from "@/components/icons/index";
 import { User, FileText, Mail, Phone, Globe, Calendar } from "lucide-react";
 
 export default function CounsellingSessionDetailPage({ params }: { params: { id: string, sessionId: string } }) {

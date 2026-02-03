@@ -6,7 +6,7 @@ import {
     SearchIcon,
     ChevronRightIcon,
     ArrowLeftIcon,
-} from "@/components/icons";
+} from "@/components/icons/index";
 import CounsellingPreviewModal from "@/components/corporate/CounsellingPreviewModal";
 import { Clipboard as ClipboardIcon, Check as CheckIcon } from "lucide-react";
 
