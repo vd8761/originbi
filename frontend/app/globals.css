@@ -82,6 +82,23 @@
   }
 }
 
+@keyframes blink {
+
+  0%,
+  50% {
+    opacity: 1;
+  }
+
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Background Images */
+/* --background-image-personality-gradient: radial-gradient(circle at 80% 20%, rgba(237, 51, 51, 0.3), transparent 70%); */
+
+
 @font-face {
   font-family: 'Haskoy';
   src: url('/fonts/Haskoy-Thin.otf') format('opentype');
@@ -156,6 +173,7 @@ body {
 }
 
 /* --- FONT SIZE VW CLASSES (Based on 1920px width) --- */
+/* Uses max() to ensure text doesn't become illegible on smaller screens (e.g. 1280px) */
 .text-48vw {
   font-size: 2.5vw;
 }
@@ -188,33 +206,42 @@ body {
   font-size: 0.625vw;
 }
 
+/* ~12px */
 .text-10vw {
   font-size: 0.52vw;
 }
 
-/* --- TOGGLE DIMENSION VW CLASSES --- */
+/* ~10px */
+
+/* --- TOGGLE DIMENSION VW CLASSES (Based on 1920px width) --- */
 .h-24vw {
   height: 1.25vw;
+  /* Track Height (~24px) */
 }
 
 .w-48vw {
   width: 2.5vw;
+  /* Track Width (~48px) */
 }
 
 .w-16vw {
   width: 0.833vw;
+  /* Thumb Width/Height (~16px) */
 }
 
 .h-16vw {
   height: 0.833vw;
+  /* Thumb Width/Height (~16px) */
 }
 
 /* --- TOGGLE TRANSLATION VW CLASSES --- */
 .translate-x-32vw {
+  /* Calculated ON position (Track width - Thumb width - margin) / 1920 * 100 */
   transform: translateX(1.66vw);
 }
 
 .translate-x-4vw {
+  /* Small starting margin for the OFF position */
   transform: translateX(0.2vw);
 }
 
