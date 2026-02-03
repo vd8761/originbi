@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { confirmResetPassword } from 'aws-amplify/auth';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { EyeIcon, EyeOffIcon } from '@/components/icons';
+import { EyeIcon, EyeOffIcon } from '@/components/icons/index';
 import Logo from '@/components/ui/Logo';
 
 const ResetPasswordForm: React.FC = () => {

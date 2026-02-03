@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { updatePassword, signOut } from 'aws-amplify/auth';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { EyeIcon, EyeOffIcon } from '@/components/icons';
+import { EyeIcon, EyeOffIcon } from '@/components/icons/index';
 import Logo from '@/components/ui/Logo';
 
 const FirstTimeResetForm: React.FC = () => {

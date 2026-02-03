@@ -13,7 +13,7 @@ import {
     LockIcon,
     ProfileIcon,
     BanIcon,
-} from '@/components/icons';
+} from '@/components/icons/index';
 
 interface AssessmentResultPreviewProps {
     session: AssessmentSession;

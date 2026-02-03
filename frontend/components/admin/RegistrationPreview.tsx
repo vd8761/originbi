@@ -3,7 +3,7 @@ import { Registration } from '@/lib/types';
 import { AssessmentSession, assessmentService } from '@/lib/services/assessment.service';
 import AssessmentSessionsTable from '@/components/admin/AssessmentSessionsTable';
 import AssessmentResultPreview from '@/components/admin/AssessmentResultPreview';
-import { ArrowLeftWithoutLineIcon, PlusIcon, ChevronDownIcon, ArrowRightWithoutLineIcon, FilterFunnelIcon } from '@/components/icons';
+import { ArrowLeftWithoutLineIcon, PlusIcon, ChevronDownIcon, ArrowRightWithoutLineIcon, FilterFunnelIcon } from '@/components/icons/index';
 import ExcelExportButton from '@/components/ui/ExcelExportButton';
 import DateRangeFilter, { DateRangeOption } from '@/components/ui/DateRangeFilter';
 import DateRangePickerModal from '@/components/ui/DateRangePickerModal';

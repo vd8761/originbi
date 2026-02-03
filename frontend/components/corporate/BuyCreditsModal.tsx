@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { CoinIcon, FlashIcon } from '@/components/icons';
+import { CoinIcon, FlashIcon } from '@/components/icons/index';
 import { ChevronDownIcon, X } from "lucide-react";
 
 interface BuyCreditsModalProps {
