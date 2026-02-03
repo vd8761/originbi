@@ -1,5 +1,5 @@
 import React from "react";
-import { ExcelIcon } from "../icons";
+import { ExcelIcon } from '@/components/icons';
 
 interface ExcelExportButtonProps {
   onClick?: () => void;

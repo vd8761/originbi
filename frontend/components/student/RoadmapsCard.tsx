@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
-import { RoadmapItem as RoadmapItemType } from '../../lib/types';
-import { ArrowUpRightIcon } from '../../components/icons';
+import { RoadmapItem as RoadmapItemType } from '@/lib/types';
+import { ArrowUpRightIcon } from '@/components/icons';
 
 const RoadmapItem: React.FC<{ item: RoadmapItemType & { id?: string } }> = ({ item }) => (
     <div

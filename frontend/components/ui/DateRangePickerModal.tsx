@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeftWithoutLineIcon, ArrowRightWithoutLineIcon } from "../icons";
+import { ArrowLeftWithoutLineIcon, ArrowRightWithoutLineIcon } from '@/components/icons';
 
 type DatePreset = 'All' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'Last 30 Days' | 'This Month' | 'Last Month' | 'Custom Range';
 

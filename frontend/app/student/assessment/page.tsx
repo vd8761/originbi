@@ -4,12 +4,12 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'aws-amplify/auth';
-import { configureAmplify } from '../../../lib/aws-amplify-config';
-import RequireStudent from '../../../components/auth/RequireStudent';
+import { configureAmplify } from '@/lib/aws-amplify-config';
+import RequireStudent from '@/components/auth/RequireStudent';
 
 configureAmplify();
-import AssessmentLayout from '../../../components/student/AssessmentLayout';
-import AssessmentScreen from '../../../components/student/AssessmentScreen';
+import AssessmentLayout from '@/components/student/AssessmentLayout';
+import AssessmentScreen from '@/components/student/AssessmentScreen';
 
 export default function StudentAssessmentPage() {
   const router = useRouter();

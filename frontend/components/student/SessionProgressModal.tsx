@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { SessionItem as SessionItemType } from '../../lib/types';
+import { SessionItem as SessionItemType } from '@/lib/types';
 
 // Close icon component
 const CloseIcon: React.FC<{ className?: string }> = ({ className }) => (

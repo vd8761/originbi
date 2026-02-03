@@ -1,5 +1,5 @@
 import { AuthService } from "./auth.service";
-import { CorporateAccount } from "../types";
+import { CorporateAccount } from '@/lib/types';
 
 // Should be changed to Corporate Service URL (4003)
 const API_URL =

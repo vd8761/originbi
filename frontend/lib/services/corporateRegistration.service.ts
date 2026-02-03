@@ -1,4 +1,4 @@
-import { CorporateAccount, CreateCorporateRegistrationDto, PaginatedResponse } from "../types";
+import { CorporateAccount, CreateCorporateRegistrationDto, PaginatedResponse } from '@/lib/types';
 import { AuthService } from "./auth.service";
 
 const API_URL =

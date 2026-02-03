@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { CalendarIcon, ChevronDownIcon } from "../icons";
+import { CalendarIcon, ChevronDownIcon } from '@/components/icons';
 
 export type DateRangeOption = 'All' | 'Today' | 'Yesterday' | 'Last 7 Days' | 'Last 30 Days' | 'This Month' | 'Last Month' | 'Custom Range';
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import CorporateDashboard from '../../../components/corporate/CorporateDashboard';
+import CorporateDashboard from '@/components/corporate/CorporateDashboard';
 
 export default function CorporateDashboardPage() {
   return (

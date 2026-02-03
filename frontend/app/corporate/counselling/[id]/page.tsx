@@ -1,13 +1,13 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { corporateDashboardService } from "../../../../lib/services";
+import { corporateDashboardService } from '@/lib/services';
 import { useRouter } from "next/navigation";
 import {
     SearchIcon,
     ChevronRightIcon,
     ArrowLeftIcon,
-} from "../../../../components/icons";
-import CounsellingPreviewModal from "../../../../components/corporate/CounsellingPreviewModal";
+} from '@/components/icons';
+import CounsellingPreviewModal from '@/components/corporate/CounsellingPreviewModal';
 import { Clipboard as ClipboardIcon, Check as CheckIcon } from "lucide-react";
 
 export default function CounsellingSessionListPage({ params }: { params: { id: string } }) {

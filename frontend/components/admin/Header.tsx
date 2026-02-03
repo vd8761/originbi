@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter, usePathname } from 'next/navigation';
-import ThemeToggle from "../ui/ThemeToggle";
+import ThemeToggle from '@/components/ui/ThemeToggle';
 import {
     NotificationWithDotIcon,
     NotificationIcon,
@@ -17,9 +17,9 @@ import {
     CoinIcon,
     OriginDataIcon,
     MyEmployeesIcon,
-} from "../../components/icons";
+} from '@/components/icons';
 import Script from "next/script";
-import { useTheme } from "../../contexts/ThemeContext";
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface HeaderProps {
     onLogout: () => void;

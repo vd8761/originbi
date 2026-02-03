@@ -1,6 +1,6 @@
 "use client";
 
-import PortalHome from '../../components/home';
+import PortalHome from '@/components/home';
 import { useRouter } from 'next/navigation';
 import React from 'react';
 

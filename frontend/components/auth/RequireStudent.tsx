@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchAuthSession, signOut } from 'aws-amplify/auth';
-import { configureAmplify } from '../../lib/aws-amplify-config';
+import { configureAmplify } from '@/lib/aws-amplify-config';
 
 configureAmplify();
 

@@ -1,6 +1,6 @@
 'use client';
 
-import ChatAssistant from '../../../components/admin/ChatAssistant';
+import ChatAssistant from '@/components/admin/ChatAssistant';
 
 export default function AssistantPage() {
     return (

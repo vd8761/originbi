@@ -1,6 +1,6 @@
 import React from 'react';
 import { Metadata } from 'next';
-import CorporateRegistration from '../../../components/corporate/CorporateRegistration';
+import CorporateRegistration from '@/components/corporate/CorporateRegistration';
 
 export const metadata: Metadata = {
     title: 'Register Organization | OriginBI Corporate',

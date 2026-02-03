@@ -1,11 +1,11 @@
 'use client';
 
 import React from 'react';
-import Logo from '../../components/ui/Logo';
-import ForgotPasswordForm from '../../components/corporate/ForgotPasswordForm';
-import ForgotPasswordHero from '../../components/student/ForgotPasswordHero';
-import ThemeToggle from '../../components/ui/ThemeToggle';
-import { useTheme } from '../../contexts/ThemeContext';
+import Logo from '@/components/ui/Logo';
+import ForgotPasswordForm from '@/components/corporate/ForgotPasswordForm';
+import ForgotPasswordHero from '@/components/student/ForgotPasswordHero';
+import ThemeToggle from '@/components/ui/ThemeToggle';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const ForgotPassword: React.FC = () => {
     const { theme, toggleTheme } = useTheme();

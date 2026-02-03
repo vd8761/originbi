@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SessionItem as SessionItemType } from '../../lib/types';
+import { SessionItem as SessionItemType } from '@/lib/types';
 import SessionProgressModal from './SessionProgressModal';
 
 const SemiCircularProgress: React.FC<{ progress: number }> = ({ progress }) => {

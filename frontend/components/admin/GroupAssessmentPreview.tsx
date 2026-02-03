@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { assessmentService } from '../../lib/services/assessment.service';
-import { ArrowLeftWithoutLineIcon, ArrowRightWithoutLineIcon, ChevronDownIcon, EyeVisibleIcon, FilterFunnelIcon } from '../../components/icons';
-import ExcelExportButton from '../../components/ui/ExcelExportButton';
+import { assessmentService } from '@/lib/services/assessment.service';
+import { ArrowLeftWithoutLineIcon, ArrowRightWithoutLineIcon, ChevronDownIcon, EyeVisibleIcon, FilterFunnelIcon } from '@/components/icons';
+import ExcelExportButton from '@/components/ui/ExcelExportButton';
 
 interface GroupAssessmentPreviewProps {
     sessionId: string;

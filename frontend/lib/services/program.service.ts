@@ -1,4 +1,4 @@
-import { Program, PaginatedResponse } from "../types";
+import { Program, PaginatedResponse } from '@/lib/types';
 import { AuthService } from "./auth.service";
 
 const API_URL =

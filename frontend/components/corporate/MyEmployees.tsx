@@ -8,20 +8,20 @@ import {
     ArrowLeftWithoutLineIcon,
     ArrowRightWithoutLineIcon,
     FilterFunnelIcon,
-} from "../icons";
+} from '@/components/icons';
 import { format } from "date-fns";
 import { toast } from "react-hot-toast";
 import BulkUploadRegistration from "./BulkUploadRegistration";
 import AddRegistrationForm from "./AddRegistrationForm";
 import EmployeePreview from "./EmployeePreview";
-import { corporateDashboardService } from "../../lib/services";
-import { Registration } from "../../lib/types";
-import { AssessmentSession } from "../../lib/services/assessment.service"; // type
-import RegistrationTable from "../ui/RegistrationTable";
-import AssessmentSessionsTable from "../admin/AssessmentSessionsTable";
-import DateRangeFilter, { DateRangeOption } from "../ui/DateRangeFilter";
-import ExcelExportButton from "../ui/ExcelExportButton";
-import DateRangePickerModal from "../ui/DateRangePickerModal";
+import { corporateDashboardService } from '@/lib/services';
+import { Registration } from '@/lib/types';
+import { AssessmentSession } from '@/lib/services/assessment.service'; // type
+import RegistrationTable from '@/components/ui/RegistrationTable';
+import AssessmentSessionsTable from '@/components/admin/AssessmentSessionsTable';
+import DateRangeFilter, { DateRangeOption } from '@/components/ui/DateRangeFilter';
+import ExcelExportButton from '@/components/ui/ExcelExportButton';
+import DateRangePickerModal from '@/components/ui/DateRangePickerModal';
 import GroupAssessmentPreview from "./GroupAssessmentPreview";
 import GroupCandidateAssessmentPreview from "./GroupCandidateAssessmentPreview";
 

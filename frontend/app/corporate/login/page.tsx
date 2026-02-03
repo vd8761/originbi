@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import Login from '../../../components/corporate/CorporateLogin';
+import Login from '@/components/corporate/CorporateLogin';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {

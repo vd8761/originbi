@@ -3,9 +3,9 @@
 import React, { useState, FormEvent, FocusEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { EyeIcon, EyeOffIcon } from '../../components/icons';
+import { EyeIcon, EyeOffIcon } from '@/components/icons';
 import { signIn, fetchAuthSession, signOut } from 'aws-amplify/auth';
-import { configureAmplify } from '../../lib/aws-amplify-config.js';
+import { configureAmplify } from '@/lib/aws-amplify-config.js';
 
 configureAmplify(); // ensure Amplify is configured
 

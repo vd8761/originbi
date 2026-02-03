@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Registration } from '../../lib/types';
-import { AssessmentSession } from '../../lib/services/assessment.service';
-import { corporateDashboardService } from '../../lib/services';
-import AssessmentSessionsTable from '../../components/admin/AssessmentSessionsTable';
-import { ArrowLeftWithoutLineIcon, PlusIcon, ChevronDownIcon, ArrowRightWithoutLineIcon, FilterFunnelIcon } from '../../components/icons';
-import ExcelExportButton from '../../components/ui/ExcelExportButton';
-import DateRangeFilter, { DateRangeOption } from '../../components/ui/DateRangeFilter';
-import DateRangePickerModal from '../../components/ui/DateRangePickerModal';
+import { Registration } from '@/lib/types';
+import { AssessmentSession } from '@/lib/services/assessment.service';
+import { corporateDashboardService } from '@/lib/services';
+import AssessmentSessionsTable from '@/components/admin/AssessmentSessionsTable';
+import { ArrowLeftWithoutLineIcon, PlusIcon, ChevronDownIcon, ArrowRightWithoutLineIcon, FilterFunnelIcon } from '@/components/icons';
+import ExcelExportButton from '@/components/ui/ExcelExportButton';
+import DateRangeFilter, { DateRangeOption } from '@/components/ui/DateRangeFilter';
+import DateRangePickerModal from '@/components/ui/DateRangePickerModal';
 
 interface EmployeePreviewProps {
     registration: Registration;

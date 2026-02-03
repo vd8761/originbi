@@ -1,4 +1,4 @@
-import FirstTimeReset from '../../../components/student/FirstTimeReset';
+import FirstTimeReset from '@/components/student/FirstTimeReset';
 
 export default function StudentFirstTimeResetPage() {
     return (

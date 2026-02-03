@@ -1,7 +1,7 @@
 'use client';
 
 import React, { Suspense } from 'react';
-import CounsellingRunner from '../../../components/counselling/CounsellingRunner';
+import CounsellingRunner from '@/components/counselling/CounsellingRunner';
 
 export default function CounsellingStartPage() {
     return (

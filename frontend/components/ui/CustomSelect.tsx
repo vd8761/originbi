@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDownIcon } from "../icons";
+import { ChevronDownIcon } from '@/components/icons';
 
 interface Option {
     value: string;
