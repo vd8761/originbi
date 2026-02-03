@@ -1,4 +1,4 @@
-import ResetPassword from '@/components/student/ResetPassword';
+import ResetPassword from '../../../components/student/ResetPassword';
 
 export default function StudentResetPasswordPage() {
     return (

@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import CorporateProfileView from '@/components/corporate/CorporateProfileView';
-import { corporateDashboardService } from '@/lib/services';
+import CorporateProfileView from '../../../components/corporate/CorporateProfileView';
+import { corporateDashboardService } from '../../../lib/services';
 import { useRouter } from 'next/navigation';
 
 export default function CorporateProfilePage() {
