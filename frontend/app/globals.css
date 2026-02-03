@@ -34,69 +34,70 @@
   --animate-progress-bar: progress 5s linear forwards;
   --animate-spin-slow: spin 15s linear infinite;
   --animate-spin-slow-reverse: spin-reverse 15s linear infinite;
-
-  @keyframes fade-in {
-    0% {
-      opacity: 0.5;
-      transform: scale(1.05);
-    }
-
-    100% {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-
-  @keyframes blob {
-    0% {
-      transform: translate(0px, 0px) scale(1);
-    }
-
-    33% {
-      transform: translate(30px, -50px) scale(1.1);
-    }
-
-    66% {
-      transform: translate(-20px, 20px) scale(0.9);
-    }
-
-    100% {
-      transform: translate(0px, 0px) scale(1);
-    }
-  }
-
-  @keyframes progress {
-    0% {
-      width: 0%;
-    }
-
-    100% {
-      width: 100%;
-    }
-  }
-
-  @keyframes spin-reverse {
-    to {
-      transform: rotate(-360deg);
-    }
-  }
-
-  @keyframes blink {
-
-    0%,
-    50% {
-      opacity: 1;
-    }
-
-    51%,
-    100% {
-      opacity: 0;
-    }
-  }
-
-  /* Background Images */
-  /* --background-image-personality-gradient: radial-gradient(circle at 80% 20%, rgba(237, 51, 51, 0.3), transparent 70%); */
 }
+
+@keyframes fade-in {
+  0% {
+    opacity: 0.5;
+    transform: scale(1.05);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+@keyframes progress {
+  0% {
+    width: 0%;
+  }
+
+  100% {
+    width: 100%;
+  }
+}
+
+@keyframes spin-reverse {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes blink {
+
+  0%,
+  50% {
+    opacity: 1;
+  }
+
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Background Images */
+/* --background-image-personality-gradient: radial-gradient(circle at 80% 20%, rgba(237, 51, 51, 0.3), transparent 70%); */
+
 
 @font-face {
   font-family: 'Haskoy';
