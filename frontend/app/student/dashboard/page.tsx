@@ -4,11 +4,11 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'aws-amplify/auth';
-import { configureAmplify } from '@/lib/aws-amplify-config';
-import RequireStudent from '@/components/auth/RequireStudent';
+import { configureAmplify } from '../../../lib/aws-amplify-config';
+import RequireStudent from '../../../components/auth/RequireStudent';
 
 configureAmplify();
-import DashboardLayout from '@/components/student/DashboardLayout';
+import DashboardLayout from '../../../components/student/DashboardLayout';
 
 export default function StudentDashboardPage() {
   const router = useRouter();

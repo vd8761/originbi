@@ -4,10 +4,10 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'aws-amplify/auth';
-import { configureAmplify } from '@/lib/aws-amplify-config';
-import RequireStudent from '@/components/auth/RequireStudent';
-import Header from '@/components/student/Header';
-import RoadmapsPage from '@/components/student/RoadmapsPage';
+import { configureAmplify } from '../../../lib/aws-amplify-config';
+import RequireStudent from '../../../components/auth/RequireStudent';
+import Header from '../../../components/student/Header';
+import RoadmapsPage from '../../../components/student/RoadmapsPage';
 
 configureAmplify();
 

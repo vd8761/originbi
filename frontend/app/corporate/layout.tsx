@@ -1,12 +1,12 @@
 "use client";
 
 import React from 'react';
-import Header from '@/components/corporate/Header';
-import FloatingChatBot from '@/components/admin/FloatingChatBot';
+import Header from '../../components/corporate/Header';
+import FloatingChatBot from '../../components/admin/FloatingChatBot';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut } from 'aws-amplify/auth';
-import { configureAmplify } from '@/lib/aws-amplify-config';
-import RequireCorporate from '@/components/auth/RequireCorporate';
+import { configureAmplify } from '../../lib/aws-amplify-config';
+import RequireCorporate from '../../components/auth/RequireCorporate';
 
 configureAmplify();
 
