@@ -44,14 +44,7 @@ const nextConfig = {
       },
     ];
   },
-  webpack: (config, { isServer }) => {
-    // Add alias resolution to ensure Vercel recognizes @ path aliases
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@': path.resolve(path.dirname(fileURLToPath(import.meta.url))),
-    };
-    return config;
-  },
+
 };
 
 export default nextConfig;
