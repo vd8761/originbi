@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { AssessmentSession } from '@/lib/services/assessment.service';
-import { Registration } from '@/lib/types';
-import { ArrowLeftWithoutLineIcon, DownloadIcon, SendIcon, CheckIcon, LockIcon, ArrowRightWithoutLineIcon } from '@/components/icons';
+import { AssessmentSession } from '../../lib/services/assessment.service';
+import { Registration } from '../../lib/types';
+import { ArrowLeftWithoutLineIcon, DownloadIcon, SendIcon, CheckIcon, LockIcon, ArrowRightWithoutLineIcon } from '../../components/icons';
 
 interface AssessmentDetailsProps {
     session: AssessmentSession; // Contains assessment/exam info

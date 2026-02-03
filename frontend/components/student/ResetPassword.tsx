@@ -1,11 +1,11 @@
 'use client';
 
 import React, { Suspense } from 'react';
-import Logo from '@/components/ui/Logo';
-import ResetPasswordForm from '@/components/student/ResetPasswordForm';
-import ForgotPasswordHero from '@/components/student/ForgotPasswordHero';
-import ThemeToggle from '@/components/ui/ThemeToggle';
-import { useTheme } from '@/contexts/ThemeContext';
+import Logo from '../../components/ui/Logo';
+import ResetPasswordForm from '../../components/student/ResetPasswordForm';
+import ForgotPasswordHero from '../../components/student/ForgotPasswordHero';
+import ThemeToggle from '../../components/ui/ThemeToggle';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const ResetPassword: React.FC = () => {
     const { theme, toggleTheme } = useTheme();

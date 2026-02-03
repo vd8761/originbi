@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo, FormEvent, FocusEvent } from 'react';
 import Link from 'next/link';
-import { EyeIcon, EyeOffIcon, ChevronDownIcon } from '@/components/icons';
+import { EyeIcon, EyeOffIcon, ChevronDownIcon } from '../../components/icons';
 import ReactCountryFlag from "react-country-flag";
 import { SECTOR_OPTIONS, SectorCode } from "../../lib/sectors";
 import { COUNTRY_CODES } from "../../lib/countryCodes";

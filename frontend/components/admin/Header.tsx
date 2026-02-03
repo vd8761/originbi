@@ -17,7 +17,7 @@ import {
     CoinIcon,
     OriginDataIcon,
     MyEmployeesIcon,
-} from "@/components/icons";
+} from "../../components/icons";
 import Script from "next/script";
 import { useTheme } from "../../contexts/ThemeContext";
 

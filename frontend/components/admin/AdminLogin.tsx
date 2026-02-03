@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import LoginForm from '@/components/admin/LoginForm';
-import AdminAuthLayout from '@/components/admin/AdminAuthLayout';
+import LoginForm from '../../components/admin/LoginForm';
+import AdminAuthLayout from '../../components/admin/AdminAuthLayout';
 
 interface AdminLoginProps {
   onLoginSuccess: () => void;

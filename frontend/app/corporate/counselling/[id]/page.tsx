@@ -7,7 +7,7 @@ import {
     ChevronRightIcon,
     ArrowLeftIcon,
 } from "../../../../components/icons";
-import CounsellingPreviewModal from "@/components/corporate/CounsellingPreviewModal";
+import CounsellingPreviewModal from "../../../../components/corporate/CounsellingPreviewModal";
 import { Clipboard as ClipboardIcon, Check as CheckIcon } from "lucide-react";
 
 export default function CounsellingSessionListPage({ params }: { params: { id: string } }) {

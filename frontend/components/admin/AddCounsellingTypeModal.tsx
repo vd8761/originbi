@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-// import { adminCounsellingService } from '@/lib/services';
+// import { adminCounsellingService } from '../../lib/services';
 
 interface AddCounsellingTypeModalProps {
     isOpen: boolean;
