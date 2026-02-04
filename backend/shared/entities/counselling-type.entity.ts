@@ -16,6 +16,9 @@ export class CounsellingType {
     @Column({ name: 'name', type: 'varchar', length: 255 })
     name: string;
 
+    @Column({ name: 'code', type: 'varchar', length: 50, nullable: true })
+    code: string;
+
     @Column({ name: 'prompt', type: 'text', nullable: true })
     prompt: string;
 
