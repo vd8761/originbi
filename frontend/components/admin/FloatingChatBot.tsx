@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { 
     Send, Bot, User, Loader2, Copy, Check, Trash2, 
     MessageSquare, Download, X, Minus, Maximize2, 
@@ -156,6 +157,8 @@ export default function FloatingChatBot({
     userRole = 'ADMIN',
     apiUrl = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL
 }: FloatingChatBotProps) {
+    const router = useRouter();
+    const pathname = usePathname();
     const [isOpen, setIsOpen] = useState(false);
     const [isMinimized, setIsMinimized] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
@@ -165,6 +168,9 @@ export default function FloatingChatBot({
     const [hasUnread, setHasUnread] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+
+    // Check if on assistant page
+    const isAssistantPage = pathname?.includes('/assistant');
 
     useEffect(() => {
         if (isOpen && !isMinimized) {
@@ -238,6 +244,9 @@ export default function FloatingChatBot({
         { icon: '🏆', text: 'Show top performers' },
     ];
 
+    // Hide floating chatbot on assistant page
+    if (isAssistantPage) return null;
+
     return (
         <>
             {/* Floating Chat Button */}
@@ -303,12 +312,21 @@ export default function FloatingChatBot({
                                     <Trash2 className="w-4 h-4" />
                                 </button>
                             )}
+                            {!isMinimized && (
+                                <button
+                                    onClick={() => router.push('/admin/assistant')}
+                                    className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
+                                    title="Open full page"
+                                >
+                                    <Maximize2 className="w-4 h-4" />
+                                </button>
+                            )}
                             <button
                                 onClick={() => setIsMinimized(!isMinimized)}
                                 className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
                                 title={isMinimized ? 'Expand' : 'Minimize'}
                             >
-                                {isMinimized ? <Maximize2 className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
+                                {isMinimized ? <ChevronDown className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
                             </button>
                             <button
                                 onClick={() => setIsOpen(false)}
