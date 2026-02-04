@@ -68,4 +68,7 @@ export class CreateCorporateRegistrationDto {
   @IsOptional()
   @IsBoolean()
   sendEmail?: boolean;
+
+  @IsOptional()
+  counsellingAccess?: number[];
 }

@@ -1,4 +1,4 @@
-import { AuthService } from "@/lib/services/auth.service";
+import { AuthService } from "./auth.service";
 import {
   Registration,
   Program,
@@ -8,7 +8,7 @@ import {
   SchoolLevel,
   SchoolStream,
   PaymentStatus,
-} from "../types";
+} from '../types';
 
 const API_URL =
   process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;

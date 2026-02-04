@@ -38,6 +38,14 @@ export { AciTrait } from './aci-trait.entity';
 export { AciValue } from './aci-value.entity';
 export { AciTraitValueNote } from './aci-trait-value-note.entity';
 
+// Counselling Entities (New Module)
+export { CounsellingType } from './counselling-type.entity';
+export { CounsellingQuestion } from './counselling-question.entity';
+export { CounsellingQuestionOption } from './counselling-question-option.entity';
+export { CounsellingSession } from './counselling-session.entity';
+export { CounsellingResponse } from './counselling-response.entity';
+export { CorporateCounsellingAccess } from './corporate-counselling-access.entity';
+
 // ============================================
 // Usage in services:
 //

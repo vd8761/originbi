@@ -1,5 +1,5 @@
-import { Program, PaginatedResponse } from "@/lib/types";
-import { AuthService } from "@/lib/services";
+import { Program, PaginatedResponse } from '../types';
+import { AuthService } from "./auth.service";
 
 const API_URL =
   process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
@@ -28,7 +28,7 @@ export const programService = {
     const res = await fetch(`${API_URL}/admin/programs?${params.toString()}`, {
       headers: {
         "Content-Type": "application/json",
-        Authorization: token ? `Bearer ${token}` : "",
+        Authorization: token ? `Bearer ${token} ` : "",
       },
       cache: "no-store",
     });
@@ -59,7 +59,7 @@ export const programService = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: token ? `Bearer ${token}` : "",
+        Authorization: token ? `Bearer ${token} ` : "",
       },
       body: JSON.stringify(data),
     });
@@ -82,7 +82,7 @@ export const programService = {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        Authorization: token ? `Bearer ${token}` : "",
+        Authorization: token ? `Bearer ${token} ` : "",
       },
       body: JSON.stringify(data),
     });

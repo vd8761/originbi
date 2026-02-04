@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { corporateRegistrationService } from "@/lib/services/corporateRegistration.service";
+import { corporateRegistrationService } from '../../lib/services/corporateRegistration.service';
+import * as XLSX from 'xlsx';
+import { toast } from 'react-hot-toast';
+import { CreateCorporateRegistrationDto } from '../../lib/types';
 import { BulkUploadDropzone } from "./bulk/BulkUploadDropzone";
 import { BulkReviewTable } from "./bulk/BulkReviewTable";
 import { BulkSuccessSummary } from "./bulk/BulkSuccessSummary";
-import { ArrowRightWithoutLineIcon } from "@/components/icons";
+import { ArrowRightWithoutLineIcon } from '../icons';
 
 interface BulkUploadRegistrationProps {
     onCancel: () => void;
@@ -163,7 +166,7 @@ const BulkUploadRegistration: React.FC<BulkUploadRegistrationProps> = ({ onCance
                             <span className="mx-2 text-gray-400 dark:text-gray-600">
                                 <ArrowRightWithoutLineIcon className="w-3 h-3 text-gray-400 dark:text-gray-600" />
                             </span>
-                            <span className={`${view === 'upload' ? 'text-brand-green font-semibold' : 'hover:text-gray-900 dark:hover:text-white hover:underline cursor-pointer'} transition-colors`} onClick={() => { if (view !== 'upload') handleReset() }}>
+                            <span className={`${view === 'upload' ? 'text-brand-green font-semibold' : 'hover:text-gray-900 dark:hover:text-white hover:underline cursor-pointer'} transition - colors`} onClick={() => { if (view !== 'upload') handleReset() }}>
                                 Bulk Upload
                             </span>
                             {view === 'review' && (

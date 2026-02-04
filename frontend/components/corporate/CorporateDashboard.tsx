@@ -2,9 +2,11 @@ import React, { useEffect, useState } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { Search, Edit2, MoreHorizontal, CheckCircle, Clock, Users, Briefcase } from "lucide-react";
-import { TrendUpIcon, TrendDownIcon, CircleArrowUpIcon, EditPencilIcon, DiamondIcon } from "@/components/icons";
-import BuyCreditsModal from "./BuyCreditsModal";
-import { corporateDashboardService } from "@/lib/services";
+import { TrendUpIcon, TrendDownIcon, CircleArrowUpIcon, EditPencilIcon, DiamondIcon } from '../icons';
+import { CorporateAccount } from '../../lib/types';
+import { corporateDashboardService } from '../../lib/services';
+import { ToastContainer, ToastMessage } from '../ui/Toast';
+import BuyCreditsModal from './BuyCreditsModal';
 
 // --- Types ---
 interface DashboardStats {
@@ -593,6 +595,18 @@ const CorporateDashboard: React.FC = () => {
     const [showResult, setShowResult] = useState(false);
     const [isBuyCreditsOpen, setIsBuyCreditsOpen] = useState(false);
 
+    // Toast State
+    const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+    const addToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', title?: string) => {
+        const id = Math.random().toString(36).substring(2, 9);
+        setToasts(prev => [...prev, { id, message, type, title }]);
+    };
+
+    const removeToast = (id: string) => {
+        setToasts(prev => prev.filter(t => t.id !== id));
+    };
+
     // Mock Participants Data
     const participants: Participant[] = [
         { id: '1', name: 'Monishwar Rajasekaran (M)', programType: 'School Student', status: true, registerDate: '10 May 2024', mobile: '9585743154' },
@@ -777,10 +791,10 @@ const CorporateDashboard: React.FC = () => {
                                     }) : null);
 
                                     setIsBuyCreditsOpen(false);
-                                    alert("Payment successful! Credits added.");
+                                    addToast("Payment successful! Credits added.", 'success');
                                 } catch (e) {
                                     console.error("Verification failed", e);
-                                    alert("Payment verification failed.");
+                                    addToast("Payment verification failed.", 'error');
                                 }
                             },
                             prefill: {
@@ -791,23 +805,27 @@ const CorporateDashboard: React.FC = () => {
                         };
 
                         if (!(window as any).Razorpay) {
-                            alert("Razorpay SDK not loaded. Please try again in a moment.");
+                            addToast("Razorpay SDK not loaded. Please try again in a moment.", 'error');
                             return;
                         }
                         const rzp = new (window as any).Razorpay(options);
                         rzp.on('payment.failed', async function (response: any) {
                             await corporateDashboardService.recordPaymentFailure(order.orderId, response.error.description);
-                            alert(`Payment Failed: ${response.error.description}`);
+                            addToast(`Payment Failed: ${response.error.description}`, 'error');
                         });
                         rzp.open();
 
-                    } catch (error) {
+                    } catch (error: any) {
                         console.error("Order creation failed", error);
-                        alert("Failed to initiate payment");
+                        // Extract message from error object (NestJS standard error format)
+                        const msg = error?.response?.data?.message || error.message || "Failed to initiate payment";
+                        addToast(msg, 'error', 'Payment Initialization Failed');
                     }
                 }}
                 perCreditCost={stats?.perCreditCost}
             />
+
+            <ToastContainer toasts={toasts} removeToast={removeToast} />
         </div >
     );
 };

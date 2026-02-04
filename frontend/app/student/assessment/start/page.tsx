@@ -2,8 +2,8 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import AssessmentLayout from '@/components/student/AssessmentLayout';
-import AssessmentRunner from '@/components/student/AssessmentStarter';
+import AssessmentLayout from '../../../../components/student/AssessmentLayout';
+import AssessmentRunner from '../../../../components/student/AssessmentStarter';
 import { Suspense } from 'react';
 
 function AssessmentRunnerContent() {

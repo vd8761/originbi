@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter, usePathname } from 'next/navigation';
-import ThemeToggle from "@/components/ui/ThemeToggle";
+import ThemeToggle from '../ui/ThemeToggle';
 import {
     NotificationWithDotIcon,
     NotificationIcon,
@@ -17,14 +17,14 @@ import {
     CoinIcon,
     OriginDataIcon,
     MyEmployeesIcon,
-} from "@/components/icons";
-
-import { useTheme } from "@/contexts/ThemeContext";
+} from '../icons';
+import Script from "next/script";
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface HeaderProps {
     onLogout: () => void;
     // Combined views for flexibility, or just string
-    currentView?: "dashboard" | "assessment" | "registrations" | "jobs" | "origindata" | "settings" | "programs" | "corporate";
+    currentView?: "dashboard" | "assessment" | "registrations" | "jobs" | "origindata" | "settings" | "programs" | "corporate" | "counselling";
     portalMode?: "student" | "corporate" | "admin";
     onSwitchPortal?: () => void;
     onNavigate?: (view: any) => void;
@@ -151,7 +151,7 @@ const Header: React.FC<HeaderProps> = ({
                 }
             } catch (e) { /* empty */ }
 
-            import('@/lib/services').then(({ corporateDashboardService }) => {
+            import('../../lib/services').then(({ corporateDashboardService }) => {
                 const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
                 let queryEmail = email;
                 if (!queryEmail) {
@@ -204,6 +204,7 @@ const Header: React.FC<HeaderProps> = ({
         if (pathname.includes('/corporate')) return 'corporate';
         if (pathname.includes('/registrations')) return 'registrations';
         if (pathname.includes('/programs')) return 'programs';
+        if (pathname.includes('/counselling')) return 'counselling';
         if (pathname.includes('/dashboard')) return 'dashboard';
         return currentView;
     })();
@@ -252,6 +253,13 @@ const Header: React.FC<HeaderProps> = ({
                         active={activeView === 'registrations'}
                         isMobile={isMobile}
                         onClick={() => handleNavClick('registrations')}
+                    />
+                    <NavItem
+                        icon={<DashboardIcon />}
+                        label="Counselling"
+                        active={activeView === 'counselling'}
+                        isMobile={isMobile}
+                        onClick={() => handleNavClick('counselling')}
                     />
                     <NavItem icon={<SettingsIcon />} label="Settings" isMobile={isMobile} />
                 </>

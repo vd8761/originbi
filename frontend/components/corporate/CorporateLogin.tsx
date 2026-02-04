@@ -1,9 +1,9 @@
 import React from "react";
-import Logo from "@/components/ui/Logo";
-import LoginForm from "@/components/corporate/LoginForm";
-import CorporateTestimonial from "@/components/corporate/CorporateTestimonial";
-import ThemeToggle from "@/components/ui/ThemeToggle";
-import { useTheme } from "@/contexts/ThemeContext";
+import Logo from '../ui/Logo';
+import LoginForm from "./LoginForm";
+import CorporateTestimonial from "./CorporateTestimonial";
+import ThemeToggle from '../ui/ThemeToggle';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface CorporateLoginProps {
   onLoginSuccess: () => void;

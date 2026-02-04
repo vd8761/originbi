@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
-import { AssessmentSession } from '@/lib/services/assessment.service';
-import { assessmentService } from '@/lib/services/assessment.service';
+import { AssessmentSession } from '../../lib/services/assessment.service';
+import { assessmentService } from '../../lib/services/assessment.service';
 import {
     ArrowLeftWithoutLineIcon,
     ArrowRightWithoutLineIcon,
@@ -13,7 +13,7 @@ import {
     LockIcon,
     ProfileIcon,
     BanIcon,
-} from '@/components/icons';
+} from '../icons';
 
 interface AssessmentResultPreviewProps {
     session: AssessmentSession;

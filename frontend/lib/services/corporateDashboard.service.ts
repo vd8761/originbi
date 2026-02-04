@@ -1,5 +1,5 @@
 import { AuthService } from "./auth.service";
-import { CorporateAccount } from "@/lib/types";
+import { CorporateAccount } from '../types';
 
 // Should be changed to Corporate Service URL (4003)
 const API_URL =
@@ -91,7 +91,8 @@ export const corporateDashboardService = {
         });
 
         if (!res.ok) {
-            throw new Error("Failed to create order");
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData.message || "Failed to create order");
         }
         return res.json();
     },
@@ -197,6 +198,86 @@ export const corporateDashboardService = {
             throw new Error("Failed to fetch assessment sessions");
         }
 
+        return res.json();
+    },
+
+    async getCounsellingAccess(email: string): Promise<{ data: any[] }> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/dashboard/counselling-access?email=${encodeURIComponent(email)}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        });
+
+        if (!res.ok) {
+            throw new Error("Failed to fetch counselling access");
+        }
+        return res.json();
+    },
+
+    async getCounsellingSessions(
+        email: string,
+        typeId: number,
+        page = 1,
+        limit = 10,
+        search = '',
+        status = ''
+    ): Promise<{ data: any[], total: number }> {
+        const token = AuthService.getToken();
+        const query = new URLSearchParams({
+            email,
+            typeId: String(typeId),
+            page: String(page),
+            limit: String(limit),
+            search,
+            status
+        });
+
+        const res = await fetch(`${API_URL}/dashboard/counselling-sessions?${query.toString()}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        });
+
+        if (!res.ok) {
+            throw new Error("Failed to fetch counselling sessions");
+        }
+        return res.json();
+    },
+
+    async getCounsellingSessionById(email: string, id: number): Promise<any> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/dashboard/counselling-session/${id}?email=${encodeURIComponent(email)}&id=${id}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        });
+
+        if (!res.ok) {
+            throw new Error("Failed to fetch counselling session details");
+        }
+        return res.json();
+    },
+
+    async getSessionResponses(sessionId: number): Promise<any[]> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/dashboard/counselling/responses/${sessionId}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        });
+
+        if (!res.ok) {
+            throw new Error("Failed to fetch session responses");
+        }
         return res.json();
     }
 };

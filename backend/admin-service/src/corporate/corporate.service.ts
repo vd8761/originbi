@@ -15,6 +15,7 @@ import {
   User as AdminUser,
   CorporateAccount,
   CorporateCreditLedger,
+  CorporateCounsellingAccess,
 } from '@originbi/shared-entities';
 import { CreateCorporateRegistrationDto } from './dto/create-corporate-registration.dto';
 import { getCorporateWelcomeEmailTemplate } from '../mail/templates/corporate-welcome.template';
@@ -119,8 +120,8 @@ export class CorporateService {
         typeof authErr === 'string'
           ? authErr
           : (authErr as { message?: string })?.message ||
-            JSON.stringify(authErr) ||
-            'Failed to create Cognito user';
+          JSON.stringify(authErr) ||
+          'Failed to create Cognito user';
 
       if (status === 429) {
         throw new HttpException(errorMessage, 429);
@@ -250,9 +251,17 @@ export class CorporateService {
     if (!account) {
       throw new BadRequestException('Corporate account not found');
     }
+    const accessRecords = await this.dataSource
+      .getRepository(CorporateCounsellingAccess)
+      .find({
+        where: { corporateAccountId: id, isEnabled: true },
+        select: ['counsellingTypeId']
+      });
+
     return {
       ...account,
       email: account.user?.email,
+      counsellingAccess: accessRecords.map(a => Number(a.counsellingTypeId)),
     };
   }
 
@@ -369,6 +378,23 @@ export class CorporateService {
       if (dto.status !== undefined) account.isActive = dto.status;
 
       await manager.save(account);
+
+      // 3. Update Counselling Access if provided
+      if (dto.counsellingAccess && Array.isArray(dto.counsellingAccess)) {
+        // Hard Reset strategy: Delete all previous for this corp, insert new
+        await manager.delete(CorporateCounsellingAccess, { corporateAccountId: account.id });
+
+        if (dto.counsellingAccess.length > 0) {
+          const accessEntities = dto.counsellingAccess.map((typeId: number) =>
+            manager.create(CorporateCounsellingAccess, {
+              corporateAccountId: account.id,
+              counsellingTypeId: typeId,
+              isEnabled: true
+            })
+          );
+          await manager.save(accessEntities);
+        }
+      }
 
       return { ...account, email: account.user.email };
     });
@@ -678,6 +704,18 @@ export class CorporateService {
           } catch (e) {
             this.logger.error(`Failed to send email to ${email}`, e);
           }
+        }
+
+        // D. Counselling Access
+        if (dto.counsellingAccess && Array.isArray(dto.counsellingAccess)) {
+          const accessEntities = dto.counsellingAccess.map(typeId =>
+            manager.create(CorporateCounsellingAccess, {
+              corporateAccountId: corporateAccount.id,
+              counsellingTypeId: typeId,
+              isEnabled: true
+            })
+          );
+          await manager.save(accessEntities);
         }
 
         return {

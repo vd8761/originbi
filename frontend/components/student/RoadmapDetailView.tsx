@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
-import { ArrowRightWithoutLineIcon, ArrowUpRightIcon } from '@/components/icons';
-import { RoadmapDetailData, RoadmapCardData } from '@/lib/types';
+import { ArrowRightWithoutLineIcon, ArrowUpRightIcon } from '../icons';
+import { RoadmapDetailData, RoadmapCardData } from '../../lib/types';
 
 // Small card for "Explore Other Roadmaps" section
 const ExploreRoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: string) => void; isActive?: boolean; isLast?: boolean }> = ({ item, onSelect, isActive, isLast }) => (

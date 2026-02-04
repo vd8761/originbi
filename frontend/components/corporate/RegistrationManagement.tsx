@@ -7,21 +7,22 @@ import {
   ChevronDownIcon,
   ArrowLeftWithoutLineIcon,
   ArrowRightWithoutLineIcon,
-} from "@/components/icons";
-import AddRegistrationForm from "@/components/corporate/AddRegistrationForm";
+} from '../icons';
+import AddRegistrationForm from "./AddRegistrationForm";
 import DateRangeFilter, {
-  DateRangeOption,
-} from "@/components/ui/DateRangeFilter";
-import DateRangePickerModal from "@/components/ui/DateRangePickerModal";
-import ExcelExportButton from "@/components/ui/ExcelExportButton";
-import RegistrationTable from "@/components/ui/RegistrationTable";
-import AssessmentSessionsTable from "@/components/corporate/AssessmentSessionsTable";
-import GroupAssessmentPreview from "@/components/corporate/GroupAssessmentPreview";
-import GroupCandidateAssessmentPreview from "@/components/corporate/GroupCandidateAssessmentPreview";
+  DateRangeOption
+} from '../ui/DateRangeFilter';
+import DateRangePickerModal from '../ui/DateRangePickerModal';
+import ExcelExportButton from '../ui/ExcelExportButton';
+import RegistrationTable from '../ui/RegistrationTable';
+import AssessmentSessionsTable from "./AssessmentSessionsTable";
+import GroupAssessmentPreview from "./GroupAssessmentPreview";
+import GroupCandidateAssessmentPreview from "./GroupCandidateAssessmentPreview";
 
-import { Registration } from "@/lib/types";
-import { corporateRegistrationService } from "@/lib/services/corporate-registration.service";
-import { assessmentService, AssessmentSession } from "@/lib/services/assessment.service";
+import { Registration } from '../../lib/types';
+import { corporateRegistrationService } from '../../lib/services/corporateRegistration.service';
+import { corporateDashboardService } from '../../lib/services/corporateDashboard.service';
+import { assessmentService, AssessmentSession } from '../../lib/services/assessment.service';
 
 // Debounce utility
 const useDebounce = (value: string, delay: number) => {
@@ -113,30 +114,29 @@ const RegistrationManagement: React.FC = () => {
         end_date: formatDate(endDate),
       };
 
-      // Similar to Admin, fetch all tab counts to keep UI consistent
-      // But here we might optimize to fetch only active tab data + counts
-      // For simplicity and matching admin, fetching counts separate or concurrently
+      const userStr = localStorage.getItem('user');
+      const userEmail = userStr ? JSON.parse(userStr).email : '';
 
       const [regRes, indRes, grpRes] = await Promise.all([
-        corporateRegistrationService.getMyEmployees(
+        corporateDashboardService.getMyEmployees(
+          userEmail,
           activeTab === 'registrations' ? currentPage : 1,
-          activeTab === 'registrations' ? entriesPerPage : 1,
+          activeTab === 'registrations' ? entriesPerPage : entriesPerPage,
           debouncedSearchTerm
-          // date filters for employees if supported? 
-          // corporateRegistrationService.getMyEmployees signature might need check.
-          // Assuming it supports basic params. Keeping it simple.
         ),
-        assessmentService.getSessions(
+        corporateDashboardService.getAssessmentSessions(
+          userEmail,
           activeTab === 'individual' ? currentPage : 1,
-          activeTab === 'individual' ? entriesPerPage : 1,
+          activeTab === 'individual' ? entriesPerPage : entriesPerPage,
           debouncedSearchTerm,
           activeTab === 'individual' ? sortColumn : undefined,
           activeTab === 'individual' ? sortOrder : undefined,
           { ...dateFilters, type: 'individual' }
         ),
-        assessmentService.getSessions(
+        corporateDashboardService.getAssessmentSessions(
+          userEmail,
           activeTab === 'group' ? currentPage : 1,
-          activeTab === 'group' ? entriesPerPage : 1,
+          activeTab === 'group' ? entriesPerPage : entriesPerPage,
           debouncedSearchTerm,
           activeTab === 'group' ? sortColumn : undefined,
           activeTab === 'group' ? sortOrder : undefined,

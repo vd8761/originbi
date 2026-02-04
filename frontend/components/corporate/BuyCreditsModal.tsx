@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { CoinIcon, FlashIcon } from '@/components/icons';
+import { CoinIcon, FlashIcon } from '../icons';
 import { ChevronDownIcon, X } from "lucide-react";
 
 interface BuyCreditsModalProps {
@@ -24,6 +24,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
     const [isPricingExpanded, setIsPricingExpanded] = useState(true);
 
     const PER_CREDIT_COST = perCreditCost || Number(process.env.NEXT_PUBLIC_PER_CREDIT_COST) || 200;
+    const MIN_CREDIT_PURCHASE = Number(process.env.NEXT_PUBLIC_MIN_CREDIT_PURCHASE) || 100;
     const totalCost = credits * PER_CREDIT_COST;
 
     const [mounted, setMounted] = useState(false);
@@ -36,7 +37,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
     // Reset on open
     useEffect(() => {
         if (isOpen) {
-            setCredits(200);
+            setCredits(Math.max(200, MIN_CREDIT_PURCHASE)); // Start at default or min
             setIsPricingExpanded(true);
         }
     }, [isOpen]);
@@ -45,9 +46,9 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
 
     // Constants
     const CONTAINER_WIDTH = 100; // %
-    const INPUT_MIN = 10;
+    const INPUT_MIN = MIN_CREDIT_PURCHASE;
     const INPUT_MAX = 1000;
-    const quickSelectValues = [10, 50, 100, 200];
+    const quickSelectValues = [100, 200, 500, 1000]; // Adjusted quick selects to match likely limits
 
     // Calculate position for the thumb
     // We need to map the credit value (MIN-MAX) to a percentage (0-100)
@@ -72,6 +73,10 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
     };
 
     const handleBuy = () => {
+        if (credits < MIN_CREDIT_PURCHASE) {
+            alert(`Minimum purchase is ${MIN_CREDIT_PURCHASE} credits.`);
+            return;
+        }
         onBuy(credits, totalCost);
     };
 
@@ -214,11 +219,18 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                                     <input
                                         type="number"
                                         placeholder="Enter.."
-                                        value={credits === 0 ? '' : (credits > 0 && ![10, 50, 100, 200].includes(credits) ? credits : '')}
+                                        min={MIN_CREDIT_PURCHASE}
+                                        max={INPUT_MAX}
+                                        value={credits === 0 ? '' : (credits > 0 && !quickSelectValues.includes(credits) ? credits : '')}
                                         onChange={(e) => {
                                             const val = e.target.value === '' ? 0 : Number(e.target.value);
                                             if (!isNaN(val) && val <= INPUT_MAX) {
                                                 setCredits(val);
+                                            }
+                                        }}
+                                        onBlur={() => {
+                                            if (credits < MIN_CREDIT_PURCHASE) {
+                                                setCredits(MIN_CREDIT_PURCHASE);
                                             }
                                         }}
                                         className="w-full h-[30px] rounded-[8px] bg-[#F3F4F6] dark:bg-white/5 text-[12px] px-1 text-center font-bold outline-none border-2 border-transparent focus:border-[#1ED36A] focus:bg-white dark:focus:bg-[#24272C] placeholder:text-gray-400 text-[#19211C] dark:text-white transition-all"
