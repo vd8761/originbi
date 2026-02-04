@@ -168,3 +168,11 @@
   font-weight: 800;
   font-style: normal;
 }
+/* Hide Next.js dev indicator globally */
+[data-nextjs-dialog-overlay],
+[data-nextjs-dialog],
+nextjs-portal,
+#__next-build-watcher,
+[data-nextjs-toast] {
+    display: none !important;
+}
