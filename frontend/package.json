@@ -15,12 +15,12 @@
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "autoprefixer": "^10.4.20",
-    "aws-amplify": "^6.15.9",
+    "aws-amplify": "^6.4.3",
     "axios": "^1.13.2",
     "date-fns": "^4.1.0",
     "flag-icons": "^7.5.0",
     "lucide-react": "^0.555.0",
-    "next": "^14.2.3",
+    "next": "^16.1.6",
     "postcss": "^8.4.49",
     "react": "^18.2.0",
     "react-country-flag": "^3.1.0",
@@ -34,8 +34,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
-    "eslint": "^8",
-    "eslint-config-next": "14.2.3",
+    "eslint": "^9",
+    "eslint-config-next": "^16.1.6",
     "globals": "^16.5.0",
     "typescript-eslint": "^8.50.0"
   }
