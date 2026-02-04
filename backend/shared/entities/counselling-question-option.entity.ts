@@ -27,6 +27,9 @@ export class CounsellingQuestionOption {
     @Column({ name: 'option_text_ta', type: 'text', nullable: true })
     optionTextTa: string;
 
+    @Column({ name: 'disc_trait', type: 'varchar', length: 1, nullable: true })
+    discTrait: string;
+
     @Column({ name: 'display_order', type: 'int', default: 0 })
     displayOrder: number;
 

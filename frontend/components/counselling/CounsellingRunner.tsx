@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 // Types
@@ -38,6 +38,9 @@ export default function CounsellingRunner() {
     const [verifyingAccess, setVerifyingAccess] = useState(false);
 
     const [errorInfo, setErrorInfo] = useState<string | null>(null);
+
+    // Ref for the scrollable main container
+    const mainContainerRef = useRef<HTMLElement>(null);
 
     // Initial Load: Validate Token
     useEffect(() => {
@@ -168,8 +171,10 @@ export default function CounsellingRunner() {
         setErrorInfo(null);
         if (currentQuestionIndex < questions.length - 1) {
             setCurrentQuestionIndex(prev => prev + 1);
-            // Scroll to top
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            // Fix: Scroll the main container to top, not the window
+            if (mainContainerRef.current) {
+                mainContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+            }
         } else {
             // Mark as completed in backend
             try {
@@ -352,33 +357,39 @@ export default function CounsellingRunner() {
             </div>
 
             {/* Main Content */}
-            <main className="flex-1 flex flex-col items-center justify-start px-4 py-5 overflow-y-auto">
+            <main
+                ref={mainContainerRef}
+                className="flex-1 flex flex-col items-center justify-start px-4 py-5 overflow-y-auto scroll-smooth"
+            >
                 <div
                     key={currentQuestion.id}
                     className="w-full max-w-4xl lg:max-w-5xl animate-in fade-in slide-in-from-bottom-4 duration-500"
-                    style={{ zoom: '90%' }}
                 >
-                    <h2 className="text-2xl md:text-3xl font-medium text-[#2D3748] text-left mb-6 leading-snug sticky top-0 z-10 bg-[#F0F4F8] pb-4">
+                    <h2 className="text-xl md:text-2xl font-medium text-[#2D3748] text-left mb-6 leading-snug">
                         {currentQuestion.text_en}
                         {currentQuestion.text_ta && (
-                            <span className="block text-lg text-gray-500 mt-2 font-normal">{currentQuestion.text_ta}</span>
+                            <span className="block text-sm md:text-base text-gray-600 mt-1 font-normal leading-relaxed">{currentQuestion.text_ta}</span>
                         )}
                     </h2>
 
-                    <div className="space-y-4 mb-4">
+                    <div className="space-y-3 mb-4">
                         {currentQuestion.options.map((option) => (
                             <button
                                 key={option.id}
                                 onClick={() => handleOptionSelect(currentQuestion.id, option.id)}
-                                className={`w-full p-5 rounded-xl border-2 text-left transition-all duration-200 flex items-center justify-between group
+                                className={`w-full p-4 rounded-xl border-2 text-left transition-all duration-200 flex items-center justify-between group
                                     ${answers[currentQuestion.id] === option.id
                                         ? 'border-[#1ED36A] bg-[#1ED36A] text-white shadow-lg transform scale-[1.01]'
                                         : 'border-white bg-white hover:border-[#1ED36A] hover:bg-green-50/20 hover:shadow-md text-[#4A5568]'
                                     }`}
                             >
-                                <span className="text-lg font-medium pr-4">
+                                <span className="text-base md:text-lg font-medium pr-4 leading-snug">
                                     {option.text_en}
-                                    {option.text_ta && <span className={`text-base ml-2 inline-block ${answers[currentQuestion.id] === option.id ? 'text-green-50' : 'text-gray-500'}`}>({option.text_ta})</span>}
+                                    {option.text_ta && (
+                                        <span className={`text-sm ml-2 inline ${answers[currentQuestion.id] === option.id ? 'text-green-50' : 'text-gray-600'}`}>
+                                            ({option.text_ta})
+                                        </span>
+                                    )}
                                 </span>
 
                                 <div className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors

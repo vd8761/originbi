@@ -51,6 +51,15 @@ export class CounsellingSession {
     @Column({ name: 'student_details', type: 'jsonb', default: {} })
     studentDetails: any;
 
+    @Column({ name: 'results', type: 'jsonb', default: {} })
+    results: any;
+
+    @Column({ name: 'report_data', type: 'jsonb', default: {} })
+    reportData: any;
+
+    @Column({ name: 'personality_trait_id', type: 'bigint', nullable: true })
+    personalityTraitId: number;
+
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 
