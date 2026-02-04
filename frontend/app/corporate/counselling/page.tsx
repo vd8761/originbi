@@ -53,7 +53,7 @@ export default function CorporateCounsellingPage() {
                     </p>
                     <button
                         className="px-8 py-3 bg-brand-green text-white rounded-xl font-medium hover:bg-green-600 transition-shadow shadow-md hover:shadow-lg flex items-center justify-center gap-2 mx-auto"
-                        onClick={() => window.location.href = 'mailto:support@originbi.com'}
+                        onClick={() => window.location.href = 'mailto:info@originbi.com'}
                     >
                         Contact Administrator
                     </button>

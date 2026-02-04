@@ -14,6 +14,7 @@ import {
     CounsellingQuestionOption,
     CorporateAccount,
     CorporateCreditLedger,
+    PersonalityTrait,
 } from '@originbi/shared-entities';
 import { v4 as uuidv4 } from 'uuid';
 import { HttpService } from '@nestjs/axios';
@@ -36,6 +37,8 @@ export class CounsellingService {
         private corporateRepo: Repository<CorporateAccount>,
         @InjectRepository(CorporateCreditLedger)
         private ledgerRepo: Repository<CorporateCreditLedger>,
+        @InjectRepository(PersonalityTrait)
+        private traitRepo: Repository<PersonalityTrait>,
         private httpService: HttpService,
         private configService: ConfigService,
     ) { }
@@ -311,8 +314,104 @@ export class CounsellingService {
     /**
      * Completes a session
      */
+    /**
+     * Completes a session and calculates DISC results
+     */
     async completeSession(sessionId: number): Promise<any> {
-        await this.sessionRepo.update(sessionId, { status: 'COMPLETED' });
-        return { success: true };
+        // 1. Fetch Responses with Options
+        const allResponses = await this.responseRepo.find({
+            where: { sessionId },
+            relations: ['selectedOption'],
+            order: { createdAt: 'DESC' } // Latest first
+        });
+
+        // Filter for unique responses per question (in case of duplicates/retries)
+        const uniqueResponsesMap = new Map<number, CounsellingResponse>();
+        allResponses.forEach(r => {
+            if (!uniqueResponsesMap.has(r.questionId)) {
+                uniqueResponsesMap.set(r.questionId, r);
+            }
+        });
+        const responses = Array.from(uniqueResponsesMap.values());
+
+        // 2. Calculate Scores
+        const scores: { [key: string]: number } = { D: 0, I: 0, S: 0, C: 0 };
+        let totalScore = 0;
+
+        responses.forEach(r => {
+            const trait = r.selectedOption?.discTrait;
+            if (trait && ['D', 'I', 'S', 'C'].includes(trait)) {
+                scores[trait] = (scores[trait] || 0) + 1;
+                totalScore++;
+            }
+        });
+
+        // 3. Determine Dominant Trait (Sort Descending by Score, then by DISC order)
+        const priority = { 'D': 1, 'I': 2, 'S': 3, 'C': 4 };
+
+        const sortedTraits = Object.entries(scores)
+            .sort((a, b) => {
+                const [traitA, scoreA] = a;
+                const [traitB, scoreB] = b;
+
+                // Primary Sort: Score Descending
+                if (scoreB !== scoreA) {
+                    return scoreB - scoreA;
+                }
+
+                // Secondary Sort: DISC Priority Ascending (Lower index is better)
+                const priorityA = priority[traitA as keyof typeof priority] || 99;
+                const priorityB = priority[traitB as keyof typeof priority] || 99;
+                return priorityA - priorityB;
+            });
+
+        // Logic (Modified): ALWAYS Combine Top 2 Traits (e.g. "DS", "DI")
+        // User Requirement: "not 16 now 12 only combination of 2 not D, I, S, C"
+        // Since we initialize scores with 0 for all 4 traits, sortedTraits length is always 4.
+        let dominantTraitCode = '';
+        if (sortedTraits.length >= 2) {
+            dominantTraitCode = sortedTraits[0][0] + sortedTraits[1][0];
+        }
+
+        // 4. Fetch Personality Trait Entity (e.g. 'DS')
+        let personalityTrait = null;
+        if (dominantTraitCode) {
+            personalityTrait = await this.traitRepo.findOne({ where: { code: dominantTraitCode } });
+
+            // Fallback: If 'DS' not found, try reverse 'SD'
+            if (!personalityTrait && dominantTraitCode.length === 2) {
+                const reverseCode = dominantTraitCode[1] + dominantTraitCode[0];
+                personalityTrait = await this.traitRepo.findOne({ where: { code: reverseCode } });
+            }
+        }
+
+        // 5. Update Session
+        const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
+        if (!session) {
+            throw new NotFoundException('Session not found during completion.');
+        }
+
+        session.status = 'COMPLETED';
+        session.results = {
+            disc_scores: scores,
+            total_score: totalScore,
+            dominant_trait: dominantTraitCode,
+            sorted_scores: sortedTraits
+        };
+
+        if (personalityTrait) {
+            session.personalityTraitId = personalityTrait.id;
+        }
+
+        await this.sessionRepo.save(session);
+
+        return {
+            success: true,
+            data: {
+                results: session.results,
+                trait: personalityTrait ? personalityTrait.blendedStyleName : null,
+                trait_id: personalityTrait ? personalityTrait.id : null
+            }
+        };
     }
 }

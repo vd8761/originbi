@@ -13,6 +13,7 @@ import {
     CorporateAccount,
     User,
     CorporateCreditLedger,
+    PersonalityTrait,
 } from '@originbi/shared-entities';
 
 @Module({
@@ -26,6 +27,7 @@ import {
             CorporateAccount,
             User,
             CorporateCreditLedger,
+            PersonalityTrait,
         ]),
         HttpModule,
         ConfigModule,
