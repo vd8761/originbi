@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import CounsellingTypesTable from './CounsellingTypesTable';
 import AddCounsellingTypeModal from './AddCounsellingTypeModal';
+import CounsellingReportView from './CounsellingReportView';
 import { PlusIcon, ChevronDownIcon, ArrowLeftWithoutLineIcon, ArrowRightWithoutLineIcon, ArrowRightIcon } from '../icons';
 // import { adminCounsellingService } from '@/lib/services.ts'; // Mock service removed for direct fetch
 
@@ -14,7 +15,12 @@ interface CounsellingType {
     isDeleted?: boolean;
 }
 
+type TabType = 'types' | 'reports';
+
 const CounsellingManagement: React.FC = () => {
+    // Tab State
+    const [activeTab, setActiveTab] = useState<TabType>('types');
+
     // UI State
     const [view, setView] = useState<"list" | "form">("list");
     const [isLoading, setIsLoading] = useState(true);
@@ -33,7 +39,7 @@ const CounsellingManagement: React.FC = () => {
     // Mock Fetch - Replace with actual service call
     const fetchTypes = async () => {
         setIsLoading(true);
-        const baseUrl = process.env.NEXT_PUBLIC_ADMIN_SERVICE_URL || 'http://localhost:4001';
+        const baseUrl = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4001';
         try {
             const token = localStorage.getItem('token');
             console.log(`Fetching counselling types from: ${baseUrl}/admin/counselling/types`);
@@ -79,7 +85,7 @@ const CounsellingManagement: React.FC = () => {
         if (!confirm('Are you sure you want to delete this type?')) return;
         try {
             const token = localStorage.getItem('token');
-            const baseUrl = process.env.NEXT_PUBLIC_ADMIN_SERVICE_URL || 'http://localhost:4001';
+            const baseUrl = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4001';
             await fetch(`${baseUrl}/admin/counselling/types/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -99,6 +105,46 @@ const CounsellingManagement: React.FC = () => {
         if (page >= 1 && page <= totalPages) setCurrentPage(page);
     };
 
+    // Render Reports Tab
+    if (activeTab === 'reports') {
+        return (
+            <div className="flex flex-col h-full w-full gap-6 font-sans">
+                {/* Header / Breadcrumb */}
+                <div>
+                    <div className="flex items-center text-xs text-black dark:text-white mb-1.5 font-normal flex-wrap">
+                        <span>Dashboard</span>
+                        <span className="mx-2 text-gray-400 dark:text-gray-600">
+                            <svg className="w-3 h-3 text-black dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
+                        </span>
+                        <span className="text-brand-green font-semibold">Counselling</span>
+                    </div>
+                    <h1 className="text-2xl sm:text-3xl font-semibold text-[#150089] dark:text-white">
+                        Counselling Management
+                    </h1>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex gap-1 bg-gray-100 dark:bg-brand-dark-tertiary p-1 rounded-lg w-fit">
+                    <button
+                        onClick={() => setActiveTab('types')}
+                        className="px-4 py-2 rounded-md text-sm font-medium transition-all text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                    >
+                        Counselling Types
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('reports')}
+                        className="px-4 py-2 rounded-md text-sm font-medium transition-all bg-white dark:bg-brand-dark-secondary text-brand-green shadow-sm"
+                    >
+                        Session Reports
+                    </button>
+                </div>
+
+                {/* Reports View */}
+                <CounsellingReportView onBack={() => setActiveTab('types')} />
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col h-full w-full gap-6 font-sans">
             {/* Header / Breadcrumb */}
@@ -114,6 +160,22 @@ const CounsellingManagement: React.FC = () => {
                 <h1 className="text-2xl sm:text-3xl font-semibold text-[#150089] dark:text-white">
                     Counselling Management
                 </h1>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-1 bg-gray-100 dark:bg-brand-dark-tertiary p-1 rounded-lg w-fit">
+                <button
+                    onClick={() => setActiveTab('types')}
+                    className="px-4 py-2 rounded-md text-sm font-medium transition-all bg-white dark:bg-brand-dark-secondary text-brand-green shadow-sm"
+                >
+                    Counselling Types
+                </button>
+                <button
+                    onClick={() => setActiveTab('reports')}
+                    className="px-4 py-2 rounded-md text-sm font-medium transition-all text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                >
+                    Session Reports
+                </button>
             </div>
 
             {/* Controls (Search + Add New) Buttons */}

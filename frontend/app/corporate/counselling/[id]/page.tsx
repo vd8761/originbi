@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, use } from "react";
 import { corporateDashboardService } from '../../../../lib/services';
 import { useRouter } from "next/navigation";
 import {
@@ -10,7 +10,8 @@ import {
 import CounsellingPreviewModal from '../../../../components/corporate/CounsellingPreviewModal';
 import { Clipboard as ClipboardIcon, Check as CheckIcon } from "lucide-react";
 
-export default function CounsellingSessionListPage({ params }: { params: { id: string } }) {
+export default function CounsellingSessionListPage({ params }: { params: Promise<{ id: string }> }) {
+    const resolvedParams = use(params);
     const router = useRouter();
     const [sessions, setSessions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -22,7 +23,7 @@ export default function CounsellingSessionListPage({ params }: { params: { id: s
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const limit = 10;
 
-    const typeId = Number(params.id);
+    const typeId = Number(resolvedParams.id);
 
     useEffect(() => {
         const handler = setTimeout(() => {

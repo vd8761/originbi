@@ -55,7 +55,7 @@ const AddCounsellingTypeModal: React.FC<AddCounsellingTypeModalProps> = ({ isOpe
             };
 
             const token = localStorage.getItem('token');
-            const url = `${process.env.NEXT_PUBLIC_ADMIN_SERVICE_URL || 'http://localhost:3002'}/admin/counselling/types${editType ? `/${editType.id}` : ''}`;
+            const url = `${process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:3002'}/admin/counselling/types${editType ? `/${editType.id}` : ''}`;
             const method = editType ? 'PUT' : 'POST';
 
             const response = await fetch(url, {

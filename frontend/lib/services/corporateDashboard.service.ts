@@ -279,5 +279,46 @@ export const corporateDashboardService = {
             throw new Error("Failed to fetch session responses");
         }
         return res.json();
+    },
+
+    // ============================================================================
+    // COUNSELLING REPORT METHODS
+    // ============================================================================
+
+    async generateCounsellingReport(email: string, sessionId: number): Promise<any> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/dashboard/counselling/report/generate/${sessionId}?email=${encodeURIComponent(email)}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        });
+
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.message || "Failed to generate counselling report");
+        }
+        return res.json();
+    },
+
+    async getCounsellingReport(email: string, sessionId: number): Promise<any | null> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/dashboard/counselling/report/${sessionId}?email=${encodeURIComponent(email)}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        });
+
+        if (res.status === 404) {
+            return null;
+        }
+
+        if (!res.ok) {
+            throw new Error("Failed to fetch counselling report");
+        }
+        return res.json();
     }
 };

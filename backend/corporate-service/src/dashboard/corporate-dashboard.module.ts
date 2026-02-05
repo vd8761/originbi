@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { HttpModule } from '@nestjs/axios';
 import { CorporateDashboardController } from './corporate-dashboard.controller';
 import { CorporateDashboardService } from './corporate-dashboard.service';
+import { CounsellingReportService } from './counselling-report.service';
 
 // Import from shared entities package
 import {
@@ -21,6 +22,7 @@ import {
   CounsellingQuestionOption,
   CounsellingSession,
   CounsellingResponse,
+  PersonalityTrait,
 } from '@originbi/shared-entities';
 
 @Module({
@@ -41,10 +43,12 @@ import {
       CounsellingQuestionOption,
       CounsellingSession,
       CounsellingResponse,
+      PersonalityTrait,
     ]),
     HttpModule,
   ],
   controllers: [CorporateDashboardController],
-  providers: [CorporateDashboardService],
+  providers: [CorporateDashboardService, CounsellingReportService],
+  exports: [CounsellingReportService],
 })
 export class CorporateDashboardModule { }
