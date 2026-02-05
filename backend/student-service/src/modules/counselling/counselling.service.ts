@@ -405,12 +405,80 @@ export class CounsellingService {
 
         await this.sessionRepo.save(session);
 
+        // Trigger report generation asynchronously (fire-and-forget)
+        this.triggerReportGeneration(session.id).catch(err => {
+            console.error(`Failed to trigger report generation for session ${session.id}:`, err.message);
+        });
+
         return {
             success: true,
             data: {
                 results: session.results,
                 trait: personalityTrait ? personalityTrait.blendedStyleName : null,
                 trait_id: personalityTrait ? personalityTrait.id : null
+            }
+        };
+    }
+
+    /**
+     * Trigger report generation via admin-service
+     */
+    private async triggerReportGeneration(sessionId: number): Promise<void> {
+        const adminServiceUrl = this.configService.get<string>('ADMIN_SERVICE_URL') || 'http://localhost:4001';
+        try {
+            await this.httpService.post(
+                `${adminServiceUrl}/admin/counselling/sessions/${sessionId}/report/generate`,
+                {},
+                { headers: { 'x-internal-service': 'student-service' } }
+            ).toPromise();
+            console.log(`Report generation triggered for session ${sessionId}`);
+        } catch (error) {
+            console.error(`Failed to trigger report generation:`, error.message);
+        }
+    }
+
+    /**
+     * Get Session Report by Token
+     */
+    async getSessionReport(token: string): Promise<any> {
+        const session = await this.sessionRepo.findOne({
+            where: { sessionToken: token },
+            relations: ['counsellingType'],
+        });
+
+        if (!session) {
+            throw new NotFoundException('Session not found');
+        }
+
+        if (session.status !== 'COMPLETED') {
+            throw new BadRequestException('Assessment not completed yet');
+        }
+
+        // Get personality trait details
+        let personalityTrait = null;
+        if (session.personalityTraitId) {
+            personalityTrait = await this.traitRepo.findOne({
+                where: { id: session.personalityTraitId }
+            });
+        }
+
+        return {
+            success: true,
+            data: {
+                session_id: session.id,
+                student_name: `${session.studentDetails?.personal_details?.first_name || ''} ${session.studentDetails?.personal_details?.last_name || ''}`.trim(),
+                counselling_type: session.counsellingType?.name,
+                status: session.status,
+                results: session.results,
+                personality_trait: personalityTrait ? {
+                    id: personalityTrait.id,
+                    code: personalityTrait.code,
+                    name: personalityTrait.blendedStyleName,
+                    description: personalityTrait.blendedStyleDesc,
+                } : null,
+                report_data: session.reportData,
+                has_report: session.reportData && Object.keys(session.reportData).length > 0,
+                completed_at: session.updatedAt,
             }
         };
     }

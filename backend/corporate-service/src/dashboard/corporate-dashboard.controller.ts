@@ -8,11 +8,15 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { CorporateDashboardService } from './corporate-dashboard.service';
+import { CounsellingReportService } from './counselling-report.service';
 import { RegisterCorporateDto } from './dto/register-corporate.dto';
 
 @Controller('dashboard')
 export class CorporateDashboardController {
-  constructor(private readonly dashboardService: CorporateDashboardService) { }
+  constructor(
+    private readonly dashboardService: CorporateDashboardService,
+    private readonly reportService: CounsellingReportService,
+  ) { }
 
   @Get('stats')
   getDashboardStats(@Query('email') email: string) {
@@ -171,5 +175,29 @@ export class CorporateDashboardController {
   @Get('counselling/responses/:sessionId')
   getSessionResponses(@Param('sessionId') sessionId: number) {
     return this.dashboardService.getSessionResponses(sessionId);
+  }
+
+  // ============================================================================
+  // COUNSELLING REPORT ENDPOINTS
+  // ============================================================================
+
+  @Post('counselling/report/generate/:sessionId')
+  async generateReport(
+    @Query('email') email: string,
+    @Param('sessionId') sessionId: number,
+  ) {
+    if (!email) throw new BadRequestException('Email is required');
+    const corporateAccountId = await this.dashboardService.getCorporateAccountIdByEmail(email);
+    return this.reportService.generateReport(sessionId, corporateAccountId);
+  }
+
+  @Get('counselling/report/:sessionId')
+  async getReport(
+    @Query('email') email: string,
+    @Param('sessionId') sessionId: number,
+  ) {
+    if (!email) throw new BadRequestException('Email is required');
+    const corporateAccountId = await this.dashboardService.getCorporateAccountIdByEmail(email);
+    return this.reportService.getReport(sessionId, corporateAccountId);
   }
 }
