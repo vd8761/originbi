@@ -100,7 +100,7 @@ const AddCorporateRegistrationForm: React.FC<
     const fetchTypes = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${process.env.NEXT_PUBLIC_ADMIN_SERVICE_URL || 'http://localhost:4001'}/admin/counselling/types`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4001'}/admin/counselling/types`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {

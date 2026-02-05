@@ -43,4 +43,13 @@ export class CounsellingPublicController {
     async completeSession(@Body() body: { session_id: number }) {
         return this.counsellingService.completeSession(body.session_id);
     }
+
+    /**
+     * Get session report by token
+     * This allows students to view their report after completing the assessment
+     */
+    @Get('report')
+    async getSessionReport(@Query('token') token: string) {
+        return this.counsellingService.getSessionReport(token);
+    }
 }

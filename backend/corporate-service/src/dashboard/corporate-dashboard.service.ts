@@ -106,6 +106,33 @@ export class CorporateDashboardService {
         }
     }
 
+    // ========================================================================
+    // Helper: Get Corporate Account ID by User Email
+    // ========================================================================
+    async getCorporateAccountIdByEmail(email: string): Promise<number> {
+        const { ILike } = require('typeorm');
+        const user = await this.userRepo.findOne({ where: { email: ILike(email) } });
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        let corporate = await this.corporateRepo.findOne({
+            where: { userId: user.id },
+        });
+
+        if (!corporate && user.corporateId) {
+            corporate = await this.corporateRepo.findOne({
+                where: { id: Number(user.corporateId) }
+            });
+        }
+
+        if (!corporate) {
+            throw new NotFoundException('Corporate account not found');
+        }
+
+        return corporate.id;
+    }
+
     async getStats(email: string) {
         const { ILike } = require('typeorm');
         const user = await this.userRepo.findOne({ where: { email: ILike(email) } });
