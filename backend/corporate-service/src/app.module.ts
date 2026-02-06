@@ -9,48 +9,50 @@ import { CorporateRegistrationsModule } from './registrations/corporate-registra
 import { AssessmentModule } from './assessment/assessment.module';
 
 @Module({
-    imports: [
-        ConfigModule.forRoot({
-            isGlobal: true,
-            envFilePath: '.env.local',
-        }),
-        TypeOrmModule.forRootAsync({
-            imports: [ConfigModule],
-            inject: [ConfigService],
-            useFactory: (config: ConfigService) => {
-                const databaseUrl = config.get<string>('DATABASE_URL');
-                // DB_SYNC is now SAFE because all services use @originbi/shared-entities
-                const shouldSync = config.get<string>('DB_SYNC') === 'true';
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env.local',
+    }),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const databaseUrl = config.get<string>('DATABASE_URL');
+        // DB_SYNC is now SAFE because all services use @originbi/shared-entities
+        const shouldSync = config.get<string>('DB_SYNC') === 'true';
 
-                if (databaseUrl) {
-                    const isLocal = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
-                    return {
-                        type: 'postgres',
-                        url: databaseUrl,
-                        autoLoadEntities: true,
-                        synchronize: shouldSync,
-                        ssl: isLocal ? false : { rejectUnauthorized: false },
-                    };
-                }
+        if (databaseUrl) {
+          const isLocal =
+            databaseUrl.includes('localhost') ||
+            databaseUrl.includes('127.0.0.1');
+          return {
+            type: 'postgres',
+            url: databaseUrl,
+            autoLoadEntities: true,
+            synchronize: shouldSync,
+            ssl: isLocal ? false : { rejectUnauthorized: false },
+          };
+        }
 
-                return {
-                    type: 'postgres',
-                    host: config.get<string>('DB_HOST') || 'localhost',
-                    port: Number(config.get<string>('DB_PORT') || 5432),
-                    username: config.get<string>('DB_USER') || 'origin_user',
-                    password: config.get<string>('DB_PASS') || '',
-                    database: config.get<string>('DB_NAME') || 'originbi',
-                    autoLoadEntities: true,
-                    synchronize: shouldSync,
-                    ssl: false,
-                };
-            },
-        }),
-        CorporateDashboardModule,
-        CorporateRegistrationsModule,
-        AssessmentModule,
-        ScheduleModule.forRoot(),
-    ],
-    controllers: [MailAssetsController, HealthController],
+        return {
+          type: 'postgres',
+          host: config.get<string>('DB_HOST') || 'localhost',
+          port: Number(config.get<string>('DB_PORT') || 5432),
+          username: config.get<string>('DB_USER') || 'origin_user',
+          password: config.get<string>('DB_PASS') || '',
+          database: config.get<string>('DB_NAME') || 'originbi',
+          autoLoadEntities: true,
+          synchronize: shouldSync,
+          ssl: false,
+        };
+      },
+    }),
+    CorporateDashboardModule,
+    CorporateRegistrationsModule,
+    AssessmentModule,
+    ScheduleModule.forRoot(),
+  ],
+  controllers: [MailAssetsController, HealthController],
 })
-export class AppModule { }
+export class AppModule {}

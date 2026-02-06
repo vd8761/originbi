@@ -13,14 +13,22 @@ async function bootstrap() {
   const allowedOrigins = [
     'https://mind.originbi.com',
     'https://originbi.vercel.app',
-    ...(process.env.FRONTEND_URL || '').split(',').map(u => u.trim()).filter(Boolean),
+    ...(process.env.FRONTEND_URL || '')
+      .split(',')
+      .map((u) => u.trim())
+      .filter(Boolean),
   ];
 
   app.enableCors({
     origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+    ],
   });
 
   // Serve static email assets
