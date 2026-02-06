@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { corporateDashboardService } from '../../../../../lib/services';
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeftIcon } from '../../../../../components/icons';
-import { User, FileText, Mail, Phone, Globe, Calendar, Download, RefreshCw, CheckCircle, AlertCircle, BookOpen, Target, TrendingUp, Award, Briefcase, ChevronRight } from "lucide-react";
+import { User, FileText, Mail, Phone, Globe, Calendar, Download, RefreshCw, CheckCircle, AlertCircle, BookOpen, Target, TrendingUp, Award, Briefcase, ChevronRight, MapPin, Building2, GraduationCap, Sparkles, Clock, ArrowRight, Layers, Star } from "lucide-react";
 
 // ============================================================================
 // INTERFACES
@@ -48,6 +48,7 @@ interface ReportData {
         conclusion: string;
     };
     career_roadmap: { stage: string; bullets: string[] }[];
+    qualification_note?: string;
     final_guidance: string;
 }
 
@@ -135,14 +136,14 @@ export default function CounsellingSessionDetailPage() {
     }, [activeTab, session]);
 
     // 4. Generate Report Handler
-    const handleGenerateReport = async () => {
+    const handleGenerateReport = async (forceRegenerate: boolean = false) => {
         setReportGenerating(true);
         setReportError("");
         try {
             const user = localStorage.getItem("user");
             if (!user) throw new Error("Not logged in");
             const { email } = JSON.parse(user);
-            const reportData = await corporateDashboardService.generateCounsellingReport(email, session.id);
+            const reportData = await corporateDashboardService.generateCounsellingReport(email, session.id, forceRegenerate);
             setReport(reportData);
         } catch (err: any) {
             console.error("Report generation failed:", err);
@@ -160,8 +161,10 @@ export default function CounsellingSessionDetailPage() {
         const printWindow = window.open('', '_blank');
         if (!printWindow) return;
 
-        const studentName = report.student_name || 'Student';
-        const html = generatePrintableHTML(report, studentName);
+        // Use full name from student details, fallback to report.student_name
+        const candidateName = fullName !== 'N/A' ? fullName : (report.student_name || 'Candidate');
+        const counsellingTypeId = session.counselling_type_id || session.counsellingTypeId || '';
+        const html = generatePrintableHTML(report, candidateName, counsellingTypeId);
 
         printWindow.document.write(html);
         printWindow.document.close();
@@ -169,7 +172,7 @@ export default function CounsellingSessionDetailPage() {
             // Delay print to allow fonts and images to fully load
             setTimeout(() => {
                 printWindow.print();
-            }, 1500);
+            }, 150);
         };
     };
 
@@ -448,7 +451,7 @@ export default function CounsellingSessionDetailPage() {
                                                 </div>
                                             )}
                                             <button
-                                                onClick={handleGenerateReport}
+                                                onClick={() => handleGenerateReport(false)}
                                                 disabled={reportGenerating}
                                                 className="inline-flex items-center gap-2 px-6 py-3 bg-brand-green text-white font-semibold rounded-xl hover:bg-brand-green/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                                             >
@@ -466,90 +469,133 @@ export default function CounsellingSessionDetailPage() {
                                             </button>
                                         </div>
                                     ) : (
-                                        /* REPORT PREVIEW */
+                                        /* REPORT PREVIEW - Professional Full Layout */
                                         <div className="space-y-6">
-                                            {/* Report Header & Actions */}
-                                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gradient-to-r from-brand-green/5 to-transparent p-5 rounded-xl border border-brand-green/20">
-                                                <div>
-                                                    <div className="flex items-center gap-2 text-brand-green mb-1">
-                                                        <CheckCircle className="w-5 h-5" />
-                                                        <span className="text-sm font-semibold">Report Generated</span>
+                                            {/* Report Header Banner */}
+                                            <div className="bg-gradient-to-r from-[#150089] to-[#3a1cad] p-6 rounded-2xl text-white relative overflow-hidden">
+                                                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+                                                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2"></div>
+                                                <div className="relative z-10">
+                                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                                        <div>
+                                                            <h3 className="text-xl font-bold mb-1">Career Fitment & Course Recommendation Report</h3>
+                                                            <p className="text-white/70 text-sm">
+                                                                <span className="inline-flex items-center gap-1.5">
+                                                                    <User className="w-3.5 h-3.5" />
+                                                                    {report.student_name}
+                                                                </span>
+                                                                <span className="mx-3 text-white/30">|</span>
+                                                                <span className="inline-flex items-center gap-1.5">
+                                                                    <Clock className="w-3.5 h-3.5" />
+                                                                    {new Date(report.generated_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}
+                                                                </span>
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex gap-3">
+                                                            <button
+                                                                onClick={() => handleGenerateReport(true)}
+                                                                disabled={reportGenerating}
+                                                                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg transition-all"
+                                                            >
+                                                                <RefreshCw className={`w-4 h-4 ${reportGenerating ? 'animate-spin' : ''}`} />
+                                                                Regenerate
+                                                            </button>
+                                                            <button
+                                                                onClick={handleDownloadPDF}
+                                                                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-white text-[#150089] rounded-lg hover:bg-white/90 transition-all"
+                                                            >
+                                                                <Download className="w-4 h-4" />
+                                                                Download PDF
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                    <p className="text-xs text-gray-500">
-                                                        Generated on {new Date(report.generated_at).toLocaleString()}
-                                                    </p>
-                                                </div>
-                                                <div className="flex gap-3">
-                                                    <button
-                                                        onClick={handleGenerateReport}
-                                                        disabled={reportGenerating}
-                                                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-brand-dark-tertiary border border-gray-200 dark:border-brand-dark-tertiary rounded-lg hover:bg-gray-50 dark:hover:bg-white/5 transition-all"
-                                                    >
-                                                        <RefreshCw className={`w-4 h-4 ${reportGenerating ? 'animate-spin' : ''}`} />
-                                                        Regenerate
-                                                    </button>
-                                                    <button
-                                                        onClick={handleDownloadPDF}
-                                                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-brand-green rounded-lg hover:bg-brand-green/90 transition-all"
-                                                    >
-                                                        <Download className="w-4 h-4" />
-                                                        Download PDF
-                                                    </button>
                                                 </div>
                                             </div>
 
+                                            {/* Associate Info Card (if available) */}
+                                            {d.associate_details && (
+                                                <div className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/10 dark:to-indigo-900/10 p-5 rounded-xl border border-purple-200 dark:border-purple-800/30">
+                                                    <h4 className="font-bold text-purple-900 dark:text-purple-300 mb-4 flex items-center gap-2 text-sm">
+                                                        <Building2 className="w-4 h-4" />
+                                                        Associate Information
+                                                    </h4>
+                                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                                        <div>
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Associate ID</p>
+                                                            <p className="font-semibold text-sm text-gray-900 dark:text-white">{d.associate_details.associate_id || 'N/A'}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Full Name</p>
+                                                            <p className="font-semibold text-sm text-gray-900 dark:text-white">{d.associate_details.full_name || 'N/A'}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">City</p>
+                                                            <p className="font-semibold text-sm text-gray-900 dark:text-white">{d.associate_details.city || 'N/A'}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">District</p>
+                                                            <p className="font-semibold text-sm text-gray-900 dark:text-white">{d.associate_details.district || 'N/A'}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">State</p>
+                                                            <p className="font-semibold text-sm text-gray-900 dark:text-white">{d.associate_details.state || 'N/A'}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             {/* Behavioral Assessment */}
-                                            <div className="bg-white dark:bg-white/5 p-5 rounded-xl border border-gray-100 dark:border-white/10">
-                                                <h4 className="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                                                    <Target className="w-4 h-4 text-brand-green" />
+                                            <div className="bg-white dark:bg-white/5 p-6 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm">
+                                                <h4 className="font-bold text-[#150089] dark:text-white mb-4 flex items-center gap-2 text-base">
+                                                    <Target className="w-5 h-5 text-brand-green" />
                                                     Behavioral Assessment Summary
                                                 </h4>
-                                                <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
+                                                <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">
                                                     {report.behavioral_assessment}
                                                 </p>
                                             </div>
 
                                             {/* Strengths, Abilities, Growth Areas Grid */}
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                <div className="bg-green-50 dark:bg-green-900/10 p-4 rounded-xl border border-green-100 dark:border-green-800/30">
-                                                    <h5 className="font-bold text-green-800 dark:text-green-400 mb-3 text-sm flex items-center gap-2">
+                                                <div className="bg-green-50 dark:bg-green-900/10 p-5 rounded-xl border border-green-200 dark:border-green-800/30">
+                                                    <h5 className="font-bold text-green-800 dark:text-green-400 mb-4 text-sm flex items-center gap-2">
                                                         <Award className="w-4 h-4" />
                                                         Key Strengths
                                                     </h5>
-                                                    <ul className="space-y-1.5">
+                                                    <ul className="space-y-2">
                                                         {report.key_strengths?.map((s, i) => (
-                                                            <li key={i} className="flex items-start gap-2 text-xs text-green-700 dark:text-green-300">
-                                                                <CheckCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                                            <li key={i} className="flex items-start gap-2 text-sm text-green-700 dark:text-green-300">
+                                                                <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                                                                 {s}
                                                             </li>
                                                         ))}
                                                     </ul>
                                                 </div>
 
-                                                <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-800/30">
-                                                    <h5 className="font-bold text-blue-800 dark:text-blue-400 mb-3 text-sm flex items-center gap-2">
+                                                <div className="bg-blue-50 dark:bg-blue-900/10 p-5 rounded-xl border border-blue-200 dark:border-blue-800/30">
+                                                    <h5 className="font-bold text-blue-800 dark:text-blue-400 mb-4 text-sm flex items-center gap-2">
                                                         <TrendingUp className="w-4 h-4" />
                                                         Natural Abilities
                                                     </h5>
-                                                    <ul className="space-y-1.5">
+                                                    <ul className="space-y-2">
                                                         {report.natural_abilities?.map((a, i) => (
-                                                            <li key={i} className="flex items-start gap-2 text-xs text-blue-700 dark:text-blue-300">
-                                                                <ChevronRight className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                                            <li key={i} className="flex items-start gap-2 text-sm text-blue-700 dark:text-blue-300">
+                                                                <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0" />
                                                                 {a}
                                                             </li>
                                                         ))}
                                                     </ul>
                                                 </div>
 
-                                                <div className="bg-orange-50 dark:bg-orange-900/10 p-4 rounded-xl border border-orange-100 dark:border-orange-800/30">
-                                                    <h5 className="font-bold text-orange-800 dark:text-orange-400 mb-3 text-sm flex items-center gap-2">
+                                                <div className="bg-orange-50 dark:bg-orange-900/10 p-5 rounded-xl border border-orange-200 dark:border-orange-800/30">
+                                                    <h5 className="font-bold text-orange-800 dark:text-orange-400 mb-4 text-sm flex items-center gap-2">
                                                         <Target className="w-4 h-4" />
                                                         Growth Areas
                                                     </h5>
-                                                    <ul className="space-y-1.5">
+                                                    <ul className="space-y-2">
                                                         {report.growth_areas?.map((g, i) => (
-                                                            <li key={i} className="flex items-start gap-2 text-xs text-orange-700 dark:text-orange-300">
-                                                                <ChevronRight className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                                            <li key={i} className="flex items-start gap-2 text-sm text-orange-700 dark:text-orange-300">
+                                                                <ArrowRight className="w-4 h-4 mt-0.5 flex-shrink-0" />
                                                                 {g}
                                                             </li>
                                                         ))}
@@ -557,65 +603,303 @@ export default function CounsellingSessionDetailPage() {
                                                 </div>
                                             </div>
 
-                                            {/* Course Recommendations Summary */}
-                                            <div className="bg-white dark:bg-white/5 p-5 rounded-xl border border-gray-100 dark:border-white/10">
-                                                <h4 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                                                    <BookOpen className="w-4 h-4 text-brand-green" />
-                                                    Course Recommendations
+                                            {/* Course Fitment Methodology */}
+                                            <div className="bg-white dark:bg-white/5 p-6 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm">
+                                                <h4 className="font-bold text-[#150089] dark:text-white mb-4 flex items-center gap-2 text-base">
+                                                    <Layers className="w-5 h-5 text-brand-green" />
+                                                    Course Fitment Methodology
                                                 </h4>
-                                                <div className="space-y-3">
-                                                    {report.perfect_courses?.map((c, i) => (
-                                                        <div key={i} className="flex items-center justify-between bg-green-50/50 dark:bg-green-900/10 p-3 rounded-lg">
-                                                            <span className="font-medium text-gray-800 dark:text-white text-sm">{c.name}</span>
-                                                            <span className="text-xs font-bold text-green-600 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded">
-                                                                {c.fitment}% Match
-                                                            </span>
-                                                        </div>
+                                                <p className="text-gray-700 dark:text-gray-300 text-sm mb-3">Courses are shortlisted using:</p>
+                                                <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-5">
+                                                    {(report.course_fitment?.methodology || ['Work stability', 'Safety and compliance orientation', 'Structured career growth', 'Long-term employability']).map((m, i) => (
+                                                        <li key={i} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                                            <CheckCircle className="w-4 h-4 text-brand-green flex-shrink-0" />
+                                                            {m}
+                                                        </li>
                                                     ))}
-                                                    {report.good_courses?.map((c, i) => (
-                                                        <div key={i} className="flex items-center justify-between bg-blue-50/50 dark:bg-blue-900/10 p-3 rounded-lg">
-                                                            <span className="font-medium text-gray-800 dark:text-white text-sm">{c.name}</span>
-                                                            <span className="text-xs font-bold text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded">
-                                                                {c.fitment}% Match
-                                                            </span>
-                                                        </div>
-                                                    ))}
+                                                </ul>
+                                                
+                                                {/* Fitment Levels Table */}
+                                                <h5 className="font-semibold text-gray-900 dark:text-white mb-3 text-sm">Fitment Levels</h5>
+                                                <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-white/10">
+                                                    <table className="w-full text-sm">
+                                                        <thead>
+                                                            <tr className="bg-gray-100 dark:bg-white/5">
+                                                                <th className="px-4 py-2.5 text-left font-semibold text-gray-900 dark:text-white">Range</th>
+                                                                <th className="px-4 py-2.5 text-center font-semibold text-gray-900 dark:text-white">Category</th>
+                                                                <th className="px-4 py-2.5 text-left font-semibold text-gray-900 dark:text-white">Recommendation</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <tr className="bg-green-50 dark:bg-green-900/10 border-t border-gray-200 dark:border-white/10">
+                                                                <td className="px-4 py-2.5 text-green-700 dark:text-green-400">85% – 95%</td>
+                                                                <td className="px-4 py-2.5 text-center font-semibold text-green-700 dark:text-green-400">Perfect Match</td>
+                                                                <td className="px-4 py-2.5 text-green-700 dark:text-green-400">Highly Recommended</td>
+                                                            </tr>
+                                                            <tr className="bg-blue-50 dark:bg-blue-900/10 border-t border-gray-200 dark:border-white/10">
+                                                                <td className="px-4 py-2.5 text-blue-700 dark:text-blue-400">70% – 84%</td>
+                                                                <td className="px-4 py-2.5 text-center font-semibold text-blue-700 dark:text-blue-400">Good Match</td>
+                                                                <td className="px-4 py-2.5 text-blue-700 dark:text-blue-400">Recommended with support</td>
+                                                            </tr>
+                                                            <tr className="bg-gray-50 dark:bg-white/5 border-t border-gray-200 dark:border-white/10">
+                                                                <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">&lt; 70%</td>
+                                                                <td className="px-4 py-2.5 text-center font-semibold text-gray-600 dark:text-gray-400">Below Threshold</td>
+                                                                <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Not Recommended</td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
                                                 </div>
                                             </div>
 
+                                            {/* Course Suggestions Overview Table */}
+                                            <div className="bg-white dark:bg-white/5 p-6 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm">
+                                                <h4 className="font-bold text-[#150089] dark:text-white mb-4 flex items-center gap-2 text-base">
+                                                    <GraduationCap className="w-5 h-5 text-brand-green" />
+                                                    Course Suggestions Overview
+                                                </h4>
+                                                <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-white/10">
+                                                    <table className="w-full text-sm">
+                                                        <thead>
+                                                            <tr className="bg-[#150089] text-white">
+                                                                <th className="px-4 py-3 text-left font-semibold">Course Name</th>
+                                                                <th className="px-4 py-3 text-center font-semibold">Fitment</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {[...(report.perfect_courses || []), ...(report.good_courses || [])].map((c, i) => (
+                                                                <tr key={i} className="border-t border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5">
+                                                                    <td className="px-4 py-3 text-gray-800 dark:text-white">{c.name}</td>
+                                                                    <td className="px-4 py-3 text-center font-bold text-green-600">{c.fitment}%</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+
+                                            {/* Detailed Course Recommendations */}
+                                            <div className="bg-white dark:bg-white/5 p-6 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm">
+                                                <h4 className="font-bold text-[#150089] dark:text-white mb-2 flex items-center gap-2 text-base">
+                                                    <BookOpen className="w-5 h-5 text-brand-green" />
+                                                    Detailed Course Recommendations
+                                                </h4>
+                                                <p className="text-sm text-[#150089] dark:text-blue-300 mb-5">
+                                                    The following courses have been selected based on your behavioral strengths and career fitment score. They represent your best opportunities for long-term growth.
+                                                </p>
+
+                                                {/* Priority 1: Perfect Match */}
+                                                {report.perfect_courses?.length > 0 && (
+                                                    <>
+                                                        <h5 className="font-bold text-green-700 dark:text-green-400 mb-4 text-base">Priority 1: Top Recommendations</h5>
+                                                        <div className="space-y-4 mb-6">
+                                                            {report.perfect_courses.map((c, i) => (
+                                                                <div key={i} className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/10 rounded-r-xl overflow-hidden">
+                                                                    <div className="flex items-center justify-between p-4 bg-green-100/50 dark:bg-green-900/20">
+                                                                        <span className="font-bold text-green-800 dark:text-green-300 text-base">{c.name}</span>
+                                                                        <span className="px-3 py-1.5 bg-green-600 text-white text-sm font-bold rounded-lg">{c.fitment}% Match</span>
+                                                                    </div>
+                                                                    <div className="p-4">
+                                                                        {c.why_recommended && c.why_recommended.length > 0 && (
+                                                                            <div className="mb-3">
+                                                                                <p className="font-semibold text-sm text-gray-800 dark:text-white mb-2">Why recommended:</p>
+                                                                                <ul className="space-y-1.5">
+                                                                                    {c.why_recommended.map((r, j) => (
+                                                                                        <li key={j} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                                                                            <span className="text-green-600 mt-1">•</span>
+                                                                                            {r}
+                                                                                        </li>
+                                                                                    ))}
+                                                                                </ul>
+                                                                            </div>
+                                                                        )}
+                                                                        {c.career_progression && (
+                                                                            <div className="pt-2 border-t border-green-200 dark:border-green-800/30">
+                                                                                <p className="text-sm text-gray-700 dark:text-gray-300">
+                                                                                    <span className="font-semibold">Career Progression:</span> {c.career_progression}
+                                                                                </p>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </>
+                                                )}
+
+                                                {/* Priority 2: Good Match */}
+                                                {report.good_courses?.length > 0 && (
+                                                    <>
+                                                        <h5 className="font-bold text-blue-700 dark:text-blue-400 mb-4 text-base">Priority 2: Strong Alternatives</h5>
+                                                        <div className="space-y-4">
+                                                            {report.good_courses.map((c, i) => (
+                                                                <div key={i} className="border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/10 rounded-r-xl overflow-hidden">
+                                                                    <div className="flex items-center justify-between p-4 bg-blue-100/50 dark:bg-blue-900/20">
+                                                                        <span className="font-bold text-blue-800 dark:text-blue-300 text-base">{c.name}</span>
+                                                                        <span className="px-3 py-1.5 bg-blue-600 text-white text-sm font-bold rounded-lg">{c.fitment}% Match</span>
+                                                                    </div>
+                                                                    {c.why_recommended && c.why_recommended.length > 0 && (
+                                                                        <div className="p-4">
+                                                                            <p className="font-semibold text-sm text-gray-800 dark:text-white mb-2">Why recommended:</p>
+                                                                            <ul className="space-y-1.5">
+                                                                                {c.why_recommended.map((r, j) => (
+                                                                                    <li key={j} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                                                                        <span className="text-blue-600 mt-1">•</span>
+                                                                                        {r}
+                                                                                    </li>
+                                                                                ))}
+                                                                            </ul>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+
+                                            {/* Additional Pathways */}
+                                            {(report.entry_level_courses?.length > 0 || report.international_courses?.length > 0) && (
+                                                <div className="bg-white dark:bg-white/5 p-6 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm">
+                                                    <h4 className="font-bold text-[#150089] dark:text-white mb-2 flex items-center gap-2 text-base">
+                                                        <Layers className="w-5 h-5 text-brand-green" />
+                                                        Additional Pathways
+                                                    </h4>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-5">
+                                                        Courses listed below offer alternative entry points or specialized global opportunities.
+                                                    </p>
+
+                                                    {/* Entry Level Courses */}
+                                                    {report.entry_level_courses?.length > 0 && (
+                                                        <div className="mb-6">
+                                                            <h5 className="font-bold text-gray-700 dark:text-gray-300 mb-3 text-base">Option A: Foundational Entry-Level Roles</h5>
+                                                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Ideal for gaining immediate work experience before upskilling.</p>
+                                                            <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-white/10">
+                                                                <table className="w-full text-sm">
+                                                                    <thead>
+                                                                        <tr className="bg-gray-100 dark:bg-white/5">
+                                                                            <th className="px-4 py-2.5 text-left font-semibold text-gray-900 dark:text-white">Course Name</th>
+                                                                            <th className="px-4 py-2.5 text-center font-semibold text-gray-900 dark:text-white">Fitment</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {report.entry_level_courses.map((c, i) => (
+                                                                            <tr key={i} className="border-t border-gray-200 dark:border-white/10">
+                                                                                <td className="px-4 py-2.5 text-gray-800 dark:text-white">{c.name}</td>
+                                                                                <td className="px-4 py-2.5 text-center text-gray-600 dark:text-gray-400">{c.fitment}%</td>
+                                                                            </tr>
+                                                                        ))}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* International Courses */}
+                                                    {report.international_courses?.length > 0 && (
+                                                        <div>
+                                                            <h5 className="font-bold text-blue-800 dark:text-blue-400 mb-3 text-base">Option B: International Opportunities</h5>
+                                                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Specialized certifications with high demand in overseas markets.</p>
+                                                            <div className="space-y-3">
+                                                                {report.international_courses.map((c, i) => (
+                                                                    <div key={i} className="border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/10 rounded-r-xl overflow-hidden">
+                                                                        <div className="flex items-center justify-between p-4">
+                                                                            <span className="font-bold text-blue-800 dark:text-blue-300">{c.name}</span>
+                                                                            <span className="px-3 py-1.5 bg-blue-600 text-white text-sm font-bold rounded-lg">{c.fitment}% Match</span>
+                                                                        </div>
+                                                                        {c.why_recommended && c.why_recommended.length > 0 && (
+                                                                            <div className="px-4 pb-4">
+                                                                                <ul className="space-y-1">
+                                                                                    {c.why_recommended.map((r, j) => (
+                                                                                        <li key={j} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                                                                            <span className="text-blue-600 mt-1">•</span>
+                                                                                            {r}
+                                                                                        </li>
+                                                                                    ))}
+                                                                                </ul>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Career Direction Guidance */}
+                                            {report.career_guidance && (
+                                                <div className="bg-white dark:bg-white/5 p-6 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm">
+                                                    <h4 className="font-bold text-[#150089] dark:text-white mb-4 flex items-center gap-2 text-base">
+                                                        <Briefcase className="w-5 h-5 text-brand-green" />
+                                                        Career Direction Guidance
+                                                    </h4>
+                                                    <p className="text-gray-700 dark:text-gray-300 text-sm mb-3">{report.career_guidance.intro || 'The candidate will perform best in careers that:'}</p>
+                                                    <ul className="space-y-2 mb-4">
+                                                        {(report.career_guidance.bullets || ['Offer structured growth', 'Value safety and responsibility', 'Reward consistency and accuracy']).map((b, i) => (
+                                                            <li key={i} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                                                <CheckCircle className="w-4 h-4 text-brand-green mt-0.5 flex-shrink-0" />
+                                                                {b}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                    {report.career_guidance.conclusion && (
+                                                        <p className="text-gray-700 dark:text-gray-300 text-sm">{report.career_guidance.conclusion}</p>
+                                                    )}
+                                                </div>
+                                            )}
+
                                             {/* Career Roadmap */}
                                             {report.career_roadmap?.length > 0 && (
-                                                <div className="bg-white dark:bg-white/5 p-5 rounded-xl border border-gray-100 dark:border-white/10">
-                                                    <h4 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                                                        <Briefcase className="w-4 h-4 text-brand-green" />
-                                                        Career Roadmap
+                                                <div className="bg-white dark:bg-white/5 p-6 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm">
+                                                    <h4 className="font-bold text-[#150089] dark:text-white mb-5 flex items-center gap-2 text-base">
+                                                        <TrendingUp className="w-5 h-5 text-brand-green" />
+                                                        Suggested Career Roadmap
                                                     </h4>
-                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                    <div className="space-y-4">
                                                         {report.career_roadmap.map((stage, i) => (
-                                                            <div key={i} className="bg-gradient-to-br from-brand-green/5 to-transparent p-3 rounded-lg border border-brand-green/20">
-                                                                <div className="flex items-center gap-2 mb-2">
-                                                                    <span className="w-6 h-6 rounded-full bg-brand-green text-white flex items-center justify-center text-xs font-bold">
-                                                                        {i + 1}
-                                                                    </span>
-                                                                    <span className="font-semibold text-brand-green text-xs">{stage.stage}</span>
+                                                            <div key={i} className="flex gap-4">
+                                                                <div className="flex-shrink-0 w-28 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-3 text-center">
+                                                                    <p className="text-xs text-[#150089] dark:text-blue-300 font-medium">STEP 0{i + 1}</p>
+                                                                    <p className="text-sm font-bold text-[#150089] dark:text-white">{stage.stage}</p>
                                                                 </div>
-                                                                <ul className="space-y-1">
-                                                                    {stage.bullets.map((b, j) => (
-                                                                        <li key={j} className="text-xs text-gray-600 dark:text-gray-400">• {b}</li>
-                                                                    ))}
-                                                                </ul>
+                                                                <div className="flex-1 pt-2">
+                                                                    <ul className="space-y-1.5">
+                                                                        {stage.bullets.map((b, j) => (
+                                                                            <li key={j} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                                                                <span className="text-[#150089] dark:text-blue-400 mt-1">•</span>
+                                                                                {b}
+                                                                            </li>
+                                                                        ))}
+                                                                    </ul>
+                                                                </div>
                                                             </div>
                                                         ))}
                                                     </div>
                                                 </div>
                                             )}
 
+                                            {/* Qualification Note */}
+                                            {report.qualification_note && (
+                                                <div className="bg-amber-50 dark:bg-amber-900/10 p-5 rounded-xl border border-amber-200 dark:border-amber-800/30">
+                                                    <h4 className="font-bold text-amber-800 dark:text-amber-300 mb-3 flex items-center gap-2 text-base">
+                                                        <AlertCircle className="w-5 h-5" />
+                                                        NOTE
+                                                    </h4>
+                                                    <p className="text-amber-900 dark:text-amber-200 text-sm leading-relaxed">
+                                                        {report.qualification_note}
+                                                    </p>
+                                                </div>
+                                            )}
+
                                             {/* Final Guidance */}
                                             {report.final_guidance && (
-                                                <div className="bg-gradient-to-r from-brand-green/10 to-blue-500/10 p-5 rounded-xl border border-brand-green/20">
-                                                    <h4 className="font-bold text-gray-900 dark:text-white mb-2 text-sm">Final Guidance</h4>
-                                                    <p className="text-gray-700 dark:text-gray-300 text-sm italic leading-relaxed">
-                                                        "{report.final_guidance}"
+                                                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10 p-6 rounded-xl border border-blue-200 dark:border-blue-800/30">
+                                                    <h4 className="font-bold text-[#150089] dark:text-white mb-3 flex items-center gap-2 text-base">
+                                                        <Star className="w-5 h-5 text-yellow-500" />
+                                                        Final Guidance
+                                                    </h4>
+                                                    <p className="text-gray-800 dark:text-gray-200 text-sm leading-relaxed">
+                                                        {report.final_guidance}
                                                     </p>
                                                 </div>
                                             )}
@@ -645,15 +929,20 @@ export default function CounsellingSessionDetailPage() {
 // PDF Generation Helper - Exact 5-Page A4 Layout Matching Sample PDF
 // ============================================================================
 
-function generatePrintableHTML(report: ReportData, studentName: string): string {
+function generatePrintableHTML(report: ReportData, studentName: string, counsellingTypeId: string): string {
     const date = new Date(report.generated_at).toLocaleDateString('en-IN', {
         day: '2-digit',
         month: 'long',
         year: 'numeric'
     });
 
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const refNo = `REF-${dateStr}`;
+    // Generate Report ID: OBI-S[CounsellingTypeId][Date as DDMMYYYY]
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = now.getFullYear();
+    const dateCode = `${day}${month}${year}`;
+    const refNo = `OBI-S${counsellingTypeId}${dateCode}`;
 
     return `
 <!DOCTYPE html>
@@ -709,7 +998,7 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
             position: absolute;
             top: 10mm;
             right: 12mm;
-            width: 30mm;
+            width: 22mm;
             height: auto;
         }
         
@@ -728,20 +1017,20 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
         .cover-ref {
     position: absolute;
 
-    top: 18mm;        /* distance from top */
-    right: 6mm;      /* distance from right edge */
+    top: 34mm;   /* sits below logo */
+    right: 16mm;
 
     transform: rotate(-90deg);
     transform-origin: top right;
 
     font-family: 'Inter', sans-serif;
-    font-size: 8pt;
+    font-size: 7pt;
     font-weight: 500;
-
     color: rgba(0,0,0,0.35);
-    letter-spacing: 1px;
+    letter-spacing:0px;
     white-space: nowrap;
 }
+
 
         
         .cover-bottom-left {
@@ -792,24 +1081,24 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
             page-break-after: auto; 
         }
         
-        /* Section Title - 15pt Sora bold brand blue NO underline */
+        /* Section Title - 16pt Sora bold brand blue NO underline */
         .section-title {
             font-family: 'Sora', sans-serif;
-            font-size: 15pt;
+            font-size: 16pt;
             font-weight: 700;
             color: #150089;
-            margin: 0 0 2mm 0;
+            margin: 0 0 2.5mm 0;
             padding: 0;
             border: none;
         }
         
-        /* Sub-section Title - 13pt Sora bold brand blue NO underline */
+        /* Sub-section Title - 14pt Sora bold brand blue NO underline */
         .section-title-sm {
             font-family: 'Sora', sans-serif;
-            font-size: 13pt;
+            font-size: 14pt;
             font-weight: 700;
             color: #150089;
-            margin: 2mm 0 1mm 0;
+            margin: 2.5mm 0 1.5mm 0;
             padding: 0;
             border: none;
         }
@@ -817,37 +1106,37 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
         /* Gray sub-section (Entry Level) */
         .section-title-gray {
             font-family: 'Sora', sans-serif;
-            font-size: 15pt;
+            font-size: 16pt;
             font-weight: 700;
             color: #505050;
-            margin: 3mm 0 1.5mm 0;
+            margin: 3.5mm 0 2mm 0;
         }
         
         /* Blue sub-section (International) */
         .section-title-blue {
             font-family: 'Sora', sans-serif;
-            font-size: 15pt;
+            font-size: 16pt;
             font-weight: 700;
             color: #003296;
-            margin: 3mm 0 1.5mm 0;
+            margin: 3.5mm 0 2mm 0;
         }
         
-        /* Text - 11pt Inter */
+        /* Text - 12pt Inter */
         .text-block {
             font-family: 'Inter', sans-serif;
-            font-size: 11pt;
-            line-height: 1.4;
+            font-size: 12pt;
+            line-height: 1.45;
             color: #000000;
-            margin-bottom: 1.5mm;
+            margin-bottom: 2mm;
             text-align: justify;
         }
         
         .text-sm {
             font-family: 'Inter', sans-serif;
-            font-size: 10pt;
-            line-height: 1.4;
+            font-size: 11pt;
+            line-height: 1.45;
             color: #000000;
-            margin-bottom: 1.5mm;
+            margin-bottom: 2mm;
             text-align: justify;
         }
         
@@ -855,14 +1144,14 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
         .bullet-list {
             list-style: disc outside;
             padding-left: 6mm;
-            margin: 0.5mm 0 1.5mm 0;
+            margin: 1mm 0 2mm 0;
         }
         
         .bullet-list li {
             font-family: 'Inter', sans-serif;
-            font-size: 10pt;
-            line-height: 1.35;
-            padding: 0.3mm 0;
+            font-size: 11pt;
+            line-height: 1.4;
+            padding: 0.5mm 0;
             color: #000000;
             text-align: justify;
         }
@@ -870,22 +1159,21 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
         /* ===== FITMENT LEVELS TABLE ===== */
         .fitment-table {
             width: 100%;
-            max-width: 180mm;
             border-collapse: collapse;
-            margin: 1.5mm 0 2mm 0;
+            margin: 2mm 0 2.5mm 0;
             font-family: 'Inter', sans-serif;
-            font-size: 9pt;
+            font-size: 10pt;
             table-layout: fixed;
         }
         
         .fitment-table th {
             background-color: #f5f5f5;
-            padding: 1.5mm 2mm;
+            padding: 2mm 2.5mm;
             text-align: center;
             border: 0.5pt solid #999999;
             font-weight: 600;
             color: #000000;
-            font-size: 9pt;
+            font-size: 10pt;
         }
         
         .fitment-table th:nth-child(1) { width: 18%; text-align: center; }
@@ -893,11 +1181,11 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
         .fitment-table th:nth-child(3) { width: 55%; text-align: left; }
         
         .fitment-table td {
-            padding: 1.5mm 2mm;
+            padding: 2mm 2.5mm;
             border: 0.5pt solid #999999;
             vertical-align: middle;
-            font-size: 9pt;
-            line-height: 1.2;
+            font-size: 10pt;
+            line-height: 1.3;
         }
         
         .fitment-table td:nth-child(1) { text-align: center; }
@@ -916,31 +1204,30 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
         /* ===== COURSE OVERVIEW TABLE ===== */
         .course-table {
             width: 100%;
-            max-width: 180mm;
             border-collapse: collapse;
             margin: 1.5mm 0 2mm 0;
             font-family: 'Inter', sans-serif;
-            font-size: 9pt;
+            font-size: 10pt;
             table-layout: fixed;
         }
         
         .course-table th {
             background-color: #150089;
             color: #ffffff;
-            padding: 1.5mm 2.5mm;
+            padding: 2mm 3mm;
             border: 0.5pt solid #150089;
             font-weight: 600;
-            font-size: 9pt;
+            font-size: 10pt;
         }
         
         .course-table th:nth-child(1) { text-align: left; width: 70%; }
         .course-table th:nth-child(2) { text-align: center; width: 30%; }
         
         .course-table td {
-            padding: 1.5mm 2.5mm;
+            padding: 2mm 3mm;
             border: 0.5pt solid #dddddd;
             color: #000000;
-            font-size: 9pt;
+            font-size: 10pt;
         }
         
         .course-table td:nth-child(1) { text-align: left; }
@@ -949,10 +1236,10 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
         /* Brand colored text */
         .text-brand {
             font-family: 'Inter', sans-serif;
-            font-size: 10pt;
-            line-height: 1.4;
+            font-size: 11pt;
+            line-height: 1.45;
             color: #150089;
-            margin-bottom: 1.5mm;
+            margin-bottom: 2mm;
             text-align: justify;
         }
         
@@ -961,7 +1248,7 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
             font-family: 'Sora', sans-serif;
             font-size: 15pt;
             font-weight: 700;
-            margin: 3.5mm 0 2.5mm 0;
+            margin: 3mm 0 2mm 0;
         }
         
         /* Priority 1 = Green (Perfect Match) */
@@ -977,33 +1264,33 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
         /* ===== COURSE CARDS ===== */
         .course-card {
             width: 100%;
-            max-width: 180mm;
-            margin-bottom: 3.5mm;
+            margin-bottom: 3mm;
             background: #ffffff;
             border: 1pt solid #e0e0e0;
         }
         
         /* Card Header */
         .course-card-header {
-            display: table;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             width: 100%;
-            height: 12mm;
+            min-height: 11mm;
             padding: 0;
         }
         
         .course-card-header-inner {
-            display: table-cell;
-            vertical-align: middle;
-            padding: 2mm 4mm;
+            padding: 2mm 3.5mm;
         }
         
         .course-card-header-left {
             text-align: left;
+            flex: 1;
         }
         
         .course-card-header-right {
             text-align: right;
-            width: 25%;
+            flex-shrink: 0;
         }
         
         /* Perfect Match Card - Green */
@@ -1014,19 +1301,19 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
         
         .course-card.perfect .course-card-title {
             font-family: 'Sora', sans-serif;
-            font-size: 16pt;
+            font-size: 15pt;
             font-weight: 700;
             color: #008000;
         }
         
         .course-card.perfect .course-card-badge {
             display: inline-block;
-            padding: 1.5mm 4mm;
+            padding: 2mm 4.5mm;
             border-radius: 2mm;
             background-color: #008000;
             color: #ffffff;
             font-family: 'Inter', sans-serif;
-            font-size: 10pt;
+            font-size: 11pt;
             font-weight: 700;
         }
         
@@ -1038,28 +1325,28 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
         
         .course-card.good .course-card-title {
             font-family: 'Sora', sans-serif;
-            font-size: 16pt;
+            font-size: 15pt;
             font-weight: 700;
             color: #0050b4;
         }
         
         .course-card.good .course-card-badge {
             display: inline-block;
-            padding: 1.5mm 4mm;
+            padding: 2mm 4.5mm;
             border-radius: 2mm;
             background-color: #0050b4;
             color: #ffffff;
             font-family: 'Inter', sans-serif;
-            font-size: 10pt;
+            font-size: 11pt;
             font-weight: 700;
         }
         
         /* Card Body */
         .course-card-body {
-            padding: 2.5mm 4mm 2.5mm 6mm;
+            padding: 2.5mm 3.5mm 2.5mm 4.5mm;
             font-family: 'Inter', sans-serif;
             font-size: 11pt;
-            line-height: 1.45;
+            line-height: 1.4;
             color: #000000;
             text-align: justify;
         }
@@ -1070,46 +1357,46 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
         
         .course-card-body ul {
             list-style: disc outside;
-            padding-left: 5mm;
-            margin: 1mm 0;
+            padding-left: 4mm;
+            margin: 0.5mm 0;
         }
         
         .course-card-body li {
             padding: 0.3mm 0;
-            line-height: 1.5;
+            line-height: 1.4;
         }
         
         .career-path {
-            margin-top: 1mm;
+            margin-top: 1.5mm;
         }
         
         /* ===== ENTRY LEVEL TABLE ===== */
         .entry-table {
             width: 100%;
-            max-width: 180mm;
             border-collapse: collapse;
-            margin: 2.5mm 0 3mm 0;
+            margin: 3mm 0 3.5mm 0;
             font-family: 'Inter', sans-serif;
-            font-size: 11pt;
+            font-size: 12pt;
             table-layout: fixed;
         }
         
         .entry-table th {
             background-color: #f0f0f0;
-            padding: 2.5mm 4mm;
+            padding: 3mm 4mm;
             border: 1pt solid #999999;
             font-weight: 600;
             color: #000000;
-            font-size: 11pt;
+            font-size: 12pt;
         }
         
         .entry-table th:nth-child(1) { text-align: left; width: 75%; }
         .entry-table th:nth-child(2) { text-align: center; width: 25%; }
         
         .entry-table td {
-            padding: 2mm 3mm;
+            padding: 3mm 4mm;
             border: 0.5pt solid #cccccc;
             color: #000000;
+            font-size: 12pt;
         }
         
         .entry-table td:nth-child(1) { text-align: left; }
@@ -1140,14 +1427,14 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
         
         .roadmap-step-num {
             font-family: 'Sora', sans-serif;
-            font-size: 9pt;
+            font-size: 10pt;
             color: #150089;
             font-weight: 400;
         }
         
         .roadmap-year {
             font-family: 'Sora', sans-serif;
-            font-size: 12pt;
+            font-size: 13pt;
             font-weight: 700;
             color: #150089;
             margin-top: 0.5mm;
@@ -1156,9 +1443,9 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
         .roadmap-right {
             display: table-cell;
             vertical-align: top;
-            padding: 2mm 0 2mm 8mm;
+            padding: 2.5mm 0 2.5mm 8mm;
             font-family: 'Inter', sans-serif;
-            font-size: 11pt;
+            font-size: 12pt;
             color: #3c3c3c;
             text-align: justify;
         }
@@ -1170,31 +1457,59 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
         }
         
         .roadmap-right li {
-            padding: 0.3mm 0;
+            padding: 0.5mm 0;
             line-height: 1.5;
         }
         
         /* ===== FINAL GUIDANCE BOX ===== */
         .final-box {
             width: 100%;
-            max-width: 180mm;
             background-color: #f0f8ff;
-            padding: 3.5mm;
-            margin-top: 3.5mm;
-            border-radius: 1mm;
+            padding: 4mm;
+            margin-top: 4mm;
+            border-radius: 1.5mm;
         }
         
         .final-box .section-title-sm {
             margin-top: 0;
-            margin-bottom: 1.5mm;
+            margin-bottom: 2mm;
             color: #150089;
         }
         
         .final-text {
             font-family: 'Inter', sans-serif;
             font-size: 12pt;
-            line-height: 1.5;
+            line-height: 1.55;
             color: #000000;
+            text-align: justify;
+        }
+        
+        /* ===== NOTE BOX ===== */
+        .note-box {
+            width: 100%;
+            background-color: #fefce8;
+            padding: 2.5mm 3mm;
+            margin-top: 2mm;
+            margin-bottom: 1mm;
+            border-radius: 1mm;
+            border-left: 2mm solid #ca8a04;
+        }
+        
+        .note-box .note-title {
+            font-family: 'Inter', sans-serif;
+            font-size: 8pt;
+            font-weight: 700;
+            color: #a16207;
+            margin-bottom: 1mm;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        
+        .note-box .note-text {
+            font-family: 'Inter', sans-serif;
+            font-size: 9pt;
+            line-height: 1.4;
+            color: #78350f;
             text-align: justify;
         }
         
@@ -1206,16 +1521,16 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
             right: 15mm;
             padding-top: 2mm;
             border-top: 0.5pt solid #b4b4b4;
-            display: table;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             width: calc(100% - 30mm);
             font-family: 'Inter', sans-serif;
             font-size: 8pt;
         }
         
         .footer-left {
-            display: table-cell;
             text-align: left;
-            vertical-align: middle;
         }
         
         .footer-title {
@@ -1229,9 +1544,7 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
         }
         
         .footer-right {
-            display: table-cell;
             text-align: right;
-            vertical-align: middle;
         }
         
         .footer-page {
@@ -1382,7 +1695,7 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
             </tbody>
         </table>
         
-        <div class="section-title mt-3">Detailed Course Recommendations</div>
+        <div class="section-title mt-2">Detailed Course Recommendations</div>
         <div class="text-brand">The following courses have been selected based on your behavioral strengths and career fitment score. They represent your best opportunities for long-term growth.</div>
         
         <div class="priority-label priority-1">Priority 1: Top Recommendations</div>
@@ -1403,21 +1716,7 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
         </div>
         `).join('')}
         
-        <div class="priority-label priority-2">Priority 2: Strong Alternatives</div>
-        
-        <div class="page-footer">
-            <div class="footer-left">
-                <span class="footer-title">Origin BI</span>
-                <span class="footer-ref">#${refNo}</span>
-            </div>
-            <div class="footer-right">
-                <span class="footer-page">Page 3 of 5</span>
-            </div>
-        </div>
-    </div>
-    
-    <!-- PAGE 4: GOOD COURSES + ADDITIONAL PATHWAYS -->
-    <div class="content-page">
+        <div class="priority-label priority-2 mt-2">Priority 2: Strong Alternatives</div>
         ${(report.good_courses || []).map(c => `
         <div class="course-card good">
             <div class="course-card-header">
@@ -1434,7 +1733,20 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
         </div>
         `).join('')}
         
-        <div class="section-title mt-4">Additional Pathways</div>
+        <div class="page-footer">
+            <div class="footer-left">
+                <span class="footer-title">Origin BI</span>
+                <span class="footer-ref">#${refNo}</span>
+            </div>
+            <div class="footer-right">
+                <span class="footer-page">Page 3 of 5</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- PAGE 4: ADDITIONAL PATHWAYS -->
+    <div class="content-page">
+        <div class="section-title">Additional Pathways</div>
         <div class="text-sm">Courses listed below offer alternative entry points or specialized global opportunities.</div>
         
         <div class="section-title-gray">Option A: Foundational Entry-Level Roles</div>
@@ -1512,6 +1824,13 @@ function generatePrintableHTML(report: ReportData, studentName: string): string 
             </div>
             `).join('')}
         </div>
+        
+        ${report.qualification_note ? `
+        <div class="note-box">
+            <div class="note-title">NOTE</div>
+            <div class="note-text">${report.qualification_note}</div>
+        </div>
+        ` : ''}
         
         <div class="final-box">
             <div class="section-title-sm">Final Guidance</div>

@@ -16,7 +16,7 @@ export class CorporateDashboardController {
   constructor(
     private readonly dashboardService: CorporateDashboardService,
     private readonly reportService: CounsellingReportService,
-  ) { }
+  ) {}
 
   @Get('stats')
   getDashboardStats(@Query('email') email: string) {
@@ -113,7 +113,14 @@ export class CorporateDashboardController {
     @Query('endDate') endDate?: string,
   ) {
     if (!email) throw new BadRequestException('Email is required');
-    return this.dashboardService.getMyEmployees(email, page, limit, search, startDate, endDate);
+    return this.dashboardService.getMyEmployees(
+      email,
+      page,
+      limit,
+      search,
+      startDate,
+      endDate,
+    );
   }
 
   @Get('assessment-sessions')
@@ -142,7 +149,7 @@ export class CorporateDashboardController {
       endDate,
       status,
       userId,
-      type
+      type,
     );
   }
 
@@ -163,11 +170,21 @@ export class CorporateDashboardController {
   ) {
     if (!email) throw new BadRequestException('Email is required');
     if (!typeId) throw new BadRequestException('Type ID is required');
-    return this.dashboardService.getCounsellingSessions(email, typeId, page, limit, search, status);
+    return this.dashboardService.getCounsellingSessions(
+      email,
+      typeId,
+      page,
+      limit,
+      search,
+      status,
+    );
   }
 
   @Get('counselling-session/:id')
-  getCounsellingSessionById(@Query('email') email: string, @Query('id') id: number) {
+  getCounsellingSessionById(
+    @Query('email') email: string,
+    @Query('id') id: number,
+  ) {
     if (!email) throw new BadRequestException('Email is required');
     return this.dashboardService.getCounsellingSessionById(email, id);
   }
@@ -185,10 +202,17 @@ export class CorporateDashboardController {
   async generateReport(
     @Query('email') email: string,
     @Param('sessionId') sessionId: number,
+    @Query('force') force?: string,
   ) {
     if (!email) throw new BadRequestException('Email is required');
-    const corporateAccountId = await this.dashboardService.getCorporateAccountIdByEmail(email);
-    return this.reportService.generateReport(sessionId, corporateAccountId);
+    const corporateAccountId =
+      await this.dashboardService.getCorporateAccountIdByEmail(email);
+    const forceRegenerate = force === 'true';
+    return this.reportService.generateReport(
+      sessionId,
+      corporateAccountId,
+      forceRegenerate,
+    );
   }
 
   @Get('counselling/report/:sessionId')
@@ -197,7 +221,8 @@ export class CorporateDashboardController {
     @Param('sessionId') sessionId: number,
   ) {
     if (!email) throw new BadRequestException('Email is required');
-    const corporateAccountId = await this.dashboardService.getCorporateAccountIdByEmail(email);
+    const corporateAccountId =
+      await this.dashboardService.getCorporateAccountIdByEmail(email);
     return this.reportService.getReport(sessionId, corporateAccountId);
   }
 }
