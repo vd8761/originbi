@@ -618,7 +618,6 @@ export default function CounsellingSessionDetailPage() {
                                                         </li>
                                                     ))}
                                                 </ul>
-
                                                 {/* Fitment Levels Table */}
                                                 <h5 className="font-semibold text-gray-900 dark:text-white mb-3 text-sm">Fitment Levels</h5>
                                                 <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-white/10">
