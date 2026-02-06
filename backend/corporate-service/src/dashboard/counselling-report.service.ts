@@ -46,6 +46,7 @@ export interface CounsellingReportData {
         stage: string;
         bullets: string[];
     }[];
+    qualification_note?: string;
     final_guidance: string;
 }
 
@@ -93,8 +94,8 @@ export class CounsellingReportService {
     // MAIN METHOD: Generate Counselling Report
     // ========================================================================
 
-    async generateReport(sessionId: number, corporateAccountId: number): Promise<CounsellingReportData> {
-        this.logger.log(`📊 Generating counselling report for session: ${sessionId}`);
+    async generateReport(sessionId: number, corporateAccountId: number, forceRegenerate: boolean = false): Promise<CounsellingReportData> {
+        this.logger.log(`📊 Generating counselling report for session: ${sessionId}${forceRegenerate ? ' (FORCE REGENERATE)' : ''}`);
 
         // 1. Fetch Session with related data and validate corporate access
         const session = await this.sessionRepo.findOne({
@@ -110,10 +111,11 @@ export class CounsellingReportService {
             throw new BadRequestException(`Session ${sessionId} is not completed yet. Current status: ${session.status}`);
         }
 
-        // 2. Check if report already exists
-        if (session.reportData && Object.keys(session.reportData).length > 0) {
+        // 2. Check if report already exists (skip if force regenerate)
+        if (!forceRegenerate && session.reportData && Object.keys(session.reportData).length > 0) {
             this.logger.log(`📋 Report already exists for session ${sessionId}, returning cached report`);
-            return session.reportData as CounsellingReportData;
+            // Normalize cached report to ensure proper structure
+            return this.normalizeReportData(session.reportData as CounsellingReportData);
         }
 
         // 3. Fetch Personality Trait details
@@ -127,18 +129,20 @@ export class CounsellingReportService {
         // 4. Get Course Dataset from counselling type
         const courseDataset = await this.getCourseDataset(session.counsellingType);
 
-        // 5. Get student name
+        // 5. Get student name and qualification details
         const studentDetails = session.studentDetails || {};
         const firstName = studentDetails.personal_details?.first_name || studentDetails.first_name || '';
         const lastName = studentDetails.personal_details?.last_name || studentDetails.last_name || '';
         const studentName = `${firstName} ${lastName}`.trim() || 'Student';
+        const qualificationDetails = studentDetails.qualification_details || null;
 
         // 6. Generate Report using AI
         const reportData = await this.generateAIReport(
             session,
             personalityTrait,
             courseDataset,
-            studentName
+            studentName,
+            qualificationDetails
         );
 
         // 7. Save report to session
@@ -166,7 +170,49 @@ export class CounsellingReportService {
             return null;
         }
 
-        return session.reportData as CounsellingReportData;
+        // Normalize cached report to ensure proper structure
+        return this.normalizeReportData(session.reportData as CounsellingReportData);
+    }
+
+    // ========================================================================
+    // Normalize Report Data (fix malformed course objects)
+    // ========================================================================
+
+    private normalizeReportData(report: CounsellingReportData): CounsellingReportData {
+        // Helper function to normalize course objects
+        const normalizeCourses = (courses: any[], withDetails = true): any[] => {
+            if (!courses || !Array.isArray(courses)) return [];
+            return courses.map(c => {
+                if (typeof c === 'string') {
+                    return withDetails 
+                        ? { name: c, fitment: 80, why_recommended: [] }
+                        : { name: c, fitment: 80 };
+                }
+                if (typeof c === 'object' && c !== null) {
+                    const name = typeof c.name === 'string' ? c.name : 
+                        (typeof c.course_name === 'string' ? c.course_name : '');
+                    const fitment = typeof c.fitment === 'number' ? c.fitment : 80;
+                    
+                    if (withDetails) {
+                        const whyRec = Array.isArray(c.why_recommended) 
+                            ? c.why_recommended.filter((r: any) => typeof r === 'string')
+                            : [];
+                        const careerProg = typeof c.career_progression === 'string' ? c.career_progression : undefined;
+                        return { name, fitment, why_recommended: whyRec, career_progression: careerProg };
+                    }
+                    return { name, fitment };
+                }
+                return null;
+            }).filter(c => c !== null && c.name);
+        };
+
+        return {
+            ...report,
+            perfect_courses: normalizeCourses(report.perfect_courses, true),
+            good_courses: normalizeCourses(report.good_courses, true),
+            entry_level_courses: normalizeCourses(report.entry_level_courses, false),
+            international_courses: normalizeCourses(report.international_courses, true),
+        };
     }
 
     // ========================================================================
@@ -174,14 +220,24 @@ export class CounsellingReportService {
     // ========================================================================
 
     private async getCourseDataset(counsellingType?: CounsellingType): Promise<CourseDataset> {
+        // Helper function to extract course names from array (handles both string[] and object[])
+        const extractCourseNames = (courses: any[]): string[] => {
+            if (!courses || !Array.isArray(courses)) return [];
+            return courses.map(c => {
+                if (typeof c === 'string') return c;
+                if (typeof c === 'object' && c !== null) return c.name || c.course_name || '';
+                return '';
+            }).filter(name => name.length > 0);
+        };
+
         // First try to get from counselling type's course_details
         if (counsellingType?.courseDetails) {
             const cd = counsellingType.courseDetails;
             if (cd.basic_courses || cd.advance_courses || cd.international_courses) {
                 return {
-                    basic_courses: cd.basic_courses || [],
-                    advance_courses: cd.advance_courses || [],
-                    international_courses: cd.international_courses || [],
+                    basic_courses: extractCourseNames(cd.basic_courses),
+                    advance_courses: extractCourseNames(cd.advance_courses),
+                    international_courses: extractCourseNames(cd.international_courses),
                 };
             }
         }
@@ -261,18 +317,19 @@ export class CounsellingReportService {
         session: CounsellingSession,
         trait: PersonalityTrait | null,
         courseDataset: CourseDataset,
-        studentName: string
+        studentName: string,
+        qualificationDetails?: any
     ): Promise<CounsellingReportData> {
         const traitCode = trait?.code || session.results?.dominant_trait || 'SC';
         const traitName = trait?.blendedStyleName || 'Balanced Professional';
         const traitDescription = trait?.blendedStyleDesc || 'A balanced approach to work with adaptable characteristics.';
         const discScores = session.results?.disc_scores || { D: 5, I: 5, S: 5, C: 5 };
 
-        // Build the system prompt
-        const systemPrompt = this.buildSystemPrompt();
+        // Build the system prompt with career progression data
+        const systemPrompt = this.buildSystemPrompt(qualificationDetails);
 
         // Build the user prompt with trait code and course dataset
-        const userPrompt = this.buildUserPrompt(traitCode, courseDataset);
+        const userPrompt = this.buildUserPrompt(traitCode, courseDataset, qualificationDetails);
 
         try {
             this.logger.log(`🤖 Calling Groq API (llama-3.3-70b-versatile) for report generation...`);
@@ -291,21 +348,59 @@ export class CounsellingReportService {
             this.logger.log(`✅ Received AI response (${aiResponse.length} chars)`);
 
             // Parse AI response into structured data
-            const parsedReport = this.parseAIResponse(aiResponse, discScores, traitCode, traitName, traitDescription, studentName);
+            const parsedReport = this.parseAIResponse(aiResponse, discScores, traitCode, traitName, traitDescription, studentName, qualificationDetails);
             return parsedReport;
 
         } catch (error) {
             this.logger.error(`❌ AI generation failed: ${error.message}`);
             // Fallback to template-based generation
-            return this.generateFallbackReport(discScores, traitCode, traitName, traitDescription, courseDataset, studentName);
+            return this.generateFallbackReport(discScores, traitCode, traitName, traitDescription, courseDataset, studentName, qualificationDetails);
         }
     }
 
     // ========================================================================
-    // System Prompt Builder - Updated to Match PHP Format
+    // System Prompt Builder - Updated with Career Progression Data
     // ========================================================================
 
-    private buildSystemPrompt(): string {
+    private buildSystemPrompt(qualificationDetails?: any): string {
+        // Determine if qualification note is needed
+        const qualCategory = (qualificationDetails?.category || '').toLowerCase();
+        const degree = (qualificationDetails?.degree || '').toLowerCase();
+        
+        // Check for ITI, 12th, dropout, or below degree qualification levels
+        const needsHigherStudyNote = 
+            qualCategory.includes('dropout') || 
+            qualCategory.includes('8th') || 
+            qualCategory.includes('10th') ||
+            qualCategory.includes('12th') ||
+            qualCategory.includes('12') ||
+            qualCategory.includes('iti') ||
+            degree.includes('iti') ||
+            degree.includes('8th') ||
+            degree.includes('10th') ||
+            degree.includes('12th') ||
+            degree.includes('12') ||
+            (qualCategory === 'fresher' && (!degree || degree === '' || degree.includes('12'))) ||
+            qualCategory.includes('school') ||
+            qualCategory.includes('sslc') ||
+            qualCategory.includes('hsc') ||
+            qualCategory.includes('hslc') ||
+            qualCategory.includes('plus two') ||
+            qualCategory.includes('+2') ||
+            degree.includes('hsc') ||
+            degree.includes('sslc') ||
+            degree.includes('plus two') ||
+            degree.includes('+2');
+
+        const qualificationNoteInstruction = needsHigherStudyNote ? `
+MANDATORY QUALIFICATION NOTE REQUIREMENT:
+The candidate's current qualification is ITI level or below, or they are a dropout/fresher without a degree. You MUST include the "qualification_note" field in your JSON response with an encouraging 2-3 sentence message about:
+- The importance of pursuing higher education (Diploma, Degree, or specialized certifications)
+- How it will upgrade their skills and career prospects
+- How it will improve their overall life and earning potential
+This field is REQUIRED - do not skip it. Make the message supportive, motivating, and hopeful.
+` : '';
+
         return `You are an expert career counsellor and vocational guidance analyst. Create a professional counselling report using ONLY the provided Trait Code and Course Dataset. Do NOT mention or reveal the trait code, DISC, or any personality label/titles in the output. Do NOT invent new courses or certifications. Use clean headings and bullet points. Keep tone neutral, supportive, and parent-friendly.
 
 GLOBAL CONSTRAINTS (VERY IMPORTANT)
@@ -319,6 +414,54 @@ GLOBAL CONSTRAINTS (VERY IMPORTANT)
 - If fewer suitable courses exist, show fewer (do not fill artificially)
 - Do NOT repeat the same course in multiple sections
 - Assign realistic match percentages based on Trait Code fit
+${qualificationNoteInstruction}
+CAREER PROGRESSION DATA (USE THIS FOR career_roadmap):
+Use the following career progression data based on the selected course. Match the stages to:
+- 0 to 6 Months: Entry role
+- 1 to 2 Years: Skilled role
+- 3 to 5 Years: Senior/Certified role
+- 5 to 8 Years: Supervisor/Manager role
+- Entrepreneur: Own business opportunity
+
+BASIC COURSES (8th-10th Pass/Fail/ITI Dropouts):
+| Course | 0-6 Months | 1-2 Years | 3-5 Years | 5-8 Years | Entrepreneur |
+|--------|------------|-----------|-----------|-----------|--------------|
+| Refrigeration & Air conditioner (A/C) | Assistant Technician | Technician | Senior Technician | Supervisor | Own Service Unit |
+| Basic Electrical & HVAC Training | Assistant Technician | Technician | Senior Technician | Supervisor | Own Service Unit |
+| Washing Machine Training | Assistant Technician | Technician | Senior Technician | Supervisor | Own Service Unit |
+| Electrician | Assistant Technician | Technician | Senior Technician | Supervisor | Own Service Unit |
+| Plumber | Assistant Technician | Technician | Senior Technician | Supervisor | Own Service Unit |
+| Industrial Electrician | Assistant Technician | Technician | Senior Technician | Supervisor | Own Service Unit |
+| Home Appliance Training | Assistant Technician | Technician | Senior Technician | Supervisor | Own Service Unit |
+| Fitter | Assistant Fitter | Skilled Fitter | Certified Fitter | Fitter Supervisor | Start Own Welding Unit |
+| Welding (ARC/TIG/MIG) | Assistant Welder | Skilled Welder | Certified Welder | Welding Supervisor | Start Own Welding Unit |
+| MEP Engineer | Assistant Technician | Multi Technician | Senior MEP Technician | MEP Supervisor | Facility Management Company |
+
+DIPLOMA/ENGINEERING BASIC COURSES:
+| Course | 0-6 Months | 1-2 Years | 3-5 Years | 5-8 Years | Entrepreneur |
+|--------|------------|-----------|-----------|-----------|--------------|
+| Diploma In HVAC | Technician | Senior Technician | Supervisor | Manager | Own Company |
+| NDT & Quality Management Training | Quality Inspector | Quality In Charge | Asst Manager Quality | QA Manager | GM |
+| Advance Diploma In Fire & Industrial Safety | Fire Safety Technician | Safety Officer/Supervisor | Safety Engineer | Safety Manager | EHS Manager |
+| Welding Supervisor Training | Welding Forman | Welding Supervisor | Welding In Charge | Manager | Own Company |
+| Automobile Quality Inspector Training | Quality Inspector | Quality In Charge | Asst Manager Quality | QA Manager | GM |
+
+DIPLOMA/ENGINEERING ADVANCE COURSES:
+| Course | 0-6 Months | 1-2 Years | 3-5 Years | 5-8 Years | Entrepreneur |
+|--------|------------|-----------|-----------|-----------|--------------|
+| Certified HVAC Engineer (CHE) | Ass Project Engineer | Project Engineer | Project In Charge | Project Manager | Own HVAC Company |
+| Certified Health, Safety & Environmental Officer (CHSEO) | Safety Supervisor | Safety Officer | Safety Engineer | Safety Manager | EHS Manager |
+| Certified Oil & Gas Piping Engineer (CPE) | Ass Site Engineer | Project Engineer | Project In Charge | Project Manager | Own Company |
+| Mechanical Electrical Plumbing Engineer (MEP) | Ass Project Engineer | Project Engineer | Project In Charge | Project Manager | Own MEP Company |
+
+DEGREE COURSES:
+| Course | 0-6 Months | 1-2 Years | 3-5 Years | 5-8 Years | Entrepreneur |
+|--------|------------|-----------|-----------|-----------|--------------|
+| Refrigeration & Air conditioner (A/C) | Assistant Technician | Technician | Senior Technician | Supervisor | Own Service Unit |
+| Basic Electrical & HVAC Training | Assistant Technician | Technician | Senior Technician | Supervisor | Own Service Unit |
+| Home Appliance Training | Assistant Technician | Technician | Senior Technician | Supervisor | Own Service Unit |
+| Welding (ARC/TIG/MIG) | Assistant Welder | Skilled Welder | Certified Welder | Welding Supervisor | Start Own Welding Unit |
+| Advance Diploma In Fire & Industrial Safety | Fire Safety Technician | Safety Officer/Supervisor | Safety Engineer | Safety Manager | EHS Manager |
 
 OUTPUT FORMAT: Return a valid JSON object with this exact structure:
 {
@@ -332,7 +475,7 @@ OUTPUT FORMAT: Return a valid JSON object with this exact structure:
             "name": "Course Name from advance_courses ONLY",
             "fitment": 85-95,
             "why_recommended": ["reason1", "reason2", "reason3"],
-            "career_progression": "Role 1 → Role 2 → Role 3"
+            "career_progression": "Use the career progression from the tables above: Role at 0-6M → Role at 1-2Y → Role at 3-5Y → Role at 5-8Y"
         }
     ],
     "good_courses": [
@@ -358,11 +501,13 @@ OUTPUT FORMAT: Return a valid JSON object with this exact structure:
         "conclusion": "One sentence about growth into supervisory/management roles"
     },
     "career_roadmap": [
-        {"stage": "Year 0–1", "bullets": ["action1", "action2"]},
-        {"stage": "Year 1–3", "bullets": ["action1", "action2"]},
-        {"stage": "Year 3–5", "bullets": ["action1", "action2"]},
-        {"stage": "5+ Years", "bullets": ["action1", "action2"]}
+        {"stage": "0-6 Months", "bullets": ["Start as [entry role from table]", "Complete technical training", "Learn fundamentals"]},
+        {"stage": "1-2 Years", "bullets": ["Progress to [skilled role from table]", "Gain hands-on experience"]},
+        {"stage": "3-5 Years", "bullets": ["Advance to [senior role from table]", "Take on more responsibilities"]},
+        {"stage": "5-8 Years", "bullets": ["Move to [supervisor/manager role from table]", "Lead teams"]},
+        {"stage": "Entrepreneur", "bullets": ["[Entrepreneur opportunity from table]", "Start own business"]}
     ],
+    "qualification_note": "Only include if candidate has ITI or below qualification - encouraging message about pursuing higher education",
     "final_guidance": "2 sentences of final guidance. No DISC terms. No trait labels."
 }
 
@@ -371,17 +516,26 @@ SCORING RULES (INTERNAL)
 - Good Match: 70–84
 - Do not show anything below 70
 - Match logic must align with work stability, safety orientation, structure, and long-term growth
-- Use exact course names as in the dataset`;
+- Use exact course names as in the dataset
+- For career_roadmap, use EXACT role titles from the career progression tables above based on the recommended course`;
     }
 
     // ========================================================================
     // User Prompt Builder
     // ========================================================================
 
-    private buildUserPrompt(traitCode: string, courseDataset: CourseDataset): string {
+    private buildUserPrompt(traitCode: string, courseDataset: CourseDataset, qualificationDetails?: any): string {
+        const qualInfo = qualificationDetails ? `
+Student Qualification Details:
+- Category: ${qualificationDetails.category || 'Not specified'}
+- Degree: ${qualificationDetails.degree || 'Not specified'}
+- College: ${qualificationDetails.college_name || 'Not specified'}
+- Passout Year: ${qualificationDetails.passout_year || 'Not specified'}
+` : '';
+
         return `INPUTS
 Trait Code: ${traitCode}
-
+${qualInfo}
 Course Dataset (JSON):
 ${JSON.stringify(courseDataset, null, 2)}
 
@@ -396,6 +550,13 @@ IMPORTANT COURSE SELECTION RULES:
 - Use exact course names as provided in the dataset
 - Assign realistic fitment percentages based on the trait code
 - Do NOT mention DISC, personality traits, or the trait code in the output text
+- For career_roadmap, use the EXACT role titles from the career progression tables provided in the system prompt
+- The career_progression field in perfect_courses should show the progression path using actual role titles
+
+IMPORTANT FOR CAREER ROADMAP:
+- Use the career progression data provided to generate accurate role titles for each time period
+- Match the course name to find the correct progression path
+- Include an "Entrepreneur" stage showing the business opportunity
 
 Now generate the JSON report following the exact format specified in the system prompt.`;
     }
@@ -410,7 +571,8 @@ Now generate the JSON report following the exact format specified in the system 
         traitCode: string,
         traitName: string,
         traitDescription: string,
-        studentName: string
+        studentName: string,
+        qualificationDetails?: any
     ): CounsellingReportData {
         try {
             // Extract JSON from response (handle markdown code blocks)
@@ -428,6 +590,69 @@ Now generate the JSON report following the exact format specified in the system 
             }
 
             const parsed = JSON.parse(jsonStr);
+
+            // Helper function to normalize course objects to correct structure
+            const normalizeCourses = (courses: any[], withDetails = true): any[] => {
+                if (!courses || !Array.isArray(courses)) return [];
+                return courses.map(c => {
+                    if (typeof c === 'string') {
+                        return withDetails 
+                            ? { name: c, fitment: 80, why_recommended: [] }
+                            : { name: c, fitment: 80 };
+                    }
+                    if (typeof c === 'object' && c !== null) {
+                        // Ensure name is a string, not an object
+                        const name = typeof c.name === 'string' ? c.name : 
+                            (typeof c.course_name === 'string' ? c.course_name : '');
+                        const fitment = typeof c.fitment === 'number' ? c.fitment : 80;
+                        
+                        if (withDetails) {
+                            // Ensure why_recommended is an array of strings
+                            const whyRec = Array.isArray(c.why_recommended) 
+                                ? c.why_recommended.filter((r: any) => typeof r === 'string')
+                                : [];
+                            const careerProg = typeof c.career_progression === 'string' ? c.career_progression : undefined;
+                            return { name, fitment, why_recommended: whyRec, career_progression: careerProg };
+                        }
+                        return { name, fitment };
+                    }
+                    return null;
+                }).filter(c => c !== null && c.name);
+            };
+
+            // Check if qualification note needs to be generated as fallback
+            let qualificationNote = parsed.qualification_note;
+            if (!qualificationNote && qualificationDetails) {
+                const qualCategory = (qualificationDetails.category || '').toLowerCase();
+                const degree = (qualificationDetails.degree || '').toLowerCase();
+                const needsNote = 
+                    qualCategory.includes('dropout') || 
+                    qualCategory.includes('8th') || 
+                    qualCategory.includes('10th') ||
+                    qualCategory.includes('12th') ||
+                    qualCategory.includes('12') ||
+                    qualCategory.includes('iti') ||
+                    degree.includes('iti') ||
+                    degree.includes('8th') ||
+                    degree.includes('10th') ||
+                    degree.includes('12th') ||
+                    degree.includes('12') ||
+                    (qualCategory === 'fresher' && (!degree || degree === '' || degree.includes('12'))) ||
+                    qualCategory.includes('school') ||
+                    qualCategory.includes('sslc') ||
+                    qualCategory.includes('hsc') ||
+                    qualCategory.includes('hslc') ||
+                    qualCategory.includes('plus two') ||
+                    qualCategory.includes('+2') ||
+                    degree.includes('hsc') ||
+                    degree.includes('sslc') ||
+                    degree.includes('plus two') ||
+                    degree.includes('+2');
+                
+                if (needsNote) {
+                    qualificationNote = 'We strongly encourage you to consider pursuing higher education such as a Diploma or Degree program alongside your vocational training. Higher education will significantly enhance your career prospects, open doors to better opportunities, and provide a stronger foundation for long-term professional growth and earning potential.';
+                }
+            }
 
             return {
                 generated_at: new Date().toISOString(),
@@ -455,16 +680,17 @@ Now generate the JSON report following the exact format specified in the system 
                         below: { max: 70, label: 'Below Threshold' }
                     }
                 },
-                perfect_courses: parsed.perfect_courses || [],
-                good_courses: parsed.good_courses || [],
-                entry_level_courses: parsed.entry_level_courses || [],
-                international_courses: parsed.international_courses || [],
+                perfect_courses: normalizeCourses(parsed.perfect_courses, true),
+                good_courses: normalizeCourses(parsed.good_courses, true),
+                entry_level_courses: normalizeCourses(parsed.entry_level_courses, false),
+                international_courses: normalizeCourses(parsed.international_courses, true),
                 career_guidance: parsed.career_guidance || {
                     intro: 'The candidate will perform best in careers that:',
                     bullets: [],
                     conclusion: ''
                 },
                 career_roadmap: parsed.career_roadmap || [],
+                qualification_note: qualificationNote,
                 final_guidance: parsed.final_guidance || ''
             };
 
@@ -484,11 +710,46 @@ Now generate the JSON report following the exact format specified in the system 
         traitName: string,
         traitDescription: string,
         courseDataset: CourseDataset,
-        studentName: string
+        studentName: string,
+        qualificationDetails?: any
     ): CounsellingReportData {
         this.logger.log(`📝 Using fallback template-based report generation`);
 
         const firstTrait = traitCode[0] || 'S';
+
+        // Check if qualification note is needed
+        let qualificationNote: string | undefined = undefined;
+        if (qualificationDetails) {
+            const qualCategory = (qualificationDetails.category || '').toLowerCase();
+            const degree = (qualificationDetails.degree || '').toLowerCase();
+            const needsNote = 
+                qualCategory.includes('dropout') || 
+                qualCategory.includes('8th') || 
+                qualCategory.includes('10th') ||
+                qualCategory.includes('12th') ||
+                qualCategory.includes('12') ||
+                qualCategory.includes('iti') ||
+                degree.includes('iti') ||
+                degree.includes('8th') ||
+                degree.includes('10th') ||
+                degree.includes('12th') ||
+                degree.includes('12') ||
+                (qualCategory === 'fresher' && (!degree || degree === '' || degree.includes('12'))) ||
+                qualCategory.includes('school') ||
+                qualCategory.includes('sslc') ||
+                qualCategory.includes('hsc') ||
+                qualCategory.includes('hslc') ||
+                qualCategory.includes('plus two') ||
+                qualCategory.includes('+2') ||
+                degree.includes('hsc') ||
+                degree.includes('sslc') ||
+                degree.includes('plus two') ||
+                degree.includes('+2');
+            
+            if (needsNote) {
+                qualificationNote = 'We strongly encourage you to consider pursuing higher education such as a Diploma or Degree program alongside your vocational training. Higher education will significantly enhance your career prospects, open doors to better opportunities, and provide a stronger foundation for long-term professional growth and earning potential.';
+            }
+        }
 
         const traitProfiles: Record<string, {
             behavioral: string;
@@ -589,11 +850,13 @@ Now generate the JSON report following the exact format specified in the system 
                 conclusion: 'Such roles naturally lead to supervisory and management positions over time.'
             },
             career_roadmap: [
-                { stage: 'Year 0–1', bullets: ['Complete selected technical training', 'Begin work as Technician / Inspector'] },
-                { stage: 'Year 1–3', bullets: ['Move into senior technical roles', 'Gain responsibility and stability'] },
-                { stage: 'Year 3–5', bullets: ['Transition into supervision or safety roles', 'Lead small teams'] },
-                { stage: '5+ Years', bullets: ['Leadership positions', 'Overseas opportunities'] }
+                { stage: '0-6 Months', bullets: ['Complete selected technical training', 'Begin work as Assistant Technician / Trainee'] },
+                { stage: '1-2 Years', bullets: ['Progress to Technician / Skilled Worker role', 'Gain hands-on experience and stability'] },
+                { stage: '3-5 Years', bullets: ['Advance to Senior Technician / Certified Professional', 'Take on more responsibilities'] },
+                { stage: '5-8 Years', bullets: ['Move to Supervisor / Manager position', 'Lead teams and projects'] },
+                { stage: 'Entrepreneur', bullets: ['Start own service unit or company', 'Build independent business'] }
             ],
+            qualification_note: qualificationNote,
             final_guidance: 'Your strength lies in doing work correctly, safely, and consistently. Choosing structured technical and safety-focused careers will ensure steady income, professional respect, and long-term growth.'
         };
     }

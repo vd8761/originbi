@@ -185,10 +185,12 @@ export class CorporateDashboardController {
   async generateReport(
     @Query('email') email: string,
     @Param('sessionId') sessionId: number,
+    @Query('force') force?: string,
   ) {
     if (!email) throw new BadRequestException('Email is required');
     const corporateAccountId = await this.dashboardService.getCorporateAccountIdByEmail(email);
-    return this.reportService.generateReport(sessionId, corporateAccountId);
+    const forceRegenerate = force === 'true';
+    return this.reportService.generateReport(sessionId, corporateAccountId, forceRegenerate);
   }
 
   @Get('counselling/report/:sessionId')

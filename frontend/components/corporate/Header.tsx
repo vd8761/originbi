@@ -436,7 +436,7 @@ const Header: React.FC<HeaderProps> = ({
                           <span
                             className="font-semibold text-[42px] text-[#150089] dark:text-white leading-none tracking-tight"
                           >
-                            {corporateData ? Math.floor(parseInt(corporateData.available_credits)) : 0}
+                            {corporateData?.available_credits ? Math.floor(Number(corporateData.available_credits) || 0) : 0}
                           </span>
 
                           <div className="flex flex-col text-[13px] leading-[1.1] text-[#19211C] dark:text-gray-300 font-medium whitespace-nowrap opacity-90">
@@ -458,7 +458,7 @@ const Header: React.FC<HeaderProps> = ({
                   <BuyCreditsModal
                     isOpen={isBuyCreditsOpen}
                     onClose={() => setIsBuyCreditsOpen(false)}
-                    currentBalance={corporateData ? parseInt(corporateData.available_credits) : 0}
+                    currentBalance={corporateData?.available_credits ? Number(corporateData.available_credits) || 0 : 0}
                     onBuy={handleBuyCredits}
                   />
                 </>

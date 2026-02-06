@@ -106,6 +106,7 @@ export default function CounsellingSessionListPage({ params }: { params: Promise
                                 <th className="px-6 py-4">Date</th>
                                 <th className="px-6 py-4">Name</th>
                                 <th className="px-6 py-4">Mobile / Email</th>
+                                <th className="px-6 py-4">Associate Info</th>
                                 <th className="px-6 py-4">Access Code</th>
                                 <th className="px-6 py-4">Link</th>
                                 <th className="px-6 py-4">Status</th>
@@ -115,13 +116,13 @@ export default function CounsellingSessionListPage({ params }: { params: Promise
                         <tbody className="divide-y divide-gray-100 dark:divide-brand-dark-tertiary">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                                    <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                                         Loading...
                                     </td>
                                 </tr>
                             ) : sessions.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                                    <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                                         No sessions found.
                                     </td>
                                 </tr>
@@ -157,6 +158,23 @@ export default function CounsellingSessionListPage({ params }: { params: Promise
                                                     </span>
                                                 </div>
                                             </td>
+                                            <td className="px-6 py-4 align-middle">
+  {d.associate_details ? (
+    <div className="flex flex-col items-start">
+      <span className="text-sm text-gray-900 dark:text-white">
+        {d.associate_details.full_name || "-"}
+      </span>
+      <span className="text-xs text-gray-500 dark:text-gray-400">
+        {d.associate_details.city || "-"}
+      </span>
+    </div>
+  ) : (
+    <div className="flex items-center justify-center w-full h-full">
+      <span className="text-sm text-gray-400">-</span>
+    </div>
+  )}
+</td>
+
                                             <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 font-mono">
                                                 {session.accessCode}
                                             </td>
