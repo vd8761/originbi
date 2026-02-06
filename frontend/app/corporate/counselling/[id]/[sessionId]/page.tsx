@@ -1,8 +1,8 @@
 
 "use client";
-import React, { useEffect, useState, use } from "react";
+import React, { useEffect, useState } from "react";
 import { corporateDashboardService } from '../../../../../lib/services';
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { ArrowLeftIcon } from '../../../../../components/icons';
 import { User, FileText, Mail, Phone, Globe, Calendar, Download, RefreshCw, CheckCircle, AlertCircle, BookOpen, Target, TrendingUp, Award, Briefcase, ChevronRight, MapPin, Building2, GraduationCap, Sparkles, Clock, ArrowRight, Layers, Star } from "lucide-react";
 
@@ -52,8 +52,8 @@ interface ReportData {
     final_guidance: string;
 }
 
-export default function CounsellingSessionDetailPage({ params }: { params: Promise<{ id: string, sessionId: string }> }) {
-    const resolvedParams = use(params);
+export default function CounsellingSessionDetailPage() {
+    const params = useParams();
     const router = useRouter();
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -68,7 +68,7 @@ export default function CounsellingSessionDetailPage({ params }: { params: Promi
     const [reportGenerating, setReportGenerating] = useState(false);
     const [reportError, setReportError] = useState("");
 
-    const sessionId = Number(resolvedParams.sessionId);
+    const sessionId = params?.sessionId ? Number(params.sessionId) : 0;
 
     // 1. Fetch Session Details
     useEffect(() => {
@@ -618,7 +618,6 @@ export default function CounsellingSessionDetailPage({ params }: { params: Promi
                                                         </li>
                                                     ))}
                                                 </ul>
-                                                
                                                 {/* Fitment Levels Table */}
                                                 <h5 className="font-semibold text-gray-900 dark:text-white mb-3 text-sm">Fitment Levels</h5>
                                                 <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-white/10">
