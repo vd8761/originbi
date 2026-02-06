@@ -51,4 +51,4 @@ import {
   providers: [CorporateDashboardService, CounsellingReportService],
   exports: [CounsellingReportService],
 })
-export class CorporateDashboardModule { }
+export class CorporateDashboardModule {}
