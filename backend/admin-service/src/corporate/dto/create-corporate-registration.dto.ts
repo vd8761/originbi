@@ -71,4 +71,41 @@ export class CreateCorporateRegistrationDto {
 
   @IsOptional()
   counsellingAccess?: number[];
+
+  // Snake_case aliases for Update compatibility
+  @IsOptional()
+  @IsString()
+  full_name?: string;
+
+  @IsOptional()
+  @IsString()
+  company_name?: string;
+
+  @IsOptional()
+  @IsString()
+  job_title?: string;
+
+  @IsOptional()
+  @IsString()
+  employee_ref_id?: string;
+
+  @IsOptional()
+  @IsString()
+  linkedin_url?: string;
+
+  @IsOptional()
+  @IsString()
+  sector_code?: string;
+
+  @IsOptional()
+  @IsString()
+  mobile_number?: string;
+
+  @IsOptional()
+  @IsString()
+  country_code?: string;
+
+  @IsOptional()
+  @IsString()
+  business_locations?: string;
 }

@@ -262,6 +262,20 @@ export class CorporateService {
       ...account,
       email: account.user?.email,
       counsellingAccess: accessRecords.map(a => Number(a.counsellingTypeId)),
+      // Map to snake_case to match findAll and potentially frontend expectations
+      full_name: account.fullName || (account.user?.metadata as any)?.fullName || '',
+      company_name: account.companyName, // Explicitly mapping these ensures they exist even if spread
+      job_title: account.jobTitle,
+      employee_ref_id: account.employeeRefId,
+      linkedin_url: account.linkedinUrl,
+      mobile_number: account.mobileNumber,
+      country_code: account.countryCode,
+      sector_code: account.sectorCode,
+      business_locations: account.businessLocations,
+      available_credits: account.availableCredits,
+      total_credits: account.totalCredits,
+      is_active: account.isActive,
+      is_blocked: account.isBlocked,
     };
   }
 
@@ -278,6 +292,17 @@ export class CorporateService {
     if (!account) {
       throw new BadRequestException('Corporate account not found');
     }
+
+    // Normalize DTO (handle snake_case inputs from frontend)
+    dto.name = dto.name || dto.full_name;
+    dto.companyName = dto.companyName || dto.company_name;
+    dto.jobTitle = dto.jobTitle || dto.job_title;
+    dto.employeeCode = dto.employeeCode || dto.employee_ref_id;
+    dto.linkedinUrl = dto.linkedinUrl || dto.linkedin_url;
+    dto.sector = dto.sector || dto.sector_code;
+    dto.mobile = dto.mobile || dto.mobile_number;
+    dto.countryCode = dto.countryCode || dto.country_code;
+    dto.businessLocations = dto.businessLocations || dto.business_locations;
 
     return this.dataSource.transaction(async (manager) => {
       // 1. Update User fields if email/name changed (though name is in metadata)
