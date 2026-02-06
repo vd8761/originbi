@@ -10,7 +10,6 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import * as nodemailer from 'nodemailer';
 import { SES } from 'aws-sdk';
-import * as path from 'path';
 
 import {
     CorporateAccount,

@@ -221,13 +221,16 @@ export class CounsellingReportService {
 
     private async getCourseDataset(counsellingType?: CounsellingType): Promise<CourseDataset> {
         // Helper function to extract course names from array (handles both string[] and object[])
-        const extractCourseNames = (courses: any[]): string[] => {
+        const extractCourseNames = (courses: unknown[]): string[] => {
             if (!courses || !Array.isArray(courses)) return [];
-            return courses.map(c => {
+            return courses.map((c: unknown): string => {
                 if (typeof c === 'string') return c;
-                if (typeof c === 'object' && c !== null) return c.name || c.course_name || '';
+                if (typeof c === 'object' && c !== null) {
+                    const obj = c as Record<string, unknown>;
+                    return String(obj.name || obj.course_name || '');
+                }
                 return '';
-            }).filter(name => name.length > 0);
+            }).filter((name: string) => name.length > 0);
         };
 
         // First try to get from counselling type's course_details
