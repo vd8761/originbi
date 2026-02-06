@@ -285,9 +285,10 @@ export const corporateDashboardService = {
     // COUNSELLING REPORT METHODS
     // ============================================================================
 
-    async generateCounsellingReport(email: string, sessionId: number): Promise<any> {
+    async generateCounsellingReport(email: string, sessionId: number, force: boolean = false): Promise<any> {
         const token = AuthService.getToken();
-        const res = await fetch(`${API_URL}/dashboard/counselling/report/generate/${sessionId}?email=${encodeURIComponent(email)}`, {
+        const forceParam = force ? '&force=true' : '';
+        const res = await fetch(`${API_URL}/dashboard/counselling/report/generate/${sessionId}?email=${encodeURIComponent(email)}${forceParam}`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

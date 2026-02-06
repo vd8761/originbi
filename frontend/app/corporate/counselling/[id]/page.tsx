@@ -1,7 +1,11 @@
-import React from "react";
-import ClientPage from "./ClientPage";
+import React from 'react';
+import ClientPage from './ClientPage';
 
-export default async function CounsellingSessionListPage({ params }: { params: Promise<{ id: string }> }) {
+type Props = {
+    params: Promise<{ id: string }>;
+};
+
+export default async function CounsellingSessionListPage({ params }: Props) {
     const { id } = await params;
-    return <ClientPage typeId={Number(id)} />;
+    return <ClientPage typeId={parseInt(id)} />;
 }
