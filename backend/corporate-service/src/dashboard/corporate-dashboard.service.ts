@@ -1207,13 +1207,25 @@ export class CorporateDashboardService {
     }
 
     async getSessionResponses(sessionId: number) {
-        const responses = await this.counsellingResponseRepo.find({
+        // Fetch specific responses (latest first to handle retries)
+        const allResponses = await this.counsellingResponseRepo.find({
             where: { sessionId: sessionId },
             relations: ['question', 'selectedOption'],
-            order: { questionId: 'ASC' }
+            order: { createdAt: 'DESC' }
         });
 
-        return responses.map(r => ({
+        // Filter valid unique responses per question
+        const uniqueMap = new Map();
+        allResponses.forEach(r => {
+            if (!uniqueMap.has(r.questionId)) {
+                uniqueMap.set(r.questionId, r);
+            }
+        });
+
+        // Sort by Question ID
+        const responses = Array.from(uniqueMap.values()).sort((a: any, b: any) => a.questionId - b.questionId);
+
+        return responses.map((r: any) => ({
             id: r.id,
             question: r.question.questionTextEn,
             question_ta: r.question.questionTextTa,

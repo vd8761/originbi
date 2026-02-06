@@ -303,11 +303,19 @@ export class CounsellingService {
      * Submits an Answer
      */
     async submitResponse(sessionId: number, questionId: number, optionId: number): Promise<any> {
-        const response = this.responseRepo.create({
-            sessionId,
-            questionId,
-            selectedOptionId: optionId,
+        let response = await this.responseRepo.findOne({
+            where: { sessionId, questionId }
         });
+
+        if (response) {
+            response.selectedOptionId = optionId;
+        } else {
+            response = this.responseRepo.create({
+                sessionId,
+                questionId,
+                selectedOptionId: optionId,
+            });
+        }
         return await this.responseRepo.save(response);
     }
 
