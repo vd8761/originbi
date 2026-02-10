@@ -3,14 +3,28 @@ import {
   ExecutionContext,
   Injectable,
   UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { verifyCognitoIdToken } from './verify-id-token';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
+import { UserEnrichmentService } from './user-enrichment.service';
 
+/**
+ * CognitoAdminGuard
+ *
+ * Strict guard for Admin-only endpoints.
+ * Verifies Cognito token AND requires ADMIN role.
+ * Enriches request.user with full UserContext from DB.
+ */
 @Injectable()
 export class CognitoAdminGuard implements CanActivate {
-  constructor(private readonly config: ConfigService) {}
+  private readonly logger = new Logger(CognitoAdminGuard.name);
+
+  constructor(
+    private readonly config: ConfigService,
+    private readonly userEnrichment: UserEnrichmentService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context
@@ -31,10 +45,15 @@ export class CognitoAdminGuard implements CanActivate {
         throw new UnauthorizedException('NOT_ADMIN');
       }
 
-      request.user = payload;
+      // Enrich with DB data for full UserContext
+      const userContext = await this.userEnrichment.enrichFromCognito(payload);
+      request.user = userContext;
+
+      this.logger.debug(`Admin auth: user=${userContext.id}, email=${userContext.email}`);
       return true;
     } catch (err) {
-      console.error('Token verify failed:', err);
+      if (err instanceof UnauthorizedException) throw err;
+      this.logger.error('Token verify failed:', err);
       throw new UnauthorizedException('INVALID_COGNITO_TOKEN');
     }
   }

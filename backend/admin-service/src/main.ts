@@ -25,12 +25,14 @@ async function bootstrap() {
       'Content-Type',
       'Authorization',
       'X-Requested-With',
+      'X-User-Context',
       'Accept',
       'Origin',
       'Access-Control-Request-Method',
       'Access-Control-Request-Headers',
       'content-type',
       'authorization',
+      'x-user-context',
     ],
   });
 

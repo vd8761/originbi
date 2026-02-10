@@ -9,8 +9,36 @@ import { DataSource } from 'typeorm';
 @Injectable()
 export class EmbeddingsService implements OnModuleInit {
   private readonly logger = new Logger(EmbeddingsService.name);
-  private jinaApiKey: string | null = null;
+  private hfApiToken: string | null = null;
   private pgvectorAvailable = false;
+
+  // Fallback list of free HuggingFace models (all 384 dimensions)
+  private readonly HF_MODELS = [
+    'sentence-transformers/all-MiniLM-L6-v2',
+    'BAAI/bge-small-en-v1.5',
+    'sentence-transformers/paraphrase-MiniLM-L6-v2',
+  ];
+  private activeModelIdx = 0;
+  private readonly EMBEDDING_DIM = 384;
+
+  /** Current model URL – updates automatically on 410 fallback */
+  private get HF_API_URL(): string {
+    return `https://api-inference.huggingface.co/models/${this.HF_MODELS[this.activeModelIdx]}`;
+  }
+  private get HF_MODEL(): string {
+    return this.HF_MODELS[this.activeModelIdx];
+  }
+
+  /** Switch to next model when current one returns 410 Gone */
+  private switchToNextModel(): boolean {
+    if (this.activeModelIdx < this.HF_MODELS.length - 1) {
+      this.activeModelIdx++;
+      this.logger.warn(`⚡ Switching to fallback model: ${this.HF_MODEL}`);
+      return true;
+    }
+    this.logger.error('❌ All HF embedding models exhausted (410 Gone). Embeddings unavailable.');
+    return false;
+  }
 
   // Cache for embeddings to reduce API calls
   private embeddingCache = new Map<
@@ -24,11 +52,11 @@ export class EmbeddingsService implements OnModuleInit {
   constructor(private dataSource: DataSource) { }
 
   async onModuleInit() {
-    this.jinaApiKey = process.env.JINA_API_KEY || null;
-    if (this.jinaApiKey) {
-      this.logger.log('✅ Jina API key configured');
+    this.hfApiToken = process.env.HF_API_TOKEN || null;
+    if (this.hfApiToken) {
+      this.logger.log('✅ HuggingFace API token configured (higher rate limits)');
     } else {
-      this.logger.warn('⚠️ JINA_API_KEY not set - embeddings disabled');
+      this.logger.log('ℹ️  No HF_API_TOKEN – using HuggingFace free tier (works without key, lower rate limits)');
     }
     await this.checkPgvector();
   }
@@ -47,12 +75,28 @@ export class EmbeddingsService implements OnModuleInit {
   /**
    * Generate single embedding with caching and retry
    */
+  /**
+   * Normalize HuggingFace API response to a flat number[] embedding.
+   * HF returns different shapes depending on model / pipeline:
+   *   number[]  – direct embedding
+   *   number[][] – batch with 1 item
+   *   number[][][] – token-level (shouldn't happen for sentence-transformers)
+   */
+  private normalizeEmbedding(data: any): number[] | null {
+    if (!data) return null;
+    if (Array.isArray(data)) {
+      if (typeof data[0] === 'number') return data;          // flat
+      if (Array.isArray(data[0])) {
+        if (typeof data[0][0] === 'number') return data[0];  // nested once
+      }
+    }
+    return null;
+  }
+
   async generateEmbedding(
     text: string,
     task: 'passage' | 'query' = 'passage',
   ): Promise<number[] | null> {
-    if (!this.jinaApiKey) return null;
-
     // Check cache
     const cacheKey = `${task}:${text.slice(0, 100)}`;
     const cached = this.embeddingCache.get(cacheKey);
@@ -62,24 +106,23 @@ export class EmbeddingsService implements OnModuleInit {
 
     for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
       try {
-        // Create AbortController for timeout handling
         const controller = new AbortController();
         const timeoutId = setTimeout(() => {
           controller.abort();
-          this.logger.warn(`Single embedding request timeout after 20 seconds (attempt ${attempt})`);
-        }, 20000); // 20 second timeout
+          this.logger.warn(`HF embedding request timeout after 20s (attempt ${attempt})`);
+        }, 20000);
 
-        const response = await fetch('https://api.jina.ai/v1/embeddings', {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (this.hfApiToken) {
+          headers['Authorization'] = `Bearer ${this.hfApiToken}`;
+        }
+
+        const response = await fetch(this.HF_API_URL, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.jinaApiKey}`,
-          },
+          headers,
           body: JSON.stringify({
-            model: 'jina-embeddings-v3',
-            task: `retrieval.${task}`,
-            dimensions: 1024,
-            input: [text.slice(0, 8000)], // Limit text length
+            inputs: text.slice(0, 8000),
+            options: { wait_for_model: true },
           }),
           signal: controller.signal,
         });
@@ -87,34 +130,45 @@ export class EmbeddingsService implements OnModuleInit {
         clearTimeout(timeoutId);
 
         if (response.status === 429) {
-          // Rate limited - wait and retry
           await this.sleep(1000 * attempt);
           continue;
         }
 
-        if (response.status === 401 || response.status === 403) {
-          this.logger.error('❌ Jina API Key Invalid/Expired (401/403). disabling embeddings.');
-          this.jinaApiKey = null; // Disable for future calls to fail fast
+        if (response.status === 410) {
+          // Model removed from HF serverless – try next model
+          if (this.switchToNextModel()) {
+            continue; // retry with next model
+          }
           return null;
         }
 
+        if (response.status === 503) {
+          // Model still loading on HuggingFace serverless – back off and retry
+          this.logger.warn('HF model loading, retrying…');
+          await this.sleep(2000 * attempt);
+          continue;
+        }
+
+        if (response.status === 401 || response.status === 403) {
+          this.logger.warn('⚠️ HF token invalid – falling back to unauthenticated requests');
+          this.hfApiToken = null;
+          continue; // retry without token
+        }
+
         if (!response.ok) {
-          throw new Error(`Jina API error: ${response.status}`);
+          throw new Error(`HF API error: ${response.status}`);
         }
 
         const data = await response.json();
+        const embedding = this.normalizeEmbedding(data);
 
-        const embedding = data.data[0].embedding;
-
-        // Cache the result
-        this.embeddingCache.set(cacheKey, { embedding, timestamp: Date.now() });
+        if (embedding) {
+          this.embeddingCache.set(cacheKey, { embedding, timestamp: Date.now() });
+        }
         return embedding;
       } catch (error) {
         if (attempt === this.MAX_RETRIES) {
-          this.logger.error(
-            `Failed after ${this.MAX_RETRIES} attempts:`,
-            error,
-          );
+          this.logger.error(`Failed after ${this.MAX_RETRIES} attempts:`, error);
           return null;
         }
         await this.sleep(500 * attempt);
@@ -127,7 +181,7 @@ export class EmbeddingsService implements OnModuleInit {
    * Generate embeddings in batch for efficiency
    */
   async generateBatchEmbeddings(texts: string[]): Promise<(number[] | null)[]> {
-    if (!this.jinaApiKey || texts.length === 0) return texts.map(() => null);
+    if (texts.length === 0) return [];
 
     const results: (number[] | null)[] = new Array(texts.length).fill(null);
 
@@ -146,22 +200,42 @@ export class EmbeddingsService implements OnModuleInit {
             this.logger.warn(`Batch request timeout after 30 seconds (attempt ${attempt})`);
           }, 30000); // 30 second timeout
 
-          const response = await fetch('https://api.jina.ai/v1/embeddings', {
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (this.hfApiToken) {
+            headers['Authorization'] = `Bearer ${this.hfApiToken}`;
+          }
+
+          const response = await fetch(this.HF_API_URL, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${this.jinaApiKey}`,
-            },
+            headers,
             body: JSON.stringify({
-              model: 'jina-embeddings-v3',
-              task: 'retrieval.passage',
-              dimensions: 1024,
-              input: batch,
+              inputs: batch,
+              options: { wait_for_model: true },
             }),
             signal: controller.signal,
           });
 
           clearTimeout(timeoutId);
+
+          if (response.status === 410) {
+            // Model removed – try fallback
+            if (this.switchToNextModel()) {
+              continue;
+            }
+            break; // all models exhausted
+          }
+
+          if (response.status === 503) {
+            this.logger.warn('HF model loading (batch), retrying…');
+            await this.sleep(2000 * attempt);
+            continue;
+          }
+
+          if (response.status === 401 || response.status === 403) {
+            this.logger.warn('⚠️ HF token invalid – retrying without auth');
+            this.hfApiToken = null;
+            continue;
+          }
 
           if (!response.ok) {
             if (attempt === this.MAX_RETRIES) {
@@ -171,9 +245,12 @@ export class EmbeddingsService implements OnModuleInit {
           }
 
           const data = await response.json();
-          data.data.forEach((item: any, idx: number) => {
-            results[i + idx] = item.embedding;
-          });
+          // HF batch response: number[][] (one embedding per input)
+          if (Array.isArray(data)) {
+            data.forEach((item: any, idx: number) => {
+              results[i + idx] = this.normalizeEmbedding([item]) ?? (Array.isArray(item) && typeof item[0] === 'number' ? item : null);
+            });
+          }
           
           // Successfully processed batch, break retry loop
           break;
@@ -360,10 +437,13 @@ export class EmbeddingsService implements OnModuleInit {
     }
   }
 
-  getStatus(): { jinaAvailable: boolean; pgvectorAvailable: boolean } {
+  getStatus(): { embeddingsAvailable: boolean; pgvectorAvailable: boolean; model: string; dimensions: number; fallbackModels: string[] } {
     return {
-      jinaAvailable: !!this.jinaApiKey,
+      embeddingsAvailable: this.activeModelIdx < this.HF_MODELS.length,
       pgvectorAvailable: this.pgvectorAvailable,
+      model: this.HF_MODEL,
+      dimensions: this.EMBEDDING_DIM,
+      fallbackModels: this.HF_MODELS,
     };
   }
 

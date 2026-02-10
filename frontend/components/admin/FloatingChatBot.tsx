@@ -2,11 +2,12 @@
 
 import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { 
-    Send, Bot, User, Loader2, Copy, Check, Trash2, 
-    MessageSquare, Download, X, Minus, Maximize2, 
+import {
+    Send, Bot, User, Loader2, Copy, Check, Trash2,
+    MessageSquare, Download, X, Minus, Maximize2,
     Sparkles, ChevronDown
 } from 'lucide-react';
+import { getAuthHeaders, getStoredUser, snapshotUserToSession } from '../../lib/auth-helpers';
 
 interface Message {
     id: string;
@@ -30,10 +31,10 @@ const TypeWriter = memo(({ text, onDone }: { text: string; onDone?: () => void }
 
     useEffect(() => {
         if (completedRef.current) return;
-        
+
         indexRef.current = 0;
         const charsPerFrame = 3; // Fast typing speed
-        
+
         const animate = () => {
             if (indexRef.current < text.length) {
                 indexRef.current = Math.min(indexRef.current + charsPerFrame, text.length);
@@ -44,9 +45,9 @@ const TypeWriter = memo(({ text, onDone }: { text: string; onDone?: () => void }
                 onDone?.();
             }
         };
-        
+
         frameRef.current = requestAnimationFrame(animate);
-        
+
         return () => {
             if (frameRef.current) cancelAnimationFrame(frameRef.current);
         };
@@ -65,11 +66,11 @@ const TypeWriter = memo(({ text, onDone }: { text: string; onDone?: () => void }
 TypeWriter.displayName = 'TypeWriter';
 
 // Optimized content renderer
-const RenderContent = memo(({ content, streaming, onDone, apiUrl }: { 
-    content: string; 
-    streaming?: boolean; 
-    onDone?: () => void; 
-    apiUrl?: string 
+const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
+    content: string;
+    streaming?: boolean;
+    onDone?: () => void;
+    apiUrl?: string
 }) => {
     if (streaming) return <TypeWriter text={content} onDone={onDone} />;
 
@@ -169,6 +170,9 @@ export default function FloatingChatBot({
     const scrollRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
+    // Snapshot user identity on mount so this tab keeps its own user
+    useEffect(() => { snapshotUserToSession(); }, []);
+
     // Check if on assistant page
     const isAssistantPage = pathname?.includes('/assistant');
 
@@ -205,7 +209,7 @@ export default function FloatingChatBot({
         try {
             const res = await fetch(`${apiUrl}/rag/query`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify({ question: userMsg.content }),
             });
 
@@ -217,7 +221,7 @@ export default function FloatingChatBot({
                 timestamp: new Date(),
                 isStreaming: true
             }]);
-            
+
             if (!isOpen || isMinimized) setHasUnread(true);
         } catch {
             setMessages(prev => [...prev, {
@@ -258,19 +262,19 @@ export default function FloatingChatBot({
                     {/* Animated rings */}
                     <div className="absolute inset-0 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 animate-ping opacity-20" />
                     <div className="absolute inset-0 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 animate-pulse opacity-30" />
-                    
+
                     {/* Main button */}
                     <div className="relative w-14 h-14 rounded-full bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 shadow-lg shadow-emerald-500/30 flex items-center justify-center hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-105 transition-all duration-300">
                         <Bot className="w-6 h-6 text-white" />
                     </div>
-                    
+
                     {/* Unread indicator */}
                     {hasUnread && (
                         <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold animate-bounce">
                             !
                         </span>
                     )}
-                    
+
                     {/* Tooltip */}
                     <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                         Chat with MITHRA
@@ -280,14 +284,12 @@ export default function FloatingChatBot({
             </button>
 
             {/* Chat Window */}
-            <div className={`fixed right-6 bottom-6 z-50 transition-all duration-300 ease-out ${
-                isOpen 
-                    ? 'opacity-100 translate-y-0 scale-100' 
-                    : 'opacity-0 translate-y-4 scale-95 pointer-events-none'
-            }`}>
-                <div className={`bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col transition-all duration-300 ${
-                    isMinimized ? 'w-72 h-14' : 'w-[380px] h-[560px]'
+            <div className={`fixed right-6 bottom-6 z-50 transition-all duration-300 ease-out ${isOpen
+                ? 'opacity-100 translate-y-0 scale-100'
+                : 'opacity-0 translate-y-4 scale-95 pointer-events-none'
                 }`}>
+                <div className={`bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col transition-all duration-300 ${isMinimized ? 'w-72 h-14' : 'w-[380px] h-[560px]'
+                    }`}>
                     {/* Header */}
                     <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 text-white flex-shrink-0">
                         <div className="flex items-center gap-3">
@@ -314,7 +316,16 @@ export default function FloatingChatBot({
                             )}
                             {!isMinimized && (
                                 <button
-                                    onClick={() => router.push('/admin/assistant')}
+                                    onClick={() => {
+                                        // Navigate to the correct assistant page based on current path
+                                        if (pathname?.includes('/corporate/')) {
+                                            router.push('/corporate/assistant');
+                                        } else if (pathname?.includes('/student/')) {
+                                            router.push('/student/assistant');
+                                        } else {
+                                            router.push('/admin/assistant');
+                                        }
+                                    }}
                                     className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
                                     title="Open full page"
                                 >
@@ -354,7 +365,7 @@ export default function FloatingChatBot({
                                         <p className="text-xs text-gray-500 dark:text-gray-400 text-center mb-4">
                                             Your intelligent assistant for talent insights
                                         </p>
-                                        
+
                                         <div className="w-full space-y-2">
                                             {suggestions.map((s, i) => (
                                                 <button
@@ -387,11 +398,10 @@ export default function FloatingChatBot({
 
                                                 {/* Message */}
                                                 <div className={`group flex flex-col max-w-[75%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                                    <div className={`rounded-2xl px-3 py-2.5 ${
-                                                        m.role === 'user'
-                                                            ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white'
-                                                            : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm'
-                                                    }`}>
+                                                    <div className={`rounded-2xl px-3 py-2.5 ${m.role === 'user'
+                                                        ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white'
+                                                        : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm'
+                                                        }`}>
                                                         {m.role === 'assistant' ? (
                                                             <RenderContent
                                                                 content={m.content}

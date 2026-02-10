@@ -176,6 +176,157 @@ export default function CounsellingSessionDetailPage({ params }: { params: Promi
         };
     };
 
+    // 6. Get Course Roadmap - Returns career progression for each course
+    const getCourseRoadmap = (courseName: string): { stage: string; bullets: string[] }[] => {
+        const roadmaps: Record<string, { stage: string; bullets: string[] }[]> = {
+            'Refrigeration & Air conditioner training (A/C)': [
+                { stage: '0-6 Months', bullets: ['Start as Assistant Technician', 'Complete technical training', 'Learn fundamentals'] },
+                { stage: '1-2 Years', bullets: ['Progress to Technician', 'Gain hands-on experience'] },
+                { stage: '3-5 Years', bullets: ['Advance to Senior Technician', 'Take on more responsibilities'] },
+                { stage: '5-8 Years', bullets: ['Move to Supervisor', 'Lead teams'] },
+                { stage: 'Entrepreneur', bullets: ['Own Service Unit or Start Own Company', 'Utilize technical expertise to manage and grow the business'] }
+            ],
+            'Basic Electrical & HVAC Training': [
+                { stage: '0-6 Months', bullets: ['Start as Assistant Technician', 'Complete technical training', 'Learn fundamentals'] },
+                { stage: '1-2 Years', bullets: ['Progress to Technician', 'Gain hands-on experience'] },
+                { stage: '3-5 Years', bullets: ['Advance to Senior Technician', 'Take on more responsibilities'] },
+                { stage: '5-8 Years', bullets: ['Move to Supervisor', 'Lead teams'] },
+                { stage: 'Entrepreneur', bullets: ['Own Service Unit or Start Own Company', 'Utilize technical expertise to manage and grow the business'] }
+            ],
+            'Diploma In HVAC': [
+                { stage: '0-6 Months', bullets: ['Start as Technician', 'Apply theoretical knowledge'] },
+                { stage: '1-2 Years', bullets: ['Advance to Senior Technician', 'Handle complex systems'] },
+                { stage: '3-5 Years', bullets: ['Move to Supervisor role', 'Train junior technicians'] },
+                { stage: '5-8 Years', bullets: ['Become Manager', 'Oversee multiple projects'] },
+                { stage: 'Entrepreneur', bullets: ['Own HVAC Company', 'Build client base and expand operations'] }
+            ],
+            'CERTIFIED HVAC ENGINEER (CHE)': [
+                { stage: '0-6 Months', bullets: ['Start as Asst. Project Engineer', 'Learn project execution'] },
+                { stage: '1-2 Years', bullets: ['Advance to Project Engineer', 'Lead small projects'] },
+                { stage: '3-5 Years', bullets: ['Become Project In Charge', 'Handle multiple projects'] },
+                { stage: '5-8 Years', bullets: ['Move to Project Manager', 'Strategic planning and client management'] },
+                { stage: 'Entrepreneur', bullets: ['Own HVAC Engineering Company', 'Manage large-scale commercial projects'] }
+            ],
+            'NDT & Quality Management Training': [
+                { stage: '0-6 Months', bullets: ['Start as Quality Inspector', 'Learn inspection procedures'] },
+                { stage: '1-2 Years', bullets: ['Advance to Quality In Charge', 'Lead quality audits'] },
+                { stage: '3-5 Years', bullets: ['Become Asst. Manager Quality', 'Implement quality systems'] },
+                { stage: '5-8 Years', bullets: ['Move to QA Manager', 'Drive quality strategy'] },
+                { stage: 'Entrepreneur', bullets: ['Become General Manager (GM)', 'Lead entire quality division'] }
+            ],
+            'Advance Diploma In Fire & Industrial Safety': [
+                { stage: '0-6 Months', bullets: ['Start as Fire Safety Technician', 'Learn safety protocols'] },
+                { stage: '1-2 Years', bullets: ['Advance to Safety Officer/Supervisor', 'Conduct safety audits'] },
+                { stage: '3-5 Years', bullets: ['Become Safety Engineer', 'Design safety systems'] },
+                { stage: '5-8 Years', bullets: ['Move to Safety Manager', 'Lead safety teams'] },
+                { stage: 'Entrepreneur', bullets: ['Become EHS Manager', 'Head Environment, Health & Safety division'] }
+            ],
+            'CERTIFIED HEALTH, SAFETY & ENVIRONMENTAL OFFICER (CHSEO)': [
+                { stage: '0-6 Months', bullets: ['Start as Safety Supervisor', 'Implement safety measures'] },
+                { stage: '1-2 Years', bullets: ['Advance to Safety Officer', 'Lead site safety'] },
+                { stage: '3-5 Years', bullets: ['Become Safety Engineer', 'Design comprehensive safety programs'] },
+                { stage: '5-8 Years', bullets: ['Move to Safety Manager', 'Manage safety across organization'] },
+                { stage: 'Entrepreneur', bullets: ['Become EHS Manager', 'Strategic EHS leadership role'] }
+            ],
+            'WELDING- ARC/TIG/MIG': [
+                { stage: '0-6 Months', bullets: ['Start as Assistant Welder', 'Learn basic welding techniques'] },
+                { stage: '1-2 Years', bullets: ['Advance to Skilled Welder', 'Master different welding types'] },
+                { stage: '3-5 Years', bullets: ['Become Certified Welder', 'Handle specialized projects'] },
+                { stage: '5-8 Years', bullets: ['Move to Welding Supervisor', 'Lead welding teams'] },
+                { stage: 'Entrepreneur', bullets: ['Own Welding Unit', 'Provide welding services independently'] }
+            ],
+            'Welding Supervisor Training': [
+                { stage: '0-6 Months', bullets: ['Start as Welding Foreman', 'Supervise daily operations'] },
+                { stage: '1-2 Years', bullets: ['Advance to Welding Supervisor', 'Manage welding teams'] },
+                { stage: '3-5 Years', bullets: ['Become Welding In Charge', 'Oversee multiple projects'] },
+                { stage: '5-8 Years', bullets: ['Move to Manager', 'Strategic operations management'] },
+                { stage: 'Entrepreneur', bullets: ['Own Welding Company', 'Expand to fabrication services'] }
+            ],
+            'MECHANICAL ELECTRICAL PLUMBING ENGINEER (MEP)': [
+                { stage: '0-6 Months', bullets: ['Start as Asst. Project Engineer', 'Learn MEP systems'] },
+                { stage: '1-2 Years', bullets: ['Advance to Project Engineer', 'Execute MEP projects'] },
+                { stage: '3-5 Years', bullets: ['Become Project In Charge', 'Lead project teams'] },
+                { stage: '5-8 Years', bullets: ['Move to Project Manager', 'Handle client relationships'] },
+                { stage: 'Entrepreneur', bullets: ['Own MEP Consultancy', 'Provide engineering services'] }
+            ],
+            'CERTIFIED OIL & GAS PIPING ENGINEER (CPE)': [
+                { stage: '0-6 Months', bullets: ['Start as Asst. Site Engineer', 'Learn piping systems'] },
+                { stage: '1-2 Years', bullets: ['Advance to Project Engineer', 'Execute piping projects'] },
+                { stage: '3-5 Years', bullets: ['Become Project In Charge', 'Manage project delivery'] },
+                { stage: '5-8 Years', bullets: ['Move to Project Manager', 'Lead major projects'] },
+                { stage: 'Entrepreneur', bullets: ['Own Engineering Company', 'Serve oil & gas industry'] }
+            ],
+            'Electrician': [
+                { stage: '0-6 Months', bullets: ['Start as Assistant Technician', 'Learn electrical basics'] },
+                { stage: '1-2 Years', bullets: ['Advance to Technician', 'Handle installations'] },
+                { stage: '3-5 Years', bullets: ['Become Senior Technician', 'Complex troubleshooting'] },
+                { stage: '5-8 Years', bullets: ['Move to Supervisor', 'Lead electrical teams'] },
+                { stage: 'Entrepreneur', bullets: ['Own Electrical Service Unit', 'Provide independent services'] }
+            ],
+            'Plumber': [
+                { stage: '0-6 Months', bullets: ['Start as Assistant Technician', 'Learn plumbing fundamentals'] },
+                { stage: '1-2 Years', bullets: ['Advance to Technician', 'Handle installations'] },
+                { stage: '3-5 Years', bullets: ['Become Senior Technician', 'Complex systems'] },
+                { stage: '5-8 Years', bullets: ['Move to Supervisor', 'Lead plumbing teams'] },
+                { stage: 'Entrepreneur', bullets: ['Own Plumbing Service Business', 'Commercial & residential services'] }
+            ],
+            'Industrial electrician': [
+                { stage: '0-6 Months', bullets: ['Start as Assistant Technician', 'Industrial equipment basics'] },
+                { stage: '1-2 Years', bullets: ['Advance to Technician', 'Maintain industrial systems'] },
+                { stage: '3-5 Years', bullets: ['Become Senior Technician', 'Handle automation'] },
+                { stage: '5-8 Years', bullets: ['Move to Supervisor', 'Manage industrial electrical systems'] },
+                { stage: 'Entrepreneur', bullets: ['Own Industrial Electrical Service Unit', 'Serve manufacturing sector'] }
+            ],
+            'HOME APPLIANCE TRAINING': [
+                { stage: '0-6 Months', bullets: ['Start as Assistant Technician', 'Learn appliance repair'] },
+                { stage: '1-2 Years', bullets: ['Advance to Technician', 'Handle varied appliances'] },
+                { stage: '3-5 Years', bullets: ['Become Senior Technician', 'Complex repairs'] },
+                { stage: '5-8 Years', bullets: ['Move to Supervisor', 'Manage service center'] },
+                { stage: 'Entrepreneur', bullets: ['Own Appliance Service Center', 'Brand authorized services'] }
+            ],
+            'Fitter': [
+                { stage: '0-6 Months', bullets: ['Start as Assistant Fitter', 'Learn fitting basics'] },
+                { stage: '1-2 Years', bullets: ['Advance to Skilled Fitter', 'Precision fitting work'] },
+                { stage: '3-5 Years', bullets: ['Become Certified Fitter', 'Handle complex assemblies'] },
+                { stage: '5-8 Years', bullets: ['Move to Fitter Supervisor', 'Lead fitting teams'] },
+                { stage: 'Entrepreneur', bullets: ['Own Fitting/Fabrication Unit', 'Provide industrial services'] }
+            ],
+            'Automobile Quality Inspector Training': [
+                { stage: '0-6 Months', bullets: ['Start as Quality Inspector', 'Learn inspection processes'] },
+                { stage: '1-2 Years', bullets: ['Advance to Quality In Charge', 'Lead quality checks'] },
+                { stage: '3-5 Years', bullets: ['Become Asst. Manager Quality', 'Implement quality systems'] },
+                { stage: '5-8 Years', bullets: ['Move to QA Manager', 'Drive quality strategy'] },
+                { stage: 'Entrepreneur', bullets: ['Become General Manager (GM)', 'Lead quality operations'] }
+            ],
+            'Washing Machine Training': [
+                { stage: '0-6 Months', bullets: ['Start as Assistant Technician', 'Learn appliance repair'] },
+                { stage: '1-2 Years', bullets: ['Advance to Technician', 'Independent repairs'] },
+                { stage: '3-5 Years', bullets: ['Become Senior Technician', 'Train others'] },
+                { stage: '5-8 Years', bullets: ['Move to Supervisor', 'Manage service team'] },
+                { stage: 'Entrepreneur', bullets: ['Own Appliance Service Center', 'Multi-brand service center'] }
+            ]
+        };
+
+        // Find matching roadmap (case insensitive partial match)
+        const normalizedName = courseName.toLowerCase().trim();
+        for (const [key, value] of Object.entries(roadmaps)) {
+            if (key.toLowerCase().trim() === normalizedName ||
+                normalizedName.includes(key.toLowerCase()) ||
+                key.toLowerCase().includes(normalizedName)) {
+                return value;
+            }
+        }
+
+        // Default roadmap if course not found
+        return [
+            { stage: '0-6 Months', bullets: ['Start at Entry Level position', 'Complete initial training', 'Learn fundamentals'] },
+            { stage: '1-2 Years', bullets: ['Progress to Skilled Professional', 'Gain hands-on experience'] },
+            { stage: '3-5 Years', bullets: ['Advance to Senior Professional', 'Take on leadership responsibilities'] },
+            { stage: '5-8 Years', bullets: ['Move to Supervisor/Manager role', 'Lead teams and projects'] },
+            { stage: 'Entrepreneur', bullets: ['Own Business', 'Utilize expertise to manage and grow operations'] }
+        ];
+    };
+
     // ... (rest of the file until the report tab content)
 
 
@@ -618,7 +769,7 @@ export default function CounsellingSessionDetailPage({ params }: { params: Promi
                                                         </li>
                                                     ))}
                                                 </ul>
-                                                
+
                                                 {/* Fitment Levels Table */}
                                                 <h5 className="font-semibold text-gray-900 dark:text-white mb-3 text-sm">Fitment Levels</h5>
                                                 <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-white/10">
@@ -691,37 +842,64 @@ export default function CounsellingSessionDetailPage({ params }: { params: Promi
                                                 {report.perfect_courses?.length > 0 && (
                                                     <>
                                                         <h5 className="font-bold text-green-700 dark:text-green-400 mb-4 text-base">Priority 1: Top Recommendations</h5>
-                                                        <div className="space-y-4 mb-6">
-                                                            {report.perfect_courses.map((c, i) => (
-                                                                <div key={i} className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/10 rounded-r-xl overflow-hidden">
-                                                                    <div className="flex items-center justify-between p-4 bg-green-100/50 dark:bg-green-900/20">
-                                                                        <span className="font-bold text-green-800 dark:text-green-300 text-base">{c.name}</span>
-                                                                        <span className="px-3 py-1.5 bg-green-600 text-white text-sm font-bold rounded-lg">{c.fitment}% Match</span>
-                                                                    </div>
-                                                                    <div className="p-4">
-                                                                        {c.why_recommended && c.why_recommended.length > 0 && (
-                                                                            <div className="mb-3">
-                                                                                <p className="font-semibold text-sm text-gray-800 dark:text-white mb-2">Why recommended:</p>
-                                                                                <ul className="space-y-1.5">
-                                                                                    {c.why_recommended.map((r, j) => (
-                                                                                        <li key={j} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
-                                                                                            <span className="text-green-600 mt-1">•</span>
-                                                                                            {r}
-                                                                                        </li>
+                                                        <div className="space-y-6 mb-6">
+                                                            {report.perfect_courses.map((c, i) => {
+                                                                // Get roadmap for this course
+                                                                const courseRoadmap = getCourseRoadmap(c.name);
+                                                                return (
+                                                                    <div key={i} className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/10 rounded-r-xl overflow-hidden">
+                                                                        <div className="flex items-center justify-between p-4 bg-green-100/50 dark:bg-green-900/20">
+                                                                            <span className="font-bold text-green-800 dark:text-green-300 text-base">{c.name}</span>
+                                                                            <span className="px-3 py-1.5 bg-green-600 text-white text-sm font-bold rounded-lg">{c.fitment}% Match</span>
+                                                                        </div>
+                                                                        <div className="p-4">
+                                                                            {c.why_recommended && c.why_recommended.length > 0 && (
+                                                                                <div className="mb-4">
+                                                                                    <p className="font-semibold text-sm text-gray-800 dark:text-white mb-2">Why recommended:</p>
+                                                                                    <ul className="space-y-1.5">
+                                                                                        {c.why_recommended.map((r, j) => (
+                                                                                            <li key={j} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                                                                                <span className="text-green-600 mt-1">•</span>
+                                                                                                {r}
+                                                                                            </li>
+                                                                                        ))}
+                                                                                    </ul>
+                                                                                </div>
+                                                                            )}
+
+                                                                            {/* Career Roadmap for this course */}
+                                                                            <div className="mt-4 pt-4 border-t border-green-200 dark:border-green-800/30">
+                                                                                <h6 className="font-bold text-[#150089] dark:text-white mb-4 text-sm flex items-center gap-2">
+                                                                                    <TrendingUp className="w-4 h-4 text-brand-green" />
+                                                                                    Suggested Career Roadmap
+                                                                                </h6>
+                                                                                <div className="space-y-3">
+                                                                                    {courseRoadmap.map((step, stepIdx) => (
+                                                                                        <div key={stepIdx} className="flex items-start gap-4">
+                                                                                            {/* Step Label Box */}
+                                                                                            <div className="flex-shrink-0 w-28 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-lg py-2 px-3 text-center border border-blue-100 dark:border-blue-800/30">
+                                                                                                <p className="text-[10px] text-[#150089] dark:text-blue-300 font-semibold uppercase tracking-wide">STEP {String(stepIdx + 1).padStart(2, '0')}</p>
+                                                                                                <p className="text-sm font-bold text-[#150089] dark:text-white">{step.stage}</p>
+                                                                                            </div>
+                                                                                            {/* Step Content */}
+                                                                                            <div className="flex-1 pt-1">
+                                                                                                <ul className="space-y-1">
+                                                                                                    {step.bullets.map((bullet, bulletIdx) => (
+                                                                                                        <li key={bulletIdx} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                                                                                            <span className="text-[#150089] dark:text-blue-400 mt-1">•</span>
+                                                                                                            {bullet}
+                                                                                                        </li>
+                                                                                                    ))}
+                                                                                                </ul>
+                                                                                            </div>
+                                                                                        </div>
                                                                                     ))}
-                                                                                </ul>
+                                                                                </div>
                                                                             </div>
-                                                                        )}
-                                                                        {c.career_progression && (
-                                                                            <div className="pt-2 border-t border-green-200 dark:border-green-800/30">
-                                                                                <p className="text-sm text-gray-700 dark:text-gray-300">
-                                                                                    <span className="font-semibold">Career Progression:</span> {c.career_progression}
-                                                                                </p>
-                                                                            </div>
-                                                                        )}
+                                                                        </div>
                                                                     </div>
-                                                                </div>
-                                                            ))}
+                                                                );
+                                                            })}
                                                         </div>
                                                     </>
                                                 )}
@@ -730,28 +908,63 @@ export default function CounsellingSessionDetailPage({ params }: { params: Promi
                                                 {report.good_courses?.length > 0 && (
                                                     <>
                                                         <h5 className="font-bold text-blue-700 dark:text-blue-400 mb-4 text-base">Priority 2: Strong Alternatives</h5>
-                                                        <div className="space-y-4">
-                                                            {report.good_courses.map((c, i) => (
-                                                                <div key={i} className="border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/10 rounded-r-xl overflow-hidden">
-                                                                    <div className="flex items-center justify-between p-4 bg-blue-100/50 dark:bg-blue-900/20">
-                                                                        <span className="font-bold text-blue-800 dark:text-blue-300 text-base">{c.name}</span>
-                                                                        <span className="px-3 py-1.5 bg-blue-600 text-white text-sm font-bold rounded-lg">{c.fitment}% Match</span>
-                                                                    </div>
-                                                                    {c.why_recommended && c.why_recommended.length > 0 && (
-                                                                        <div className="p-4">
-                                                                            <p className="font-semibold text-sm text-gray-800 dark:text-white mb-2">Why recommended:</p>
-                                                                            <ul className="space-y-1.5">
-                                                                                {c.why_recommended.map((r, j) => (
-                                                                                    <li key={j} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
-                                                                                        <span className="text-blue-600 mt-1">•</span>
-                                                                                        {r}
-                                                                                    </li>
-                                                                                ))}
-                                                                            </ul>
+                                                        <div className="space-y-6">
+                                                            {report.good_courses.map((c, i) => {
+                                                                const courseRoadmap = getCourseRoadmap(c.name);
+                                                                return (
+                                                                    <div key={i} className="border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/10 rounded-r-xl overflow-hidden">
+                                                                        <div className="flex items-center justify-between p-4 bg-blue-100/50 dark:bg-blue-900/20">
+                                                                            <span className="font-bold text-blue-800 dark:text-blue-300 text-base">{c.name}</span>
+                                                                            <span className="px-3 py-1.5 bg-blue-600 text-white text-sm font-bold rounded-lg">{c.fitment}% Match</span>
                                                                         </div>
-                                                                    )}
-                                                                </div>
-                                                            ))}
+                                                                        <div className="p-4">
+                                                                            {c.why_recommended && c.why_recommended.length > 0 && (
+                                                                                <div className="mb-4">
+                                                                                    <p className="font-semibold text-sm text-gray-800 dark:text-white mb-2">Why recommended:</p>
+                                                                                    <ul className="space-y-1.5">
+                                                                                        {c.why_recommended.map((r, j) => (
+                                                                                            <li key={j} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                                                                                <span className="text-blue-600 mt-1">•</span>
+                                                                                                {r}
+                                                                                            </li>
+                                                                                        ))}
+                                                                                    </ul>
+                                                                                </div>
+                                                                            )}
+
+                                                                            {/* Career Roadmap for this course */}
+                                                                            <div className="mt-4 pt-4 border-t border-blue-200 dark:border-blue-800/30">
+                                                                                <h6 className="font-bold text-[#150089] dark:text-white mb-4 text-sm flex items-center gap-2">
+                                                                                    <TrendingUp className="w-4 h-4 text-brand-green" />
+                                                                                    Suggested Career Roadmap
+                                                                                </h6>
+                                                                                <div className="space-y-3">
+                                                                                    {courseRoadmap.map((step, stepIdx) => (
+                                                                                        <div key={stepIdx} className="flex items-start gap-4">
+                                                                                            {/* Step Label Box */}
+                                                                                            <div className="flex-shrink-0 w-28 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-lg py-2 px-3 text-center border border-blue-100 dark:border-blue-800/30">
+                                                                                                <p className="text-[10px] text-[#150089] dark:text-blue-300 font-semibold uppercase tracking-wide">STEP {String(stepIdx + 1).padStart(2, '0')}</p>
+                                                                                                <p className="text-sm font-bold text-[#150089] dark:text-white">{step.stage}</p>
+                                                                                            </div>
+                                                                                            {/* Step Content */}
+                                                                                            <div className="flex-1 pt-1">
+                                                                                                <ul className="space-y-1">
+                                                                                                    {step.bullets.map((bullet, bulletIdx) => (
+                                                                                                        <li key={bulletIdx} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                                                                                            <span className="text-[#150089] dark:text-blue-400 mt-1">•</span>
+                                                                                                            {bullet}
+                                                                                                        </li>
+                                                                                                    ))}
+                                                                                                </ul>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
                                                     </>
                                                 )}
@@ -926,7 +1139,7 @@ export default function CounsellingSessionDetailPage({ params }: { params: Promi
 }
 
 // ============================================================================
-// PDF Generation Helper - Exact 5-Page A4 Layout Matching Sample PDF
+// PDF Generation Helper - Fixed A4 Pages with Proper Layout
 // ============================================================================
 
 function generatePrintableHTML(report: ReportData, studentName: string, counsellingTypeId: string): string {
@@ -944,6 +1157,196 @@ function generatePrintableHTML(report: ReportData, studentName: string, counsell
     const dateCode = `${day}${month}${year}`;
     const refNo = `OBI-S${counsellingTypeId}${dateCode}`;
 
+    // Career roadmap data based on course name (from Course Career path-2026.docx)
+    const getCareerRoadmap = (courseName: string): { stage: string; role: string }[] => {
+        const roadmaps: Record<string, { stage: string; role: string }[]> = {
+            'Refrigeration & Air conditioner training (A/C)': [
+                { stage: '0-6 Months', role: 'Assistant Technician' },
+                { stage: '1-2 Years', role: 'Technician' },
+                { stage: '3-5 Years', role: 'Senior Technician' },
+                { stage: '5-8 Years', role: 'Supervisor' },
+                { stage: 'Entrepreneur', role: 'Own Service Unit' }
+            ],
+            'Basic Electrical & HVAC Training': [
+                { stage: '0-6 Months', role: 'Assistant Technician' },
+                { stage: '1-2 Years', role: 'Technician' },
+                { stage: '3-5 Years', role: 'Senior Technician' },
+                { stage: '5-8 Years', role: 'Supervisor' },
+                { stage: 'Entrepreneur', role: 'Own Service Unit' }
+            ],
+            'Diploma In HVAC': [
+                { stage: '0-6 Months', role: 'Technician' },
+                { stage: '1-2 Years', role: 'Senior Technician' },
+                { stage: '3-5 Years', role: 'Supervisor' },
+                { stage: '5-8 Years', role: 'Manager' },
+                { stage: 'Entrepreneur', role: 'Own Company' }
+            ],
+            'CERTIFIED HVAC ENGINEER (CHE)': [
+                { stage: '0-6 Months', role: 'Asst. Project Engineer' },
+                { stage: '1-2 Years', role: 'Project Engineer' },
+                { stage: '3-5 Years', role: 'Project In Charge' },
+                { stage: '5-8 Years', role: 'Project Manager' },
+                { stage: 'Entrepreneur', role: 'Own HVAC Company' }
+            ],
+            'NDT & Quality Management Training': [
+                { stage: '0-6 Months', role: 'Quality Inspector' },
+                { stage: '1-2 Years', role: 'Quality In Charge' },
+                { stage: '3-5 Years', role: 'Asst. Manager Quality' },
+                { stage: '5-8 Years', role: 'QA Manager' },
+                { stage: 'Entrepreneur', role: 'GM' }
+            ],
+            'Advance Diploma In Fire & Industrial Safety': [
+                { stage: '0-6 Months', role: 'Fire Safety Technician' },
+                { stage: '1-2 Years', role: 'Safety Officer/Supervisor' },
+                { stage: '3-5 Years', role: 'Safety Engineer' },
+                { stage: '5-8 Years', role: 'Safety Manager' },
+                { stage: 'Entrepreneur', role: 'EHS Manager' }
+            ],
+            'CERTIFIED HEALTH, SAFETY & ENVIRONMENTAL OFFICER (CHSEO)': [
+                { stage: '0-6 Months', role: 'Safety Supervisor' },
+                { stage: '1-2 Years', role: 'Safety Officer' },
+                { stage: '3-5 Years', role: 'Safety Engineer' },
+                { stage: '5-8 Years', role: 'Safety Manager' },
+                { stage: 'Entrepreneur', role: 'EHS Manager' }
+            ],
+            'WELDING- ARC/TIG/MIG': [
+                { stage: '0-6 Months', role: 'Assistant Welder' },
+                { stage: '1-2 Years', role: 'Skilled Welder' },
+                { stage: '3-5 Years', role: 'Certified Welder' },
+                { stage: '5-8 Years', role: 'Welding Supervisor' },
+                { stage: 'Entrepreneur', role: 'Own Welding Unit' }
+            ],
+            'Welding Supervisor Training': [
+                { stage: '0-6 Months', role: 'Welding Foreman' },
+                { stage: '1-2 Years', role: 'Welding Supervisor' },
+                { stage: '3-5 Years', role: 'Welding In Charge' },
+                { stage: '5-8 Years', role: 'Manager' },
+                { stage: 'Entrepreneur', role: 'Own Company' }
+            ],
+            'MECHANICAL ELECTRICAL PLUMBING ENGINEER (MEP)': [
+                { stage: '0-6 Months', role: 'Asst. Project Engineer' },
+                { stage: '1-2 Years', role: 'Project Engineer' },
+                { stage: '3-5 Years', role: 'Project In Charge' },
+                { stage: '5-8 Years', role: 'Project Manager' },
+                { stage: 'Entrepreneur', role: 'Own MEP Company' }
+            ],
+            'CERTIFIED OIL & GAS PIPING ENGINEER (CPE)': [
+                { stage: '0-6 Months', role: 'Asst. Site Engineer' },
+                { stage: '1-2 Years', role: 'Project Engineer' },
+                { stage: '3-5 Years', role: 'Project In Charge' },
+                { stage: '5-8 Years', role: 'Project Manager' },
+                { stage: 'Entrepreneur', role: 'Own Company' }
+            ],
+            'Electrician': [
+                { stage: '0-6 Months', role: 'Assistant Technician' },
+                { stage: '1-2 Years', role: 'Technician' },
+                { stage: '3-5 Years', role: 'Senior Technician' },
+                { stage: '5-8 Years', role: 'Supervisor' },
+                { stage: 'Entrepreneur', role: 'Own Service Unit' }
+            ],
+            'Plumber': [
+                { stage: '0-6 Months', role: 'Assistant Technician' },
+                { stage: '1-2 Years', role: 'Technician' },
+                { stage: '3-5 Years', role: 'Senior Technician' },
+                { stage: '5-8 Years', role: 'Supervisor' },
+                { stage: 'Entrepreneur', role: 'Own Service Unit' }
+            ],
+            'Industrial electrician': [
+                { stage: '0-6 Months', role: 'Assistant Technician' },
+                { stage: '1-2 Years', role: 'Technician' },
+                { stage: '3-5 Years', role: 'Senior Technician' },
+                { stage: '5-8 Years', role: 'Supervisor' },
+                { stage: 'Entrepreneur', role: 'Own Service Unit' }
+            ],
+            'HOME APPLIANCE TRAINING': [
+                { stage: '0-6 Months', role: 'Assistant Technician' },
+                { stage: '1-2 Years', role: 'Technician' },
+                { stage: '3-5 Years', role: 'Senior Technician' },
+                { stage: '5-8 Years', role: 'Supervisor' },
+                { stage: 'Entrepreneur', role: 'Own Service Unit' }
+            ],
+            'Fitter': [
+                { stage: '0-6 Months', role: 'Assistant Fitter' },
+                { stage: '1-2 Years', role: 'Skilled Fitter' },
+                { stage: '3-5 Years', role: 'Certified Fitter' },
+                { stage: '5-8 Years', role: 'Fitter Supervisor' },
+                { stage: 'Entrepreneur', role: 'Own Unit' }
+            ],
+            'Automobile Quality Inspector Training': [
+                { stage: '0-6 Months', role: 'Quality Inspector' },
+                { stage: '1-2 Years', role: 'Quality In Charge' },
+                { stage: '3-5 Years', role: 'Asst. Manager Quality' },
+                { stage: '5-8 Years', role: 'QA Manager' },
+                { stage: 'Entrepreneur', role: 'GM' }
+            ],
+            'Washing Machine Training': [
+                { stage: '0-6 Months', role: 'Assistant Technician' },
+                { stage: '1-2 Years', role: 'Technician' },
+                { stage: '3-5 Years', role: 'Senior Technician' },
+                { stage: '5-8 Years', role: 'Supervisor' },
+                { stage: 'Entrepreneur', role: 'Own Service Unit' }
+            ]
+        };
+
+        // Find matching roadmap (case insensitive partial match)
+        const normalizedName = courseName.toLowerCase().trim();
+        for (const [key, value] of Object.entries(roadmaps)) {
+            if (key.toLowerCase().trim() === normalizedName ||
+                normalizedName.includes(key.toLowerCase()) ||
+                key.toLowerCase().includes(normalizedName)) {
+                return value;
+            }
+        }
+
+        // Default roadmap if course not found
+        return [
+            { stage: '0-6 Months', role: 'Entry Level' },
+            { stage: '1-2 Years', role: 'Skilled Professional' },
+            { stage: '3-5 Years', role: 'Senior Professional' },
+            { stage: '5-8 Years', role: 'Supervisor/Manager' },
+            { stage: 'Entrepreneur', role: 'Own Business' }
+        ];
+    };
+
+    // Generate course card with its career roadmap
+    const generateCourseWithRoadmap = (course: CourseRecommendation, type: 'perfect' | 'good') => {
+        const roadmap = getCareerRoadmap(course.name);
+        const bgColor = type === 'perfect' ? '#dcfce7' : '#dbeafe';
+        const borderColor = type === 'perfect' ? '#22c55e' : '#3b82f6';
+        const textColor = type === 'perfect' ? '#166534' : '#1e40af';
+        
+        return `
+        <div class="course-card">
+            <div class="course-card-header" style="background: ${bgColor}; border-left: 3mm solid ${borderColor};">
+                <div class="course-name" style="color: ${textColor};">${course.name}</div>
+                <div class="course-score" style="background: ${borderColor};">${course.fitment}%</div>
+            </div>
+            ${course.why_recommended?.length ? `
+            <div class="course-reasons">
+                <strong>Why recommended:</strong>
+                <ul>${course.why_recommended.map(r => `<li>${r}</li>`).join('')}</ul>
+            </div>
+            ` : ''}
+            <div class="career-roadmap">
+                <div class="roadmap-heading">Suggested Career Roadmap</div>
+                <table class="roadmap-table">
+                    <tbody>
+                        ${roadmap.map((step, i) => `
+                        <tr>
+                            <td class="roadmap-left">
+                                <div class="roadmap-step-num">STEP 0${i + 1}</div>
+                                <div class="roadmap-year">${step.stage}</div>
+                            </td>
+                            <td class="roadmap-right">${step.role}</td>
+                        </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        `;
+    };
+
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -954,647 +1357,456 @@ function generatePrintableHTML(report: ReportData, studentName: string, counsell
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap');
+        
         @page { 
-            size: A4 portrait; 
-            margin: 0; 
+            size: A4;
+            margin: 0;
         }
         
-        *, *::before, *::after { 
+        * { 
             margin: 0; 
             padding: 0; 
             box-sizing: border-box; 
         }
         
-        html { 
-            font-size: 18pt;
-            -webkit-text-size-adjust: 100%;
-        }
-        
-        body { 
+        html, body { 
             width: 210mm;
             margin: 0 auto;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-            font-size: 12pt;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 10pt;
             line-height: 1.5;
-            color: #000000;
-            background: #ffffff;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            text-align: justify;
+            color: #1a1a1a;
+            background: #fff;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
         }
         
-        /* ===== PAGE 1: COVER ===== */
+        /* ========== PAGE WRAPPER ========== */
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            height: 297mm;
+            position: relative;
+            page-break-after: always;
+            overflow: hidden;
+        }
+        
+        .page:last-child {
+            page-break-after: auto;
+        }
+        
+        /* ========== COVER PAGE (Page 1) ========== */
         .cover-page {
             width: 210mm;
             height: 297mm;
             position: relative;
             background: url('/Handbook_Cover_Default.jpg') no-repeat center center;
-            background-size: 210mm 297mm;
-            page-break-after: always;
-            overflow: hidden;
+            background-size: cover;
         }
         
         .cover-logo {
             position: absolute;
-            top: 10mm;
-            right: 12mm;
+            top: 12mm;
+            right: 15mm;
             width: 22mm;
             height: auto;
         }
         
         .cover-title {
             position: absolute;
-            top: 12mm;
-            left: 12mm;
+            top: 15mm;
+            left: 15mm;
             font-family: 'Sora', sans-serif;
-            font-size: 28pt;
+            font-size: 26pt;
             font-weight: 700;
             color: #150089;
             line-height: 1.2;
-            max-width: 125mm;
+            max-width: 120mm;
         }
         
         .cover-ref {
-    position: absolute;
-
-    top: 34mm;   /* sits below logo */
-    right: 16mm;
-
-    transform: rotate(-90deg);
-    transform-origin: top right;
-
-    font-family: 'Inter', sans-serif;
-    font-size: 7pt;
-    font-weight: 500;
-    color: rgba(0,0,0,0.35);
-    letter-spacing:0px;
-    white-space: nowrap;
-}
-
-
+            position: absolute;
+            top: 50mm;
+            right: 15mm;
+            transform: rotate(-90deg);
+            transform-origin: top right;
+            font-size: 7pt;
+            color: rgba(0,0,0,0.25);
+            letter-spacing: 0.5px;
+        }
         
         .cover-bottom-left {
             position: absolute;
             bottom: 20mm;
-            left: 12mm;
+            left: 15mm;
         }
         
         .cover-label {
             font-family: 'Sora', sans-serif;
-            font-size: 16pt;
+            font-size: 13pt;
             font-weight: 600;
-            color: #000000;
+            color: #1a1a1a;
         }
         
         .cover-date {
-            font-family: 'Inter', sans-serif;
-            font-size: 14pt;
-            font-weight: 400;
-            color: #000000;
+            font-size: 11pt;
+            color: #555;
             margin-top: 2mm;
         }
         
         .cover-candidate {
             position: absolute;
             bottom: 20mm;
-            right: 12mm;
+            right: 15mm;
             font-family: 'Sora', sans-serif;
-            font-size: 22pt;
+            font-size: 20pt;
             font-weight: 700;
             color: #150089;
             text-align: right;
         }
         
-        /* ===== CONTENT PAGES 2-5 ===== */
+        /* ========== CONTENT PAGES (Pages 2-6) ========== */
         .content-page {
             width: 210mm;
             height: 297mm;
-            padding: 12mm 15mm 22mm 15mm;
             position: relative;
-            background: url('/Watermark_Background.jpg') no-repeat center center;
-            background-size: 210mm 297mm;
-            page-break-after: always;
+            padding: 12mm 12mm 18mm 12mm;
+            border: 1.5pt solid #150089;
+            background: #fff;
+        }
+        
+        .page-content {
+            height: calc(297mm - 12mm - 18mm - 14mm);
             overflow: hidden;
         }
         
-        .content-page:last-child { 
-            page-break-after: auto; 
-        }
-        
-        /* Section Title - 16pt Sora bold brand blue NO underline */
-        .section-title {
-            font-family: 'Sora', sans-serif;
-            font-size: 16pt;
-            font-weight: 700;
-            color: #150089;
-            margin: 0 0 2.5mm 0;
-            padding: 0;
-            border: none;
-        }
-        
-        /* Sub-section Title - 14pt Sora bold brand blue NO underline */
-        .section-title-sm {
-            font-family: 'Sora', sans-serif;
-            font-size: 14pt;
-            font-weight: 700;
-            color: #150089;
-            margin: 2.5mm 0 1.5mm 0;
-            padding: 0;
-            border: none;
-        }
-        
-        /* Gray sub-section (Entry Level) */
-        .section-title-gray {
-            font-family: 'Sora', sans-serif;
-            font-size: 16pt;
-            font-weight: 700;
-            color: #505050;
-            margin: 3.5mm 0 2mm 0;
-        }
-        
-        /* Blue sub-section (International) */
-        .section-title-blue {
-            font-family: 'Sora', sans-serif;
-            font-size: 16pt;
-            font-weight: 700;
-            color: #003296;
-            margin: 3.5mm 0 2mm 0;
-        }
-        
-        /* Text - 12pt Inter */
-        .text-block {
-            font-family: 'Inter', sans-serif;
-            font-size: 12pt;
-            line-height: 1.45;
-            color: #000000;
-            margin-bottom: 2mm;
-            text-align: justify;
-        }
-        
-        .text-sm {
-            font-family: 'Inter', sans-serif;
-            font-size: 11pt;
-            line-height: 1.45;
-            color: #000000;
-            margin-bottom: 2mm;
-            text-align: justify;
-        }
-        
-        /* Bullet Lists */
-        .bullet-list {
-            list-style: disc outside;
-            padding-left: 6mm;
-            margin: 1mm 0 2mm 0;
-        }
-        
-        .bullet-list li {
-            font-family: 'Inter', sans-serif;
-            font-size: 11pt;
-            line-height: 1.4;
-            padding: 0.5mm 0;
-            color: #000000;
-            text-align: justify;
-        }
-        
-        /* ===== FITMENT LEVELS TABLE ===== */
-        .fitment-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 2mm 0 2.5mm 0;
-            font-family: 'Inter', sans-serif;
-            font-size: 10pt;
-            table-layout: fixed;
-        }
-        
-        .fitment-table th {
-            background-color: #f5f5f5;
-            padding: 2mm 2.5mm;
-            text-align: center;
-            border: 0.5pt solid #999999;
-            font-weight: 600;
-            color: #000000;
-            font-size: 10pt;
-        }
-        
-        .fitment-table th:nth-child(1) { width: 18%; text-align: center; }
-        .fitment-table th:nth-child(2) { width: 27%; text-align: center; }
-        .fitment-table th:nth-child(3) { width: 55%; text-align: left; }
-        
-        .fitment-table td {
-            padding: 2mm 2.5mm;
-            border: 0.5pt solid #999999;
-            vertical-align: middle;
-            font-size: 10pt;
-            line-height: 1.3;
-        }
-        
-        .fitment-table td:nth-child(1) { text-align: center; }
-        .fitment-table td:nth-child(2) { text-align: center; font-weight: 600; }
-        .fitment-table td:nth-child(3) { text-align: left; padding-left: 2mm; }
-        
-        .fitment-perfect { background-color: #e8f8e8; }
-        .fitment-perfect td { color: #006400; }
-        
-        .fitment-good { background-color: #e8f2ff; }
-        .fitment-good td { color: #003a8c; }
-        
-        .fitment-below { background-color: #f7f7f7; }
-        .fitment-below td { color: #595959; }
-        
-        /* ===== COURSE OVERVIEW TABLE ===== */
-        .course-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 1.5mm 0 2mm 0;
-            font-family: 'Inter', sans-serif;
-            font-size: 10pt;
-            table-layout: fixed;
-        }
-        
-        .course-table th {
-            background-color: #150089;
-            color: #ffffff;
-            padding: 2mm 3mm;
-            border: 0.5pt solid #150089;
-            font-weight: 600;
-            font-size: 10pt;
-        }
-        
-        .course-table th:nth-child(1) { text-align: left; width: 70%; }
-        .course-table th:nth-child(2) { text-align: center; width: 30%; }
-        
-        .course-table td {
-            padding: 2mm 3mm;
-            border: 0.5pt solid #dddddd;
-            color: #000000;
-            font-size: 10pt;
-        }
-        
-        .course-table td:nth-child(1) { text-align: left; }
-        .course-table td:nth-child(2) { text-align: center; color: #009600; font-weight: 600; }
-        
-        /* Brand colored text */
-        .text-brand {
-            font-family: 'Inter', sans-serif;
-            font-size: 11pt;
-            line-height: 1.45;
-            color: #150089;
-            margin-bottom: 2mm;
-            text-align: justify;
-        }
-        
-        /* ===== PRIORITY LABELS ===== */
-        .priority-label {
-            font-family: 'Sora', sans-serif;
-            font-size: 15pt;
-            font-weight: 700;
-            margin: 3mm 0 2mm 0;
-        }
-        
-        /* Priority 1 = Green (Perfect Match) */
-        .priority-1 { 
-            color: #008000;
-        }
-        
-        /* Priority 2 = Blue (Good Match) */
-        .priority-2 { 
-            color: #0050b4;
-        }
-        
-        /* ===== COURSE CARDS ===== */
-        .course-card {
-            width: 100%;
-            margin-bottom: 3mm;
-            background: #ffffff;
-            border: 1pt solid #e0e0e0;
-        }
-        
-        /* Card Header */
-        .course-card-header {
+        /* Page Header */
+        .page-header {
             display: flex;
-            align-items: center;
             justify-content: space-between;
-            width: 100%;
-            min-height: 11mm;
-            padding: 0;
+            align-items: center;
+            padding-bottom: 4mm;
+            margin-bottom: 5mm;
+            border-bottom: 1pt solid #e0e0e0;
         }
         
-        .course-card-header-inner {
-            padding: 2mm 3.5mm;
-        }
-        
-        .course-card-header-left {
-            text-align: left;
-            flex: 1;
-        }
-        
-        .course-card-header-right {
-            text-align: right;
-            flex-shrink: 0;
-        }
-        
-        /* Perfect Match Card - Green */
-        .course-card.perfect .course-card-header {
-            background-color: #f0fff0;
-            border-left: 2.5mm solid #008000;
-        }
-        
-        .course-card.perfect .course-card-title {
+        .header-left {
             font-family: 'Sora', sans-serif;
-            font-size: 15pt;
-            font-weight: 700;
-            color: #008000;
-        }
-        
-        .course-card.perfect .course-card-badge {
-            display: inline-block;
-            padding: 2mm 4.5mm;
-            border-radius: 2mm;
-            background-color: #008000;
-            color: #ffffff;
-            font-family: 'Inter', sans-serif;
-            font-size: 11pt;
-            font-weight: 700;
-        }
-        
-        /* Good Match Card - Blue */
-        .course-card.good .course-card-header {
-            background-color: #f5faff;
-            border-left: 2.5mm solid #0050b4;
-        }
-        
-        .course-card.good .course-card-title {
-            font-family: 'Sora', sans-serif;
-            font-size: 15pt;
-            font-weight: 700;
-            color: #0050b4;
-        }
-        
-        .course-card.good .course-card-badge {
-            display: inline-block;
-            padding: 2mm 4.5mm;
-            border-radius: 2mm;
-            background-color: #0050b4;
-            color: #ffffff;
-            font-family: 'Inter', sans-serif;
-            font-size: 11pt;
-            font-weight: 700;
-        }
-        
-        /* Card Body */
-        .course-card-body {
-            padding: 2.5mm 3.5mm 2.5mm 4.5mm;
-            font-family: 'Inter', sans-serif;
-            font-size: 11pt;
-            line-height: 1.4;
-            color: #000000;
-            text-align: justify;
-        }
-        
-        .course-card-body strong {
+            font-size: 9pt;
             font-weight: 600;
-        }
-        
-        .course-card-body ul {
-            list-style: disc outside;
-            padding-left: 4mm;
-            margin: 0.5mm 0;
-        }
-        
-        .course-card-body li {
-            padding: 0.3mm 0;
-            line-height: 1.4;
-        }
-        
-        .career-path {
-            margin-top: 1.5mm;
-        }
-        
-        /* ===== ENTRY LEVEL TABLE ===== */
-        .entry-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 3mm 0 3.5mm 0;
-            font-family: 'Inter', sans-serif;
-            font-size: 12pt;
-            table-layout: fixed;
-        }
-        
-        .entry-table th {
-            background-color: #f0f0f0;
-            padding: 3mm 4mm;
-            border: 1pt solid #999999;
-            font-weight: 600;
-            color: #000000;
-            font-size: 12pt;
-        }
-        
-        .entry-table th:nth-child(1) { text-align: left; width: 75%; }
-        .entry-table th:nth-child(2) { text-align: center; width: 25%; }
-        
-        .entry-table td {
-            padding: 3mm 4mm;
-            border: 0.5pt solid #cccccc;
-            color: #000000;
-            font-size: 12pt;
-        }
-        
-        .entry-table td:nth-child(1) { text-align: left; }
-        .entry-table td:nth-child(2) { text-align: center; }
-        
-        /* ===== CAREER ROADMAP ===== */
-        .roadmap-container {
-            margin: 2.5mm 0;
-        }
-        
-        .roadmap-step {
-            display: table;
-            width: 100%;
-            margin-bottom: 3.5mm;
-        }
-        
-        .roadmap-left {
-            display: table-cell;
-            width: 35mm;
-            min-height: 16mm;
-            background-color: #ebf2ff;
-            border-radius: 2mm;
-            padding: 2mm;
-            text-align: center;
-            vertical-align: middle;
-            position: relative;
-        }
-        
-        .roadmap-step-num {
-            font-family: 'Sora', sans-serif;
-            font-size: 10pt;
             color: #150089;
-            font-weight: 400;
         }
         
-        .roadmap-year {
+        .header-right {
+            font-size: 9pt;
+            color: #555;
+        }
+        
+        /* Page Footer with Page Number */
+        .page-footer {
+            position: absolute;
+            bottom: 6mm;
+            left: 12mm;
+            right: 12mm;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 3mm;
+            border-top: 0.5pt solid #e0e0e0;
+        }
+        
+        .footer-left {
+            font-size: 8pt;
+            color: #888;
+        }
+        
+        .footer-right {
+            font-size: 8pt;
+            color: #888;
+        }
+        
+        .page-number {
+            font-family: 'Sora', sans-serif;
+            font-size: 9pt;
+            font-weight: 600;
+            color: #150089;
+        }
+        
+        /* ========== SECTION STYLING ========== */
+        .section-title {
             font-family: 'Sora', sans-serif;
             font-size: 13pt;
             font-weight: 700;
             color: #150089;
-            margin-top: 0.5mm;
+            margin: 0 0 4mm 0;
+            padding-bottom: 2mm;
+            border-bottom: 1pt solid #150089;
         }
         
-        .roadmap-right {
-            display: table-cell;
-            vertical-align: top;
-            padding: 2.5mm 0 2.5mm 8mm;
-            font-family: 'Inter', sans-serif;
-            font-size: 12pt;
-            color: #3c3c3c;
-            text-align: justify;
-        }
-        
-        .roadmap-right ul {
-            list-style: disc outside;
-            padding-left: 5mm;
-            margin: 0;
-        }
-        
-        .roadmap-right li {
-            padding: 0.5mm 0;
-            line-height: 1.5;
-        }
-        
-        /* ===== FINAL GUIDANCE BOX ===== */
-        .final-box {
-            width: 100%;
-            background-color: #f0f8ff;
-            padding: 4mm;
-            margin-top: 4mm;
-            border-radius: 1.5mm;
-        }
-        
-        .final-box .section-title-sm {
-            margin-top: 0;
-            margin-bottom: 2mm;
-            color: #150089;
-        }
-        
-        .final-text {
-            font-family: 'Inter', sans-serif;
-            font-size: 12pt;
-            line-height: 1.55;
-            color: #000000;
-            text-align: justify;
-        }
-        
-        /* ===== NOTE BOX ===== */
-        .note-box {
-            width: 100%;
-            background-color: #fefce8;
-            padding: 2.5mm 3mm;
-            margin-top: 2mm;
-            margin-bottom: 1mm;
-            border-radius: 1mm;
-            border-left: 2mm solid #ca8a04;
-        }
-        
-        .note-box .note-title {
-            font-family: 'Inter', sans-serif;
-            font-size: 8pt;
+        .section-title-sm {
+            font-family: 'Sora', sans-serif;
+            font-size: 11pt;
             font-weight: 700;
-            color: #a16207;
-            margin-bottom: 1mm;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
+            color: #150089;
+            margin: 4mm 0 2mm 0;
         }
         
-        .note-box .note-text {
-            font-family: 'Inter', sans-serif;
-            font-size: 9pt;
-            line-height: 1.4;
-            color: #78350f;
+        .text-block {
+            font-size: 10pt;
+            line-height: 1.55;
+            color: #333;
+            margin-bottom: 3mm;
             text-align: justify;
         }
         
-        /* ===== PAGE FOOTER ===== */
-        .page-footer {
+        .bullet-list {
+            list-style: none;
+            padding-left: 0;
+            margin: 2mm 0 4mm 0;
+        }
+        
+        .bullet-list li {
+            position: relative;
+            padding-left: 5mm;
+            margin-bottom: 1.5mm;
+            font-size: 10pt;
+            line-height: 1.5;
+            color: #333;
+        }
+        
+        .bullet-list li::before {
+            content: "•";
             position: absolute;
-            bottom: 10mm;
-            left: 15mm;
-            right: 15mm;
-            padding-top: 2mm;
-            border-top: 0.5pt solid #b4b4b4;
+            left: 0;
+            color: #150089;
+            font-weight: bold;
+        }
+        
+        /* ========== TABLES ========== */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 3mm 0;
+            font-size: 9pt;
+        }
+        
+        .data-table th {
+            background: #150089;
+            color: #fff;
+            padding: 2.5mm 3mm;
+            text-align: left;
+            font-weight: 600;
+            font-size: 9pt;
+        }
+        
+        .data-table td {
+            padding: 2.5mm 3mm;
+            border: 0.5pt solid #e0e0e0;
+            background: #fafafa;
+        }
+        
+        .data-table tr:nth-child(even) td {
+            background: #fff;
+        }
+        
+        .row-perfect td { background: #f0fff4 !important; color: #166534; }
+        .row-good td { background: #eff6ff !important; color: #1e40af; }
+        .row-below td { background: #fef2f2 !important; color: #991b1b; }
+        
+        /* ========== COURSE CARDS ========== */
+        .priority-label {
+            font-family: 'Sora', sans-serif;
+            font-size: 11pt;
+            font-weight: 700;
+            margin: 4mm 0 3mm 0;
+            display: flex;
+            align-items: center;
+            gap: 2mm;
+        }
+        
+        .priority-label.priority-1 { color: #166534; }
+        .priority-label.priority-1::before {
+            content: "";
+            display: inline-block;
+            width: 3mm;
+            height: 3mm;
+            background: #22c55e;
+            border-radius: 0.5mm;
+        }
+        
+        .priority-label.priority-2 { color: #1e40af; }
+        .priority-label.priority-2::before {
+            content: "";
+            display: inline-block;
+            width: 3mm;
+            height: 3mm;
+            background: #3b82f6;
+            border-radius: 0.5mm;
+        }
+        
+        .course-card {
+            margin-bottom: 4mm;
+            border: 1pt solid #e0e0e0;
+            border-radius: 1.5mm;
+            overflow: hidden;
+            page-break-inside: avoid;
+        }
+        
+        .course-card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            width: calc(100% - 30mm);
-            font-family: 'Inter', sans-serif;
+            padding: 2.5mm 4mm;
+        }
+        
+        .course-name {
+            font-family: 'Sora', sans-serif;
+            font-size: 10pt;
+            font-weight: 700;
+        }
+        
+        .course-score {
+            padding: 1.5mm 3mm;
+            border-radius: 2mm;
+            font-size: 9pt;
+            font-weight: 700;
+            color: #fff;
+        }
+        
+        .course-reasons {
+            padding: 2mm 4mm;
+            background: #f9fafb;
+            border-top: 0.5pt solid #e5e7eb;
+            font-size: 9pt;
+        }
+        
+        .course-reasons ul {
+            margin: 1mm 0 0 4mm;
+            padding: 0;
+            list-style: disc;
+        }
+        
+        .course-reasons li {
+            margin-bottom: 0.5mm;
+            color: #555;
+            font-size: 9pt;
+        }
+        
+        /* ========== CAREER ROADMAP ========== */
+        .career-roadmap {
+            padding: 2.5mm 4mm;
+            background: #f8fafc;
+            border-top: 0.5pt solid #e5e7eb;
+        }
+        
+        .roadmap-heading {
+            font-family: 'Sora', sans-serif;
+            font-size: 9pt;
+            font-weight: 700;
+            color: #150089;
+            margin-bottom: 2mm;
+        }
+        
+        .roadmap-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .roadmap-table tr {
+            border-bottom: 0.3pt solid #e0e0e0;
+        }
+        
+        .roadmap-table tr:last-child {
+            border-bottom: none;
+        }
+        
+        .roadmap-left {
+            width: 26mm;
+            padding: 1.5mm 2mm;
+            background: #e0e7ff;
+            text-align: center;
+            vertical-align: middle;
+        }
+        
+        .roadmap-step-num {
+            font-family: 'Sora', sans-serif;
+            font-size: 7pt;
+            color: #4338ca;
+            font-weight: 600;
+        }
+        
+        .roadmap-year {
+            font-family: 'Sora', sans-serif;
             font-size: 8pt;
+            font-weight: 700;
+            color: #150089;
         }
         
-        .footer-left {
-            text-align: left;
+        .roadmap-right {
+            padding: 1.5mm 3mm;
+            background: #fff;
+            font-size: 9pt;
+            color: #374151;
+            vertical-align: middle;
+            border-left: 0.3pt solid #e0e0e0;
         }
         
-        .footer-title {
-            color: #000000;
-            font-weight: 400;
+        /* ========== GUIDANCE & NOTE BOXES ========== */
+        .guidance-box {
+            background: #f0f9ff;
+            padding: 4mm;
+            border-radius: 2mm;
+            margin: 4mm 0;
+            border: 1pt solid #bae6fd;
         }
         
-        .footer-ref {
-            color: #808080;
-            margin-left: 2mm;
+        .note-box {
+            background: #fffbeb;
+            padding: 3mm 4mm;
+            margin: 4mm 0;
+            border-radius: 2mm;
+            border-left: 3mm solid #f59e0b;
         }
         
-        .footer-right {
-            text-align: right;
+        .note-title {
+            font-family: 'Sora', sans-serif;
+            font-size: 9pt;
+            font-weight: 700;
+            color: #b45309;
+            text-transform: uppercase;
+            margin-bottom: 1mm;
         }
         
-        .footer-page {
-            color: #000000;
+        .note-text {
+            font-size: 9pt;
+            line-height: 1.5;
+            color: #92400e;
         }
         
-        /* Spacing */
-        .mt-2 { margin-top: 2mm; }
-        .mt-3 { margin-top: 3mm; }
-        .mt-4 { margin-top: 4mm; }
-        .mt-5 { margin-top: 5mm; }
-        
-        /* Print */
+        /* ========== PRINT STYLES ========== */
         @media print {
             html, body {
                 width: 210mm;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-                color-adjust: exact !important;
             }
             
-            .cover-page, .content-page {
-                width: 210mm !important;
-                height: 297mm !important;
-                page-break-inside: avoid;
+            .page, .cover-page, .content-page {
+                page-break-after: always;
             }
             
-            .section-title { 
-                page-break-after: avoid;
-                page-break-inside: avoid;
+            .page:last-child, .content-page:last-child {
+                page-break-after: auto;
             }
-            .course-card { 
-                page-break-inside: avoid;
-                page-break-before: auto;
-            }
-            .roadmap-step { 
-                page-break-inside: avoid;
-            }
-            .bullet-list {
-                page-break-inside: avoid;
-            }
-            .fitment-table, .course-table, .entry-table {
+            
+            .course-card {
                 page-break-inside: avoid;
             }
         }
     </style>
 </head>
 <body>
-    <!-- PAGE 1: COVER -->
-    <div class="cover-page">
+    <!-- PAGE 1: COVER PAGE -->
+    <div class="page cover-page">
         <img src="/NTSC.jpeg" alt="Logo" class="cover-logo" />
         <div class="cover-title">Career Fitment & Course<br>Recommendation Report</div>
         <div class="cover-ref">${refNo}</div>
@@ -1605,246 +1817,224 @@ function generatePrintableHTML(report: ReportData, studentName: string, counsell
         <div class="cover-candidate">${studentName}</div>
     </div>
     
-    <!-- PAGE 2: BEHAVIORAL + METHODOLOGY + FITMENT -->
-    <div class="content-page">
-        <div class="section-title">Behavioral Assessment Summary</div>
-        <div class="text-block">${report.behavioral_assessment}</div>
+    <!-- PAGE 2: Behavioral Assessment & Methodology -->
+    <div class="page content-page">
+        <div class="page-header">
+            <div class="header-left">Career Fitment Report</div>
+            <div class="header-right">${studentName}</div>
+        </div>
         
-        <div class="section-title-sm">Key Strengths</div>
-        <ul class="bullet-list">
-            ${report.key_strengths?.map(s => `<li>${s}</li>`).join('') || ''}
-        </ul>
-        
-        <div class="section-title-sm">Natural Abilities</div>
-        <ul class="bullet-list">
-            ${report.natural_abilities?.map(a => `<li>${a}</li>`).join('') || ''}
-        </ul>
-        
-        <div class="section-title-sm">Potential Growth Areas</div>
-        <ul class="bullet-list">
-            ${report.growth_areas?.map(g => `<li>${g}</li>`).join('') || ''}
-        </ul>
-        
-        <div class="section-title mt-3">Course Fitment Methodology</div>
-        <div class="text-block">Courses are shortlisted using:</div>
-        <ul class="bullet-list">
-            ${report.course_fitment?.methodology?.map(m => `<li>${m}</li>`).join('') || `
-            <li>Work stability</li>
-            <li>Safety and compliance orientation</li>
-            <li>Structured career growth</li>
-            <li>Long-term employability</li>
-            `}
-        </ul>
-        
-        <div class="section-title-sm mt-2">Fitment Levels</div>
-        <table class="fitment-table">
-            <thead>
-                <tr>
-                    <th>Range</th>
-                    <th>Category</th>
-                    <th>Recommendation</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr class="fitment-perfect">
-                    <td>85% – 95%</td>
-                    <td>Perfect Match</td>
-                    <td>Highly Recommended</td>
-                </tr>
-                <tr class="fitment-good">
-                    <td>70% – 84%</td>
-                    <td>Good Match</td>
-                    <td>Recommended with support</td>
-                </tr>
-                <tr class="fitment-below">
-                    <td>&lt; 70%</td>
-                    <td>Below Threshold</td>
-                    <td>Not Recommended</td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="page-content">
+            <div class="section-title">Behavioral Assessment Summary</div>
+            <div class="text-block">${report.behavioral_assessment}</div>
+            
+            <div class="section-title-sm">Key Strengths</div>
+            <ul class="bullet-list">
+                ${report.key_strengths?.map(s => `<li>${s}</li>`).join('') || ''}
+            </ul>
+            
+            <div class="section-title-sm">Natural Abilities</div>
+            <ul class="bullet-list">
+                ${report.natural_abilities?.map(a => `<li>${a}</li>`).join('') || ''}
+            </ul>
+            
+            <div class="section-title-sm">Potential Growth Areas</div>
+            <ul class="bullet-list">
+                ${report.growth_areas?.map(g => `<li>${g}</li>`).join('') || ''}
+            </ul>
+            
+            <div class="section-title" style="margin-top: 5mm;">Course Fitment Methodology</div>
+            <div class="text-block">Courses are shortlisted based on the following criteria:</div>
+            <ul class="bullet-list">
+                ${report.course_fitment?.methodology?.map(m => `<li>${m}</li>`).join('') || `
+                <li>Work stability and job security potential</li>
+                <li>Safety and compliance orientation</li>
+                <li>Structured career growth path</li>
+                <li>Long-term employability in the industry</li>
+                `}
+            </ul>
+            
+            <div class="section-title-sm">Fitment Levels</div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width:20%">Score Range</th>
+                        <th style="width:20%">Category</th>
+                        <th>Recommendation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="row-perfect">
+                        <td>85% – 95%</td>
+                        <td>Perfect Match</td>
+                        <td>Highly Recommended – Strong alignment with candidate profile</td>
+                    </tr>
+                    <tr class="row-good">
+                        <td>70% – 84%</td>
+                        <td>Good Match</td>
+                        <td>Recommended with additional support and training</td>
+                    </tr>
+                    <tr class="row-below">
+                        <td>&lt; 70%</td>
+                        <td>Below Threshold</td>
+                        <td>Not Recommended for this candidate</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
         
         <div class="page-footer">
-            <div class="footer-left">
-                <span class="footer-title">Origin BI</span>
-                <span class="footer-ref">#${refNo}</span>
-            </div>
-            <div class="footer-right">
-                <span class="footer-page">Page 2 of 5</span>
-            </div>
+            <div class="footer-left">OriginBI</div>
+            <div class="page-number">Page 2</div>
+            <div class="footer-right">${date}</div>
         </div>
     </div>
     
-    <!-- PAGE 3: COURSE OVERVIEW + DETAILED (PERFECT) -->
-    <div class="content-page">
-        <div class="section-title">Course Suggestions Overview</div>
-        <table class="course-table">
-            <thead>
-                <tr>
-                    <th>Course Name</th>
-                    <th>Fitment</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${[...(report.perfect_courses || []), ...(report.good_courses || [])].map(c => `
-                <tr>
-                    <td>${c.name}</td>
-                    <td>${c.fitment}%</td>
-                </tr>
-                `).join('')}
-            </tbody>
-        </table>
-        
-        <div class="section-title mt-2">Detailed Course Recommendations</div>
-        <div class="text-brand">The following courses have been selected based on your behavioral strengths and career fitment score. They represent your best opportunities for long-term growth.</div>
-        
-        <div class="priority-label priority-1">Priority 1: Top Recommendations</div>
-        ${(report.perfect_courses || []).map(c => `
-        <div class="course-card perfect">
-            <div class="course-card-header">
-                <div class="course-card-header-inner course-card-header-left">
-                    <span class="course-card-title">${c.name}</span>
-                </div>
-                <div class="course-card-header-inner course-card-header-right">
-                    <span class="course-card-badge">${c.fitment}% Match</span>
-                </div>
-            </div>
-            <div class="course-card-body">
-                ${c.why_recommended?.length ? `<strong>Why recommended:</strong><ul>${c.why_recommended.map(r => `<li>${r}</li>`).join('')}</ul>` : ''}
-                ${c.career_progression ? `<div class="career-path"><strong>Career Progression:</strong> ${c.career_progression}</div>` : ''}
-            </div>
+    <!-- PAGE 3: Course Suggestions Overview -->
+    <div class="page content-page">
+        <div class="page-header">
+            <div class="header-left">Career Fitment Report</div>
+            <div class="header-right">${studentName}</div>
         </div>
-        `).join('')}
         
-        <div class="priority-label priority-2 mt-2">Priority 2: Strong Alternatives</div>
-        ${(report.good_courses || []).map(c => `
-        <div class="course-card good">
-            <div class="course-card-header">
-                <div class="course-card-header-inner course-card-header-left">
-                    <span class="course-card-title">${c.name}</span>
-                </div>
-                <div class="course-card-header-inner course-card-header-right">
-                    <span class="course-card-badge">${c.fitment}% Match</span>
-                </div>
-            </div>
-            <div class="course-card-body">
-                ${c.why_recommended?.length ? `<strong>Why recommended:</strong><ul>${c.why_recommended.map(r => `<li>${r}</li>`).join('')}</ul>` : ''}
-            </div>
+        <div class="page-content">
+            <div class="section-title">Course Suggestions Overview</div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Course Name</th>
+                        <th style="text-align:center;width:18%">Fitment Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${[...(report.perfect_courses || []), ...(report.good_courses || [])].map(c => `
+                    <tr>
+                        <td>${c.name}</td>
+                        <td style="text-align:center;font-weight:700;color:#166534">${c.fitment}%</td>
+                    </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            
+            <div class="section-title" style="margin-top: 5mm;">Detailed Course Recommendations</div>
+            
+            ${(report.perfect_courses || []).length > 0 ? `
+            <div class="priority-label priority-1">Priority 1: Top Recommendations</div>
+            ${(report.perfect_courses || []).slice(0, 1).map(c => generateCourseWithRoadmap(c, 'perfect')).join('')}
+            ` : ''}
         </div>
-        `).join('')}
         
         <div class="page-footer">
-            <div class="footer-left">
-                <span class="footer-title">Origin BI</span>
-                <span class="footer-ref">#${refNo}</span>
-            </div>
-            <div class="footer-right">
-                <span class="footer-page">Page 3 of 5</span>
-            </div>
+            <div class="footer-left">OriginBI</div>
+            <div class="page-number">Page 3</div>
+            <div class="footer-right">${date}</div>
         </div>
     </div>
     
-    <!-- PAGE 4: ADDITIONAL PATHWAYS -->
-    <div class="content-page">
-        <div class="section-title">Additional Pathways</div>
-        <div class="text-sm">Courses listed below offer alternative entry points or specialized global opportunities.</div>
-        
-        <div class="section-title-gray">Option A: Foundational Entry-Level Roles</div>
-        <div class="text-sm">Ideal for gaining immediate work experience before upskilling.</div>
-        <table class="entry-table">
-            <thead>
-                <tr>
-                    <th>Course Name</th>
-                    <th>Fitment</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${(report.entry_level_courses || []).map(c => `
-                <tr>
-                    <td>${c.name}</td>
-                    <td>${c.fitment}%</td>
-                </tr>
-                `).join('')}
-            </tbody>
-        </table>
-        
-        <div class="section-title-blue mt-4">Option B: International Opportunities</div>
-        <div class="text-sm">Specialized certifications with high demand in overseas markets.</div>
-        ${(report.international_courses || []).map(c => `
-        <div class="course-card good">
-            <div class="course-card-header">
-                <div class="course-card-header-inner course-card-header-left">
-                    <span class="course-card-title">${c.name}</span>
-                </div>
-                <div class="course-card-header-inner course-card-header-right">
-                    <span class="course-card-badge">${c.fitment}% Match</span>
-                </div>
-            </div>
-            <div class="course-card-body">
-                ${c.why_recommended?.length ? `<strong>Why recommended:</strong><ul>${c.why_recommended.map(r => `<li>${r}</li>`).join('')}</ul>` : ''}
-            </div>
+    <!-- PAGE 4: More Courses -->
+    <div class="page content-page">
+        <div class="page-header">
+            <div class="header-left">Career Fitment Report</div>
+            <div class="header-right">${studentName}</div>
         </div>
-        `).join('')}
+        
+        <div class="page-content">
+            ${(report.perfect_courses || []).length > 1 ? `
+            <div class="priority-label priority-1">Priority 1: Top Recommendations (continued)</div>
+            ${(report.perfect_courses || []).slice(1).map(c => generateCourseWithRoadmap(c, 'perfect')).join('')}
+            ` : ''}
+            
+            ${(report.good_courses || []).length > 0 ? `
+            <div class="priority-label priority-2">Priority 2: Strong Alternatives</div>
+            ${(report.good_courses || []).slice(0, 2).map(c => generateCourseWithRoadmap(c, 'good')).join('')}
+            ` : ''}
+        </div>
         
         <div class="page-footer">
-            <div class="footer-left">
-                <span class="footer-title">Origin BI</span>
-                <span class="footer-ref">#${refNo}</span>
-            </div>
-            <div class="footer-right">
-                <span class="footer-page">Page 4 of 5</span>
-            </div>
+            <div class="footer-left">OriginBI</div>
+            <div class="page-number">Page 4</div>
+            <div class="footer-right">${date}</div>
         </div>
     </div>
     
-    <!-- PAGE 5: CAREER GUIDANCE + ROADMAP + FINAL -->
-    <div class="content-page">
-        <div class="section-title">Career Direction Guidance</div>
-        <div class="text-block">${report.career_guidance?.intro || 'The candidate will perform best in careers that:'}</div>
-        <ul class="bullet-list">
-            ${report.career_guidance?.bullets?.map(b => `<li>${b}</li>`).join('') || `
-            <li>Offer structured growth</li>
-            <li>Value safety and responsibility</li>
-            <li>Reward consistency and accuracy</li>
-            `}
-        </ul>
-        <div class="text-block mt-2">${report.career_guidance?.conclusion || 'Such roles naturally lead to supervisory and management positions over time.'}</div>
-        
-        <div class="section-title mt-4">Suggested Career Roadmap</div>
-        <div class="roadmap-container">
-            ${(report.career_roadmap || []).map((stage, i) => `
-            <div class="roadmap-step">
-                <div class="roadmap-left">
-                    <div class="roadmap-step-num">STEP 0${i + 1}</div>
-                    <div class="roadmap-year">${stage.stage}</div>
-                </div>
-                <div class="roadmap-right">
-                    <ul>${stage.bullets.map(b => `<li>${b}</li>`).join('')}</ul>
-                </div>
-            </div>
-            `).join('')}
+    <!-- PAGE 5: Remaining Courses -->
+    <div class="page content-page">
+        <div class="page-header">
+            <div class="header-left">Career Fitment Report</div>
+            <div class="header-right">${studentName}</div>
         </div>
         
-        ${report.qualification_note ? `
-        <div class="note-box">
-            <div class="note-title">NOTE</div>
-            <div class="note-text">${report.qualification_note}</div>
-        </div>
-        ` : ''}
-        
-        <div class="final-box">
-            <div class="section-title-sm">Final Guidance</div>
-            <div class="final-text">${report.final_guidance || 'Your strength lies in doing work correctly, safely, and consistently. Choosing structured technical and safety-focused careers will ensure steady income, professional respect, and long-term growth.'}</div>
+        <div class="page-content">
+            ${(report.good_courses || []).length > 2 ? `
+            <div class="priority-label priority-2">Priority 2: Strong Alternatives (continued)</div>
+            ${(report.good_courses || []).slice(2).map(c => generateCourseWithRoadmap(c, 'good')).join('')}
+            ` : ''}
+            
+            ${(report.entry_level_courses || []).length > 0 ? `
+            <div class="section-title">Additional Pathways</div>
+            <div class="section-title-sm">Option A: Foundational Entry-Level Roles</div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Course Name</th>
+                        <th style="text-align:center;width:18%">Fitment</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${(report.entry_level_courses || []).map(c => `
+                    <tr>
+                        <td>${c.name}</td>
+                        <td style="text-align:center;font-weight:600">${c.fitment}%</td>
+                    </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            ` : ''}
         </div>
         
         <div class="page-footer">
-            <div class="footer-left">
-                <span class="footer-title">Origin BI</span>
-                <span class="footer-ref">#${refNo}</span>
+            <div class="footer-left">OriginBI</div>
+            <div class="page-number">Page 5</div>
+            <div class="footer-right">${date}</div>
+        </div>
+    </div>
+    
+    <!-- PAGE 6: Career Guidance & Final Notes -->
+    <div class="page content-page">
+        <div class="page-header">
+            <div class="header-left">Career Fitment Report</div>
+            <div class="header-right">${studentName}</div>
+        </div>
+        
+        <div class="page-content">
+            <div class="section-title">Career Direction Guidance</div>
+            <div class="text-block">${report.career_guidance?.intro || 'Based on the assessment, the candidate will perform best in careers that:'}</div>
+            <ul class="bullet-list">
+                ${report.career_guidance?.bullets?.map(b => `<li>${b}</li>`).join('') || `
+                <li>Offer structured growth with clear milestones</li>
+                <li>Value safety, responsibility, and attention to detail</li>
+                <li>Reward consistency, accuracy, and reliability</li>
+                `}
+            </ul>
+            <div class="text-block">${report.career_guidance?.conclusion || 'Such roles naturally lead to supervisory and management positions over time, providing stable career advancement.'}</div>
+            
+            ${report.qualification_note ? `
+            <div class="note-box">
+                <div class="note-title">Important Note</div>
+                <div class="note-text">${report.qualification_note}</div>
             </div>
-            <div class="footer-right">
-                <span class="footer-page">Page 5 of 5</span>
+            ` : ''}
+            
+            <div class="guidance-box">
+                <div class="section-title-sm" style="margin-top: 0; color: #0369a1;">Final Guidance</div>
+                <div class="text-block" style="margin-bottom: 0;">${report.final_guidance || 'Your strength lies in doing work correctly, safely, and consistently. Choosing structured technical and safety-focused careers will ensure steady income, professional respect, and long-term growth opportunities.'}</div>
             </div>
+        </div>
+        
+        <div class="page-footer">
+            <div class="footer-left">OriginBI</div>
+            <div class="page-number">Page 6</div>
+            <div class="footer-right">${date}</div>
         </div>
     </div>
 </body>
