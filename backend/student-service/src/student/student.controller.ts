@@ -1,5 +1,6 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { StudentService } from './student.service';
+import { CreateRegistrationDto } from './dto/create-registration.dto';
 
 @Controller('student')
 export class StudentController {
@@ -37,5 +38,15 @@ export class StudentController {
   async completeFirstLogin(@Body() body: { email: string }) {
     await this.studentService.completeFirstLogin(body.email);
     return { success: true };
+  }
+
+  @Post('register')
+  async register(@Body() dto: CreateRegistrationDto) {
+    return this.studentService.register(dto);
+  }
+
+  @Post('validate-registration')
+  async validateRegistration(@Body() dto: { email: string; mobile_number?: string }) {
+    return this.studentService.validateRegistration(dto);
   }
 }
