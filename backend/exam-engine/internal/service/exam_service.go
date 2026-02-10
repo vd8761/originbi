@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type ExamService struct{}
@@ -227,379 +228,402 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 	db.Model(&models.AssessmentAnswer{}).Where("assessment_attempt_id = ? AND status = ?", answerRecord.AssessmentAttemptID, "ANSWERED").Count(&answeredCounts)
 
 	if totalCounts > 0 && answeredCounts == totalCounts {
-		now := time.Now()
+		// Start Transaction (Concurrency Fix)
+		err := db.Transaction(func(tx *gorm.DB) error {
+			now := time.Now()
 
-		// Fetch Level Context First
-		var currentLevel models.AssessmentLevel
-		db.First(&currentLevel, "id = ?", answerRecord.AssessmentLevelID)
-
-		scoreMap := make(map[string]float64)
-		var totalScore float64
-		var dominantFactor string
-		var traitID *int64
-		var agileOrderedData interface{}
-
-		// --- Scoring Logic Based on Level ---
-		if currentLevel.LevelNumber == 1 || currentLevel.Name == "Level 1" || currentLevel.PatternType == "DISC" {
-			// ** Level 1: DISC Logic (Option Based) **
-			type ScoreResult struct {
-				DiscFactor string
-				Total      float64
+			// 1. Lock Attempt Row & Check Idempotency
+			var lockedAttempt models.AssessmentAttempt
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&lockedAttempt, answerRecord.AssessmentAttemptID).Error; err != nil {
+				return err
 			}
-			var scores []ScoreResult
-			db.Raw(`
-                SELECT o.disc_factor, SUM(o.score_value) as total 
-                FROM assessment_answers a 
-                JOIN assessment_question_options o ON a.main_option_id = o.id 
-                WHERE a.assessment_attempt_id = ? 
-                GROUP BY o.disc_factor
-            `, answerRecord.AssessmentAttemptID).Scan(&scores)
 
-			var validScores []ScoreResult
-			for _, s := range scores {
-				totalScore += s.Total
-				if s.DiscFactor != "" {
-					scoreMap[s.DiscFactor] = s.Total
-					validScores = append(validScores, s)
+			if lockedAttempt.Status == "COMPLETED" {
+				fmt.Printf("[SubmitAnswer] IDEMPOTENCY HIT: Attempt %d already completed.\n", lockedAttempt.ID)
+				return nil
+			}
+
+			// Fetch Level Context First
+			var currentLevel models.AssessmentLevel
+			if err := tx.First(&currentLevel, "id = ?", answerRecord.AssessmentLevelID).Error; err != nil {
+				return err
+			}
+
+			scoreMap := make(map[string]float64)
+			var totalScore float64
+			var dominantFactor string
+			var traitID *int64
+			var agileOrderedData interface{}
+
+			// --- Scoring Logic Based on Level ---
+			if currentLevel.LevelNumber == 1 || currentLevel.Name == "Level 1" || currentLevel.PatternType == "DISC" {
+				// ** Level 1: DISC Logic (Option Based) **
+				type ScoreResult struct {
+					DiscFactor string
+					Total      float64
 				}
-			}
+				var scores []ScoreResult
+				tx.Raw(`
+					SELECT o.disc_factor, SUM(o.score_value) as total 
+					FROM assessment_answers a 
+					JOIN assessment_question_options o ON a.main_option_id = o.id 
+					WHERE a.assessment_attempt_id = ? 
+					GROUP BY o.disc_factor
+				`, answerRecord.AssessmentAttemptID).Scan(&scores)
 
-			// Determine Dominant Factor
-			sort.Slice(validScores, func(i, j int) bool {
-				return validScores[i].Total > validScores[j].Total
-			})
-
-			if len(validScores) >= 2 {
-				dominantFactor = validScores[0].DiscFactor + validScores[1].DiscFactor
-			} else if len(validScores) == 1 {
-				dominantFactor = validScores[0].DiscFactor
-			}
-
-			// Find Dominant Trait ID
-			if dominantFactor != "" {
-				var trait models.PersonalityTrait
-				if err := db.Where("code = ?", dominantFactor).First(&trait).Error; err == nil {
-					tID := trait.ID
-					traitID = &tID
+				var validScores []ScoreResult
+				for _, s := range scores {
+					totalScore += s.Total
+					if s.DiscFactor != "" {
+						scoreMap[s.DiscFactor] = s.Total
+						validScores = append(validScores, s)
+					}
 				}
-			}
 
-		} else if currentLevel.LevelNumber == 2 || currentLevel.Name == "Level 2" {
-			// ** Level 2: Agile Logic (Question Category Based) **
-			// Categories: Commitment, Focus, Openness, Respect, Courage
-			type AgileScoreResult struct {
-				Category string
-				Total    float64
-			}
-			var agileScores []AgileScoreResult
-			db.Raw(`
-                SELECT q.category, SUM(a.answer_score) as total
-                FROM assessment_answers a
-                JOIN assessment_questions q ON a.main_question_id = q.id
-                WHERE a.assessment_attempt_id = ?
-                GROUP BY q.category
-            `, answerRecord.AssessmentAttemptID).Scan(&agileScores)
+				// Determine Dominant Factor
+				sort.Slice(validScores, func(i, j int) bool {
+					return validScores[i].Total > validScores[j].Total
+				})
 
-			// Define struct with specific field order (Total last)
-			var orderedAgile struct {
-				Commitment float64 `json:"Commitment"`
-				Courage    float64 `json:"Courage"`
-				Focus      float64 `json:"Focus"`
-				Openness   float64 `json:"Openness"`
-				Respect    float64 `json:"Respect"`
-				Total      float64 `json:"total"`
-			}
-
-			for _, s := range agileScores {
-				totalScore += s.Total
-				// Populate struct fields
-				switch s.Category {
-				case "Commitment":
-					orderedAgile.Commitment = s.Total
-				case "Courage":
-					orderedAgile.Courage = s.Total
-				case "Focus":
-					orderedAgile.Focus = s.Total
-				case "Openness":
-					orderedAgile.Openness = s.Total
-				case "Respect":
-					orderedAgile.Respect = s.Total
+				if len(validScores) >= 2 {
+					dominantFactor = validScores[0].DiscFactor + validScores[1].DiscFactor
+				} else if len(validScores) == 1 {
+					dominantFactor = validScores[0].DiscFactor
 				}
-				// Also populate map for legacy/fallback (excluding total here to avoid duplicate if needed, but scoreMap['total'] is added later anyway)
-				if s.Category != "" {
-					scoreMap[s.Category] = s.Total
+
+				// Find Dominant Trait ID
+				if dominantFactor != "" {
+					var trait models.PersonalityTrait
+					if err := tx.Where("code = ?", dominantFactor).First(&trait).Error; err == nil {
+						tID := trait.ID
+						traitID = &tID
+					}
 				}
+
+			} else if currentLevel.LevelNumber == 2 || currentLevel.Name == "Level 2" {
+				// ** Level 2: Agile Logic (Question Category Based) **
+				// Categories: Commitment, Focus, Openness, Respect, Courage
+				type AgileScoreResult struct {
+					Category string
+					Total    float64
+				}
+				var agileScores []AgileScoreResult
+				tx.Raw(`
+					SELECT q.category, SUM(a.answer_score) as total
+					FROM assessment_answers a
+					JOIN assessment_questions q ON a.main_question_id = q.id
+					WHERE a.assessment_attempt_id = ?
+					GROUP BY q.category
+				`, answerRecord.AssessmentAttemptID).Scan(&agileScores)
+
+				// Define struct with specific field order (Total last)
+				var orderedAgile struct {
+					Commitment float64 `json:"Commitment"`
+					Courage    float64 `json:"Courage"`
+					Focus      float64 `json:"Focus"`
+					Openness   float64 `json:"Openness"`
+					Respect    float64 `json:"Respect"`
+					Total      float64 `json:"total"`
+				}
+
+				for _, s := range agileScores {
+					totalScore += s.Total
+					// Populate struct fields
+					switch s.Category {
+					case "Commitment":
+						orderedAgile.Commitment = s.Total
+					case "Courage":
+						orderedAgile.Courage = s.Total
+					case "Focus":
+						orderedAgile.Focus = s.Total
+					case "Openness":
+						orderedAgile.Openness = s.Total
+					case "Respect":
+						orderedAgile.Respect = s.Total
+					}
+					// Also populate map for legacy/fallback (excluding total here to avoid duplicate if needed, but scoreMap['total'] is added later anyway)
+					if s.Category != "" {
+						scoreMap[s.Category] = s.Total
+					}
+				}
+				orderedAgile.Total = totalScore
+				agileOrderedData = orderedAgile
 			}
-			orderedAgile.Total = totalScore
-			agileOrderedData = orderedAgile
-		}
 
-		// Add Total to Map
-		scoreMap["total"] = totalScore
+			// Add Total to Map
+			scoreMap["total"] = totalScore
 
-		// --- Sincerity Index Calculation ---
-		var sincerityStats struct {
-			AttentionFails     int64
-			DistractionsChosen int64
-			TotalQuestions     int64
-		}
+			// --- Sincerity Index Calculation ---
+			var sincerityStats struct {
+				AttentionFails     int64
+				DistractionsChosen int64
+				TotalQuestions     int64
+			}
 
-		db.Model(&models.AssessmentAnswer{}).Where("assessment_attempt_id = ?", answerRecord.AssessmentAttemptID).
-			Select("COUNT(*) FILTER (WHERE is_attention_fail = true) as attention_fails, COUNT(*) FILTER (WHERE is_distraction_chosen = true) as distractions_chosen, COUNT(*) as total_questions").
-			Scan(&sincerityStats)
+			tx.Model(&models.AssessmentAnswer{}).Where("assessment_attempt_id = ?", answerRecord.AssessmentAttemptID).
+				Select("COUNT(*) FILTER (WHERE is_attention_fail = true) as attention_fails, COUNT(*) FILTER (WHERE is_distraction_chosen = true) as distractions_chosen, COUNT(*) as total_questions").
+				Scan(&sincerityStats)
 
-		sincerityIndex := 100.0
-		sincerityIndex -= (float64(sincerityStats.AttentionFails) * 20.0)
-		sincerityIndex -= (float64(sincerityStats.DistractionsChosen) * 10.0)
-		if sincerityIndex < 0 {
-			sincerityIndex = 0
-		}
+			sincerityIndex := 100.0
+			sincerityIndex -= (float64(sincerityStats.AttentionFails) * 20.0)
+			sincerityIndex -= (float64(sincerityStats.DistractionsChosen) * 10.0)
+			if sincerityIndex < 0 {
+				sincerityIndex = 0
+			}
 
-		var sincerityClass string
-		if sincerityIndex >= 80 {
-			sincerityClass = "SINCERE"
-		} else if sincerityIndex >= 50 {
-			sincerityClass = "BORDERLINE"
-		} else {
-			sincerityClass = "NOT_SINCERE"
-		}
-
-		// --- Metadata Update ---
-		var attempt models.AssessmentAttempt
-		db.First(&attempt, answerRecord.AssessmentAttemptID)
-
-		metaMap := make(map[string]interface{})
-		if attempt.Metadata != "" && attempt.Metadata != "{}" {
-			json.Unmarshal([]byte(attempt.Metadata), &metaMap)
-		}
-
-		metaMap["overall_sincerity"] = sincerityIndex // Always store sincerity
-
-		if currentLevel.LevelNumber == 1 || currentLevel.PatternType == "DISC" || currentLevel.Name == "Level 1" {
-			metaMap["disc_scores"] = scoreMap
-		} else if currentLevel.LevelNumber == 2 || currentLevel.Name == "Level 2" {
-			if agileOrderedData != nil {
-				metaMap["agile_scores"] = agileOrderedData
+			var sincerityClass string
+			if sincerityIndex >= 80 {
+				sincerityClass = "SINCERE"
+			} else if sincerityIndex >= 50 {
+				sincerityClass = "BORDERLINE"
 			} else {
-				metaMap["agile_scores"] = scoreMap
+				sincerityClass = "NOT_SINCERE"
 			}
-		} else if currentLevel.LevelNumber == 3 {
-			metaMap["level3_scores"] = scoreMap
-		} else if currentLevel.LevelNumber == 4 {
-			metaMap["level4_scores"] = scoreMap
-		}
 
-		updatedMeta, _ := json.Marshal(metaMap)
-
-		// --- Update Current Attempt ---
-		updates := map[string]interface{}{
-			"status":          "COMPLETED",
-			"completed_at":    now,
-			"metadata":        string(updatedMeta),
-			"total_score":     totalScore,
-			"sincerity_index": sincerityIndex,
-			"sincerity_class": sincerityClass,
-		}
-		// Only update dominant_trait_id if it was calculated (Level 1)
-		if traitID != nil {
-			updates["dominant_trait_id"] = traitID
-		}
-
-		db.Model(&models.AssessmentAttempt{}).Where("id = ?", answerRecord.AssessmentAttemptID).Updates(updates)
-
-		// 5. Next Level Setup (Level 2 Generation)
-		var nextLevel models.AssessmentLevel
-		hasNextLevel := false
-
-		// Check if a next level generally exists in the system (Check only MANDATORY levels)
-		if err := db.Where("level_number > ? AND is_mandatory = ?", currentLevel.LevelNumber, true).Order("level_number ASC").First(&nextLevel).Error; err == nil {
-
-			// Check if this specific user/session HAS an attempt for this next level
-			var nextAttempt models.AssessmentAttempt
-			if err := db.Where("assessment_session_id = ? AND assessment_level_id = ?", answerRecord.AssessmentSessionID, nextLevel.ID).First(&nextAttempt).Error; err == nil {
-
-				// CASE A: Next Level Exists AND User has an attempt for it -> Unlock it
-				hasNextLevel = true
-
-				unlockAt := now.Add(time.Duration(nextLevel.UnlockAfterHours) * time.Hour)
-				startWindow := 72
-				if nextLevel.StartWithinHours > 0 {
-					startWindow = nextLevel.StartWithinHours
-				}
-				expiresAt := unlockAt.Add(time.Duration(startWindow) * time.Hour)
-
-				db.Model(&nextAttempt).Updates(map[string]interface{}{
-					"unlock_at":  unlockAt,
-					"expires_at": expiresAt,
-				})
-
-				// Generate Questions for Next Level (Trait Based for Level 2)
-				if nextLevel.LevelNumber == 2 && traitID != nil {
-					// 1. Clear existing generic questions (if any)
-					db.Exec("DELETE FROM assessment_answers WHERE assessment_attempt_id = ?", nextAttempt.ID)
-
-					// 2. Insert new questions based on Trait (Limit 25)
-					query := `
-                        INSERT INTO assessment_answers (
-                            assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
-                            main_question_id, question_source, status, question_sequence, created_at, updated_at
-                        )
-                        SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
-                        FROM assessment_questions 
-                        WHERE assessment_level_id = ? AND personality_trait_id = ?
-                        ORDER BY RANDOM()
-                        LIMIT 25
-                    `
-					db.Exec(query, nextAttempt.ID, nextAttempt.AssessmentSessionID, nextAttempt.UserID, nextAttempt.RegistrationID, nextAttempt.ProgramID, nextLevel.ID, nextLevel.ID, *traitID)
-				}
+			// --- Metadata Update ---
+			// Re-use lockedAttempt for metadata as it's fresh
+			metaMap := make(map[string]interface{})
+			if lockedAttempt.Metadata != "" && lockedAttempt.Metadata != "{}" {
+				json.Unmarshal([]byte(lockedAttempt.Metadata), &metaMap)
 			}
-		}
 
-		// CASE B: No Next Level (System-wide) OR No Attempt for Next Level (Program-specific) -> Mark Completed
-		if !hasNextLevel {
-			// This session is FULLY COMPLETED
-			var session models.AssessmentSession
-			if err := db.First(&session, answerRecord.AssessmentSessionID).Error; err == nil {
-				db.Model(&session).Updates(map[string]interface{}{
-					"status":       "COMPLETED",
-					"completed_at": now,
-				})
+			metaMap["overall_sincerity"] = sincerityIndex // Always store sincerity
 
-				// --- 🟢 GENERATE ASSESSMENT REPORT ---
-				var existingReport models.AssessmentReports
-				if err := db.Where("assessment_session_id = ?", session.ID).First(&existingReport).Error; err != nil {
-					// Report does not exist, create it
+			if currentLevel.LevelNumber == 1 || currentLevel.PatternType == "DISC" || currentLevel.Name == "Level 1" {
+				metaMap["disc_scores"] = scoreMap
+			} else if currentLevel.LevelNumber == 2 || currentLevel.Name == "Level 2" {
+				if agileOrderedData != nil {
+					metaMap["agile_scores"] = agileOrderedData
+				} else {
+					metaMap["agile_scores"] = scoreMap
+				}
+			} else if currentLevel.LevelNumber == 3 {
+				metaMap["level3_scores"] = scoreMap
+			} else if currentLevel.LevelNumber == 4 {
+				metaMap["level4_scores"] = scoreMap
+			}
 
-					// 1. Fetch Program Code
-					var program models.Program
-					db.First(&program, session.ProgramID)
+			updatedMeta, _ := json.Marshal(metaMap)
 
-					// 2. Fetch Group (if applicable)
-					groupIDStr := ""
-					if session.GroupID != nil {
-						groupIDStr = fmt.Sprintf("G%d-", *session.GroupID)
+			// --- Update Current Attempt ---
+			updates := map[string]interface{}{
+				"status":          "COMPLETED",
+				"completed_at":    now,
+				"metadata":        string(updatedMeta),
+				"total_score":     totalScore,
+				"sincerity_index": sincerityIndex,
+				"sincerity_class": sincerityClass,
+			}
+			// Only update dominant_trait_id if it was calculated (Level 1)
+			if traitID != nil {
+				updates["dominant_trait_id"] = traitID
+			}
+
+			if err := tx.Model(&models.AssessmentAttempt{}).Where("id = ?", answerRecord.AssessmentAttemptID).Updates(updates).Error; err != nil {
+				return err
+			}
+
+			// 5. Next Level Setup (Level 2 Generation)
+			var nextLevel models.AssessmentLevel
+			hasNextLevel := false
+
+			// Check if a next level generally exists in the system (Check only MANDATORY levels)
+			if err := tx.Where("level_number > ? AND is_mandatory = ?", currentLevel.LevelNumber, true).Order("level_number ASC").First(&nextLevel).Error; err == nil {
+
+				// Check if this specific user/session HAS an attempt for this next level
+				var nextAttempt models.AssessmentAttempt
+				if err := tx.Where("assessment_session_id = ? AND assessment_level_id = ?", answerRecord.AssessmentSessionID, nextLevel.ID).First(&nextAttempt).Error; err == nil {
+
+					// CASE A: Next Level Exists AND User has an attempt for it -> Unlock it
+					hasNextLevel = true
+
+					unlockAt := now.Add(time.Duration(nextLevel.UnlockAfterHours) * time.Hour)
+					startWindow := 72
+					if nextLevel.StartWithinHours > 0 {
+						startWindow = nextLevel.StartWithinHours
 					}
+					expiresAt := unlockAt.Add(time.Duration(startWindow) * time.Hour)
 
-					// 3. Generate Report Number Prefix
-					// Format: OBI-G{group_id}-{Month/Year}-{Program code}-
-					dateStr := now.Format("01/06") // Month/Year (e.g., 06/25)
-					reportPrefix := fmt.Sprintf("OBI-%s%s-%s-", groupIDStr, dateStr, program.Code)
+					tx.Model(&nextAttempt).Updates(map[string]interface{}{
+						"unlock_at":  unlockAt,
+						"expires_at": expiresAt,
+					})
 
-					// 4. Calculate Sequence Number
-					var count int64
-					db.Model(&models.AssessmentReports{}).Where("report_number LIKE ?", reportPrefix+"%").Count(&count)
-					seqNum := count + 1
-					reportNumber := fmt.Sprintf("%s%03d", reportPrefix, seqNum)
+					// Generate Questions for Next Level (Trait Based for Level 2)
+					if nextLevel.LevelNumber == 2 && traitID != nil {
+						// 1. Clear existing generic questions (if any)
+						tx.Exec("DELETE FROM assessment_answers WHERE assessment_attempt_id = ?", nextAttempt.ID)
 
-					// 5. Aggregate Data from Attempts
-					var attempts []models.AssessmentAttempt
-					db.Where("assessment_session_id = ?", session.ID).Find(&attempts)
+						// 2. Insert new questions based on Trait (Limit 25)
+						query := `
+							INSERT INTO assessment_answers (
+								assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
+								main_question_id, question_source, status, question_sequence, created_at, updated_at
+							)
+							SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
+							FROM assessment_questions 
+							WHERE assessment_level_id = ? AND personality_trait_id = ?
+							ORDER BY RANDOM()
+							LIMIT 25
+						`
+						tx.Exec(query, nextAttempt.ID, nextAttempt.AssessmentSessionID, nextAttempt.UserID, nextAttempt.RegistrationID, nextAttempt.ProgramID, nextLevel.ID, nextLevel.ID, *traitID)
+					}
+				}
+			}
 
-					discScores := "{}"
-					agileScores := "{}"
-					level3Scores := "{}"
-					level4Scores := "{}"
-					var overallSincerity float64
-					var dominantTraitID *int64
+			// CASE B: No Next Level (System-wide) OR No Attempt for Next Level (Program-specific) -> Mark Completed
+			if !hasNextLevel {
+				// This session is FULLY COMPLETED
+				var session models.AssessmentSession
+				if err := tx.First(&session, answerRecord.AssessmentSessionID).Error; err == nil {
+					tx.Model(&session).Updates(map[string]interface{}{
+						"status":       "COMPLETED",
+						"completed_at": now,
+					})
 
-					// Loop attempts to extract scores based on level
-					for _, att := range attempts {
-						// Parse Level Info
-						var level models.AssessmentLevel
-						db.First(&level, att.AssessmentLevelID)
+					// --- 🟢 GENERATE ASSESSMENT REPORT ---
+					var existingReport models.AssessmentReports
+					if err := tx.Where("assessment_session_id = ?", session.ID).First(&existingReport).Error; err != nil {
+						// Report does not exist, create it
 
-						// Attempt Metadata
-						var meta map[string]interface{}
-						if att.Metadata != "" && att.Metadata != "{}" {
-							json.Unmarshal([]byte(att.Metadata), &meta)
+						// 1. Fetch Program Code
+						var program models.Program
+						tx.First(&program, session.ProgramID)
+
+						// 2. Fetch Group (if applicable)
+						groupIDStr := ""
+						if session.GroupID != nil {
+							groupIDStr = fmt.Sprintf("G%d-", *session.GroupID)
 						}
 
-						if level.LevelNumber == 1 || level.Name == "Level 1" || level.PatternType == "DISC" {
-							// DISC Scores
-							if val, ok := meta["disc_scores"]; ok {
-								bytes, _ := json.Marshal(val)
-								discScores = string(bytes)
+						// 3. Generate Report Number Prefix
+						// Format: OBI-G{group_id}-{Month/Year}-{Program code}-
+						dateStr := now.Format("01/06") // Month/Year (e.g., 06/25)
+						reportPrefix := fmt.Sprintf("OBI-%s%s-%s-", groupIDStr, dateStr, program.Code)
+
+						// 4. Calculate Sequence Number
+						var count int64
+						tx.Model(&models.AssessmentReports{}).Where("report_number LIKE ?", reportPrefix+"%").Count(&count)
+						seqNum := count + 1
+						reportNumber := fmt.Sprintf("%s%03d", reportPrefix, seqNum)
+
+						// 5. Aggregate Data from Attempts
+						var attempts []models.AssessmentAttempt
+						tx.Where("assessment_session_id = ?", session.ID).Find(&attempts)
+
+						discScores := "{}"
+						agileScores := "{}"
+						level3Scores := "{}"
+						level4Scores := "{}"
+						var overallSincerity float64
+						var dominantTraitID *int64
+
+						// Loop attempts to extract scores based on level
+						for _, att := range attempts {
+							// Parse Level Info
+							var level models.AssessmentLevel
+							tx.First(&level, att.AssessmentLevelID)
+
+							// Attempt Metadata
+							var meta map[string]interface{}
+							if att.Metadata != "" && att.Metadata != "{}" {
+								json.Unmarshal([]byte(att.Metadata), &meta)
 							}
-							overallSincerity = att.SincerityIndex
-							dominantTraitID = att.DominantTraitID
-						} else if level.LevelNumber == 2 || level.Name == "Level 2" {
-							// Agile Scores
-							if val, ok := meta["agile_scores"]; ok {
-								bytes, _ := json.Marshal(val)
-								agileScores = string(bytes)
+
+							if level.LevelNumber == 1 || level.Name == "Level 1" || level.PatternType == "DISC" {
+								// DISC Scores
+								if val, ok := meta["disc_scores"]; ok {
+									bytes, _ := json.Marshal(val)
+									discScores = string(bytes)
+								}
+								overallSincerity = att.SincerityIndex
+								dominantTraitID = att.DominantTraitID
+							} else if level.LevelNumber == 2 || level.Name == "Level 2" {
+								// Agile Scores
+								if val, ok := meta["agile_scores"]; ok {
+									bytes, _ := json.Marshal(val)
+									agileScores = string(bytes)
+								}
 							}
 						}
-					}
 
-					fmt.Printf("DEBUG: Generating Report -> Prefix: %s, Number: %s\n", reportPrefix, reportNumber)
+						fmt.Printf("DEBUG: Generating Report -> Prefix: %s, Number: %s\n", reportPrefix, reportNumber)
 
-					// Create Report Record
-					newReport := models.AssessmentReports{
-						AssessmentSessionID: session.ID,
-						ReportNumber:        reportNumber,
-						GeneratedAt:         now,
-						DiscScores:          discScores,
-						AgileScores:         agileScores,
-						Level3Scores:        level3Scores,
-						Level4Scores:        level4Scores,
-						OverallSincerity:    overallSincerity,
-						DominantTraitID:     dominantTraitID,
-						Metadata:            "{}",
-					}
+						// Create Report Record
+						newReport := models.AssessmentReports{
+							AssessmentSessionID: session.ID,
+							ReportNumber:        reportNumber,
+							GeneratedAt:         now,
+							DiscScores:          discScores,
+							AgileScores:         agileScores,
+							Level3Scores:        level3Scores,
+							Level4Scores:        level4Scores,
+							OverallSincerity:    overallSincerity,
+							DominantTraitID:     dominantTraitID,
+							Metadata:            "{}",
+						}
 
-					// Save
-					if err := db.Create(&newReport).Error; err != nil {
-						fmt.Printf("ERROR: Failed to create Assessment Report: %v\n", err)
-					} else {
-						fmt.Printf("SUCCESS: Assessment Report Created. ID: %d\n", newReport.ID)
-					}
-				}
-
-				// Update Group Assessment Status
-				if session.GroupID != nil {
-					var groupAssessment models.GroupAssessment
-					db.Where("group_id = ? AND program_id = ?", *session.GroupID, session.ProgramID).First(&groupAssessment)
-
-					var stats struct {
-						Total     int64
-						Started   int64
-						Completed int64
-					}
-
-					// Count sessions in the group for this program
-					db.Model(&models.AssessmentSession{}).
-						Where("group_id = ? AND program_id = ?", *session.GroupID, session.ProgramID).
-						Select("COUNT(*) as total, COUNT(*) FILTER (WHERE status != 'NOT_STARTED') as started, COUNT(*) FILTER (WHERE status = 'COMPLETED') as completed").
-						Scan(&stats)
-
-					newStatus := "NOT_STARTED"
-					isExpired := groupAssessment.ValidTo != nil && groupAssessment.ValidTo.Before(now)
-
-					if stats.Total > 0 {
-						if stats.Completed == stats.Total {
-							newStatus = "COMPLETED"
-						} else if isExpired {
-							if stats.Started > 0 {
-								// Some completed or started but unfinished AND time expired
-								newStatus = "PARTIALLY_EXPIRED"
-							} else {
-								// No one started AND time expired
-								newStatus = "EXPIRED"
-							}
+						// Save
+						if err := tx.Create(&newReport).Error; err != nil {
+							fmt.Printf("ERROR: Failed to create Assessment Report: %v\n", err)
 						} else {
-							// Not Expired
-							if stats.Started > 0 {
-								newStatus = "IN_PROGRESS"
-							}
+							fmt.Printf("SUCCESS: Assessment Report Created. ID: %d\n", newReport.ID)
 						}
 					}
 
-					// Update the GroupAssessment status
-					db.Model(&models.GroupAssessment{}).
-						Where("group_id = ? AND program_id = ?", *session.GroupID, session.ProgramID).
-						Update("status", newStatus)
+					// Update Group Assessment Status
+					if session.GroupID != nil {
+						var groupAssessment models.GroupAssessment
+						tx.Where("group_id = ? AND program_id = ?", *session.GroupID, session.ProgramID).First(&groupAssessment)
+
+						var stats struct {
+							Total     int64
+							Started   int64
+							Completed int64
+						}
+
+						// Count sessions in the group for this program
+						tx.Model(&models.AssessmentSession{}).
+							Where("group_id = ? AND program_id = ?", *session.GroupID, session.ProgramID).
+							Select("COUNT(*) as total, COUNT(*) FILTER (WHERE status != 'NOT_STARTED') as started, COUNT(*) FILTER (WHERE status = 'COMPLETED') as completed").
+							Scan(&stats)
+
+						newStatus := "NOT_STARTED"
+						isExpired := groupAssessment.ValidTo != nil && groupAssessment.ValidTo.Before(now)
+
+						if stats.Total > 0 {
+							if stats.Completed == stats.Total {
+								newStatus = "COMPLETED"
+							} else if isExpired {
+								if stats.Started > 0 {
+									// Some completed or started but unfinished AND time expired
+									newStatus = "PARTIALLY_EXPIRED"
+								} else {
+									// No one started AND time expired
+									newStatus = "EXPIRED"
+								}
+							} else {
+								// Not Expired
+								if stats.Started > 0 {
+									newStatus = "IN_PROGRESS"
+								}
+							}
+						}
+
+						// Update the GroupAssessment status
+						tx.Model(&models.GroupAssessment{}).
+							Where("group_id = ? AND program_id = ?", *session.GroupID, session.ProgramID).
+							Update("status", newStatus)
+					}
 				}
 			}
+
+			return nil
+		})
+
+		if err != nil {
+			fmt.Printf("[SubmitAnswer] ERROR: Transaction Failed: %v\n", err)
+			return err
 		}
 	}
 
