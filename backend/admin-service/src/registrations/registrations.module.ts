@@ -6,6 +6,8 @@ import {
   User as AdminUser,
   Registration,
   Program,
+  Groups,
+  GroupAssessment,
 } from '@originbi/shared-entities';
 
 import { RegistrationsService } from './registrations.service';
@@ -17,6 +19,7 @@ import { AssessmentModule } from '../assessment/assessment.module';
 import { BulkImport } from './entities/bulk-import.entity';
 import { BulkImportRow } from './entities/bulk-import-row.entity';
 import { Department } from '../departments/department.entity';
+import { DepartmentDegree } from '../departments/department-degree.entity';
 
 @Module({
   imports: [
@@ -27,6 +30,9 @@ import { Department } from '../departments/department.entity';
       BulkImportRow,
       Program,
       Department,
+      DepartmentDegree,
+      Groups,
+      GroupAssessment,
     ]),
     HttpModule,
     GroupsModule,
@@ -35,4 +41,4 @@ import { Department } from '../departments/department.entity';
   providers: [RegistrationsService, BulkRegistrationsService],
   controllers: [RegistrationsController],
 })
-export class RegistrationsModule {}
+export class RegistrationsModule { }
