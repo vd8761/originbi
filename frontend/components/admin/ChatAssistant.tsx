@@ -258,10 +258,16 @@ export default function ChatAssistant({
         setUserName(user.name || user.email?.split('@')[0] || '');
         setUserId(user.id);
         setMounted(true);
-        if (user.id > 0) {
+        // Always attempt to load conversations on mount
+        loadConversations();
+    }, [userRole, loadConversations]);
+
+    /* ── Re-load conversations when userId becomes available (deferred auth) ── */
+    useEffect(() => {
+        if (userId > 0) {
             loadConversations();
         }
-    }, [userRole, loadConversations]);
+    }, [userId, loadConversations]);
 
     /* ── Load messages when active conversation changes ── */
     useEffect(() => {
@@ -552,7 +558,7 @@ export default function ChatAssistant({
                                             </div>
                                             {menuOpenId === conv.id && (
                                                 <div className="absolute right-0 top-full mt-1 w-40 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50 py-1 animate-chatFadeIn"
-                                                     onClick={e => e.stopPropagation()}>
+                                                    onClick={e => e.stopPropagation()}>
                                                     <button
                                                         onClick={() => startRename(conv)}
                                                         className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"

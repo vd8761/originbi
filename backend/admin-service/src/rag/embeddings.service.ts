@@ -15,15 +15,20 @@ export class EmbeddingsService implements OnModuleInit {
   // Fallback list of free HuggingFace models (all 384 dimensions)
   private readonly HF_MODELS = [
     'sentence-transformers/all-MiniLM-L6-v2',
-    'BAAI/bge-small-en-v1.5',
+    'sentence-transformers/all-MiniLM-L12-v2',
     'sentence-transformers/paraphrase-MiniLM-L6-v2',
+    'BAAI/bge-small-en-v1.5',
   ];
   private activeModelIdx = 0;
   private readonly EMBEDDING_DIM = 384;
 
+  /** Track when all models were exhausted for auto-recovery */
+  private modelsExhaustedAt: number | null = null;
+  private readonly MODEL_RETRY_COOLDOWN = 5 * 60 * 1000; // 5 minutes
+
   /** Current model URL – updates automatically on 410 fallback */
   private get HF_API_URL(): string {
-    return `https://api-inference.huggingface.co/models/${this.HF_MODELS[this.activeModelIdx]}`;
+    return `https://router.huggingface.co/hf-inference/models/${this.HF_MODELS[this.activeModelIdx]}/pipeline/feature-extraction`;
   }
   private get HF_MODEL(): string {
     return this.HF_MODELS[this.activeModelIdx];
@@ -36,8 +41,24 @@ export class EmbeddingsService implements OnModuleInit {
       this.logger.warn(`⚡ Switching to fallback model: ${this.HF_MODEL}`);
       return true;
     }
-    this.logger.error('❌ All HF embedding models exhausted (410 Gone). Embeddings unavailable.');
+    this.modelsExhaustedAt = Date.now();
+    this.logger.error('❌ All HF embedding models exhausted (410 Gone). Will retry in 5 minutes.');
     return false;
+  }
+
+  /**
+   * Reset model index after cooldown so the service can recover
+   * from transient 410 errors without requiring a server restart.
+   */
+  private resetIfCooledDown(): void {
+    if (
+      this.modelsExhaustedAt &&
+      Date.now() - this.modelsExhaustedAt >= this.MODEL_RETRY_COOLDOWN
+    ) {
+      this.logger.log('🔄 Cooldown elapsed – resetting HF model list for retry');
+      this.activeModelIdx = 0;
+      this.modelsExhaustedAt = null;
+    }
   }
 
   // Cache for embeddings to reduce API calls
@@ -97,6 +118,9 @@ export class EmbeddingsService implements OnModuleInit {
     text: string,
     task: 'passage' | 'query' = 'passage',
   ): Promise<number[] | null> {
+    // Auto-recover from exhausted state after cooldown
+    this.resetIfCooledDown();
+    if (this.activeModelIdx >= this.HF_MODELS.length) return null;
     // Check cache
     const cacheKey = `${task}:${text.slice(0, 100)}`;
     const cached = this.embeddingCache.get(cacheKey);
@@ -150,9 +174,14 @@ export class EmbeddingsService implements OnModuleInit {
         }
 
         if (response.status === 401 || response.status === 403) {
-          this.logger.warn('⚠️ HF token invalid – falling back to unauthenticated requests');
-          this.hfApiToken = null;
-          continue; // retry without token
+          if (this.hfApiToken) {
+            this.logger.warn('⚠️ HF token invalid – falling back to unauthenticated requests');
+            this.hfApiToken = null;
+            continue; // retry without token
+          }
+          // Already unauthenticated and still failing – give up
+          this.logger.error('❌ HF API returned 401/403 even without token');
+          return null;
         }
 
         if (!response.ok) {
@@ -182,6 +211,12 @@ export class EmbeddingsService implements OnModuleInit {
    */
   async generateBatchEmbeddings(texts: string[]): Promise<(number[] | null)[]> {
     if (texts.length === 0) return [];
+
+    // Auto-recover from exhausted state after cooldown
+    this.resetIfCooledDown();
+    if (this.activeModelIdx >= this.HF_MODELS.length) {
+      return new Array(texts.length).fill(null);
+    }
 
     const results: (number[] | null)[] = new Array(texts.length).fill(null);
 
@@ -232,9 +267,14 @@ export class EmbeddingsService implements OnModuleInit {
           }
 
           if (response.status === 401 || response.status === 403) {
-            this.logger.warn('⚠️ HF token invalid – retrying without auth');
-            this.hfApiToken = null;
-            continue;
+            if (this.hfApiToken) {
+              this.logger.warn('⚠️ HF token invalid – retrying without auth');
+              this.hfApiToken = null;
+              continue;
+            }
+            // Already unauthenticated – stop retrying
+            this.logger.error('❌ HF API returned 401/403 even without token');
+            break;
           }
 
           if (!response.ok) {
@@ -251,7 +291,7 @@ export class EmbeddingsService implements OnModuleInit {
               results[i + idx] = this.normalizeEmbedding([item]) ?? (Array.isArray(item) && typeof item[0] === 'number' ? item : null);
             });
           }
-          
+
           // Successfully processed batch, break retry loop
           break;
         } catch (error) {
