@@ -217,10 +217,17 @@ const LoginForm: React.FC<LoginFormProps> = ({
       const backendUser = data.user || {};
       const metadata = backendUser.metadata || {};
 
+      // Store tokens in both localStorage and sessionStorage for auth-helpers
       localStorage.setItem('originbi_id_token', idTokenJwt);
+      sessionStorage.setItem('idToken', idTokenJwt);
+      sessionStorage.setItem('accessToken', idTokenJwt);
+
+      // Store user with all fields needed by auth-helpers (id, role, email, name)
       localStorage.setItem('user', JSON.stringify({
+        id: backendUser.id || 0,
         name: metadata.fullName || backendUser.email?.split('@')[0] || 'User',
-        email: backendUser.email || ''
+        email: backendUser.email || '',
+        role: backendUser.role || 'ADMIN',
       }));
 
       onLoginSuccess();

@@ -98,7 +98,23 @@ const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
     const handleDownload = async (reportPath: string) => {
         try {
             const baseUrl = apiUrl || process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
-            const response = await fetch(`${baseUrl}${reportPath}`);
+            // Include auth headers for protected endpoints
+            const headers: Record<string, string> = {};
+            const token = sessionStorage.getItem('idToken') || sessionStorage.getItem('accessToken');
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            const storedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
+            if (storedUser) {
+                try {
+                    const u = JSON.parse(storedUser);
+                    if (u.id && u.id > 0) headers['X-User-Context'] = storedUser;
+                } catch { /* skip */ }
+            }
+
+            const response = await fetch(`${baseUrl}${reportPath}`, { headers });
+            if (!response.ok) {
+                console.error(`PDF download failed: ${response.status} ${response.statusText}`);
+                return;
+            }
             const blob = await response.blob();
             const downloadUrl = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -238,6 +254,9 @@ export default function ChatAssistant({
     };
 
     const loadConversations = useCallback(async () => {
+        // Don't attempt to load if user is anonymous (id=0) — backend will return nothing
+        const currentUser = getStoredUser();
+        if (!currentUser.id || currentUser.id <= 0) return;
         try {
             const res = await fetch(`${base}/rag/chat/conversations`, { headers: getAuthHeaders() });
             if (!res.ok) {
@@ -268,6 +287,19 @@ export default function ChatAssistant({
             loadConversations();
         }
     }, [userId, loadConversations]);
+
+    /* ── Periodically re-check auth if anonymous (e.g. slow Cognito token arrival) ── */
+    useEffect(() => {
+        if (userId > 0) return;
+        const interval = setInterval(() => {
+            const user = getStoredUser();
+            if (user.id > 0) {
+                setUserId(user.id);
+                setUserName(user.name || user.email?.split('@')[0] || '');
+            }
+        }, 2000);
+        return () => clearInterval(interval);
+    }, [userId]);
 
     /* ── Load messages when active conversation changes ── */
     useEffect(() => {

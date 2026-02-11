@@ -49,7 +49,7 @@ async function bootstrap() {
 
     if (!queryEmbedding) {
       logger.error(
-        '❌ Failed to generate embedding. Check HuggingFace API or network.',
+        '❌ Failed to generate embedding. Check Google Gemini API key or network.',
       );
     } else {
       logger.log(`✅ Embedding generated successfully. (${embedDuration}ms)`);

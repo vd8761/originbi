@@ -78,7 +78,16 @@ const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
         try {
             const baseUrl = apiUrl || process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
             const url = `${baseUrl}${reportPath}`;
-            const response = await fetch(url);
+            const token = typeof window !== 'undefined' ? sessionStorage.getItem('token') : null;
+            const userContext = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+            const headers: Record<string, string> = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            if (userContext) headers['X-User-Context'] = userContext;
+            const response = await fetch(url, { headers });
+            if (!response.ok) {
+                console.error('Download failed with status:', response.status);
+                return;
+            }
             const blob = await response.blob();
             const downloadUrl = window.URL.createObjectURL(blob);
             const a = document.createElement('a');

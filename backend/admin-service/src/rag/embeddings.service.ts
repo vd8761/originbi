@@ -3,63 +3,25 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
 /**
- * Production-Grade Embeddings Service
- * Features: Batch processing, caching, retry logic, optimized semantic search
+ * Production-Grade Embeddings Service — Google Gemini
+ * Model: gemini-embedding-001 (1536 dimensions)
+ * Features:
+ *   - Task-aware embeddings (RETRIEVAL_DOCUMENT vs RETRIEVAL_QUERY)
+ *   - Batch processing via batchEmbedContents API
+ *   - Caching, retry logic, rate limiting
+ *   - Auto-schema migration with HNSW indexing
+ *   - 1536d: optimal balance of quality + IVFFlat compatibility
  */
 @Injectable()
 export class EmbeddingsService implements OnModuleInit {
   private readonly logger = new Logger(EmbeddingsService.name);
-  private hfApiToken: string | null = null;
+  private googleApiKey: string | null = null;
   private pgvectorAvailable = false;
+  private embeddingsAvailable = false;
 
-  // Fallback list of free HuggingFace models (all 384 dimensions)
-  private readonly HF_MODELS = [
-    'sentence-transformers/all-MiniLM-L6-v2',
-    'sentence-transformers/all-MiniLM-L12-v2',
-    'sentence-transformers/paraphrase-MiniLM-L6-v2',
-    'BAAI/bge-small-en-v1.5',
-  ];
-  private activeModelIdx = 0;
-  private readonly EMBEDDING_DIM = 384;
-
-  /** Track when all models were exhausted for auto-recovery */
-  private modelsExhaustedAt: number | null = null;
-  private readonly MODEL_RETRY_COOLDOWN = 5 * 60 * 1000; // 5 minutes
-
-  /** Current model URL – updates automatically on 410 fallback */
-  private get HF_API_URL(): string {
-    return `https://router.huggingface.co/hf-inference/models/${this.HF_MODELS[this.activeModelIdx]}/pipeline/feature-extraction`;
-  }
-  private get HF_MODEL(): string {
-    return this.HF_MODELS[this.activeModelIdx];
-  }
-
-  /** Switch to next model when current one returns 410 Gone */
-  private switchToNextModel(): boolean {
-    if (this.activeModelIdx < this.HF_MODELS.length - 1) {
-      this.activeModelIdx++;
-      this.logger.warn(`⚡ Switching to fallback model: ${this.HF_MODEL}`);
-      return true;
-    }
-    this.modelsExhaustedAt = Date.now();
-    this.logger.error('❌ All HF embedding models exhausted (410 Gone). Will retry in 5 minutes.');
-    return false;
-  }
-
-  /**
-   * Reset model index after cooldown so the service can recover
-   * from transient 410 errors without requiring a server restart.
-   */
-  private resetIfCooledDown(): void {
-    if (
-      this.modelsExhaustedAt &&
-      Date.now() - this.modelsExhaustedAt >= this.MODEL_RETRY_COOLDOWN
-    ) {
-      this.logger.log('🔄 Cooldown elapsed – resetting HF model list for retry');
-      this.activeModelIdx = 0;
-      this.modelsExhaustedAt = null;
-    }
-  }
+  private readonly MODEL = 'models/gemini-embedding-001';
+  private readonly EMBEDDING_DIM = 1536;  // Safe dimension that works with both IVFFlat and HNSW
+  private readonly GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
   // Cache for embeddings to reduce API calls
   private embeddingCache = new Map<
@@ -67,20 +29,33 @@ export class EmbeddingsService implements OnModuleInit {
     { embedding: number[]; timestamp: number }
   >();
   private readonly CACHE_TTL = 1000 * 60 * 60; // 1 hour cache
-  private readonly BATCH_SIZE = 10; // Process 10 at a time
+  private readonly BATCH_SIZE = 50; // Google supports up to 100 per batch
   private readonly MAX_RETRIES = 3;
+
+  // Rate limiting for free tier (15 RPM)
+  private requestTimestamps: number[] = [];
+  private readonly RATE_LIMIT_RPM = 14; // stay just under limit
 
   constructor(private dataSource: DataSource) { }
 
   async onModuleInit() {
-    this.hfApiToken = process.env.HF_API_TOKEN || null;
-    if (this.hfApiToken) {
-      this.logger.log('✅ HuggingFace API token configured (higher rate limits)');
+    this.googleApiKey = process.env.GOOGLE_API_KEY || null;
+    if (this.googleApiKey) {
+      this.logger.log('✅ Google Gemini API key configured');
+      this.embeddingsAvailable = true;
     } else {
-      this.logger.log('ℹ️  No HF_API_TOKEN – using HuggingFace free tier (works without key, lower rate limits)');
+      this.logger.error(
+        '❌ No GOOGLE_API_KEY set — embeddings disabled. Add it to .env',
+      );
+      this.embeddingsAvailable = false;
     }
     await this.checkPgvector();
+    if (this.pgvectorAvailable) {
+      await this.checkAndMigrateSchema();
+    }
   }
+
+  // ─────────────── Infrastructure ───────────────
 
   private async checkPgvector(): Promise<void> {
     try {
@@ -94,59 +69,177 @@ export class EmbeddingsService implements OnModuleInit {
   }
 
   /**
-   * Generate single embedding with caching and retry
+   * Auto-detect and migrate vector column from old dimension
+   * to the new 1536-dim Google Gemini format.
    */
-  /**
-   * Normalize HuggingFace API response to a flat number[] embedding.
-   * HF returns different shapes depending on model / pipeline:
-   *   number[]  – direct embedding
-   *   number[][] – batch with 1 item
-   *   number[][][] – token-level (shouldn't happen for sentence-transformers)
-   */
-  private normalizeEmbedding(data: any): number[] | null {
-    if (!data) return null;
-    if (Array.isArray(data)) {
-      if (typeof data[0] === 'number') return data;          // flat
-      if (Array.isArray(data[0])) {
-        if (typeof data[0][0] === 'number') return data[0];  // nested once
+  private async checkAndMigrateSchema(): Promise<void> {
+    try {
+      // Check current vector dimension by inspecting column type
+      const colInfo = await this.dataSource.query(`
+        SELECT atttypmod FROM pg_attribute
+        WHERE attrelid = 'rag_embeddings'::regclass
+          AND attname = 'embedding'
+      `);
+
+      if (colInfo.length === 0) {
+        this.logger.warn('⚠️ rag_embeddings table or embedding column not found');
+        return;
       }
+
+      const currentDim = colInfo[0].atttypmod;
+
+      if (currentDim !== this.EMBEDDING_DIM) {
+        this.logger.warn(
+          `⚠️ Schema mismatch detected (current: ${currentDim} dims, required: ${this.EMBEDDING_DIM} dims). Migrating...`,
+        );
+
+        // 1. Clear incompatible embeddings
+        await this.dataSource.query('DELETE FROM rag_embeddings');
+        await this.dataSource.query('DELETE FROM rag_documents');
+
+        // 2. Drop old indexes first
+        await this.dataSource.query('DROP INDEX IF EXISTS idx_rag_embeddings_vector');
+        await this.dataSource.query('DROP INDEX IF EXISTS rag_embeddings_embedding_idx');
+        
+        // 3. Alter column to new dimension
+        await this.dataSource.query(
+          `ALTER TABLE rag_embeddings ALTER COLUMN embedding TYPE vector(${this.EMBEDDING_DIM})`,
+        );
+
+        // 4. Create HNSW index (better for 1536+ dimensions)
+        try {
+          await this.dataSource.query(`
+            CREATE INDEX idx_rag_embeddings_vector 
+            ON rag_embeddings USING hnsw (embedding vector_cosine_ops)
+          `);
+          this.logger.log('✅ Created HNSW index for optimal performance');
+        } catch (hnswError) {
+          // Fallback to IVFFlat if HNSW not available (older pgvector)
+          this.logger.warn('HNSW not available, falling back to IVFFlat');
+          await this.dataSource.query(`
+            CREATE INDEX idx_rag_embeddings_vector 
+            ON rag_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)
+          `);
+        }
+
+        // 5. Update semantic_search function to match new dimension
+        await this.dataSource.query(`
+          CREATE OR REPLACE FUNCTION semantic_search(
+              query_embedding vector(${this.EMBEDDING_DIM}),
+              match_count INT DEFAULT 5,
+              filter_category VARCHAR DEFAULT NULL
+          )
+          RETURNS TABLE (
+              document_id INT,
+              content TEXT,
+              metadata JSONB,
+              category VARCHAR(50),
+              similarity FLOAT
+          ) AS $$
+          BEGIN
+              RETURN QUERY
+              SELECT 
+                  d.id,
+                  d.content,
+                  d.metadata,
+                  d.category,
+                  1 - (e.embedding <=> query_embedding) AS similarity
+              FROM rag_embeddings e
+              JOIN rag_documents d ON d.id = e.document_id
+              WHERE (filter_category IS NULL OR d.category = filter_category)
+              ORDER BY e.embedding <=> query_embedding
+              LIMIT match_count;
+          END;
+          $$ LANGUAGE plpgsql;
+        `);
+
+        // 6. Update other tables if they exist
+        const tables = ['rag_employee_profiles', 'rag_role_requirements'];
+        for (const table of tables) {
+          const tableExists = await this.dataSource.query(`
+            SELECT EXISTS (
+              SELECT FROM information_schema.tables 
+              WHERE table_name = '${table}'
+            )
+          `);
+          if (tableExists[0].exists) {
+            await this.dataSource.query(`DELETE FROM ${table}`);
+            await this.dataSource.query(
+              `ALTER TABLE ${table} ALTER COLUMN embedding TYPE vector(${this.EMBEDDING_DIM})`,
+            );
+          }
+        }
+
+        this.logger.log(
+          `✅ Schema migrated to ${this.EMBEDDING_DIM} dimensions. Old data cleared.`,
+        );
+      } else {
+        this.logger.log(`✅ Vector schema OK (${this.EMBEDDING_DIM} dimensions)`);
+      }
+    } catch (error) {
+      this.logger.warn('⚠️ Schema check skipped (table may not exist yet):', error.message);
     }
-    return null;
   }
 
+  // ─────────────── Rate Limiting ───────────────
+
+  private async waitForRateLimit(): Promise<void> {
+    const now = Date.now();
+    // Remove timestamps older than 1 minute
+    this.requestTimestamps = this.requestTimestamps.filter(
+      (t) => now - t < 60000,
+    );
+
+    if (this.requestTimestamps.length >= this.RATE_LIMIT_RPM) {
+      const oldestInWindow = this.requestTimestamps[0];
+      const waitMs = 60000 - (now - oldestInWindow) + 500; // +500ms buffer
+      this.logger.debug(`⏳ Rate limit: waiting ${(waitMs / 1000).toFixed(1)}s`);
+      await this.sleep(waitMs);
+    }
+
+    this.requestTimestamps.push(Date.now());
+  }
+
+  // ─────────────── Core: Single Embedding ───────────────
+
+  /**
+   * Generate a single embedding using Google Gemini.
+   * @param text - The text to embed (max ~2048 tokens)
+   * @param task - 'passage' uses RETRIEVAL_DOCUMENT, 'query' uses RETRIEVAL_QUERY
+   */
   async generateEmbedding(
     text: string,
     task: 'passage' | 'query' = 'passage',
   ): Promise<number[] | null> {
-    // Auto-recover from exhausted state after cooldown
-    this.resetIfCooledDown();
-    if (this.activeModelIdx >= this.HF_MODELS.length) return null;
+    if (!this.embeddingsAvailable || !this.googleApiKey) return null;
+
     // Check cache
-    const cacheKey = `${task}:${text.slice(0, 100)}`;
+    const cacheKey = `${task}:${text.slice(0, 200)}`;
     const cached = this.embeddingCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
       return cached.embedding;
     }
 
+    const taskType =
+      task === 'query' ? 'RETRIEVAL_QUERY' : 'RETRIEVAL_DOCUMENT';
+
     for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
       try {
+        await this.waitForRateLimit();
+
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-          controller.abort();
-          this.logger.warn(`HF embedding request timeout after 20s (attempt ${attempt})`);
-        }, 20000);
+        const timeoutId = setTimeout(() => controller.abort(), 20000);
 
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (this.hfApiToken) {
-          headers['Authorization'] = `Bearer ${this.hfApiToken}`;
-        }
+        const url = `${this.GEMINI_BASE_URL}/${this.MODEL}:embedContent?key=${this.googleApiKey}`;
 
-        const response = await fetch(this.HF_API_URL, {
+        const response = await fetch(url, {
           method: 'POST',
-          headers,
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            inputs: text.slice(0, 8000),
-            options: { wait_for_model: true },
+            model: this.MODEL,
+            content: { parts: [{ text: text.slice(0, 10000) }] },
+            taskType,
+            outputDimensionality: this.EMBEDDING_DIM,
           }),
           signal: controller.signal,
         });
@@ -154,162 +247,155 @@ export class EmbeddingsService implements OnModuleInit {
         clearTimeout(timeoutId);
 
         if (response.status === 429) {
-          await this.sleep(1000 * attempt);
-          continue;
-        }
-
-        if (response.status === 410) {
-          // Model removed from HF serverless – try next model
-          if (this.switchToNextModel()) {
-            continue; // retry with next model
-          }
-          return null;
-        }
-
-        if (response.status === 503) {
-          // Model still loading on HuggingFace serverless – back off and retry
-          this.logger.warn('HF model loading, retrying…');
+          this.logger.warn(`⏳ Rate limited (attempt ${attempt}), backing off...`);
           await this.sleep(2000 * attempt);
           continue;
         }
 
-        if (response.status === 401 || response.status === 403) {
-          if (this.hfApiToken) {
-            this.logger.warn('⚠️ HF token invalid – falling back to unauthenticated requests');
-            this.hfApiToken = null;
-            continue; // retry without token
-          }
-          // Already unauthenticated and still failing – give up
-          this.logger.error('❌ HF API returned 401/403 even without token');
+        if (response.status === 400) {
+          const errBody = await response.json().catch(() => ({}));
+          this.logger.warn(`⚠️ Bad request: ${JSON.stringify(errBody).slice(0, 200)}`);
           return null;
         }
 
         if (!response.ok) {
-          throw new Error(`HF API error: ${response.status}`);
+          const errText = await response.text().catch(() => '');
+          throw new Error(`Google API ${response.status}: ${errText.slice(0, 200)}`);
         }
 
         const data = await response.json();
-        const embedding = this.normalizeEmbedding(data);
+        const embedding: number[] | undefined = data?.embedding?.values;
 
-        if (embedding) {
-          this.embeddingCache.set(cacheKey, { embedding, timestamp: Date.now() });
+        if (embedding && embedding.length === this.EMBEDDING_DIM) {
+          this.embeddingCache.set(cacheKey, {
+            embedding,
+            timestamp: Date.now(),
+          });
+          return embedding;
         }
-        return embedding;
+
+        this.logger.warn('⚠️ Unexpected embedding response shape');
+        return null;
       } catch (error) {
         if (attempt === this.MAX_RETRIES) {
-          this.logger.error(`Failed after ${this.MAX_RETRIES} attempts:`, error);
+          this.logger.error(
+            `❌ Embedding failed after ${this.MAX_RETRIES} attempts:`,
+            error,
+          );
           return null;
         }
-        await this.sleep(500 * attempt);
+        await this.sleep(1000 * attempt);
       }
     }
     return null;
   }
 
-  /**
-   * Generate embeddings in batch for efficiency
-   */
-  async generateBatchEmbeddings(texts: string[]): Promise<(number[] | null)[]> {
-    if (texts.length === 0) return [];
+  // ─────────────── Core: Batch Embeddings ───────────────
 
-    // Auto-recover from exhausted state after cooldown
-    this.resetIfCooledDown();
-    if (this.activeModelIdx >= this.HF_MODELS.length) {
+  /**
+   * Generate embeddings in batch using Google's batchEmbedContents API.
+   * This is significantly more efficient than calling embedContent N times.
+   */
+  async generateBatchEmbeddings(
+    texts: string[],
+    task: 'passage' | 'query' = 'passage',
+  ): Promise<(number[] | null)[]> {
+    if (texts.length === 0) return [];
+    if (!this.embeddingsAvailable || !this.googleApiKey) {
       return new Array(texts.length).fill(null);
     }
 
+    const taskType =
+      task === 'query' ? 'RETRIEVAL_QUERY' : 'RETRIEVAL_DOCUMENT';
     const results: (number[] | null)[] = new Array(texts.length).fill(null);
 
     for (let i = 0; i < texts.length; i += this.BATCH_SIZE) {
-      const batch = texts
-        .slice(i, i + this.BATCH_SIZE)
-        .map((t) => t.slice(0, 8000));
+      const batchTexts = texts.slice(i, i + this.BATCH_SIZE);
 
-      // Add retry logic for batch requests
+      // Check cache first; only request uncached items
+      const uncachedIndices: number[] = [];
+      for (let j = 0; j < batchTexts.length; j++) {
+        const cacheKey = `${task}:${batchTexts[j].slice(0, 200)}`;
+        const cached = this.embeddingCache.get(cacheKey);
+        if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+          results[i + j] = cached.embedding;
+        } else {
+          uncachedIndices.push(j);
+        }
+      }
+
+      if (uncachedIndices.length === 0) continue; // all from cache
+
+      // Build batch request body
+      const requests = uncachedIndices.map((j) => ({
+        model: this.MODEL,
+        content: { parts: [{ text: batchTexts[j].slice(0, 10000) }] },
+        taskType,
+        outputDimensionality: this.EMBEDDING_DIM,
+      }));
+
       for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
         try {
-          // Create AbortController for timeout handling
+          await this.waitForRateLimit();
+
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => {
-            controller.abort();
-            this.logger.warn(`Batch request timeout after 30 seconds (attempt ${attempt})`);
-          }, 30000); // 30 second timeout
+          const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-          if (this.hfApiToken) {
-            headers['Authorization'] = `Bearer ${this.hfApiToken}`;
-          }
+          const url = `${this.GEMINI_BASE_URL}/${this.MODEL}:batchEmbedContents?key=${this.googleApiKey}`;
 
-          const response = await fetch(this.HF_API_URL, {
+          const response = await fetch(url, {
             method: 'POST',
-            headers,
-            body: JSON.stringify({
-              inputs: batch,
-              options: { wait_for_model: true },
-            }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requests }),
             signal: controller.signal,
           });
 
           clearTimeout(timeoutId);
 
-          if (response.status === 410) {
-            // Model removed – try fallback
-            if (this.switchToNextModel()) {
-              continue;
-            }
-            break; // all models exhausted
-          }
-
-          if (response.status === 503) {
-            this.logger.warn('HF model loading (batch), retrying…');
-            await this.sleep(2000 * attempt);
+          if (response.status === 429) {
+            this.logger.warn(`⏳ Batch rate limited (attempt ${attempt}), backing off...`);
+            await this.sleep(3000 * attempt);
             continue;
           }
 
-          if (response.status === 401 || response.status === 403) {
-            if (this.hfApiToken) {
-              this.logger.warn('⚠️ HF token invalid – retrying without auth');
-              this.hfApiToken = null;
-              continue;
-            }
-            // Already unauthenticated – stop retrying
-            this.logger.error('❌ HF API returned 401/403 even without token');
-            break;
-          }
-
           if (!response.ok) {
-            if (attempt === this.MAX_RETRIES) {
-              this.logger.warn(`Batch failed with status ${response.status} after ${attempt} attempts`);
-            }
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            const errText = await response.text().catch(() => '');
+            throw new Error(`Google Batch API ${response.status}: ${errText.slice(0, 200)}`);
           }
 
           const data = await response.json();
-          // HF batch response: number[][] (one embedding per input)
-          if (Array.isArray(data)) {
-            data.forEach((item: any, idx: number) => {
-              results[i + idx] = this.normalizeEmbedding([item]) ?? (Array.isArray(item) && typeof item[0] === 'number' ? item : null);
-            });
-          }
+          const embeddings: any[] = data?.embeddings || [];
 
-          // Successfully processed batch, break retry loop
-          break;
+          embeddings.forEach((emb: any, idx: number) => {
+            const values: number[] | undefined = emb?.values;
+            if (values && values.length === this.EMBEDDING_DIM) {
+              const originalIdx = uncachedIndices[idx];
+              results[i + originalIdx] = values;
+              // Cache the result
+              const cacheKey = `${task}:${batchTexts[originalIdx].slice(0, 200)}`;
+              this.embeddingCache.set(cacheKey, {
+                embedding: values,
+                timestamp: Date.now(),
+              });
+            }
+          });
+
+          break; // success
         } catch (error) {
           if (attempt === this.MAX_RETRIES) {
-            this.logger.error('Batch embedding error:');
-            this.logger.error(error);
-            // Continue to next batch instead of failing completely
+            this.logger.error('❌ Batch embedding failed:', error);
             break;
-          } else {
-            this.logger.warn(`Batch attempt ${attempt} failed, retrying in ${attempt * 1000}ms...`);
-            await this.sleep(attempt * 1000); // Progressive backoff
           }
+          this.logger.warn(`Batch attempt ${attempt} failed, retrying...`);
+          await this.sleep(1500 * attempt);
         }
       }
     }
 
     return results;
   }
+
+  // ─────────────── Storage: Single Document ───────────────
 
   /**
    * Store document with embedding
@@ -352,6 +438,8 @@ export class EmbeddingsService implements OnModuleInit {
       return null;
     }
   }
+
+  // ─────────────── Storage: Bulk Store ───────────────
 
   /**
    * Bulk store documents efficiently
@@ -411,6 +499,8 @@ export class EmbeddingsService implements OnModuleInit {
     return { success, failed };
   }
 
+  // ─────────────── Semantic Search ───────────────
+
   /**
    * Semantic search with minimum similarity threshold
    */
@@ -459,6 +549,8 @@ export class EmbeddingsService implements OnModuleInit {
     }
   }
 
+  // ─────────────── Stats & Status ───────────────
+
   /**
    * Get document count by category
    */
@@ -477,15 +569,21 @@ export class EmbeddingsService implements OnModuleInit {
     }
   }
 
-  getStatus(): { embeddingsAvailable: boolean; pgvectorAvailable: boolean; model: string; dimensions: number; fallbackModels: string[] } {
+  getStatus(): {
+    embeddingsAvailable: boolean;
+    pgvectorAvailable: boolean;
+    model: string;
+    dimensions: number;
+  } {
     return {
-      embeddingsAvailable: this.activeModelIdx < this.HF_MODELS.length,
+      embeddingsAvailable: this.embeddingsAvailable,
       pgvectorAvailable: this.pgvectorAvailable,
-      model: this.HF_MODEL,
+      model: 'Google Gemini gemini-embedding-001',
       dimensions: this.EMBEDDING_DIM,
-      fallbackModels: this.HF_MODELS,
     };
   }
+
+  // ─────────────── Storage: Bulk Upsert ───────────────
 
   /**
    * Store or Update documents efficiently
@@ -574,6 +672,8 @@ export class EmbeddingsService implements OnModuleInit {
 
     return { success, failed };
   }
+
+  // ─────────────── Utilities ───────────────
 
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
