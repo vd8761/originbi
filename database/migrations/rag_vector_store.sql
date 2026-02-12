@@ -8,7 +8,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE IF NOT EXISTS rag_embeddings (
     id SERIAL PRIMARY KEY,
     content TEXT NOT NULL,
-    embedding vector(1024),  -- Jina v3 uses 1024 dimensions
+    embedding vector(1536),  -- Google Gemini gemini-embedding-001 uses 1536 dimensions (optimal)
     metadata JSONB DEFAULT '{}',
     category VARCHAR(100),
     source_table VARCHAR(100),
@@ -17,11 +17,10 @@ CREATE TABLE IF NOT EXISTS rag_embeddings (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Create index for fast similarity search
+-- Create index for fast similarity search (HNSW for better performance)
 CREATE INDEX IF NOT EXISTS rag_embeddings_embedding_idx 
 ON rag_embeddings 
-USING ivfflat (embedding vector_cosine_ops)
-WITH (lists = 100);
+USING hnsw (embedding vector_cosine_ops);
 
 -- Create index for category filtering
 CREATE INDEX IF NOT EXISTS rag_embeddings_category_idx ON rag_embeddings(category);
@@ -36,7 +35,7 @@ CREATE TABLE IF NOT EXISTS rag_employee_profiles (
     total_score DECIMAL(5,2),
     suitability_level VARCHAR(50),
     suitable_roles TEXT[],
-    embedding vector(1024),
+    embedding vector(1536),
     indexed_at TIMESTAMP DEFAULT NOW(),
     UNIQUE(registration_id)
 );
@@ -44,8 +43,7 @@ CREATE TABLE IF NOT EXISTS rag_employee_profiles (
 -- Create index for employee embedding search
 CREATE INDEX IF NOT EXISTS rag_employee_profiles_embedding_idx 
 ON rag_employee_profiles 
-USING ivfflat (embedding vector_cosine_ops)
-WITH (lists = 50);
+USING hnsw (embedding vector_cosine_ops);
 
 -- Table to store role requirements for matching
 CREATE TABLE IF NOT EXISTS rag_role_requirements (
@@ -54,7 +52,7 @@ CREATE TABLE IF NOT EXISTS rag_role_requirements (
     role_description TEXT,
     min_score INTEGER DEFAULT 70,
     required_traits TEXT[],
-    embedding vector(1024),
+    embedding vector(1536),
     created_at TIMESTAMP DEFAULT NOW(),
     UNIQUE(role_name)
 );

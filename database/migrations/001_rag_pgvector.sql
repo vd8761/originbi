@@ -22,22 +22,22 @@ CREATE TABLE IF NOT EXISTS rag_documents (
 
 -- =============================================
 -- 2. RAG Embeddings Table
--- Stores vector embeddings (1024 dimensions for Jina v3)
+-- Stores vector embeddings (1536 dimensions for Gemini)
 -- =============================================
 CREATE TABLE IF NOT EXISTS rag_embeddings (
     id SERIAL PRIMARY KEY,
     document_id INTEGER REFERENCES rag_documents(id) ON DELETE CASCADE,
-    embedding vector(1024),        -- Jina embeddings v3 dimension
-    model VARCHAR(100) DEFAULT 'jina-embeddings-v3',
+    embedding vector(1536),        -- Gemini embeddings dimension (optimal)
+    model VARCHAR(100) DEFAULT 'gemini-embedding-001',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- =============================================
 -- 3. Indexes for Fast Search
 -- =============================================
--- IVFFlat index for approximate nearest neighbor search
+-- HNSW index for fast similarity search (better than IVFFlat for 1536d)
 CREATE INDEX IF NOT EXISTS idx_rag_embeddings_vector 
-ON rag_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+ON rag_embeddings USING hnsw (embedding vector_cosine_ops);
 
 -- Index for filtering by category
 CREATE INDEX IF NOT EXISTS idx_rag_documents_category ON rag_documents(category);
@@ -49,7 +49,7 @@ CREATE INDEX IF NOT EXISTS idx_rag_documents_source ON rag_documents(source_tabl
 -- 4. Helper Function: Semantic Search
 -- =============================================
 CREATE OR REPLACE FUNCTION semantic_search(
-    query_embedding vector(1024),
+    query_embedding vector(1536),
     match_count INT DEFAULT 5,
     filter_category VARCHAR DEFAULT NULL
 )

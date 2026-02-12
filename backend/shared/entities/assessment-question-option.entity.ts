@@ -44,8 +44,8 @@ export class AssessmentQuestionOption {
     })
     scoreValue: number;
 
-    @Column({ name: 'is_correct', type: 'boolean', default: false })
-    isCorrect: boolean;
+    @Column({ name: 'is_correct', type: 'boolean', nullable: true, default: false })
+    isCorrect: boolean | null;
 
     @Column({ name: 'metadata', type: 'jsonb', default: () => `'{}'` })
     metadata: any;

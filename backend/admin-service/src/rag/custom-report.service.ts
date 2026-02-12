@@ -9,6 +9,75 @@ import {
 } from '@originbi/shared-entities';
 import Groq from 'groq-sdk';
 
+// ─── Resilient LLM Helper ────────────────────────────────────────────────
+// Tries Groq first, falls back to Google Gemini on rate-limit (429) or error.
+// Uses the GOOGLE_API_KEY already in .env for Gemini.
+async function resilientLLMCall(
+    groqClient: Groq,
+    messages: { role: string; content: string }[],
+    opts: { maxTokens?: number; temperature?: number; logger?: Logger } = {},
+): Promise<string> {
+    const { maxTokens = 1000, temperature = 0, logger } = opts;
+
+    // ── Attempt 1: Groq ──
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+            const res = await groqClient.chat.completions.create({
+                model: 'llama-3.3-70b-versatile',
+                messages: messages as any,
+                temperature,
+                max_tokens: maxTokens,
+            });
+            return res.choices[0]?.message?.content || '';
+        } catch (err: any) {
+            const isRateLimit = err?.status === 429 || err?.error?.error?.code === 'rate_limit_exceeded';
+            if (isRateLimit && attempt === 1) {
+                logger?.warn('⚠️ Groq rate-limited, falling back to Gemini...');
+                break; // fall through to Gemini
+            }
+            if (attempt === 2) throw err;
+            // Transient error — wait and retry once
+            await new Promise(r => setTimeout(r, 2000));
+        }
+    }
+
+    // ── Attempt 2: Google Gemini fallback ──
+    const googleApiKey = process.env.GOOGLE_API_KEY;
+    if (!googleApiKey) {
+        throw new Error('Groq rate-limited and no GOOGLE_API_KEY for fallback');
+    }
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${googleApiKey}`;
+    const geminiBody = {
+        contents: [{ parts: [{ text: messages.map(m => `${m.role}: ${m.content}`).join('\n') }] }],
+        generationConfig: { temperature, maxOutputTokens: maxTokens },
+    };
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(geminiBody),
+            });
+            if (resp.status === 429) {
+                logger?.warn('⏳ Gemini also rate-limited, waiting 5s...');
+                await new Promise(r => setTimeout(r, 5000));
+                continue;
+            }
+            if (!resp.ok) {
+                const errText = await resp.text().catch(() => '');
+                throw new Error(`Gemini ${resp.status}: ${errText.slice(0, 200)}`);
+            }
+            const data = await resp.json();
+            return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        } catch (err) {
+            if (attempt === 2) throw err;
+            await new Promise(r => setTimeout(r, 2000));
+        }
+    }
+    return '';
+}
+
 // Agile ACI Score Interpretation (0-125 scale from totalScore)
 const AGILE_LEVELS = {
     naturalist: {
@@ -280,10 +349,12 @@ export class CustomReportService {
         this.logger.log(`📈 Agile Profile: ${agileProfile.level} (${agileProfile.rawScore}/125 = ${agileProfile.percentage}%)`);
 
         // ═══════════════════════════════════════════════════════════════
-        // STEP 6: Generate AI-based insights using REAL data
+        // STEP 6: Generate AI-based insights using REAL data (PARALLEL)
         // ═══════════════════════════════════════════════════════════════
-        const skillCategories = await this.generateSkillScores(profile, discProfile, agileProfile);
-        const behavioralSummary = await this.generateBehavioralSummary(profile, discProfile, agileProfile);
+        const [skillCategories, behavioralSummary] = await Promise.all([
+            this.generateSkillScores(profile, discProfile, agileProfile),
+            this.generateBehavioralSummary(profile, discProfile, agileProfile),
+        ]);
 
         // ═══════════════════════════════════════════════════════════════
         // STEP 7: Calculate scores using REAL assessment data
@@ -293,10 +364,12 @@ export class CustomReportService {
         const industrySuitability = this.determineIndustrySuitability(profile, discProfile);
 
         // ═══════════════════════════════════════════════════════════════
-        // STEP 8: Generate AI-powered insights
+        // STEP 8: Generate AI-powered insights (PARALLEL)
         // ═══════════════════════════════════════════════════════════════
-        const transitionRequirements = await this.generateTransitionRequirements(profile);
-        const executiveInsight = await this.generateExecutiveInsight(profile, roleFitmentScore, futureRoleReadiness, agileProfile);
+        const [transitionRequirements, executiveInsight] = await Promise.all([
+            this.generateTransitionRequirements(profile),
+            this.generateExecutiveInsight(profile, roleFitmentScore, futureRoleReadiness, agileProfile),
+        ]);
         const overallSkillInsight = this.extractSkillInsights(skillCategories);
 
         // ═══════════════════════════════════════════════════════════════
@@ -398,14 +471,11 @@ Generate JSON with this EXACT structure (no markdown, just JSON):
 Make scores realistic based on role/experience. Adapt skill categories to the person's actual role/industry.`;
 
         try {
-            const response = await this.groqClient.chat.completions.create({
-                model: 'llama-3.3-70b-versatile',
-                messages: [{ role: 'user', content: prompt }],
-                temperature: 0,
-                max_tokens: 2000,
-            });
-
-            const content = response.choices[0]?.message?.content || '';
+            const content = await resilientLLMCall(
+                this.groqClient,
+                [{ role: 'user', content: prompt }],
+                { maxTokens: 2000, logger: this.logger },
+            );
             // Extract JSON from response
             const jsonMatch = content.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
@@ -434,13 +504,12 @@ Experience: ${profile.yearsOfExperience} years in ${profile.currentIndustry}
 Focus on how their behavioral profile aligns with the target role. Be specific and insightful. No bullet points, just flowing text.`;
 
         try {
-            const response = await this.groqClient.chat.completions.create({
-                model: 'llama-3.3-70b-versatile',
-                messages: [{ role: 'user', content: prompt }],
-                temperature: 0,
-                max_tokens: 500,
-            });
-            return response.choices[0]?.message?.content || this.getDefaultBehavioralSummary(disc);
+            const content = await resilientLLMCall(
+                this.groqClient,
+                [{ role: 'user', content: prompt }],
+                { maxTokens: 500, logger: this.logger },
+            );
+            return content || this.getDefaultBehavioralSummary(disc);
         } catch (error) {
             this.logger.error('Error generating behavioral summary:', error);
             return this.getDefaultBehavioralSummary(disc);
@@ -460,13 +529,11 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
 Return ONLY the JSON array, no other text.`;
 
         try {
-            const response = await this.groqClient.chat.completions.create({
-                model: 'llama-3.3-70b-versatile',
-                messages: [{ role: 'user', content: prompt }],
-                temperature: 0,
-                max_tokens: 500,
-            });
-            const content = response.choices[0]?.message?.content || '';
+            const content = await resilientLLMCall(
+                this.groqClient,
+                [{ role: 'user', content: prompt }],
+                { maxTokens: 500, logger: this.logger },
+            );
             const jsonMatch = content.match(/\[[\s\S]*\]/);
             if (jsonMatch) {
                 return JSON.parse(jsonMatch[0]);
@@ -506,13 +573,12 @@ Summarize their potential, key strengths, and what they need to focus on. Be enc
 IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, or external training programs. Focus ONLY on the candidate's readiness and internal development areas.`;
 
         try {
-            const response = await this.groqClient.chat.completions.create({
-                model: 'llama-3.3-70b-versatile',
-                messages: [{ role: 'user', content: prompt }],
-                temperature: 0,
-                max_tokens: 500,
-            });
-            return response.choices[0]?.message?.content || 'Based on current assessment, you show strong potential for role transition with focused development.';
+            const content = await resilientLLMCall(
+                this.groqClient,
+                [{ role: 'user', content: prompt }],
+                { maxTokens: 500, logger: this.logger },
+            );
+            return content || 'Based on current assessment, you show strong potential for role transition with focused development.';
         } catch (error) {
             this.logger.error('Error generating executive insight:', error);
             return 'Based on current assessment, you show strong potential for role transition with focused development.';

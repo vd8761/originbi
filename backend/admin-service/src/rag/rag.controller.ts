@@ -10,6 +10,7 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  UseGuards,
 } from '@nestjs/common';
 import { Response } from 'express';
 import {
@@ -28,7 +29,13 @@ import { SyncService } from './sync.service';
 import { FutureRoleReportService } from './future-role-report.service';
 import { OverallRoleFitmentService } from './overall-role-fitment.service';
 import { CustomReportService } from './custom-report.service';
+import { ChatMemoryService } from './chat-memory.service';
 import { PdfService } from '../common/pdf/pdf.service';
+
+// RBAC: Auth guard & user context
+import { CognitoUniversalGuard } from '../auth/cognito-universal.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { UserContext } from '../common/interfaces/user-context.interface';
 
 // DTO for query request
 export class RagQueryDto {
@@ -39,6 +46,11 @@ export class RagQueryDto {
   @IsOptional()
   @IsBoolean()
   generatePdf?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  conversationId?: number;
 }
 
 // DTO for Career Report
@@ -176,6 +188,7 @@ export class RagController {
     private readonly futureRoleReportService: FutureRoleReportService,
     private readonly overallRoleFitmentService: OverallRoleFitmentService,
     private readonly customReportService: CustomReportService,
+    private readonly chatMemory: ChatMemoryService,
     private readonly pdfService: PdfService,
   ) { }
 
@@ -227,11 +240,11 @@ export class RagController {
     }
   }
 
-    /**
-   * GET /rag/custom-report/pdf
-   * Generate Custom Report PDF (e.g., Career Fitment)
-   * Fetches user by ID, looks up their name, and generates report with available assessment data
-   */
+  /**
+ * GET /rag/custom-report/pdf
+ * Generate Custom Report PDF (e.g., Career Fitment)
+ * Fetches user by ID, looks up their name, and generates report with available assessment data
+ */
   @Get('custom-report/pdf')
   async generateCustomReportPdf(
     @Query('userId') userId: string,
@@ -377,35 +390,74 @@ export class RagController {
   /**
    * POST /rag/query
    * Main endpoint for RAG queries (Hybrid: Semantic + SQL)
+   *
+   * RBAC: CognitoUniversalGuard handles authentication & enrichment:
+   *   - Verifies Cognito token (if present) and enriches with DB IDs
+   *   - Falls back to X-User-Context header (validated via DB)
+   *   - Defaults to anonymous STUDENT (most restricted) if no auth
+   *
+   * The enriched UserContext contains:
+   *   - id: numeric users.id
+   *   - role: ADMIN | CORPORATE | STUDENT
+   *   - corporateId: corporate_accounts.id (for CORPORATE role)
+   *   - registrationId: registrations.id (for STUDENT role)
    */
+  @UseGuards(CognitoUniversalGuard)
   @Post('query')
   async query(
     @Body() queryDto: RagQueryDto,
-    @Req() req: any,
-  ): Promise<RagResponse> {
-    console.log(`🎯 RAG CONTROLLER: POST /query received at ${new Date().toISOString()}`);
-    console.log(`📝 Request body:`, queryDto);
-    console.log(`👤 Request user:`, req.user);
+    @CurrentUser() user: UserContext,
+  ): Promise<RagResponse & { conversationId?: number }> {
+    this.logger.log(`🎯 POST /query | user=${user.id} role=${user.role} corporateId=${user.corporateId || 'N/A'}`);
 
     try {
       const question = queryDto?.question;
       if (!question) {
-        console.log(`❌ No question provided`);
         throw new Error('Question is required');
       }
 
-      const user = req.user || {
-        id: 1,
-        role: 'ADMIN',
-        corporateId: null,
-      };
+      this.logger.log(`🔐 RBAC context: id=${user.id}, role=${user.role}, corporateId=${user.corporateId || 'N/A'}`);
 
-      console.log(`🔄 Calling ragService.query with question: "${question}"`);
+      // ── Chat memory: resolve or create conversation ──
+      let convId = queryDto.conversationId || 0;
+      if (user.id > 0) {
+        try {
+          if (convId > 0) {
+            // Verify ownership
+            const conv = await this.chatMemory.getConversation(convId, user.id);
+            if (!conv) convId = 0; // not found → create new
+          }
+          if (convId === 0) {
+            const conv = await this.chatMemory.createConversation(user.id, user.role);
+            convId = conv.id;
+          }
+          // Save user message
+          await this.chatMemory.addMessage(convId, 'user', question);
+        } catch (e) {
+          this.logger.warn(`Chat memory save failed (non-blocking): ${e}`);
+        }
+      }
+
       const result = await this.ragService.query(question, user);
-      console.log(`✅ RAG Service returned result`);
-      return result;
+      this.logger.log(`✅ RAG query completed`);
+
+      // ── Chat memory: save assistant reply + auto-title ──
+      if (user.id > 0 && convId > 0) {
+        try {
+          await this.chatMemory.addMessage(convId, 'assistant', result.answer, {
+            searchType: result.searchType,
+            confidence: result.confidence,
+          });
+          // Auto-generate title after first exchange
+          await this.chatMemory.autoGenerateTitle(convId, user.id);
+        } catch (e) {
+          this.logger.warn(`Chat memory reply save failed (non-blocking): ${e}`);
+        }
+      }
+
+      return { ...result, conversationId: convId || undefined };
     } catch (error) {
-      console.log(`❌ RAG Controller error:`, error);
+      this.logger.error(`❌ RAG Controller error: ${error.message}`);
       throw new HttpException(
         error.message || 'Failed to process query',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -520,16 +572,17 @@ export class RagController {
 
   /**
    * POST /rag/query/pdf
-   * Generate PDF from query result
+   * Generate PDF from query result (RBAC enforced)
    */
+  @UseGuards(CognitoUniversalGuard)
   @Post('query/pdf')
   async queryWithPdf(
     @Body() queryDto: RagQueryDto,
-    @Req() req: any,
+    @CurrentUser() user: UserContext,
     @Res() res: Response,
   ): Promise<void> {
     try {
-      const user = req.user || { id: 1, role: 'ADMIN', corporateId: null };
+      this.logger.log(`📄 PDF query | user=${user.id} role=${user.role}`);
       const result = await this.ragService.query(queryDto.question, user);
       const pdfBuffer = await this.ragService.generatePdf(
         result,

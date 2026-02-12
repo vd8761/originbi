@@ -28,7 +28,7 @@ export class SyncService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private dataSource: DataSource,
     private embeddingsService: EmbeddingsService,
-  ) {}
+  ) { }
 
   async onModuleInit() {
     // Initial sync after 1 minute (let app fully start)
@@ -182,7 +182,7 @@ Contact: ${r.mobile_number || 'N/A'}`,
       // Corporate Accounts
       {
         name: 'corporate_accounts',
-        query: `SELECT id, company_name, sector_code, total_credits, available_credits FROM corporate_accounts WHERE is_deleted = false`,
+        query: `SELECT id, company_name, sector_code, total_credits, available_credits FROM corporate_accounts`,
         format: (r: any) => `CORPORATE ACCOUNT: ${r.company_name}
 Sector: ${r.sector_code || 'General'}
 Credits: ${r.available_credits}/${r.total_credits}`,
@@ -219,13 +219,13 @@ Type: ${r.question_type || 'General'}`,
         query: `SELECT 
                     p.name as program_name, 
                     COUNT(*) as attempt_count,
-                    AVG(CASE WHEN aa.score IS NOT NULL THEN aa.score ELSE 0 END) as avg_score
+                    COUNT(CASE WHEN aa.status = 'COMPLETED' THEN 1 END) as completed_count
                 FROM assessment_attempts aa
                 JOIN programs p ON aa.program_id = p.id
                 GROUP BY p.id, p.name`,
         format: (r: any) => `ASSESSMENT STATISTICS: ${r.program_name}
 Total Attempts: ${r.attempt_count}
-Average Score: ${parseFloat(r.avg_score || 0).toFixed(1)}%`,
+Completed: ${r.completed_count}`,
         category: 'stats',
       },
     ];

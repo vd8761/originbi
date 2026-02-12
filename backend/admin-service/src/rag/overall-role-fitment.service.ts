@@ -16,11 +16,19 @@ export interface GroupReportInput {
 export class OverallRoleFitmentService {
   private readonly logger = new Logger(OverallRoleFitmentService.name);
 
+  // ── In-memory report cache (avoids double computation for chat → PDF) ──
+  private reportCache = new Map<string, { data: OverallReportData; timestamp: number }>();
+  private readonly CACHE_TTL = 10 * 60 * 1000; // 10 min
+
   constructor(
     private dataSource: DataSource,
     private pdfService: PdfService,
     private customReportService: CustomReportService
   ) { }
+
+  private getCacheKey(input: GroupReportInput): string {
+    return `${input.groupId || 'all'}_${input.corporateId || 'all'}_${input.title || ''}`;
+  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // MAIN REPORT GENERATION
@@ -28,6 +36,14 @@ export class OverallRoleFitmentService {
   async generateReport(
     input: GroupReportInput,
   ): Promise<OverallReportData> {
+    // Check cache first
+    const cacheKey = this.getCacheKey(input);
+    const cached = this.reportCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      this.logger.log('✅ Using cached report data (avoids duplicate LLM calls)');
+      return cached.data;
+    }
+
     this.logger.log(`📊 Generating Overall Role Fitment Report`);
 
     // 1. Fetch unique students in the group
@@ -77,6 +93,9 @@ export class OverallRoleFitmentService {
       candidates: candidates,
     };
 
+    // Cache the report to avoid re-computation on PDF download
+    this.reportCache.set(cacheKey, { data: reportData, timestamp: Date.now() });
+
     return reportData;
   }
 
@@ -94,10 +113,12 @@ export class OverallRoleFitmentService {
     const params: any[] = [];
 
     if (input.groupId) {
-      whereClause += ` AND r.group_id = ${input.groupId}`;
+      params.push(input.groupId);
+      whereClause += ` AND r.group_id = $${params.length}`;
     }
     if (input.corporateId) {
-      whereClause += ` AND r.corporate_account_id = ${input.corporateId}`;
+      params.push(input.corporateId);
+      whereClause += ` AND r.corporate_account_id = $${params.length}`;
     }
 
     // Select distinct users to avoid duplicates
