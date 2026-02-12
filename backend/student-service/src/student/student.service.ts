@@ -636,6 +636,9 @@ export class StudentService {
       // program title?
       const programTitle = program.assessmentTitle || program.name;
 
+      this.logger.log(`[Email Debug] Attempting to send welcome email to: ${dto.email}`);
+      this.logger.log(`[Email Debug] Params: Name=${dto.full_name}, ValidFrom=${validFrom}, Title=${programTitle}`);
+
       try {
         await this.sendWelcomeEmail(
           dto.email,
@@ -644,11 +647,14 @@ export class StudentService {
           validFrom,
           programTitle,
         );
-        this.logger.log(`Welcome email sent to ${dto.email}`);
+        this.logger.log(`Welcome email sent successfully to ${dto.email}`);
       } catch (emailErr) {
-        this.logger.error('Failed to send welcome email', emailErr);
+        this.logger.error(`[Email Failed] Failed to send welcome email to ${dto.email}`);
+        this.logger.error(`[Email Error Details] ${JSON.stringify(emailErr, Object.getOwnPropertyNames(emailErr))}`);
         // Do not fail registration if email fails
       }
+    } else {
+      this.logger.log(`[Email Debug] Skipping email for ${dto.email} (sendEmail metadata is false/missing)`);
     }
 
 
