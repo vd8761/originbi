@@ -29,4 +29,4 @@ import { Program } from '../entities/program.entity';
   providers: [StudentService],
   exports: [StudentService],
 })
-export class StudentModule { }
+export class StudentModule {}
