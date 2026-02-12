@@ -15,6 +15,10 @@ import { AssessmentAnswer } from '../entities/assessment_answer.entity';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { Program } from '../entities/program.entity';
 import { Registration } from '../entities/registration.entity';
+import * as nodemailer from 'nodemailer';
+import { SES } from 'aws-sdk';
+import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
+
 
 export interface AssessmentProgressItem {
   id: number;
@@ -626,6 +630,28 @@ export class StudentService {
       }
     }
 
+    // 8. Send Welcome Email
+    if (registration.metadata?.sendEmail) {
+      const validFrom = session.validFrom ? new Date(session.validFrom) : new Date();
+      // program title?
+      const programTitle = program.assessmentTitle || program.name;
+
+      try {
+        await this.sendWelcomeEmail(
+          dto.email,
+          dto.full_name,
+          dto.password, // We need the password here. DTO has it.
+          validFrom,
+          programTitle,
+        );
+        this.logger.log(`Welcome email sent to ${dto.email}`);
+      } catch (emailErr) {
+        this.logger.error('Failed to send welcome email', emailErr);
+        // Do not fail registration if email fails
+      }
+    }
+
+
     return {
       success: true,
       userId: user.id,
@@ -698,4 +724,57 @@ export class StudentService {
 
     return { isValid: true, message: 'Available' };
   }
+
+  // ---------------------------------------------------------
+  // Helper: Send Welcome Email
+  // ---------------------------------------------------------
+  private async sendWelcomeEmail(
+    to: string,
+    name: string,
+    pass: string,
+    startDateTime?: Date | string,
+    assessmentTitle?: string,
+  ) {
+    const ses = new SES({
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      region: process.env.AWS_REGION,
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    const transporter = nodemailer.createTransport({
+      SES: ses,
+    } as any);
+
+    const ccEmail = process.env.EMAIL_CC || '';
+    const fromName = process.env.EMAIL_SEND_FROM_NAME || 'Origin BI Mind Works';
+    const fromEmail = process.env.EMAIL_FROM || 'no-reply@originbi.com';
+    const fromAddress = `"${fromName}" <${fromEmail}>`;
+
+    const assets = {
+      popper: `${process.env.API_URL}/assets/Popper.png`, // student-service API_URL
+      pattern: `${process.env.API_URL}/assets/Pattern_mask.png`,
+      footer: `${process.env.API_URL}/assets/Email_Vector.png`,
+      logo: `${process.env.API_URL}/assets/logo-light.png`,
+    };
+
+    const mailOptions = {
+      from: fromAddress,
+      to,
+      cc: ccEmail,
+      subject: 'Welcome to OriginBI - Your Assessment is Ready!',
+      html: getStudentWelcomeEmailTemplate(
+        name,
+        to,
+        pass,
+        process.env.FRONTEND_APP_URL ?? 'http://localhost:3000',
+        assets,
+        startDateTime,
+        assessmentTitle,
+      ),
+    };
+
+    return await transporter.sendMail(mailOptions);
+  }
 }
+

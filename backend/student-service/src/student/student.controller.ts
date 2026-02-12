@@ -14,8 +14,8 @@ export class StudentController {
   @Post('seed')
   seedStudent(@Body() body: { email: string; fullName: string }) {
     return this.studentService.createTestStudent(
-      body.email || 'monish@touchmarkdes.com',
-      body.fullName || 'Monish Test',
+      body.email,
+      body.fullName,
     );
   }
 
