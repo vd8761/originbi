@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 import { Injectable, ConsoleLogger, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, ILike } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
@@ -48,7 +49,8 @@ export class StudentService {
     @InjectRepository(AssessmentAnswer)
     private readonly answerRepo: Repository<AssessmentAnswer>,
     private readonly http: HttpService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) { }
 
   private async createCognitoUser(email: string, password: string) {
     const authServiceUrl =
@@ -510,7 +512,9 @@ export class StudentService {
   // PUBLIC REGISTER
   // ---------------------------------------------------------------------------
   async register(dto: CreateRegistrationDto) {
-    this.logger.log(`Public registration attempt for: ${dto.email}`);
+    this.logger.log(`[Register Debug] Register called for: ${dto.email}`);
+    this.logger.log(`[Register Debug] Payload: ${JSON.stringify(dto)}`);
+    this.logger.log(`[Register Debug] Public registration attempt for: ${dto.email}`);
 
     // 1. Check if User exists
     let user = await this.userRepo.findOne({
@@ -776,10 +780,21 @@ export class StudentService {
     startDateTime?: Date | string,
     assessmentTitle?: string,
   ) {
+    const region = this.configService.get<string>('AWS_REGION') || this.configService.get<string>('AWS_DEFAULT_REGION');
+    const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
+    const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
+
+    this.logger.log(`[Email Debug] AWS Config Check: Region=${region}, KeyPresent=${!!accessKeyId}`);
+
+    if (!region) {
+      this.logger.error('[Email Critical] AWS_REGION is missing in environment variables.');
+      throw new Error('Configuration Error: AWS_REGION is not defined in the environment.');
+    }
+
     const ses = new SES({
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-      region: process.env.AWS_REGION,
+      accessKeyId,
+      secretAccessKey,
+      region,
     });
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
@@ -787,16 +802,18 @@ export class StudentService {
       SES: ses,
     } as any);
 
-    const ccEmail = process.env.EMAIL_CC || '';
-    const fromName = process.env.EMAIL_SEND_FROM_NAME || 'Origin BI Mind Works';
-    const fromEmail = process.env.EMAIL_FROM || 'no-reply@originbi.com';
+    const ccEmail = this.configService.get<string>('EMAIL_CC') || '';
+    const fromName = this.configService.get<string>('EMAIL_SEND_FROM_NAME') || 'Origin BI Mind Works';
+    const fromEmail = this.configService.get<string>('EMAIL_FROM') || 'no-reply@originbi.com';
     const fromAddress = `"${fromName}" <${fromEmail}>`;
 
+    this.logger.log(`[Email Debug] Sending from: ${fromAddress}, to: ${to}`);
+
     const assets = {
-      popper: `${process.env.API_URL}/assets/Popper.png`, // student-service API_URL
-      pattern: `${process.env.API_URL}/assets/Pattern_mask.png`,
-      footer: `${process.env.API_URL}/assets/Email_Vector.png`,
-      logo: `${process.env.API_URL}/assets/logo-light.png`,
+      popper: `${this.configService.get('API_URL')}/assets/Popper.png`,
+      pattern: `${this.configService.get('API_URL')}/assets/Pattern_mask.png`,
+      footer: `${this.configService.get('API_URL')}/assets/Email_Vector.png`,
+      logo: `${this.configService.get('API_URL')}/assets/logo-light.png`,
     };
 
     const mailOptions = {
@@ -808,13 +825,20 @@ export class StudentService {
         name,
         to,
         pass,
-        process.env.FRONTEND_APP_URL ?? 'http://localhost:3000',
+        this.configService.get('FRONTEND_APP_URL') ?? 'http://localhost:3000',
         assets,
         startDateTime,
         assessmentTitle,
       ),
     };
 
-    return await transporter.sendMail(mailOptions);
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      this.logger.log(`[Email Debug] Email sent: ${JSON.stringify(info)}`);
+      return info;
+    } catch (err) {
+      this.logger.error(`[Email Debug] SendMail threw: ${err.message}`, err.stack);
+      throw err;
+    }
   }
 }
