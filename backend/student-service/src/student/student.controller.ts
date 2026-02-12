@@ -4,7 +4,7 @@ import { CreateRegistrationDto } from './dto/create-registration.dto';
 
 @Controller('student')
 export class StudentController {
-  constructor(private readonly studentService: StudentService) { }
+  constructor(private readonly studentService: StudentService) {}
 
   @Post('profile')
   async getProfile(@Body() body: { email: string }) {
@@ -13,10 +13,7 @@ export class StudentController {
 
   @Post('seed')
   seedStudent(@Body() body: { email: string; fullName: string }) {
-    return this.studentService.createTestStudent(
-      body.email,
-      body.fullName,
-    );
+    return this.studentService.createTestStudent(body.email, body.fullName);
   }
 
   @Post('assessment-status')
@@ -46,7 +43,9 @@ export class StudentController {
   }
 
   @Post('validate-registration')
-  async validateRegistration(@Body() dto: { email: string; mobile_number?: string }) {
+  async validateRegistration(
+    @Body() dto: { email: string; mobile_number?: string },
+  ) {
     return this.studentService.validateRegistration(dto);
   }
 }

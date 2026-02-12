@@ -18,7 +18,9 @@ import { CounsellingModule } from './modules/counselling/counselling.module';
         const databaseUrl = config.get<string>('DATABASE_URL');
 
         if (databaseUrl) {
-          const isLocal = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
+          const isLocal =
+            databaseUrl.includes('localhost') ||
+            databaseUrl.includes('127.0.0.1');
           return {
             type: 'postgres',
             url: databaseUrl,
@@ -46,4 +48,4 @@ import { CounsellingModule } from './modules/counselling/counselling.module';
     CounsellingModule,
   ],
 })
-export class AppModule { }
+export class AppModule {}
