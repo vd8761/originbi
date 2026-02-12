@@ -20,7 +20,7 @@ import { UserContext } from '../interfaces/user-context.interface';
  * }
  */
 export const CurrentUser = createParamDecorator(
-    (data: keyof UserContext | undefined, ctx: ExecutionContext): UserContext | any => {
+    (data: keyof UserContext | undefined, ctx: ExecutionContext): unknown => {
         const request = ctx.switchToHttp().getRequest();
         const user = request.user as UserContext;
 

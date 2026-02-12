@@ -211,7 +211,7 @@ export class UserEnrichmentService {
     private async findUserByCognitoSub(
         cognitoSub: string,
         email: string,
-    ): Promise<any | null> {
+    ): Promise<any> {
         try {
             // Primary lookup: by cognito_sub
             const rows = await this.dataSource.query(
@@ -257,7 +257,7 @@ export class UserEnrichmentService {
     /**
      * Find a user by their numeric DB id.
      */
-    private async findUserById(userId: number): Promise<any | null> {
+    private async findUserById(userId: number): Promise<any> {
         try {
             const rows = await this.dataSource.query(
                 `SELECT id, email, role, corporate_id
