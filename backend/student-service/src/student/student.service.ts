@@ -19,7 +19,6 @@ import * as nodemailer from 'nodemailer';
 import { SES } from 'aws-sdk';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
 
-
 export interface AssessmentProgressItem {
   id: number;
   stepName: string;
@@ -49,10 +48,11 @@ export class StudentService {
     @InjectRepository(AssessmentAnswer)
     private readonly answerRepo: Repository<AssessmentAnswer>,
     private readonly http: HttpService,
-  ) { }
+  ) {}
 
   private async createCognitoUser(email: string, password: string) {
-    const authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:4000'; // Default or Env
+    const authServiceUrl =
+      process.env.AUTH_SERVICE_URL || 'http://localhost:4000'; // Default or Env
     try {
       const res = await firstValueFrom(
         this.http.post(
@@ -63,7 +63,10 @@ export class StudentService {
       );
       return res.data as { sub?: string };
     } catch (err: any) {
-      this.logger.error('Error creating Cognito user:', err.response?.data || err.message);
+      this.logger.error(
+        'Error creating Cognito user:',
+        err.response?.data || err.message,
+      );
       // If user exists in Cognito but not in DB (edge case), we might want to proceed.
       // But for now, we throw to match admin-service behavior or at least log it.
       // If error says "User already exists", we might want to fetch the sub.
@@ -120,10 +123,13 @@ export class StudentService {
 
     // First Login Logic (No DB Schema Identity)
     // If loginCount is low (<=1) and we haven't recorded a password change yet.
-    const isFirstLogin = (user.loginCount <= 1) && !user.metadata?.hasChangedPassword;
+    const isFirstLogin =
+      user.loginCount <= 1 && !user.metadata?.hasChangedPassword;
 
     if (isFirstLogin) {
-      this.logger.log(`User ${email} requires mandatory password reset (First Login).`);
+      this.logger.log(
+        `User ${email} requires mandatory password reset (First Login).`,
+      );
       return {
         redirectUrl: '/student/first-time-reset',
         isAssessmentMode: false,
@@ -490,7 +496,9 @@ export class StudentService {
   }
 
   async completeFirstLogin(email: string) {
-    const user = await this.userRepo.findOne({ where: { email: ILike(email) } });
+    const user = await this.userRepo.findOne({
+      where: { email: ILike(email) },
+    });
     if (user) {
       user.metadata = { ...user.metadata, hasChangedPassword: true };
       await this.userRepo.save(user);
@@ -505,7 +513,9 @@ export class StudentService {
     this.logger.log(`Public registration attempt for: ${dto.email}`);
 
     // 1. Check if User exists
-    let user = await this.userRepo.findOne({ where: { email: ILike(dto.email) } });
+    let user = await this.userRepo.findOne({
+      where: { email: ILike(dto.email) },
+    });
     if (user) {
       this.logger.warn(`User ${dto.email} already exists.`);
       // return { success: false, message: 'User already exists' };
@@ -520,20 +530,20 @@ export class StudentService {
       cognitoSub = cognitoRes.sub || '';
     } catch (e) {
       this.logger.error('Cognito creation failed', e);
-      // Fallback or re-throw? 
+      // Fallback or re-throw?
       // If we want to allow login, we must have it. Re-throw.
       throw e;
     }
 
     // 3. Create User Entity
-    // (In a real scenario, we might call Cognito here, but for now we assume 
+    // (In a real scenario, we might call Cognito here, but for now we assume
     // auth-service handles login via simple Db check or the user will be created in Cognito later)
     // Actually, the requirement says "Call auth-service to create Cognito User".
-    // For this implementation, we will skip the external auth-service call to avoid complexity 
+    // For this implementation, we will skip the external auth-service call to avoid complexity
     // and assume the user can login if the DB record exists (or we rely on the existing auth flow).
     // *Self-correction*: The implementation plan says "Call auth-service...". To keep it simple and robust
-    // for this specific codebase state, we'll focus on DB creation. The auth-service likely has a trigger or 
-    // we can add the call if needed. 
+    // for this specific codebase state, we'll focus on DB creation. The auth-service likely has a trigger or
+    // we can add the call if needed.
 
     user = this.userRepo.create({
       email: dto.email,
@@ -584,7 +594,10 @@ export class StudentService {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
-    const savedReg = await this.sessionRepo.manager.save(Registration, registration);
+    const savedReg = await this.sessionRepo.manager.save(
+      Registration,
+      registration,
+    );
 
     // 6. Create Assessment Session with Schedule
     // Schedule: Start = Now + 5 mins, End = Now + 7 days
@@ -626,18 +639,29 @@ export class StudentService {
 
       // Generate Questions for Level 1
       if (level.levelNumber === 1 || level.name.includes('Level 1')) {
-        await this.generateQuestionsForAttempt(savedAttempt, user, savedReg, level);
+        await this.generateQuestionsForAttempt(
+          savedAttempt,
+          user,
+          savedReg,
+          level,
+        );
       }
     }
 
     // 8. Send Welcome Email
     if (registration.metadata?.sendEmail) {
-      const validFrom = session.validFrom ? new Date(session.validFrom) : new Date();
+      const validFrom = session.validFrom
+        ? new Date(session.validFrom)
+        : new Date();
       // program title?
       const programTitle = program.assessmentTitle || program.name;
 
-      this.logger.log(`[Email Debug] Attempting to send welcome email to: ${dto.email}`);
-      this.logger.log(`[Email Debug] Params: Name=${dto.full_name}, ValidFrom=${validFrom}, Title=${programTitle}`);
+      this.logger.log(
+        `[Email Debug] Attempting to send welcome email to: ${dto.email}`,
+      );
+      this.logger.log(
+        `[Email Debug] Params: Name=${dto.full_name}, ValidFrom=${String(validFrom)}, Title=${programTitle}`,
+      );
 
       try {
         await this.sendWelcomeEmail(
@@ -649,25 +673,35 @@ export class StudentService {
         );
         this.logger.log(`Welcome email sent successfully to ${dto.email}`);
       } catch (emailErr) {
-        this.logger.error(`[Email Failed] Failed to send welcome email to ${dto.email}`);
-        this.logger.error(`[Email Error Details] ${JSON.stringify(emailErr, Object.getOwnPropertyNames(emailErr))}`);
+        this.logger.error(
+          `[Email Failed] Failed to send welcome email to ${dto.email}`,
+        );
+        this.logger.error(
+          `[Email Error Details] ${JSON.stringify(emailErr, Object.getOwnPropertyNames(emailErr))}`,
+        );
         // Do not fail registration if email fails
       }
     } else {
-      this.logger.log(`[Email Debug] Skipping email for ${dto.email} (sendEmail metadata is false/missing)`);
+      this.logger.log(
+        `[Email Debug] Skipping email for ${dto.email} (sendEmail metadata is false/missing)`,
+      );
     }
-
 
     return {
       success: true,
       userId: user.id,
       registrationId: savedReg.id,
-      message: 'Registration successful. Exam scheduled.'
+      message: 'Registration successful. Exam scheduled.',
     };
   }
 
   // Helper to generate questions locally (simplified version of admin-service logic)
-  private async generateQuestionsForAttempt(attempt: AssessmentAttempt, user: User, reg: Registration, level: AssessmentLevel) {
+  private async generateQuestionsForAttempt(
+    attempt: AssessmentAttempt,
+    user: User,
+    reg: Registration,
+    level: AssessmentLevel,
+  ) {
     // Fetch random questions
     await this.answerRepo.query(
       `
@@ -693,15 +727,16 @@ export class StudentService {
         level.id,
         attempt.programId,
         reg.schoolLevel,
-        reg.schoolStream
+        reg.schoolStream,
       ],
     );
   }
 
-
   async validateRegistration(dto: { email: string; mobile_number?: string }) {
     // 1. Check Email
-    const user = await this.userRepo.findOne({ where: { email: ILike(dto.email) } });
+    const user = await this.userRepo.findOne({
+      where: { email: ILike(dto.email) },
+    });
     if (user) {
       return {
         isValid: false,
@@ -783,4 +818,3 @@ export class StudentService {
     return await transporter.sendMail(mailOptions);
   }
 }
-
