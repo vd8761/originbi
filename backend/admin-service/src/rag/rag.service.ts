@@ -9,6 +9,7 @@ import { OverallRoleFitmentService } from './overall-role-fitment.service';
 import { ConversationService } from './conversation.service';
 import { ChatMemoryService } from './chat-memory.service';
 import { OriIntelligenceService } from './ori-intelligence.service';
+import { JDMatchingService } from './jd-matching.service';
 
 // RBAC Imports
 import { AccessPolicyFactory } from './policies';
@@ -158,6 +159,7 @@ export class RagService {
     private conversationService: ConversationService,
     private chatMemory: ChatMemoryService,
     private oriIntelligence: OriIntelligenceService,
+    private jdMatchingService: JDMatchingService,
     private policyFactory: AccessPolicyFactory,
     private auditLogger: AuditLoggerService,
   ) {
@@ -343,6 +345,14 @@ export class RagService {
       // ═══════════════════════════════════════════════════════════════
       if (interpretation.intent === 'chat_profile_report') {
         return await this.handleChatProfileReport(question);
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // SPECIAL HANDLER: JD CANDIDATE MATCHING (Admin/Corporate)
+      // Matches candidates to a job description using advanced scoring
+      // ═══════════════════════════════════════════════════════════════
+      if (interpretation.intent === 'jd_candidate_match') {
+        return await this.handleJDCandidateMatch(question, user);
       }
 
       // ═══════════════════════════════════════════════════════════════
@@ -1082,7 +1092,7 @@ export class RagService {
         /experience[:\s]*(\d+)/i,
       ]);
       const yearsOfExperience = parseInt(yearsStr) || 0;
-
+5
       const relevantExperience = extractField([
         /relevant\s*experience[:\s\(]*([^\n\)]+)/i,
         /key\s*focus\s*areas?[:\s]*([^\n]+)/i,
@@ -1119,6 +1129,92 @@ export class RagService {
       this.logger.error(`Failed to parse profile: ${error.message}`);
       return null;
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HANDLER: JD-BASED CANDIDATE MATCHING (Admin / Corporate)
+  // ═══════════════════════════════════════════════════════════════════════════
+  private async handleJDCandidateMatch(question: string, user: any): Promise<QueryResult> {
+    try {
+      const userRole = (user?.role || 'STUDENT').toUpperCase();
+      const corporateId = user?.corporateId;
+
+      // RBAC: Only ADMIN and CORPORATE can use JD matching
+      if (userRole === 'STUDENT') {
+        return {
+          answer: `JD-based candidate matching is available for administrators and corporate users. If you'd like to see your own career fit, try: **"What jobs am I eligible for?"**`,
+          searchType: 'rbac_redirect',
+          confidence: 1.0,
+        };
+      }
+
+      // Extract the JD from the question
+      const jobDescription = this.extractJDFromMessage(question);
+
+      if (!jobDescription || jobDescription.length < 20) {
+        return {
+          answer: `**🎯 JD Candidate Matching**\n\nTo find the best candidates for a role, please provide a job description. You can:\n\n**Option 1 — Paste a full JD:**\n\`\`\`\nFind candidates for:\nJob Title: Senior Software Engineer\nResponsibilities: Lead backend development...\nRequirements: 5+ years experience, strong leadership...\n\`\`\`\n\n**Option 2 — Describe the role:**\n• "Find candidates suitable for a project manager role requiring leadership, analytical thinking, and team collaboration"\n• "Who is best suited for a customer success manager who needs empathy, communication, and adaptability?"\n• "Match candidates for: Senior Data Analyst - needs strong analytical skills, attention to detail, works independently"\n\nThe more detail you provide, the more accurate the matching will be!`,
+          searchType: 'jd_candidate_match',
+          confidence: 0.5,
+        };
+      }
+
+      this.logger.log(`🎯 JD Matching triggered | role=${userRole} | JD length=${jobDescription.length}`);
+
+      const result = await this.jdMatchingService.matchCandidatesToJD(jobDescription, {
+        corporateId: userRole === 'CORPORATE' ? corporateId : undefined,
+        topN: 10,
+        minScore: 0,
+        includeInsights: true,
+      });
+
+      const answer = this.jdMatchingService.formatMatchResultForChat(result);
+
+      return {
+        answer,
+        searchType: 'jd_candidate_match',
+        sources: { candidatesEvaluated: result.totalCandidatesEvaluated, matched: result.matchedCandidates.length },
+        confidence: 0.95,
+      };
+    } catch (error) {
+      this.logger.error(`JD Matching error: ${error.message}`);
+      return {
+        answer: `**❌ Error during JD matching:** ${error.message}\n\nPlease try again with a clearer job description.`,
+        searchType: 'error',
+        confidence: 0,
+      };
+    }
+  }
+
+  /**
+   * Extract the Job Description content from the user's message.
+   * Handles various formats: "find candidates for: [JD]", "match for [JD]", etc.
+   */
+  private extractJDFromMessage(message: string): string {
+    // Try to extract JD after common prefixes
+    const prefixPatterns = [
+      /(?:find|match|search|identify|list|show|get|who)\s+(?:candidates?|people|users?|suitable)\s+(?:for|matching|suited\s+for|that\s+match|who\s+(?:fit|match|suit))\s*[:\-]?\s*([\s\S]+)/i,
+      /(?:job\s*description|jd)\s*[:\-]?\s*([\s\S]+)/i,
+      /(?:find|match|search)\s+(?:for|candidates?\s+for)\s*[:\-]?\s*([\s\S]+)/i,
+      /(?:who\s+(?:is|are)\s+(?:best|suitable|fit|right|ideal)\s+(?:for|candidate))\s*[:\-]?\s*([\s\S]+)/i,
+      /(?:suitable\s+candidates?\s+for)\s*[:\-]?\s*([\s\S]+)/i,
+      /(?:candidates?\s+(?:for|matching))\s*[:\-]?\s*([\s\S]+)/i,
+    ];
+
+    for (const pattern of prefixPatterns) {
+      const match = message.match(pattern);
+      if (match && match[1] && match[1].trim().length > 15) {
+        return match[1].trim();
+      }
+    }
+
+    // If no prefix found but message is long enough, treat the whole thing as JD
+    // (user might have just pasted a JD directly)
+    if (message.length > 80) {
+      return message;
+    }
+
+    return message;
   }
 
   private async executeDatabaseQuery(sql: string, params: any[] = []): Promise<any[]> {
@@ -1174,6 +1270,7 @@ INTENTS (choose the MOST SPECIFIC one):
 - general_knowledge: ANY question about skills, technologies, career advice, how-to guides, courses, learning, salaries, job markets, comparisons, explanations, tips, tutorials, roadmaps, programming concepts, or general world knowledge. This is the DEFAULT for any question that does NOT require looking up specific platform data.
 - career_guidance: Personal career advice ("what jobs suit ME", "am I eligible", "should I try X")
 - personal_info: "my name", "my profile", "who am I" (user asking about their own stored data)
+- jd_candidate_match: User provides a job description, role description, or hiring criteria and wants to find/match/identify suitable candidates from the platform's assessment data. Trigger words: "find candidates for", "match candidates", "who is suitable for", "best candidates for [role/JD]", "job description:", "identify suitable users for"
 - greeting: hi, hello, hey
 - help: what can you do
 - list_users: ONLY when explicitly asking to "list users", "show all users"
@@ -1197,7 +1294,8 @@ CRITICAL RULES:
 4. career_roles should ONLY be used when asking to list the career roles stored in the DATABASE
 5. If you're unsure, default to general_knowledge rather than list_users
 6. searchTerm should be null unless the query mentions a specific person's name
-7. includePersonality=true for: test_results, person_lookup, best_performer, career_report, overall_report, custom_report
+7. includePersonality=true for: test_results, person_lookup, best_performer, career_report, overall_report, custom_report, jd_candidate_match
+8. jd_candidate_match should be used when the user explicitly wants to find candidates matching a job description or role description. The searchTerm should be null for this intent.
 
 Query: "${question}"
 JSON:`;
@@ -1253,6 +1351,18 @@ JSON:`;
     // Chat profile report (contains structured "Name:", "Current Role:", etc.)
     if (/name\s*:/i.test(q) && (/current\s*role\s*:/i.test(q) || /experience\s*:/i.test(q) || /industry\s*:/i.test(q))) {
       return { intent: 'chat_profile_report', searchTerm: null, table: 'none', includePersonality: false };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // JD CANDIDATE MATCHING — detect when user provides a job description
+    // ═══════════════════════════════════════════════════════════════
+    if (/\b(find|match|search|identify|list|show|get|who)\b.*\b(candidates?|people|users?|suitable|suited)\b.*\b(for|matching|that\s+match|who\s+fit)\b/i.test(q) ||
+        /\b(job\s*description|jd)\s*[:\-]/i.test(q) ||
+        /\b(suitable|best|ideal|right)\s+(candidates?|people|users?)\s+(for|to)\b/i.test(q) ||
+        /\bwho\s+(is|are)\s+(best\s+)?(suitable|fit|suited|right|ideal)\s+(for|candidate)\b/i.test(q) ||
+        /\b(match|find)\s+(candidates?|people)\s+(for|to|based\s+on)\s+.*\b(role|position|job|description)\b/i.test(q) ||
+        /\bcandidates?\s+(for|matching|suited\s+for)\s*[:\-]?\s*.{20,}/i.test(q)) {
+      return { intent: 'jd_candidate_match', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
     }
 
     // Overall / placement report
@@ -1422,6 +1532,21 @@ JSON:`;
         searchTerm: null,
         table: 'none',
         includePersonality: false,
+      };
+    }
+
+    // JD candidate matching - find suitable candidates for a role/JD
+    if (
+      qLowerUniq.match(/\b(find|match|search|identify)\b.*\b(candidates?|people|users?|suitable)\b.*\b(for|matching)\b/) ||
+      qLowerUniq.match(/\b(suitable|best|ideal)\s+(candidates?|people)\s+(for|to)\b/) ||
+      qLowerUniq.match(/\bjob\s*description/i) ||
+      qLowerUniq.match(/\bwho\s+(is|are)\s+(suitable|fit|suited|ideal)\s+for\b/)
+    ) {
+      return {
+        intent: 'jd_candidate_match',
+        searchTerm: null,
+        table: 'assessment_attempts',
+        includePersonality: true,
       };
     }
 
