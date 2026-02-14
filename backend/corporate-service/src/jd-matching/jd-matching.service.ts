@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import Groq from 'groq-sdk';
@@ -123,7 +123,11 @@ interface WorkforceInsights {
   averageMatchScore: number;
   tierDistribution: Record<string, number>;
   topPersonalityStyles: { style: string; count: number; avgScore: number }[];
-  groupDistribution?: { groupName: string; candidateCount: number; avgScore: number }[];
+  groupDistribution?: {
+    groupName: string;
+    candidateCount: number;
+    avgScore: number;
+  }[];
   talentGapsSummary: string[];
 }
 
@@ -131,77 +135,206 @@ interface WorkforceInsights {
 // DISC PERSONALITY KNOWLEDGE BASE
 // ═══════════════════════════════════════════════════════════════════════════
 
-const PERSONALITY_VECTORS: Record<string, {
-  dominance: number; influence: number; steadiness: number; compliance: number;
-  leadership: number; creativity: number; analytical: number; teamwork: number;
-  independence: number; adaptability: number; communication: number; empathy: number;
-}> = {
+const PERSONALITY_VECTORS: Record<
+  string,
+  {
+    dominance: number;
+    influence: number;
+    steadiness: number;
+    compliance: number;
+    leadership: number;
+    creativity: number;
+    analytical: number;
+    teamwork: number;
+    independence: number;
+    adaptability: number;
+    communication: number;
+    empathy: number;
+  }
+> = {
   'Charismatic Leader': {
-    dominance: 90, influence: 95, steadiness: 40, compliance: 35,
-    leadership: 95, creativity: 75, analytical: 50, teamwork: 80,
-    independence: 85, adaptability: 80, communication: 95, empathy: 70,
+    dominance: 90,
+    influence: 95,
+    steadiness: 40,
+    compliance: 35,
+    leadership: 95,
+    creativity: 75,
+    analytical: 50,
+    teamwork: 80,
+    independence: 85,
+    adaptability: 80,
+    communication: 95,
+    empathy: 70,
   },
   'Strategic Stabilizer': {
-    dominance: 60, influence: 45, steadiness: 90, compliance: 85,
-    leadership: 65, creativity: 40, analytical: 85, teamwork: 75,
-    independence: 70, adaptability: 55, communication: 60, empathy: 65,
+    dominance: 60,
+    influence: 45,
+    steadiness: 90,
+    compliance: 85,
+    leadership: 65,
+    creativity: 40,
+    analytical: 85,
+    teamwork: 75,
+    independence: 70,
+    adaptability: 55,
+    communication: 60,
+    empathy: 65,
   },
   'Decisive Analyst': {
-    dominance: 85, influence: 40, steadiness: 50, compliance: 90,
-    leadership: 70, creativity: 55, analytical: 95, teamwork: 50,
-    independence: 90, adaptability: 60, communication: 55, empathy: 40,
+    dominance: 85,
+    influence: 40,
+    steadiness: 50,
+    compliance: 90,
+    leadership: 70,
+    creativity: 55,
+    analytical: 95,
+    teamwork: 50,
+    independence: 90,
+    adaptability: 60,
+    communication: 55,
+    empathy: 40,
   },
   'Analytical Leader': {
-    dominance: 80, influence: 55, steadiness: 55, compliance: 85,
-    leadership: 85, creativity: 60, analytical: 90, teamwork: 65,
-    independence: 85, adaptability: 65, communication: 70, empathy: 55,
+    dominance: 80,
+    influence: 55,
+    steadiness: 55,
+    compliance: 85,
+    leadership: 85,
+    creativity: 60,
+    analytical: 90,
+    teamwork: 65,
+    independence: 85,
+    adaptability: 65,
+    communication: 70,
+    empathy: 55,
   },
   'Creative Thinker': {
-    dominance: 50, influence: 85, steadiness: 55, compliance: 50,
-    leadership: 55, creativity: 95, analytical: 60, teamwork: 75,
-    independence: 70, adaptability: 90, communication: 80, empathy: 75,
+    dominance: 50,
+    influence: 85,
+    steadiness: 55,
+    compliance: 50,
+    leadership: 55,
+    creativity: 95,
+    analytical: 60,
+    teamwork: 75,
+    independence: 70,
+    adaptability: 90,
+    communication: 80,
+    empathy: 75,
   },
   'Supportive Energizer': {
-    dominance: 35, influence: 90, steadiness: 80, compliance: 45,
-    leadership: 50, creativity: 65, analytical: 40, teamwork: 95,
-    independence: 35, adaptability: 75, communication: 85, empathy: 95,
+    dominance: 35,
+    influence: 90,
+    steadiness: 80,
+    compliance: 45,
+    leadership: 50,
+    creativity: 65,
+    analytical: 40,
+    teamwork: 95,
+    independence: 35,
+    adaptability: 75,
+    communication: 85,
+    empathy: 95,
   },
   'Reliable Executor': {
-    dominance: 55, influence: 35, steadiness: 95, compliance: 80,
-    leadership: 45, creativity: 30, analytical: 70, teamwork: 70,
-    independence: 75, adaptability: 40, communication: 50, empathy: 60,
+    dominance: 55,
+    influence: 35,
+    steadiness: 95,
+    compliance: 80,
+    leadership: 45,
+    creativity: 30,
+    analytical: 70,
+    teamwork: 70,
+    independence: 75,
+    adaptability: 40,
+    communication: 50,
+    empathy: 60,
   },
   'Influential Connector': {
-    dominance: 60, influence: 92, steadiness: 60, compliance: 40,
-    leadership: 70, creativity: 80, analytical: 45, teamwork: 90,
-    independence: 55, adaptability: 85, communication: 95, empathy: 85,
+    dominance: 60,
+    influence: 92,
+    steadiness: 60,
+    compliance: 40,
+    leadership: 70,
+    creativity: 80,
+    analytical: 45,
+    teamwork: 90,
+    independence: 55,
+    adaptability: 85,
+    communication: 95,
+    empathy: 85,
   },
   'Methodical Planner': {
-    dominance: 50, influence: 30, steadiness: 85, compliance: 95,
-    leadership: 55, creativity: 35, analytical: 95, teamwork: 60,
-    independence: 80, adaptability: 35, communication: 45, empathy: 50,
+    dominance: 50,
+    influence: 30,
+    steadiness: 85,
+    compliance: 95,
+    leadership: 55,
+    creativity: 35,
+    analytical: 95,
+    teamwork: 60,
+    independence: 80,
+    adaptability: 35,
+    communication: 45,
+    empathy: 50,
   },
   'Dynamic Achiever': {
-    dominance: 92, influence: 75, steadiness: 35, compliance: 55,
-    leadership: 88, creativity: 70, analytical: 65, teamwork: 60,
-    independence: 90, adaptability: 85, communication: 80, empathy: 50,
+    dominance: 92,
+    influence: 75,
+    steadiness: 35,
+    compliance: 55,
+    leadership: 88,
+    creativity: 70,
+    analytical: 65,
+    teamwork: 60,
+    independence: 90,
+    adaptability: 85,
+    communication: 80,
+    empathy: 50,
   },
   'Steady Contributor': {
-    dominance: 30, influence: 50, steadiness: 92, compliance: 70,
-    leadership: 35, creativity: 45, analytical: 60, teamwork: 85,
-    independence: 45, adaptability: 50, communication: 60, empathy: 80,
+    dominance: 30,
+    influence: 50,
+    steadiness: 92,
+    compliance: 70,
+    leadership: 35,
+    creativity: 45,
+    analytical: 60,
+    teamwork: 85,
+    independence: 45,
+    adaptability: 50,
+    communication: 60,
+    empathy: 80,
   },
   'Visionary Strategist': {
-    dominance: 85, influence: 80, steadiness: 40, compliance: 70,
-    leadership: 90, creativity: 85, analytical: 80, teamwork: 65,
-    independence: 88, adaptability: 80, communication: 85, empathy: 60,
+    dominance: 85,
+    influence: 80,
+    steadiness: 40,
+    compliance: 70,
+    leadership: 90,
+    creativity: 85,
+    analytical: 80,
+    teamwork: 65,
+    independence: 88,
+    adaptability: 80,
+    communication: 85,
+    empathy: 60,
   },
 };
 
 const DEFAULT_VECTOR = {
-  dominance: 50, influence: 50, steadiness: 50, compliance: 50,
-  leadership: 50, creativity: 50, analytical: 50, teamwork: 50,
-  independence: 50, adaptability: 50, communication: 50, empathy: 50,
+  dominance: 50,
+  influence: 50,
+  steadiness: 50,
+  compliance: 50,
+  leadership: 50,
+  creativity: 50,
+  analytical: 50,
+  teamwork: 50,
+  independence: 50,
+  adaptability: 50,
+  communication: 50,
+  empathy: 50,
 };
 
 const SCORING_WEIGHTS = {
@@ -260,7 +393,9 @@ export class CorporateJDMatchingService {
     const minScore = options.minScore || 0;
 
     this.logger.log('═══════════════════════════════════════════════════');
-    this.logger.log(`🎯 CORPORATE JD MATCHING ENGINE — Corporate #${corporateId}`);
+    this.logger.log(
+      `🎯 CORPORATE JD MATCHING ENGINE — Corporate #${corporateId}`,
+    );
     this.logger.log(`📄 JD Length: ${jobDescription.length} chars`);
     this.logger.log('═══════════════════════════════════════════════════');
 
@@ -270,12 +405,21 @@ export class CorporateJDMatchingService {
     // ── LAYER 1: Parse Job Description ──
     this.logger.log('📋 Layer 1: Parsing Job Description...');
     const requirements = await this.parseJobDescription(jobDescription);
-    this.logger.log(`   ✅ Role: ${requirements.roleTitle} (${requirements.seniorityLevel})`);
+    this.logger.log(
+      `   ✅ Role: ${requirements.roleTitle} (${requirements.seniorityLevel})`,
+    );
 
     // ── LAYER 2: Fetch corporate-scoped candidate profiles ──
-    this.logger.log(`👥 Layer 2: Fetching candidates for Corporate #${corporateId}...`);
-    const candidates = await this.fetchCorporateCandidates(corporateId, options.groupId);
-    this.logger.log(`   ✅ Found ${candidates.length} candidates in your organization`);
+    this.logger.log(
+      `👥 Layer 2: Fetching candidates for Corporate #${corporateId}...`,
+    );
+    const candidates = await this.fetchCorporateCandidates(
+      corporateId,
+      options.groupId,
+    );
+    this.logger.log(
+      `   ✅ Found ${candidates.length} candidates in your organization`,
+    );
 
     if (candidates.length === 0) {
       return {
@@ -305,7 +449,9 @@ export class CorporateJDMatchingService {
     scoredCandidates.sort((a, b) => b.compositeScore - a.compositeScore);
     const totalScored = scoredCandidates.length;
     scoredCandidates.forEach((sc, index) => {
-      sc.confidenceLevel = Math.round(((totalScored - index) / totalScored) * 100);
+      sc.confidenceLevel = Math.round(
+        ((totalScored - index) / totalScored) * 100,
+      );
     });
 
     const topCandidates = scoredCandidates.slice(0, topN);
@@ -320,11 +466,16 @@ export class CorporateJDMatchingService {
     let workforceInsights: WorkforceInsights | undefined;
     if (options.includeWorkforceInsights !== false) {
       this.logger.log('📈 Layer 6: Building workforce intelligence...');
-      workforceInsights = this.buildWorkforceInsights(scoredCandidates, requirements);
+      workforceInsights = this.buildWorkforceInsights(
+        scoredCandidates,
+        requirements,
+      );
     }
 
     const executionTimeMs = Date.now() - startTime;
-    this.logger.log(`✅ Corporate JD Matching complete in ${executionTimeMs}ms — ${topCandidates.length} matches`);
+    this.logger.log(
+      `✅ Corporate JD Matching complete in ${executionTimeMs}ms — ${topCandidates.length} matches`,
+    );
 
     return {
       jobDescription,
@@ -422,14 +573,20 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
         model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `JOB DESCRIPTION:\n"""\n${jd}\n"""\n\nParse the job description above.` },
+          {
+            role: 'user',
+            content: `JOB DESCRIPTION:\n"""\n${jd}\n"""\n\nParse the job description above.`,
+          },
         ],
         temperature: 0.1,
         max_tokens: 2000,
       });
 
       const jsonStr = (completion.choices[0]?.message?.content || '').trim();
-      const cleanJson = jsonStr.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
+      const cleanJson = jsonStr
+        .replace(/^```json?\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
       const parsed = JSON.parse(cleanJson) as JDRequirements;
 
       return {
@@ -437,7 +594,11 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
         seniorityLevel: parsed.seniorityLevel || 'mid',
         requiredTraits: parsed.requiredTraits || [],
         behavioralPatterns: parsed.behavioralPatterns || [],
-        agileRequirement: parsed.agileRequirement || { minScore: 50, idealScore: 80, adaptabilityWeight: 0.5 },
+        agileRequirement: parsed.agileRequirement || {
+          minScore: 50,
+          idealScore: 80,
+          adaptabilityWeight: 0.5,
+        },
         softSkills: parsed.softSkills || [],
         hardSkills: parsed.hardSkills || [],
         industryContext: parsed.industryContext || 'General',
@@ -454,38 +615,86 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
   }
 
   private fallbackJDParsing(jd: string): JDRequirements {
-    const leadershipRequired = /\b(lead|leader|leadership|manage|director|head|vp|chief)\b/i.test(jd);
-    const analyticalRequired = /\b(analy|data|research|metrics|statistics|quantitative)\b/i.test(jd);
-    const creativityRequired = /\b(creat|innovat|design|ideate|brainstorm)\b/i.test(jd);
-    const customerFacing = /\b(customer|client|stakeholder|partner|sales|support)\b/i.test(jd);
+    const leadershipRequired =
+      /\b(lead|leader|leadership|manage|director|head|vp|chief)\b/i.test(jd);
+    const analyticalRequired =
+      /\b(analy|data|research|metrics|statistics|quantitative)\b/i.test(jd);
+    const creativityRequired =
+      /\b(creat|innovat|design|ideate|brainstorm)\b/i.test(jd);
+    const customerFacing =
+      /\b(customer|client|stakeholder|partner|sales|support)\b/i.test(jd);
 
     const traits: TraitRequirement[] = [];
     if (leadershipRequired) {
-      traits.push({ traitName: 'Dominance', importance: 'critical', minLevel: 'high', description: 'Leadership role requires assertiveness' });
-      traits.push({ traitName: 'Influence', importance: 'important', minLevel: 'moderate', description: 'Need to inspire and persuade teams' });
+      traits.push({
+        traitName: 'Dominance',
+        importance: 'critical',
+        minLevel: 'high',
+        description: 'Leadership role requires assertiveness',
+      });
+      traits.push({
+        traitName: 'Influence',
+        importance: 'important',
+        minLevel: 'moderate',
+        description: 'Need to inspire and persuade teams',
+      });
     }
     if (analyticalRequired) {
-      traits.push({ traitName: 'Compliance', importance: 'critical', minLevel: 'high', description: 'Role requires analytical precision' });
+      traits.push({
+        traitName: 'Compliance',
+        importance: 'critical',
+        minLevel: 'high',
+        description: 'Role requires analytical precision',
+      });
     }
     if (customerFacing) {
-      traits.push({ traitName: 'Influence', importance: 'important', minLevel: 'high', description: 'Customer-facing needs strong communication' });
-      traits.push({ traitName: 'Steadiness', importance: 'important', minLevel: 'moderate', description: 'Need patience with customer interactions' });
+      traits.push({
+        traitName: 'Influence',
+        importance: 'important',
+        minLevel: 'high',
+        description: 'Customer-facing needs strong communication',
+      });
+      traits.push({
+        traitName: 'Steadiness',
+        importance: 'important',
+        minLevel: 'moderate',
+        description: 'Need patience with customer interactions',
+      });
     }
     if (traits.length === 0) {
-      traits.push({ traitName: 'Steadiness', importance: 'important', minLevel: 'moderate', description: 'General role stability' });
-      traits.push({ traitName: 'Compliance', importance: 'important', minLevel: 'moderate', description: 'Quality and accuracy needed' });
+      traits.push({
+        traitName: 'Steadiness',
+        importance: 'important',
+        minLevel: 'moderate',
+        description: 'General role stability',
+      });
+      traits.push({
+        traitName: 'Compliance',
+        importance: 'important',
+        minLevel: 'moderate',
+        description: 'Quality and accuracy needed',
+      });
     }
 
     return {
       roleTitle: 'Extracted Role',
-      seniorityLevel: /\b(senior|sr|lead|principal|director|vp|chief|head)\b/i.test(jd) ? 'senior' : 'mid',
+      seniorityLevel:
+        /\b(senior|sr|lead|principal|director|vp|chief|head)\b/i.test(jd)
+          ? 'senior'
+          : 'mid',
       requiredTraits: traits,
       behavioralPatterns: [],
-      agileRequirement: { minScore: 50, idealScore: 80, adaptabilityWeight: 0.5 },
+      agileRequirement: {
+        minScore: 50,
+        idealScore: 80,
+        adaptabilityWeight: 0.5,
+      },
       softSkills: [],
       hardSkills: [],
       industryContext: 'General',
-      teamDynamic: /\b(team|collaborat|cross.?functional)\b/i.test(jd) ? 'cross_functional' : 'small_team',
+      teamDynamic: /\b(team|collaborat|cross.?functional)\b/i.test(jd)
+        ? 'cross_functional'
+        : 'small_team',
       leadershipRequired,
       creativityRequired,
       analyticalRequired,
@@ -562,12 +771,16 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
         personalityDescription: row.personality_description,
         personalityCode: row.personality_code,
         totalScore: row.total_score ? parseFloat(row.total_score) : null,
-        sincerityIndex: row.sincerity_index ? parseFloat(row.sincerity_index) : null,
+        sincerityIndex: row.sincerity_index
+          ? parseFloat(row.sincerity_index)
+          : null,
         sincerityClass: row.sincerity_class,
         attemptCount: parseInt(row.attempt_count) || 0,
         bestScore: row.best_score ? parseFloat(row.best_score) : null,
         assessmentStatus: row.assessment_status || 'UNKNOWN',
-        corporateAccountId: row.corporate_account_id ? parseInt(row.corporate_account_id) : null,
+        corporateAccountId: row.corporate_account_id
+          ? parseInt(row.corporate_account_id)
+          : null,
         groupId: row.group_id ? parseInt(row.group_id) : null,
         groupName: row.group_name || null,
       }));
@@ -587,38 +800,71 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
     const vector = this.getPersonalityVector(candidate.personalityStyle);
 
     const bas = this.calculateBehavioralAlignment(vector, requirements);
-    const ars = this.calculateAgileReadiness(candidate, requirements.agileRequirement);
+    const ars = this.calculateAgileReadiness(
+      candidate,
+      requirements.agileRequirement,
+    );
     const tfs = this.calculateTraitRoleFit(vector, requirements);
     const rsi = this.calculateReliabilityIndex(candidate);
     const confidenceMultiplier = this.calculateConfidenceMultiplier(candidate);
 
-    let compositeScore = (
-      bas * SCORING_WEIGHTS.behavioralAlignment +
-      ars * SCORING_WEIGHTS.agileReadiness +
-      tfs * SCORING_WEIGHTS.traitRoleFit +
-      rsi * SCORING_WEIGHTS.reliabilityIndex
-    ) * confidenceMultiplier;
+    let compositeScore =
+      (bas * SCORING_WEIGHTS.behavioralAlignment +
+        ars * SCORING_WEIGHTS.agileReadiness +
+        tfs * SCORING_WEIGHTS.traitRoleFit +
+        rsi * SCORING_WEIGHTS.reliabilityIndex) *
+      confidenceMultiplier;
 
     // Advanced adjustments
     const industryBonus = this.calculateIndustryAlignment(vector, requirements);
     compositeScore = Math.min(100, compositeScore + industryBonus);
 
-    const seniorityPenalty = this.calculateSeniorityMismatch(requirements.seniorityLevel, vector);
+    const seniorityPenalty = this.calculateSeniorityMismatch(
+      requirements.seniorityLevel,
+      vector,
+    );
     compositeScore = Math.max(0, compositeScore - seniorityPenalty);
 
-    const teamFitScore = this.calculateTeamFit(vector, requirements.teamDynamic);
-    const successPrediction = this.predictSuccessRate(vector, requirements, bas, ars, tfs, rsi);
-    const retentionRisk = this.assessRetentionRisk(vector, requirements, candidate);
+    const teamFitScore = this.calculateTeamFit(
+      vector,
+      requirements.teamDynamic,
+    );
+    const successPrediction = this.predictSuccessRate(
+      vector,
+      requirements,
+      bas,
+      ars,
+      tfs,
+      rsi,
+    );
+    const retentionRisk = this.assessRetentionRisk(
+      vector,
+      requirements,
+      candidate,
+    );
 
     compositeScore = Math.round(compositeScore * 10) / 10;
 
-    const tier = compositeScore >= TIER_THRESHOLDS.STRONG_FIT ? 'STRONG_FIT'
-      : compositeScore >= TIER_THRESHOLDS.GOOD_FIT ? 'GOOD_FIT'
-      : compositeScore >= TIER_THRESHOLDS.MODERATE_FIT ? 'MODERATE_FIT'
-      : 'DEVELOPING';
+    const tier =
+      compositeScore >= TIER_THRESHOLDS.STRONG_FIT
+        ? 'STRONG_FIT'
+        : compositeScore >= TIER_THRESHOLDS.GOOD_FIT
+          ? 'GOOD_FIT'
+          : compositeScore >= TIER_THRESHOLDS.MODERATE_FIT
+            ? 'MODERATE_FIT'
+            : 'DEVELOPING';
 
-    const matchReasons = this.generateMatchReasons(vector, requirements, bas, ars, tfs);
-    const developmentAreas = this.identifyDevelopmentAreas(vector, requirements);
+    const matchReasons = this.generateMatchReasons(
+      vector,
+      requirements,
+      bas,
+      ars,
+      tfs,
+    );
+    const developmentAreas = this.identifyDevelopmentAreas(
+      vector,
+      requirements,
+    );
 
     return {
       candidate,
@@ -645,10 +891,12 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
 
   private getPersonalityVector(styleName: string | null) {
     if (!styleName) return { ...DEFAULT_VECTOR };
-    if (PERSONALITY_VECTORS[styleName]) return { ...PERSONALITY_VECTORS[styleName] };
+    if (PERSONALITY_VECTORS[styleName])
+      return { ...PERSONALITY_VECTORS[styleName] };
     const key = Object.keys(PERSONALITY_VECTORS).find(
-      k => styleName.toLowerCase().includes(k.toLowerCase()) ||
-           k.toLowerCase().includes(styleName.toLowerCase()),
+      (k) =>
+        styleName.toLowerCase().includes(k.toLowerCase()) ||
+        k.toLowerCase().includes(styleName.toLowerCase()),
     );
     return key ? { ...PERSONALITY_VECTORS[key] } : { ...DEFAULT_VECTOR };
   }
@@ -667,18 +915,32 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
     return Math.max(0, Math.min(100, (similarity + 1) * 50));
   }
 
-  private buildIdealVector(requirements: JDRequirements): typeof DEFAULT_VECTOR {
+  private buildIdealVector(
+    requirements: JDRequirements,
+  ): typeof DEFAULT_VECTOR {
     const ideal = { ...DEFAULT_VECTOR };
 
     for (const trait of requirements.requiredTraits) {
-      const levelValue = trait.minLevel === 'very_high' ? 95
-        : trait.minLevel === 'high' ? 80
-        : trait.minLevel === 'moderate' ? 60 : 40;
+      const levelValue =
+        trait.minLevel === 'very_high'
+          ? 95
+          : trait.minLevel === 'high'
+            ? 80
+            : trait.minLevel === 'moderate'
+              ? 60
+              : 40;
 
-      const importanceMultiplier = trait.importance === 'critical' ? 1.2
-        : trait.importance === 'important' ? 1.0 : 0.8;
+      const importanceMultiplier =
+        trait.importance === 'critical'
+          ? 1.2
+          : trait.importance === 'important'
+            ? 1.0
+            : 0.8;
 
-      const scaledValue = Math.min(100, Math.round(levelValue * importanceMultiplier));
+      const scaledValue = Math.min(
+        100,
+        Math.round(levelValue * importanceMultiplier),
+      );
 
       switch (trait.traitName.toLowerCase()) {
         case 'dominance':
@@ -734,7 +996,9 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
   }
 
   private cosineSimilarity(a: number[], b: number[]): number {
-    let dotProduct = 0, normA = 0, normB = 0;
+    let dotProduct = 0,
+      normA = 0,
+      normB = 0;
     for (let i = 0; i < a.length; i++) {
       dotProduct += a[i] * b[i];
       normA += a[i] * a[i];
@@ -760,7 +1024,7 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
     if (score >= minScore) {
       const range = idealScore - minScore;
       const progress = (score - minScore) / (range || 1);
-      return 50 + (progress * 40);
+      return 50 + progress * 40;
     }
     const ratio = score / (minScore || 1);
     const sigmoidScore = 50 / (1 + Math.exp(-8 * (ratio - 0.5)));
@@ -773,15 +1037,20 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
     candidateVector: typeof DEFAULT_VECTOR,
     requirements: JDRequirements,
   ): number {
-    let totalScore = 0, totalWeight = 0;
+    let totalScore = 0,
+      totalWeight = 0;
 
     for (const pattern of requirements.behavioralPatterns) {
-      const patternScore = this.evaluateBehavioralPattern(candidateVector, pattern);
+      const patternScore = this.evaluateBehavioralPattern(
+        candidateVector,
+        pattern,
+      );
       totalScore += patternScore * pattern.weight;
       totalWeight += pattern.weight;
     }
 
-    if (totalWeight === 0) return this.fallbackTraitFit(candidateVector, requirements);
+    if (totalWeight === 0)
+      return this.fallbackTraitFit(candidateVector, requirements);
     return Math.round((totalScore / totalWeight) * 10) / 10;
   }
 
@@ -793,23 +1062,30 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
     let score = 50;
 
     if (/\b(decision|decisive|authority|asserti)\b/.test(keywords))
-      score = candidateVector.dominance * 0.7 + candidateVector.independence * 0.3;
+      score =
+        candidateVector.dominance * 0.7 + candidateVector.independence * 0.3;
     if (/\b(team|collaborat|cooperat)\b/.test(keywords))
-      score = candidateVector.teamwork * 0.6 + candidateVector.communication * 0.4;
+      score =
+        candidateVector.teamwork * 0.6 + candidateVector.communication * 0.4;
     if (/\b(creat|innovat|ideate)\b/.test(keywords))
-      score = candidateVector.creativity * 0.7 + candidateVector.adaptability * 0.3;
+      score =
+        candidateVector.creativity * 0.7 + candidateVector.adaptability * 0.3;
     if (/\b(analy|data|logic|system)\b/.test(keywords))
-      score = candidateVector.analytical * 0.7 + candidateVector.compliance * 0.3;
+      score =
+        candidateVector.analytical * 0.7 + candidateVector.compliance * 0.3;
     if (/\b(lead|inspir|motiv|vision)\b/.test(keywords))
-      score = candidateVector.leadership * 0.6 + candidateVector.influence * 0.4;
+      score =
+        candidateVector.leadership * 0.6 + candidateVector.influence * 0.4;
     if (/\b(stable|consistent|reliable|steady)\b/.test(keywords))
       score = candidateVector.steadiness * 0.7 + candidateVector.teamwork * 0.3;
     if (/\b(communicat|present|negotiat|persua)\b/.test(keywords))
-      score = candidateVector.communication * 0.6 + candidateVector.influence * 0.4;
+      score =
+        candidateVector.communication * 0.6 + candidateVector.influence * 0.4;
     if (/\b(empath|support|care|patient)\b/.test(keywords))
       score = candidateVector.empathy * 0.6 + candidateVector.steadiness * 0.4;
     if (/\b(adapt|flexib|change|agile)\b/.test(keywords))
-      score = candidateVector.adaptability * 0.7 + candidateVector.creativity * 0.3;
+      score =
+        candidateVector.adaptability * 0.7 + candidateVector.creativity * 0.3;
 
     return Math.max(0, Math.min(100, score));
   }
@@ -818,16 +1094,29 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
     candidateVector: typeof DEFAULT_VECTOR,
     requirements: JDRequirements,
   ): number {
-    let score = 50, factors = 1;
+    let score = 50,
+      factors = 1;
 
-    if (requirements.leadershipRequired) { score += candidateVector.leadership * 0.5; factors++; }
-    if (requirements.creativityRequired) { score += candidateVector.creativity * 0.5; factors++; }
-    if (requirements.analyticalRequired) { score += candidateVector.analytical * 0.5; factors++; }
+    if (requirements.leadershipRequired) {
+      score += candidateVector.leadership * 0.5;
+      factors++;
+    }
+    if (requirements.creativityRequired) {
+      score += candidateVector.creativity * 0.5;
+      factors++;
+    }
+    if (requirements.analyticalRequired) {
+      score += candidateVector.analytical * 0.5;
+      factors++;
+    }
     if (requirements.customerFacing) {
       score += (candidateVector.communication + candidateVector.empathy) * 0.25;
       factors++;
     }
-    if (requirements.seniorityLevel === 'lead' || requirements.seniorityLevel === 'executive') {
+    if (
+      requirements.seniorityLevel === 'lead' ||
+      requirements.seniorityLevel === 'executive'
+    ) {
       score += candidateVector.leadership * 0.3;
       factors++;
     }
@@ -842,7 +1131,11 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
 
     if (candidate.sincerityClass) {
       const sincerityClasses: Record<string, number> = {
-        'HIGH': 30, 'MODERATE': 20, 'ADEQUATE': 15, 'LOW': 5, 'VERY_LOW': 0,
+        HIGH: 30,
+        MODERATE: 20,
+        ADEQUATE: 15,
+        LOW: 5,
+        VERY_LOW: 0,
       };
       score += sincerityClasses[candidate.sincerityClass.toUpperCase()] ?? 10;
     } else if (candidate.sincerityIndex !== null) {
@@ -856,7 +1149,10 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
     else if (candidate.attemptCount >= 1) score += 5;
 
     if (candidate.bestScore !== null && candidate.totalScore !== null) {
-      const consistency = 1 - Math.abs(candidate.bestScore - candidate.totalScore) / (candidate.bestScore || 1);
+      const consistency =
+        1 -
+        Math.abs(candidate.bestScore - candidate.totalScore) /
+          (candidate.bestScore || 1);
       score += Math.round(consistency * 5);
     }
 
@@ -867,8 +1163,10 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
     let confidence = 0.6;
     if (candidate.personalityStyle) confidence += 0.2;
     if (candidate.totalScore !== null) confidence += 0.1;
-    if (candidate.sincerityIndex !== null || candidate.sincerityClass) confidence += 0.05;
-    if (candidate.fullName && candidate.fullName !== 'Unknown') confidence += 0.05;
+    if (candidate.sincerityIndex !== null || candidate.sincerityClass)
+      confidence += 0.05;
+    if (candidate.fullName && candidate.fullName !== 'Unknown')
+      confidence += 0.05;
     return Math.min(1.0, confidence);
   }
 
@@ -891,7 +1189,9 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
       if (vector.compliance >= 80 && vector.analytical >= 75) bonus += 4;
       if (vector.steadiness >= 70) bonus += 2;
     }
-    if (/\b(sales|marketing|business development|advertising)\b/.test(industry)) {
+    if (
+      /\b(sales|marketing|business development|advertising)\b/.test(industry)
+    ) {
       if (vector.influence >= 80 && vector.communication >= 75) bonus += 4;
       if (vector.adaptability >= 70) bonus += 2;
     }
@@ -941,16 +1241,28 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
     let score = 50;
     switch (teamDynamic) {
       case 'solo':
-        score = vector.independence * 0.6 + vector.analytical * 0.3 + (100 - vector.teamwork) * 0.1;
+        score =
+          vector.independence * 0.6 +
+          vector.analytical * 0.3 +
+          (100 - vector.teamwork) * 0.1;
         break;
       case 'small_team':
-        score = vector.teamwork * 0.4 + vector.communication * 0.3 + vector.adaptability * 0.3;
+        score =
+          vector.teamwork * 0.4 +
+          vector.communication * 0.3 +
+          vector.adaptability * 0.3;
         break;
       case 'large_team':
-        score = vector.teamwork * 0.5 + vector.empathy * 0.3 + vector.steadiness * 0.2;
+        score =
+          vector.teamwork * 0.5 +
+          vector.empathy * 0.3 +
+          vector.steadiness * 0.2;
         break;
       case 'cross_functional':
-        score = vector.communication * 0.4 + vector.adaptability * 0.3 + vector.influence * 0.3;
+        score =
+          vector.communication * 0.4 +
+          vector.adaptability * 0.3 +
+          vector.influence * 0.3;
         break;
     }
     return Math.max(0, Math.min(100, score));
@@ -959,25 +1271,40 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
   private predictSuccessRate(
     vector: typeof DEFAULT_VECTOR,
     requirements: JDRequirements,
-    bas: number, ars: number, tfs: number, rsi: number,
+    bas: number,
+    ars: number,
+    tfs: number,
+    rsi: number,
   ): number {
-    let prediction = (bas * 0.3 + ars * 0.25 + tfs * 0.25 + rsi * 0.2);
+    let prediction = bas * 0.3 + ars * 0.25 + tfs * 0.25 + rsi * 0.2;
 
-    const criticalTraits = requirements.requiredTraits.filter(t => t.importance === 'critical');
+    const criticalTraits = requirements.requiredTraits.filter(
+      (t) => t.importance === 'critical',
+    );
     for (const trait of criticalTraits) {
       const traitValue = this.getVectorDimension(vector, trait.traitName);
-      const threshold = trait.minLevel === 'very_high' ? 85 : trait.minLevel === 'high' ? 75 : 60;
+      const threshold =
+        trait.minLevel === 'very_high'
+          ? 85
+          : trait.minLevel === 'high'
+            ? 75
+            : 60;
       if (traitValue >= threshold) prediction += 5;
     }
     prediction = Math.min(100, prediction);
 
-    if (requirements.leadershipRequired && vector.leadership < 60) prediction -= 10;
-    if (requirements.analyticalRequired && vector.analytical < 60) prediction -= 10;
-    if (requirements.creativityRequired && vector.creativity < 60) prediction -= 8;
+    if (requirements.leadershipRequired && vector.leadership < 60)
+      prediction -= 10;
+    if (requirements.analyticalRequired && vector.analytical < 60)
+      prediction -= 10;
+    if (requirements.creativityRequired && vector.creativity < 60)
+      prediction -= 8;
 
     const dimensions = Object.values(vector);
     const avgDim = dimensions.reduce((a, b) => a + b, 0) / dimensions.length;
-    const variance = dimensions.reduce((sum, v) => sum + Math.pow(v - avgDim, 2), 0) / dimensions.length;
+    const variance =
+      dimensions.reduce((sum, v) => sum + Math.pow(v - avgDim, 2), 0) /
+      dimensions.length;
     if (variance < 400) prediction += 3;
 
     return Math.max(0, Math.min(100, Math.round(prediction)));
@@ -990,20 +1317,43 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
   ): 'LOW' | 'MEDIUM' | 'HIGH' {
     let riskScore = 0;
 
-    if (requirements.seniorityLevel === 'entry' && vector.leadership > 80 && vector.dominance > 80) riskScore += 3;
-    if (requirements.creativityRequired && vector.creativity < 50 && vector.adaptability < 50) riskScore += 2;
-    if (requirements.teamDynamic === 'large_team' && vector.teamwork < 50 && vector.independence > 80) riskScore += 2;
+    if (
+      requirements.seniorityLevel === 'entry' &&
+      vector.leadership > 80 &&
+      vector.dominance > 80
+    )
+      riskScore += 3;
+    if (
+      requirements.creativityRequired &&
+      vector.creativity < 50 &&
+      vector.adaptability < 50
+    )
+      riskScore += 2;
+    if (
+      requirements.teamDynamic === 'large_team' &&
+      vector.teamwork < 50 &&
+      vector.independence > 80
+    )
+      riskScore += 2;
 
     const agileScore = candidate.bestScore || candidate.totalScore || 0;
-    if (requirements.agileRequirement.adaptabilityWeight > 0.6 && agileScore < 50) riskScore += 2;
-    if (requirements.teamDynamic !== 'solo' && vector.steadiness < 40) riskScore += 1;
+    if (
+      requirements.agileRequirement.adaptabilityWeight > 0.6 &&
+      agileScore < 50
+    )
+      riskScore += 2;
+    if (requirements.teamDynamic !== 'solo' && vector.steadiness < 40)
+      riskScore += 1;
 
     if (riskScore >= 5) return 'HIGH';
     if (riskScore >= 2) return 'MEDIUM';
     return 'LOW';
   }
 
-  private getVectorDimension(vector: typeof DEFAULT_VECTOR, traitName: string): number {
+  private getVectorDimension(
+    vector: typeof DEFAULT_VECTOR,
+    traitName: string,
+  ): number {
     const trait = traitName.toLowerCase();
     if (trait.includes('dominance')) return vector.dominance;
     if (trait.includes('influence')) return vector.influence;
@@ -1019,18 +1369,25 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
   private generateMatchReasons(
     vector: typeof DEFAULT_VECTOR,
     requirements: JDRequirements,
-    bas: number, ars: number, tfs: number,
+    bas: number,
+    ars: number,
+    tfs: number,
   ): string[] {
     const reasons: string[] = [];
 
-    if (bas >= 80) reasons.push('Excellent behavioral alignment with role requirements');
-    else if (bas >= 65) reasons.push('Good behavioral alignment with role needs');
+    if (bas >= 80)
+      reasons.push('Excellent behavioral alignment with role requirements');
+    else if (bas >= 65)
+      reasons.push('Good behavioral alignment with role needs');
 
     if (ars >= 85) reasons.push('Outstanding agile readiness and adaptability');
-    else if (ars >= 70) reasons.push('Strong agile mindset for dynamic environments');
+    else if (ars >= 70)
+      reasons.push('Strong agile mindset for dynamic environments');
 
-    if (tfs >= 80) reasons.push('Personality traits strongly match role demands');
-    else if (tfs >= 65) reasons.push('Personality traits complement role requirements');
+    if (tfs >= 80)
+      reasons.push('Personality traits strongly match role demands');
+    else if (tfs >= 65)
+      reasons.push('Personality traits complement role requirements');
 
     if (requirements.leadershipRequired && vector.leadership >= 80)
       reasons.push('Natural leadership qualities align with role');
@@ -1038,10 +1395,14 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
       reasons.push('Strong creative thinking matches innovation needs');
     if (requirements.analyticalRequired && vector.analytical >= 80)
       reasons.push('Analytical mindset suits data-driven requirements');
-    if (requirements.customerFacing && (vector.communication >= 80 || vector.empathy >= 80))
+    if (
+      requirements.customerFacing &&
+      (vector.communication >= 80 || vector.empathy >= 80)
+    )
       reasons.push('Strong communication/empathy for customer-facing role');
 
-    if (reasons.length === 0) reasons.push('Candidate has completed assessment with available data');
+    if (reasons.length === 0)
+      reasons.push('Candidate has completed assessment with available data');
     return reasons;
   }
 
@@ -1052,21 +1413,40 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
     const areas: string[] = [];
 
     if (requirements.leadershipRequired && vector.leadership < 60)
-      areas.push('Leadership development needed — consider mentoring/coaching programs');
+      areas.push(
+        'Leadership development needed — consider mentoring/coaching programs',
+      );
     if (requirements.analyticalRequired && vector.analytical < 60)
-      areas.push('Analytical skills enhancement — data literacy training recommended');
+      areas.push(
+        'Analytical skills enhancement — data literacy training recommended',
+      );
     if (requirements.creativityRequired && vector.creativity < 60)
       areas.push('Creative thinking — design thinking workshops could help');
     if (requirements.customerFacing && vector.communication < 60)
-      areas.push('Communication skills — presentation and interpersonal training');
+      areas.push(
+        'Communication skills — presentation and interpersonal training',
+      );
     if (requirements.customerFacing && vector.empathy < 60)
       areas.push('Emotional intelligence development for client interactions');
-    if (requirements.agileRequirement.adaptabilityWeight > 0.6 && vector.adaptability < 60)
-      areas.push('Adaptability & change management — agile training recommended');
-    if ((requirements.teamDynamic === 'large_team' || requirements.teamDynamic === 'cross_functional') && vector.teamwork < 60)
-      areas.push('Team collaboration skills — cross-functional project experience needed');
+    if (
+      requirements.agileRequirement.adaptabilityWeight > 0.6 &&
+      vector.adaptability < 60
+    )
+      areas.push(
+        'Adaptability & change management — agile training recommended',
+      );
+    if (
+      (requirements.teamDynamic === 'large_team' ||
+        requirements.teamDynamic === 'cross_functional') &&
+      vector.teamwork < 60
+    )
+      areas.push(
+        'Team collaboration skills — cross-functional project experience needed',
+      );
     if (requirements.teamDynamic === 'solo' && vector.independence < 60)
-      areas.push('Independent working capability — self-management skills development');
+      areas.push(
+        'Independent working capability — self-management skills development',
+      );
 
     return areas;
   }
@@ -1100,9 +1480,15 @@ Key Requirements: ${requirements.softSkills.join(', ')}
 Industry: ${requirements.industryContext}
 
 CANDIDATES:
-${candidateSummaries.map(c => `${c.rank}. ${c.name} | Style: ${c.style} | Score: ${c.score}/100 | Tier: ${c.tier} | Group: ${c.group} | Agile: ${c.agileScore}/125
+${candidateSummaries
+  .map(
+    (
+      c,
+    ) => `${c.rank}. ${c.name} | Style: ${c.style} | Score: ${c.score}/100 | Tier: ${c.tier} | Group: ${c.group} | Agile: ${c.agileScore}/125
    Strengths: ${c.strengths}
-   Gaps: ${c.gaps}`).join('\n')}
+   Gaps: ${c.gaps}`,
+  )
+  .join('\n')}
 
 For each candidate, provide a 1-2 sentence insight about their fit and one actionable recommendation.
 Output ONLY a JSON array:
@@ -1117,8 +1503,15 @@ Output ONLY a JSON array:
       });
 
       const jsonStr = (completion.choices[0]?.message?.content || '').trim();
-      const cleanJson = jsonStr.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
-      const insights = JSON.parse(cleanJson) as { rank: number; insight: string; recommendation: string }[];
+      const cleanJson = jsonStr
+        .replace(/^```json?\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
+      const insights = JSON.parse(cleanJson) as {
+        rank: number;
+        insight: string;
+        recommendation: string;
+      }[];
 
       for (const item of insights) {
         const idx = item.rank - 1;
@@ -1129,7 +1522,9 @@ Output ONLY a JSON array:
     } catch (error) {
       this.logger.warn(`Insight generation failed: ${error.message}`);
       for (const sc of topForInsights) {
-        sc.insights = [`${sc.candidate.personalityStyle || 'This candidate'} shows ${sc.tier === 'STRONG_FIT' ? 'excellent' : sc.tier === 'GOOD_FIT' ? 'good' : 'moderate'} alignment with the ${requirements.roleTitle} role.`];
+        sc.insights = [
+          `${sc.candidate.personalityStyle || 'This candidate'} shows ${sc.tier === 'STRONG_FIT' ? 'excellent' : sc.tier === 'GOOD_FIT' ? 'good' : 'moderate'} alignment with the ${requirements.roleTitle} role.`,
+        ];
       }
     }
   }
@@ -1145,15 +1540,25 @@ Output ONLY a JSON array:
     const totalAssessedCandidates = allScored.length;
 
     // Average match score
-    const averageMatchScore = totalAssessedCandidates > 0
-      ? Math.round((allScored.reduce((sum, sc) => sum + sc.compositeScore, 0) / totalAssessedCandidates) * 10) / 10
-      : 0;
+    const averageMatchScore =
+      totalAssessedCandidates > 0
+        ? Math.round(
+            (allScored.reduce((sum, sc) => sum + sc.compositeScore, 0) /
+              totalAssessedCandidates) *
+              10,
+          ) / 10
+        : 0;
 
     // Tier distribution
     const tierDistribution: Record<string, number> = {
-      STRONG_FIT: 0, GOOD_FIT: 0, MODERATE_FIT: 0, DEVELOPING: 0,
+      STRONG_FIT: 0,
+      GOOD_FIT: 0,
+      MODERATE_FIT: 0,
+      DEVELOPING: 0,
     };
-    allScored.forEach(sc => { tierDistribution[sc.tier]++; });
+    allScored.forEach((sc) => {
+      tierDistribution[sc.tier]++;
+    });
 
     // Top personality styles
     const styleMap: Record<string, { count: number; totalScore: number }> = {};
@@ -1190,37 +1595,52 @@ Output ONLY a JSON array:
 
     // Talent gaps
     const talentGapsSummary: string[] = [];
-    const strongFitPct = totalAssessedCandidates > 0 ? (tierDistribution.STRONG_FIT / totalAssessedCandidates) * 100 : 0;
+    const strongFitPct =
+      totalAssessedCandidates > 0
+        ? (tierDistribution.STRONG_FIT / totalAssessedCandidates) * 100
+        : 0;
 
     if (strongFitPct < 5) {
-      talentGapsSummary.push(`Critical gap: Only ${Math.round(strongFitPct)}% of your workforce is a strong fit for this role — consider external hiring or targeted development programs`);
+      talentGapsSummary.push(
+        `Critical gap: Only ${Math.round(strongFitPct)}% of your workforce is a strong fit for this role — consider external hiring or targeted development programs`,
+      );
     } else if (strongFitPct < 15) {
-      talentGapsSummary.push(`Moderate gap: ${Math.round(strongFitPct)}% strong fit rate — some development investment recommended`);
+      talentGapsSummary.push(
+        `Moderate gap: ${Math.round(strongFitPct)}% strong fit rate — some development investment recommended`,
+      );
     }
 
     if (requirements.leadershipRequired) {
-      const leadersCount = allScored.filter(sc => {
+      const leadersCount = allScored.filter((sc) => {
         const v = this.getPersonalityVector(sc.candidate.personalityStyle);
         return v.leadership >= 75;
       }).length;
       if (leadersCount < 3) {
-        talentGapsSummary.push(`Leadership pipeline: Only ${leadersCount} candidates show strong natural leadership traits`);
+        talentGapsSummary.push(
+          `Leadership pipeline: Only ${leadersCount} candidates show strong natural leadership traits`,
+        );
       }
     }
 
     if (requirements.analyticalRequired) {
-      const analyticalCount = allScored.filter(sc => {
+      const analyticalCount = allScored.filter((sc) => {
         const v = this.getPersonalityVector(sc.candidate.personalityStyle);
         return v.analytical >= 75;
       }).length;
       if (analyticalCount < 3) {
-        talentGapsSummary.push(`Analytical talent: Only ${analyticalCount} candidates demonstrate strong analytical capabilities`);
+        talentGapsSummary.push(
+          `Analytical talent: Only ${analyticalCount} candidates demonstrate strong analytical capabilities`,
+        );
       }
     }
 
-    const highRetentionRisk = allScored.filter(sc => sc.retentionRisk === 'HIGH').length;
+    const highRetentionRisk = allScored.filter(
+      (sc) => sc.retentionRisk === 'HIGH',
+    ).length;
     if (highRetentionRisk > totalAssessedCandidates * 0.3) {
-      talentGapsSummary.push(`Retention warning: ${highRetentionRisk} candidates (${Math.round((highRetentionRisk / totalAssessedCandidates) * 100)}%) show high retention risk for this role`);
+      talentGapsSummary.push(
+        `Retention warning: ${highRetentionRisk} candidates (${Math.round((highRetentionRisk / totalAssessedCandidates) * 100)}%) show high retention risk for this role`,
+      );
     }
 
     return {
@@ -1238,144 +1658,170 @@ Output ONLY a JSON array:
   // ═══════════════════════════════════════════════════════════════════════════
 
   formatMatchResultForChat(result: JDMatchResult): string {
+    const company = result.companyName || 'Your Organization';
+
     if (result.matchedCandidates.length === 0) {
-      return `**🎯 Talent Match Report — ${result.companyName || 'Your Organization'}**\n\n` +
-        `**Role:** ${result.parsedRequirements.roleTitle} (${result.parsedRequirements.seniorityLevel} level)\n` +
-        `**Industry:** ${result.parsedRequirements.industryContext}\n\n` +
-        `No candidates with completed assessments were found in your organization matching this role.\n\n` +
-        `**What you can do:**\n` +
-        `• Ensure candidates have completed their behavioral assessments\n` +
-        `• Try broadening the job description requirements\n` +
-        `• Check if candidates are assigned to your corporate account\n`;
+      return (
+        `**🎯 Talent Match Report — ${company}**\n\n` +
+        `No candidates matched the criteria for **${result.parsedRequirements.roleTitle}**.\n\n` +
+        `**Position Details:**\n` +
+        `• Seniority: ${result.parsedRequirements.seniorityLevel}\n` +
+        `• Industry: ${result.parsedRequirements.industryContext}\n` +
+        `• Team: ${result.parsedRequirements.teamDynamic.replace(/_/g, ' ')}\n\n` +
+        `*Please ensure candidates have completed their behavioral assessments.*`
+      );
     }
 
     const req = result.parsedRequirements;
-    let response = '';
+    const strongCount = result.matchedCandidates.filter(
+      (c) => c.tier === 'STRONG_FIT',
+    ).length;
+    const goodCount = result.matchedCandidates.filter(
+      (c) => c.tier === 'GOOD_FIT',
+    ).length;
+    const moderateCount = result.matchedCandidates.filter(
+      (c) => c.tier === 'MODERATE_FIT',
+    ).length;
 
-    // ── Premium Header ──
-    response += `**🎯 Talent Intelligence Report**\n`;
-    response += `**${result.companyName || 'Your Organization'}** — Internal Talent Match\n`;
-    response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    let response = `**🎯 Talent Intelligence Report**\n`;
+    response += `**${company}** — Internal Talent Match\n`;
+    response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-    // ── Role Requirements ──
-    response += `**📋 Position:** ${req.roleTitle} (${req.seniorityLevel} level)\n`;
-    response += `**🏢 Industry:** ${req.industryContext}\n`;
-    response += `**👥 Team Structure:** ${req.teamDynamic.replace(/_/g, ' ')}\n`;
+    // ── Role Overview ──
+    response += `🏢 **Role:** ${req.roleTitle} *(${req.seniorityLevel} level)*\n`;
+    response += `📍 **Industry:** ${req.industryContext}\n`;
+    response += `👥 **Team:** ${req.teamDynamic.replace(/_/g, ' ')}\n\n`;
 
-    const roleFlags: string[] = [];
-    if (req.leadershipRequired) roleFlags.push('🏆 Leadership');
-    if (req.analyticalRequired) roleFlags.push('📊 Analytical');
-    if (req.creativityRequired) roleFlags.push('🎨 Creative');
-    if (req.customerFacing) roleFlags.push('🤝 Client-facing');
-    if (roleFlags.length > 0) response += `**🔑 Key Competencies:** ${roleFlags.join(' | ')}\n`;
+    // ── Competencies ──
+    const competencies: string[] = [];
+    if (req.leadershipRequired) competencies.push('Leadership');
+    if (req.analyticalRequired) competencies.push('Analytical Thinking');
+    if (req.creativityRequired) competencies.push('Creativity');
+    if (req.customerFacing) competencies.push('Client-Facing');
+    if (req.softSkills.length > 0)
+      competencies.push(...req.softSkills.slice(0, 3));
 
-    response += `\n**📊 ${result.totalCandidatesEvaluated} employees evaluated** | Top ${result.matchedCandidates.length} matches shown\n\n`;
-    response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    if (competencies.length > 0) {
+      response += `🔑 **Core Competencies:** ${competencies.join(' · ')}\n\n`;
+    }
 
-    // ── Candidate Results ──
+    // ── Summary ──
+    response += `📊 **${result.totalCandidatesEvaluated}** employees evaluated → **${result.matchedCandidates.length}** top matches\n`;
+    const tierSummary: string[] = [];
+    if (strongCount > 0) tierSummary.push(`🟢 ${strongCount} Strong`);
+    if (goodCount > 0) tierSummary.push(`🔵 ${goodCount} Good`);
+    if (moderateCount > 0) tierSummary.push(`🟡 ${moderateCount} Moderate`);
+    if (tierSummary.length > 0) response += `${tierSummary.join('  •  ')}\n`;
+
+    response += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+
+    // ── Candidates ──
     result.matchedCandidates.forEach((sc, index) => {
-      const tierEmoji = sc.tier === 'STRONG_FIT' ? '🟢'
-        : sc.tier === 'GOOD_FIT' ? '🔵'
-        : sc.tier === 'MODERATE_FIT' ? '🟡'
-        : '🟠';
+      const tierDot =
+        sc.tier === 'STRONG_FIT'
+          ? '🟢'
+          : sc.tier === 'GOOD_FIT'
+            ? '🔵'
+            : sc.tier === 'MODERATE_FIT'
+              ? '🟡'
+              : '🟠';
 
-      const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `**#${index + 1}**`;
+      const tierLabel =
+        sc.tier === 'STRONG_FIT'
+          ? 'Strong Fit'
+          : sc.tier === 'GOOD_FIT'
+            ? 'Good Fit'
+            : sc.tier === 'MODERATE_FIT'
+              ? 'Moderate Fit'
+              : 'Developing';
 
-      response += `\n${medal} **${sc.candidate.fullName}** ${tierEmoji} ${sc.tier.replace(/_/g, ' ')}\n`;
-      response += `   📊 **Match Score: ${sc.compositeScore}/100** | Confidence: ${sc.confidenceLevel}%\n`;
+      const rank = index + 1;
+      const medal =
+        rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
+
+      response += `\n${medal} **${sc.candidate.fullName}** ${tierDot} *${tierLabel}*\n\n`;
+
+      // Metrics
+      response += `**Match Score: ${sc.compositeScore}/100** · Confidence: ${sc.confidenceLevel}%\n`;
 
       if (sc.candidate.personalityStyle) {
-        response += `   🧬 **Behavioral Profile:** ${sc.candidate.personalityStyle}\n`;
+        response += `**Behavioral Profile:** ${sc.candidate.personalityStyle}\n`;
       }
 
-      // Group/department info (corporate-specific)
+      // Corporate Specific: Group/Dept
       if (sc.candidate.groupName) {
-        response += `   🏷️ **Department/Group:** ${sc.candidate.groupName}\n`;
+        response += `**Department:** ${sc.candidate.groupName}\n`;
       }
 
-      // Success prediction & retention
+      // Predictions
       if (sc.successPrediction !== undefined) {
-        const predictionEmoji = sc.successPrediction >= 80 ? '🎯' : sc.successPrediction >= 65 ? '📈' : '📊';
-        response += `   ${predictionEmoji} **Success Likelihood:** ${sc.successPrediction}%`;
+        response += `\n**Predictions:**\n`;
+        response += `• Success Rate — **${sc.successPrediction}%**`;
         if (sc.retentionRisk) {
-          const riskEmoji = sc.retentionRisk === 'LOW' ? '✅' : sc.retentionRisk === 'MEDIUM' ? '⚠️' : '🔴';
-          response += ` | **Retention:** ${riskEmoji} ${sc.retentionRisk}`;
+          const riskIcon =
+            sc.retentionRisk === 'LOW'
+              ? '✅'
+              : sc.retentionRisk === 'MEDIUM'
+                ? '⚠️'
+                : '🔴';
+          response += `  ·  Retention Risk — ${riskIcon} ${sc.retentionRisk}`;
         }
         response += '\n';
+        if (sc.teamFitScore !== undefined) {
+          response += `• Team Compatibility — **${sc.teamFitScore}**/100\n`;
+        }
       }
 
-      // Team fit score
-      if (sc.teamFitScore !== undefined) {
-        const fitEmoji = sc.teamFitScore >= 80 ? '🤝' : sc.teamFitScore >= 60 ? '👥' : '🔄';
-        response += `   ${fitEmoji} **Team Fit:** ${sc.teamFitScore}%\n`;
-      }
-
-      // Match reasons
+      // Strengths
       if (sc.matchReasons.length > 0) {
-        response += `   ✓ ${sc.matchReasons.slice(0, 2).join('\n   ✓ ')}\n`;
+        response += `\n**Key Strengths:**\n`;
+        sc.matchReasons.slice(0, 3).forEach((reason) => {
+          response += `✓ ${reason}\n`;
+        });
       }
 
       // AI Insights
       if (sc.insights.length > 0) {
-        response += `\n   **Assessment:** *${sc.insights[0]}*\n`;
+        response += `\n💡 *${sc.insights[0]}*\n`;
         if (sc.insights.length > 1) {
-          response += `   **Recommendation:** *${sc.insights[1]}*\n`;
+          response += `📌 *${sc.insights[1]}*\n`;
         }
       }
 
-      // Development areas
+      // Growth
       if (sc.developmentAreas.length > 0 && sc.tier !== 'STRONG_FIT') {
-        response += `   \n   **Growth Opportunity:** ${sc.developmentAreas[0]}\n`;
+        response += `\n**Areas for Growth:**\n`;
+        sc.developmentAreas.slice(0, 2).forEach((area) => {
+          response += `→ ${area}\n`;
+        });
+      }
+
+      if (index < result.matchedCandidates.length - 1) {
+        response += `\n──────────────────────────\n`;
       }
     });
 
-    // ── Workforce Intelligence Section (Corporate-exclusive) ──
+    // ── Workforce Intelligence (Corporate Exclusive) ──
     if (result.workforceInsights) {
       const wi = result.workforceInsights;
-      response += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-      response += `\n**📈 Workforce Intelligence Dashboard**\n\n`;
+      response += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      response += `\n**📈 Workforce Intelligence**\n\n`;
 
-      // Tier distribution bar
       const total = wi.totalAssessedCandidates;
       response += `**Talent Pool Distribution:**\n`;
-      response += `🟢 Strong Fit: ${wi.tierDistribution.STRONG_FIT} (${Math.round((wi.tierDistribution.STRONG_FIT / total) * 100)}%)`;
-      response += ` | 🔵 Good Fit: ${wi.tierDistribution.GOOD_FIT} (${Math.round((wi.tierDistribution.GOOD_FIT / total) * 100)}%)\n`;
+      response += `🟢 Strong: ${wi.tierDistribution.STRONG_FIT} (${Math.round((wi.tierDistribution.STRONG_FIT / total) * 100)}%)`;
+      response += `  •  🔵 Good: ${wi.tierDistribution.GOOD_FIT} (${Math.round((wi.tierDistribution.GOOD_FIT / total) * 100)}%)\n`;
       response += `🟡 Moderate: ${wi.tierDistribution.MODERATE_FIT} (${Math.round((wi.tierDistribution.MODERATE_FIT / total) * 100)}%)`;
-      response += ` | 🟠 Developing: ${wi.tierDistribution.DEVELOPING} (${Math.round((wi.tierDistribution.DEVELOPING / total) * 100)}%)\n`;
-      response += `**Average Match Score:** ${wi.averageMatchScore}/100\n\n`;
 
-      // Top performing profiles
-      if (wi.topPersonalityStyles.length > 0) {
-        response += `**🧬 Top-Performing Profiles for this Role:**\n`;
-        wi.topPersonalityStyles.slice(0, 3).forEach((ps, i) => {
-          const rank = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
-          response += `${rank} ${ps.style} — Avg Score: ${ps.avgScore}/100 (${ps.count} employees)\n`;
-        });
-        response += '\n';
-      }
-
-      // Group/department insights
-      if (wi.groupDistribution && wi.groupDistribution.length > 1) {
-        response += `**🏢 Department Performance:**\n`;
-        wi.groupDistribution.forEach((gd) => {
-          const perf = gd.avgScore >= 70 ? '⭐' : gd.avgScore >= 55 ? '📊' : '📉';
-          response += `${perf} ${gd.groupName}: ${gd.candidateCount} candidates, Avg: ${gd.avgScore}/100\n`;
-        });
-        response += '\n';
-      }
-
-      // Talent gaps & recommendations
-      if (wi.talentGapsSummary.length > 0) {
-        response += `**⚡ Strategic Insights:**\n`;
-        wi.talentGapsSummary.forEach((gap) => {
-          response += `• ${gap}\n`;
-        });
-        response += '\n';
+      const gaps = wi.talentGapsSummary;
+      if (gaps && gaps.length > 0) {
+        response += `\n\n**Strategic Insights:**\n`;
+        gaps.forEach((gap) => (response += `• ${gap}\n`));
       }
     }
 
-    response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    response += `\n*Talent intelligence powered by multi-dimensional behavioral and competency analysis across your organization.*\n`;
+    response += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    response += `*Multi-dimensional analysis of ${result.totalCandidatesEvaluated} employees*\n`;
 
     return response;
   }
@@ -1386,12 +1832,12 @@ Output ONLY a JSON array:
 
   extractJDFromMessage(message: string): string {
     const prefixPatterns = [
-      /(?:find|match|search|identify|list|show|get|who)\s+(?:candidates?|people|users?|employees?|suitable)\s+(?:for|matching|suited\s+for|that\s+match|who\s+(?:fit|match|suit))\s*[:\-]?\s*([\s\S]+)/i,
-      /(?:job\s*description|jd)\s*[:\-]?\s*([\s\S]+)/i,
-      /(?:find|match|search)\s+(?:for|candidates?\s+for)\s*[:\-]?\s*([\s\S]+)/i,
-      /(?:who\s+(?:is|are)\s+(?:best|suitable|fit|right|ideal)\s+(?:for|candidate))\s*[:\-]?\s*([\s\S]+)/i,
-      /(?:suitable\s+(?:candidates?|employees?)\s+for)\s*[:\-]?\s*([\s\S]+)/i,
-      /(?:match\s+(?:my\s+)?(?:employees?|team|people)\s+(?:for|to|against|with))\s*[:\-]?\s*([\s\S]+)/i,
+      /(?:find|match|search|identify|list|show|get|who)\s+(?:candidates?|people|users?|employees?|suitable)\s+(?:for|matching|suited\s+for|that\s+match|who\s+(?:fit|match|suit))\s*[:-]?\s*([\s\S]+)/i,
+      /(?:job\s*description|jd)\s*[:-]?\s*([\s\S]+)/i,
+      /(?:find|match|search)\s+(?:for|candidates?\s+for)\s*[:-]?\s*([\s\S]+)/i,
+      /(?:who\s+(?:is|are)\s+(?:best|suitable|fit|right|ideal)\s+(?:for|candidate))\s*[:-]?\s*([\s\S]+)/i,
+      /(?:suitable\s+(?:candidates?|employees?)\s+for)\s*[:-]?\s*([\s\S]+)/i,
+      /(?:match\s+(?:my\s+)?(?:employees?|team|people)\s+(?:for|to|against|with))\s*[:-]?\s*([\s\S]+)/i,
     ];
 
     for (const pattern of prefixPatterns) {
@@ -1416,6 +1862,6 @@ Output ONLY a JSON array:
       /\b(?:suitable\s+for|best\s+fit\s+for|who\s+fits?)\b/i,
     ];
 
-    return patterns.some(p => p.test(message));
+    return patterns.some((p) => p.test(message));
   }
 }

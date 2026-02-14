@@ -6,7 +6,10 @@ import {
   Get,
   BadRequestException,
 } from '@nestjs/common';
-import { CorporateJDMatchingService, JDMatchResult } from './jd-matching.service';
+import {
+  CorporateJDMatchingService,
+  JDMatchResult,
+} from './jd-matching.service';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DTOs
@@ -32,9 +35,7 @@ class ChatJDMatchRequestDto {
 
 @Controller('jd-matching')
 export class JDMatchingController {
-  constructor(
-    private readonly jdMatchingService: CorporateJDMatchingService,
-  ) {}
+  constructor(private readonly jdMatchingService: CorporateJDMatchingService) {}
 
   /**
    * POST /jd-matching/match
@@ -47,10 +48,14 @@ export class JDMatchingController {
   ): Promise<{ success: boolean; data: JDMatchResult }> {
     if (!dto.email) throw new BadRequestException('Email is required');
     if (!dto.jobDescription || dto.jobDescription.length < 20) {
-      throw new BadRequestException('A detailed job description is required (minimum 20 characters)');
+      throw new BadRequestException(
+        'A detailed job description is required (minimum 20 characters)',
+      );
     }
 
-    const corporateId = await this.jdMatchingService.getCorporateAccountId(dto.email);
+    const corporateId = await this.jdMatchingService.getCorporateAccountId(
+      dto.email,
+    );
 
     const result = await this.jdMatchingService.matchCandidatesToJD(
       dto.jobDescription,
@@ -73,9 +78,12 @@ export class JDMatchingController {
    * Returns formatted markdown response for chat display
    */
   @Post('chat')
-  async chatJDMatch(
-    @Body() dto: ChatJDMatchRequestDto,
-  ): Promise<{ success: boolean; answer: string; isJDMatch: boolean; data?: JDMatchResult }> {
+  async chatJDMatch(@Body() dto: ChatJDMatchRequestDto): Promise<{
+    success: boolean;
+    answer: string;
+    isJDMatch: boolean;
+    data?: JDMatchResult;
+  }> {
     if (!dto.email) throw new BadRequestException('Email is required');
     if (!dto.message) throw new BadRequestException('Message is required');
 
@@ -90,8 +98,12 @@ export class JDMatchingController {
       };
     }
 
-    const corporateId = await this.jdMatchingService.getCorporateAccountId(dto.email);
-    const jobDescription = this.jdMatchingService.extractJDFromMessage(dto.message);
+    const corporateId = await this.jdMatchingService.getCorporateAccountId(
+      dto.email,
+    );
+    const jobDescription = this.jdMatchingService.extractJDFromMessage(
+      dto.message,
+    );
 
     if (!jobDescription || jobDescription.length < 15) {
       return {
