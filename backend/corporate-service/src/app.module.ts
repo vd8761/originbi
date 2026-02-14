@@ -7,6 +7,7 @@ import { MailAssetsController } from './mail/mail-assets.controller';
 import { HealthController } from './health.controller';
 import { CorporateRegistrationsModule } from './registrations/corporate-registrations.module';
 import { AssessmentModule } from './assessment/assessment.module';
+import { JDMatchingModule } from './jd-matching/jd-matching.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { AssessmentModule } from './assessment/assessment.module';
     CorporateDashboardModule,
     CorporateRegistrationsModule,
     AssessmentModule,
+    JDMatchingModule,
     ScheduleModule.forRoot(),
   ],
   controllers: [MailAssetsController, HealthController],
