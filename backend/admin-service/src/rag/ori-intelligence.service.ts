@@ -7,13 +7,13 @@ import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
  * ║                    MITHRA INTELLIGENCE SERVICE                            ║
- * ║         Advanced AI Brain - Like JARVIS for Career Guidance              ║
+ * ║       Advanced AI Brain — Professional Career Intelligence               ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
  * ║  CAPABILITIES:                                                            ║
  * ║  • Personalized career guidance based on user's assessment data          ║
  * ║  • Job eligibility analysis with detailed reasoning                       ║
  * ║  • Higher studies recommendations                                         ║
- * ║  • Emotional AI - friendly, supportive, like a mentor                    ║
+ * ║  • Professional, supportive advisory tone                                ║
  * ║  • Answer ANY question intelligently using LLM                           ║
  * ║  • Remember user preferences and build relationship                       ║
  * ╚═══════════════════════════════════════════════════════════════════════════╝
@@ -200,7 +200,7 @@ export class OriIntelligenceService {
 
             return {
                 userId: result[0].user_id,
-                name: result[0].name || result[0].email?.split('@')[0] || 'Friend',
+                name: result[0].name || result[0].email?.split('@')[0] || 'User',
                 email: result[0].email,
                 personalityStyle: result[0].personality_style,
                 personalityDescription: result[0].personality_description,
@@ -222,51 +222,51 @@ export class OriIntelligenceService {
         // "What is my name"
         if (q.includes('my name') || q.includes('who am i')) {
             if (profile?.name) {
-                return `Your name is **${profile.name}** 😊 You're logged in as **${profile.email}**. How can I help you today?`;
+                return `Your name on record is **${profile.name}**, and you are currently logged in as **${profile.email}**. How may I assist you today?`;
             }
-            return `I don't have your full name on record yet, but you're logged in! Would you like to tell me your name so I can address you properly?`;
+            return `Your full name is not yet on record, but your session is active. You can update your profile to ensure I address you correctly.`;
         }
 
         // "What is my personality" / "my style"
         if (q.includes('my personality') || q.includes('my style') || q.includes('my type')) {
             if (profile?.personalityStyle) {
-                return `Based on your assessment, your personality style is **${profile.personalityStyle}** 🎯\n\n${profile.personalityDescription || ''}\n\nWant me to suggest careers that match your personality?`;
+                return `Based on your assessment, your personality style is **${profile.personalityStyle}**.\n\n${profile.personalityDescription || ''}\n\nI can suggest career paths aligned with your personality profile — just ask.`;
             }
-            return `I don't have your personality assessment yet. Have you completed the OriginBI assessment? Once you do, I can give you personalized career guidance! 📋`;
+            return `Your personality assessment has not been completed yet. Once you complete the OriginBI assessment, I can provide personalized career guidance tailored to your profile.`;
         }
 
         // "My score" / "How did I do"
         if (q.includes('my score') || q.includes('how did i do') || q.includes('my result')) {
             if (profile?.agileScore !== undefined) {
-                return `Your assessment shows an Agile Adaptability indicator. Based on this and your **${profile.personalityStyle || 'personality profile'}**, I can recommend careers that suit you best!\n\nWant to know which jobs are right for you?`;
+                return `Your assessment indicates an Agile Adaptability score. Combined with your **${profile.personalityStyle || 'personality profile'}**, I can recommend career paths that align with your strengths.\n\nWould you like to see which roles are best suited for you?`;
             }
-            return `I don't see a completed assessment for you yet. Would you like to take the assessment to get personalized career recommendations?`;
+            return `I do not have a completed assessment on record for you. Once you complete the assessment, I can provide personalized career recommendations.`;
         }
 
         // "My email" / "my account"
         if (q.includes('my email') || q.includes('my account')) {
             if (profile?.email) {
-                return `You're logged in as **${profile.email}** 📧`;
+                return `You are currently logged in as **${profile.email}**.`;
             }
-            return `I don't have your account information available. Please make sure you're logged in.`;
+            return `Your account information is not available at the moment. Please ensure you are logged in.`;
         }
 
         // "About me" / "my profile"
         if (q.includes('about me') || q.includes('my profile') || q.includes('tell me about me')) {
             if (profile) {
-                let response = `**Here's what I know about you, ${profile.name}** 📋\n\n`;
-                response += `📧 **Email**: ${profile.email}\n`;
+                let response = `**Profile Summary — ${profile.name}**\n\n`;
+                response += `**Email**: ${profile.email}\n`;
                 if (profile.personalityStyle) {
-                    response += `🎯 **Personality**: ${profile.personalityStyle}\n`;
-                    response += `   ${profile.personalityDescription || ''}\n`;
+                    response += `**Personality Style**: ${profile.personalityStyle}\n`;
+                    response += `${profile.personalityDescription || ''}\n`;
                 }
                 if (profile.assessmentStatus) {
-                    response += `📊 **Assessment**: ${profile.assessmentStatus}\n`;
+                    response += `**Assessment Status**: ${profile.assessmentStatus}\n`;
                 }
-                response += `\n*Ask me "what jobs am I eligible for?" to get personalized career recommendations!* 😊`;
+                response += `\n*You can ask "what jobs am I eligible for?" to receive personalized career recommendations.*`;
                 return response;
             }
-            return `I'd love to tell you about yourself, but I need you to complete an assessment first! Once you do, I'll have personalized insights for you.`;
+            return `I don't have enough data to display your profile yet. Please complete an assessment first, and I'll be able to provide personalized insights.`;
         }
 
         return null; // Not a personal question
@@ -360,23 +360,23 @@ export class OriIntelligenceService {
             return {
                 eligible: true,
                 score: matchingCareer.matchScore,
-                advice: `**Absolutely!** ${matchingCareer.reasoning}. Your ${profile.personalityStyle} personality gives you a **${matchingCareer.matchScore}%** match for this role. Focus on these skills: ${matchingCareer.skills.join(', ')}.`
+                advice: `**Strong Match.** ${matchingCareer.reasoning}. Your ${profile.personalityStyle} profile indicates a **${matchingCareer.matchScore}%** alignment with this role. Key skills to develop: ${matchingCareer.skills.join(', ')}.`
             };
         }
 
         // Use LLM to provide nuanced advice
         const prompt = `
-You are MITHRA, a world-class career advisor powered by AI. A user with "${profile.personalityStyle || 'undetermined'}" personality style (Behavioral Assessment Score: ${profile.agileScore || 'N/A'}) wants to know if they can pursue a career as "${jobTitle}".
+You are MITHRA, a professional career advisor integrated into the OriginBI platform. A user with "${profile.personalityStyle || 'undetermined'}" personality style (Behavioral Assessment Score: ${profile.agileScore || 'N/A'}) wants to know if they can pursue a career as "${jobTitle}".
 
-Provide a thoughtful, encouraging but honest assessment:
-1. Start with whether this is a GREAT fit, GOOD fit, or GROWTH OPPORTUNITY for their personality type
+Provide a professional, honest, and encouraging assessment:
+1. Start with whether this is a STRONG FIT, GOOD FIT, or DEVELOPMENT OPPORTUNITY for their personality type
 2. Explain WHY based on their personality traits
 3. List 3-4 specific skills they should develop
 4. Suggest 2-3 concrete first steps to get started
 5. If it's a stretch role, suggest 1-2 stepping-stone roles
 
-Keep the tone warm, encouraging, and mentor-like. Use markdown formatting.
-Keep response under 200 words. Be specific and actionable.
+Keep the tone professional, supportive, and advisory. Use markdown formatting.
+Keep response under 200 words. Be specific and actionable. Do not use excessive emojis.
 `;
 
         try {
@@ -390,7 +390,7 @@ Keep response under 200 words. Be specific and actionable.
             return {
                 eligible: true,
                 score: 65,
-                advice: `While ${jobTitle} might be a stretch from your current profile, every career path is possible with dedication! Let me suggest some stepping stones to get there.`
+                advice: `While ${jobTitle} may require additional development beyond your current profile, it remains achievable with the right preparation. I recommend exploring stepping-stone roles that build the necessary skills progressively.`
             };
         }
     }
@@ -403,10 +403,10 @@ Keep response under 200 words. Be specific and actionable.
         profile: UserProfile | null,
         conversationContext: string
     ): Promise<string> {
-        const userName = profile?.name || 'friend';
-        const personality = profile?.personalityStyle || 'not assessed yet';
+        const userName = profile?.name || 'there';
+        const personality = profile?.personalityStyle || 'not yet assessed';
 
-        const systemPrompt = `You are **MITHRA** (OriginBI Intelligent Assistant) — an elite AI career advisor and knowledge expert, similar to JARVIS from Iron Man. You are the world-class AI assistant built into the OriginBI platform.
+        const systemPrompt = `You are **MITHRA** (OriginBI Intelligent Assistant) — a professional career advisor and knowledge expert. You are the intelligent assistant built into the OriginBI platform.
 
 ═══════════════════════════════════════════════════
 USER CONTEXT
@@ -488,8 +488,8 @@ CRITICAL RULES
 2. **FOLLOW FLOW**: Maintain conversation continuity. Answer follow-ups based on previous topics.
 3. **COMPLETE ANSWERS**: NEVER cut off mid-sentence or use "..." to truncate.
 4. **NO DATABASE REFERENCES**: You are answering as a knowledge expert. Do NOT mention databases, SQL, tables, or platform internals.
-5. **FRIENDLY TONE**: Be warm, encouraging, and professional — like a senior mentor who genuinely cares.
-6. **USE EMOJIS SPARINGLY**: A few emojis for section headers are fine (🎯, 📚, 💡, 🚀) but don't overdo it.
+5. **PROFESSIONAL TONE**: Be confident, articulate, and advisory — like a senior career consultant. Avoid being casual or chatty.
+6. **MINIMAL EMOJIS**: Do NOT use emojis in the response body. Keep the output clean and professional.
 
 Now answer the user's question comprehensively:`;
 
@@ -501,7 +501,7 @@ Now answer the user's question comprehensively:`;
             return response.content.toString();
         } catch (error) {
             this.logger.error(`LLM error: ${error.message}`);
-            return `I'd love to help with that, ${userName}! Let me think... Could you tell me a bit more about what you're looking for? I want to give you the best advice possible. 💡`;
+            return `I'm unable to generate a detailed response at the moment. Could you provide a bit more context about what you're looking for? That will help me give you the most relevant guidance.`;
         }
     }
 
@@ -520,7 +520,7 @@ Now answer the user's question comprehensively:`;
 
         // "What jobs am I eligible for?"
         if (q.includes('eligible') || q.includes('jobs for me') || q.includes('suitable') || q.includes('fit for')) {
-            let response = `**Hey ${name}!** 🌟 Based on your ${profile?.personalityStyle || 'profile'}, here are careers that suit you perfectly:\n\n`;
+            let response = `**Career Recommendations for ${name}**\n\nBased on your **${profile?.personalityStyle || 'profile'}**, the following roles align well with your strengths:\n\n`;
 
             eligibleCareers.slice(0, 4).forEach((career, i) => {
                 const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '•';
@@ -529,7 +529,7 @@ Now answer the user's question comprehensively:`;
                 response += `   Skills to develop: ${career.skills.join(', ')}\n\n`;
             });
 
-            response += `\n*Want me to dive deeper into any of these? Just ask!* 😊`;
+            response += `\n*For a deeper analysis on any of these roles, feel free to ask.*`;
             return response;
         }
 
@@ -544,7 +544,7 @@ Now answer the user's question comprehensively:`;
         // Higher studies
         if (q.includes('higher studies') || q.includes('masters') || q.includes('mba') || q.includes('further studies') || q.includes('education')) {
             const recommendations = this.getHigherStudiesRecommendations(profile!);
-            let response = `**${name}, great question!** 📚 Higher education can accelerate your career. Based on your ${profile?.personalityStyle || 'profile'}:\n\n`;
+            let response = `**Higher Education Recommendations for ${name}**\n\nBased on your **${profile?.personalityStyle || 'profile'}**, the following programs could accelerate your career trajectory:\n\n`;
 
             recommendations.forEach((rec, i) => {
                 const num = i + 1;
@@ -556,7 +556,7 @@ Now answer the user's question comprehensively:`;
                 response += '\n';
             });
 
-            response += `\n*Would you like me to explain why any of these would be perfect for you?* 🎓`;
+            response += `\n*I can provide a more detailed analysis on any of these options — just ask.*`;
             return response;
         }
 

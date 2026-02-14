@@ -621,7 +621,7 @@ RULES:
     let compositeScore = Math.round(rawScore * confidenceMultiplier * 10) / 10;
 
     // ── ADVANCED ADJUSTMENTS ──
-    
+
     // 1. Industry-specific calibration
     const industryBonus = this.calculateIndustryAlignment(vector, requirements);
     compositeScore = Math.min(100, compositeScore + industryBonus);
@@ -645,8 +645,8 @@ RULES:
     // Determine tier
     const tier = compositeScore >= TIER_THRESHOLDS.STRONG_FIT ? 'STRONG_FIT'
       : compositeScore >= TIER_THRESHOLDS.GOOD_FIT ? 'GOOD_FIT'
-      : compositeScore >= TIER_THRESHOLDS.MODERATE_FIT ? 'MODERATE_FIT'
-      : 'DEVELOPING';
+        : compositeScore >= TIER_THRESHOLDS.MODERATE_FIT ? 'MODERATE_FIT'
+          : 'DEVELOPING';
 
     // Generate match reasons
     const matchReasons = this.generateMatchReasons(vector, requirements, bas, ars, tfs);
@@ -685,7 +685,7 @@ RULES:
     // Fuzzy match
     const key = Object.keys(PERSONALITY_VECTORS).find(
       k => styleName.toLowerCase().includes(k.toLowerCase()) ||
-           k.toLowerCase().includes(styleName.toLowerCase())
+        k.toLowerCase().includes(styleName.toLowerCase())
     );
     return key ? { ...PERSONALITY_VECTORS[key] } : { ...DEFAULT_VECTOR };
   }
@@ -720,12 +720,12 @@ RULES:
     for (const trait of requirements.requiredTraits) {
       const levelValue = trait.minLevel === 'very_high' ? 95
         : trait.minLevel === 'high' ? 80
-        : trait.minLevel === 'moderate' ? 60
-        : 40;
+          : trait.minLevel === 'moderate' ? 60
+            : 40;
 
       const importanceMultiplier = trait.importance === 'critical' ? 1.2
         : trait.importance === 'important' ? 1.0
-        : 0.8;
+          : 0.8;
 
       const scaledValue = Math.min(100, Math.round(levelValue * importanceMultiplier));
 
@@ -1339,87 +1339,130 @@ Output ONLY a JSON array:
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // RESPONSE FORMATTING — Rich markdown for chat display
+  // RESPONSE FORMATTING — Professional report for chat display
   // ═══════════════════════════════════════════════════════════════════════════
   formatMatchResultForChat(result: JDMatchResult): string {
     if (result.matchedCandidates.length === 0) {
-      return `**🎯 JD Analysis Complete for "${result.parsedRequirements.roleTitle}"**\n\n` +
-        `No candidates with completed assessments were found matching the criteria.\n\n` +
-        `**Position Requirements:**\n` +
-        `• Seniority Level: ${result.parsedRequirements.seniorityLevel}\n` +
-        `• Industry: ${result.parsedRequirements.industryContext}\n\n` +
-        `Ensure candidates have completed their behavioral assessments first.`;
+      return `🎯 **Candidate Matching Report — ${result.parsedRequirements.roleTitle}**\n\n` +
+        `No candidates with completed assessments matched the specified criteria.\n\n` +
+        `**Position Details:**\n` +
+        `• Seniority: ${result.parsedRequirements.seniorityLevel}\n` +
+        `• Industry: ${result.parsedRequirements.industryContext}\n` +
+        `• Team: ${result.parsedRequirements.teamDynamic.replace(/_/g, ' ')}\n\n` +
+        `*Please ensure candidates have completed their behavioral assessments before running a match.*`;
     }
 
     const req = result.parsedRequirements;
-    let response = `**🎯 JD-Based Candidate Matching Report**\n`;
+    const strongCount = result.matchedCandidates.filter(c => c.tier === 'STRONG_FIT').length;
+    const goodCount = result.matchedCandidates.filter(c => c.tier === 'GOOD_FIT').length;
+    const moderateCount = result.matchedCandidates.filter(c => c.tier === 'MODERATE_FIT').length;
+
+    let response = `🎯 **Candidate Matching Report**\n`;
     response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-    // ── Requirements Summary ──
-    response += `**📋 Role:** ${req.roleTitle} (${req.seniorityLevel} level)\n`;
-    response += `**🏢 Industry:** ${req.industryContext}\n`;
-    response += `**👥 Team:** ${req.teamDynamic.replace(/_/g, ' ')}\n`;
+    // ── Role Overview ──
+    response += `🏢 **Role:** ${req.roleTitle} *(${req.seniorityLevel} level)*\n`;
+    response += `📍 **Industry:** ${req.industryContext}\n`;
+    response += `👥 **Team:** ${req.teamDynamic.replace(/_/g, ' ')}\n\n`;
 
-    const roleFlags: string[] = [];
-    if (req.leadershipRequired) roleFlags.push('🏆 Leadership');
-    if (req.analyticalRequired) roleFlags.push('📊 Analytical');
-    if (req.creativityRequired) roleFlags.push('🎨 Creative');
-    if (req.customerFacing) roleFlags.push('🤝 Customer-facing');
-    if (roleFlags.length > 0) response += `**🔑 Key:** ${roleFlags.join(' | ')}\n`;
+    // ── Core Competencies ──
+    const competencies: string[] = [];
+    if (req.leadershipRequired) competencies.push('Leadership');
+    if (req.analyticalRequired) competencies.push('Analytical Thinking');
+    if (req.creativityRequired) competencies.push('Creativity');
+    if (req.customerFacing) competencies.push('Client-Facing');
+    if (req.softSkills.length > 0) competencies.push(...req.softSkills.slice(0, 3));
 
-    response += `\n**📊 ${result.totalCandidatesEvaluated} candidates evaluated** | Top ${result.matchedCandidates.length} matches\n\n`;
+    if (competencies.length > 0) {
+      response += `🔑 **Core Competencies:** ${competencies.join(' · ')}\n\n`;
+    }
 
-    response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    // ── Summary Stats ──
+    response += `📊 **${result.totalCandidatesEvaluated}** candidates evaluated → **${result.matchedCandidates.length}** top matches\n`;
+    const tierSummary: string[] = [];
+    if (strongCount > 0) tierSummary.push(`🟢 ${strongCount} Strong`);
+    if (goodCount > 0) tierSummary.push(`🔵 ${goodCount} Good`);
+    if (moderateCount > 0) tierSummary.push(`🟡 ${moderateCount} Moderate`);
+    if (tierSummary.length > 0) response += `${tierSummary.join('  •  ')}\n`;
+
+    response += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
 
     // ── Candidate Results ──
     result.matchedCandidates.forEach((sc, index) => {
-      const tierEmoji = sc.tier === 'STRONG_FIT' ? '🟢'
+      const tierDot = sc.tier === 'STRONG_FIT' ? '🟢'
         : sc.tier === 'GOOD_FIT' ? '🔵'
-        : sc.tier === 'MODERATE_FIT' ? '🟡'
-        : '🟠';
+          : sc.tier === 'MODERATE_FIT' ? '🟡'
+            : '🟠';
 
-      const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `**#${index + 1}**`;
+      const tierLabel = sc.tier === 'STRONG_FIT' ? 'Strong Fit'
+        : sc.tier === 'GOOD_FIT' ? 'Good Fit'
+          : sc.tier === 'MODERATE_FIT' ? 'Moderate Fit'
+            : 'Developing';
 
-      response += `\n${medal} **${sc.candidate.fullName}** ${tierEmoji} ${sc.tier.replace(/_/g, ' ')}\n`;
-      response += `   📊 **Match Score: ${sc.compositeScore}/100** | Confidence: ${sc.confidenceLevel}%\n`;
+      const rank = index + 1;
+      const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
+
+      response += `\n${medal} **${sc.candidate.fullName}** ${tierDot} *${tierLabel}*\n\n`;
+
+      // Core metrics
+      response += `**Match Score: ${sc.compositeScore}/100** · Confidence: ${sc.confidenceLevel}%\n`;
 
       if (sc.candidate.personalityStyle) {
-        response += `   🧬 **Leadership Style:** ${sc.candidate.personalityStyle}\n`;
+        response += `**Behavioral Profile:** ${sc.candidate.personalityStyle}\n`;
       }
 
-      // Show success prediction and retention risk
-      if (sc.successPrediction !== undefined) {
-        const predictionEmoji = sc.successPrediction >= 80 ? '🎯' : sc.successPrediction >= 65 ? '📈' : '📊';
-        response += `   ${predictionEmoji} **Success Likelihood:** ${sc.successPrediction}%`;
-        if (sc.retentionRisk) {
-          const riskEmoji = sc.retentionRisk === 'LOW' ? '✅' : sc.retentionRisk === 'MEDIUM' ? '⚠️' : '🔴';
-          response += ` | **Retention:** ${riskEmoji} ${sc.retentionRisk}`;
+      // Predictions
+      if (sc.successPrediction !== undefined || sc.teamFitScore !== undefined) {
+        response += `\n**Predictions:**\n`;
+        if (sc.successPrediction !== undefined) {
+          response += `• Success Rate — **${sc.successPrediction}%**`;
+          if (sc.retentionRisk) {
+            const riskIcon = sc.retentionRisk === 'LOW' ? '✅' : sc.retentionRisk === 'MEDIUM' ? '⚠️' : '🔴';
+            response += `  ·  Retention Risk — ${riskIcon} ${sc.retentionRisk}`;
+          }
+          response += '\n';
         }
-        response += '\n';
+        if (sc.teamFitScore !== undefined) {
+          response += `• Team Compatibility — **${sc.teamFitScore}**/100\n`;
+        }
       }
 
-      // Match reasons - make it more professional
+      // Match strengths
       if (sc.matchReasons.length > 0) {
-        response += `   ✓ ${sc.matchReasons.slice(0, 2).join('\n   ✓ ')}\n`;
+        response += `\n**Key Strengths:**\n`;
+        sc.matchReasons.slice(0, 3).forEach(reason => {
+          response += `✓ ${reason}\n`;
+        });
       }
 
-      // AI Insights - more prominent
+      // AI Insights
       if (sc.insights.length > 0) {
-        response += `\n   **Assessment:** *${sc.insights[0]}*\n`;
+        response += `\n💡 *${sc.insights[0]}*\n`;
         if (sc.insights.length > 1) {
-          response += `   **Recommendation:** *${sc.insights[1]}*\n`;
+          response += `📌 *${sc.insights[1]}*\n`;
         }
       }
 
-      // Development areas (for non-strong fits) - reframe as growth opportunities
+      // Development areas
       if (sc.developmentAreas.length > 0 && sc.tier !== 'STRONG_FIT') {
-        response += `   \n   **Development Focus:** ${sc.developmentAreas[0]}\n`;
+        response += `\n**Areas for Growth:**\n`;
+        sc.developmentAreas.slice(0, 2).forEach(area => {
+          response += `→ ${area}\n`;
+        });
+      }
+
+      if (index < result.matchedCandidates.length - 1) {
+        response += `\n──────────────────────────\n`;
       }
     });
 
     response += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    response += `\n*Analysis completed for ${result.totalCandidatesEvaluated} candidates using multi-dimensional behavioral and competency assessment.*\n`;
+    response += `*Multi-dimensional analysis of ${result.totalCandidatesEvaluated} candidates*\n`;
 
     return response;
   }
+
 }
+
+
+

@@ -239,7 +239,7 @@ export class RagService {
       // Detects pagination requests and returns the next/prev page
       // ═══════════════════════════════════════════════════════════════
       if (/^(next|more|show\s*more|next\s*\d+|see\s*more|continue|prev|previous|go\s*back)\b/i.test(normalizedQ) ||
-          /\b(next|more)\s+(\d+\s+)?(users?|candidates?|students?|results?|roles?)\b/i.test(normalizedQ)) {
+        /\b(next|more)\s+(\d+\s+)?(users?|candidates?|students?|results?|roles?)\b/i.test(normalizedQ)) {
         const pagKey = this.getPaginationKey(user);
         const pagCtx = this.paginationCache.get(pagKey);
         if (pagCtx && Date.now() - pagCtx.timestamp < this.PAGINATION_EXPIRY) {
@@ -270,8 +270,8 @@ export class RagService {
             intent: pagCtx.intent,
             searchTerm: null as string | null,
             table: pagCtx.intent === 'list_users' ? 'users' :
-                   pagCtx.intent === 'list_candidates' ? 'registrations' :
-                   pagCtx.intent === 'career_roles' ? 'career_roles' : 'assessment_attempts',
+              pagCtx.intent === 'list_candidates' ? 'registrations' :
+                pagCtx.intent === 'career_roles' ? 'career_roles' : 'assessment_attempts',
             includePersonality: ['test_results', 'best_performer'].includes(pagCtx.intent),
           };
           const data = await this.executeQuery(interpretation, user as UserContext, offset);
@@ -510,7 +510,7 @@ export class RagService {
       if ((!user || user.id === 0) && (user?.role === 'STUDENT' || !user?.role)) {
         this.logger.log('🔒 RBAC: Anonymous user detected — prompting to log in');
         return {
-          answer: '👋 Welcome to MITHRA! To access your personalized data and results, please log in first. If you have any general career questions, feel free to ask!',
+          answer: 'Welcome to MITHRA. To access your personalized data and results, please log in first. If you have any general career questions, feel free to ask.',
           searchType: 'auth_required',
           confidence: 1.0,
         };
@@ -602,7 +602,7 @@ export class RagService {
     } catch (error) {
       this.logger.error(`❌ Error: ${error.message}`);
       return {
-        answer: `Sorry, I couldn't process that. Try: "list users", "test results", or "show [person name]'s score"`,
+        answer: `I was unable to process that request. You can try queries like: "list users", "test results", or "show [person name]'s score".`,
         searchType: 'error',
         confidence: 0,
       };
@@ -1092,7 +1092,7 @@ export class RagService {
         /experience[:\s]*(\d+)/i,
       ]);
       const yearsOfExperience = parseInt(yearsStr) || 0;
-5
+      5
       const relevantExperience = extractField([
         /relevant\s*experience[:\s\(]*([^\n\)]+)/i,
         /key\s*focus\s*areas?[:\s]*([^\n]+)/i,
@@ -1153,7 +1153,7 @@ export class RagService {
 
       if (!jobDescription || jobDescription.length < 20) {
         return {
-          answer: `**🎯 JD Candidate Matching**\n\nTo find the best candidates for a role, please provide a job description. You can:\n\n**Option 1 — Paste a full JD:**\n\`\`\`\nFind candidates for:\nJob Title: Senior Software Engineer\nResponsibilities: Lead backend development...\nRequirements: 5+ years experience, strong leadership...\n\`\`\`\n\n**Option 2 — Describe the role:**\n• "Find candidates suitable for a project manager role requiring leadership, analytical thinking, and team collaboration"\n• "Who is best suited for a customer success manager who needs empathy, communication, and adaptability?"\n• "Match candidates for: Senior Data Analyst - needs strong analytical skills, attention to detail, works independently"\n\nThe more detail you provide, the more accurate the matching will be!`,
+          answer: `**JD Candidate Matching**\n\nTo identify the best-suited candidates for a role, please provide a job description.\n\n**Option 1 — Paste a full JD:**\n\`\`\`\nFind candidates for:\nJob Title: Senior Software Engineer\nResponsibilities: Lead backend development...\nRequirements: 5+ years experience, strong leadership...\n\`\`\`\n\n**Option 2 — Describe the role naturally:**\n- "Find candidates suitable for a project manager role requiring leadership, analytical thinking, and team collaboration"\n- "Who is best suited for a customer success manager who needs empathy, communication, and adaptability?"\n- "Match candidates for: Senior Data Analyst — strong analytical skills, attention to detail, works independently"\n\nThe more detail you provide, the more precise the matching will be.`,
           searchType: 'jd_candidate_match',
           confidence: 0.5,
         };
@@ -1179,7 +1179,7 @@ export class RagService {
     } catch (error) {
       this.logger.error(`JD Matching error: ${error.message}`);
       return {
-        answer: `**❌ Error during JD matching:** ${error.message}\n\nPlease try again with a clearer job description.`,
+        answer: `**Error during JD matching:** ${error.message}\n\nPlease try again with a more detailed job description.`,
         searchType: 'error',
         confidence: 0,
       };
@@ -1258,7 +1258,7 @@ export class RagService {
     // ── LLM call with compact prompt (~400 tokens instead of ~1200) ──
     const roleHint = userRole === 'ADMIN' ? 'ADMIN(full access)'
       : userRole === 'CORPORATE' ? 'CORPORATE(company-scoped)'
-      : 'STUDENT(personal only)';
+        : 'STUDENT(personal only)';
 
     const prompt = `You are an intent classifier for OriginBI, a career assessment platform. Your job is to classify user questions into the correct intent for routing.
 
@@ -1357,11 +1357,11 @@ JSON:`;
     // JD CANDIDATE MATCHING — detect when user provides a job description
     // ═══════════════════════════════════════════════════════════════
     if (/\b(find|match|search|identify|list|show|get|who)\b.*\b(candidates?|people|users?|suitable|suited)\b.*\b(for|matching|that\s+match|who\s+fit)\b/i.test(q) ||
-        /\b(job\s*description|jd)\s*[:\-]/i.test(q) ||
-        /\b(suitable|best|ideal|right)\s+(candidates?|people|users?)\s+(for|to)\b/i.test(q) ||
-        /\bwho\s+(is|are)\s+(best\s+)?(suitable|fit|suited|right|ideal)\s+(for|candidate)\b/i.test(q) ||
-        /\b(match|find)\s+(candidates?|people)\s+(for|to|based\s+on)\s+.*\b(role|position|job|description)\b/i.test(q) ||
-        /\bcandidates?\s+(for|matching|suited\s+for)\s*[:\-]?\s*.{20,}/i.test(q)) {
+      /\b(job\s*description|jd)\s*[:\-]/i.test(q) ||
+      /\b(suitable|best|ideal|right)\s+(candidates?|people|users?)\s+(for|to)\b/i.test(q) ||
+      /\bwho\s+(is|are)\s+(best\s+)?(suitable|fit|suited|right|ideal)\s+(for|candidate)\b/i.test(q) ||
+      /\b(match|find)\s+(candidates?|people)\s+(for|to|based\s+on)\s+.*\b(role|position|job|description)\b/i.test(q) ||
+      /\bcandidates?\s+(for|matching|suited\s+for)\s*[:\-]?\s*.{20,}/i.test(q)) {
       return { intent: 'jd_candidate_match', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
     }
 
@@ -1438,13 +1438,13 @@ JSON:`;
 
     // "what is X", "what are X", "what does X mean"
     if (/^(what|who|why|when|where)\s+(is|are|does|do|was|were|would|could|should|can|will)\b/.test(q) &&
-        !/\b(my |user|candidate|registration|result|score|attempt|corporate|list|show|get|count|how many)\b/.test(q)) {
+      !/\b(my |user|candidate|registration|result|score|attempt|corporate|list|show|get|count|how many)\b/.test(q)) {
       return { intent: 'general_knowledge', searchTerm: null, table: 'none', includePersonality: false };
     }
 
     // "how to become", "how to learn", "how to get", "how do I", "how can I"
     if (/^how\s+(to|do|can|should|would|could)\b/.test(q) &&
-        !/\b(my result|my score|list|candidate|user|database|count|test result)\b/.test(q)) {
+      !/\b(my result|my score|list|candidate|user|database|count|test result)\b/.test(q)) {
       return { intent: 'general_knowledge', searchTerm: null, table: 'none', includePersonality: false };
     }
 
@@ -1460,19 +1460,19 @@ JSON:`;
 
     // "explain X", "tell me about X" (general topics, not person/data)
     if (/^(explain|describe|define)\s+/.test(q) ||
-        (/\btell\s+me\s+about\b/.test(q) && !/\b(my|his|her|their|candidate|user|\w+'s)\b/.test(q))) {
+      (/\btell\s+me\s+about\b/.test(q) && !/\b(my|his|her|their|candidate|user|\w+'s)\b/.test(q))) {
       return { intent: 'general_knowledge', searchTerm: null, table: 'none', includePersonality: false };
     }
 
     // "difference between X and Y", "X vs Y", "compare X and Y" (conceptual)
     if (/\b(difference\s+between|vs\.?|versus|compare|comparison)\b/.test(q) &&
-        !/\b(candidate|user|score|result|name)\b/.test(q)) {
+      !/\b(candidate|user|score|result|name)\b/.test(q)) {
       return { intent: 'general_knowledge', searchTerm: null, table: 'none', includePersonality: false };
     }
 
     // Technology / tool / framework / language questions
     if (/\b(python|java|javascript|typescript|react|angular|vue|node|docker|kubernetes|aws|azure|gcp|sql|mongodb|machine\s*learning|deep\s*learning|ai|artificial\s*intelligence|data\s*science|devops|cloud|blockchain|cybersecurity|frontend|backend|full\s*stack|web\s*development|mobile\s*development|software\s*engineering|programming|coding)\b/.test(q) &&
-        !/\b(my|score|result|candidate|user|list|show|count)\b/.test(q)) {
+      !/\b(my|score|result|candidate|user|list|show|count)\b/.test(q)) {
       return { intent: 'general_knowledge', searchTerm: null, table: 'none', includePersonality: false };
     }
 
@@ -1483,7 +1483,7 @@ JSON:`;
 
     // "what courses", "recommend courses", "suggest courses", "learning path"
     if (/\b(course|tutorial|certification|learning\s*path|study\s*plan|curriculum|syllabus|book|resource|training|bootcamp|workshop)\b/.test(q) &&
-        !/\b(my|result|candidate|user|list|show|count|assessment)\b/.test(q)) {
+      !/\b(my|result|candidate|user|list|show|count|assessment)\b/.test(q)) {
       return { intent: 'general_knowledge', searchTerm: null, table: 'none', includePersonality: false };
     }
 
