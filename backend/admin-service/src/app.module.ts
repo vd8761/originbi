@@ -18,6 +18,7 @@ import { MailAssetsController } from './mail/mail-assets.controller';
 import { HealthController } from './health.controller';
 import { KeepAliveModule } from './keepalive/keepalive.module';
 import { AdministratorCounsellingModule } from './counselling/counselling.module';
+import { AffiliatesModule } from './affiliates/affiliates.module';
 
 @Module({
   imports: [
@@ -107,6 +108,7 @@ import { AdministratorCounsellingModule } from './counselling/counselling.module
     RagModule,
     KeepAliveModule,
     AdministratorCounsellingModule,
+    AffiliatesModule,
   ],
   controllers: [TestController, MailAssetsController, HealthController],
 })
