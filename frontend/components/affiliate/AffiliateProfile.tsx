@@ -144,66 +144,7 @@ const AffiliateProfile: React.FC = () => {
                 </div>
             </div>
 
-            {/* Performance Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                {[
-                    { label: 'Total Earnings', value: `₹${data.totalEarnings.toLocaleString('en-IN')}`, color: '#150089' },
-                    { label: 'Total Referrals', value: data.totalReferrals.toString(), color: '#0EA5E9' },
-                    { label: 'Conversion Rate', value: `${data.conversionRate}%`, color: '#1ED36A' },
-                    { label: 'Active Since', value: data.joinedDate, color: '#F59E0B' },
-                ].map((stat, i) => (
-                    <div key={i} className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-8 border border-[#E0E0E0] dark:border-white/10 shadow-sm">
-                        <div className="flex justify-between items-start mb-3">
-                            <span className="text-[clamp(14px,1vw,16px)] text-[#19211C] dark:text-white font-normal">{stat.label}</span>
-                            <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: stat.color }}>
-                                <svg width="60%" height="60%" viewBox="0 0 24 24" fill="none"><path d="M7 17L17 7M17 7H7M17 7V17" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                            </div>
-                        </div>
-                        <span className="text-[clamp(32px,2.5vw,48px)] font-medium text-[#150089] dark:text-white leading-none">{stat.value}</span>
-                    </div>
-                ))}
-            </div>
-
-            {/* Recent Activity */}
-            <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] border border-[#E0E0E0] dark:border-white/10 overflow-hidden shadow-sm mb-8">
-                <div className="flex justify-between items-center p-6">
-                    <h3 className="font-semibold text-[clamp(16px,1.04vw,20px)] text-[#19211C] dark:text-white leading-none">Recent Activity</h3>
-                </div>
-
-                <div className="w-full overflow-x-auto">
-                    <table className="w-full min-w-[600px]">
-                        <thead>
-                            <tr className="bg-[#EAEAEA] dark:bg-white/5">
-                                <th className="text-left py-3 pl-6 pr-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[20%]">Date</th>
-                                <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[50%]">Activity</th>
-                                <th className="text-center py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[15%]">Type</th>
-                                <th className="text-right py-3 pl-4 pr-6 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[15%]">Impact</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#F5F5F5] dark:divide-white/5">
-                            {[
-                                { date: '16 Feb 2026', activity: 'Pinnacle HR signed up via your referral link', type: 'Referral', impact: '+₹2,000' },
-                                { date: '14 Feb 2026', activity: 'Global Edu Services upgraded to Enterprise plan', type: 'Conversion', impact: '+₹7,500' },
-                                { date: '12 Feb 2026', activity: 'Reached 5 referrals milestone bonus', type: 'Milestone', impact: '+₹3,000' },
-                                { date: '10 Feb 2026', activity: 'Digital Academy completed onboarding', type: 'Referral', impact: '+₹3,500' },
-                                { date: '08 Feb 2026', activity: 'TechCorp Solutions purchased Enterprise plan', type: 'Conversion', impact: '+₹5,000' },
-                            ].map((item, i) => (
-                                <tr key={i} className="group hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                                    <td className="py-3.5 pl-6 pr-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{item.date}</td>
-                                    <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{item.activity}</td>
-                                    <td className="py-3.5 px-4 text-center">
-                                        <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold ${item.type === 'Conversion' ? 'bg-[#1ED36A]/10 text-[#1ED36A] border border-[#1ED36A]/20' :
-                                            item.type === 'Milestone' ? 'bg-yellow-500/10 text-yellow-600 border border-yellow-500/20' :
-                                                'bg-blue-500/10 text-blue-500 border border-blue-500/20'
-                                            }`}>{item.type}</span>
-                                    </td>
-                                    <td className="py-3.5 pl-4 pr-6 text-right font-semibold text-[clamp(14px,1.1vw,17px)] text-[#1ED36A] leading-none">{item.impact}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            {/* Removed Performance Summary Cards and Recent Activity Table as per user request */}
 
             {/* Footer */}
             <div className="mt-12 border-t border-gray-200 dark:border-white/5 pt-6 flex flex-col sm:flex-row justify-between text-[clamp(13px,1vw,15px)] font-medium items-center gap-4">

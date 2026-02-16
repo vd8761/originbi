@@ -8,13 +8,12 @@ interface Transaction {
     id: string;
     date: string;
     description: string;
-    referral: string;
+    paymentMode: string;
     amount: number;
-    status: 'completed' | 'pending' | 'processing';
 }
 
 // --- Sub Components ---
-const EarningStat = ({ label, value, trend, isPositive, icon }: { label: string; value: string; trend?: string; isPositive?: boolean; icon: React.ReactNode }) => (
+const EarningStat = ({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) => (
     <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-8 border border-[#E0E0E0] dark:border-white/10 font-['Haskoy'] shadow-sm">
         <div className="flex justify-between items-start mb-4">
             <span className="text-[clamp(14px,1vw,16px)] text-[#19211C] dark:text-white font-normal">{label}</span>
@@ -25,23 +24,17 @@ const EarningStat = ({ label, value, trend, isPositive, icon }: { label: string;
         <div className="flex flex-row items-baseline gap-3">
             <span className="text-[clamp(32px,2.5vw,48px)] font-medium text-[#150089] dark:text-white leading-none">{value}</span>
         </div>
-        {trend && (
-            <div className="flex items-center gap-2 mt-3">
-                <span className={`text-[clamp(14px,1vw,16px)] font-semibold flex items-center gap-1.5 ${isPositive ? 'text-[#1ED36A]' : 'text-[#FF5457]'}`}>
-                    {trend}
-                    {isPositive ? <TrendUpIcon /> : <TrendDownIcon />}
-                </span>
-                <span className="text-[clamp(12px,0.8vw,14px)] font-normal text-[#19211C] dark:text-white opacity-80">
-                    vs last month
-                </span>
-            </div>
-        )}
     </div>
 );
 
 // --- Earnings Chart (Large version) ---
 const LargeEarningsChart = () => {
     const chartData = [
+        { label: 'Mar', earned: 9000, pending: 2000 },
+        { label: 'Apr', earned: 11000, pending: 2500 },
+        { label: 'May', earned: 10000, pending: 2200 },
+        { label: 'Jun', earned: 13000, pending: 3000 },
+        { label: 'Jul', earned: 14000, pending: 3100 },
         { label: 'Aug', earned: 8000, pending: 2000 },
         { label: 'Sep', earned: 12000, pending: 3000 },
         { label: 'Oct', earned: 18000, pending: 5000 },
@@ -120,42 +113,30 @@ const LargeEarningsChart = () => {
 };
 
 // --- Transaction Status Badge ---
-const txnStatusBadge = (status: string) => {
-    switch (status) {
-        case 'completed':
-            return <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-[#1ED36A]/10 text-[#1ED36A] border border-[#1ED36A]/20">Completed</span>;
-        case 'processing':
-            return <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-500 border border-blue-500/20">Processing</span>;
-        case 'pending':
-            return <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-yellow-500/10 text-yellow-600 border border-yellow-500/20">Pending</span>;
-        default:
-            return null;
-    }
-};
+
 
 // --- Main Component ---
 const AffiliateEarnings: React.FC = () => {
     const transactions: Transaction[] = [
-        { id: '1', date: '16 Feb 2026', description: 'Commission - Pro Plan', referral: 'Pinnacle HR', amount: 2000, status: 'completed' },
-        { id: '2', date: '14 Feb 2026', description: 'Commission - Enterprise Plan', referral: 'Global Edu Services', amount: 7500, status: 'completed' },
-        { id: '3', date: '12 Feb 2026', description: 'Bonus - 5 Referrals Milestone', referral: '—', amount: 3000, status: 'processing' },
-        { id: '4', date: '10 Feb 2026', description: 'Commission - Business Plan', referral: 'Digital Academy', amount: 3500, status: 'completed' },
-        { id: '5', date: '08 Feb 2026', description: 'Commission - Enterprise Plan', referral: 'TechCorp Solutions', amount: 5000, status: 'completed' },
-        { id: '6', date: '05 Feb 2026', description: 'Commission - Pro Plan', referral: 'Bright Minds Edu', amount: 4200, status: 'completed' },
-        { id: '7', date: '02 Feb 2026', description: 'Commission - Business Plan', referral: 'Apex Recruiters', amount: 1800, status: 'pending' },
-        { id: '8', date: '25 Jan 2026', description: 'Commission - Enterprise Plan', referral: 'CloudBridge Inc', amount: 6000, status: 'completed' },
+        { id: '1', date: '16 Feb 2026', description: 'Commission - Pro Plan', paymentMode: 'Bank Transfer', amount: 2000 },
+        { id: '2', date: '14 Feb 2026', description: 'Commission - Enterprise Plan', paymentMode: 'UPI', amount: 7500 },
+        { id: '3', date: '12 Feb 2026', description: 'Bonus - 5 Referrals Milestone', paymentMode: 'Wallet', amount: 3000 },
+        { id: '4', date: '10 Feb 2026', description: 'Commission - Business Plan', paymentMode: 'Bank Transfer', amount: 3500 },
+        { id: '5', date: '08 Feb 2026', description: 'Commission - Enterprise Plan', paymentMode: 'UPI', amount: 5000 },
+        { id: '6', date: '05 Feb 2026', description: 'Commission - Pro Plan', paymentMode: 'Wallet', amount: 4200 },
+        { id: '7', date: '02 Feb 2026', description: 'Commission - Business Plan', paymentMode: 'Bank Transfer', amount: 1800 },
+        { id: '8', date: '25 Jan 2026', description: 'Commission - Enterprise Plan', paymentMode: 'UPI', amount: 6000 },
     ];
 
     // --- Export CSV ---
     const handleExportCSV = () => {
-        const headers = ["Date", "Description", "Referral", "Status", "Amount"];
+        const headers = ["Date", "Description", "Payment Mode", "Total Amount"];
         const csvContent = [
             headers.join(","),
             ...transactions.map(txn => [
                 txn.date,
                 `"${txn.description}"`, // Quote description to handle commas
-                txn.referral,
-                txn.status,
+                txn.paymentMode,
                 txn.amount
             ].join(","))
         ].join("\n");
@@ -180,33 +161,20 @@ const AffiliateEarnings: React.FC = () => {
             </div>
 
             {/* Stats Row — Matching corporate MiniStat layout */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <EarningStat
                     label="Total Earned"
                     value="₹95,000"
-                    trend="18%"
-                    isPositive={true}
                     icon={<svg className="w-5 h-5 text-[#150089] dark:text-[#1ED36A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>}
                 />
                 <EarningStat
-                    label="This Month"
-                    value="₹28,000"
-                    trend="24%"
-                    isPositive={true}
-                    icon={<svg className="w-5 h-5 text-[#150089] dark:text-[#1ED36A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>}
-                />
-                <EarningStat
-                    label="Pending Payout"
+                    label="Total Pending"
                     value="₹8,000"
-                    trend="5%"
-                    isPositive={false}
                     icon={<svg className="w-5 h-5 text-[#150089] dark:text-[#1ED36A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>}
                 />
                 <EarningStat
-                    label="Settled Down"
+                    label="Total Settled"
                     value="₹67,000"
-                    trend="12%"
-                    isPositive={true}
                     icon={<svg className="w-5 h-5 text-[#150089] dark:text-[#1ED36A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
                 />
             </div>
@@ -216,72 +184,39 @@ const AffiliateEarnings: React.FC = () => {
                 <LargeEarningsChart />
             </div>
 
-            {/* Payout Card + Transaction Table */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
-                {/* Payout Info */}
-                <div className="lg:col-span-4">
-                    <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-8 border border-[#E0E0E0] dark:border-white/10 shadow-sm h-full flex flex-col justify-between">
-                        <div>
-                            <h3 className="font-semibold text-[clamp(16px,1.04vw,20px)] text-[#19211C] dark:text-white leading-none mb-6">Payout Details</h3>
-                            <div className="space-y-4">
-                                <div className="bg-[#FAFAFA] dark:bg-white/5 rounded-xl px-4 py-3 border border-[#E0E0E0] dark:border-white/10">
-                                    <div className="text-[clamp(11px,0.73vw,13px)] text-[#19211C] dark:text-white opacity-60 mb-1 font-normal">Bank Account</div>
-                                    <div className="text-[clamp(14px,1vw,16px)] font-medium text-[#19211C] dark:text-white">HDFC Bank •••• 4521</div>
-                                </div>
-                                <div className="bg-[#FAFAFA] dark:bg-white/5 rounded-xl px-4 py-3 border border-[#E0E0E0] dark:border-white/10">
-                                    <div className="text-[clamp(11px,0.73vw,13px)] text-[#19211C] dark:text-white opacity-60 mb-1 font-normal">UPI ID</div>
-                                    <div className="text-[clamp(14px,1vw,16px)] font-medium text-[#19211C] dark:text-white">affiliate@upi</div>
-                                </div>
-                                <div className="bg-[#FAFAFA] dark:bg-white/5 rounded-xl px-4 py-3 border border-[#E0E0E0] dark:border-white/10">
-                                    <div className="text-[clamp(11px,0.73vw,13px)] text-[#19211C] dark:text-white opacity-60 mb-1 font-normal">Next Payout</div>
-                                    <div className="text-[clamp(14px,1vw,16px)] font-medium text-[#1ED36A]">28 Feb 2026</div>
-                                </div>
-                            </div>
-                        </div>
-                        <button className="mt-6 w-full font-medium text-[clamp(16px,1vw,18px)] text-white bg-[#1ED36A] hover:bg-[#16b058] py-3.5 rounded-full shadow-lg shadow-[#1ED36A]/20 transition-all">
-                            Withdraw ₹67,000
-                        </button>
-                    </div>
+            {/* Transaction History (Full Width) */}
+            <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] border border-[#E0E0E0] dark:border-white/10 overflow-hidden shadow-sm h-full flex flex-col mb-8">
+                <div className="flex justify-between items-center p-6">
+                    <h3 className="font-semibold text-[clamp(16px,1.04vw,20px)] text-[#19211C] dark:text-white leading-none">Transaction History</h3>
+                    <button
+                        onClick={handleExportCSV}
+                        className="font-medium text-[clamp(13px,1vw,15px)] text-[#1ED36A] cursor-pointer hover:underline bg-transparent border-none flex items-center gap-1"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                        Export CSV
+                    </button>
                 </div>
-
-                {/* Transaction History */}
-                <div className="lg:col-span-8">
-                    <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] border border-[#E0E0E0] dark:border-white/10 overflow-hidden shadow-sm h-full flex flex-col">
-                        <div className="flex justify-between items-center p-6">
-                            <h3 className="font-semibold text-[clamp(16px,1.04vw,20px)] text-[#19211C] dark:text-white leading-none">Transaction History</h3>
-                            <button
-                                onClick={handleExportCSV}
-                                className="font-medium text-[clamp(13px,1vw,15px)] text-[#1ED36A] cursor-pointer hover:underline bg-transparent border-none flex items-center gap-1"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                Export CSV
-                            </button>
-                        </div>
-                        <div className="w-full overflow-x-auto flex-1">
-                            <table className="w-full min-w-[700px]">
-                                <thead>
-                                    <tr className="bg-[#EAEAEA] dark:bg-white/5">
-                                        <th className="text-left py-3 pl-6 pr-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none">Date</th>
-                                        <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none">Description</th>
-                                        <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none">Referral</th>
-                                        <th className="text-center py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none">Status</th>
-                                        <th className="text-right py-3 pl-4 pr-6 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none">Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-[#F5F5F5] dark:divide-white/5">
-                                    {transactions.map((txn) => (
-                                        <tr key={txn.id} className="group hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                                            <td className="py-3.5 pl-6 pr-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{txn.date}</td>
-                                            <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{txn.description}</td>
-                                            <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{txn.referral}</td>
-                                            <td className="py-3.5 px-4 text-center">{txnStatusBadge(txn.status)}</td>
-                                            <td className="py-3.5 pl-4 pr-6 text-right font-semibold text-[clamp(14px,1.1vw,17px)] text-[#1ED36A] leading-none">+₹{txn.amount.toLocaleString('en-IN')}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                <div className="w-full overflow-x-auto flex-1">
+                    <table className="w-full min-w-[700px]">
+                        <thead>
+                            <tr className="bg-[#EAEAEA] dark:bg-white/5">
+                                <th className="text-left py-3 pl-6 pr-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none">Date</th>
+                                <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none">Description</th>
+                                <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none">Payment Mode</th>
+                                <th className="text-right py-3 pl-4 pr-6 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none">Total Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#F5F5F5] dark:divide-white/5">
+                            {transactions.map((txn) => (
+                                <tr key={txn.id} className="group hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                    <td className="py-3.5 pl-6 pr-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{txn.date}</td>
+                                    <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{txn.description}</td>
+                                    <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{txn.paymentMode}</td>
+                                    <td className="py-3.5 pl-4 pr-6 text-right font-semibold text-[clamp(14px,1.1vw,17px)] text-[#1ED36A] leading-none">+₹{txn.amount.toLocaleString('en-IN')}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 

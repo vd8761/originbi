@@ -7,11 +7,13 @@ interface Referral {
     id: string;
     name: string;
     email: string;
-    status: 'active' | 'pending' | 'converted';
-    signUpDate: string;
-    commission: number;
-    lastActivity: string;
-
+    status: 'pending' | 'converted'; // Simplified as per request: Pending Assessment / Completed Assessment
+    registeredOn: string;
+    studentBoard: string;
+    schoolLevel: string;
+    schoolStream: string;
+    commissionPercentage: number;
+    totalEarnedCommission: number;
 }
 
 // --- Sub Components ---
@@ -33,9 +35,7 @@ const StatCard = ({ label, value, subtext, color }: { label: string; value: stri
 const statusBadge = (status: string) => {
     switch (status) {
         case 'converted':
-            return <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-[#1ED36A]/10 text-[#1ED36A] border border-[#1ED36A]/20">Converted</span>;
-        case 'active':
-            return <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-500 border border-blue-500/20">Active</span>;
+            return <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-[#1ED36A]/10 text-[#1ED36A] border border-[#1ED36A]/20">Completed</span>;
         case 'pending':
             return <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-yellow-500/10 text-yellow-600 border border-yellow-500/20">Pending</span>;
         default:
@@ -48,20 +48,72 @@ const AffiliateReferrals: React.FC = () => {
     const [filterStatus, setFilterStatus] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [copied, setCopied] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
 
     const referralLink = "https://originbi.com/ref/aff_001";
 
     const allReferrals: Referral[] = [
-        { id: '1', name: 'Pinnacle HR', email: 'info@pinnaclehr.com', status: 'active', signUpDate: '16 Feb 2026', commission: 2000, lastActivity: '2 hours ago' },
-        { id: '2', name: 'Nova Tech Labs', email: 'hello@novalabs.io', status: 'pending', signUpDate: '15 Feb 2026', commission: 0, lastActivity: '1 day ago' },
-        { id: '3', name: 'Global Edu Services', email: 'contact@globaledu.com', status: 'converted', signUpDate: '14 Feb 2026', commission: 7500, lastActivity: '3 days ago' },
-        { id: '4', name: 'StartUp Hub', email: 'team@startuphub.io', status: 'pending', signUpDate: '12 Feb 2026', commission: 0, lastActivity: '5 days ago' },
-        { id: '5', name: 'Digital Academy', email: 'admin@digitala.com', status: 'active', signUpDate: '10 Feb 2026', commission: 3500, lastActivity: '1 week ago' },
-        { id: '6', name: 'TechCorp Solutions', email: 'hr@techcorp.com', status: 'converted', signUpDate: '08 Feb 2026', commission: 5000, lastActivity: '1 week ago' },
-        { id: '7', name: 'Bright Minds Edu', email: 'admin@brightminds.in', status: 'converted', signUpDate: '05 Feb 2026', commission: 4200, lastActivity: '2 weeks ago' },
-        { id: '8', name: 'Apex Recruiters', email: 'ops@apexhr.com', status: 'active', signUpDate: '02 Feb 2026', commission: 1800, lastActivity: '2 weeks ago' },
-        { id: '9', name: 'Skyline Analytics', email: 'team@skylinean.com', status: 'pending', signUpDate: '28 Jan 2026', commission: 0, lastActivity: '3 weeks ago' },
-        { id: '10', name: 'CloudBridge Inc', email: 'hello@cloudbridge.io', status: 'converted', signUpDate: '25 Jan 2026', commission: 6000, lastActivity: '3 weeks ago' },
+        {
+            id: '1',
+            name: 'Aarav Gupta',
+            email: 'aarav.g@example.com',
+            status: 'pending',
+            registeredOn: '16 Feb 2026',
+            studentBoard: 'CBSE',
+            schoolLevel: 'Grade 12',
+            schoolStream: 'Science (PCM)',
+            commissionPercentage: 10,
+            totalEarnedCommission: 0
+        },
+        {
+            id: '2',
+            name: 'Ishita Sharma',
+            email: 'ishita.s@example.com',
+            status: 'converted',
+            registeredOn: '15 Feb 2026',
+            studentBoard: 'ICSE',
+            schoolLevel: 'Grade 10',
+            schoolStream: 'N/A',
+            commissionPercentage: 15,
+            totalEarnedCommission: 1500
+        },
+        {
+            id: '3',
+            name: 'Rohan Mehta',
+            email: 'rohan.m@example.com',
+            status: 'pending',
+            registeredOn: '14 Feb 2026',
+            studentBoard: 'State Board',
+            schoolLevel: 'Grade 11',
+            schoolStream: 'Commerce',
+            commissionPercentage: 10,
+            totalEarnedCommission: 0
+        },
+        {
+            id: '4',
+            name: 'Sneha Patel',
+            email: 'sneha.p@example.com',
+            status: 'converted',
+            registeredOn: '12 Feb 2026',
+            studentBoard: 'CBSE',
+            schoolLevel: 'Grade 12',
+            schoolStream: 'Humanities',
+            commissionPercentage: 12,
+            totalEarnedCommission: 1200
+        },
+        {
+            id: '5',
+            name: 'Vivaan Singh',
+            email: 'vivaan.s@example.com',
+            status: 'converted',
+            registeredOn: '10 Feb 2026',
+            studentBoard: 'IGCSE',
+            schoolLevel: 'Grade 9',
+            schoolStream: 'N/A',
+            commissionPercentage: 15,
+            totalEarnedCommission: 2500
+        },
     ];
 
     const filteredReferrals = allReferrals.filter(r => {
@@ -70,9 +122,22 @@ const AffiliateReferrals: React.FC = () => {
         return matchesStatus && matchesSearch;
     });
 
-    const totalActive = allReferrals.filter(r => r.status === 'active').length;
+    const totalReferrals = allReferrals.length;
+    const totalCompleted = allReferrals.filter(r => r.status === 'converted').length;
     const totalPending = allReferrals.filter(r => r.status === 'pending').length;
-    const totalConverted = allReferrals.filter(r => r.status === 'converted').length;
+
+    // Pagination Logic
+    const totalPages = Math.ceil(filteredReferrals.length / itemsPerPage);
+    const paginatedReferrals = filteredReferrals.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
+
+    const handlePageChange = (page: number) => {
+        if (page >= 1 && page <= totalPages) {
+            setCurrentPage(page);
+        }
+    };
 
     const handleCopy = () => {
         navigator.clipboard.writeText(referralLink);
@@ -103,24 +168,22 @@ const AffiliateReferrals: React.FC = () => {
             </div>
 
             {/* Stats Row */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <StatCard label="Total Referrals" value={allReferrals.length.toString()} subtext="+3 this month" color="#150089" />
-                <StatCard label="Active" value={totalActive.toString()} subtext="Currently subscribed" color="#0EA5E9" />
-                <StatCard label="Pending" value={totalPending.toString()} subtext="Awaiting sign-up" color="#F59E0B" />
-                <StatCard label="Converted" value={totalConverted.toString()} subtext="Completed purchase" color="#1ED36A" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <StatCard label="Total Referrals" value={totalReferrals.toString()} subtext="All time" color="#150089" />
+                <StatCard label="Completed Assessment" value={totalCompleted.toString()} subtext="Converted users" color="#1ED36A" />
+                <StatCard label="Pending Assessment" value={totalPending.toString()} subtext="Yet to complete" color="#F59E0B" />
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex items-center gap-2 mb-6">
+            <div className="flex items-center gap-2 mb-6 flex-wrap">
                 {[
                     { label: 'All', value: 'all' },
-                    { label: 'Active', value: 'active' },
-                    { label: 'Pending', value: 'pending' },
-                    { label: 'Converted', value: 'converted' },
+                    { label: 'Pending Assessment', value: 'pending' },
+                    { label: 'Completed Assessment', value: 'converted' },
                 ].map(tab => (
                     <button
                         key={tab.value}
-                        onClick={() => setFilterStatus(tab.value)}
+                        onClick={() => { setFilterStatus(tab.value); setCurrentPage(1); }}
                         className={`px-5 py-2 rounded-full text-[clamp(13px,0.9vw,15px)] font-medium transition-all ${filterStatus === tab.value
                             ? 'bg-[#150089] text-white shadow-md'
                             : 'bg-white/60 dark:bg-white/5 text-[#19211C] dark:text-white border border-[#E0E0E0] dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/10'
@@ -135,16 +198,18 @@ const AffiliateReferrals: React.FC = () => {
             <div className="flex justify-end mb-4">
                 <button
                     onClick={() => {
-                        const headers = ["Organization", "Email", "Status", "Sign-up Date", "Last Activity", "Commission"];
+                        const headers = ["Name", "Email", "Registered On", "Student Board", "School Level", "School Stream", "Commission (%)", "Total Earned Commission"];
                         const csvContent = [
                             headers.join(","),
                             ...filteredReferrals.map(row => [
                                 `"${row.name}"`,
                                 row.email,
-                                row.status,
-                                row.signUpDate,
-                                row.lastActivity,
-                                row.commission
+                                row.registeredOn,
+                                row.studentBoard,
+                                row.schoolLevel,
+                                row.schoolStream,
+                                `${row.commissionPercentage}%`,
+                                row.totalEarnedCommission
                             ].join(","))
                         ].join("\n");
 
@@ -168,20 +233,21 @@ const AffiliateReferrals: React.FC = () => {
             {/* Referrals Table */}
             <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] border border-[#E0E0E0] dark:border-white/10 overflow-hidden font-['Haskoy'] shadow-sm mb-8">
                 <div className="w-full overflow-x-auto">
-                    <table className="w-full min-w-[900px]">
+                    <table className="w-full min-w-[1200px]">
                         <thead>
                             <tr className="bg-[#EAEAEA] dark:bg-white/5">
-                                <th className="text-left py-3 pl-6 pr-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[18%]">Organization</th>
-                                <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[18%]">Email</th>
-                                <th className="text-center py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[10%]">Status</th>
-                                <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[14%]">Sign-up Date</th>
-
-                                <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[14%]">Last Activity</th>
-                                <th className="text-right py-3 pl-4 pr-6 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[12%]">Commission</th>
+                                <th className="text-left py-3 pl-6 pr-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[12%]">Name</th>
+                                <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[15%]">Email</th>
+                                <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[10%]">Registered On</th>
+                                <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[10%]">Student Board</th>
+                                <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[10%]">School Level</th>
+                                <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[12%]">School Stream</th>
+                                <th className="text-center py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[10%]">Commission (%)</th>
+                                <th className="text-right py-3 pl-4 pr-6 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[15%]">Total Earned Commission</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#F5F5F5] dark:divide-white/5">
-                            {filteredReferrals.map((row) => (
+                            {paginatedReferrals.map((row) => (
                                 <tr key={row.id} className="group hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                                     <td className="py-3.5 pl-6 pr-4">
                                         <div className="flex items-center gap-3">
@@ -191,25 +257,79 @@ const AffiliateReferrals: React.FC = () => {
                                             <span className="font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{row.name}</span>
                                         </div>
                                     </td>
-                                    <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{row.email}</td>
-                                    <td className="py-3.5 px-4 text-center">{statusBadge(row.status)}</td>
-                                    <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{row.signUpDate}</td>
-
-                                    <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{row.lastActivity}</td>
+                                    <td className="py-3.5 px-4 font-medium text-[clamp(13px,0.9vw,15px)] text-brand-text-light-secondary dark:text-brand-text-secondary leading-none">{row.email}</td>
+                                    <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{row.registeredOn}</td>
+                                    <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{row.studentBoard}</td>
+                                    <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{row.schoolLevel}</td>
+                                    <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{row.schoolStream}</td>
+                                    <td className="py-3.5 px-4 text-center font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{row.commissionPercentage}%</td>
                                     <td className="py-3.5 pl-4 pr-6 text-right font-semibold text-[clamp(14px,1.1vw,17px)] text-[#1ED36A] leading-none">
-                                        {row.commission > 0 ? `₹${row.commission.toLocaleString('en-IN')}` : '—'}
+                                        {row.totalEarnedCommission > 0 ? `₹${row.totalEarnedCommission.toLocaleString('en-IN')}` : '—'}
                                     </td>
                                 </tr>
                             ))}
                             {filteredReferrals.length === 0 && (
                                 <tr>
-                                    <td colSpan={6} className="py-12 text-center text-[#19211C] dark:text-white opacity-50 text-[clamp(14px,1vw,16px)]">No referrals found matching your criteria</td>
+                                    <td colSpan={8} className="py-12 text-center text-[#19211C] dark:text-white opacity-50 text-[clamp(14px,1vw,16px)]">No referrals found matching your criteria</td>
                                 </tr>
                             )}
                         </tbody>
                     </table>
                 </div>
             </div>
+
+            {/* Pagination Controls */}
+            {filteredReferrals.length > 0 && (
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-xs sm:text-sm text-brand-text-light-secondary dark:text-brand-text-secondary mb-8">
+                    <div className="w-full sm:w-1/3 order-2 sm:order-1"></div>
+                    <div className="flex justify-center w-full sm:w-1/3 order-1 sm:order-2">
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => handlePageChange(currentPage - 1)}
+                                disabled={currentPage === 1}
+                                className="p-2 flex items-center justify-center text-[#19211C] dark:text-white hover:text-[#1ED36A] dark:hover:text-[#1ED36A] transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                            </button>
+
+                            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                let page = i + 1;
+                                if (totalPages > 5 && currentPage > 3) {
+                                    let start = Math.max(1, currentPage - 2);
+                                    if (start + 4 > totalPages) start = Math.max(1, totalPages - 4);
+                                    page = start + i;
+                                }
+
+                                if (page > totalPages) return null;
+
+                                return (
+                                    <button
+                                        key={page}
+                                        onClick={() => handlePageChange(page)}
+                                        className={`min-w-[32px] h-8 px-1 rounded-md font-medium text-sm flex items-center justify-center transition-all border cursor-pointer ${currentPage === page
+                                            ? "bg-[#150089] border-[#150089] text-white shadow-md"
+                                            : "bg-transparent border-[#E0E0E0] dark:border-white/10 text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/5"
+                                            }`}
+                                    >
+                                        {page}
+                                    </button>
+                                );
+                            })}
+
+                            <button
+                                onClick={() => handlePageChange(currentPage + 1)}
+                                disabled={currentPage === totalPages}
+                                className="p-2 flex items-center justify-center text-[#19211C] dark:text-white hover:text-[#1ED36A] dark:hover:text-[#1ED36A] transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div className="text-center sm:text-right w-full sm:w-1/3 order-3 font-medium text-[#19211C] dark:text-white">
+                        Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, filteredReferrals.length)} of {filteredReferrals.length} referrals
+                    </div>
+                </div>
+            )}
 
             {/* Referral Link Quick Banner */}
             <div className="bg-gradient-to-r from-[#150089] to-[#1ED36A] rounded-[32px] p-8 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">

@@ -34,6 +34,9 @@ const FormField = ({ label, value, onChange, type = "text", placeholder, disable
 
 // --- Main Component ---
 const AffiliateSettings: React.FC = () => {
+    // Tabs
+    const [activeTab, setActiveTab] = useState<'profile' | 'payout' | 'security'>('profile');
+
     // Profile
     const [fullName, setFullName] = useState('Jaya Krishna');
     const [email] = useState('jayakrishna@example.com');
@@ -42,9 +45,11 @@ const AffiliateSettings: React.FC = () => {
 
     // Payout
     const [bankName, setBankName] = useState('HDFC Bank');
+    const [accountHolderName, setAccountHolderName] = useState('Jaya Krishna');
     const [accountNumber, setAccountNumber] = useState('•••• •••• 4521');
     const [ifsc, setIfsc] = useState('HDFC0001234');
     const [upiId, setUpiId] = useState('affiliate@upi');
+    const [upiNumber, setUpiNumber] = useState('');
     const [payoutMethod, setPayoutMethod] = useState<'bank' | 'upi'>('bank');
 
     // Password
@@ -62,7 +67,7 @@ const AffiliateSettings: React.FC = () => {
     return (
         <div className="relative min-h-screen bg-transparent font-['Haskoy'] transition-colors duration-300 overflow-hidden p-4 sm:p-6 lg:p-8">
             {/* Page Header */}
-            <div className="mb-8">
+            <div className="mb-6">
                 <h1 className="text-[clamp(24px,2vw,36px)] font-bold text-[#150089] dark:text-white leading-tight">Settings</h1>
                 <p className="text-[clamp(14px,1vw,16px)] text-[#19211C] dark:text-white opacity-80 mt-1 font-normal">Manage your account preferences</p>
             </div>
@@ -75,79 +80,117 @@ const AffiliateSettings: React.FC = () => {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                {/* Profile Section */}
-                <SettingsSection
-                    title="Profile Information"
-                    icon={<svg className="w-5 h-5 text-[#150089] dark:text-[#1ED36A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>}
+            {/* Tabs */}
+            <div className="flex items-center border-b border-[#E0E0E0] dark:border-white/10 mb-8 overflow-x-auto scrollbar-hide">
+                <button
+                    onClick={() => setActiveTab('profile')}
+                    className={`px-4 py-3 mr-4 text-sm sm:text-base border-b-2 transition-colors whitespace-nowrap font-medium ${activeTab === 'profile'
+                        ? "border-[#1ED36A] text-[#150089] dark:text-[#1ED36A]"
+                        : "border-transparent text-[#19211C] dark:text-white opacity-60 hover:opacity-100"
+                        }`}
                 >
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-4 mb-6">
+                    Profile Information
+                </button>
+                <button
+                    onClick={() => setActiveTab('payout')}
+                    className={`px-4 py-3 mr-4 text-sm sm:text-base border-b-2 transition-colors whitespace-nowrap font-medium ${activeTab === 'payout'
+                        ? "border-[#1ED36A] text-[#150089] dark:text-[#1ED36A]"
+                        : "border-transparent text-[#19211C] dark:text-white opacity-60 hover:opacity-100"
+                        }`}
+                >
+                    Payout Settings
+                </button>
+                <button
+                    onClick={() => setActiveTab('security')}
+                    className={`px-4 py-3 text-sm sm:text-base border-b-2 transition-colors whitespace-nowrap font-medium ${activeTab === 'security'
+                        ? "border-[#1ED36A] text-[#150089] dark:text-[#1ED36A]"
+                        : "border-transparent text-[#19211C] dark:text-white opacity-60 hover:opacity-100"
+                        }`}
+                >
+                    Security
+                </button>
+            </div>
+
+            {/* Content */}
+            <div className="max-w-3xl">
+                {activeTab === 'profile' && (
+                    <div className="space-y-6 animate-fade-in">
+                        <div className="flex items-center gap-6 mb-8">
                             <img
-                                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=150089&color=fff&size=80`}
+                                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=150089&color=fff&size=128`}
                                 alt="Avatar"
-                                className="w-16 h-16 rounded-2xl border-2 border-[#E0E0E0] dark:border-white/10"
+                                className="w-24 h-24 rounded-full border-4 border-white dark:border-[#19211C] shadow-lg"
                             />
                             <div>
-                                <p className="font-semibold text-[clamp(16px,1.1vw,20px)] text-[#19211C] dark:text-white">{fullName}</p>
+                                <h3 className="font-bold text-[clamp(20px,1.5vw,24px)] text-[#19211C] dark:text-white">{fullName}</h3>
                                 <p className="text-[clamp(14px,1vw,16px)] text-[#19211C] dark:text-white opacity-60 font-normal">Affiliate ID: AFF_001</p>
                             </div>
                         </div>
-                        <FormField label="Full Name" value={fullName} onChange={setFullName} />
-                        <FormField label="Email Address" value={email} onChange={() => { }} type="email" disabled={true} />
-                        <FormField label="Phone Number" value={phone} onChange={setPhone} type="tel" />
-                        <FormField label="Company / Organization" value={company} onChange={setCompany} />
-                        <button onClick={() => handleSave('Profile')} className="mt-4 px-10 py-3 rounded-full font-medium text-[clamp(14px,1vw,16px)] bg-[#1ED36A] hover:bg-[#16b058] text-white shadow-lg shadow-[#1ED36A]/20 transition-all">
-                            Save Changes
-                        </button>
-                    </div>
-                </SettingsSection>
 
-                {/* Payout Settings */}
-                <SettingsSection
-                    title="Payout Settings"
-                    icon={<svg className="w-5 h-5 text-[#150089] dark:text-[#1ED36A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" /></svg>}
-                >
-                    <div className="space-y-4">
-                        {/* Method Toggle */}
-                        <div className="flex gap-2 p-1 bg-[#FAFAFA] dark:bg-white/5 rounded-xl border border-[#E0E0E0] dark:border-white/10">
-                            <button onClick={() => setPayoutMethod('bank')} className={`flex-1 py-2.5 rounded-lg text-[clamp(14px,1vw,16px)] font-medium transition-all ${payoutMethod === 'bank' ? 'bg-[#150089] text-white shadow-md' : 'text-[#19211C] dark:text-white opacity-60 hover:opacity-100'}`}>
-                                Bank Transfer
-                            </button>
-                            <button onClick={() => setPayoutMethod('upi')} className={`flex-1 py-2.5 rounded-lg text-[clamp(14px,1vw,16px)] font-medium transition-all ${payoutMethod === 'upi' ? 'bg-[#150089] text-white shadow-md' : 'text-[#19211C] dark:text-white opacity-60 hover:opacity-100'}`}>
-                                UPI
-                            </button>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField label="Full Name" value={fullName} onChange={setFullName} />
+                            <FormField label="Email Address" value={email} onChange={() => { }} type="email" disabled={true} />
+                            <FormField label="Phone Number" value={phone} onChange={setPhone} type="tel" />
+                            <FormField label="Company / Organization" value={company} onChange={setCompany} />
                         </div>
 
-                        {payoutMethod === 'bank' ? (
-                            <>
+                        <div className="pt-4">
+                            <button onClick={() => handleSave('Profile')} className="px-10 py-3 rounded-full font-medium text-[clamp(14px,1vw,16px)] bg-[#1ED36A] hover:bg-[#16b058] text-white shadow-lg shadow-[#1ED36A]/20 transition-all">
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'payout' && (
+                    <div className="space-y-8 animate-fade-in">
+                        {/* Bank Details */}
+                        <div>
+                            <h3 className="text-lg font-semibold text-[#150089] dark:text-white mb-4 border-b border-[#E0E0E0] dark:border-white/10 pb-2">
+                                Bank Details
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FormField label="Account Holder Name" value={accountHolderName} onChange={setAccountHolderName} placeholder="Name as per bank records" />
                                 <FormField label="Bank Name" value={bankName} onChange={setBankName} />
                                 <FormField label="Account Number" value={accountNumber} onChange={setAccountNumber} />
                                 <FormField label="IFSC Code" value={ifsc} onChange={setIfsc} />
-                            </>
-                        ) : (
-                            <FormField label="UPI ID" value={upiId} onChange={setUpiId} placeholder="yourname@upi" />
-                        )}
-                        <button onClick={() => handleSave('Payout settings')} className="mt-4 px-10 py-3 rounded-full font-medium text-[clamp(14px,1vw,16px)] bg-[#1ED36A] hover:bg-[#16b058] text-white shadow-lg shadow-[#1ED36A]/20 transition-all">
-                            Save Payout Details
-                        </button>
-                    </div>
-                </SettingsSection>
+                            </div>
+                        </div>
 
-                {/* Security */}
-                <SettingsSection
-                    title="Security"
-                    icon={<svg className="w-5 h-5 text-[#150089] dark:text-[#1ED36A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>}
-                >
-                    <div className="space-y-4">
-                        <FormField label="Current Password" value={currentPassword} onChange={setCurrentPassword} type="password" placeholder="Enter current password" />
-                        <FormField label="New Password" value={newPassword} onChange={setNewPassword} type="password" placeholder="Enter new password" />
-                        <FormField label="Confirm New Password" value={confirmPassword} onChange={setConfirmPassword} type="password" placeholder="Confirm new password" />
-                        <button onClick={() => handleSave('Password')} className="mt-4 px-10 py-3 rounded-full font-medium text-[clamp(14px,1vw,16px)] bg-[#1ED36A] hover:bg-[#16b058] text-white shadow-lg shadow-[#1ED36A]/20 transition-all">
-                            Update Password
-                        </button>
+                        {/* UPI Details */}
+                        <div>
+                            <h3 className="text-lg font-semibold text-[#150089] dark:text-white mb-4 border-b border-[#E0E0E0] dark:border-white/10 pb-2">
+                                UPI Details
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FormField label="UPI ID" value={upiId} onChange={setUpiId} placeholder="yourname@upi" />
+                                <FormField label="UPI Number" value={upiNumber} onChange={setUpiNumber} placeholder="Linked mobile number" />
+                            </div>
+                        </div>
+
+                        <div className="pt-4">
+                            <button onClick={() => handleSave('Payout settings')} className="px-10 py-3 rounded-full font-medium text-[clamp(14px,1vw,16px)] bg-[#1ED36A] hover:bg-[#16b058] text-white shadow-lg shadow-[#1ED36A]/20 transition-all">
+                                Save Payout Details
+                            </button>
+                        </div>
                     </div>
-                </SettingsSection>
+                )}
+
+                {activeTab === 'security' && (
+                    <div className="space-y-6 animate-fade-in">
+                        <div className="max-w-md space-y-6">
+                            <FormField label="Current Password" value={currentPassword} onChange={setCurrentPassword} type="password" placeholder="Enter current password" />
+                            <FormField label="New Password" value={newPassword} onChange={setNewPassword} type="password" placeholder="Enter new password" />
+                            <FormField label="Confirm New Password" value={confirmPassword} onChange={setConfirmPassword} type="password" placeholder="Confirm new password" />
+                        </div>
+
+                        <div className="pt-4">
+                            <button onClick={() => handleSave('Password')} className="px-10 py-3 rounded-full font-medium text-[clamp(14px,1vw,16px)] bg-[#1ED36A] hover:bg-[#16b058] text-white shadow-lg shadow-[#1ED36A]/20 transition-all">
+                                Update Password
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Footer */}
