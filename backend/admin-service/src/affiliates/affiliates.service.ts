@@ -14,6 +14,7 @@ import {
     AffiliateAccount,
 } from '@originbi/shared-entities';
 import { CreateAffiliateDto, UpdateAffiliateDto } from './dto/create-affiliate.dto';
+import { R2Service } from '../r2/r2.service';
 
 @Injectable()
 export class AffiliatesService {
@@ -29,6 +30,7 @@ export class AffiliatesService {
 
         private readonly dataSource: DataSource,
         private readonly http: HttpService,
+        private readonly r2Service: R2Service,
     ) { }
 
     // ---------------------------------------------------------
@@ -213,8 +215,8 @@ export class AffiliatesService {
                     accountNumber: dto.accountNumber ?? null,
                     ifscCode: dto.ifscCode ?? null,
                     branchName: dto.branchName ?? null,
-                    aadharUrl: dto.aadharUrl ?? null,
-                    panUrl: dto.panUrl ?? null,
+                    aadharDocuments: [],
+                    panDocuments: [],
                     isActive: true,
                     metadata: {},
                 });
@@ -309,8 +311,8 @@ export class AffiliatesService {
                 account_number: a.accountNumber,
                 ifsc_code: a.ifscCode,
                 branch_name: a.branchName,
-                aadhar_url: a.aadharUrl,
-                pan_url: a.panUrl,
+                aadhar_documents: a.aadharDocuments || [],
+                pan_documents: a.panDocuments || [],
                 is_active: a.isActive,
                 created_at: a.createdAt,
                 updated_at: a.updatedAt,
@@ -364,8 +366,7 @@ export class AffiliatesService {
         if (dto.accountNumber !== undefined) affiliate.accountNumber = dto.accountNumber;
         if (dto.ifscCode !== undefined) affiliate.ifscCode = dto.ifscCode;
         if (dto.branchName !== undefined) affiliate.branchName = dto.branchName;
-        if (dto.aadharUrl) affiliate.aadharUrl = dto.aadharUrl;
-        if (dto.panUrl) affiliate.panUrl = dto.panUrl;
+        // Note: Document uploads are handled via the separate /documents endpoint
 
         await this.affiliateRepo.save(affiliate);
 
@@ -392,5 +393,63 @@ export class AffiliatesService {
 
         affiliate.referralCount += 1;
         await this.affiliateRepo.save(affiliate);
+    }
+
+    // ---------------------------------------------------------
+    // UPLOAD KYC DOCUMENTS TO CLOUDFLARE R2
+    // ---------------------------------------------------------
+    async uploadDocuments(
+        affiliateId: number,
+        aadharFiles: Array<{ buffer: Buffer; originalname: string; mimetype: string }>,
+        panFiles: Array<{ buffer: Buffer; originalname: string; mimetype: string }>,
+    ) {
+        const affiliate = await this.affiliateRepo.findOne({
+            where: { id: affiliateId },
+        });
+        if (!affiliate) {
+            throw new BadRequestException('Affiliate not found');
+        }
+
+        this.logger.log(
+            `Uploading documents for affiliate ${affiliate.name} (ID: ${affiliateId}): ` +
+            `${aadharFiles.length} aadhar, ${panFiles.length} pan`,
+        );
+
+        // Upload Aadhar documents
+        let aadharResults: Array<{ key: string; url: string; fileName: string }> = [];
+        if (aadharFiles.length > 0) {
+            aadharResults = await this.r2Service.uploadMultipleFiles(
+                aadharFiles,
+                affiliate.name,
+                affiliate.mobileNumber,
+                'aadhar',
+            );
+        }
+
+        // Upload PAN documents
+        let panResults: Array<{ key: string; url: string; fileName: string }> = [];
+        if (panFiles.length > 0) {
+            panResults = await this.r2Service.uploadMultipleFiles(
+                panFiles,
+                affiliate.name,
+                affiliate.mobileNumber,
+                'pan',
+            );
+        }
+
+        // Merge with existing documents (append, respecting max 5 per type)
+        const existingAadhar = affiliate.aadharDocuments || [];
+        const existingPan = affiliate.panDocuments || [];
+
+        affiliate.aadharDocuments = [...existingAadhar, ...aadharResults].slice(0, 5);
+        affiliate.panDocuments = [...existingPan, ...panResults].slice(0, 5);
+
+        await this.affiliateRepo.save(affiliate);
+
+        return {
+            message: 'Documents uploaded successfully',
+            aadharDocuments: affiliate.aadharDocuments,
+            panDocuments: affiliate.panDocuments,
+        };
     }
 }

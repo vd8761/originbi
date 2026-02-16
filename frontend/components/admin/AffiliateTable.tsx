@@ -24,7 +24,7 @@ interface AffiliateTableProps {
     onEdit?: (affiliate: any) => void;
 }
 
-const REFERRAL_BASE_URL = (process.env.NEXT_PUBLIC_REFERAL_BASE_URL || "https://discover.originbi.com/register") + "?ref=";
+const REFERRAL_BASE_URL = (process.env.NEXT_PUBLIC_REFERAL_BASE_URL || "") + "?ref=";
 
 // QR Code generator using Google Charts API (no dependency needed)
 const getQrCodeUrl = (data: string, size: number = 200) => {

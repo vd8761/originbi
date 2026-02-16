@@ -75,12 +75,12 @@ export class AffiliateAccount {
     @Column({ name: 'branch_name', type: 'varchar', length: 255, nullable: true })
     branchName: string | null;
 
-    // Documents
-    @Column({ name: 'aadhar_url', type: 'varchar', length: 500, nullable: true })
-    aadharUrl: string | null;
+    // Documents (arrays of { key, url, fileName })
+    @Column({ name: 'aadhar_documents', type: 'jsonb', default: () => `'[]'` })
+    aadharDocuments: Array<{ key: string; url: string; fileName: string }>;
 
-    @Column({ name: 'pan_url', type: 'varchar', length: 500, nullable: true })
-    panUrl: string | null;
+    @Column({ name: 'pan_documents', type: 'jsonb', default: () => `'[]'` })
+    panDocuments: Array<{ key: string; url: string; fileName: string }>;
 
     // Status
     @Column({ name: 'is_active', type: 'boolean', default: true })

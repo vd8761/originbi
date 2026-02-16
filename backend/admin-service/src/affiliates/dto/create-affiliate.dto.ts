@@ -1,5 +1,6 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, IsNumber } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, IsNumber, IsArray } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
+import { Type } from 'class-transformer';
 
 export class CreateAffiliateDto {
     @IsString()
@@ -56,15 +57,6 @@ export class CreateAffiliateDto {
     @IsString()
     @IsOptional()
     branchName?: string;
-
-    // Document URLs (already uploaded by frontend)
-    @IsString()
-    @IsOptional()
-    aadharUrl?: string;
-
-    @IsString()
-    @IsOptional()
-    panUrl?: string;
 }
 
-export class UpdateAffiliateDto extends PartialType(CreateAffiliateDto) {}
+export class UpdateAffiliateDto extends PartialType(CreateAffiliateDto) { }
