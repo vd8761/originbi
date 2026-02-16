@@ -11,6 +11,14 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 
 const csv = require('fast-csv');
 import { Readable } from 'stream';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.extend(customParseFormat);
 
 import { BulkImport } from './entities/bulk-import.entity';
 import { BulkImportRow } from './entities/bulk-import-row.entity';
@@ -44,7 +52,7 @@ export class BulkCorporateRegistrationsService {
     private groupAssessmentRepo: Repository<GroupAssessment>,
     private dataSource: DataSource,
     private readonly corporateRegistrationsService: CorporateRegistrationsService,
-  ) {}
+  ) { }
 
   /**
    * Phase 1: Preview & Validate
@@ -689,6 +697,37 @@ export class BulkCorporateRegistrationsService {
     return undefined;
   }
 
+  private parseDateAsIST(dateStr?: string): string | undefined {
+    if (!dateStr) return undefined;
+
+    const formats = [
+      'M/D/YYYY H:mm',
+      'M/D/YYYY HH:mm',
+      'YYYY-MM-DD HH:mm',
+      'YYYY-MM-DD H:mm',
+      'DD/MM/YYYY HH:mm',
+      'DD/MM/YYYY H:mm',
+      'MM/DD/YYYY HH:mm',
+      'MM/DD/YYYY H:mm',
+    ];
+
+    // Attempt to parse strictly with formats
+    for (const fmt of formats) {
+      if (dayjs(dateStr, fmt, true).isValid()) {
+        const d = dayjs.tz(dateStr, fmt, 'Asia/Kolkata');
+        if (d.isValid()) return d.toISOString();
+      }
+    }
+
+    // Fallback to standard parser if strict fails
+    const fallback = dayjs.tz(dateStr, 'Asia/Kolkata');
+    if (fallback.isValid()) {
+      return fallback.toISOString();
+    }
+
+    return undefined;
+  }
+
   private mapRowToDto(
     rawData: unknown,
     groupName: string,
@@ -730,12 +769,12 @@ export class BulkCorporateRegistrationsService {
         const val = this.getValue(rawData, ['send_email', 'SendEmail']);
         return val ? val.toUpperCase() === 'TRUE' : false;
       })(),
-      examStart: this.getValue(rawData, [
+      examStart: this.parseDateAsIST(this.getValue(rawData, [
         'ExamStart',
         'exam_start_date',
         'valid_from',
-      ]),
-      examEnd: this.getValue(rawData, ['ExamEnd', 'exam_end_date', 'valid_to']),
+      ])),
+      examEnd: this.parseDateAsIST(this.getValue(rawData, ['ExamEnd', 'exam_end_date', 'valid_to'])),
     };
   }
 

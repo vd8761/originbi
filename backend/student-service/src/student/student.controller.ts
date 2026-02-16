@@ -1,9 +1,10 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { StudentService } from './student.service';
+import { CreateRegistrationDto } from './dto/create-registration.dto';
 
 @Controller('student')
 export class StudentController {
-  constructor(private readonly studentService: StudentService) { }
+  constructor(private readonly studentService: StudentService) {}
 
   @Post('profile')
   async getProfile(@Body() body: { email: string }) {
@@ -12,10 +13,7 @@ export class StudentController {
 
   @Post('seed')
   seedStudent(@Body() body: { email: string; fullName: string }) {
-    return this.studentService.createTestStudent(
-      body.email || 'monish@touchmarkdes.com',
-      body.fullName || 'Monish Test',
-    );
+    return this.studentService.createTestStudent(body.email, body.fullName);
   }
 
   @Post('assessment-status')
@@ -37,5 +35,17 @@ export class StudentController {
   async completeFirstLogin(@Body() body: { email: string }) {
     await this.studentService.completeFirstLogin(body.email);
     return { success: true };
+  }
+
+  @Post('register')
+  async register(@Body() dto: CreateRegistrationDto) {
+    return this.studentService.register(dto);
+  }
+
+  @Post('validate-registration')
+  async validateRegistration(
+    @Body() dto: { email: string; mobile_number?: string },
+  ) {
+    return this.studentService.validateRegistration(dto);
   }
 }

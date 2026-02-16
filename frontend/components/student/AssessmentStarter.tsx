@@ -305,6 +305,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
   const [isCompleted, setIsCompleted] = useState(false);
   const [changeCount, setChangeCount] = useState(0);
   const [isLastLevel, setIsLastLevel] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // Language Context
   const { language } = useLanguage();
@@ -547,26 +548,26 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
 
   // Submit Answer & Next
   const handleNext = async () => {
-    if (!currentQuestion || !selectedOption) return;
+    if (!currentQuestion || !selectedOption || submitting) return;
 
+    setSubmitting(true);
     const timeSpent = Math.floor((Date.now() - startTimeRef.current) / 1000);
 
-    // Final Save before moving (Ensure strictly awaited if we want to guarantee save before nav, 
-    // but for speed we often fire-and-forget or await in background. 
-    // Given the refresh issue, let's await it to be safe or rely on the previous auto-save).
-    // We'll await it to ensure the "Next" action definitely commits the state before UI change if possible,
-    // OR just fire it. Since we added Auto-Save in handleOptionSelect, this is a redundant "confirmation" save
-    // which is good for capturing final timeSpent.
-    await submitAnswer(currentQuestion, selectedOption, timeSpent, changeCount);
+    try {
+      // Final Save before moving
+      await submitAnswer(currentQuestion, selectedOption, timeSpent, changeCount);
 
-    // Optimistic Update: Switch to next question
-    if (currentNumber < totalQuestions) {
-      setCurrentQIndex((prev) => prev + 1);
-      // setSelectedOption handled by useEffect via 'answers' map or reset
-      setChangeCount(0);
-      startTimeRef.current = Date.now();
-    } else {
-      setIsCompleted(true);
+      // Optimistic Update: Switch to next question
+      if (currentNumber < totalQuestions) {
+        setCurrentQIndex((prev) => prev + 1);
+        // setSelectedOption handled by useEffect via 'answers' map or reset
+        setChangeCount(0);
+        startTimeRef.current = Date.now();
+      } else {
+        setIsCompleted(true);
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -714,18 +715,28 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
 
               <button
                 onClick={handleNext}
-                disabled={!selectedOption}
+                disabled={!selectedOption || submitting}
                 className={`
-                px-[clamp(24px,2.5vw,40px)] py-[clamp(6px,0.8vw,12px)] rounded-full text-white transition-all shadow-lg text-[clamp(11px,0.9vw,15px)] font-medium
-                ${selectedOption
+                px-[clamp(24px,2.5vw,40px)] py-[clamp(6px,0.8vw,12px)] rounded-full text-white transition-all shadow-lg text-[clamp(11px,0.9vw,15px)] font-medium flex items-center justify-center gap-2
+                ${selectedOption && !submitting
                     ? "bg-[#1ED36A] hover:bg-[#1ED36A]/90 shadow-[#1ED36A]/20 cursor-pointer transform hover:-translate-y-0.5"
                     : "bg-gray-300 dark:bg-[#303438] text-gray-500 dark:text-[#718096] cursor-not-allowed"
                   }
               `}
               >
-                {currentNumber === totalQuestions
-                  ? "Finish Assessment"
-                  : "Next Question"}
+                {submitting ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  currentNumber === totalQuestions
+                    ? "Finish Assessment"
+                    : "Next Question"
+                )}
               </button>
             </div>
           </div>
@@ -741,7 +752,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
 
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 

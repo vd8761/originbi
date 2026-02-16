@@ -23,6 +23,15 @@ import {
 } from '@originbi/shared-entities';
 import { RegistrationsService } from './registrations.service';
 import { Department } from '../departments/department.entity';
+import { DepartmentDegree } from '../departments/department-degree.entity';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.extend(customParseFormat);
 
 @Injectable()
 export class BulkRegistrationsService {
@@ -41,6 +50,8 @@ export class BulkRegistrationsService {
     private programRepo: Repository<Program>,
     @InjectRepository(Department)
     private departmentRepo: Repository<Department>,
+    @InjectRepository(DepartmentDegree)
+    private departmentDegreeRepo: Repository<DepartmentDegree>,
     @InjectRepository(GroupAssessment)
     private groupAssessmentRepo: Repository<GroupAssessment>,
     private dataSource: DataSource,
@@ -104,6 +115,14 @@ export class BulkRegistrationsService {
         e,
       );
     }
+
+    // Fetch DepartmentDegrees to map specifics (Department + Degree)
+    const allDeptDegrees = await this.departmentDegreeRepo.find();
+    // Map: `${deptId}_${degreeTypeId}` -> departmentDegreeId (string)
+    const deptDegreeMap = new Map<string, string>();
+    allDeptDegrees.forEach((dd) => {
+      deptDegreeMap.set(`${dd.departmentId}_${dd.degreeTypeId}`, dd.id);
+    });
 
     // 3. Parse All Rows First
     const rawRows: any[] = [];
@@ -204,6 +223,7 @@ export class BulkRegistrationsService {
         programMap,
         deptMap,
         degreeMap,
+        deptDegreeMap,
         allGroups,
         groupMap, // Pass group map
         userMapByEmail,
@@ -362,6 +382,12 @@ export class BulkRegistrationsService {
       );
     }
 
+    const allDeptDegrees = await this.departmentDegreeRepo.find();
+    const deptDegreeMap = new Map<string, string>();
+    allDeptDegrees.forEach((dd) => {
+      deptDegreeMap.set(`${dd.departmentId}_${dd.degreeTypeId}`, dd.id);
+    });
+
     const rows = await this.bulkImportRowRepo.find({
       where: { importId: jobId, status: 'READY' },
       order: { rowIndex: 'ASC' },
@@ -392,6 +418,7 @@ export class BulkRegistrationsService {
           programMap,
           deptMap,
           degreeMap,
+          deptDegreeMap,
         );
 
         // Use a composite key to group assessments
@@ -702,6 +729,7 @@ export class BulkRegistrationsService {
     programMap: Map<string, Program>,
     deptMap: Map<string, Department>,
     degreeMap: Map<string, any>,
+    deptDegreeMap: Map<string, string>,
   ) {
     const pCode = this.getValue(rawData, ['ProgramId', 'program_code']);
     let pId: any = null;
@@ -734,6 +762,39 @@ export class BulkRegistrationsService {
     const isCollege = pCode && pCode.toUpperCase().includes('COLLEGE');
     const isSchool = pCode && pCode.toUpperCase().includes('SCHOOL');
 
+    // Resolve DepartmentDegreeId
+    let departmentDegreeId: string | undefined = undefined;
+    if (isCollege && dId && degId) {
+      // Try to find exact combination
+      const key = `${dId}_${degId}`;
+      if (deptDegreeMap.has(key)) {
+        departmentDegreeId = deptDegreeMap.get(key);
+      } else {
+        // Fallback or warning? For now, if exact match not found, we might just pass departmentId ONLY if allowed
+        // But Registration.departmentDegreeId expects a DepartmentDegree ID, not Dept ID.
+        // So validation should probably fail if not found.
+        // We will leave it undefined to signal "Not Found" logic in validation if needed,
+        // or just let it be null.
+        // However, the existing logic mapped dId to departmentId.
+        // If we want to support legacy/loose mapping, we might keep dId as fallback IF logic allows.
+        // But `Registration.departmentDegreeId` IS `department_degree_id`.
+      }
+    }
+
+    const examStartRaw = this.getValue(rawData, [
+      'ExamStart',
+      'exam_start_date',
+      'valid_from',
+    ]);
+    const examEndRaw = this.getValue(rawData, [
+      'ExamEnd',
+      'exam_end_date',
+      'valid_to',
+    ]);
+
+    const examStart = this.parseDateAsIST(examStartRaw);
+    const examEnd = this.parseDateAsIST(examEndRaw);
+
     return {
       name: this.getValue(rawData, ['FullName', 'Name', 'full_name']) || '',
       email: this.getValue(rawData, ['Email', 'email']) || '',
@@ -759,8 +820,8 @@ export class BulkRegistrationsService {
         ? this.getValue(rawData, ['SchoolStream', 'school_stream'])
         : undefined,
 
-      departmentId: isCollege ? dId : undefined,
-      degreeId: isCollege ? degId : undefined,
+      departmentId: departmentDegreeId, // Correctly mapped to DepartmentDegree ID
+      degreeId: undefined, // Not used in registration directly, inferred via DepartmentDegree
       currentYear: isCollege
         ? this.getValue(rawData, [
           'current_year',
@@ -775,13 +836,48 @@ export class BulkRegistrationsService {
         const val = this.getValue(rawData, ['send_email', 'SendEmail']);
         return val ? val.toUpperCase() === 'TRUE' : false;
       })(),
-      examStart: this.getValue(rawData, [
-        'ExamStart',
-        'exam_start_date',
-        'valid_from',
-      ]),
-      examEnd: this.getValue(rawData, ['ExamEnd', 'exam_end_date', 'valid_to']),
+      examStart: examStart,
+      examEnd: examEnd,
     };
+  }
+
+  private parseDateAsIST(dateStr?: string): string | undefined {
+    if (!dateStr) return undefined;
+
+    // Common formats from Excel/CSV
+    // 1. M/D/YYYY H:mm  (1/29/2026 14:00)
+    // 2. YYYY-MM-DD HH:mm
+    // 3. DD/MM/YYYY HH:mm
+
+    // We assume the input string is MEANT to be IST.
+    // e.g. "14:00" means "14:00 IST".
+
+    const formats = [
+      'M/D/YYYY H:mm',
+      'M/D/YYYY HH:mm',
+      'YYYY-MM-DD HH:mm',
+      'YYYY-MM-DD H:mm',
+      'DD/MM/YYYY HH:mm',
+      'DD/MM/YYYY H:mm',
+      'MM/DD/YYYY HH:mm',
+      'MM/DD/YYYY H:mm',
+    ];
+
+    // Attempt to parse strictly with formats
+    for (const fmt of formats) {
+      if (dayjs(dateStr, fmt, true).isValid()) {
+        const d = dayjs.tz(dateStr, fmt, 'Asia/Kolkata');
+        if (d.isValid()) return d.toISOString();
+      }
+    }
+
+    // Fallback to standard parser if strict fails
+    const fallback = dayjs.tz(dateStr, 'Asia/Kolkata');
+    if (fallback.isValid()) {
+      return fallback.toISOString();
+    }
+
+    return undefined;
   }
 
   private processRow(
@@ -791,6 +887,7 @@ export class BulkRegistrationsService {
     programMap: Map<string, Program>,
     deptMap: Map<string, Department>,
     degreeMap: Map<string, any>,
+    deptDegreeMap: Map<string, string>,
     allGroups: Groups[],
     groupMap: Map<string, Groups>,
     userMapByEmail: Map<string, AdminUser>,

@@ -8,6 +8,8 @@ import { AssessmentSession } from '../entities/assessment_session.entity';
 import { AssessmentAttempt } from '../entities/assessment_attempt.entity';
 import { AssessmentLevel } from '../entities/assessment_level.entity';
 import { AssessmentAnswer } from '../entities/assessment_answer.entity';
+import { Registration } from '../entities/registration.entity';
+import { Program } from '../entities/program.entity';
 
 @Module({
   imports: [
@@ -16,7 +18,10 @@ import { AssessmentAnswer } from '../entities/assessment_answer.entity';
       AssessmentSession,
       AssessmentAttempt,
       AssessmentLevel,
+      AssessmentLevel,
       AssessmentAnswer,
+      Registration,
+      Program,
     ]),
     HttpModule,
   ],
