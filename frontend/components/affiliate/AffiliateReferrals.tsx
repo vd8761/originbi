@@ -132,6 +132,39 @@ const AffiliateReferrals: React.FC = () => {
                 <span className="ml-2 text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white opacity-70 font-normal">{filteredReferrals.length} results</span>
             </div>
 
+            <div className="flex justify-end mb-4">
+                <button
+                    onClick={() => {
+                        const headers = ["Organization", "Email", "Status", "Sign-up Date", "Last Activity", "Commission"];
+                        const csvContent = [
+                            headers.join(","),
+                            ...filteredReferrals.map(row => [
+                                `"${row.name}"`,
+                                row.email,
+                                row.status,
+                                row.signUpDate,
+                                row.lastActivity,
+                                row.commission
+                            ].join(","))
+                        ].join("\n");
+
+                        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                        const link = document.createElement("a");
+                        const url = URL.createObjectURL(blob);
+                        link.setAttribute("href", url);
+                        link.setAttribute("download", `referrals_${new Date().toISOString().split('T')[0]}.csv`);
+                        link.style.visibility = 'hidden';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#1ED36A]/30 text-[#1ED36A] text-sm font-medium hover:bg-[#1ED36A]/5 transition-all"
+                >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                    Export CSV
+                </button>
+            </div>
+
             {/* Referrals Table */}
             <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] border border-[#E0E0E0] dark:border-white/10 overflow-hidden font-['Haskoy'] shadow-sm mb-8">
                 <div className="w-full overflow-x-auto">

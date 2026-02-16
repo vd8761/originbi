@@ -2,18 +2,6 @@
 
 import React, { useState } from "react";
 
-// --- Toggle Switch ---
-const Toggle = ({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) => (
-    <div
-        onClick={onToggle}
-        className={`w-[52px] h-[22px] relative flex items-center rounded-full p-1 transition-colors duration-300 cursor-pointer ${enabled ? 'bg-[#1ED36A]' : 'bg-gray-300 dark:bg-white/20'}`}
-    >
-        <span className={`absolute left-2 text-[9px] font-bold text-white transition-opacity duration-300 ${enabled ? 'opacity-100' : 'opacity-0'}`}>ON</span>
-        <span className={`absolute right-2 text-[9px] font-bold text-gray-600 transition-opacity duration-300 ${enabled ? 'opacity-0' : 'opacity-100'}`}>OFF</span>
-        <div className={`w-[14px] h-[14px] bg-white rounded-full shadow-sm transform transition-transform duration-300 ${enabled ? 'translate-x-[30px]' : 'translate-x-0'} z-10`}></div>
-    </div>
-);
-
 // --- Section Card Wrapper ---
 const SettingsSection = ({ title, children, icon }: { title: string; children: React.ReactNode; icon: React.ReactNode }) => (
     <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-8 border border-[#E0E0E0] dark:border-white/10 font-['Haskoy'] shadow-sm">
@@ -58,14 +46,6 @@ const AffiliateSettings: React.FC = () => {
     const [ifsc, setIfsc] = useState('HDFC0001234');
     const [upiId, setUpiId] = useState('affiliate@upi');
     const [payoutMethod, setPayoutMethod] = useState<'bank' | 'upi'>('bank');
-
-    // Notifications
-    const [emailNotifications, setEmailNotifications] = useState(true);
-    const [smsNotifications, setSmsNotifications] = useState(false);
-    const [pushNotifications, setPushNotifications] = useState(true);
-    const [weeklyReport, setWeeklyReport] = useState(true);
-    const [newReferralAlert, setNewReferralAlert] = useState(true);
-    const [payoutAlert, setPayoutAlert] = useState(true);
 
     // Password
     const [currentPassword, setCurrentPassword] = useState('');
@@ -154,42 +134,6 @@ const AffiliateSettings: React.FC = () => {
                     </div>
                 </SettingsSection>
 
-                {/* Notification Preferences */}
-                <SettingsSection
-                    title="Notification Preferences"
-                    icon={<svg className="w-5 h-5 text-[#150089] dark:text-[#1ED36A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 01-3.46 0" /></svg>}
-                >
-                    <div className="space-y-5">
-                        {[
-                            { label: 'Email Notifications', desc: 'Receive updates via email', val: emailNotifications, toggle: () => setEmailNotifications(!emailNotifications) },
-                            { label: 'SMS Notifications', desc: 'Get alerts via text message', val: smsNotifications, toggle: () => setSmsNotifications(!smsNotifications) },
-                            { label: 'Push Notifications', desc: 'Browser push alerts', val: pushNotifications, toggle: () => setPushNotifications(!pushNotifications) },
-                        ].map((item, i) => (
-                            <div key={i} className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-[clamp(14px,1vw,16px)] font-medium text-[#19211C] dark:text-white">{item.label}</p>
-                                    <p className="text-[clamp(12px,0.8vw,14px)] text-[#19211C] dark:text-white opacity-60 font-normal">{item.desc}</p>
-                                </div>
-                                <Toggle enabled={item.val} onToggle={item.toggle} />
-                            </div>
-                        ))}
-                        <div className="border-t border-gray-200 dark:border-white/5 pt-4"></div>
-                        {[
-                            { label: 'Weekly Summary Report', desc: 'Digest of your weekly performance', val: weeklyReport, toggle: () => setWeeklyReport(!weeklyReport) },
-                            { label: 'New Referral Alert', desc: 'When a new user signs up via your link', val: newReferralAlert, toggle: () => setNewReferralAlert(!newReferralAlert) },
-                            { label: 'Payout Notifications', desc: 'When your payout is processed', val: payoutAlert, toggle: () => setPayoutAlert(!payoutAlert) },
-                        ].map((item, i) => (
-                            <div key={i} className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-[clamp(14px,1vw,16px)] font-medium text-[#19211C] dark:text-white">{item.label}</p>
-                                    <p className="text-[clamp(12px,0.8vw,14px)] text-[#19211C] dark:text-white opacity-60 font-normal">{item.desc}</p>
-                                </div>
-                                <Toggle enabled={item.val} onToggle={item.toggle} />
-                            </div>
-                        ))}
-                    </div>
-                </SettingsSection>
-
                 {/* Security */}
                 <SettingsSection
                     title="Security"
@@ -202,15 +146,6 @@ const AffiliateSettings: React.FC = () => {
                         <button onClick={() => handleSave('Password')} className="mt-4 px-10 py-3 rounded-full font-medium text-[clamp(14px,1vw,16px)] bg-[#1ED36A] hover:bg-[#16b058] text-white shadow-lg shadow-[#1ED36A]/20 transition-all">
                             Update Password
                         </button>
-
-                        {/* Danger Zone */}
-                        <div className="mt-8 border-t border-gray-200 dark:border-white/5 pt-6">
-                            <h4 className="text-[clamp(14px,1vw,16px)] font-semibold text-[#FF5457] mb-2">Danger Zone</h4>
-                            <p className="text-[clamp(12px,0.8vw,14px)] text-[#19211C] dark:text-white opacity-60 font-normal mb-4">Permanently delete your affiliate account and all associated data. This action cannot be undone.</p>
-                            <button className="px-6 py-2.5 rounded-full text-[clamp(14px,1vw,16px)] font-medium text-[#FF5457] border border-[#FF5457]/30 bg-[#FF5457]/5 hover:bg-[#FF5457]/10 transition-all">
-                                Delete Account
-                            </button>
-                        </div>
                     </div>
                 </SettingsSection>
             </div>

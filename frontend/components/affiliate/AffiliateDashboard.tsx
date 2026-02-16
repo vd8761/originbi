@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import ReactDOM from "react-dom";
 import { useRouter } from "next/navigation";
 import { TrendUpIcon, TrendDownIcon } from '../icons';
 
@@ -259,12 +260,17 @@ const ReferralPerformance = () => {
     );
 };
 
-// --- Referral Link Card ---
+// --- Referral Link Card (Redesigned as Share Card) ---
 const ReferralLinkCard = () => {
     const [copied, setCopied] = useState(false);
     const [showShareMenu, setShowShareMenu] = useState(false);
     const [showQRModal, setShowQRModal] = useState(false);
+    const [mounted, setMounted] = useState(false);
     const referralLink = "https://originbi.com/ref/aff_001";
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const handleCopy = () => {
         navigator.clipboard.writeText(referralLink);
@@ -286,81 +292,114 @@ const ReferralLinkCard = () => {
         }
     };
 
-    return (
-        <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] border border-[#E0E0E0] dark:border-white/10 font-['Haskoy'] shadow-sm">
-            {/* Top gradient accent */}
-            {/* <div className="h-1 w-full bg-gradient-to-r from-[#150089] via-[#1ED36A] to-[#0EA5E9]"></div> */}
+    const ModalContent = () => (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={() => setShowQRModal(false)}>
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-fade-in"></div>
+            <div className="relative bg-white dark:bg-[#1a1a2e] rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-scale-up border border-white/10" onClick={e => e.stopPropagation()}>
+                {/* Close Button - More prominent */}
+                <button
+                    onClick={() => setShowQRModal(false)}
+                    className="absolute -top-3 -right-3 sm:top-5 sm:right-5 w-10 h-10 rounded-full bg-white dark:bg-[#2a2a40] shadow-lg border border-gray-100 dark:border-white/10 flex items-center justify-center text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/20 transition-all transform hover:scale-110 z-50"
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
 
-            <div className="p-6 pt-5">
-                <div className="flex items-center justify-between mb-5">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-[#150089]/10 dark:bg-[#1ED36A]/10 flex items-center justify-center">
-                            <svg className="w-5 h-5 text-[#150089] dark:text-[#1ED36A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                            </svg>
-                        </div>
-                        <h3 className="font-semibold text-[clamp(16px,1.04vw,20px)] text-[#19211C] dark:text-white leading-none">
-                            Your Referral Link
-                        </h3>
+                {/* Header */}
+                <div className="text-center mb-8">
+                    <h3 className="font-['Haskoy'] font-bold text-[clamp(20px,1.5vw,28px)] text-[#150089] dark:text-white">Affiliate Card</h3>
+                    <p className="text-sm text-[#19211C]/60 dark:text-white/50 mt-1">Scan or share your referral details</p>
+                </div>
+
+                {/* QR Code - Larger */}
+                <div className="flex justify-center mb-8">
+                    <div className="p-5 bg-white rounded-[24px] shadow-xl border border-gray-100">
+                        <img
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(referralLink)}&bgcolor=ffffff&color=150089&margin=8`}
+                            alt="Referral QR Code"
+                            className="w-[220px] h-[220px] rounded-xl"
+                        />
                     </div>
                 </div>
 
-                <div className="flex items-stretch gap-5">
-                    {/* QR Code */}
-                    <div className="shrink-0 hidden sm:flex flex-col items-center gap-2">
-                        <button onClick={() => setShowQRModal(true)} className="p-2 bg-white rounded-2xl shadow-md border border-gray-100 dark:border-white/10 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 group">
-                            <img
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(referralLink)}&bgcolor=ffffff&color=150089&margin=6`}
-                                alt="Referral QR Code"
-                                className="w-[110px] h-[110px] rounded-lg"
-                            />
-                        </button>
-                        <span className="text-[11px] text-[#19211C]/50 dark:text-white/40 font-medium">Click to expand</span>
+                {/* Affiliate Details */}
+                <div className="space-y-3 mb-8">
+                    <div className="flex justify-between items-center bg-[#FAFAFA] dark:bg-white/5 rounded-2xl px-5 py-4 border border-[#E0E0E0] dark:border-white/10">
+                        <span className="text-xs font-bold text-[#19211C]/50 dark:text-white/40 uppercase tracking-widest">Affiliate ID</span>
+                        <span className="text-base font-bold text-[#150089] dark:text-[#1ED36A]">AFF_001</span>
+                    </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-4">
+                    <button
+                        onClick={() => { navigator.clipboard.writeText(referralLink); handleCopy(); }}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-full font-bold text-sm bg-[#150089] text-white hover:shadow-lg hover:-translate-y-0.5 transition-all"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
+                        {copied ? 'Copied!' : 'Copy Link'}
+                    </button>
+                    <button
+                        onClick={handleShare}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-full font-bold text-sm bg-gradient-to-r from-[#1ED36A] to-[#16b058] text-white hover:shadow-lg hover:-translate-y-0.5 transition-all"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                        </svg>
+                        Share
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
+    return (
+        <>
+            <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] border border-[#E0E0E0] dark:border-white/10 font-['Haskoy'] shadow-sm h-full flex flex-col">
+                <div className="p-6 h-full flex flex-col justify-between gap-6">
+                    <div>
+                        <h3 className="font-semibold text-[clamp(16px,1.04vw,20px)] text-[#19211C] dark:text-white leading-none mb-2">
+                            Your Affiliate Link!
+                        </h3>
+                        <p className="text-sm text-[#19211C]/60 dark:text-white/60">Invite friends to OriginBI</p>
                     </div>
 
-                    {/* Link + Buttons */}
-                    <div className="flex-1 flex flex-col justify-between gap-4">
-                        <div className="flex items-center bg-[#FAFAFA] dark:bg-white/5 rounded-2xl px-5 py-3.5 border border-[#E0E0E0] dark:border-white/10 group hover:border-[#1ED36A]/30 transition-colors">
-                            <svg className="w-4 h-4 mr-3 text-[#19211C]/30 dark:text-white/30 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                            </svg>
-                            <span className="text-[clamp(13px,0.9vw,15px)] text-[#19211C] dark:text-white font-medium break-all flex-1">{referralLink}</span>
-                        </div>
+                    <div className="flex flex-col items-center gap-6 flex-1 justify-center">
+                        {/* QR Trigger */}
+                        <button onClick={() => setShowQRModal(true)} className="p-3 bg-white rounded-2xl shadow-md border border-gray-100 dark:border-white/10 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 group">
+                            <img
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(referralLink)}&bgcolor=ffffff&color=150089&margin=6`}
+                                alt="Referral QR Code"
+                                className="w-[120px] h-[120px] rounded-lg"
+                            />
+                        </button>
 
-                        <div className="flex items-center gap-3 flex-wrap">
+                        {/* Buttons */}
+                        <div className="w-full space-y-3">
                             <button
                                 onClick={handleCopy}
-                                className={`flex items-center gap-2 px-7 py-3 rounded-full font-semibold text-[clamp(13px,0.9vw,15px)] transition-all shrink-0 shadow-sm hover:shadow-md transform active:scale-[0.97] ${copied
-                                    ? 'bg-[#1ED36A] text-white shadow-[#1ED36A]/20'
-                                    : 'bg-[#150089] dark:bg-white text-white dark:text-[#19211C] hover:opacity-90'
+                                className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm transition-all shadow-sm hover:shadow-md transform active:scale-[0.98] ${copied
+                                    ? 'bg-[#1ED36A] text-white'
+                                    : 'bg-[#150089] text-white hover:bg-[#150089]/90'
                                     }`}
                             >
-                                {copied ? (
-                                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg> Copied!</>
-                                ) : (
-                                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg> Copy Link</>
-                                )}
+                                {copied ? 'Copied!' : 'Copy Link'}
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
                             </button>
 
-                            {/* Share Button */}
-                            <div className="relative">
+                            <div className="relative w-full">
                                 <button
                                     onClick={handleShare}
-                                    className="flex items-center gap-2 px-7 py-3 rounded-full font-semibold text-[clamp(13px,0.9vw,15px)] transition-all shrink-0 bg-gradient-to-r from-[#1ED36A] to-[#16b058] text-white hover:from-[#16b058] hover:to-[#1ED36A] shadow-sm hover:shadow-md transform active:scale-[0.97]"
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm transition-all bg-white dark:bg-white/5 border border-[#E0E0E0] dark:border-white/10 text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/10"
                                 >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <circle cx="18" cy="5" r="3" />
-                                        <circle cx="6" cy="12" r="3" />
-                                        <circle cx="18" cy="19" r="3" />
-                                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-                                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-                                    </svg>
                                     Share
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+                                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                                    </svg>
                                 </button>
-
                                 {showShareMenu && (
-                                    <div className="absolute bottom-full left-0 mb-2 bg-white dark:bg-brand-dark-secondary rounded-xl shadow-2xl border border-gray-100 dark:border-brand-dark-tertiary p-1.5 min-w-[190px] z-50">
+                                    <div className="absolute bottom-full left-0 w-full mb-2 bg-white dark:bg-brand-dark-secondary rounded-xl shadow-xl border border-gray-100 dark:border-brand-dark-tertiary p-1.5 z-50">
                                         <a href={`https://wa.me/?text=${encodeURIComponent('Check out OriginBI! ' + referralLink)}`} target="_blank" rel="noopener noreferrer"
                                             className="flex items-center gap-3 px-3.5 py-2.5 text-sm font-medium text-[#19211C] dark:text-white rounded-lg hover:bg-[#25D366]/10 transition-colors">
                                             <span className="text-base">💬</span> WhatsApp
@@ -380,84 +419,23 @@ const ReferralLinkCard = () => {
                     </div>
                 </div>
             </div>
-
-            {/* QR Code Modal */}
-            {showQRModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setShowQRModal(false)}>
-                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
-                    <div className="relative bg-white dark:bg-[#1a1a2e] rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in" onClick={e => e.stopPropagation()}>
-                        {/* Close */}
-                        <button onClick={() => setShowQRModal(false)} className="absolute top-5 right-5 w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center text-[#19211C] dark:text-white hover:bg-gray-200 dark:hover:bg-white/20 transition-colors">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-
-                        {/* Header */}
-                        <div className="text-center mb-6">
-                            <h3 className="font-['Haskoy'] font-bold text-[clamp(20px,1.5vw,28px)] text-[#150089] dark:text-white">Affiliate Card</h3>
-                            <p className="text-sm text-[#19211C]/60 dark:text-white/50 mt-1">Scan or share your referral details</p>
-                        </div>
-
-                        {/* QR Code */}
-                        <div className="flex justify-center mb-6">
-                            <div className="p-4 bg-white rounded-3xl shadow-lg border border-gray-100">
-                                <img
-                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(referralLink)}&bgcolor=ffffff&color=150089&margin=8`}
-                                    alt="Referral QR Code"
-                                    className="w-[200px] h-[200px] rounded-xl"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Affiliate Details */}
-                        <div className="space-y-3 mb-6">
-                            <div className="flex justify-between items-center bg-[#FAFAFA] dark:bg-white/5 rounded-xl px-4 py-3 border border-[#E0E0E0] dark:border-white/10">
-                                <span className="text-xs font-medium text-[#19211C]/50 dark:text-white/40 uppercase tracking-wider">Affiliate ID</span>
-                                <span className="text-sm font-bold text-[#150089] dark:text-[#1ED36A]">AFF_001</span>
-                            </div>
-                            <div className="flex justify-between items-center bg-[#FAFAFA] dark:bg-white/5 rounded-xl px-4 py-3 border border-[#E0E0E0] dark:border-white/10">
-                                <span className="text-xs font-medium text-[#19211C]/50 dark:text-white/40 uppercase tracking-wider">Referral Link</span>
-                                <span className="text-xs font-medium text-[#19211C] dark:text-white truncate max-w-[180px]">{referralLink}</span>
-                            </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => { navigator.clipboard.writeText(referralLink); handleCopy(); }}
-                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-full font-semibold text-sm bg-[#150089] text-white hover:opacity-90 transition-all"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
-                                {copied ? 'Copied!' : 'Copy Link'}
-                            </button>
-                            <button
-                                onClick={handleShare}
-                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-full font-semibold text-sm bg-gradient-to-r from-[#1ED36A] to-[#16b058] text-white hover:opacity-90 transition-all"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
-                                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-                                </svg>
-                                Share
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
+            {showQRModal && mounted && ReactDOM.createPortal(<ModalContent />, document.body)}
+        </>
     );
 };
 
 // --- Referrals Table ---
 const ReferralsTable = () => {
-    const tableData: Referral[] = [
-        { id: '1', name: 'Pinnacle HR', email: 'info@pinnaclehr.com', status: 'active', signUpDate: '16 Feb 2026', commission: 2000 },
-        { id: '2', name: 'Nova Tech Labs', email: 'hello@novalabs.io', status: 'pending', signUpDate: '15 Feb 2026', commission: 0 },
-        { id: '3', name: 'Global Edu Services', email: 'contact@globaledu.com', status: 'converted', signUpDate: '14 Feb 2026', commission: 7500 },
-        { id: '4', name: 'StartUp Hub', email: 'team@startuphub.io', status: 'pending', signUpDate: '12 Feb 2026', commission: 0 },
-        { id: '5', name: 'Digital Academy', email: 'admin@digitala.com', status: 'active', signUpDate: '10 Feb 2026', commission: 3500 },
-        { id: '6', name: 'TechCorp Solutions', email: 'hr@techcorp.com', status: 'converted', signUpDate: '08 Feb 2026', commission: 5000 },
-        { id: '7', name: 'Bright Minds Edu', email: 'admin@brightminds.in', status: 'converted', signUpDate: '05 Feb 2026', commission: 4200 },
-        { id: '8', name: 'Apex Recruiters', email: 'ops@apexhr.com', status: 'active', signUpDate: '02 Feb 2026', commission: 1800 },
+    const router = useRouter();
+    const tableData: (Referral & { settledDown: 'Completed' | 'Incomplete' })[] = [
+        { id: '1', name: 'Pinnacle HR', email: 'info@pinnaclehr.com', status: 'active', signUpDate: '16 Feb 2026', commission: 2000, settledDown: 'Incomplete' },
+        { id: '2', name: 'Nova Tech Labs', email: 'hello@novalabs.io', status: 'pending', signUpDate: '15 Feb 2026', commission: 0, settledDown: 'Incomplete' },
+        { id: '3', name: 'Global Edu Services', email: 'contact@globaledu.com', status: 'converted', signUpDate: '14 Feb 2026', commission: 7500, settledDown: 'Completed' },
+        { id: '4', name: 'StartUp Hub', email: 'team@startuphub.io', status: 'pending', signUpDate: '12 Feb 2026', commission: 0, settledDown: 'Incomplete' },
+        { id: '5', name: 'Digital Academy', email: 'admin@digitala.com', status: 'active', signUpDate: '10 Feb 2026', commission: 3500, settledDown: 'Incomplete' },
+        { id: '6', name: 'TechCorp Solutions', email: 'hr@techcorp.com', status: 'converted', signUpDate: '08 Feb 2026', commission: 5000, settledDown: 'Completed' },
+        { id: '7', name: 'Bright Minds Edu', email: 'admin@brightminds.in', status: 'converted', signUpDate: '05 Feb 2026', commission: 4200, settledDown: 'Completed' },
+        { id: '8', name: 'Apex Recruiters', email: 'ops@apexhr.com', status: 'active', signUpDate: '02 Feb 2026', commission: 1800, settledDown: 'Incomplete' },
     ];
 
     const statusBadge = (status: string) => {
@@ -479,7 +457,10 @@ const ReferralsTable = () => {
                 <h3 className="font-semibold text-[clamp(16px,1.04vw,20px)] text-[#19211C] dark:text-white leading-none">
                     Recent Referrals
                 </h3>
-                <span className="font-medium text-[clamp(13px,1vw,15px)] text-[#1ED36A] cursor-pointer hover:underline">
+                <span
+                    onClick={() => router.push('/affiliate/referrals')}
+                    className="font-medium text-[clamp(13px,1vw,15px)] text-[#1ED36A] cursor-pointer hover:underline"
+                >
                     View all
                 </span>
             </div>
@@ -488,10 +469,11 @@ const ReferralsTable = () => {
                 <table className="w-full min-w-[800px]">
                     <thead>
                         <tr className="bg-[#EAEAEA] dark:bg-white/5">
-                            <th className="text-left py-3 pl-6 pr-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[25%]">Organization</th>
-                            <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[25%]">Email</th>
+                            <th className="text-left py-3 pl-6 pr-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[20%]">Organization</th>
+                            <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[20%]">Email</th>
                             <th className="text-center py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[15%]">Status</th>
                             <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[15%]">Sign-up Date</th>
+                            <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[15%]">Settled Down</th>
                             <th className="text-right py-3 pl-4 pr-6 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[15%]">Commission</th>
                         </tr>
                     </thead>
@@ -509,6 +491,11 @@ const ReferralsTable = () => {
                                 </td>
                                 <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">
                                     {row.signUpDate}
+                                </td>
+                                <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] leading-none">
+                                    <span className={row.settledDown === 'Completed' ? 'text-[#1ED36A]' : 'text-[#FF5457]'}>
+                                        {row.settledDown}
+                                    </span>
                                 </td>
                                 <td className="py-3.5 pl-4 pr-6 text-right font-semibold text-[clamp(14px,1.1vw,17px)] text-[#1ED36A] leading-none">
                                     {row.commission > 0 ? `₹${row.commission.toLocaleString('en-IN')}` : '—'}
@@ -559,25 +546,20 @@ const AffiliateDashboard: React.FC = () => {
                 </div>
             </div>
 
-            {/* 2. Referral Link */}
-            <div className="mb-6">
-                <ReferralLinkCard />
-            </div>
-
-            {/* 3. Top Grid: Earnings, Chart, Performance */}
+            {/* 2. Top Grid: Earnings, Chart, Share */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
                 <div className="lg:col-span-3">
                     <EarningsCard earnings={95000} />
                 </div>
-                <div className="lg:col-span-5 relative z-20">
+                <div className="lg:col-span-6 relative z-20">
                     <EarningsChart />
                 </div>
-                <div className="lg:col-span-4 relative z-10">
-                    <ReferralPerformance />
+                <div className="lg:col-span-3 relative z-10">
+                    <ReferralLinkCard />
                 </div>
             </div>
 
-            {/* 4. Referrals Table (Full Width) */}
+            {/* 3. Referrals Table (Full Width) */}
             <div className="mb-8">
                 <ReferralsTable />
             </div>

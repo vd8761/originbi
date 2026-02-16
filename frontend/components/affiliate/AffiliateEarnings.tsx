@@ -146,6 +146,31 @@ const AffiliateEarnings: React.FC = () => {
         { id: '8', date: '25 Jan 2026', description: 'Commission - Enterprise Plan', referral: 'CloudBridge Inc', amount: 6000, status: 'completed' },
     ];
 
+    // --- Export CSV ---
+    const handleExportCSV = () => {
+        const headers = ["Date", "Description", "Referral", "Status", "Amount"];
+        const csvContent = [
+            headers.join(","),
+            ...transactions.map(txn => [
+                txn.date,
+                `"${txn.description}"`, // Quote description to handle commas
+                txn.referral,
+                txn.status,
+                txn.amount
+            ].join(","))
+        ].join("\n");
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `earnings_transactions_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div className="relative min-h-screen bg-transparent font-['Haskoy'] transition-colors duration-300 overflow-hidden p-4 sm:p-6 lg:p-8">
             {/* Page Header */}
@@ -178,9 +203,11 @@ const AffiliateEarnings: React.FC = () => {
                     icon={<svg className="w-5 h-5 text-[#150089] dark:text-[#1ED36A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>}
                 />
                 <EarningStat
-                    label="Available"
+                    label="Settled Down"
                     value="₹67,000"
-                    icon={<svg className="w-5 h-5 text-[#150089] dark:text-[#1ED36A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2" /><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" /></svg>}
+                    trend="12%"
+                    isPositive={true}
+                    icon={<svg className="w-5 h-5 text-[#150089] dark:text-[#1ED36A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
                 />
             </div>
 
@@ -222,7 +249,13 @@ const AffiliateEarnings: React.FC = () => {
                     <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] border border-[#E0E0E0] dark:border-white/10 overflow-hidden shadow-sm h-full flex flex-col">
                         <div className="flex justify-between items-center p-6">
                             <h3 className="font-semibold text-[clamp(16px,1.04vw,20px)] text-[#19211C] dark:text-white leading-none">Transaction History</h3>
-                            <span className="font-medium text-[clamp(13px,1vw,15px)] text-[#1ED36A] cursor-pointer hover:underline">Export CSV</span>
+                            <button
+                                onClick={handleExportCSV}
+                                className="font-medium text-[clamp(13px,1vw,15px)] text-[#1ED36A] cursor-pointer hover:underline bg-transparent border-none flex items-center gap-1"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                Export CSV
+                            </button>
                         </div>
                         <div className="w-full overflow-x-auto flex-1">
                             <table className="w-full min-w-[700px]">
@@ -266,5 +299,4 @@ const AffiliateEarnings: React.FC = () => {
         </div>
     );
 };
-
 export default AffiliateEarnings;
