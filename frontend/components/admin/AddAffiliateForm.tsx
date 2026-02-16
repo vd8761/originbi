@@ -135,7 +135,7 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
             errors.commissionPercentage = "Must be between 0 and 100";
         }
         if (!formData.address.trim()) errors.address = "Required";
-        if (!formData.upiId.trim()) errors.upiId = "Required";
+
         if (!formData.upiNumber.trim()) errors.upiNumber = "Required";
         if (!formData.bankingName.trim()) errors.bankingName = "Required";
         if (!formData.accountNumber.trim()) errors.accountNumber = "Required";
@@ -338,6 +338,31 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
                             </div>
                         )}
 
+                        {/* Commission Percentage */}
+                        <div className="space-y-2">
+                            <label className={baseLabelClasses}>
+                                Commission Percentage <span className="text-red-500">*</span>
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    step={0.01}
+                                    value={formData.commissionPercentage}
+                                    onChange={(e) => handleCommissionChange(e.target.value)}
+                                    onBlur={() => {
+                                        const val = parseFloat(formData.commissionPercentage);
+                                        if (!isNaN(val) && val > 100) handleInputChange("commissionPercentage", "100");
+                                    }}
+                                    placeholder="e.g. 10"
+                                    className={`${baseInputClasses} pr-10 ${formErrors.commissionPercentage ? "border-red-500/50" : ""}`}
+                                />
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-semibold">%</span>
+                            </div>
+                            {formErrors.commissionPercentage && <p className="text-xs text-red-500 ml-1">{formErrors.commissionPercentage}</p>}
+                        </div>
+
                         {/* Address */}
                         <div className="space-y-2 lg:col-span-3">
                             <label className={baseLabelClasses}>
@@ -361,7 +386,7 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
                         {/* UPI ID */}
                         <div className="space-y-2">
                             <label className={baseLabelClasses}>
-                                UPI ID <span className="text-red-500">*</span>
+                                UPI ID
                             </label>
                             <input
                                 type="text"
@@ -552,36 +577,7 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
                     </div>
                 </div>
 
-                {/* Section 4 – Commission */}
-                <div className="pt-6 border-t border-gray-100 dark:border-white/5">
-                    <h3 className={sectionHeadingClasses}>Commission</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                        {/* Commission Percentage */}
-                        <div className="space-y-2">
-                            <label className={baseLabelClasses}>
-                                Commission Percentage <span className="text-red-500">*</span>
-                            </label>
-                            <div className="relative">
-                                <input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    step={0.01}
-                                    value={formData.commissionPercentage}
-                                    onChange={(e) => handleCommissionChange(e.target.value)}
-                                    onBlur={() => {
-                                        const val = parseFloat(formData.commissionPercentage);
-                                        if (!isNaN(val) && val > 100) handleInputChange("commissionPercentage", "100");
-                                    }}
-                                    placeholder="e.g. 10"
-                                    className={`${baseInputClasses} pr-10 ${formErrors.commissionPercentage ? "border-red-500/50" : ""}`}
-                                />
-                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-semibold">%</span>
-                            </div>
-                            {formErrors.commissionPercentage && <p className="text-xs text-red-500 ml-1">{formErrors.commissionPercentage}</p>}
-                        </div>
-                    </div>
-                </div>
+
             </div>
 
             {/* Actions */}
