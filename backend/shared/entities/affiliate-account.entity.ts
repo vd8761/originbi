@@ -3,11 +3,13 @@ import {
     PrimaryGeneratedColumn,
     Column,
     OneToOne,
+    OneToMany,
     JoinColumn,
     CreateDateColumn,
     UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
+import { AffiliateReferralTransaction } from './affiliate-referral-transaction.entity';
 
 @Entity('affiliate_accounts')
 export class AffiliateAccount {
@@ -89,6 +91,9 @@ export class AffiliateAccount {
     // Metadata (for anything extra)
     @Column({ name: 'metadata', type: 'jsonb', default: () => `'{}'` })
     metadata: any;
+
+    @OneToMany(() => AffiliateReferralTransaction, (transaction) => transaction.affiliate)
+    referralTransactions: AffiliateReferralTransaction[];
 
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
