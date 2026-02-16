@@ -1,8 +1,7 @@
 import { AuthService } from "./auth.service";
-import { PaginatedResponse } from '../types';
+import { PaginatedResponse } from "../types";
 
-const API_URL =
-    process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
+const API_URL = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
 
 export interface AssessmentSession {
     id: string;
@@ -47,7 +46,13 @@ export const assessmentService = {
         search?: string,
         sortBy?: string,
         sortOrder?: "ASC" | "DESC",
-        filters?: { start_date?: string; end_date?: string; status?: string; userId?: string; type?: 'individual' | 'group' }
+        filters?: {
+            start_date?: string;
+            end_date?: string;
+            status?: string;
+            userId?: string;
+            type?: "individual" | "group";
+        },
     ): Promise<PaginatedResponse<AssessmentSession>> {
         const params = new URLSearchParams();
         params.set("page", page.toString());
@@ -63,13 +68,16 @@ export const assessmentService = {
 
         const token = AuthService.getToken();
 
-        const res = await fetch(`${API_URL}/admin/assessments/sessions?${params.toString()}`, {
-            method: "GET",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: token ? `Bearer ${token}` : "",
+        const res = await fetch(
+            `${API_URL}/admin/assessments/sessions?${params.toString()}`,
+            {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: token ? `Bearer ${token}` : "",
+                },
             },
-        });
+        );
 
         if (!res.ok) {
             throw new Error("Failed to fetch assessment sessions");
@@ -99,7 +107,8 @@ export const assessmentService = {
                 Authorization: token ? `Bearer ${token}` : "",
             },
         });
-        if (!res.ok) throw new Error("Failed to fetch assessment session details");
+        if (!res.ok)
+            throw new Error("Failed to fetch assessment session details");
         return res.json();
     },
 
@@ -112,7 +121,26 @@ export const assessmentService = {
                 Authorization: token ? `Bearer ${token}` : "",
             },
         });
-        if (!res.ok) throw new Error("Failed to fetch group assessment details");
+        if (!res.ok)
+            throw new Error("Failed to fetch group assessment details");
         return res.json();
-    }
+    },
+
+    async getGroupDepartmentStats(
+        groupId: string,
+    ): Promise<{ departments: any[] }> {
+        const token = AuthService.getToken();
+        const res = await fetch(
+            `${API_URL}/admin/assessments/group/${groupId}/department-stats`,
+            {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: token ? `Bearer ${token}` : "",
+                },
+            },
+        );
+        if (!res.ok) throw new Error("Failed to fetch group department stats");
+        return res.json();
+    },
 };

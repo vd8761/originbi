@@ -14,7 +14,10 @@ import {
   AciTraitValueNote,
   AciTrait,
   AciValue,
+  Registration,
 } from '@originbi/shared-entities';
+import { Department } from '../departments/department.entity';
+import { DepartmentDegree } from '../departments/department-degree.entity';
 import { AssessmentGenerationService } from './assessment-generation.service';
 import { AssessmentService } from './assessment.service';
 import { AssessmentController } from './assessment.controller';
@@ -35,10 +38,13 @@ import { AssessmentController } from './assessment.controller';
       AciTraitValueNote,
       AciTrait,
       AciValue,
+      Department,
+      DepartmentDegree,
+      Registration,
     ]),
   ],
   controllers: [AssessmentController],
   providers: [AssessmentGenerationService, AssessmentService],
   exports: [TypeOrmModule, AssessmentGenerationService, AssessmentService],
 })
-export class AssessmentModule { }
+export class AssessmentModule {}
