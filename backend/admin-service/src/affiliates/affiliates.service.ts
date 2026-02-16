@@ -8,6 +8,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import * as nodemailer from 'nodemailer';
+import { SES } from 'aws-sdk';
 
 import {
     User as AdminUser,
@@ -15,6 +17,7 @@ import {
 } from '@originbi/shared-entities';
 import { CreateAffiliateDto, UpdateAffiliateDto } from './dto/create-affiliate.dto';
 import { R2Service, R2UploadResult } from '../r2/r2.service';
+import { getAffiliateWelcomeEmailTemplate } from '../mail/templates/affiliate-welcome.template';
 
 @Injectable()
 export class AffiliatesService {
@@ -101,7 +104,7 @@ export class AffiliatesService {
         const referralCode = await this.generateUniqueReferralCode();
 
         try {
-            return await this.dataSource.transaction(async (manager) => {
+            const affiliate = await this.dataSource.transaction(async (manager) => {
                 const user = manager.create(AdminUser, {
                     email: dto.email,
                     role: 'AFFILIATE',
@@ -112,7 +115,7 @@ export class AffiliatesService {
                 });
                 await manager.save(user);
 
-                const affiliate = manager.create(AffiliateAccount, {
+                const affiliateAccount = manager.create(AffiliateAccount, {
                     userId: user.id,
                     name: dto.name,
                     email: dto.email,
@@ -128,9 +131,35 @@ export class AffiliatesService {
                     ifscCode: dto.ifscCode ?? null,
                     branchName: dto.branchName ?? null,
                 });
-                await manager.save(affiliate);
-                return affiliate;
+                await manager.save(affiliateAccount);
+                return affiliateAccount;
             });
+
+            // Send Welcome Email after successful creation
+            try {
+                const referralBaseUrl = process.env.REFERAL_BASE_URL || '';
+                const fullReferralLink = `${referralBaseUrl}?ref=${referralCode}`;
+
+                // Redirection URL for affiliate login
+                const affiliateLoginUrl = 'https://mind.originbi.com/affiliate/login';
+
+                await this.sendWelcomeEmail(
+                    dto.email,
+                    dto.name,
+                    dto.password,
+                    dto.mobileNumber,
+                    dto.countryCode ?? '+91',
+                    dto.commissionPercentage ?? 0,
+                    fullReferralLink,
+                    affiliateLoginUrl,
+                );
+                this.logger.log(`Welcome email sent to affiliate: ${dto.email}`);
+            } catch (emailErr: any) {
+                this.logger.error(`Failed to send welcome email to affiliate ${dto.email}: ${emailErr.message}`, emailErr.stack);
+                // Don't fail the creation if email fails
+            }
+
+            return affiliate;
         } catch (e: any) {
             throw new BadRequestException(`Affiliate creation failed: ${e.message}`);
         }
@@ -254,5 +283,68 @@ export class AffiliatesService {
         await this.affiliateRepo.save(affiliate);
 
         return { message: 'Documents uploaded successfully', aadharDocuments: affiliate.aadharDocuments, panDocuments: affiliate.panDocuments };
+    }
+
+    // ---------------------------------------------------------
+    // Helper: Send Welcome Email to Affiliate
+    // ---------------------------------------------------------
+    private async sendWelcomeEmail(
+        to: string,
+        name: string,
+        pass: string,
+        mobile: string,
+        countryCode: string,
+        commissionPercentage: number,
+        referralLink: string,
+        loginUrl: string,
+    ) {
+        const ses = new SES({
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+            sessionToken: process.env.AWS_SESSION_TOKEN,
+            region: process.env.AWS_REGION,
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        const transporter = nodemailer.createTransport({
+            SES: ses,
+        } as any);
+
+        const ccEmail = process.env.EMAIL_CC || '';
+        const frontendUrl = process.env.FRONTEND_URL ?? '';
+        const backendUrl = process.env.BACKEND_URL ?? '';
+
+        const fromName = process.env.EMAIL_SEND_FROM_NAME || 'Origin BI (Affiliate)';
+        const fromEmail = process.env.EMAIL_FROM || 'no-reply@originbi.com';
+        const fromAddress = `"${fromName}" <${fromEmail}>`;
+
+        const assets = {
+            popper: `${backendUrl}/assets/Popper.png`,
+            pattern: `${backendUrl}/assets/Pattern_mask.png`,
+            footer: `${backendUrl}/assets/Email_Vector.png`,
+            logo: `${backendUrl}/assets/logo.png`,
+        };
+
+        const html = getAffiliateWelcomeEmailTemplate(
+            name,
+            to,
+            pass,
+            mobile,
+            countryCode,
+            commissionPercentage,
+            referralLink,
+            loginUrl,
+            assets,
+        );
+
+        const mailOptions = {
+            from: fromAddress,
+            to,
+            cc: ccEmail,
+            subject: 'Welcome to OriginBI - Affiliate Partner Account Created',
+            html: html,
+        };
+
+        return transporter.sendMail(mailOptions);
     }
 }
