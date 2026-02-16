@@ -10,11 +10,12 @@ import {
 } from '../icons';
 import AffiliateTable from "./AffiliateTable";
 import AddAffiliateForm from "./AddAffiliateForm";
+import AffiliateDetailsView from "./AffiliateDetailsView";
 
 const API_BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "";
 
 const AffiliateManagement: React.FC = () => {
-    const [view, setView] = useState<"list" | "form">("list");
+    const [view, setView] = useState<"list" | "form" | "details">("list");
     const [selectedAffiliate, setSelectedAffiliate] = useState<any | null>(null);
 
     // Data state
@@ -78,6 +79,19 @@ const AffiliateManagement: React.FC = () => {
                     fetchAffiliates();
                 }}
                 initialData={selectedAffiliate}
+            />
+        );
+    }
+
+    // Details view
+    if (view === "details" && selectedAffiliate) {
+        return (
+            <AffiliateDetailsView
+                data={selectedAffiliate}
+                onBack={() => {
+                    setView("list");
+                    setSelectedAffiliate(null);
+                }}
             />
         );
     }
@@ -194,6 +208,10 @@ const AffiliateManagement: React.FC = () => {
                     onEdit={(affiliate) => {
                         setSelectedAffiliate(affiliate);
                         setView("form");
+                    }}
+                    onView={(affiliate) => {
+                        setSelectedAffiliate(affiliate);
+                        setView("details");
                     }}
                 />
             </div>

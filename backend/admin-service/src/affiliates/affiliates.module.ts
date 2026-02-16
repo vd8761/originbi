@@ -5,6 +5,7 @@ import { HttpModule } from '@nestjs/axios';
 import {
     User as AdminUser,
     AffiliateAccount,
+    AffiliateReferralTransaction,
 } from '@originbi/shared-entities';
 
 import { AffiliatesService } from './affiliates.service';
@@ -12,7 +13,7 @@ import { AffiliatesController } from './affiliates.controller';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([AdminUser, AffiliateAccount]),
+        TypeOrmModule.forFeature([AdminUser, AffiliateAccount, AffiliateReferralTransaction]),
         HttpModule,
     ],
     providers: [AffiliatesService],

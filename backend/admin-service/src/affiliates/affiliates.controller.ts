@@ -6,9 +6,16 @@ import {
     Query,
     Param,
     Patch,
+    UploadedFiles,
+    UseInterceptors,
+    BadRequestException,
 } from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { AffiliatesService } from './affiliates.service';
 import { CreateAffiliateDto, UpdateAffiliateDto } from './dto/create-affiliate.dto';
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_FILES_PER_TYPE = 5;
 
 @Controller('admin/affiliates')
 export class AffiliatesController {
@@ -17,6 +24,76 @@ export class AffiliatesController {
     @Post()
     async create(@Body() dto: CreateAffiliateDto) {
         return this.affiliatesService.create(dto);
+    }
+
+    /**
+     * Upload KYC documents for an affiliate.
+     * Accepts multipart form data with fields:
+     *   - aadhar: up to 5 files, each max 5MB
+     *   - pan: up to 5 files, each max 5MB
+     */
+    @Post(':id/documents')
+    @UseInterceptors(
+        FileFieldsInterceptor(
+            [
+                { name: 'aadhar', maxCount: MAX_FILES_PER_TYPE },
+                { name: 'pan', maxCount: MAX_FILES_PER_TYPE },
+            ],
+            {
+                limits: {
+                    fileSize: MAX_FILE_SIZE,
+                    files: MAX_FILES_PER_TYPE * 2,
+                },
+                fileFilter: (_req, file, cb) => {
+                    // Allow images and PDFs
+                    const allowed = [
+                        'image/jpeg',
+                        'image/png',
+                        'image/webp',
+                        'image/gif',
+                        'application/pdf',
+                    ];
+                    if (allowed.includes(file.mimetype)) {
+                        cb(null, true);
+                    } else {
+                        cb(
+                            new BadRequestException(
+                                `Invalid file type: ${file.mimetype}. Allowed: JPEG, PNG, WebP, GIF, PDF`,
+                            ),
+                            false,
+                        );
+                    }
+                },
+            },
+        ),
+    )
+    async uploadDocuments(
+        @Param('id') id: string,
+        @UploadedFiles()
+        files: {
+            aadhar?: Express.Multer.File[];
+            pan?: Express.Multer.File[];
+        },
+    ) {
+        if (!files.aadhar?.length && !files.pan?.length) {
+            throw new BadRequestException('At least one file must be uploaded');
+        }
+
+        // Validate individual file sizes (belt and suspenders)
+        const allFiles = [...(files.aadhar || []), ...(files.pan || [])];
+        for (const file of allFiles) {
+            if (file.size > MAX_FILE_SIZE) {
+                throw new BadRequestException(
+                    `File "${file.originalname}" exceeds the 5MB size limit (${(file.size / 1024 / 1024).toFixed(1)}MB)`,
+                );
+            }
+        }
+
+        return this.affiliatesService.uploadDocuments(
+            Number(id),
+            files.aadhar || [],
+            files.pan || [],
+        );
     }
 
     @Get()
