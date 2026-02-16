@@ -5,9 +5,10 @@ import {
     Post,
     Query,
     Param,
+    Patch,
 } from '@nestjs/common';
 import { AffiliatesService } from './affiliates.service';
-import { CreateAffiliateDto } from './dto/create-affiliate.dto';
+import { CreateAffiliateDto, UpdateAffiliateDto } from './dto/create-affiliate.dto';
 
 @Controller('admin/affiliates')
 export class AffiliatesController {
@@ -40,5 +41,10 @@ export class AffiliatesController {
     @Get(':id')
     async findById(@Param('id') id: string) {
         return this.affiliatesService.findById(Number(id));
+    }
+
+    @Patch(':id')
+    async update(@Param('id') id: string, @Body() dto: UpdateAffiliateDto) {
+        return this.affiliatesService.update(Number(id), dto);
     }
 }

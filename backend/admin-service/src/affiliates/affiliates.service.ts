@@ -13,7 +13,7 @@ import {
     User as AdminUser,
     AffiliateAccount,
 } from '@originbi/shared-entities';
-import { CreateAffiliateDto } from './dto/create-affiliate.dto';
+import { CreateAffiliateDto, UpdateAffiliateDto } from './dto/create-affiliate.dto';
 
 @Injectable()
 export class AffiliatesService {
@@ -337,6 +337,38 @@ export class AffiliatesService {
         if (!affiliate) {
             throw new BadRequestException('Affiliate not found');
         }
+        return affiliate;
+    }
+
+    // ---------------------------------------------------------
+    // UPDATE
+    // ---------------------------------------------------------
+    async update(id: number, dto: UpdateAffiliateDto) {
+        const affiliate = await this.affiliateRepo.findOne({
+            where: { id },
+            relations: ['user'],
+        });
+        if (!affiliate) {
+            throw new BadRequestException('Affiliate not found');
+        }
+
+        // Update AffiliateAccount fields
+        if (dto.name) affiliate.name = dto.name;
+        if (dto.countryCode) affiliate.countryCode = dto.countryCode;
+        if (dto.mobileNumber) affiliate.mobileNumber = dto.mobileNumber;
+        if (dto.address !== undefined) affiliate.address = dto.address;
+        if (dto.commissionPercentage !== undefined) affiliate.commissionPercentage = dto.commissionPercentage;
+        if (dto.upiId !== undefined) affiliate.upiId = dto.upiId;
+        if (dto.upiNumber !== undefined) affiliate.upiNumber = dto.upiNumber;
+        if (dto.bankingName !== undefined) affiliate.bankingName = dto.bankingName;
+        if (dto.accountNumber !== undefined) affiliate.accountNumber = dto.accountNumber;
+        if (dto.ifscCode !== undefined) affiliate.ifscCode = dto.ifscCode;
+        if (dto.branchName !== undefined) affiliate.branchName = dto.branchName;
+        if (dto.aadharUrl) affiliate.aadharUrl = dto.aadharUrl;
+        if (dto.panUrl) affiliate.panUrl = dto.panUrl;
+
+        await this.affiliateRepo.save(affiliate);
+
         return affiliate;
     }
 

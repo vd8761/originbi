@@ -166,19 +166,23 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
                 branchName: formData.branchName || undefined,
             };
 
-            const res = await fetch(`${API_BASE}/admin/affiliates`, {
-                method: "POST",
+            const url = isEditMode
+                ? `${API_BASE}/admin/affiliates/${initialData.id}`
+                : `${API_BASE}/admin/affiliates`;
+
+            const res = await fetch(url, {
+                method: isEditMode ? "PATCH" : "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
             });
 
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.message || `Failed to create affiliate (${res.status})`);
+                throw new Error(errData.message || `Failed to ${isEditMode ? "update" : "create"} affiliate (${res.status})`);
             }
 
             const data = await res.json();
-            setCreatedReferralCode(data.referralCode || null);
+            if (!isEditMode) setCreatedReferralCode(data.referralCode || null);
             onSubmit();
         } catch (err: any) {
             setError(err.message || `Failed to ${isEditMode ? "update" : "create"} affiliate`);
