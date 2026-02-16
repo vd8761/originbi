@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
     PlusIcon,
@@ -11,113 +11,17 @@ import {
 import AffiliateTable from "./AffiliateTable";
 import AddAffiliateForm from "./AddAffiliateForm";
 
-// Mock data for UI demonstration (will be replaced with real API calls later)
-const MOCK_AFFILIATES = [
-    {
-        id: "1",
-        name: "Rahul Sharma",
-        country_code: "+91",
-        mobile_number: "9876543210",
-        upi_id: "rahul@upi",
-        upi_number: "9876543210",
-        banking_name: "State Bank of India",
-        account_number: "****5678",
-        ifsc_code: "SBIN0001234",
-        branch_name: "Coimbatore Main",
-        commission_percentage: 10,
-        referral_code: "RAHUL10",
-        total_earned_commission: 15000,
-        total_settled_commission: 12000,
-        total_pending_commission: 3000,
-        is_active: true,
-        created_at: "2026-01-15",
-    },
-    {
-        id: "2",
-        name: "Priya Patel",
-        country_code: "+91",
-        mobile_number: "9123456789",
-        upi_id: "priya@ybl",
-        upi_number: "9123456789",
-        banking_name: "HDFC Bank",
-        account_number: "****1234",
-        ifsc_code: "HDFC0001234",
-        branch_name: "Chennai T. Nagar",
-        commission_percentage: 12,
-        referral_code: "PRIYA12",
-        total_earned_commission: 28500,
-        total_settled_commission: 25000,
-        total_pending_commission: 3500,
-        is_active: true,
-        created_at: "2026-01-20",
-    },
-    {
-        id: "3",
-        name: "Arjun Kumar",
-        country_code: "+91",
-        mobile_number: "8765432109",
-        upi_id: "arjun@paytm",
-        upi_number: "8765432109",
-        banking_name: "ICICI Bank",
-        account_number: "****9012",
-        ifsc_code: "ICIC0001234",
-        branch_name: "Bangalore MG Road",
-        commission_percentage: 8,
-        referral_code: "ARJUN8",
-        total_earned_commission: 9200,
-        total_settled_commission: 7000,
-        total_pending_commission: 2200,
-        is_active: false,
-        created_at: "2026-02-01",
-    },
-    {
-        id: "4",
-        name: "Sneha Reddy",
-        country_code: "+91",
-        mobile_number: "7654321098",
-        upi_id: "sneha@oksbi",
-        upi_number: "7654321098",
-        banking_name: "Axis Bank",
-        account_number: "****3456",
-        ifsc_code: "UTIB0001234",
-        branch_name: "Hyderabad Jubilee",
-        commission_percentage: 15,
-        referral_code: "SNEHA15",
-        total_earned_commission: 42000,
-        total_settled_commission: 38000,
-        total_pending_commission: 4000,
-        is_active: true,
-        created_at: "2026-02-05",
-    },
-    {
-        id: "5",
-        name: "Vikram Singh",
-        country_code: "+91",
-        mobile_number: "6543210987",
-        upi_id: "vikram@gpay",
-        upi_number: "6543210987",
-        banking_name: "Kotak Mahindra Bank",
-        account_number: "****7890",
-        ifsc_code: "KKBK0001234",
-        branch_name: "Delhi Connaught Place",
-        commission_percentage: 10,
-        referral_code: "VIKRAM10",
-        total_earned_commission: 18700,
-        total_settled_commission: 15000,
-        total_pending_commission: 3700,
-        is_active: true,
-        created_at: "2026-02-10",
-    },
-];
+const API_BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "";
 
 const AffiliateManagement: React.FC = () => {
     const [view, setView] = useState<"list" | "form">("list");
     const [selectedAffiliate, setSelectedAffiliate] = useState<any | null>(null);
 
-    // Data state (mock for now)
-    const [affiliates] = useState<any[]>(MOCK_AFFILIATES);
-    const [loading] = useState<boolean>(false);
-    const [error] = useState<string | null>(null);
+    // Data state
+    const [affiliates, setAffiliates] = useState<any[]>([]);
+    const [loading, setLoading] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
+    const [totalCount, setTotalCount] = useState(0);
 
     // Pagination & filter
     const [currentPage, setCurrentPage] = useState(1);
@@ -125,24 +29,36 @@ const AffiliateManagement: React.FC = () => {
     const [showEntriesDropdown, setShowEntriesDropdown] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
 
-    const totalCount = affiliates.length;
+    // Fetch affiliates from real API
+    const fetchAffiliates = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const params = new URLSearchParams({
+                page: String(currentPage),
+                limit: String(entriesPerPage),
+            });
+            if (searchTerm.trim()) {
+                params.set("search", searchTerm.trim());
+            }
+            const res = await fetch(`${API_BASE}/admin/affiliates?${params.toString()}`);
+            if (!res.ok) throw new Error(`Failed to load affiliates (${res.status})`);
+            const json = await res.json();
+            setAffiliates(json.data || []);
+            setTotalCount(json.total || 0);
+        } catch (err: any) {
+            setError(err.message || "Failed to fetch affiliates");
+            setAffiliates([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [currentPage, entriesPerPage, searchTerm]);
 
-    // Filter by search
-    const filteredAffiliates = affiliates.filter((a) => {
-        const term = searchTerm.toLowerCase();
-        return (
-            a.name.toLowerCase().includes(term) ||
-            a.referral_code.toLowerCase().includes(term) ||
-            a.mobile_number.includes(term)
-        );
-    });
+    useEffect(() => {
+        fetchAffiliates();
+    }, [fetchAffiliates]);
 
-    const totalPages = Math.ceil(filteredAffiliates.length / entriesPerPage) || 1;
-
-    const paginatedAffiliates = filteredAffiliates.slice(
-        (currentPage - 1) * entriesPerPage,
-        currentPage * entriesPerPage
-    );
+    const totalPages = Math.ceil(totalCount / entriesPerPage) || 1;
 
     const handlePageChange = (page: number) => {
         if (page >= 1 && page <= totalPages) setCurrentPage(page);
@@ -159,6 +75,7 @@ const AffiliateManagement: React.FC = () => {
                 onSubmit={() => {
                     setView("list");
                     setSelectedAffiliate(null);
+                    fetchAffiliates();
                 }}
                 initialData={selectedAffiliate}
             />
@@ -251,7 +168,7 @@ const AffiliateManagement: React.FC = () => {
                             )}
                         </div>
                         <span className="text-sm text-[#19211C] dark:text-brand-text-secondary whitespace-nowrap font-[300]">
-                            of {filteredAffiliates.length.toLocaleString()} entries
+                            of {totalCount.toLocaleString()} entries
                         </span>
                     </div>
 
@@ -271,7 +188,7 @@ const AffiliateManagement: React.FC = () => {
             {/* Table */}
             <div className="flex-1 min-h-[300px] relative flex flex-col">
                 <AffiliateTable
-                    affiliates={paginatedAffiliates}
+                    affiliates={affiliates}
                     loading={loading}
                     error={error}
                     onEdit={(affiliate) => {

@@ -14,7 +14,7 @@ interface AddAffiliateFormProps {
     initialData?: any;
 }
 
-const REFERRAL_BASE_URL = "https://discover.originbi.com/register?ref=";
+
 
 const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
     onCancel,
@@ -37,7 +37,6 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
         ifscCode: initialData?.ifsc_code || "",
         branchName: initialData?.branch_name || "",
         commissionPercentage: initialData?.commission_percentage || "",
-        referralCode: initialData?.referral_code || "",
     });
 
     const [showPassword, setShowPassword] = useState(false);
@@ -50,16 +49,14 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-    const [linkCopied, setLinkCopied] = useState(false);
+    const [createdReferralCode, setCreatedReferralCode] = useState<string | null>(null);
 
     const aadharInputRef = useRef<HTMLInputElement>(null);
     const panInputRef = useRef<HTMLInputElement>(null);
 
     const MAX_FILE_SIZE = 500 * 1024; // 500 KB
 
-    const referralLink = formData.referralCode
-        ? `${REFERRAL_BASE_URL}${formData.referralCode}`
-        : "";
+    const API_BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "";
 
     const handleInputChange = (field: string, value: string) => {
         setFormData((prev) => ({ ...prev, [field]: value }));
@@ -126,11 +123,13 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
         if (!formData.name.trim()) errors.name = "Required";
         if (!formData.email.trim()) errors.email = "Required";
         else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = "Invalid email";
-        if (!formData.password.trim()) errors.password = "Required";
-        else if (formData.password.length < 8) errors.password = "Min 8 characters";
+        if (!isEditMode) {
+            if (!formData.password.trim()) errors.password = "Required";
+            else if (formData.password.length < 8) errors.password = "Min 8 characters";
+        }
         if (!formData.mobileNumber.trim()) errors.mobileNumber = "Required";
         if (!formData.commissionPercentage) errors.commissionPercentage = "Required";
-        if (!formData.referralCode.trim()) errors.referralCode = "Required";
+
         const commNum = parseFloat(formData.commissionPercentage);
         if (formData.commissionPercentage && (commNum < 0 || commNum > 100)) {
             errors.commissionPercentage = "Must be between 0 and 100";
@@ -149,9 +148,37 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
     const handleSubmit = async () => {
         if (!validateForm()) return;
         setIsLoading(true);
+        setError(null);
         try {
-            // TODO: Replace with real API call
-            await new Promise((resolve) => setTimeout(resolve, 1000));
+            const payload = {
+                name: formData.name,
+                email: formData.email,
+                ...(isEditMode ? {} : { password: formData.password }),
+                countryCode: formData.countryCode,
+                mobileNumber: formData.mobileNumber,
+                address: formData.address || undefined,
+                commissionPercentage: parseFloat(formData.commissionPercentage) || 0,
+                upiId: formData.upiId || undefined,
+                upiNumber: formData.upiNumber || undefined,
+                bankingName: formData.bankingName || undefined,
+                accountNumber: formData.accountNumber || undefined,
+                ifscCode: formData.ifscCode || undefined,
+                branchName: formData.branchName || undefined,
+            };
+
+            const res = await fetch(`${API_BASE}/admin/affiliates`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.message || `Failed to create affiliate (${res.status})`);
+            }
+
+            const data = await res.json();
+            setCreatedReferralCode(data.referralCode || null);
             onSubmit();
         } catch (err: any) {
             setError(err.message || `Failed to ${isEditMode ? "update" : "create"} affiliate`);
@@ -160,13 +187,7 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
         }
     };
 
-    const generateReferralCode = () => {
-        const base = formData.name
-            ? formData.name.split(" ")[0].toUpperCase().slice(0, 6)
-            : "AFF";
-        const code = `${base}${Math.floor(Math.random() * 900 + 100)}`;
-        handleInputChange("referralCode", code);
-    };
+
 
     const generatePassword = () => {
         const chars =
@@ -179,24 +200,7 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
         setShowPassword(true);
     };
 
-    const copyReferralLink = async () => {
-        if (!referralLink) return;
-        try {
-            await navigator.clipboard.writeText(referralLink);
-            setLinkCopied(true);
-            setTimeout(() => setLinkCopied(false), 2000);
-        } catch {
-            // Fallback
-            const textarea = document.createElement("textarea");
-            textarea.value = referralLink;
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand("copy");
-            document.body.removeChild(textarea);
-            setLinkCopied(true);
-            setTimeout(() => setLinkCopied(false), 2000);
-        }
-    };
+
 
     const baseInputClasses =
         "w-full h-[50px] bg-gray-50 dark:bg-white/10 border border-transparent dark:border-transparent rounded-xl px-4 text-sm text-black dark:text-white placeholder-black/40 dark:placeholder-white/60 focus:border-brand-green focus:outline-none transition-all";
@@ -285,48 +289,50 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
                                 value={formData.email}
                                 onChange={(e) => handleInputChange("email", e.target.value)}
                                 placeholder="affiliate@example.com"
-                                className={`${baseInputClasses} ${formErrors.email ? "border-red-500/50" : ""}`}
+                                disabled={isEditMode}
+                                className={`${baseInputClasses} ${formErrors.email ? "border-red-500/50" : ""} ${isEditMode ? "opacity-60 cursor-not-allowed" : ""}`}
                             />
                             {formErrors.email && <p className="text-xs text-red-500 ml-1">{formErrors.email}</p>}
                         </div>
 
-                        {/* Password */}
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between px-1">
-                                <label className={baseLabelClasses}>
-                                    Password <span className="text-red-500">*</span>
-                                </label>
-                                <button
-                                    type="button"
-                                    onClick={generatePassword}
-                                    className="text-[11px] font-bold text-brand-green hover:text-brand-green/80 cursor-pointer transition-colors"
-                                >
-                                    Generate Password
-                                </button>
+                        {!isEditMode && (
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between px-1">
+                                    <label className={baseLabelClasses}>
+                                        Password <span className="text-red-500">*</span>
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={generatePassword}
+                                        className="text-[11px] font-bold text-brand-green hover:text-brand-green/80 cursor-pointer transition-colors"
+                                    >
+                                        Generate Password
+                                    </button>
+                                </div>
+                                <div className="relative">
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        value={formData.password}
+                                        onChange={(e) => handleInputChange("password", e.target.value)}
+                                        placeholder="Min 8 characters"
+                                        className={`${baseInputClasses} pr-10 ${formErrors.password ? "border-red-500/50" : ""}`}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors cursor-pointer"
+                                        title={showPassword ? "Hide password" : "Show password"}
+                                    >
+                                        {showPassword ? (
+                                            <EyeOffIcon className="w-4 h-4 text-brand-green" />
+                                        ) : (
+                                            <EyeVisibleIcon className="w-4 h-4 text-brand-green" />
+                                        )}
+                                    </button>
+                                </div>
+                                {formErrors.password && <p className="text-xs text-red-500 ml-1">{formErrors.password}</p>}
                             </div>
-                            <div className="relative">
-                                <input
-                                    type={showPassword ? "text" : "password"}
-                                    value={formData.password}
-                                    onChange={(e) => handleInputChange("password", e.target.value)}
-                                    placeholder="Min 8 characters"
-                                    className={`${baseInputClasses} pr-10 ${formErrors.password ? "border-red-500/50" : ""}`}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors cursor-pointer"
-                                    title={showPassword ? "Hide password" : "Show password"}
-                                >
-                                    {showPassword ? (
-                                        <EyeOffIcon className="w-4 h-4 text-brand-green" />
-                                    ) : (
-                                        <EyeVisibleIcon className="w-4 h-4 text-brand-green" />
-                                    )}
-                                </button>
-                            </div>
-                            {formErrors.password && <p className="text-xs text-red-500 ml-1">{formErrors.password}</p>}
-                        </div>
+                        )}
 
                         {/* Address */}
                         <div className="space-y-2 lg:col-span-3">
@@ -542,9 +548,9 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
                     </div>
                 </div>
 
-                {/* Section 4 – Commission & Referral */}
+                {/* Section 4 – Commission */}
                 <div className="pt-6 border-t border-gray-100 dark:border-white/5">
-                    <h3 className={sectionHeadingClasses}>Commission & Referral</h3>
+                    <h3 className={sectionHeadingClasses}>Commission</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                         {/* Commission Percentage */}
                         <div className="space-y-2">
@@ -569,71 +575,6 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
                                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-semibold">%</span>
                             </div>
                             {formErrors.commissionPercentage && <p className="text-xs text-red-500 ml-1">{formErrors.commissionPercentage}</p>}
-                        </div>
-
-                        {/* Referral Code */}
-                        <div className="space-y-2">
-                            <label className={baseLabelClasses}>
-                                Referral Code <span className="text-red-500">*</span>
-                            </label>
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="text"
-                                    value={formData.referralCode}
-                                    onChange={(e) => handleInputChange("referralCode", e.target.value.toUpperCase())}
-                                    placeholder="e.g. RAHUL10"
-                                    className={`flex-1 ${baseInputClasses} ${formErrors.referralCode ? "border-red-500/50" : ""}`}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={generateReferralCode}
-                                    className="h-[50px] px-4 bg-brand-green/10 hover:bg-brand-green/20 text-brand-green text-xs font-semibold rounded-xl transition-colors whitespace-nowrap cursor-pointer border border-brand-green/20"
-                                    title="Auto-generate code"
-                                >
-                                    Generate
-                                </button>
-                            </div>
-                            {formErrors.referralCode && <p className="text-xs text-red-500 ml-1">{formErrors.referralCode}</p>}
-
-                            {/* Referral Link with Copy */}
-                            {formData.referralCode && (
-                                <div className="mt-2 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 p-3">
-                                    <div className="flex items-center justify-between mb-1.5 px-1">
-                                        <div className="flex items-center gap-2">
-                                            <svg className="w-3.5 h-3.5 text-brand-green flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                                            </svg>
-                                            <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-gray-500 tracking-wider">Referral Link</span>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={copyReferralLink}
-                                            className={`flex items-center gap-1.5 text-[11px] font-bold transition-all cursor-pointer ${linkCopied ? "text-brand-green" : "text-brand-green hover:text-brand-green/80"}`}
-                                        >
-                                            {linkCopied ? (
-                                                <>
-                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                                                    </svg>
-                                                    Copied!
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                                                    </svg>
-                                                    Copy Link
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
-                                    <div className="bg-white dark:bg-white/10 rounded-lg px-3 py-2 border border-gray-100 dark:border-white/10">
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate select-all font-mono">
-                                            {referralLink}
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
