@@ -53,7 +53,7 @@ const NavItem: React.FC<NavItemProps> = ({
 
     const spacingClass = isMobile
         ? "gap-3"
-        : "justify-center gap-1 2xl:gap-1";
+        : "justify-center gap-2";
 
     return (
         <div className="relative group">

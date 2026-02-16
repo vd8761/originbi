@@ -54,7 +54,7 @@ const NavItem: React.FC<NavItemProps> = ({
   const showDesktopText = "hidden lg:inline";
   const spacingClass = isMobile
     ? "gap-3"
-    : "justify-center gap-1.5 2xl:gap-2";
+    : "justify-center gap-2";
 
   return (
     <div className="relative group">
@@ -72,8 +72,8 @@ const NavItem: React.FC<NavItemProps> = ({
           {icon}
         </div>
         <span
-          // TEXT SCALING: text-xs on Laptop, text-sm on 2XL
-          className={`font-medium text-xs 2xl:text-[12px] whitespace-nowrap ${isMobile ? "inline ml-2" : showDesktopText
+          // TEXT SCALING: text-[10.5px] on Laptop, text-[11.5px] on 2XL
+          className={`font-medium ${isMobile ? "text-sm" : "text-[10.5px] 2xl:text-[11.5px]"} whitespace-nowrap ${isMobile ? "inline" : showDesktopText
             }`}
         >
           {label}

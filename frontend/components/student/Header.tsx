@@ -49,7 +49,7 @@ const NavItem: React.FC<NavItemProps> = ({
 
     const spacingClass = isMobile
         ? "gap-3"
-        : "justify-center gap-1 2xl:gap-1";
+        : "justify-center gap-2";
 
     return (
         <div className="relative group">
@@ -68,7 +68,7 @@ const NavItem: React.FC<NavItemProps> = ({
                 </div>
                 <span
                     // TEXT SCALING: text-[10.5px] on Laptop, text-[11.5px] on 2XL
-                    className={`font-medium ${isMobile ? "text-sm" : "text-[10.5px] 2xl:text-[11.5px]"} whitespace-nowrap 2xl:ml-1.5 ${isMobile ? "inline" : showDesktopText
+                    className={`font-medium ${isMobile ? "text-sm ml-2" : "text-[10.5px] 2xl:text-[11.5px]"} whitespace-nowrap ${isMobile ? "inline" : showDesktopText
                         }`}
                 >
                     {label}
