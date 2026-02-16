@@ -24,7 +24,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 interface HeaderProps {
     onLogout: () => void;
     // Combined views for flexibility, or just string
-    currentView?: "dashboard" | "assessment" | "registrations" | "jobs" | "origindata" | "settings" | "programs" | "corporate" | "counselling";
+    currentView?: "dashboard" | "assessment" | "registrations" | "jobs" | "origindata" | "settings" | "programs" | "corporate" | "counselling" | "affiliates";
     portalMode?: "student" | "corporate" | "admin";
     onSwitchPortal?: () => void;
     onNavigate?: (view: any) => void;
@@ -201,6 +201,7 @@ const Header: React.FC<HeaderProps> = ({
     const pathname = usePathname();
     const activeView = (() => {
         // More specific checks first
+        if (pathname.includes('/affiliates')) return 'affiliates';
         if (pathname.includes('/corporate')) return 'corporate';
         if (pathname.includes('/registrations')) return 'registrations';
         if (pathname.includes('/programs')) return 'programs';
@@ -260,6 +261,13 @@ const Header: React.FC<HeaderProps> = ({
                         active={activeView === 'counselling'}
                         isMobile={isMobile}
                         onClick={() => handleNavClick('counselling')}
+                    />
+                    <NavItem
+                        icon={<CoinIcon className="w-4 h-4" />}
+                        label="Affiliates"
+                        active={activeView === 'affiliates'}
+                        isMobile={isMobile}
+                        onClick={() => handleNavClick('affiliates')}
                     />
                     <NavItem icon={<SettingsIcon />} label="Settings" isMobile={isMobile} />
                 </>
