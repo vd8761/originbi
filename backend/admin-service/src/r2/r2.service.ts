@@ -5,7 +5,9 @@ import {
     PutObjectCommand,
     DeleteObjectCommand,
     ListObjectsV2Command,
+    GetObjectCommand,
 } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 export interface R2UploadResult {
     key: string;
@@ -112,6 +114,19 @@ export class R2Service {
         }
 
         return results;
+    }
+
+    /**
+     * Generate a temporary signed URL for a private file.
+     * Default expiry: 3600 seconds (1 hour)
+     */
+    async getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
+        const command = new GetObjectCommand({
+            Bucket: this.bucketName,
+            Key: key,
+        });
+
+        return getSignedUrl(this.s3, command, { expiresIn });
     }
 
     /**

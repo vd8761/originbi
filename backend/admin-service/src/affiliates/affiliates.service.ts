@@ -14,7 +14,7 @@ import {
     AffiliateAccount,
 } from '@originbi/shared-entities';
 import { CreateAffiliateDto, UpdateAffiliateDto } from './dto/create-affiliate.dto';
-import { R2Service } from '../r2/r2.service';
+import { R2Service, R2UploadResult } from '../r2/r2.service';
 
 @Injectable()
 export class AffiliatesService {
@@ -33,9 +33,6 @@ export class AffiliatesService {
         private readonly r2Service: R2Service,
     ) { }
 
-    // ---------------------------------------------------------
-    // Helper: Retry with exponential backoff
-    // ---------------------------------------------------------
     private async withRetry<T>(
         operation: () => Promise<T>,
         retries = 5,
@@ -43,25 +40,14 @@ export class AffiliatesService {
     ): Promise<T> {
         try {
             return await operation();
-        } catch (error: unknown) {
-            type Retryable = {
-                response?: { status?: number };
-                code?: string;
-                message?: string;
-            };
-            const err =
-                typeof error === 'object' && error !== null ? (error as Retryable) : {};
-
+        } catch (error: any) {
             const isRateLimit =
-                err.response?.status === 429 ||
-                err.code === 'TooManyRequestsException' ||
-                (typeof err.message === 'string' &&
-                    err.message.includes('Too Many Requests'));
+                error.response?.status === 429 ||
+                error.code === 'TooManyRequestsException' ||
+                (error.message && error.message.includes('Too Many Requests'));
 
             if (retries > 0 && isRateLimit) {
-                this.logger.warn(
-                    `Rate limit hit. Retrying in ${delay}ms... (${retries} left)`,
-                );
+                this.logger.warn(`Rate limit hit. Retrying in ${delay}ms... (${retries} left)`);
                 await new Promise((res) => setTimeout(res, delay));
                 return this.withRetry(operation, retries - 1, delay * 2);
             }
@@ -69,133 +55,63 @@ export class AffiliatesService {
         }
     }
 
-    // ---------------------------------------------------------
-    // Helper: Create Cognito user via Auth Service
-    // ---------------------------------------------------------
-    private async createCognitoUser(
-        email: string,
-        password: string,
-        groupName: string = 'AFFILIATE',
-    ) {
+    private async createCognitoUser(email: string, password: string, groupName: string = 'AFFILIATE') {
         try {
             const res = await this.withRetry(() =>
                 firstValueFrom(
-                    this.http.post(
-                        `${this.authServiceBaseUrl}/internal/cognito/users`,
-                        { email, password, groupName },
-                        { proxy: false },
-                    ),
-                ),
+                    this.http.post(`${this.authServiceBaseUrl}/internal/cognito/users`, { email, password, groupName }, { proxy: false })
+                )
             );
-            return res.data as { sub?: string; email?: string };
-        } catch (err: unknown) {
-            type AuthErr = {
-                response?: { data?: any; status?: number };
-                message?: string;
-            };
-            const e = typeof err === 'object' && err !== null ? (err as AuthErr) : {};
-            const authErr = e.response?.data || e.message || err;
-            this.logger.error('Error creating Cognito user for affiliate:', authErr);
-
-            const msg =
-                typeof authErr === 'object' && authErr !== null
-                    ? authErr.message || JSON.stringify(authErr)
-                    : String(authErr);
-
-            throw new InternalServerErrorException(
-                `Failed to create Cognito user: ${msg}`,
-            );
+            return res.data;
+        } catch (err: any) {
+            const authErr = err.response?.data || err.message || err;
+            this.logger.error('Error creating Cognito user:', authErr);
+            throw new InternalServerErrorException(`Failed to create Cognito user: ${authErr.message || JSON.stringify(authErr)}`);
         }
     }
 
-    // ---------------------------------------------------------
-    // Helper: Generate random 8-character alphanumeric code
-    // ---------------------------------------------------------
     private generateReferralCode(): string {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         let code = '';
-        for (let i = 0; i < 8; i++) {
-            code += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
+        for (let i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
         return code;
     }
 
-    // Ensure uniqueness
     private async generateUniqueReferralCode(): Promise<string> {
         let code: string;
         let exists: boolean;
         let attempts = 0;
-        const maxAttempts = 10;
-
         do {
             code = this.generateReferralCode();
-            const existing = await this.affiliateRepo.findOne({
-                where: { referralCode: code },
-            });
+            const existing = await this.affiliateRepo.findOne({ where: { referralCode: code } });
             exists = !!existing;
             attempts++;
-        } while (exists && attempts < maxAttempts);
-
-        if (exists) {
-            throw new InternalServerErrorException(
-                'Unable to generate unique referral code. Please try again.',
-            );
-        }
-
+        } while (exists && attempts < 10);
+        if (exists) throw new InternalServerErrorException('Unable to generate unique referral code');
         return code;
     }
 
-    // ---------------------------------------------------------
-    // CREATE AFFILIATE
-    // ---------------------------------------------------------
     async create(dto: CreateAffiliateDto) {
         dto.email = dto.email.toLowerCase();
-        this.logger.log(`Creating affiliate account for ${dto.email}`);
+        const existingUser = await this.userRepo.findOne({ where: { email: dto.email } });
+        if (existingUser) throw new BadRequestException('Email already registered');
 
-        // 1. Check if email already exists
-        const existingUser = await this.userRepo.findOne({
-            where: { email: dto.email },
-        });
-        if (existingUser) {
-            throw new BadRequestException('Email already registered');
-        }
-
-        const existingAffiliate = await this.affiliateRepo.findOne({
-            where: { email: dto.email },
-        });
-        if (existingAffiliate) {
-            throw new BadRequestException('Affiliate account already exists for this email');
-        }
-
-        // 2. Create Cognito user with "AFFILIATE" group
         const cognitoRes = await this.createCognitoUser(dto.email, dto.password);
         const sub = cognitoRes.sub!;
-        this.logger.log(`Cognito user created with sub: ${sub}`);
-
-        // 3. Generate unique 8-character alphanumeric referral code
         const referralCode = await this.generateUniqueReferralCode();
-        this.logger.log(`Generated referral code: ${referralCode}`);
 
-        // 4. Transaction: Create User + AffiliateAccount
         try {
             return await this.dataSource.transaction(async (manager) => {
-                // A. Create User entity
                 const user = manager.create(AdminUser, {
                     email: dto.email,
                     role: 'AFFILIATE',
                     emailVerified: true,
                     cognitoSub: sub,
                     isActive: true,
-                    isBlocked: false,
-                    metadata: {
-                        fullName: dto.name,
-                        countryCode: dto.countryCode ?? '+91',
-                        mobile: dto.mobileNumber,
-                    },
+                    metadata: { fullName: dto.name, mobile: dto.mobileNumber },
                 });
                 await manager.save(user);
 
-                // B. Create AffiliateAccount entity
                 const affiliate = manager.create(AffiliateAccount, {
                     userId: user.id,
                     name: dto.name,
@@ -204,250 +120,139 @@ export class AffiliatesService {
                     mobileNumber: dto.mobileNumber,
                     address: dto.address ?? null,
                     referralCode,
-                    referralCount: 0,
                     commissionPercentage: dto.commissionPercentage ?? 0,
-                    totalEarnedCommission: 0,
-                    totalSettledCommission: 0,
-                    totalPendingCommission: 0,
                     upiId: dto.upiId ?? null,
                     upiNumber: dto.upiNumber ?? null,
                     bankingName: dto.bankingName ?? null,
                     accountNumber: dto.accountNumber ?? null,
                     ifscCode: dto.ifscCode ?? null,
                     branchName: dto.branchName ?? null,
-                    aadharDocuments: [],
-                    panDocuments: [],
-                    isActive: true,
-                    metadata: {},
                 });
                 await manager.save(affiliate);
-
-                return {
-                    id: affiliate.id,
-                    userId: user.id,
-                    email: user.email,
-                    referralCode: affiliate.referralCode,
-                    name: affiliate.name,
-                };
+                return affiliate;
             });
-        } catch (e: unknown) {
-            this.logger.error('Affiliate creation transaction failed', e);
-            const msg = e instanceof Error ? e.message : String(e);
-            throw new BadRequestException(`Affiliate creation failed: ${msg}`);
+        } catch (e: any) {
+            throw new BadRequestException(`Affiliate creation failed: ${e.message}`);
         }
     }
 
-    // ---------------------------------------------------------
-    // LIST AFFILIATES
-    // ---------------------------------------------------------
-    async findAll(
-        page: number,
-        limit: number,
-        search?: string,
-        sortBy?: string,
-        sortOrder: 'ASC' | 'DESC' = 'DESC',
-    ) {
+    async findAll(page: number, limit: number, search?: string, sortBy?: string, sortOrder: 'ASC' | 'DESC' = 'DESC') {
         try {
-            const qb = this.affiliateRepo
-                .createQueryBuilder('a')
-                .leftJoinAndSelect('a.user', 'u')
-                .where('a.isActive = true');
+            const qb = this.affiliateRepo.createQueryBuilder('a').leftJoinAndSelect('a.user', 'u');
 
             if (search) {
                 const s = `%${search.toLowerCase()}%`;
-                qb.andWhere(
-                    '(LOWER(a.name) LIKE :s OR LOWER(a.email) LIKE :s OR LOWER(a.referralCode) LIKE :s)',
-                    { s },
-                );
+                qb.where('(LOWER(a.name) LIKE :s OR LOWER(a.email) LIKE :s OR LOWER(a.referralCode) LIKE :s)', { s });
             }
 
-            // Sorting
             if (sortBy) {
-                let sortCol = '';
-                switch (sortBy) {
-                    case 'name':
-                        sortCol = 'a.name';
-                        break;
-                    case 'email':
-                        sortCol = 'a.email';
-                        break;
-                    case 'referralCount':
-                        sortCol = 'a.referralCount';
-                        break;
-                    case 'commissionPercentage':
-                        sortCol = 'a.commissionPercentage';
-                        break;
-                    default:
-                        sortCol = 'a.createdAt';
-                }
-                qb.orderBy(sortCol, sortOrder);
+                const sortCols: any = { name: 'a.name', email: 'a.email', referralCount: 'a.referralCount', commissionPercentage: 'a.commissionPercentage' };
+                qb.orderBy(sortCols[sortBy] || 'a.createdAt', sortOrder);
             } else {
                 qb.orderBy('a.createdAt', 'DESC');
             }
 
             const total = await qb.getCount();
-            const rows = await qb
-                .skip((page - 1) * limit)
-                .take(limit)
-                .getMany();
-
-            const data = rows.map((a) => ({
-                id: a.id,
-                user_id: a.userId,
-                name: a.name,
-                email: a.email,
-                country_code: a.countryCode,
-                mobile_number: a.mobileNumber,
-                address: a.address,
-                referral_code: a.referralCode,
-                referral_count: a.referralCount,
-                commission_percentage: a.commissionPercentage,
-                total_earned_commission: a.totalEarnedCommission,
-                total_settled_commission: a.totalSettledCommission,
-                total_pending_commission: a.totalPendingCommission,
-                upi_id: a.upiId,
-                upi_number: a.upiNumber,
-                banking_name: a.bankingName,
-                account_number: a.accountNumber,
-                ifsc_code: a.ifscCode,
-                branch_name: a.branchName,
-                aadhar_documents: a.aadharDocuments || [],
-                pan_documents: a.panDocuments || [],
-                is_active: a.isActive,
-                created_at: a.createdAt,
-                updated_at: a.updatedAt,
-            }));
+            const rows = await qb.skip((page - 1) * limit).take(limit).getMany();
+            const data = await Promise.all(rows.map((a) => this.formatAffiliate(a)));
 
             return { data, total, page, limit };
-        } catch (error) {
-            const err = error as Error;
-            this.logger.error(`findAll Affiliates Error: ${err.message}`, err.stack);
-            throw new InternalServerErrorException(
-                `Failed to fetch affiliates: ${err.message}`,
-            );
+        } catch (error: any) {
+            this.logger.error(`findAll Affiliates Error: ${error.message}`, error.stack);
+            throw new InternalServerErrorException(`Failed to fetch affiliates: ${error.message}`);
         }
     }
 
-    // ---------------------------------------------------------
-    // FIND BY ID
-    // ---------------------------------------------------------
-    async findById(id: number) {
-        const affiliate = await this.affiliateRepo.findOne({
-            where: { id },
-            relations: ['user'],
-        });
-        if (!affiliate) {
-            throw new BadRequestException('Affiliate not found');
-        }
-        return affiliate;
-    }
-
-    // ---------------------------------------------------------
-    // UPDATE
-    // ---------------------------------------------------------
-    async update(id: number, dto: UpdateAffiliateDto) {
-        const affiliate = await this.affiliateRepo.findOne({
-            where: { id },
-            relations: ['user'],
-        });
-        if (!affiliate) {
-            throw new BadRequestException('Affiliate not found');
-        }
-
-        // Update AffiliateAccount fields
-        if (dto.name) affiliate.name = dto.name;
-        if (dto.countryCode) affiliate.countryCode = dto.countryCode;
-        if (dto.mobileNumber) affiliate.mobileNumber = dto.mobileNumber;
-        if (dto.address !== undefined) affiliate.address = dto.address;
-        if (dto.commissionPercentage !== undefined) affiliate.commissionPercentage = dto.commissionPercentage;
-        if (dto.upiId !== undefined) affiliate.upiId = dto.upiId;
-        if (dto.upiNumber !== undefined) affiliate.upiNumber = dto.upiNumber;
-        if (dto.bankingName !== undefined) affiliate.bankingName = dto.bankingName;
-        if (dto.accountNumber !== undefined) affiliate.accountNumber = dto.accountNumber;
-        if (dto.ifscCode !== undefined) affiliate.ifscCode = dto.ifscCode;
-        if (dto.branchName !== undefined) affiliate.branchName = dto.branchName;
-        // Note: Document uploads are handled via the separate /documents endpoint
-
-        await this.affiliateRepo.save(affiliate);
-
-        return affiliate;
-    }
-
-    // ---------------------------------------------------------
-    // FIND BY REFERRAL CODE
-    // ---------------------------------------------------------
-    async findByReferralCode(code: string) {
-        return this.affiliateRepo.findOne({
-            where: { referralCode: code, isActive: true },
-        });
-    }
-
-    // ---------------------------------------------------------
-    // INCREMENT REFERRAL COUNT
-    // ---------------------------------------------------------
-    async incrementReferralCount(referralCode: string) {
-        const affiliate = await this.affiliateRepo.findOne({
-            where: { referralCode },
-        });
-        if (!affiliate) return;
-
-        affiliate.referralCount += 1;
-        await this.affiliateRepo.save(affiliate);
-    }
-
-    // ---------------------------------------------------------
-    // UPLOAD KYC DOCUMENTS TO CLOUDFLARE R2
-    // ---------------------------------------------------------
-    async uploadDocuments(
-        affiliateId: number,
-        aadharFiles: Array<{ buffer: Buffer; originalname: string; mimetype: string }>,
-        panFiles: Array<{ buffer: Buffer; originalname: string; mimetype: string }>,
-    ) {
-        const affiliate = await this.affiliateRepo.findOne({
-            where: { id: affiliateId },
-        });
-        if (!affiliate) {
-            throw new BadRequestException('Affiliate not found');
-        }
-
-        this.logger.log(
-            `Uploading documents for affiliate ${affiliate.name} (ID: ${affiliateId}): ` +
-            `${aadharFiles.length} aadhar, ${panFiles.length} pan`,
+    private async formatAffiliate(a: AffiliateAccount) {
+        // Generate presigned URLs for Aadhar documents
+        const aadharWithSignedUrls = await Promise.all(
+            (a.aadharDocuments || []).map(async (doc) => ({
+                ...doc,
+                url: await this.r2Service.getPresignedUrl(doc.key).catch(() => doc.url),
+            }))
         );
 
-        // Upload Aadhar documents
-        let aadharResults: Array<{ key: string; url: string; fileName: string }> = [];
+        // Generate presigned URLs for PAN documents
+        const panWithSignedUrls = await Promise.all(
+            (a.panDocuments || []).map(async (doc) => ({
+                ...doc,
+                url: await this.r2Service.getPresignedUrl(doc.key).catch(() => doc.url),
+            }))
+        );
+
+        return {
+            id: a.id,
+            user_id: a.userId,
+            name: a.name || 'N/A',
+            email: a.email || a.user?.email || 'N/A',
+            country_code: a.countryCode || '+91',
+            mobile_number: a.mobileNumber || '',
+            address: a.address,
+            referral_code: a.referralCode,
+            referral_count: Number(a.referralCount) || 0,
+            commission_percentage: Number(a.commissionPercentage) || 0,
+            total_earned_commission: Number(a.totalEarnedCommission) || 0,
+            total_settled_commission: Number(a.totalSettledCommission) || 0,
+            total_pending_commission: Number(a.totalPendingCommission) || 0,
+            upi_id: a.upiId,
+            upi_number: a.upiNumber,
+            banking_name: a.bankingName,
+            account_number: a.accountNumber,
+            ifsc_code: a.ifscCode,
+            branch_name: a.branchName,
+            aadhar_documents: aadharWithSignedUrls,
+            pan_documents: panWithSignedUrls,
+            is_active: a.isActive,
+            created_at: a.createdAt,
+            updated_at: a.updatedAt,
+        };
+    }
+
+    async findById(id: number) {
+        const affiliate = await this.affiliateRepo.findOne({ where: { id }, relations: ['user'] });
+        if (!affiliate) throw new BadRequestException('Affiliate not found');
+        return await this.formatAffiliate(affiliate);
+    }
+
+    async update(id: number, dto: UpdateAffiliateDto) {
+        const affiliate = await this.affiliateRepo.findOne({ where: { id } });
+        if (!affiliate) throw new BadRequestException('Affiliate not found');
+
+        Object.assign(affiliate, dto);
+        return this.affiliateRepo.save(affiliate);
+    }
+
+    async findByReferralCode(code: string) {
+        return this.affiliateRepo.findOne({ where: { referralCode: code, isActive: true } });
+    }
+
+    async incrementReferralCount(referralCode: string) {
+        const affiliate = await this.affiliateRepo.findOne({ where: { referralCode } });
+        if (affiliate) {
+            affiliate.referralCount += 1;
+            await this.affiliateRepo.save(affiliate);
+        }
+    }
+
+    async uploadDocuments(affiliateId: number, aadharFiles: any[], panFiles: any[]) {
+        const affiliate = await this.affiliateRepo.findOne({ where: { id: affiliateId } });
+        if (!affiliate) throw new BadRequestException('Affiliate not found');
+
+        let aadharResults: R2UploadResult[] = [];
         if (aadharFiles.length > 0) {
-            aadharResults = await this.r2Service.uploadMultipleFiles(
-                aadharFiles,
-                affiliate.referralCode,
-                'aadhar',
-            );
+            aadharResults = await this.r2Service.uploadMultipleFiles(aadharFiles, affiliate.referralCode, 'aadhar');
         }
 
-        // Upload PAN documents
-        let panResults: Array<{ key: string; url: string; fileName: string }> = [];
+        let panResults: R2UploadResult[] = [];
         if (panFiles.length > 0) {
-            panResults = await this.r2Service.uploadMultipleFiles(
-                panFiles,
-                affiliate.referralCode,
-                'pan',
-            );
+            panResults = await this.r2Service.uploadMultipleFiles(panFiles, affiliate.referralCode, 'pan');
         }
 
-        // Merge with existing documents (append, respecting max 5 per type)
-        const existingAadhar = affiliate.aadharDocuments || [];
-        const existingPan = affiliate.panDocuments || [];
-
-        affiliate.aadharDocuments = [...existingAadhar, ...aadharResults].slice(0, 5);
-        affiliate.panDocuments = [...existingPan, ...panResults].slice(0, 5);
+        affiliate.aadharDocuments = [...(affiliate.aadharDocuments || []), ...aadharResults].slice(0, 5);
+        affiliate.panDocuments = [...(affiliate.panDocuments || []), ...panResults].slice(0, 5);
 
         await this.affiliateRepo.save(affiliate);
 
-        return {
-            message: 'Documents uploaded successfully',
-            aadharDocuments: affiliate.aadharDocuments,
-            panDocuments: affiliate.panDocuments,
-        };
+        return { message: 'Documents uploaded successfully', aadharDocuments: affiliate.aadharDocuments, panDocuments: affiliate.panDocuments };
     }
 }

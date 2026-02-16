@@ -22,6 +22,7 @@ interface AffiliateTableProps {
     loading: boolean;
     error: string | null;
     onEdit?: (affiliate: any) => void;
+    onView?: (affiliate: any) => void;
 }
 
 const REFERRAL_BASE_URL = (process.env.NEXT_PUBLIC_REFERAL_BASE_URL || "") + "?ref=";
@@ -36,6 +37,7 @@ const AffiliateTable: React.FC<AffiliateTableProps> = ({
     loading,
     error,
     onEdit,
+    onView,
 }) => {
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedAffiliate, setSelectedAffiliate] = useState<any | null>(null);
@@ -326,6 +328,7 @@ const AffiliateTable: React.FC<AffiliateTableProps> = ({
                                                     <EditIcon className="w-4 h-4" />
                                                 </button>
                                                 <button
+                                                    onClick={() => onView?.(affiliate)}
                                                     className="p-2 text-brand-green hover:bg-brand-green/10 rounded-lg transition-colors cursor-pointer"
                                                     title="View Details"
                                                 >
