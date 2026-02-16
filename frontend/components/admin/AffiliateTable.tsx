@@ -202,6 +202,9 @@ const AffiliateTable: React.FC<AffiliateTableProps> = ({
                                     Commission %
                                 </th>
                                 <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider">
+                                    Total Referrals
+                                </th>
+                                <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider">
                                     Total Earned
                                 </th>
                                 <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider">
@@ -226,6 +229,7 @@ const AffiliateTable: React.FC<AffiliateTableProps> = ({
                                             </div>
                                         </td>
                                         <td className="p-4 align-middle"><div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
+                                        <td className="p-4 align-middle"><div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                                         <td className="p-4 align-middle"><div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                                         <td className="p-4 align-middle"><div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                                         <td className="p-4 align-middle"><div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
@@ -290,6 +294,10 @@ const AffiliateTable: React.FC<AffiliateTableProps> = ({
                                         <td className="p-4 text-sm text-brand-text-light-primary dark:text-white align-middle font-semibold">
                                             {affiliate.commission_percentage}%
                                         </td>
+                                        {/* Total Referrals */}
+                                        <td className="p-4 text-sm text-brand-text-light-primary dark:text-white align-middle font-semibold">
+                                            {affiliate.referral_count || 0}
+                                        </td>
                                         {/* Total Earned */}
                                         <td className="p-4 text-sm align-middle">
                                             <span className="font-medium text-brand-green">
@@ -341,7 +349,7 @@ const AffiliateTable: React.FC<AffiliateTableProps> = ({
                             ) : (
                                 <tr>
                                     <td
-                                        colSpan={7}
+                                        colSpan={8}
                                         className="p-8 text-center text-brand-text-light-secondary dark:text-gray-500"
                                     >
                                         No affiliates found.

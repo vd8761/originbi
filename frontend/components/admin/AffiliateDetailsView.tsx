@@ -200,7 +200,6 @@ const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBac
                     {/* UPI Details */}
                     <div>
                         <h5 className="text-sm font-semibold text-brand-text-light-primary dark:text-white mb-4 flex items-center gap-2">
-                            <span className="w-2 h-2 bg-brand-green rounded-full"></span>
                             UPI Details
                         </h5>
                         <div className="space-y-4 pl-4">
@@ -211,7 +210,6 @@ const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBac
                     {/* Bank Details */}
                     <div>
                         <h5 className="text-sm font-semibold text-brand-text-light-primary dark:text-white mb-4 flex items-center gap-2">
-                            <span className="w-2 h-2 bg-brand-green rounded-full"></span>
                             Bank Account Details
                         </h5>
                         <div className="space-y-4 pl-4">
@@ -237,7 +235,6 @@ const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBac
                     {/* Aadhar Documents */}
                     <div>
                         <h5 className="text-sm font-semibold text-brand-text-light-primary dark:text-white mb-4 flex items-center gap-2">
-                            <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                             Aadhar Card Documents
                             <span className="text-xs font-normal text-brand-text-light-secondary dark:text-brand-text-secondary">
                                 ({aadharDocs.length} file{aadharDocs.length !== 1 ? 's' : ''})
@@ -316,7 +313,6 @@ const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBac
                     {/* PAN Documents */}
                     <div>
                         <h5 className="text-sm font-semibold text-brand-text-light-primary dark:text-white mb-4 flex items-center gap-2">
-                            <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
                             PAN Card Documents
                             <span className="text-xs font-normal text-brand-text-light-secondary dark:text-brand-text-secondary">
                                 ({panDocs.length} file{panDocs.length !== 1 ? 's' : ''})
