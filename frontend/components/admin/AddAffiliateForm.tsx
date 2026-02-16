@@ -261,6 +261,10 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
                 accountNumber: formData.accountNumber || undefined,
                 ifscCode: formData.ifscCode || undefined,
                 branchName: formData.branchName || undefined,
+                ...(isEditMode ? {
+                    aadharDocuments: existingAadharDocs,
+                    panDocuments: existingPanDocs,
+                } : {}),
             };
 
             const url = isEditMode
@@ -346,7 +350,7 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
         label: string,
         files: File[],
         existingDocs: Array<{ key: string; url: string; fileName: string }>,
-        inputRef: React.RefObject<HTMLInputElement | null>,
+        inputRef: any,
     ) => {
         const totalCount = files.length + existingDocs.length;
         const canAddMore = totalCount < MAX_FILES_PER_TYPE;
@@ -382,8 +386,8 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDrop(type, e)}
                         className={`w-full min-h-[100px] bg-gray-50 dark:bg-white/5 border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all hover:border-brand-green/50 hover:bg-gray-100 dark:hover:bg-white/10 ${formErrors[type]
-                                ? "border-red-500/50"
-                                : "border-gray-200 dark:border-white/10"
+                            ? "border-red-500/50"
+                            : "border-gray-200 dark:border-white/10"
                             } py-4`}
                     >
                         <svg

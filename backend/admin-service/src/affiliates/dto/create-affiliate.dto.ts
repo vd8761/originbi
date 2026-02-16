@@ -59,4 +59,13 @@ export class CreateAffiliateDto {
     branchName?: string;
 }
 
-export class UpdateAffiliateDto extends PartialType(CreateAffiliateDto) { }
+export class UpdateAffiliateDto extends PartialType(CreateAffiliateDto) {
+    @IsArray()
+    @IsOptional()
+    aadharDocuments?: Array<{ key: string; url: string; fileName: string }>;
+
+    @IsArray()
+    @IsOptional()
+    panDocuments?: Array<{ key: string; url: string; fileName: string }>;
+}
+
