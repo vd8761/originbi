@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, IsNumber } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, IsNumber, IsArray } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
 
 export class CreateAffiliateDto {
@@ -57,14 +57,14 @@ export class CreateAffiliateDto {
     @IsOptional()
     branchName?: string;
 
-    // Document URLs (already uploaded by frontend)
-    @IsString()
+    // Document URLs (stored as arrays after OneDrive upload)
+    @IsArray()
     @IsOptional()
-    aadharUrl?: string;
+    aadharUrls?: string[];
 
-    @IsString()
+    @IsArray()
     @IsOptional()
-    panUrl?: string;
+    panUrls?: string[];
 }
 
-export class UpdateAffiliateDto extends PartialType(CreateAffiliateDto) {}
+export class UpdateAffiliateDto extends PartialType(CreateAffiliateDto) { }

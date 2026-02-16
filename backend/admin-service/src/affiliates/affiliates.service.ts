@@ -14,6 +14,7 @@ import {
     AffiliateAccount,
 } from '@originbi/shared-entities';
 import { CreateAffiliateDto, UpdateAffiliateDto } from './dto/create-affiliate.dto';
+import { OneDriveService } from './onedrive.service';
 
 @Injectable()
 export class AffiliatesService {
@@ -29,6 +30,7 @@ export class AffiliatesService {
 
         private readonly dataSource: DataSource,
         private readonly http: HttpService,
+        private readonly oneDriveService: OneDriveService,
     ) { }
 
     // ---------------------------------------------------------
@@ -144,9 +146,79 @@ export class AffiliatesService {
     }
 
     // ---------------------------------------------------------
+    // Helper: Upload docs to OneDrive
+    // ---------------------------------------------------------
+    private async uploadDocsToOneDrive(
+        affiliateName: string,
+        affiliateId: number,
+        existingFolderId: string | null,
+        aadharFiles?: Express.Multer.File[],
+        panFiles?: Express.Multer.File[],
+    ): Promise<{ aadharUrls: string[]; panUrls: string[]; folderId: string }> {
+        let aadharUrls: string[] = [];
+        let panUrls: string[] = [];
+        let folderId = existingFolderId || '';
+
+        if (!this.oneDriveService.isConfigured()) {
+            this.logger.warn('OneDrive not configured, skipping document upload');
+            return { aadharUrls, panUrls, folderId };
+        }
+
+        const hasAadhar = aadharFiles && aadharFiles.length > 0;
+        const hasPan = panFiles && panFiles.length > 0;
+
+        if (!hasAadhar && !hasPan) {
+            return { aadharUrls, panUrls, folderId };
+        }
+
+        try {
+            // Create/reuse user folder
+            if (!folderId) {
+                folderId = await this.oneDriveService.createUserFolder(affiliateName, affiliateId);
+            }
+
+            // Upload Aadhar docs
+            if (hasAadhar) {
+                aadharUrls = await this.oneDriveService.uploadDocuments(
+                    folderId,
+                    'Aadhar_Documents',
+                    aadharFiles!.map((f) => ({
+                        buffer: f.buffer,
+                        originalname: f.originalname,
+                        mimetype: f.mimetype,
+                    })),
+                );
+            }
+
+            // Upload PAN docs
+            if (hasPan) {
+                panUrls = await this.oneDriveService.uploadDocuments(
+                    folderId,
+                    'PAN_Documents',
+                    panFiles!.map((f) => ({
+                        buffer: f.buffer,
+                        originalname: f.originalname,
+                        mimetype: f.mimetype,
+                    })),
+                );
+            }
+        } catch (err) {
+            this.logger.error('OneDrive upload failed', err);
+            // Don't fail affiliate creation due to OneDrive issues
+            this.logger.warn('Continuing without OneDrive upload');
+        }
+
+        return { aadharUrls, panUrls, folderId };
+    }
+
+    // ---------------------------------------------------------
     // CREATE AFFILIATE
     // ---------------------------------------------------------
-    async create(dto: CreateAffiliateDto) {
+    async create(
+        dto: CreateAffiliateDto,
+        aadharFiles?: Express.Multer.File[],
+        panFiles?: Express.Multer.File[],
+    ) {
         dto.email = dto.email.toLowerCase();
         this.logger.log(`Creating affiliate account for ${dto.email}`);
 
@@ -176,7 +248,7 @@ export class AffiliatesService {
 
         // 4. Transaction: Create User + AffiliateAccount
         try {
-            return await this.dataSource.transaction(async (manager) => {
+            const result = await this.dataSource.transaction(async (manager) => {
                 // A. Create User entity
                 const user = manager.create(AdminUser, {
                     email: dto.email,
@@ -213,8 +285,9 @@ export class AffiliatesService {
                     accountNumber: dto.accountNumber ?? null,
                     ifscCode: dto.ifscCode ?? null,
                     branchName: dto.branchName ?? null,
-                    aadharUrl: dto.aadharUrl ?? null,
-                    panUrl: dto.panUrl ?? null,
+                    aadharUrls: [],
+                    panUrls: [],
+                    onedriveFolderId: null,
                     isActive: true,
                     metadata: {},
                 });
@@ -228,6 +301,30 @@ export class AffiliatesService {
                     name: affiliate.name,
                 };
             });
+
+            // 5. Upload documents to OneDrive (after affiliate is created)
+            const { aadharUrls, panUrls, folderId } = await this.uploadDocsToOneDrive(
+                dto.name,
+                result.id,
+                null,
+                aadharFiles,
+                panFiles,
+            );
+
+            // 6. Update affiliate with document URLs and folder ID
+            if (aadharUrls.length > 0 || panUrls.length > 0 || folderId) {
+                await this.affiliateRepo.update(result.id, {
+                    aadharUrls: aadharUrls.length > 0 ? aadharUrls : [],
+                    panUrls: panUrls.length > 0 ? panUrls : [],
+                    onedriveFolderId: folderId || null,
+                });
+            }
+
+            return {
+                ...result,
+                aadharUrls,
+                panUrls,
+            };
         } catch (e: unknown) {
             this.logger.error('Affiliate creation transaction failed', e);
             const msg = e instanceof Error ? e.message : String(e);
@@ -309,8 +406,8 @@ export class AffiliatesService {
                 account_number: a.accountNumber,
                 ifsc_code: a.ifscCode,
                 branch_name: a.branchName,
-                aadhar_url: a.aadharUrl,
-                pan_url: a.panUrl,
+                aadhar_urls: a.aadharUrls || [],
+                pan_urls: a.panUrls || [],
                 is_active: a.isActive,
                 created_at: a.createdAt,
                 updated_at: a.updatedAt,
@@ -343,7 +440,12 @@ export class AffiliatesService {
     // ---------------------------------------------------------
     // UPDATE
     // ---------------------------------------------------------
-    async update(id: number, dto: UpdateAffiliateDto) {
+    async update(
+        id: number,
+        dto: UpdateAffiliateDto,
+        aadharFiles?: Express.Multer.File[],
+        panFiles?: Express.Multer.File[],
+    ) {
         const affiliate = await this.affiliateRepo.findOne({
             where: { id },
             relations: ['user'],
@@ -364,8 +466,27 @@ export class AffiliatesService {
         if (dto.accountNumber !== undefined) affiliate.accountNumber = dto.accountNumber;
         if (dto.ifscCode !== undefined) affiliate.ifscCode = dto.ifscCode;
         if (dto.branchName !== undefined) affiliate.branchName = dto.branchName;
-        if (dto.aadharUrl) affiliate.aadharUrl = dto.aadharUrl;
-        if (dto.panUrl) affiliate.panUrl = dto.panUrl;
+
+        // Handle document URLs - keep existing ones from DTO (sent from frontend)
+        const existingAadharUrls = dto.aadharUrls || affiliate.aadharUrls || [];
+        const existingPanUrls = dto.panUrls || affiliate.panUrls || [];
+
+        // Upload new files to OneDrive if provided
+        const { aadharUrls: newAadharUrls, panUrls: newPanUrls, folderId } = await this.uploadDocsToOneDrive(
+            affiliate.name,
+            affiliate.id,
+            affiliate.onedriveFolderId,
+            aadharFiles,
+            panFiles,
+        );
+
+        // Merge existing + new URLs (up to max 5 each)
+        affiliate.aadharUrls = [...existingAadharUrls, ...newAadharUrls].slice(0, 5);
+        affiliate.panUrls = [...existingPanUrls, ...newPanUrls].slice(0, 5);
+
+        if (folderId) {
+            affiliate.onedriveFolderId = folderId;
+        }
 
         await this.affiliateRepo.save(affiliate);
 

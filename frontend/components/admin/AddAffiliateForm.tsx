@@ -14,7 +14,9 @@ interface AddAffiliateFormProps {
     initialData?: any;
 }
 
-
+const ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'pdf'];
+const MAX_FILES = 5;
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB per file
 
 const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
     onCancel,
@@ -41,10 +43,17 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
 
     const [showPassword, setShowPassword] = useState(false);
 
-    const [aadharFile, setAadharFile] = useState<File | null>(null);
-    const [panFile, setPanFile] = useState<File | null>(null);
-    const [aadharPreview, setAadharPreview] = useState<string | null>(initialData?.aadhar_url || null);
-    const [panPreview, setPanPreview] = useState<string | null>(initialData?.pan_url || null);
+    // Multiple file support
+    const [aadharFiles, setAadharFiles] = useState<File[]>([]);
+    const [panFiles, setPanFiles] = useState<File[]>([]);
+
+    // Existing URLs from server (for edit mode)
+    const [existingAadharUrls, setExistingAadharUrls] = useState<string[]>(
+        initialData?.aadhar_urls || initialData?.aadharUrls || []
+    );
+    const [existingPanUrls, setExistingPanUrls] = useState<string[]>(
+        initialData?.pan_urls || initialData?.panUrls || []
+    );
 
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -53,8 +62,6 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
 
     const aadharInputRef = useRef<HTMLInputElement>(null);
     const panInputRef = useRef<HTMLInputElement>(null);
-
-    const MAX_FILE_SIZE = 500 * 1024; // 500 KB
 
     const API_BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "";
 
@@ -92,15 +99,41 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
         type: "aadhar" | "pan",
         e: React.ChangeEvent<HTMLInputElement>
     ) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+        const selectedFiles = Array.from(e.target.files || []);
+        if (!selectedFiles.length) return;
 
-        if (file.size > MAX_FILE_SIZE) {
+        const currentFiles = type === "aadhar" ? aadharFiles : panFiles;
+        const existingUrls = type === "aadhar" ? existingAadharUrls : existingPanUrls;
+        const totalExisting = currentFiles.length + existingUrls.length;
+
+        // Check max file limit
+        if (totalExisting + selectedFiles.length > MAX_FILES) {
             setFormErrors((prev) => ({
                 ...prev,
-                [type]: `File size exceeds 500 KB limit (${(file.size / 1024).toFixed(0)} KB)`,
+                [type]: `Maximum ${MAX_FILES} files allowed. You already have ${totalExisting} file(s).`,
             }));
             return;
+        }
+
+        // Validate each file
+        const validFiles: File[] = [];
+        for (const file of selectedFiles) {
+            const ext = file.name.split('.').pop()?.toLowerCase();
+            if (!ext || !ALLOWED_EXTENSIONS.includes(ext)) {
+                setFormErrors((prev) => ({
+                    ...prev,
+                    [type]: `Invalid file format: ${file.name}. Allowed: PNG, JPG, JPEG, PDF`,
+                }));
+                return;
+            }
+            if (file.size > MAX_FILE_SIZE) {
+                setFormErrors((prev) => ({
+                    ...prev,
+                    [type]: `File "${file.name}" exceeds 5 MB limit (${(file.size / (1024 * 1024)).toFixed(1)} MB)`,
+                }));
+                return;
+            }
+            validFiles.push(file);
         }
 
         setFormErrors((prev) => {
@@ -110,11 +143,28 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
         });
 
         if (type === "aadhar") {
-            setAadharFile(file);
-            setAadharPreview(URL.createObjectURL(file));
+            setAadharFiles((prev) => [...prev, ...validFiles]);
         } else {
-            setPanFile(file);
-            setPanPreview(URL.createObjectURL(file));
+            setPanFiles((prev) => [...prev, ...validFiles]);
+        }
+
+        // Reset input so same file can be selected again
+        e.target.value = '';
+    };
+
+    const removeFile = (type: "aadhar" | "pan", index: number) => {
+        if (type === "aadhar") {
+            setAadharFiles((prev) => prev.filter((_, i) => i !== index));
+        } else {
+            setPanFiles((prev) => prev.filter((_, i) => i !== index));
+        }
+    };
+
+    const removeExistingUrl = (type: "aadhar" | "pan", index: number) => {
+        if (type === "aadhar") {
+            setExistingAadharUrls((prev) => prev.filter((_, i) => i !== index));
+        } else {
+            setExistingPanUrls((prev) => prev.filter((_, i) => i !== index));
         }
     };
 
@@ -150,21 +200,37 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
         setIsLoading(true);
         setError(null);
         try {
-            const payload = {
-                name: formData.name,
-                email: formData.email,
-                ...(isEditMode ? {} : { password: formData.password }),
-                countryCode: formData.countryCode,
-                mobileNumber: formData.mobileNumber,
-                address: formData.address || undefined,
-                commissionPercentage: parseFloat(formData.commissionPercentage) || 0,
-                upiId: formData.upiId || undefined,
-                upiNumber: formData.upiNumber || undefined,
-                bankingName: formData.bankingName || undefined,
-                accountNumber: formData.accountNumber || undefined,
-                ifscCode: formData.ifscCode || undefined,
-                branchName: formData.branchName || undefined,
-            };
+            // Use FormData for multipart upload
+            const fd = new FormData();
+            fd.append("name", formData.name);
+            fd.append("email", formData.email);
+            if (!isEditMode) {
+                fd.append("password", formData.password);
+            }
+            fd.append("countryCode", formData.countryCode);
+            fd.append("mobileNumber", formData.mobileNumber);
+            if (formData.address) fd.append("address", formData.address);
+            if (formData.commissionPercentage) fd.append("commissionPercentage", formData.commissionPercentage);
+            if (formData.upiId) fd.append("upiId", formData.upiId);
+            if (formData.upiNumber) fd.append("upiNumber", formData.upiNumber);
+            if (formData.bankingName) fd.append("bankingName", formData.bankingName);
+            if (formData.accountNumber) fd.append("accountNumber", formData.accountNumber);
+            if (formData.ifscCode) fd.append("ifscCode", formData.ifscCode);
+            if (formData.branchName) fd.append("branchName", formData.branchName);
+
+            // Append new files
+            for (const file of aadharFiles) {
+                fd.append("aadharFiles", file);
+            }
+            for (const file of panFiles) {
+                fd.append("panFiles", file);
+            }
+
+            // In edit mode, send existing URLs to preserve them
+            if (isEditMode) {
+                fd.append("existingAadharUrls", JSON.stringify(existingAadharUrls));
+                fd.append("existingPanUrls", JSON.stringify(existingPanUrls));
+            }
 
             const url = isEditMode
                 ? `${API_BASE}/admin/affiliates/${initialData.id}`
@@ -172,8 +238,8 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
 
             const res = await fetch(url, {
                 method: isEditMode ? "PATCH" : "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
+                body: fd,
+                // Don't set Content-Type header - browser will set it with boundary
             });
 
             if (!res.ok) {
@@ -191,8 +257,6 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
         }
     };
 
-
-
     const generatePassword = () => {
         const chars =
             "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%^&*";
@@ -204,7 +268,21 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
         setShowPassword(true);
     };
 
-
+    const getFileIcon = (fileName: string) => {
+        const ext = fileName.split('.').pop()?.toLowerCase();
+        if (ext === 'pdf') {
+            return (
+                <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                </svg>
+            );
+        }
+        return (
+            <svg className="w-5 h-5 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+            </svg>
+        );
+    };
 
     const baseInputClasses =
         "w-full h-[50px] bg-gray-50 dark:bg-white/10 border border-transparent dark:border-transparent rounded-xl px-4 text-sm text-black dark:text-white placeholder-black/40 dark:placeholder-white/60 focus:border-brand-green focus:outline-none transition-all";
@@ -217,6 +295,144 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
 
     const sectionHeadingClasses =
         "text-sm font-bold text-black dark:text-white mb-4";
+
+    // Render the multi-file upload area for a document type
+    const renderFileUpload = (
+        type: "aadhar" | "pan",
+        label: string,
+        files: File[],
+        existingUrls: string[],
+        inputRef: React.RefObject<HTMLInputElement | null>,
+    ) => {
+        const totalCount = files.length + existingUrls.length;
+        const canAddMore = totalCount < MAX_FILES;
+
+        return (
+            <div className="space-y-2">
+                <label className={baseLabelClasses}>
+                    {label}{" "}
+                    <span className="text-xs font-normal text-gray-400">
+                        (Max {MAX_FILES} files • PNG, JPG, JPEG, PDF • up to 5 MB each)
+                    </span>
+                </label>
+
+                {/* Hidden file input */}
+                <input
+                    ref={inputRef}
+                    type="file"
+                    accept=".png,.jpg,.jpeg,.pdf"
+                    multiple
+                    onChange={(e) => handleFileChange(type, e)}
+                    className="hidden"
+                />
+
+                {/* Existing URLs (from server, for edit mode) */}
+                {existingUrls.length > 0 && (
+                    <div className="space-y-2 mb-2">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 ml-1 font-medium">Previously uploaded:</p>
+                        {existingUrls.map((url, index) => {
+                            const fileName = decodeURIComponent(url.split('/').pop() || `Document ${index + 1}`);
+                            return (
+                                <div
+                                    key={`existing-${index}`}
+                                    className="flex items-center gap-3 bg-gray-50 dark:bg-white/5 rounded-lg px-3 py-2.5 border border-gray-100 dark:border-white/10"
+                                >
+                                    <svg className="w-5 h-5 text-brand-green flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <a
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-sm text-brand-green hover:underline truncate flex-1"
+                                        title={fileName}
+                                    >
+                                        {fileName.length > 35 ? fileName.slice(0, 35) + '...' : fileName}
+                                    </a>
+                                    <button
+                                        type="button"
+                                        onClick={() => removeExistingUrl(type, index)}
+                                        className="text-red-400 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-500/10"
+                                        title="Remove"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* Newly selected files */}
+                {files.length > 0 && (
+                    <div className="space-y-2 mb-2">
+                        {existingUrls.length > 0 && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 ml-1 font-medium">New files to upload:</p>
+                        )}
+                        {files.map((file, index) => (
+                            <div
+                                key={`new-${index}`}
+                                className="flex items-center gap-3 bg-brand-green/5 dark:bg-brand-green/10 rounded-lg px-3 py-2.5 border border-brand-green/20"
+                            >
+                                {getFileIcon(file.name)}
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-black dark:text-white truncate">
+                                        {file.name}
+                                    </p>
+                                    <p className="text-xs text-gray-400">
+                                        {(file.size / 1024).toFixed(0)} KB
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => removeFile(type, index)}
+                                    className="text-red-400 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-500/10"
+                                    title="Remove"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Upload button / drop area */}
+                {canAddMore ? (
+                    <div
+                        onClick={() => inputRef.current?.click()}
+                        className={`w-full min-h-[100px] bg-gray-50 dark:bg-white/10 border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all hover:border-brand-green/50 ${formErrors[type]
+                            ? "border-red-500/50"
+                            : totalCount > 0
+                                ? "border-brand-green/30"
+                                : "border-gray-200 dark:border-white/10"
+                            }`}
+                    >
+                        <svg className="w-7 h-7 text-gray-400 dark:text-gray-500 mb-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Click to add {type === "aadhar" ? "Aadhar" : "PAN"} documents
+                        </p>
+                        <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                            {totalCount}/{MAX_FILES} files added
+                        </p>
+                    </div>
+                ) : (
+                    <div className="w-full py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl flex items-center justify-center">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Maximum {MAX_FILES} files reached
+                        </p>
+                    </div>
+                )}
+
+                {formErrors[type] && <p className="text-xs text-red-500 ml-1">{formErrors[type]}</p>}
+            </div>
+        );
+    };
 
     return (
         <div className="w-full font-sans animate-fade-in pb-12">
@@ -479,101 +695,10 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
 
                 {/* Section 3 – Document Uploads */}
                 <div className="mb-8 pt-6 border-t border-gray-100 dark:border-white/5">
-                    <h3 className={sectionHeadingClasses}>Documents</h3>
+                    <h3 className={sectionHeadingClasses}>KYC Documents</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Aadhar Document */}
-                        <div className="space-y-2">
-                            <label className={baseLabelClasses}>
-                                Aadhar Document <span className="text-xs font-normal text-gray-400">(Max 500 KB)</span>
-                            </label>
-                            <input
-                                ref={aadharInputRef}
-                                type="file"
-                                accept="image/*,.pdf"
-                                onChange={(e) => handleFileChange("aadhar", e)}
-                                className="hidden"
-                            />
-                            <div
-                                onClick={() => aadharInputRef.current?.click()}
-                                className={`w-full h-[120px] bg-gray-50 dark:bg-white/10 border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all hover:border-brand-green/50 ${formErrors.aadhar
-                                    ? "border-red-500/50"
-                                    : aadharPreview
-                                        ? "border-brand-green/30"
-                                        : "border-gray-200 dark:border-white/10"
-                                    }`}
-                            >
-                                {aadharPreview ? (
-                                    <div className="flex items-center gap-3">
-                                        <svg className="w-8 h-8 text-brand-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        <div>
-                                            <p className="text-sm font-medium text-brand-green">
-                                                {aadharFile?.name || "Uploaded"}
-                                            </p>
-                                            <p className="text-xs text-gray-400">Click to change</p>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <svg className="w-8 h-8 text-gray-400 dark:text-gray-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                        </svg>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            Click to upload Aadhar
-                                        </p>
-                                    </>
-                                )}
-                            </div>
-                            {formErrors.aadhar && <p className="text-xs text-red-500 ml-1">{formErrors.aadhar}</p>}
-                        </div>
-
-                        {/* PAN Document */}
-                        <div className="space-y-2">
-                            <label className={baseLabelClasses}>
-                                PAN Document <span className="text-xs font-normal text-gray-400">(Max 500 KB)</span>
-                            </label>
-                            <input
-                                ref={panInputRef}
-                                type="file"
-                                accept="image/*,.pdf"
-                                onChange={(e) => handleFileChange("pan", e)}
-                                className="hidden"
-                            />
-                            <div
-                                onClick={() => panInputRef.current?.click()}
-                                className={`w-full h-[120px] bg-gray-50 dark:bg-white/10 border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all hover:border-brand-green/50 ${formErrors.pan
-                                    ? "border-red-500/50"
-                                    : panPreview
-                                        ? "border-brand-green/30"
-                                        : "border-gray-200 dark:border-white/10"
-                                    }`}
-                            >
-                                {panPreview ? (
-                                    <div className="flex items-center gap-3">
-                                        <svg className="w-8 h-8 text-brand-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        <div>
-                                            <p className="text-sm font-medium text-brand-green">
-                                                {panFile?.name || "Uploaded"}
-                                            </p>
-                                            <p className="text-xs text-gray-400">Click to change</p>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <svg className="w-8 h-8 text-gray-400 dark:text-gray-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                        </svg>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            Click to upload PAN
-                                        </p>
-                                    </>
-                                )}
-                            </div>
-                            {formErrors.pan && <p className="text-xs text-red-500 ml-1">{formErrors.pan}</p>}
-                        </div>
+                        {renderFileUpload("aadhar", "Aadhar Document", aadharFiles, existingAadharUrls, aadharInputRef)}
+                        {renderFileUpload("pan", "PAN Document", panFiles, existingPanUrls, panInputRef)}
                     </div>
                 </div>
 

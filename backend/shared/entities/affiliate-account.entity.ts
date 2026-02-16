@@ -75,12 +75,16 @@ export class AffiliateAccount {
     @Column({ name: 'branch_name', type: 'varchar', length: 255, nullable: true })
     branchName: string | null;
 
-    // Documents
-    @Column({ name: 'aadhar_url', type: 'varchar', length: 500, nullable: true })
-    aadharUrl: string | null;
+    // Documents (multiple files per type)
+    @Column({ name: 'aadhar_urls', type: 'jsonb', default: () => `'[]'` })
+    aadharUrls: string[];
 
-    @Column({ name: 'pan_url', type: 'varchar', length: 500, nullable: true })
-    panUrl: string | null;
+    @Column({ name: 'pan_urls', type: 'jsonb', default: () => `'[]'` })
+    panUrls: string[];
+
+    // OneDrive folder tracking
+    @Column({ name: 'onedrive_folder_id', type: 'varchar', length: 500, nullable: true })
+    onedriveFolderId: string | null;
 
     // Status
     @Column({ name: 'is_active', type: 'boolean', default: true })
