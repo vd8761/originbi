@@ -41,27 +41,15 @@ export class R2Service {
 
     /**
      * Build the R2 object key for a KYC document.
-     * Pattern: originBI kyc documents/{name}_{last4phone}/{docType} documents/{filename}
+     * Path: originBI kyc documents/{folderId}/{docType} documents/{filename}
      */
     private buildKey(
-        userName: string,
-        phoneNumber: string,
+        folderId: string,
         docType: 'pan' | 'aadhar',
         fileName: string,
     ): string {
-        // Sanitize the user name (remove special chars, keep spaces)
-        const sanitizedName = userName
-            .trim()
-            .replace(/[^a-zA-Z0-9\s]/g, '')
-            .replace(/\s+/g, ' ');
-
-        // Get last 4 digits of phone number
-        const last4 = phoneNumber.replace(/\D/g, '').slice(-4);
-
-        const userFolder = `${sanitizedName}_${last4}`;
         const docFolder = `${docType} documents`;
-
-        return `originBI kyc documents/${userFolder}/${docFolder}/${fileName}`;
+        return `originBI kyc documents/${folderId}/${docFolder}/${fileName}`;
     }
 
     /**
@@ -69,18 +57,16 @@ export class R2Service {
      */
     async uploadFile(
         buffer: Buffer,
-        userName: string,
-        phoneNumber: string,
+        folderId: string,
         docType: 'pan' | 'aadhar',
         originalFileName: string,
         mimeType: string,
     ): Promise<R2UploadResult> {
-        // Add a timestamp prefix to avoid filename collisions
         const timestamp = Date.now();
         const sanitizedFileName = originalFileName.replace(/[^a-zA-Z0-9._-]/g, '_');
         const uniqueFileName = `${timestamp}_${sanitizedFileName}`;
 
-        const key = this.buildKey(userName, phoneNumber, docType, uniqueFileName);
+        const key = this.buildKey(folderId, docType, uniqueFileName);
 
         this.logger.log(`Uploading to R2: ${key} (${mimeType}, ${buffer.length} bytes)`);
 
@@ -109,8 +95,7 @@ export class R2Service {
      */
     async uploadMultipleFiles(
         files: Array<{ buffer: Buffer; originalname: string; mimetype: string }>,
-        userName: string,
-        phoneNumber: string,
+        folderId: string,
         docType: 'pan' | 'aadhar',
     ): Promise<R2UploadResult[]> {
         const results: R2UploadResult[] = [];
@@ -118,8 +103,7 @@ export class R2Service {
         for (const file of files) {
             const result = await this.uploadFile(
                 file.buffer,
-                userName,
-                phoneNumber,
+                folderId,
                 docType,
                 file.originalname,
                 file.mimetype,

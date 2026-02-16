@@ -420,8 +420,7 @@ export class AffiliatesService {
         if (aadharFiles.length > 0) {
             aadharResults = await this.r2Service.uploadMultipleFiles(
                 aadharFiles,
-                affiliate.name,
-                affiliate.mobileNumber,
+                affiliate.referralCode,
                 'aadhar',
             );
         }
@@ -431,8 +430,7 @@ export class AffiliatesService {
         if (panFiles.length > 0) {
             panResults = await this.r2Service.uploadMultipleFiles(
                 panFiles,
-                affiliate.name,
-                affiliate.mobileNumber,
+                affiliate.referralCode,
                 'pan',
             );
         }
