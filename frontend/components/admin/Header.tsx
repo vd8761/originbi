@@ -17,6 +17,7 @@ import {
     CoinIcon,
     OriginDataIcon,
     MyEmployeesIcon,
+    UsersIcon,
 } from '../icons';
 import Script from "next/script";
 import { useTheme } from '../../contexts/ThemeContext';
@@ -263,7 +264,7 @@ const Header: React.FC<HeaderProps> = ({
                         onClick={() => handleNavClick('counselling')}
                     />
                     <NavItem
-                        icon={<CoinIcon className="w-4 h-4" />}
+                        icon={<UsersIcon className="w-4 h-4" />}
                         label="Affiliates"
                         active={activeView === 'affiliates'}
                         isMobile={isMobile}

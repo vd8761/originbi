@@ -30,17 +30,40 @@ const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBac
 
     const getFileIcon = (fileName: string) => {
         const ext = fileName?.split('.').pop()?.toLowerCase();
+
         if (ext === 'pdf') {
             return (
                 <svg className="w-8 h-8 text-red-500" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM6 20V4h7v5h5v11H6z" />
-                    <text x="7" y="17" fontSize="6" fill="currentColor" fontWeight="bold">PDF</text>
+                    <text x="50%" y="17" fontSize="6" fill="currentColor" fontWeight="bold" textAnchor="middle">PDF</text>
                 </svg>
             );
         }
+
+        if (['jpg', 'jpeg'].includes(ext || '')) {
+            return (
+                <svg className="w-8 h-8 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM6 20V4h7v5h5v11H6z" />
+                    <text x="50%" y="17" fontSize="6" fill="currentColor" fontWeight="bold" textAnchor="middle">JPG</text>
+                </svg>
+            );
+        }
+
+        if (ext === 'png') {
+            return (
+                <svg className="w-8 h-8 text-emerald-500" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM6 20V4h7v5h5v11H6z" />
+                    <text x="50%" y="17" fontSize="6" fill="currentColor" fontWeight="bold" textAnchor="middle">PNG</text>
+                </svg>
+            );
+        }
+
         return (
-            <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            <svg className="w-8 h-8 text-indigo-500" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM6 20V4h7v5h5v11H6z" />
+                <text x="50%" y="17" fontSize="5" fill="currentColor" fontWeight="bold" textAnchor="middle" className="uppercase">
+                    {ext?.substring(0, 3) || 'DOC'}
+                </text>
             </svg>
         );
     };
@@ -248,17 +271,11 @@ const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBac
                                         className="flex items-center gap-4 p-3 rounded-xl bg-brand-light-secondary dark:bg-brand-dark-secondary border border-brand-light-tertiary dark:border-brand-dark-tertiary hover:border-brand-green/40 transition-colors group"
                                     >
                                         {/* Thumbnail / Icon */}
-                                        <div className="w-14 h-14 rounded-lg overflow-hidden bg-white dark:bg-[#2a2a2a] flex items-center justify-center shrink-0 border border-brand-light-tertiary dark:border-brand-dark-tertiary">
-                                            {isImage(doc.fileName) ? (
-                                                <img
-                                                    src={doc.url}
-                                                    alt={doc.fileName}
-                                                    className="w-full h-full object-cover cursor-pointer"
-                                                    onClick={() => setPreviewDoc(doc)}
-                                                />
-                                            ) : (
-                                                getFileIcon(doc.fileName)
-                                            )}
+                                        <div
+                                            className="w-14 h-14 rounded-lg overflow-hidden bg-white dark:bg-[#2a2a2a] flex items-center justify-center shrink-0 border border-brand-light-tertiary dark:border-brand-dark-tertiary cursor-pointer hover:bg-gray-50 dark:hover:bg-[#333] transition-colors"
+                                            onClick={() => isImage(doc.fileName) && setPreviewDoc(doc)}
+                                        >
+                                            {getFileIcon(doc.fileName)}
                                         </div>
                                         {/* File info */}
                                         <div className="flex-1 min-w-0">
@@ -326,17 +343,11 @@ const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBac
                                         className="flex items-center gap-4 p-3 rounded-xl bg-brand-light-secondary dark:bg-brand-dark-secondary border border-brand-light-tertiary dark:border-brand-dark-tertiary hover:border-brand-green/40 transition-colors group"
                                     >
                                         {/* Thumbnail / Icon */}
-                                        <div className="w-14 h-14 rounded-lg overflow-hidden bg-white dark:bg-[#2a2a2a] flex items-center justify-center shrink-0 border border-brand-light-tertiary dark:border-brand-dark-tertiary">
-                                            {isImage(doc.fileName) ? (
-                                                <img
-                                                    src={doc.url}
-                                                    alt={doc.fileName}
-                                                    className="w-full h-full object-cover cursor-pointer"
-                                                    onClick={() => setPreviewDoc(doc)}
-                                                />
-                                            ) : (
-                                                getFileIcon(doc.fileName)
-                                            )}
+                                        <div
+                                            className="w-14 h-14 rounded-lg overflow-hidden bg-white dark:bg-[#2a2a2a] flex items-center justify-center shrink-0 border border-brand-light-tertiary dark:border-brand-dark-tertiary cursor-pointer hover:bg-gray-50 dark:hover:bg-[#333] transition-colors"
+                                            onClick={() => isImage(doc.fileName) && setPreviewDoc(doc)}
+                                        >
+                                            {getFileIcon(doc.fileName)}
                                         </div>
                                         {/* File info */}
                                         <div className="flex-1 min-w-0">
