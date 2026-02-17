@@ -4,18 +4,22 @@ import React, { useState, useEffect, useRef } from "react";
 import { EyeVisibleIcon, XIcon, EditIcon } from '../icons';
 import { COUNTRY_CODES } from '../../lib/countryCodes';
 
+const API_BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "";
+
 const getCountryInfo = (dial: string | undefined) => {
     const finalDial = dial || "+91";
     return (
         COUNTRY_CODES.find((c) => c.dial_code === finalDial) ?? {
             code: "IN",
             dial_code: "+91",
-            flag: "🇮�",
+            flag: "🇮🇳",
             name: "India",
             maxLength: 10,
         }
     );
 };
+
+import { AffiliateSettlementModal } from "./AffiliateSettlementModal";
 
 interface AffiliateTableProps {
     affiliates: any[];
@@ -23,6 +27,7 @@ interface AffiliateTableProps {
     error: string | null;
     onEdit?: (affiliate: any) => void;
     onView?: (affiliate: any) => void;
+    onSettled?: () => void;
 }
 
 const REFERRAL_BASE_URL = (process.env.NEXT_PUBLIC_REFERAL_BASE_URL || "") + "?ref=";
@@ -32,18 +37,26 @@ const getQrCodeUrl = (data: string, size: number = 200) => {
     return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}&bgcolor=ffffff&color=000000&margin=8`;
 };
 
+
+/* ==================== Main Table ==================== */
+
 const AffiliateTable: React.FC<AffiliateTableProps> = ({
     affiliates,
     loading,
     error,
     onEdit,
     onView,
+    onSettled,
 }) => {
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedAffiliate, setSelectedAffiliate] = useState<any | null>(null);
     const [linkCopied, setLinkCopied] = useState(false);
     const [shareToast, setShareToast] = useState(false);
     const modalRef = useRef<HTMLDivElement>(null);
+
+    // Settlement modal state
+    const [settlementModalOpen, setSettlementModalOpen] = useState(false);
+    const [settlementAffiliate, setSettlementAffiliate] = useState<any | null>(null);
 
     const formatCurrency = (amount: any) => {
         const num = parseFloat(amount) || 0;
@@ -64,6 +77,11 @@ const AffiliateTable: React.FC<AffiliateTableProps> = ({
         setModalOpen(false);
         setSelectedAffiliate(null);
         setLinkCopied(false);
+    };
+
+    const openSettlementModal = (affiliate: any) => {
+        setSettlementAffiliate(affiliate);
+        setSettlementModalOpen(true);
     };
 
     const copyReferralLink = async (link: string) => {
@@ -139,19 +157,12 @@ const AffiliateTable: React.FC<AffiliateTableProps> = ({
         }
     };
 
-    // Close modal on outside click
+    // Close modal on outside click (removed per user request)
     useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-            if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
-                closeModal();
-            }
-        };
         if (modalOpen) {
-            document.addEventListener("mousedown", handleClickOutside);
             document.body.style.overflow = "hidden";
         }
         return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
             document.body.style.overflow = "";
         };
     }, [modalOpen]);
@@ -339,6 +350,20 @@ const AffiliateTable: React.FC<AffiliateTableProps> = ({
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                                                     </svg>
                                                 </button>
+                                                {/* Settle Button */}
+                                                <button
+                                                    onClick={() => openSettlementModal(affiliate)}
+                                                    className={`p-2 rounded-lg transition-colors cursor-pointer ${(parseFloat(affiliate.ready_to_process_commission) || 0) > 0
+                                                        ? "text-brand-green hover:bg-brand-green/10"
+                                                        : "text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                                                        }`}
+                                                    title="Settle Commission"
+                                                    disabled={(parseFloat(affiliate.ready_to_process_commission) || 0) <= 0}
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                                    </svg>
+                                                </button>
                                                 <button
                                                     onClick={() => onEdit?.(affiliate)}
                                                     className="p-2 text-brand-green hover:bg-brand-green/10 rounded-lg transition-colors cursor-pointer"
@@ -474,6 +499,22 @@ const AffiliateTable: React.FC<AffiliateTableProps> = ({
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Settlement Modal */}
+            {settlementModalOpen && settlementAffiliate && (
+                <AffiliateSettlementModal
+                    affiliate={settlementAffiliate}
+                    onClose={() => {
+                        setSettlementModalOpen(false);
+                        setSettlementAffiliate(null);
+                    }}
+                    onSuccess={() => {
+                        setSettlementModalOpen(false);
+                        setSettlementAffiliate(null);
+                        onSettled?.();
+                    }}
+                />
             )}
         </>
     );

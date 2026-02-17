@@ -16,8 +16,10 @@ import {
     User as AdminUser,
     AffiliateAccount,
     AffiliateReferralTransaction,
+    AffiliateSettlementTransaction,
 } from '@originbi/shared-entities';
 import { CreateAffiliateDto, UpdateAffiliateDto } from './dto/create-affiliate.dto';
+import { CreateSettlementDto } from './dto/create-settlement.dto';
 import { R2Service, R2UploadResult } from '../r2/r2.service';
 import { getAffiliateWelcomeEmailTemplate } from '../mail/templates/affiliate-welcome.template';
 
@@ -35,6 +37,9 @@ export class AffiliatesService {
 
         @InjectRepository(AffiliateReferralTransaction)
         private readonly referralTransactionRepo: Repository<AffiliateReferralTransaction>,
+
+        @InjectRepository(AffiliateSettlementTransaction)
+        private readonly settlementTransactionRepo: Repository<AffiliateSettlementTransaction>,
 
         private readonly dataSource: DataSource,
         private readonly http: HttpService,
@@ -233,7 +238,7 @@ export class AffiliatesService {
             }))
         );
 
-        // Sum of earnedCommissionAmount where settlementStatus = 1
+        // Calculate ready-to-process amount (settlement_status = 1)
         const readyToProcessRes = await this.referralTransactionRepo
             .createQueryBuilder('t')
             .select('SUM(CAST(t.earned_commission_amount AS NUMERIC))', 'sum')
@@ -241,7 +246,25 @@ export class AffiliatesService {
             .andWhere('t.settlement_status = 1')
             .getRawOne();
 
-        const readyToProcessAmount = parseFloat(readyToProcessRes?.sum) || 0;
+        const rawReadyAmount = parseFloat(readyToProcessRes?.sum) || 0;
+
+        // Sum of transactions already officially marked as settled (status = 2)
+        const settledTxnSumRes = await this.referralTransactionRepo
+            .createQueryBuilder('t')
+            .select('SUM(CAST(t.earned_commission_amount AS NUMERIC))', 'sum')
+            .where('t.affiliate_account_id = :affiliateAccountId', { affiliateAccountId: a.id })
+            .andWhere('t.settlement_status = 2')
+            .getRawOne();
+        const settledTxnSum = parseFloat(settledTxnSumRes?.sum) || 0;
+
+        // Total amount actually paid per account record
+        const totalPaid = Number(a.totalSettledCommission) || 0;
+
+        // Amount paid that hasn't yet exhausted whole transactions into status 2
+        const unpaidOverflow = Math.max(0, totalPaid - settledTxnSum);
+
+        // Net Ready to Process = Raw Ready - Overflow Paid
+        const readyToProcessAmount = Math.max(0, rawReadyAmount - unpaidOverflow);
 
         return {
             id: a.id,
@@ -381,5 +404,108 @@ export class AffiliatesService {
         };
 
         return transporter.sendMail(mailOptions);
+    }
+
+    // ---------------------------------------------------------
+    // Settle Affiliate Commission
+    // ---------------------------------------------------------
+    async settleAffiliate(affiliateId: number, dto: CreateSettlementDto) {
+        const affiliate = await this.affiliateRepo.findOne({ where: { id: affiliateId } });
+        if (!affiliate) throw new BadRequestException('Affiliate not found');
+
+        // Calculate ready-to-process amount (settlement_status = 1)
+        const readyToProcessRes = await this.referralTransactionRepo
+            .createQueryBuilder('t')
+            .select('SUM(CAST(t.earned_commission_amount AS NUMERIC))', 'sum')
+            .where('t.affiliate_account_id = :affiliateAccountId', { affiliateAccountId: affiliateId })
+            .andWhere('t.settlement_status = 1')
+            .getRawOne();
+
+        const readyToProcessAmount = parseFloat(readyToProcessRes?.sum) || 0;
+
+        if (dto.settleAmount <= 0) {
+            throw new BadRequestException('Settlement amount must be greater than 0');
+        }
+
+        if (dto.settleAmount > readyToProcessAmount) {
+            throw new BadRequestException(
+                `Settlement amount (${dto.settleAmount}) cannot exceed ready to payment amount (${readyToProcessAmount})`,
+            );
+        }
+
+        try {
+            return await this.dataSource.transaction(async (manager) => {
+                // 1. Create settlement transaction record
+                const settlement = manager.create(AffiliateSettlementTransaction, {
+                    affiliateAccountId: affiliateId,
+                    settleAmount: dto.settleAmount,
+                    transactionMode: dto.transactionMode,
+                    settlementTransactionId: dto.transactionId,
+                    paymentDate: new Date(dto.paymentDate),
+                    metadata: {
+                        earnedAsOfSettlement: Number(affiliate.totalEarnedCommission) || 0,
+                        pendingAsOfSettlement: Number(affiliate.totalPendingCommission) || 0,
+                        settledAsOfSettlement: Number(affiliate.totalSettledCommission) || 0,
+                    },
+                });
+                await manager.save(settlement);
+
+                // 2. Update referral transactions: mark as settled (status = 2)
+                // We settle up to the dto.settleAmount, marking ready-to-process transactions
+                // Get all processing transactions ordered by oldest first
+                const processingTransactions = await manager
+                    .getRepository(AffiliateReferralTransaction)
+                    .createQueryBuilder('t')
+                    .where('t.affiliate_account_id = :affiliateAccountId', { affiliateAccountId: affiliateId })
+                    .andWhere('t.settlement_status = 1')
+                    .orderBy('t.created_at', 'ASC')
+                    .getMany();
+
+                let remainingAmount = dto.settleAmount;
+                const idsToSettle: number[] = [];
+
+                for (const txn of processingTransactions) {
+                    if (remainingAmount <= 0) break;
+                    const txnAmount = parseFloat(String(txn.earnedCommissionAmount)) || 0;
+                    if (txnAmount <= remainingAmount) {
+                        idsToSettle.push(Number(txn.id));
+                        remainingAmount -= txnAmount;
+                    }
+                }
+
+                if (idsToSettle.length > 0) {
+                    await manager
+                        .getRepository(AffiliateReferralTransaction)
+                        .createQueryBuilder()
+                        .update(AffiliateReferralTransaction)
+                        .set({ settlementStatus: 2, paymentAt: new Date(dto.paymentDate) })
+                        .whereInIds(idsToSettle)
+                        .execute();
+                }
+
+                // 3. Update affiliate account totals
+                affiliate.totalSettledCommission =
+                    Number(affiliate.totalSettledCommission || 0) + dto.settleAmount;
+                affiliate.totalPendingCommission =
+                    Number(affiliate.totalPendingCommission || 0) - dto.settleAmount;
+                await manager.save(affiliate);
+
+                return {
+                    message: 'Settlement completed successfully',
+                    settlement: {
+                        id: settlement.id,
+                        settleAmount: settlement.settleAmount,
+                        transactionMode: settlement.transactionMode,
+                        transactionId: settlement.settlementTransactionId,
+                        paymentDate: settlement.paymentDate,
+                        transactionsSettled: idsToSettle.length,
+                    },
+                };
+            });
+        } catch (error: any) {
+            if (error instanceof BadRequestException) throw error;
+            this.logger.error(`Settlement failed for affiliate ${affiliateId}: ${error.message}`, error.stack);
+            throw new InternalServerErrorException(`Settlement failed: ${error.message}`);
+        }
     }
 }

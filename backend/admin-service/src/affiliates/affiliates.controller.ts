@@ -13,6 +13,7 @@ import {
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { AffiliatesService } from './affiliates.service';
 import { CreateAffiliateDto, UpdateAffiliateDto } from './dto/create-affiliate.dto';
+import { CreateSettlementDto } from './dto/create-settlement.dto';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 const MAX_FILES_PER_TYPE = 5;
@@ -123,5 +124,10 @@ export class AffiliatesController {
     @Patch(':id')
     async update(@Param('id') id: string, @Body() dto: UpdateAffiliateDto) {
         return this.affiliatesService.update(Number(id), dto);
+    }
+
+    @Post(':id/settle')
+    async settle(@Param('id') id: string, @Body() dto: CreateSettlementDto) {
+        return this.affiliatesService.settleAffiliate(Number(id), dto);
     }
 }

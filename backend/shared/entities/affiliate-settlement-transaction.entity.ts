@@ -20,8 +20,8 @@ export class AffiliateSettlementTransaction {
     @JoinColumn({ name: 'affiliate_account_id' })
     affiliateAccount: AffiliateAccount;
 
-    @Column({ name: 'settled_amount', type: 'numeric', precision: 10, scale: 2 })
-    settledAmount: number;
+    @Column({ name: 'settle_amount', type: 'numeric', precision: 10, scale: 2 })
+    settleAmount: number;
 
     @Column({ name: 'transaction_mode', type: 'varchar', length: 50 })
     transactionMode: string; // 'UPI', 'BANK_TRANSFER', etc.

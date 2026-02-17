@@ -213,6 +213,9 @@ const AffiliateManagement: React.FC = () => {
                         setSelectedAffiliate(affiliate);
                         setView("details");
                     }}
+                    onSettled={() => {
+                        fetchAffiliates();
+                    }}
                 />
             </div>
 
