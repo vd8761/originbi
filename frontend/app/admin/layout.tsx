@@ -102,7 +102,7 @@ export default function AdminLayout({
                         </div>
 
                         {/* Content Layer with Top Padding */}
-                        <div className="relative z-10 w-full min-h-screen pt-[90px] sm:pt-[98px] lg:pt-[105px]">
+                        <div className="relative w-full min-h-screen pt-[90px] sm:pt-[98px] lg:pt-[105px]">
                             <div className="w-full h-full px-4 sm:px-6 lg:px-8 2xl:px-12 max-w-[2000px] mx-auto transition-all duration-300 relative">
                                 {/* --- DEV GRID OVERLAY --- */}
                                 <div className="absolute inset-x-4 sm:inset-x-6 lg:inset-x-8 2xl:inset-x-12 top-0 bottom-0 grid grid-cols-4 lg:grid-cols-12 gap-4 lg:gap-6 pointer-events-none z-0 opacity-0" aria-hidden="true">
