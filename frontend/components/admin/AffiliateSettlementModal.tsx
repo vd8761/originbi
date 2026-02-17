@@ -2,181 +2,13 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { XIcon, CalendarIcon, ArrowLeftWithoutLineIcon, ArrowRightWithoutLineIcon } from '../icons';
+import { XIcon } from '../icons';
 
 const API_BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "";
 
 /* ==================== Settlement Date Picker ==================== */
 
-function startOfDay(d: Date): Date {
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
 
-const AffiliateSettlementDatePicker: React.FC<{
-    value: string;
-    onChange: (dateStr: string) => void;
-}> = ({ value, onChange }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
-    const TODAY = startOfDay(new Date());
-    const [currentMonth, setCurrentMonth] = useState<Date>(
-        () => new Date(TODAY.getFullYear(), TODAY.getMonth(), 1)
-    );
-    const pickerRef = useRef<HTMLDivElement>(null);
-    const buttonRef = useRef<HTMLButtonElement>(null);
-
-    const selectedDate = value ? startOfDay(new Date(value)) : null;
-
-    useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-            if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-        if (isOpen) document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [isOpen]);
-
-    useEffect(() => {
-        if (isOpen && buttonRef.current) {
-            const rect = buttonRef.current.getBoundingClientRect();
-            const calendarHeight = 320; // approximate height of calendar
-            const spaceBelow = window.innerHeight - rect.bottom;
-            const showAbove = spaceBelow < calendarHeight && rect.top > calendarHeight;
-
-            setCoords({
-                top: (showAbove ? rect.top - calendarHeight - 8 : rect.bottom + 8) + window.scrollY,
-                left: Math.max(10, Math.min(rect.left + window.scrollX, window.innerWidth - 290)),
-                width: rect.width
-            });
-        }
-    }, [isOpen]);
-
-    const handleDateClick = (date: Date) => {
-        const y = date.getFullYear();
-        const m = String(date.getMonth() + 1).padStart(2, '0');
-        const d = String(date.getDate()).padStart(2, '0');
-        onChange(`${y}-${m}-${d}`);
-        setIsOpen(false);
-    };
-
-    const renderCalendar = () => {
-        const year = currentMonth.getFullYear();
-        const month = currentMonth.getMonth();
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const firstDay = new Date(year, month, 1).getDay();
-        const startOffset = firstDay === 0 ? 6 : firstDay - 1;
-
-        const today = new Date();
-        const isTodayInView = today.getFullYear() === year && today.getMonth() === month;
-        const todayDate = today.getDate();
-
-        const days = [];
-        for (let i = 0; i < startOffset; i++) {
-            days.push(<div key={`empty-${i}`} className="h-8 w-8" />);
-        }
-
-        for (let d = 1; d <= daysInMonth; d++) {
-            const date = new Date(year, month, d);
-            const dateTime = startOfDay(date).getTime();
-            const isSelected = selectedDate && dateTime === selectedDate.getTime();
-            const isCurrentDate = isTodayInView && d === todayDate;
-
-            days.push(
-                <button
-                    key={d}
-                    type="button"
-                    onClick={() => handleDateClick(date)}
-                    className={`
-                        h-8 w-8 text-[11px] font-bold flex flex-col items-center justify-center rounded-full transition-all relative cursor-pointer
-                        ${isSelected
-                            ? "bg-brand-green text-white shadow-lg shadow-green-900/20 z-10"
-                            : "text-gray-600 dark:text-gray-400 hover:text-brand-text-light-primary dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5"
-                        }
-                    `}
-                >
-                    <span className="leading-none">{d}</span>
-                    {isCurrentDate && !isSelected && (
-                        <div className="w-1 h-1 bg-brand-green rounded-full mt-0.5" />
-                    )}
-                </button>
-            );
-        }
-        return days;
-    };
-
-    const monthName = currentMonth.toLocaleString("default", { month: "long", year: "numeric" });
-
-    const displayValue = value
-        ? new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
-        : "";
-
-    const CalendarOverlay = () => {
-        if (!isOpen) return null;
-        return createPortal(
-            <div
-                ref={pickerRef}
-                style={{
-                    position: 'absolute',
-                    top: `${coords.top}px`,
-                    left: `${coords.left}px`,
-                    zIndex: 99999,
-                }}
-                className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl p-4 w-[280px] animate-fade-in shadow-green-900/10"
-            >
-                <div className="flex justify-between items-center mb-4 bg-gray-50 dark:bg-[#24272B] p-2 rounded-xl border border-gray-200 dark:border-white/5 text-brand-text-light-primary dark:text-white">
-                    <button
-                        type="button"
-                        onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
-                        className="p-1.5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg text-gray-500 dark:text-gray-400 hover:text-brand-text-light-primary dark:hover:text-white transition-colors w-8 h-8 flex items-center justify-center cursor-pointer"
-                    >
-                        <ArrowLeftWithoutLineIcon className="w-2.5 h-3.5" />
-                    </button>
-                    <span className="text-[13px] font-bold tracking-tight">
-                        {monthName}
-                    </span>
-                    <button
-                        type="button"
-                        onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
-                        className="p-1.5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg text-gray-500 dark:text-gray-400 hover:text-brand-text-light-primary dark:hover:text-white transition-colors w-8 h-8 flex items-center justify-center cursor-pointer"
-                    >
-                        <ArrowRightWithoutLineIcon className="w-2.5 h-3.5" />
-                    </button>
-                </div>
-
-                <div className="grid grid-cols-7 gap-1 mb-2 text-center">
-                    {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((d) => (
-                        <div key={d} className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
-                            {d}
-                        </div>
-                    ))}
-                </div>
-
-                <div className="grid grid-cols-7 gap-y-1 gap-x-1 place-items-center">
-                    {renderCalendar()}
-                </div>
-            </div>,
-            document.body
-        );
-    };
-
-    return (
-        <div className="relative">
-            <button
-                ref={buttonRef}
-                type="button"
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full h-[50px] flex items-center gap-3 bg-gray-50 dark:bg-white/10 border border-transparent dark:border-transparent rounded-xl px-4 text-sm text-brand-text-light-primary dark:text-white hover:border-brand-green focus:outline-none transition-all cursor-pointer"
-            >
-                <CalendarIcon className="w-4 h-4 text-brand-green shrink-0" />
-                <span className={`font-medium ${value ? '' : 'text-black/40 dark:text-white/60'}`}>
-                    {displayValue || "Select date"}
-                </span>
-            </button>
-            <CalendarOverlay />
-        </div>
-    );
-};
 
 /* ==================== Settlement Modal ==================== */
 
@@ -191,7 +23,13 @@ export const AffiliateSettlementModal: React.FC<AffiliateSettlementModalProps> =
     const [settleAmount, setSettleAmount] = useState("");
     const [transactionMode, setTransactionMode] = useState("");
     const [transactionId, setTransactionId] = useState("");
-    const [paymentDate, setPaymentDate] = useState("");
+    const [paymentDate, setPaymentDate] = useState(() => {
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        const d = String(today.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    });
     const [submitting, setSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState("");
     const [successMsg, setSuccessMsg] = useState("");
@@ -293,10 +131,10 @@ export const AffiliateSettlementModal: React.FC<AffiliateSettlementModalProps> =
 
             <div
                 ref={modalRef}
-                className="relative w-full max-w-[95%] sm:max-w-[480px] lg:max-w-[520px] min-h-[620px] bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl animate-fade-in flex flex-col max-h-[90vh]"
+                className="relative w-full max-w-[95%] sm:max-w-[480px] lg:max-w-[520px] bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl animate-fade-in flex flex-col max-h-[90vh]"
             >
                 {/* Header Section */}
-                <div className="flex items-center justify-between px-8 py-4 border-b border-gray-100 dark:border-white/5 flex-shrink-0">
+                <div className="flex items-center justify-between px-8 py-8 border-b border-gray-100 dark:border-white/5 flex-shrink-0">
                     <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-xl bg-brand-green/10 flex items-center justify-center">
                             <svg className="w-5 h-5 text-brand-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -326,7 +164,7 @@ export const AffiliateSettlementModal: React.FC<AffiliateSettlementModalProps> =
                 {/* Scrollable Content */}
                 <div className="overflow-y-auto custom-scrollbar flex-1">
                     {/* Amount Highlight Section */}
-                    <div className="px-8 pt-4">
+                    <div className="px-8 pt-8">
                         <div className="bg-[#1A56DB] dark:bg-blue-600/20 border border-blue-500/20 rounded-2xl p-3 flex items-center justify-between group">
                             <div>
                                 <p className="text-[10px] uppercase font-bold text-blue-100 dark:text-blue-400 tracking-wider">
@@ -344,7 +182,7 @@ export const AffiliateSettlementModal: React.FC<AffiliateSettlementModalProps> =
                         </div>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="px-8 py-4 space-y-4">
+                    <form onSubmit={handleSubmit} className="px-8 py-8 space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                             <div className="sm:col-span-2">
                                 <label className={labelClasses}>
@@ -416,12 +254,7 @@ export const AffiliateSettlementModal: React.FC<AffiliateSettlementModalProps> =
                                 />
                             </div>
 
-                            <div className="sm:col-span-2">
-                                <label className={labelClasses}>
-                                    Settlement Date <span className="text-red-500">*</span>
-                                </label>
-                                <AffiliateSettlementDatePicker value={paymentDate} onChange={setPaymentDate} />
-                            </div>
+
                         </div>
 
                         {errorMsg && (
