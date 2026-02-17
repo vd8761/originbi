@@ -16,7 +16,7 @@ export { CorporateCreditLedger } from './corporate-credit-ledger.entity';
 
 // Affiliate entities
 export { AffiliateAccount } from './affiliate-account.entity';
-export { AffiliateReferralTransaction, TransactionType, TransactionStatus } from './affiliate-referral-transaction.entity';
+export { AffiliateReferralTransaction } from './affiliate-referral-transaction.entity';
 
 // Group & Registration
 export { GroupAssessment } from './group-assessment.entity';
