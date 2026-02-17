@@ -268,6 +268,12 @@ export class AffiliatesService {
         // Net Ready to Process = Raw Ready - Overflow Paid
         const readyToProcessAmount = Math.max(0, rawReadyAmount - unpaidOverflow);
 
+        // Fetch settlement history
+        const settlements = await this.settlementTransactionRepo.find({
+            where: { affiliateAccountId: a.id },
+            order: { createdAt: 'DESC' } as any
+        });
+
         return {
             id: a.id,
             user_id: a.userId,
@@ -291,6 +297,7 @@ export class AffiliatesService {
             branch_name: a.branchName,
             aadhar_documents: aadharWithSignedUrls,
             pan_documents: panWithSignedUrls,
+            settlements: settlements,
             is_active: a.isActive,
             created_at: a.createdAt,
             updated_at: a.updatedAt,
