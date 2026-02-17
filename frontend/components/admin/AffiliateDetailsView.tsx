@@ -16,6 +16,8 @@ interface AffiliateDetailsViewProps {
 
 const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBack }) => {
     const [previewDoc, setPreviewDoc] = useState<AffiliateDocument | null>(null);
+    const [currentSettlementPage, setCurrentSettlementPage] = useState(1);
+    const settlementsPerPage = 5;
 
     const aadharDocs: AffiliateDocument[] = data.aadhar_documents || [];
     const panDocs: AffiliateDocument[] = data.pan_documents || [];
@@ -195,7 +197,7 @@ const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBac
                     </svg>
                     Commission Overview
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     <div className="bg-brand-light-secondary dark:bg-brand-dark-secondary p-5 rounded-xl border border-brand-light-tertiary dark:border-brand-dark-tertiary text-center">
                         <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary mb-2 uppercase tracking-wide font-medium">Total Earned</p>
                         <p className="text-2xl font-bold text-brand-green">{formatCurrency(data.total_earned_commission)}</p>
@@ -207,6 +209,10 @@ const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBac
                     <div className="bg-brand-light-secondary dark:bg-brand-dark-secondary p-5 rounded-xl border border-brand-light-tertiary dark:border-brand-dark-tertiary text-center">
                         <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary mb-2 uppercase tracking-wide font-medium">Total Pending</p>
                         <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{formatCurrency(data.total_pending_commission)}</p>
+                    </div>
+                    <div className="bg-brand-light-secondary dark:bg-brand-dark-secondary p-5 rounded-xl border border-brand-light-tertiary dark:border-brand-dark-tertiary text-center">
+                        <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary mb-2 uppercase tracking-wide font-medium">Ready to Payment</p>
+                        <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(data.ready_to_process_commission)}</p>
                     </div>
                 </div>
             </div>
@@ -243,6 +249,94 @@ const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBac
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {/* Settlement History */}
+            <div className="bg-brand-light-primary dark:bg-brand-dark-primary p-6 rounded-xl border border-brand-light-tertiary dark:border-brand-dark-tertiary">
+                <h4 className="text-lg font-semibold text-brand-text-light-primary dark:text-white mb-6 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-brand-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Settlement History
+                </h4>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="border-b border-brand-light-tertiary dark:border-brand-dark-tertiary">
+                                <th className="pb-3 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider">Date</th>
+                                <th className="pb-3 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider">Amount</th>
+                                <th className="pb-3 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider">Mode</th>
+                                <th className="pb-3 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider">Transaction ID</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-brand-light-tertiary dark:divide-brand-dark-tertiary/50">
+                            {data.settlements && data.settlements.length > 0 ? (
+                                data.settlements
+                                    .slice((currentSettlementPage - 1) * settlementsPerPage, currentSettlementPage * settlementsPerPage)
+                                    .map((s: any) => (
+                                        <tr key={s.id} className="group hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                                            <td className="py-4 text-sm text-brand-text-light-primary dark:text-white font-medium">
+                                                {new Date(s.paymentDate).toLocaleDateString('en-IN', {
+                                                    day: '2-digit',
+                                                    month: 'short',
+                                                    year: 'numeric'
+                                                })}
+                                            </td>
+                                            <td className="py-4 text-sm text-brand-green font-bold">
+                                                {formatCurrency(s.settleAmount)}
+                                            </td>
+                                            <td className="py-4 text-sm text-brand-text-light-secondary dark:text-brand-text-secondary">
+                                                <span className="px-2 py-0.5 rounded bg-brand-light-secondary dark:bg-brand-dark-secondary border border-brand-light-tertiary dark:border-brand-dark-tertiary text-[10px] font-bold uppercase">
+                                                    {s.transactionMode}
+                                                </span>
+                                            </td>
+                                            <td className="py-4 text-sm text-brand-text-light-primary dark:text-white font-mono opacity-80 uppercase tracking-tighter">
+                                                {s.settlementTransactionId || 'N/A'}
+                                            </td>
+                                        </tr>
+                                    ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={4} className="py-8 text-center text-sm text-brand-text-light-secondary dark:text-brand-text-secondary opacity-60">
+                                        No settlement records found.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {data.settlements && data.settlements.length > settlementsPerPage && (
+                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-brand-light-tertiary dark:border-brand-dark-tertiary/30">
+                        <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary opacity-70">
+                            Showing {((currentSettlementPage - 1) * settlementsPerPage) + 1} to {Math.min(currentSettlementPage * settlementsPerPage, data.settlements.length)} of {data.settlements.length} settlements
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setCurrentSettlementPage(prev => Math.max(1, prev - 1))}
+                                disabled={currentSettlementPage === 1}
+                                className="p-2 rounded-lg border border-brand-light-tertiary dark:border-brand-dark-tertiary text-brand-text-light-primary dark:text-white disabled:opacity-30 hover:bg-brand-light-secondary dark:hover:bg-brand-dark-secondary transition-colors"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+                            <span className="text-sm font-semibold text-brand-text-light-primary dark:text-white">
+                                {currentSettlementPage}
+                            </span>
+                            <button
+                                onClick={() => setCurrentSettlementPage(prev => Math.min(Math.ceil(data.settlements.length / settlementsPerPage), prev + 1))}
+                                disabled={currentSettlementPage >= Math.ceil(data.settlements.length / settlementsPerPage)}
+                                className="p-2 rounded-lg border border-brand-light-tertiary dark:border-brand-dark-tertiary text-brand-text-light-primary dark:text-white disabled:opacity-30 hover:bg-brand-light-secondary dark:hover:bg-brand-dark-secondary transition-colors"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* KYC Documents Section */}
