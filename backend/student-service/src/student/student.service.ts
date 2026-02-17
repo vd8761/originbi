@@ -600,7 +600,7 @@ export class StudentService {
         metadata: {
           groupCode: dto.group_code,
           referralCode: dto.referral_code,
-          sendEmail: false
+          sendEmail: true
         },
         createdAt: new Date(),
         updatedAt: new Date(),
