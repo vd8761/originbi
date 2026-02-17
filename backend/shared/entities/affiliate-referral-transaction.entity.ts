@@ -8,29 +8,21 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import { AffiliateAccount } from './affiliate-account.entity';
-import { User } from './user.entity';
-
-export type TransactionType = 'COMMISSION_EARNED' | 'PAYOUT';
-export type TransactionStatus = 'PENDING' | 'COMPLETED' | 'FAILED';
 
 @Entity('affiliate_referral_transactions')
 export class AffiliateReferralTransaction {
     @PrimaryGeneratedColumn({ type: 'bigint' })
     id: number;
 
-    @Column({ name: 'affiliate_id', type: 'bigint' })
-    affiliateId: number;
+    @Column({ name: 'affiliate_account_id', type: 'bigint' })
+    affiliateAccountId: number;
 
     @ManyToOne(() => AffiliateAccount, (affiliate) => affiliate.referralTransactions)
-    @JoinColumn({ name: 'affiliate_id' })
-    affiliate: AffiliateAccount;
+    @JoinColumn({ name: 'affiliate_account_id' })
+    affiliateAccount: AffiliateAccount;
 
-    @Column({ name: 'student_user_id', type: 'bigint', nullable: true })
-    studentUserId: number | null;
-
-    @ManyToOne(() => User)
-    @JoinColumn({ name: 'student_user_id' })
-    studentUser: User;
+    @Column({ name: 'registration_id', type: 'bigint' })
+    registrationId: number;
 
     @Column({ name: 'registration_amount', type: 'numeric', precision: 10, scale: 2, default: 0 })
     registrationAmount: number;
@@ -38,21 +30,18 @@ export class AffiliateReferralTransaction {
     @Column({ name: 'commission_percentage', type: 'numeric', precision: 5, scale: 2, default: 0 })
     commissionPercentage: number;
 
-    @Column({ name: 'earned_amount', type: 'numeric', precision: 10, scale: 2, default: 0 })
-    earnedAmount: number;
+    @Column({ name: 'earned_commission_amount', type: 'numeric', precision: 10, scale: 2, default: 0 })
+    earnedCommissionAmount: number;
 
-    // "transfered too" - snapshots the payment details or status context
-    @Column({ name: 'transfer_details', type: 'jsonb', nullable: true })
-    transferDetails: any;
-
-    @Column({ name: 'transaction_type', type: 'varchar', length: 50, default: 'COMMISSION_EARNED' })
-    transactionType: TransactionType;
-
-    @Column({ name: 'status', type: 'varchar', length: 20, default: 'PENDING' })
-    status: TransactionStatus;
+    // 0 - Not Settled | 1 - Processing | 2 - Settled
+    @Column({ name: 'settlement_status', type: 'smallint', default: 0 })
+    settlementStatus: number;
 
     @Column({ name: 'metadata', type: 'jsonb', default: () => `'{}'` })
     metadata: any;
+
+    @Column({ name: 'payment_at', type: 'timestamptz', nullable: true })
+    paymentAt: Date | null;
 
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;

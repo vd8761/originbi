@@ -4,7 +4,7 @@ import { CreateRegistrationDto } from './dto/create-registration.dto';
 
 @Controller('student')
 export class StudentController {
-  constructor(private readonly studentService: StudentService) {}
+  constructor(private readonly studentService: StudentService) { }
 
   @Post('profile')
   async getProfile(@Body() body: { email: string }) {
@@ -47,5 +47,10 @@ export class StudentController {
     @Body() dto: { email: string; mobile_number?: string },
   ) {
     return this.studentService.validateRegistration(dto);
+  }
+
+  @Post('affiliate/validate')
+  async validateAffiliate(@Body() body: { code: string }) {
+    return this.studentService.validateReferralCode(body.code);
   }
 }

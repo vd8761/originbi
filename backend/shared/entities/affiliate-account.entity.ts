@@ -92,7 +92,7 @@ export class AffiliateAccount {
     @Column({ name: 'metadata', type: 'jsonb', default: () => `'{}'` })
     metadata: any;
 
-    @OneToMany(() => AffiliateReferralTransaction, (transaction) => transaction.affiliate)
+    @OneToMany(() => AffiliateReferralTransaction, (transaction) => transaction.affiliateAccount)
     referralTransactions: AffiliateReferralTransaction[];
 
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
