@@ -45,12 +45,13 @@ const AffiliateTable: React.FC<AffiliateTableProps> = ({
     const [shareToast, setShareToast] = useState(false);
     const modalRef = useRef<HTMLDivElement>(null);
 
-    const formatCurrency = (amount: number) => {
+    const formatCurrency = (amount: any) => {
+        const num = parseFloat(amount) || 0;
         return new Intl.NumberFormat('en-IN', {
             style: 'currency',
             currency: 'INR',
             maximumFractionDigits: 0,
-        }).format(amount);
+        }).format(num);
     };
 
     const openReferralModal = (affiliate: any) => {
@@ -211,6 +212,9 @@ const AffiliateTable: React.FC<AffiliateTableProps> = ({
                                     Total Settled
                                 </th>
                                 <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider">
+                                    Ready to Payment
+                                </th>
+                                <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider">
                                     Total Pending
                                 </th>
                                 <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider text-right">
@@ -231,6 +235,7 @@ const AffiliateTable: React.FC<AffiliateTableProps> = ({
                                         <td className="p-4 align-middle"><div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                                         <td className="p-4 align-middle"><div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                                         <td className="p-4 align-middle"><div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
+                                        <td className="p-4 align-middle"><div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                                         <td className="p-4 align-middle"><div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                                         <td className="p-4 align-middle"><div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                                         <td className="p-4 align-middle"><div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
@@ -310,6 +315,12 @@ const AffiliateTable: React.FC<AffiliateTableProps> = ({
                                                 {formatCurrency(affiliate.total_settled_commission)}
                                             </span>
                                         </td>
+                                        {/* Ready to Payment */}
+                                        <td className="p-4 text-sm align-middle">
+                                            <span className="font-medium text-blue-600 dark:text-blue-400">
+                                                {formatCurrency(affiliate.ready_to_process_commission)}
+                                            </span>
+                                        </td>
                                         {/* Total Pending */}
                                         <td className="p-4 text-sm align-middle">
                                             <span className="font-medium text-amber-600 dark:text-amber-400">
@@ -349,7 +360,7 @@ const AffiliateTable: React.FC<AffiliateTableProps> = ({
                             ) : (
                                 <tr>
                                     <td
-                                        colSpan={8}
+                                        colSpan={9}
                                         className="p-8 text-center text-brand-text-light-secondary dark:text-gray-500"
                                     >
                                         No affiliates found.

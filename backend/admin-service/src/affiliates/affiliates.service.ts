@@ -4,6 +4,7 @@ import {
     InternalServerErrorException,
     Logger,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
@@ -14,6 +15,7 @@ import { SES } from 'aws-sdk';
 import {
     User as AdminUser,
     AffiliateAccount,
+    AffiliateReferralTransaction,
 } from '@originbi/shared-entities';
 import { CreateAffiliateDto, UpdateAffiliateDto } from './dto/create-affiliate.dto';
 import { R2Service, R2UploadResult } from '../r2/r2.service';
@@ -31,10 +33,32 @@ export class AffiliatesService {
         @InjectRepository(AffiliateAccount)
         private readonly affiliateRepo: Repository<AffiliateAccount>,
 
+        @InjectRepository(AffiliateReferralTransaction)
+        private readonly referralTransactionRepo: Repository<AffiliateReferralTransaction>,
+
         private readonly dataSource: DataSource,
         private readonly http: HttpService,
         private readonly r2Service: R2Service,
     ) { }
+
+    @Cron(CronExpression.EVERY_HOUR)
+    async updateReadyToProcessStatus() {
+        const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+        try {
+            const result = await this.referralTransactionRepo
+                .createQueryBuilder()
+                .update(AffiliateReferralTransaction)
+                .set({ settlementStatus: 1 })
+                .where('settlement_status = 0')
+                .andWhere('created_at <= :fortyEightHoursAgo', { fortyEightHoursAgo })
+                .execute();
+            if (result.affected && result.affected > 0) {
+                this.logger.log(`Updated ${result.affected} referral transactions to status 1 (Processing)`);
+            }
+        } catch (error: any) {
+            this.logger.error(`Error updating referral statuses: ${error.message}`);
+        }
+    }
 
     private async withRetry<T>(
         operation: () => Promise<T>,
@@ -209,6 +233,16 @@ export class AffiliatesService {
             }))
         );
 
+        // Sum of earnedCommissionAmount where settlementStatus = 1
+        const readyToProcessRes = await this.referralTransactionRepo
+            .createQueryBuilder('t')
+            .select('SUM(CAST(t.earned_commission_amount AS NUMERIC))', 'sum')
+            .where('t.affiliate_account_id = :affiliateAccountId', { affiliateAccountId: a.id })
+            .andWhere('t.settlement_status = 1')
+            .getRawOne();
+
+        const readyToProcessAmount = parseFloat(readyToProcessRes?.sum) || 0;
+
         return {
             id: a.id,
             user_id: a.userId,
@@ -223,6 +257,7 @@ export class AffiliatesService {
             total_earned_commission: Number(a.totalEarnedCommission) || 0,
             total_settled_commission: Number(a.totalSettledCommission) || 0,
             total_pending_commission: Number(a.totalPendingCommission) || 0,
+            ready_to_process_commission: readyToProcessAmount,
             upi_id: a.upiId,
             upi_number: a.upiNumber,
             banking_name: a.bankingName,
