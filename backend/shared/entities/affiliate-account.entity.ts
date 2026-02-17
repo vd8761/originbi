@@ -11,6 +11,7 @@ import {
 import { User } from './user.entity';
 import type { AffiliateReferralTransaction } from './affiliate-referral-transaction.entity';
 
+
 @Entity('affiliate_accounts')
 export class AffiliateAccount {
     @PrimaryGeneratedColumn({ type: 'bigint' })
@@ -92,7 +93,7 @@ export class AffiliateAccount {
     @Column({ name: 'metadata', type: 'jsonb', default: () => `'{}'` })
     metadata: any;
 
-    @OneToMany(() => require('./affiliate-referral-transaction.entity').AffiliateReferralTransaction, (transaction: AffiliateReferralTransaction) => transaction.affiliateAccount)
+    @OneToMany(() => require('./affiliate-referral-transaction.entity').AffiliateReferralTransaction, (transaction: any) => transaction.affiliateAccount)
     referralTransactions: AffiliateReferralTransaction[];
 
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
