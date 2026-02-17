@@ -97,6 +97,11 @@ export class AffiliatesController {
         );
     }
 
+    @Post('refresh-ready-status')
+    async refreshReadyStatus() {
+        return this.affiliatesService.updateReadyToProcessStatus();
+    }
+
     @Get()
     async list(
         @Query('page') page = '1',

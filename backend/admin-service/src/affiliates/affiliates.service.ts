@@ -4,7 +4,7 @@ import {
     InternalServerErrorException,
     Logger,
 } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
@@ -46,7 +46,6 @@ export class AffiliatesService {
         private readonly r2Service: R2Service,
     ) { }
 
-    @Cron(CronExpression.EVERY_HOUR)
     async updateReadyToProcessStatus() {
         const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
         try {
@@ -57,11 +56,14 @@ export class AffiliatesService {
                 .where('settlement_status = 0')
                 .andWhere('created_at <= :fortyEightHoursAgo', { fortyEightHoursAgo })
                 .execute();
-            if (result.affected && result.affected > 0) {
-                this.logger.log(`Updated ${result.affected} referral transactions to status 1 (Processing)`);
+            const affected = result.affected || 0;
+            if (affected > 0) {
+                this.logger.log(`Updated ${affected} referral transactions to status 1 (Processing)`);
             }
+            return { message: 'Ready to payment status refreshed', updated: affected };
         } catch (error: any) {
             this.logger.error(`Error updating referral statuses: ${error.message}`);
+            throw new InternalServerErrorException(`Failed to refresh ready to payment status: ${error.message}`);
         }
     }
 
@@ -435,6 +437,15 @@ export class AffiliatesService {
 
         try {
             return await this.dataSource.transaction(async (manager) => {
+                // Calculate post-settlement remaining amounts
+                const currentEarned = Number(affiliate.totalEarnedCommission) || 0;
+                const currentPending = Number(affiliate.totalPendingCommission) || 0;
+                const currentSettled = Number(affiliate.totalSettledCommission) || 0;
+
+                const postSettlementEarned = currentEarned; // Earned doesn't change on settlement
+                const postSettlementPending = currentPending - dto.settleAmount;
+                const postSettlementSettled = currentSettled + dto.settleAmount;
+
                 // 1. Create settlement transaction record
                 const settlement = manager.create(AffiliateSettlementTransaction, {
                     affiliateAccountId: affiliateId,
@@ -443,9 +454,9 @@ export class AffiliatesService {
                     settlementTransactionId: dto.transactionId,
                     paymentDate: new Date(dto.paymentDate),
                     metadata: {
-                        earnedAsOfSettlement: Number(affiliate.totalEarnedCommission) || 0,
-                        pendingAsOfSettlement: Number(affiliate.totalPendingCommission) || 0,
-                        settledAsOfSettlement: Number(affiliate.totalSettledCommission) || 0,
+                        earnedAsOfSettlement: postSettlementEarned,
+                        pendingAsOfSettlement: postSettlementPending,
+                        settledAsOfSettlement: postSettlementSettled,
                     },
                 });
                 await manager.save(settlement);
