@@ -104,6 +104,8 @@ const EarningsCard = ({ earnings }: { earnings: number }) => {
 };
 
 // --- Earnings Chart ---
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+
 // --- Earnings Chart ---
 const EarningsChart = ({ affiliateId }: { affiliateId?: string }) => {
     const [chartData, setChartData] = useState<{ label: string; earned: number; pending: number }[]>([]);
@@ -114,7 +116,7 @@ const EarningsChart = ({ affiliateId }: { affiliateId?: string }) => {
                 .then(res => {
                     if (Array.isArray(res.data)) {
                         setChartData(res.data.map((d: any) => ({
-                            label: d.month,
+                            label: d.label,
                             earned: Number(d.earned),
                             pending: Number(d.pending)
                         })));
@@ -124,164 +126,75 @@ const EarningsChart = ({ affiliateId }: { affiliateId?: string }) => {
         }
     }, [affiliateId]);
 
-    const max = Math.max(...chartData.map(d => Math.max(d.earned, d.pending)), 100);
+    const CustomTooltip = ({ active, payload, label }: any) => {
+        if (active && payload && payload.length) {
+            return (
+                <div className="bg-white/95 dark:bg-[#19211C]/90 backdrop-blur-md p-4 rounded-xl border border-white/20 shadow-lg">
+                    <p className="text-sm font-semibold mb-2 text-[#19211C] dark:text-white">{label}</p>
+                    <div className="space-y-1">
+                        <p className="text-xs text-[#150089] dark:text-blue-300">
+                            Earned: ₹{payload[0].value.toLocaleString('en-IN')}
+                        </p>
+                        <p className="text-xs text-[#1ED36A]">
+                            Pending: ₹{payload[1].value.toLocaleString('en-IN')}
+                        </p>
+                    </div>
+                </div>
+            );
+        }
+        return null;
+    };
 
     return (
-        <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-8 border border-[#E0E0E0] dark:border-white/10 h-full flex flex-col font-['Haskoy'] overflow-visible shadow-sm">
-            <div className="flex justify-between items-center mb-8">
+        <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-6 border border-[#E0E0E0] dark:border-white/10 h-full flex flex-col font-['Haskoy'] shadow-sm">
+            <div className="flex justify-between items-center mb-6">
                 <h3 className="text-[clamp(18px,1.2vw,22px)] font-semibold text-[#19211C] dark:text-white leading-none">Earnings Overview</h3>
-                <div className="flex gap-4 text-[clamp(12px,0.8vw,14px)] font-medium text-[#19211C] dark:text-white">
-                    <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-[#150089] dark:bg-white"></span> Earned</div>
+                <div className="flex gap-4 text-xs font-medium text-[#19211C] dark:text-white">
+                    <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-[#150089]"></span> Earned</div>
                     <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-[#1ED36A]"></span> Pending</div>
                 </div>
             </div>
 
-            <div className="flex-1 flex gap-4">
-                {/* Y Axis */}
-                <div className="flex flex-col justify-between text-[#19211C] dark:text-white font-light text-[clamp(12px,0.9vw,15px)] pb-8 pt-2">
-                    <span>35K</span>
-                    <span>25K</span>
-                    <span>15K</span>
-                    <span>5K</span>
-                </div>
-
-                {/* Chart Area */}
-                <div className="flex-1 flex justify-between items-end pb-1 relative">
-                    {/* Grid Lines */}
-                    <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-8 pt-4">
-                        <div className="border-b border-dashed border-gray-200 dark:border-white/5 w-full h-0"></div>
-                        <div className="border-b border-dashed border-gray-200 dark:border-white/5 w-full h-0"></div>
-                        <div className="border-b border-dashed border-gray-200 dark:border-white/5 w-full h-0"></div>
-                        <div className="border-b border-dashed border-gray-200 dark:border-white/5 w-full h-0"></div>
-                    </div>
-
-                    {chartData.map((d, i) => (
-                        <div key={i} className="relative flex flex-col items-center justify-end h-full gap-4 flex-1 group z-10 w-full cursor-pointer">
-                            <div className="flex items-end gap-1 sm:gap-2 h-full relative justify-center w-full">
-                                {/* Earned Bar */}
-                                <div className="w-[clamp(14px,1.5vw,28px)] bg-[#150089] dark:bg-white rounded-full transition-all duration-500 hover:opacity-90 relative" style={{ height: `${(d.earned / max) * 100}%` }}>
-                                    <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#19211C] dark:bg-white border-2 border-white dark:border-[#19211C] rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-40"></div>
-                                </div>
-                                {/* Pending Bar */}
-                                <div className="w-[clamp(14px,1.5vw,28px)] bg-[#1ED36A] rounded-full transition-all duration-500 hover:opacity-90 relative" style={{ height: `${(d.pending / max) * 100}%` }}>
-                                    <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#19211C] dark:bg-[#1ED36A] border-2 border-white dark:border-[#111111] rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-40"></div>
-                                </div>
-
-                                {/* Tooltip */}
-                                <div className="absolute bottom-[calc(100%+12px)] left-1/2 -translate-x-1/4 hidden group-hover:block z-50 pointer-events-none origin-bottom transition-all">
-                                    <div className="relative backdrop-blur-[40px] bg-white/95 dark:bg-[#19211C]/80 border border-[#19211C]/10 dark:border-[#FFFFFF]/[0.08] rounded-2xl shadow-[0_8px_13.4px_-2px_rgba(0,0,0,0.4)] overflow-hidden min-w-[180px]">
-                                        <div className="p-4 border-b border-[#19211C]/5 dark:border-white/5">
-                                            <div className="font-['Haskoy'] font-medium text-[14px] text-[#19211C] dark:text-white leading-none whitespace-nowrap">
-                                                {d.label}
-                                            </div>
-                                        </div>
-                                        <div className="p-4 bg-transparent space-y-2">
-                                            <div className="flex justify-between items-center text-[12px]">
-                                                <span className="flex items-center gap-2 text-[#19211C] dark:text-white font-medium"><span className="w-1.5 h-1.5 rounded-full bg-[#150089] dark:bg-white"></span> Earned</span>
-                                                <span className="text-[#19211C] dark:text-white font-medium text-right">₹{d.earned.toLocaleString('en-IN')}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-[12px]">
-                                                <span className="flex items-center gap-2 text-[#19211C] dark:text-white font-medium"><span className="w-1.5 h-1.5 rounded-full bg-[#1ED36A]"></span> Pending</span>
-                                                <span className="text-[#19211C] dark:text-white font-medium text-right">₹{d.pending.toLocaleString('en-IN')}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="absolute top-full left-[20%] -translate-x-1/2 border-[6px] border-transparent border-t-[#19211C] dark:border-t-[#1ED36A]/50 drop-shadow-sm"></div>
-                                </div>
-                            </div>
-                            <span className="text-[clamp(14px,1vw,17px)] font-light text-[#19211C] dark:text-white">{d.label}</span>
-                        </div>
-                    ))}
-                </div>
+            <div className="flex-1 w-full min-h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} barGap={4}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
+                        <XAxis
+                            dataKey="label"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: '#888', fontSize: 12 }}
+                            dy={10}
+                        />
+                        <YAxis
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: '#888', fontSize: 12 }}
+                            tickFormatter={(value) => `₹${value >= 1000 ? value / 1000 + 'k' : value}`}
+                        />
+                        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} />
+                        <Bar
+                            dataKey="earned"
+                            fill="#150089"
+                            radius={[4, 4, 0, 0]}
+                            barSize={12}
+                        />
+                        <Bar
+                            dataKey="pending"
+                            fill="#1ED36A"
+                            radius={[4, 4, 0, 0]}
+                            barSize={12}
+                        />
+                    </BarChart>
+                </ResponsiveContainer>
             </div>
         </div>
     );
 };
+
 
 // --- Referral Performance ---
-const ReferralPerformance = () => {
-    const [selectedPeriod, setSelectedPeriod] = useState('30');
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-    const periodOptions = [
-        { label: 'Last 7 days', value: '7' },
-        { label: 'Last 30 days', value: '30' },
-        { label: 'Last 90 days', value: '90' },
-        { label: 'Last 12 months', value: '365' },
-    ];
-
-    // Mock data per period
-    const dataByPeriod: Record<string, { views: number; registrations: number }> = {
-        '7': { views: 320, registrations: 85 },
-        '30': { views: 1245, registrations: 342 },
-        '90': { views: 3580, registrations: 890 },
-        '365': { views: 12400, registrations: 3200 },
-    };
-
-    const currentData = dataByPeriod[selectedPeriod];
-    const pendings = currentData.views - currentData.registrations;
-    const max = Math.max(currentData.views, 1);
-
-    const items = [
-        { label: 'Total Views', val: currentData.views, color: '#1ED36A' },
-        { label: 'Total Registration', val: currentData.registrations, color: '#0EA5E9' },
-        { label: 'Pendings', val: pendings, color: '#F59E0B' },
-    ];
-
-    const selectedLabel = periodOptions.find(o => o.value === selectedPeriod)?.label || 'Last 30 days';
-
-    return (
-        <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-8 border border-[#E0E0E0] dark:border-white/10 h-full font-['Haskoy'] flex flex-col shadow-sm">
-            <div className="flex justify-between items-center mb-8">
-                <h3 className="text-[clamp(18px,1.2vw,22px)] font-semibold text-[#19211C] dark:text-white leading-none">
-                    Referral Performance
-                </h3>
-                <div className="relative">
-                    <button
-                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                        className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#E0E0E0] dark:border-white/10 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
-                    >
-                        <span className="text-[clamp(13px,1vw,15px)] font-normal text-[#19211C] dark:text-white leading-none whitespace-nowrap">
-                            {selectedLabel}
-                        </span>
-                        <svg className={`w-4 h-4 text-[#19211C] dark:text-white opacity-60 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 9l-7 7-7-7" /></svg>
-                    </button>
-
-                    {isDropdownOpen && (
-                        <div className="absolute right-0 top-full mt-2 bg-white dark:bg-brand-dark-secondary rounded-xl shadow-xl border border-gray-100 dark:border-brand-dark-tertiary py-1 min-w-[160px] z-50">
-                            {periodOptions.map((opt) => (
-                                <button
-                                    key={opt.value}
-                                    onClick={() => { setSelectedPeriod(opt.value); setIsDropdownOpen(false); }}
-                                    className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors ${selectedPeriod === opt.value
-                                        ? 'text-[#1ED36A] bg-[#1ED36A]/5'
-                                        : 'text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-brand-dark-tertiary'
-                                        }`}
-                                >
-                                    {opt.label}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            <div className="space-y-8 flex-1 flex flex-col justify-evenly">
-                {items.map((item, i) => (
-                    <div key={i} className="flex flex-col gap-3">
-                        <div className="flex justify-between items-end">
-                            <span className="text-[clamp(13px,1vw,15px)] font-normal text-[#19211C] dark:text-white leading-none">{item.label}</span>
-                            <span className="text-[clamp(13px,1vw,15px)] font-semibold text-[#19211C] dark:text-white leading-none">{item.val.toLocaleString('en-IN')}</span>
-                        </div>
-                        <div className="h-[clamp(6px,0.4vw,8px)] w-full bg-[#FAFAFA] dark:bg-white/5 rounded-full overflow-hidden border border-[#F5F5F5] dark:border-none">
-                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(item.val / max) * 100}%`, backgroundColor: item.color }}></div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-};
 
 // --- Referral Link Card (Redesigned as Share Card) ---
 const ReferralLinkCard = () => {
@@ -505,7 +418,7 @@ const ReferralsTable = ({ data }: { data: (Referral & { settledDown: 'Completed'
                                     {row.email}
                                 </td>
                                 <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">
-                                    {row.signUpDate}
+                                    {new Date(row.signUpDate).toISOString().split('T')[0]}
                                 </td>
                                 <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] leading-none">
                                     <span className={row.settledDown === 'Completed' ? 'text-[#1ED36A]' : 'text-[#FF5457]'}>

@@ -82,7 +82,8 @@ const AffiliateProfile: React.FC = () => {
         : profile.total_earned_commission > 50000 ? 'Gold Affiliate'
             : 'Silver Affiliate';
     const status = profile.is_active ? 'active' : 'inactive';
-    const referralLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/ref/${profile.referral_code}`;
+
+    const referralLink = `https://discover.originbi.com/register?ref=${profile.referral_code}`;
 
     const handleCopy = () => {
         navigator.clipboard.writeText(referralLink);
@@ -155,7 +156,6 @@ const AffiliateProfile: React.FC = () => {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                             <DetailItem label="Full Name" value={profile.name} />
-                            <DetailItem label="Affiliate ID" value={`AFF_${profile.id.toString().padStart(3, '0')}`} />
                             <DetailItem label="Email Address" value={profile.email} />
                             <DetailItem label="Phone Number" value={`${profile.country_code} ${profile.mobile_number}`} />
                             <DetailItem label="Address" value={profile.address} />

@@ -7,6 +7,8 @@ import {
     AffiliateAccount,
     AffiliateReferralTransaction,
     Registration,
+    Program,
+    Groups,
 } from '@originbi/shared-entities';
 
 import { AffiliatesService } from './affiliates.service';
@@ -15,7 +17,7 @@ import { AffiliatePortalController } from './affiliate-portal.controller';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([AdminUser, AffiliateAccount, AffiliateReferralTransaction, Registration]),
+        TypeOrmModule.forFeature([AdminUser, AffiliateAccount, AffiliateReferralTransaction, Registration, Program, Groups]),
         HttpModule,
     ],
     providers: [AffiliatesService],

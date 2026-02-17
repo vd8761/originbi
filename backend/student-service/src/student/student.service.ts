@@ -637,6 +637,13 @@ export class StudentService {
           const referralTransaction = this.affiliateTransactionRepo.create(transactionData);
           await this.affiliateTransactionRepo.save(referralTransaction);
           this.logger.log(`Affiliate referral transaction recorded for registration ${savedReg.id}`);
+
+          // Update aggregate fields on AffiliateAccount
+          affiliate.referralCount = (Number(affiliate.referralCount) || 0) + 1;
+          affiliate.totalEarnedCommission = (Number(affiliate.totalEarnedCommission) || 0) + earnedCommission;
+          affiliate.totalPendingCommission = (Number(affiliate.totalPendingCommission) || 0) + earnedCommission;
+          await this.affiliateRepo.save(affiliate);
+          this.logger.log(`Affiliate ${affiliate.id} aggregates updated: referralCount=${affiliate.referralCount}, totalEarned=${affiliate.totalEarnedCommission}, totalPending=${affiliate.totalPendingCommission}`);
         } else {
           this.logger.warn(`Invalid or inactive referral code provided: ${dto.referral_code}`);
         }

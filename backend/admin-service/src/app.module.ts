@@ -98,11 +98,11 @@ import { R2Module } from './r2/r2.module';
       },
     }),
 
+    ProgramsModule,
+    RegistrationsModule,
     AdminLoginModule,
     AdminModule,
-    ProgramsModule,
     DepartmentsModule,
-    RegistrationsModule,
     GroupsModule,
     AssessmentModule,
     CorporateModule,

@@ -27,6 +27,8 @@ import {
   AssessmentSession,
   User,
   PersonalityTrait,
+  Program,
+  Groups,
 } from '@originbi/shared-entities';
 import { PdfModule } from '../common/pdf/pdf.module';
 
@@ -38,6 +40,8 @@ import { PdfModule } from '../common/pdf/pdf.module';
       AssessmentSession,
       User,
       PersonalityTrait,
+      Program,
+      Groups,
     ]),
     PdfModule,
     AuthModule,

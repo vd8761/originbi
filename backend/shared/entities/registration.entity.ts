@@ -92,7 +92,7 @@ export class Registration {
     @Column({ name: 'program_id', type: 'bigint', nullable: true })
     programId: number | null;
 
-    @ManyToOne(() => Program)
+    @ManyToOne('Program')
     @JoinColumn({ name: 'program_id' })
     program: Program;
 

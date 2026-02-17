@@ -41,76 +41,72 @@ const EarningStat = ({ label, value, icon }: { label: string; value: string; ico
     </div>
 );
 
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+
 // --- Earnings Chart ---
 const LargeEarningsChart = ({ chartData }: { chartData: ChartDataPoint[] }) => {
-    const allValues = chartData.flatMap(d => [d.earned, d.pending]);
-    const max = Math.max(...allValues, 1000) * 1.2; // 20% headroom
-    const yLabels = [
-        `${Math.round(max / 1000)}K`,
-        `${Math.round((max * 0.66) / 1000)}K`,
-        `${Math.round((max * 0.33) / 1000)}K`,
-        '0',
-    ];
+
+    const CustomTooltip = ({ active, payload, label }: any) => {
+        if (active && payload && payload.length) {
+            return (
+                <div className="bg-white/95 dark:bg-[#19211C]/90 backdrop-blur-md p-4 rounded-xl border border-white/20 shadow-lg">
+                    <p className="text-sm font-semibold mb-2 text-[#19211C] dark:text-white">{label}</p>
+                    <div className="space-y-1">
+                        <p className="text-xs text-[#150089] dark:text-blue-300">
+                            Earned: ₹{payload[0].value.toLocaleString('en-IN')}
+                        </p>
+                        <p className="text-xs text-[#1ED36A]">
+                            Pending: ₹{payload[1].value.toLocaleString('en-IN')}
+                        </p>
+                    </div>
+                </div>
+            );
+        }
+        return null;
+    };
 
     return (
-        <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-8 border border-[#E0E0E0] dark:border-white/10 font-['Haskoy'] shadow-sm h-full flex flex-col overflow-visible">
-            <div className="flex justify-between items-center mb-8">
+        <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-8 border border-[#E0E0E0] dark:border-white/10 font-['Haskoy'] shadow-sm">
+            <div className="flex justify-between items-center mb-6">
                 <h3 className="text-[clamp(18px,1.2vw,22px)] font-semibold text-[#19211C] dark:text-white leading-none">Earnings Trend</h3>
                 <div className="flex gap-4 text-[clamp(12px,0.8vw,14px)] font-medium text-[#19211C] dark:text-white">
-                    <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-[#150089] dark:bg-white"></span> Earned</div>
+                    <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-[#150089]"></span> Earned</div>
                     <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-[#1ED36A]"></span> Pending</div>
                 </div>
             </div>
 
-            <div className="flex-1 flex gap-4 h-[280px]">
-                <div className="flex flex-col justify-between text-[#19211C] dark:text-white font-light text-[clamp(14px,1vw,17px)] pb-8 pt-2">
-                    {yLabels.map((l, i) => <span key={i}>{l}</span>)}
-                </div>
-                <div className="flex-1 flex justify-between items-end pb-1 relative">
-                    <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-8 pt-4">
-                        {[0, 1, 2, 3].map(i => <div key={i} className="border-b border-dashed border-gray-200 dark:border-white/5 w-full h-0"></div>)}
-                    </div>
-
-                    {chartData.map((d, i) => (
-                        <div key={i} className="relative flex flex-col items-center justify-end h-full gap-4 flex-1 group z-10 w-full cursor-pointer">
-                            <div className="flex items-end gap-1 sm:gap-2 h-full relative justify-center w-full">
-                                <div className="w-[clamp(14px,1.5vw,28px)] bg-[#150089] dark:bg-white rounded-full transition-all duration-500 hover:opacity-90 relative" style={{ height: `${Math.max((d.earned / max) * 100, 1)}%` }}>
-                                    <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#19211C] dark:bg-white border-2 border-white dark:border-[#19211C] rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-40"></div>
-                                </div>
-                                <div className="w-[clamp(14px,1.5vw,28px)] bg-[#1ED36A] rounded-full transition-all duration-500 hover:opacity-90 relative" style={{ height: `${Math.max((d.pending / max) * 100, 1)}%` }}>
-                                    <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#19211C] dark:bg-[#1ED36A] border-2 border-white dark:border-[#111111] rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-40"></div>
-                                </div>
-
-                                {/* Tooltip */}
-                                <div className="absolute bottom-[calc(100%+12px)] left-1/2 -translate-x-1/4 hidden group-hover:block z-50 pointer-events-none origin-bottom transition-all">
-                                    <div className="relative backdrop-blur-[40px] bg-white/95 dark:bg-[#19211C]/80 border border-[#19211C]/10 dark:border-[#FFFFFF]/[0.08] rounded-2xl shadow-[0_8px_13.4px_-2px_rgba(0,0,0,0.4)] overflow-hidden min-w-[200px]">
-                                        <div className="p-4 border-b border-[#19211C]/5 dark:border-white/5">
-                                            <div className="font-medium text-[14px] text-[#19211C] dark:text-white leading-none whitespace-nowrap">{d.label}</div>
-                                        </div>
-                                        <div className="p-4 space-y-2">
-                                            <div className="flex justify-between items-center text-[12px]">
-                                                <span className="flex items-center gap-2 text-[#19211C] dark:text-white font-medium"><span className="w-1.5 h-1.5 rounded-full bg-[#150089] dark:bg-white"></span>Earned</span>
-                                                <span className="font-medium text-[#19211C] dark:text-white">₹{d.earned.toLocaleString('en-IN')}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-[12px]">
-                                                <span className="flex items-center gap-2 text-[#19211C] dark:text-white font-medium"><span className="w-1.5 h-1.5 rounded-full bg-[#1ED36A]"></span>Pending</span>
-                                                <span className="font-medium text-[#19211C] dark:text-white">₹{d.pending.toLocaleString('en-IN')}</span>
-                                            </div>
-                                        </div>
-                                        <div className="px-4 py-3 bg-[#19211C] dark:bg-[#1ED36A]/20 backdrop-blur-sm border-t border-[#19211C] dark:border-white/5">
-                                            <div className="text-[12px] font-medium text-white dark:text-[#1ED36A] flex justify-between items-center w-full">
-                                                <span>Earned %</span>
-                                                <span className="text-[#1ED36A]">{(d.earned + d.pending) > 0 ? Math.round((d.earned / (d.earned + d.pending)) * 100) : 0}%</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="absolute top-full left-[20%] -translate-x-1/2 border-[6px] border-transparent border-t-[#19211C] dark:border-t-[#1ED36A]/50 drop-shadow-sm"></div>
-                                </div>
-                            </div>
-                            <span className="text-[clamp(14px,1vw,17px)] font-light text-[#19211C] dark:text-white">{d.label}</span>
-                        </div>
-                    ))}
-                </div>
+            <div style={{ width: '100%', height: 350 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} barGap={4} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
+                        <XAxis
+                            dataKey="label"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: '#888', fontSize: 12 }}
+                            dy={10}
+                        />
+                        <YAxis
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: '#888', fontSize: 12 }}
+                            tickFormatter={(value) => `₹${value >= 1000 ? value / 1000 + 'k' : value}`}
+                        />
+                        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} />
+                        <Bar
+                            dataKey="earned"
+                            fill="#150089"
+                            radius={[4, 4, 0, 0]}
+                            barSize={28}
+                        />
+                        <Bar
+                            dataKey="pending"
+                            fill="#1ED36A"
+                            radius={[4, 4, 0, 0]}
+                            barSize={28}
+                        />
+                    </BarChart>
+                </ResponsiveContainer>
             </div>
         </div>
     );
@@ -153,7 +149,11 @@ const AffiliateEarnings: React.FC = () => {
                 api.get('/affiliates/portal/earnings', { params: { affiliateId, page: currentPage, limit: itemsPerPage } }),
             ]);
             setStats(statsRes.data);
-            setChartData(chartRes.data);
+            setChartData(Array.isArray(chartRes.data) ? chartRes.data.map((d: any) => ({
+                label: d.label,
+                earned: Number(d.earned),
+                pending: Number(d.pending)
+            })) : []);
             setTransactions(historyRes.data.data);
             setTotalItems(historyRes.data.total);
         } catch (error) {
@@ -228,7 +228,7 @@ const AffiliateEarnings: React.FC = () => {
             </div>
 
             {/* Transaction History */}
-            <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] border border-[#E0E0E0] dark:border-white/10 overflow-hidden shadow-sm h-full flex flex-col mb-8">
+            <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] border border-[#E0E0E0] dark:border-white/10 overflow-hidden shadow-sm flex flex-col mb-8 min-h-[400px]">
                 <div className="flex justify-between items-center p-6">
                     <h3 className="font-semibold text-[clamp(16px,1.04vw,20px)] text-[#19211C] dark:text-white leading-none">Transaction History</h3>
                     <button

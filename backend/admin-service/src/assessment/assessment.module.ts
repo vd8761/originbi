@@ -14,6 +14,8 @@ import {
   AciTraitValueNote,
   AciTrait,
   AciValue,
+  Program,
+  Registration,
 } from '@originbi/shared-entities';
 import { AssessmentGenerationService } from './assessment-generation.service';
 import { AssessmentService } from './assessment.service';
@@ -35,6 +37,8 @@ import { AssessmentController } from './assessment.controller';
       AciTraitValueNote,
       AciTrait,
       AciValue,
+      Program,
+      Registration,
     ]),
   ],
   controllers: [AssessmentController],

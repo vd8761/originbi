@@ -432,9 +432,24 @@ export class AffiliatesService {
             ? Math.round((settledCount / totalCount) * 100)
             : 0;
 
+        // 5. Calculate Totals Live (to ensure accuracy)
+        const { totalEarnedLive } = await this.transactionRepo
+            .createQueryBuilder('t')
+            .select('COALESCE(SUM(t.earnedCommissionAmount), 0)', 'totalEarnedLive')
+            .where('t.affiliateAccountId = :id', { id: affiliateId })
+            .getRawOne();
+
+        const { totalPendingLive } = await this.transactionRepo
+            .createQueryBuilder('t')
+            .select('COALESCE(SUM(t.earnedCommissionAmount), 0)', 'totalPendingLive')
+            .where('t.affiliateAccountId = :id', { id: affiliateId })
+            .andWhere('t.settlementStatus = :status', { status: 0 })
+            .getRawOne();
+
+
         return {
-            totalEarnings: Number(account.totalEarnedCommission) || 0,
-            pendingEarnings: Number(account.totalPendingCommission) || 0,
+            totalEarnings: Number(totalEarnedLive) || 0,
+            pendingEarnings: Number(totalPendingLive) || 0,
             activeReferrals: Number(account.referralCount) || 0,
             thisMonthEarnings: currentEarnings,
             conversionRate,
@@ -535,7 +550,7 @@ export class AffiliatesService {
     async getRecentReferrals(affiliateId: number, limit = 10) {
         const transactions = await this.transactionRepo.find({
             where: { affiliateAccountId: affiliateId },
-            relations: ['registration'],
+            relations: ['registration', 'registration.user'],
             order: { createdAt: 'DESC' },
             take: limit
         });
@@ -543,7 +558,7 @@ export class AffiliatesService {
         return transactions.map(t => ({
             id: t.id.toString(),
             name: t.metadata?.orgName || t.registration?.fullName || 'Unknown',
-            email: t.registration?.metadata?.email || 'N/A',
+            email: t.registration?.user?.email || (t.metadata as any)?.studentEmail || (t.registration?.metadata as any)?.email || 'N/A',
             status: t.settlementStatus === 2 ? 'converted' : 'active',
             signUpDate: t.createdAt,
             commission: Number(t.earnedCommissionAmount),
@@ -632,7 +647,7 @@ export class AffiliatesService {
             data: transactions.map(t => ({
                 id: t.id.toString(),
                 name: t.registration?.fullName || 'Unknown',
-                email: t.registration?.user?.email || t.registration?.metadata?.email || 'N/A',
+                email: t.registration?.user?.email || (t.registration?.metadata as any)?.email || 'N/A',
                 status: t.registration?.assessmentSessionId ? 'converted' : 'pending',
                 registeredOn: t.createdAt,
                 studentBoard: t.registration?.metadata?.board || 'N/A',
@@ -656,7 +671,7 @@ export class AffiliatesService {
             return { totalEarned: 0, totalPending: 0, totalSettled: 0 };
         }
 
-        // Compute totalSettled from transactions (settlement_status = 2)
+        // Compute totalSettled live
         const { totalSettled } = await this.transactionRepo
             .createQueryBuilder('t')
             .select('COALESCE(SUM(t.earnedCommissionAmount), 0)', 'totalSettled')
@@ -664,9 +679,24 @@ export class AffiliatesService {
             .andWhere('t.settlementStatus = :status', { status: 2 })
             .getRawOne();
 
+        // Compute totalEarned live (All commissions)
+        const { totalEarned } = await this.transactionRepo
+            .createQueryBuilder('t')
+            .select('COALESCE(SUM(t.earnedCommissionAmount), 0)', 'totalEarned')
+            .where('t.affiliateAccountId = :id', { id: affiliateId })
+            .getRawOne();
+
+        // Compute totalPending live (Status 0)
+        const { totalPending } = await this.transactionRepo
+            .createQueryBuilder('t')
+            .select('COALESCE(SUM(t.earnedCommissionAmount), 0)', 'totalPending')
+            .where('t.affiliateAccountId = :id', { id: affiliateId })
+            .andWhere('t.settlementStatus = :status', { status: 0 })
+            .getRawOne();
+
         return {
-            totalEarned: Number(account.totalEarnedCommission) || 0,
-            totalPending: Number(account.totalPendingCommission) || 0,
+            totalEarned: Number(totalEarned) || 0,
+            totalPending: Number(totalPending) || 0,
             totalSettled: Number(totalSettled) || 0,
         };
     }
@@ -758,12 +788,12 @@ export class AffiliatesService {
             // eslint-disable-next-line @typescript-eslint/no-var-requires
             const CognitoISP = require('aws-sdk/clients/cognitoidentityserviceprovider');
             const cognito = new CognitoISP({
-                region: process.env.COGNITO_REGION || 'ap-south-1',
+                region: process.env.COGNITO_REGION || process.env.AWS_REGION || 'ap-south-1',
             });
 
             // Admin set user password (simpler approach for affiliate portal)
             await cognito.adminSetUserPassword({
-                UserPoolId: process.env.COGNITO_USER_POOL_ID!,
+                UserPoolId: process.env.AWS_COGNITO_USER_POOL_ID || process.env.COGNITO_USER_POOL_ID,
                 Username: affiliate.user.email,
                 Password: dto.newPassword,
                 Permanent: true,
