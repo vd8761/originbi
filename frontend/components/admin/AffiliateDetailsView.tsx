@@ -197,7 +197,7 @@ const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBac
                     </svg>
                     Commission Overview
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     <div className="bg-brand-light-secondary dark:bg-brand-dark-secondary p-5 rounded-xl border border-brand-light-tertiary dark:border-brand-dark-tertiary text-center">
                         <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary mb-2 uppercase tracking-wide font-medium">Total Earned</p>
                         <p className="text-2xl font-bold text-brand-green">{formatCurrency(data.total_earned_commission)}</p>
@@ -209,6 +209,10 @@ const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBac
                     <div className="bg-brand-light-secondary dark:bg-brand-dark-secondary p-5 rounded-xl border border-brand-light-tertiary dark:border-brand-dark-tertiary text-center">
                         <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary mb-2 uppercase tracking-wide font-medium">Total Pending</p>
                         <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{formatCurrency(data.total_pending_commission)}</p>
+                    </div>
+                    <div className="bg-brand-light-secondary dark:bg-brand-dark-secondary p-5 rounded-xl border border-brand-light-tertiary dark:border-brand-dark-tertiary text-center">
+                        <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary mb-2 uppercase tracking-wide font-medium">Ready to Payment</p>
+                        <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(data.ready_to_process_commission)}</p>
                     </div>
                 </div>
             </div>
