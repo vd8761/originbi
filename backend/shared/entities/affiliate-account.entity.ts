@@ -3,11 +3,13 @@ import {
     PrimaryGeneratedColumn,
     Column,
     OneToOne,
+    OneToMany,
     JoinColumn,
     CreateDateColumn,
     UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
+import { AffiliateReferralTransaction } from './affiliate-referral-transaction.entity';
 
 @Entity('affiliate_accounts')
 export class AffiliateAccount {
@@ -75,12 +77,12 @@ export class AffiliateAccount {
     @Column({ name: 'branch_name', type: 'varchar', length: 255, nullable: true })
     branchName: string | null;
 
-    // Documents
-    @Column({ name: 'aadhar_url', type: 'varchar', length: 500, nullable: true })
-    aadharUrl: string | null;
+    // Documents (arrays of { key, url, fileName })
+    @Column({ name: 'aadhar_documents', type: 'jsonb', default: () => `'[]'` })
+    aadharDocuments: Array<{ key: string; url: string; fileName: string }>;
 
-    @Column({ name: 'pan_url', type: 'varchar', length: 500, nullable: true })
-    panUrl: string | null;
+    @Column({ name: 'pan_documents', type: 'jsonb', default: () => `'[]'` })
+    panDocuments: Array<{ key: string; url: string; fileName: string }>;
 
     // Status
     @Column({ name: 'is_active', type: 'boolean', default: true })
@@ -89,6 +91,9 @@ export class AffiliateAccount {
     // Metadata (for anything extra)
     @Column({ name: 'metadata', type: 'jsonb', default: () => `'{}'` })
     metadata: any;
+
+    @OneToMany(() => AffiliateReferralTransaction, (transaction) => transaction.affiliate)
+    referralTransactions: AffiliateReferralTransaction[];
 
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;

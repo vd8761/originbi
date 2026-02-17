@@ -10,6 +10,7 @@ import { AssessmentLevel } from '../entities/assessment_level.entity';
 import { AssessmentAnswer } from '../entities/assessment_answer.entity';
 import { Registration } from '../entities/registration.entity';
 import { Program } from '../entities/program.entity';
+import { AffiliateReferralTransaction } from '@originbi/shared-entities';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { Program } from '../entities/program.entity';
       AssessmentAnswer,
       Registration,
       Program,
+      AffiliateReferralTransaction,
     ]),
     HttpModule,
   ],
@@ -29,4 +31,4 @@ import { Program } from '../entities/program.entity';
   providers: [StudentService],
   exports: [StudentService],
 })
-export class StudentModule {}
+export class StudentModule { }
