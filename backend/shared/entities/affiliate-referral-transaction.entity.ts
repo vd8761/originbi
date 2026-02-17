@@ -8,7 +8,6 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import { AffiliateAccount } from './affiliate-account.entity';
-import { Registration } from './registration.entity';
 
 @Entity('affiliate_referral_transactions')
 export class AffiliateReferralTransaction {
@@ -25,10 +24,6 @@ export class AffiliateReferralTransaction {
     @Column({ name: 'registration_id', type: 'bigint' })
     registrationId: number;
 
-    @ManyToOne(() => Registration)
-    @JoinColumn({ name: 'registration_id' })
-    registration: Registration;
-
     @Column({ name: 'registration_amount', type: 'numeric', precision: 10, scale: 2, default: 0 })
     registrationAmount: number;
 
@@ -38,12 +33,8 @@ export class AffiliateReferralTransaction {
     @Column({ name: 'earned_commission_amount', type: 'numeric', precision: 10, scale: 2, default: 0 })
     earnedCommissionAmount: number;
 
-    @Column({
-        name: 'settlement_status',
-        type: 'int',
-        default: 0,
-        comment: '0 - Not Settled | 1 - Processing | 2 - Settled'
-    })
+    // 0 - Not Settled | 1 - Processing | 2 - Settled
+    @Column({ name: 'settlement_status', type: 'smallint', default: 0 })
     settlementStatus: number;
 
     @Column({ name: 'metadata', type: 'jsonb', default: () => `'{}'` })
@@ -58,4 +49,3 @@ export class AffiliateReferralTransaction {
     @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
     updatedAt: Date;
 }
-

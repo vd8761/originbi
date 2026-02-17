@@ -16,7 +16,7 @@ import { AssessmentAnswer } from '../entities/assessment_answer.entity';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { Program } from '../entities/program.entity';
 import { Registration } from '../entities/registration.entity';
-import { AffiliateAccount } from '@originbi/shared-entities';
+import { AffiliateAccount, AffiliateReferralTransaction } from '@originbi/shared-entities';
 import * as nodemailer from 'nodemailer';
 import { SES } from 'aws-sdk';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
@@ -51,6 +51,8 @@ export class StudentService {
     private readonly answerRepo: Repository<AssessmentAnswer>,
     @InjectRepository(AffiliateAccount)
     private readonly affiliateRepo: Repository<AffiliateAccount>,
+    @InjectRepository(AffiliateReferralTransaction)
+    private readonly affiliateTransactionRepo: Repository<AffiliateReferralTransaction>,
     private readonly http: HttpService,
     private readonly configService: ConfigService,
   ) { }
@@ -519,188 +521,233 @@ export class StudentService {
     this.logger.log(`[Register Debug] Payload: ${JSON.stringify(dto)}`);
     this.logger.log(`[Register Debug] Public registration attempt for: ${dto.email}`);
 
-    // 1. Check if User exists
-    let user = await this.userRepo.findOne({
-      where: { email: ILike(dto.email) },
-    });
-    if (user) {
-      this.logger.warn(`User ${dto.email} already exists.`);
-      // return { success: false, message: 'User already exists' };
-      // idempotency? or throw error? For now, throw error.
-      throw new BadRequestException('User already exists');
-    }
-
-    // 2. Create User in Cognito
-    let cognitoSub = '';
     try {
-      const cognitoRes = await this.createCognitoUser(dto.email, dto.password);
-      cognitoSub = cognitoRes.sub || '';
-    } catch (e) {
-      this.logger.error('Cognito creation failed', e);
-      // Fallback or re-throw?
-      // If we want to allow login, we must have it. Re-throw.
-      throw e;
-    }
+      // 1. Check if User exists
+      let user = await this.userRepo.findOne({
+        where: { email: ILike(dto.email) },
+      });
+      if (user) {
+        this.logger.warn(`User ${dto.email} already exists.`);
+        // return { success: false, message: 'User already exists' };
+        // idempotency? or throw error? For now, throw error.
+        throw new BadRequestException('User already exists');
+      }
 
-    // 3. Create User Entity
-    // (In a real scenario, we might call Cognito here, but for now we assume
-    // auth-service handles login via simple Db check or the user will be created in Cognito later)
-    // Actually, the requirement says "Call auth-service to create Cognito User".
-    // For this implementation, we will skip the external auth-service call to avoid complexity
-    // and assume the user can login if the DB record exists (or we rely on the existing auth flow).
-    // *Self-correction*: The implementation plan says "Call auth-service...". To keep it simple and robust
-    // for this specific codebase state, we'll focus on DB creation. The auth-service likely has a trigger or
-    // we can add the call if needed.
+      // 2. Create User in Cognito
+      let cognitoSub = '';
+      try {
+        const cognitoRes = await this.createCognitoUser(dto.email, dto.password);
+        cognitoSub = cognitoRes.sub || '';
+      } catch (e) {
+        this.logger.error('Cognito creation failed', e);
+        // Fallback or re-throw?
+        // If we want to allow login, we must have it. Re-throw.
+        throw e;
+      }
 
-    user = this.userRepo.create({
-      email: dto.email,
-      role: 'STUDENT',
-      // cognitoSub: cognitoSub, // If User entity has this field. It doesn't seem to have it in the file view I saw earlier.
-      // I checked student.entity.ts earlier and it didn't have cognitoSub column explicitly shown in `Showing lines 1 to 38`.
-      // Let's check if I missed it.
-      // If not, we just rely on email matching.
-      metadata: {
+      // 3. Create User Entity
+      // (In a real scenario, we might call Cognito here, but for now we assume
+      // auth-service handles login via simple Db check or the user will be created in Cognito later)
+      // Actually, the requirement says "Call auth-service to create Cognito User".
+      // For this implementation, we will skip the external auth-service call to avoid complexity
+      // and assume the user can login if the DB record exists (or we rely on the existing auth flow).
+      // *Self-correction*: The implementation plan says "Call auth-service...". To keep it simple and robust
+      // for this specific codebase state, we'll focus on DB creation. The auth-service likely has a trigger or
+      // we can add the call if needed.
+
+      user = this.userRepo.create({
+        email: dto.email,
+        role: 'STUDENT',
+        // cognitoSub: cognitoSub, // If User entity has this field. It doesn't seem to have it in the file view I saw earlier.
+        // I checked student.entity.ts earlier and it didn't have cognitoSub column explicitly shown in `Showing lines 1 to 38`.
+        // Let's check if I missed it.
+        // If not, we just rely on email matching.
+        metadata: {
+          fullName: dto.full_name,
+          mobileNumber: dto.mobile_number,
+          countryCode: dto.country_code ?? '+91',
+          gender: dto.gender,
+          hasChangedPassword: true, // Assuming allow login immediately
+          cognitoSub: cognitoSub, // Store in metadata if not in column
+        },
+        createdAt: new Date(),
+      });
+      await this.userRepo.save(user);
+
+      // 4. Find Program
+      const programCode = dto.program_code || 'SCHOOL_STUDENT';
+      const program = await this.sessionRepo.manager.findOne(Program, {
+        where: { code: programCode },
+      });
+
+      if (!program) {
+        throw new Error(`Program ${programCode} not found`);
+      }
+
+      // 5. Create Registration
+      const registration = this.sessionRepo.manager.create(Registration, {
+        userId: user.id,
+        registrationSource: 'SELF',
         fullName: dto.full_name,
         mobileNumber: dto.mobile_number,
         countryCode: dto.country_code ?? '+91',
         gender: dto.gender,
-        hasChangedPassword: true, // Assuming allow login immediately
-        cognitoSub: cognitoSub, // Store in metadata if not in column
-      },
-      createdAt: new Date(),
-    });
-    await this.userRepo.save(user);
+        schoolLevel: dto.school_level,
+        schoolStream: dto.school_stream,
+        programId: program.id,
+        status: 'COMPLETED', // Auto-complete for self-registration
+        paymentStatus: 'NOT_REQUIRED',
+        metadata: {
+          groupCode: dto.group_code,
+          referralCode: dto.referral_code,
+          sendEmail: false
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      const savedReg = await this.sessionRepo.manager.save(
+        Registration,
+        registration,
+      );
 
-    // 4. Find Program
-    const programCode = dto.program_code || 'SCHOOL_STUDENT';
-    const program = await this.sessionRepo.manager.findOne(Program, {
-      where: { code: programCode },
-    });
+      // 5b. Create Affiliate Referral Transaction (if referral_code is present)
+      if (dto.referral_code) {
+        try {
+          const affiliate = await this.affiliateRepo.findOne({
+            where: { referralCode: dto.referral_code, isActive: true },
+          });
 
-    if (!program) {
-      throw new Error(`Program ${programCode} not found`);
-    }
+          if (affiliate) {
+            const registrationAmount = Number(this.configService.get('REGISTRATION_COST') || 500);
+            const commissionPercentage = Number(affiliate.commissionPercentage) || 0;
+            const earnedCommission = (registrationAmount * commissionPercentage) / 100;
 
-    // 5. Create Registration
-    const registration = this.sessionRepo.manager.create(Registration, {
-      userId: user.id,
-      registrationSource: 'SELF',
-      fullName: dto.full_name,
-      mobileNumber: dto.mobile_number,
-      countryCode: dto.country_code ?? '+91',
-      gender: dto.gender,
-      schoolLevel: dto.school_level,
-      schoolStream: dto.school_stream,
-      programId: program.id,
-      status: 'COMPLETED', // Auto-complete for self-registration
-      paymentStatus: 'NOT_REQUIRED',
-      metadata: {
-        groupCode: dto.group_code,
-        referralCode: dto.referral_code,
-        sendEmail: true, // User requirement
-      },
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    const savedReg = await this.sessionRepo.manager.save(
-      Registration,
-      registration,
-    );
+            // Create the referral transaction record
+            const transactionData = {
+              affiliateAccountId: Number(affiliate.id),
+              registrationId: Number(savedReg.id),
+              registrationAmount,
+              commissionPercentage,
+              earnedCommissionAmount: earnedCommission,
+              settlementStatus: 0, // 0 - Not Settled
+              metadata: {
+                studentName: dto.full_name,
+                studentEmail: dto.email,
+                referralCode: dto.referral_code,
+              },
+            };
 
-    // 6. Create Assessment Session with Schedule
-    // Schedule: Start = Now + 5 mins, End = Now + 7 days
-    const now = new Date();
-    const validFrom = new Date(now.getTime() + 5 * 60000); // +5 mins
-    const validTo = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // +7 days
+            const transaction = this.affiliateTransactionRepo.create(transactionData as any);
+            await this.affiliateTransactionRepo.save(transaction);
 
-    const session = this.sessionRepo.create({
-      userId: user.id,
-      registrationId: savedReg.id,
-      programId: program.id,
-      status: 'NOT_STARTED',
-      validFrom: validFrom,
-      validTo: validTo,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    const savedSession = await this.sessionRepo.save(session);
+            // Update affiliate stats
+            affiliate.referralCount = (Number(affiliate.referralCount) || 0) + 1;
+            affiliate.totalEarnedCommission = (Number(affiliate.totalEarnedCommission) || 0) + earnedCommission;
+            affiliate.totalPendingCommission = (Number(affiliate.totalPendingCommission) || 0) + earnedCommission;
 
-    // 7. Create Attempts (Level 1 Mandated)
-    // Fetch Level 1
-    const levels = await this.levelRepo.find({
-      where: { isMandatory: true },
-      order: { levelNumber: 'ASC' },
-    });
+            await this.affiliateRepo.save(affiliate);
 
-    for (const level of levels) {
-      const attempt = this.attemptRepo.create({
-        assessmentSessionId: savedSession.id,
-        assessmentLevelId: level.id,
+            this.logger.log(`[Referral] Successfully processed referral for ${dto.referral_code}. Affiliate ID: ${affiliate.id}`);
+          } else {
+            this.logger.warn(`[Referral] Referral code '${dto.referral_code}' not found or inactive.`);
+          }
+        } catch (refErr) {
+          this.logger.error(`[Referral Error] Failed at step 5b: ${refErr.message}`, refErr.stack);
+          // Do not fail the whole registration if referral tracking fails
+        }
+      }
+
+      // 6. Create Assessment Session with Schedule
+      // Schedule: Start = Now + 5 mins, End = Now + 7 days
+      const now = new Date();
+      const validFrom = new Date(now.getTime() + 5 * 60000); // +5 mins
+      const validTo = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // +7 days
+
+      const session = this.sessionRepo.create({
         userId: user.id,
         registrationId: savedReg.id,
         programId: program.id,
         status: 'NOT_STARTED',
+        validFrom: validFrom,
+        validTo: validTo,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-      const savedAttempt = await this.attemptRepo.save(attempt);
+      const savedSession = await this.sessionRepo.save(session);
 
-      // Generate Questions for Level 1
-      if (level.levelNumber === 1 || level.name.includes('Level 1')) {
-        await this.generateQuestionsForAttempt(
-          savedAttempt,
-          user,
-          savedReg,
-          level,
+      // 7. Create Attempts (Level 1 Mandated)
+      // Fetch Level 1
+      const levels = await this.levelRepo.find({
+        where: { isMandatory: true },
+        order: { levelNumber: 'ASC' },
+      });
+
+      for (const level of levels) {
+        const attempt = this.attemptRepo.create({
+          assessmentSessionId: savedSession.id,
+          assessmentLevelId: level.id,
+          userId: user.id,
+          registrationId: savedReg.id,
+          programId: program.id,
+          status: 'NOT_STARTED',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        const savedAttempt = await this.attemptRepo.save(attempt);
+
+        // Generate Questions for Level 1
+        if (level.levelNumber === 1 || level.name.includes('Level 1')) {
+          await this.generateQuestionsForAttempt(
+            savedAttempt,
+            user,
+            savedReg,
+            level,
+          );
+        }
+      }
+
+      // 8. Send Welcome Email
+      if (registration.metadata?.sendEmail) {
+        const validFrom = session.validFrom
+          ? new Date(session.validFrom)
+          : new Date();
+        // program title?
+        const programTitle = program.assessmentTitle || program.name;
+
+        try {
+          await this.sendWelcomeEmail(
+            dto.email,
+            dto.full_name,
+            dto.password, // We need the password here. DTO has it.
+            validFrom,
+            programTitle,
+          );
+          this.logger.log(`Welcome email sent successfully to ${dto.email}`);
+        } catch (emailErr) {
+          this.logger.error(
+            `[Email Failed] Failed to send welcome email to ${dto.email}`,
+          );
+          this.logger.error(
+            `[Email Error Details] ${JSON.stringify(emailErr, Object.getOwnPropertyNames(emailErr))}`,
+          );
+          // Do not fail registration if email fails
+        }
+      } else {
+        this.logger.log(
+          `[Email Debug] Skipping email for ${dto.email} (sendEmail metadata is false/missing)`,
         );
       }
+
+      return {
+        success: true,
+        userId: user.id,
+        registrationId: savedReg.id,
+        message: 'Registration successful. Exam scheduled.',
+      };
+    } catch (error) {
+      this.logger.error(`[Register Critical Error] ${error.message}`, error.stack);
+      throw new BadRequestException(`Registration failed: ${error.message}`);
     }
-
-    // 8. Send Welcome Email
-    if (registration.metadata?.sendEmail) {
-      const validFrom = session.validFrom
-        ? new Date(session.validFrom)
-        : new Date();
-      // program title?
-      const programTitle = program.assessmentTitle || program.name;
-
-      this.logger.log(
-        `[Email Debug] Attempting to send welcome email to: ${dto.email}`,
-      );
-      this.logger.log(
-        `[Email Debug] Params: Name=${dto.full_name}, ValidFrom=${String(validFrom)}, Title=${programTitle}`,
-      );
-
-      try {
-        await this.sendWelcomeEmail(
-          dto.email,
-          dto.full_name,
-          dto.password, // We need the password here. DTO has it.
-          validFrom,
-          programTitle,
-        );
-        this.logger.log(`Welcome email sent successfully to ${dto.email}`);
-      } catch (emailErr) {
-        this.logger.error(
-          `[Email Failed] Failed to send welcome email to ${dto.email}`,
-        );
-        this.logger.error(
-          `[Email Error Details] ${JSON.stringify(emailErr, Object.getOwnPropertyNames(emailErr))}`,
-        );
-        // Do not fail registration if email fails
-      }
-    } else {
-      this.logger.log(
-        `[Email Debug] Skipping email for ${dto.email} (sendEmail metadata is false/missing)`,
-      );
-    }
-
-    return {
-      success: true,
-      userId: user.id,
-      registrationId: savedReg.id,
-      message: 'Registration successful. Exam scheduled.',
-    };
   }
 
   // Helper to generate questions locally (simplified version of admin-service logic)
@@ -717,9 +764,9 @@ export class StudentService {
               assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
               main_question_id, question_source, status, question_sequence, created_at, updated_at
            )
-           SELECT $1, $2, $3, $4, $6, $5, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
+           SELECT $1::bigint, $2::bigint, $3::bigint, $4::bigint, $6::bigint, $5::bigint, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
            FROM assessment_questions 
-           WHERE assessment_level_id = $5 
+           WHERE assessment_level_id = $5::bigint 
              AND is_active = true
              AND is_deleted = false
              AND (metadata->>'school_level' IS NULL OR metadata->>'school_level' = $7)
@@ -728,14 +775,14 @@ export class StudentService {
            LIMIT 60
        `,
       [
-        attempt.id,
-        attempt.assessmentSessionId,
-        user.id,
-        reg.id,
-        level.id,
-        attempt.programId,
-        reg.schoolLevel,
-        reg.schoolStream,
+        Number(attempt.id),
+        Number(attempt.assessmentSessionId),
+        Number(user.id),
+        Number(reg.id),
+        Number(level.id),
+        Number(attempt.programId),
+        reg.schoolLevel || '',
+        reg.schoolStream || '',
       ],
     );
   }
