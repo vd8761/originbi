@@ -1,25 +1,46 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { api } from "../../lib/api";
 
 // --- Types ---
+interface RecentTransaction {
+    id: number;
+    type: string;
+    status: string;
+    amount: number;
+    date: string;
+    student_email: string | null;
+    metadata: any;
+}
+
 interface AffiliateProfileData {
-    affiliateId: string;
-    fullName: string;
+    id: number;
+    user_id: number;
+    name: string;
     email: string;
-    phone: string;
-    company: string;
-    status: 'active' | 'inactive';
-    joinedDate: string;
-    referralLink: string;
-    totalEarnings: number;
-    totalReferrals: number;
-    conversionRate: number;
-    tier: string;
+    country_code: string;
+    mobile_number: string;
+    address: string | null;
+    referral_code: string;
+    referral_count: number;
+    commission_percentage: number;
+    total_earned_commission: number;
+    total_settled_commission: number;
+    total_pending_commission: number;
+    upi_id: string | null;
+    banking_name: string | null;
+    account_number: string | null;
+    ifsc_code: string | null;
+    branch_name: string | null;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+    recent_transactions: RecentTransaction[];
 }
 
 // --- Detail Item (matching corporate) ---
-const DetailItem = ({ label, value }: { label: string; value?: string | number }) => (
+const DetailItem = ({ label, value }: { label: string; value?: string | number | null }) => (
     <div>
         <label className="text-[clamp(11px,0.73vw,13px)] text-[#19211C] dark:text-white block mb-1 font-normal opacity-70">{label}</label>
         <p className="text-[clamp(14px,1vw,16px)] font-medium text-[#19211C] dark:text-white">{value || '—'}</p>
@@ -29,24 +50,42 @@ const DetailItem = ({ label, value }: { label: string; value?: string | number }
 // --- Main Component ---
 const AffiliateProfile: React.FC = () => {
     const [copied, setCopied] = useState(false);
+    const [profile, setProfile] = useState<AffiliateProfileData | null>(null);
 
-    const data: AffiliateProfileData = {
-        affiliateId: 'AFF_001',
-        fullName: 'Jaya Krishna',
-        email: 'jayakrishna@example.com',
-        phone: '+91 98765 43210',
-        company: 'OriginBI Partner',
-        status: 'active',
-        joinedDate: '01 Jan 2026',
-        referralLink: 'https://originbi.com/ref/aff_001',
-        totalEarnings: 95000,
-        totalReferrals: 10,
-        conversionRate: 70,
-        tier: 'Gold Affiliate',
+    useEffect(() => {
+        try {
+            const storedUser = localStorage.getItem('affiliate_user');
+            if (storedUser) {
+                const user = JSON.parse(storedUser);
+                if (user.id) {
+                    fetchData(user.id);
+                }
+            }
+        } catch { /* empty */ }
+    }, []);
+
+    const fetchData = async (affiliateId: string) => {
+        try {
+            const res = await api.get('/affiliates/portal/profile', { params: { affiliateId } });
+            setProfile(res.data);
+        } catch (error) {
+            console.error("Failed to fetch profile", error);
+        }
     };
 
+    if (!profile) {
+        return <div className="p-8 text-center text-[#19211C] dark:text-white opacity-60">Loading profile...</div>;
+    }
+
+    // Derived Data
+    const tier = profile.total_earned_commission > 100000 ? 'Platinum Affiliate'
+        : profile.total_earned_commission > 50000 ? 'Gold Affiliate'
+            : 'Silver Affiliate';
+    const status = profile.is_active ? 'active' : 'inactive';
+    const referralLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/ref/${profile.referral_code}`;
+
     const handleCopy = () => {
-        navigator.clipboard.writeText(data.referralLink);
+        navigator.clipboard.writeText(referralLink);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
@@ -67,38 +106,38 @@ const AffiliateProfile: React.FC = () => {
                         {/* Avatar */}
                         <div className="flex flex-col items-center">
                             <img
-                                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(data.fullName)}&background=150089&color=fff&size=128`}
+                                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name)}&background=150089&color=fff&size=128`}
                                 alt="Profile"
                                 className="w-32 h-32 rounded-full mb-4 border-4 border-[#E0E0E0] dark:border-white/10"
                             />
-                            <h3 className="text-[clamp(18px,1.3vw,22px)] font-bold text-[#19211C] dark:text-white mb-1">{data.fullName}</h3>
-                            <p className="text-[clamp(14px,1vw,16px)] text-[#1ED36A] font-medium mb-1">{data.tier}</p>
-                            <p className="text-[clamp(12px,0.8vw,14px)] text-[#19211C] dark:text-white opacity-60 font-normal">{data.company}</p>
+                            <h3 className="text-[clamp(18px,1.3vw,22px)] font-bold text-[#19211C] dark:text-white mb-1">{profile.name}</h3>
+                            <p className="text-[clamp(14px,1vw,16px)] text-[#1ED36A] font-medium mb-1">{tier}</p>
+                            <p className="text-[clamp(12px,0.8vw,14px)] text-[#19211C] dark:text-white opacity-60 font-normal">{profile.commission_percentage}% Commission</p>
 
                             {/* Status Badge */}
                             <div className="mt-4">
-                                <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-xs font-semibold ${data.status === 'active'
+                                <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-xs font-semibold ${status === 'active'
                                     ? 'bg-[#1ED36A]/10 text-[#1ED36A] border border-[#1ED36A]/20'
                                     : 'bg-red-500/10 text-red-500 border border-red-500/20'
                                     }`}>
-                                    {data.status === 'active' ? 'ACTIVE' : 'INACTIVE'}
+                                    {status === 'active' ? 'ACTIVE' : 'INACTIVE'}
                                 </span>
                             </div>
                         </div>
 
-                        {/* Quick Stats */}
+                        {/* Quick Stats — from affiliate_referral_transactions */}
                         <div className="w-full pt-4 border-t border-[#E0E0E0] dark:border-white/10 grid grid-cols-3 gap-4 mt-6">
                             <div className="text-center">
                                 <p className="text-[clamp(11px,0.73vw,13px)] text-[#19211C] dark:text-white opacity-60 mb-1 font-normal">Referrals</p>
-                                <p className="text-[clamp(18px,1.3vw,22px)] font-bold text-[#150089] dark:text-white">{data.totalReferrals}</p>
+                                <p className="text-[clamp(18px,1.3vw,22px)] font-bold text-[#150089] dark:text-white">{profile.referral_count}</p>
                             </div>
                             <div className="text-center">
-                                <p className="text-[clamp(11px,0.73vw,13px)] text-[#19211C] dark:text-white opacity-60 mb-1 font-normal">Conversion</p>
-                                <p className="text-[clamp(18px,1.3vw,22px)] font-bold text-[#1ED36A]">{data.conversionRate}%</p>
+                                <p className="text-[clamp(11px,0.73vw,13px)] text-[#19211C] dark:text-white opacity-60 mb-1 font-normal">Pending</p>
+                                <p className="text-[clamp(18px,1.3vw,22px)] font-bold text-yellow-500">₹{profile.total_pending_commission.toLocaleString('en-IN')}</p>
                             </div>
                             <div className="text-center">
                                 <p className="text-[clamp(11px,0.73vw,13px)] text-[#19211C] dark:text-white opacity-60 mb-1 font-normal">Earned</p>
-                                <p className="text-[clamp(18px,1.3vw,22px)] font-bold text-[#150089] dark:text-white">₹{(data.totalEarnings / 1000).toFixed(0)}K</p>
+                                <p className="text-[clamp(18px,1.3vw,22px)] font-bold text-[#1ED36A]">₹{profile.total_earned_commission.toLocaleString('en-IN')}</p>
                             </div>
                         </div>
                     </div>
@@ -115,14 +154,16 @@ const AffiliateProfile: React.FC = () => {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                            <DetailItem label="Full Name" value={data.fullName} />
-                            <DetailItem label="Affiliate ID" value={data.affiliateId} />
-                            <DetailItem label="Email Address" value={data.email} />
-                            <DetailItem label="Phone Number" value={data.phone} />
-                            <DetailItem label="Company / Organization" value={data.company} />
-                            <DetailItem label="Affiliate Tier" value={data.tier} />
-                            <DetailItem label="Joined Date" value={data.joinedDate} />
-                            <DetailItem label="Conversion Rate" value={`${data.conversionRate}%`} />
+                            <DetailItem label="Full Name" value={profile.name} />
+                            <DetailItem label="Affiliate ID" value={`AFF_${profile.id.toString().padStart(3, '0')}`} />
+                            <DetailItem label="Email Address" value={profile.email} />
+                            <DetailItem label="Phone Number" value={`${profile.country_code} ${profile.mobile_number}`} />
+                            <DetailItem label="Address" value={profile.address} />
+                            <DetailItem label="Affiliate Tier" value={tier} />
+                            <DetailItem label="Joined Date" value={new Date(profile.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} />
+                            <DetailItem label="Commission Rate" value={`${profile.commission_percentage}%`} />
+                            <DetailItem label="Total Earned" value={`₹${profile.total_earned_commission.toLocaleString('en-IN')}`} />
+                            <DetailItem label="Total Settled" value={`₹${profile.total_settled_commission.toLocaleString('en-IN')}`} />
                         </div>
 
                         {/* Referral Link Section */}
@@ -130,7 +171,7 @@ const AffiliateProfile: React.FC = () => {
                             <label className="text-[clamp(11px,0.73vw,13px)] text-[#19211C] dark:text-white block mb-2 font-normal opacity-70">Your Referral Link</label>
                             <div className="flex items-center gap-3">
                                 <div className="flex-1 px-4 py-3 rounded-xl bg-[#FAFAFA] dark:bg-white/5 border border-[#E0E0E0] dark:border-white/10 text-[clamp(14px,1vw,16px)] font-medium text-[#150089] dark:text-[#1ED36A] truncate">
-                                    {data.referralLink}
+                                    {referralLink}
                                 </div>
                                 <button
                                     onClick={handleCopy}

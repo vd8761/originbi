@@ -15,7 +15,7 @@ import { AssessmentLevel } from '../entities/assessment_level.entity';
 import { AssessmentAnswer } from '../entities/assessment_answer.entity';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { Program } from '../entities/program.entity';
-import { Registration } from '../entities/registration.entity';
+import { Registration, Gender, RegistrationStatus, PaymentStatus } from '@originbi/shared-entities';
 import * as nodemailer from 'nodemailer';
 import { SES } from 'aws-sdk';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
@@ -585,12 +585,12 @@ export class StudentService {
       fullName: dto.full_name,
       mobileNumber: dto.mobile_number,
       countryCode: dto.country_code ?? '+91',
-      gender: dto.gender,
+      gender: dto.gender as Gender,
       schoolLevel: dto.school_level,
       schoolStream: dto.school_stream,
       programId: program.id,
-      status: 'COMPLETED', // Auto-complete for self-registration
-      paymentStatus: 'NOT_REQUIRED',
+      status: 'COMPLETED' as RegistrationStatus, // Auto-complete for self-registration
+      paymentStatus: 'NOT_REQUIRED' as PaymentStatus,
       metadata: {
         groupCode: dto.group_code,
         sendEmail: true, // User requirement

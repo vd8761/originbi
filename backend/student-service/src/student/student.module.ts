@@ -8,9 +8,10 @@ import { AssessmentSession } from '../entities/assessment_session.entity';
 import { AssessmentAttempt } from '../entities/assessment_attempt.entity';
 import { AssessmentLevel } from '../entities/assessment_level.entity';
 import { AssessmentAnswer } from '../entities/assessment_answer.entity';
-import { Registration } from '../entities/registration.entity';
+
+
 import { Program } from '../entities/program.entity';
-import { AffiliateReferralTransaction } from '@originbi/shared-entities';
+import { AffiliateReferralTransaction, AffiliateAccount, Registration, Groups } from '@originbi/shared-entities';
 
 @Module({
   imports: [
@@ -19,11 +20,13 @@ import { AffiliateReferralTransaction } from '@originbi/shared-entities';
       AssessmentSession,
       AssessmentAttempt,
       AssessmentLevel,
-      AssessmentLevel,
+
       AssessmentAnswer,
       Registration,
       Program,
       AffiliateReferralTransaction,
+      AffiliateAccount,
+      Groups,
     ]),
     HttpModule,
   ],

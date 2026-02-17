@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom";
 import { useRouter } from "next/navigation";
+import { api } from "../../lib/api";
 import { TrendUpIcon, TrendDownIcon } from '../icons';
 
 // --- Types ---
@@ -13,6 +14,10 @@ interface AffiliateStats {
     totalClicks: number;
     conversionRate: number;
     thisMonthEarnings: number;
+    trends?: {
+        earnings: number;
+        referrals: number;
+    };
 }
 
 interface Referral {
@@ -99,16 +104,27 @@ const EarningsCard = ({ earnings }: { earnings: number }) => {
 };
 
 // --- Earnings Chart ---
-const EarningsChart = () => {
-    const chartData = [
-        { label: 'Sep', earned: 12000, pending: 3000 },
-        { label: 'Oct', earned: 18000, pending: 5000 },
-        { label: 'Nov', earned: 15000, pending: 4000 },
-        { label: 'Dec', earned: 22000, pending: 6000 },
-        { label: 'Jan', earned: 28000, pending: 8000 },
-        { label: 'Feb', earned: 24000, pending: 5000 },
-    ];
-    const max = 35000;
+// --- Earnings Chart ---
+const EarningsChart = ({ affiliateId }: { affiliateId?: string }) => {
+    const [chartData, setChartData] = useState<{ label: string; earned: number; pending: number }[]>([]);
+
+    useEffect(() => {
+        if (affiliateId) {
+            api.get(`/affiliates/portal/earnings-chart?affiliateId=${affiliateId}`)
+                .then(res => {
+                    if (Array.isArray(res.data)) {
+                        setChartData(res.data.map((d: any) => ({
+                            label: d.month,
+                            earned: Number(d.earned),
+                            pending: Number(d.pending)
+                        })));
+                    }
+                })
+                .catch(err => console.error(err));
+        }
+    }, [affiliateId]);
+
+    const max = Math.max(...chartData.map(d => Math.max(d.earned, d.pending)), 100);
 
     return (
         <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-8 border border-[#E0E0E0] dark:border-white/10 h-full flex flex-col font-['Haskoy'] overflow-visible shadow-sm">
@@ -273,10 +289,21 @@ const ReferralLinkCard = () => {
     const [showShareMenu, setShowShareMenu] = useState(false);
     const [showQRModal, setShowQRModal] = useState(false);
     const [mounted, setMounted] = useState(false);
-    const referralLink = "https://originbi.com/ref/aff_001";
+    const [referralLink, setReferralLink] = useState("https://discover.originbi.com/register?ref=affiliate");
+    const [referralCode, setReferralCode] = useState('AFFILIATE');
 
     useEffect(() => {
         setMounted(true);
+        try {
+            const storedUser = localStorage.getItem('affiliate_user');
+            if (storedUser) {
+                const user = JSON.parse(storedUser);
+                if (user.referralCode) {
+                    setReferralCode(user.referralCode);
+                    setReferralLink(`https://discover.originbi.com/register?ref=${user.referralCode}`);
+                }
+            }
+        } catch { /* empty */ }
     }, []);
 
     const handleCopy = () => {
@@ -328,13 +355,7 @@ const ReferralLinkCard = () => {
                     </div>
                 </div>
 
-                {/* Affiliate Details */}
-                <div className="space-y-3 mb-8">
-                    <div className="flex justify-between items-center bg-[#FAFAFA] dark:bg-white/5 rounded-2xl px-5 py-4 border border-[#E0E0E0] dark:border-white/10">
-                        <span className="text-xs font-bold text-[#19211C]/50 dark:text-white/40 uppercase tracking-widest">Affiliate ID</span>
-                        <span className="text-base font-bold text-[#150089] dark:text-[#1ED36A]">AFF_001</span>
-                    </div>
-                </div>
+                {/* Affiliate Details - REMOVED as per request */}
 
                 {/* Actions */}
                 <div className="flex gap-4">
@@ -432,18 +453,9 @@ const ReferralLinkCard = () => {
 };
 
 // --- Referrals Table ---
-const ReferralsTable = () => {
+const ReferralsTable = ({ data }: { data: (Referral & { settledDown: 'Completed' | 'Incomplete' })[] }) => {
     const router = useRouter();
-    const tableData: (Referral & { settledDown: 'Completed' | 'Incomplete' })[] = [
-        { id: '1', name: 'Pinnacle HR', email: 'info@pinnaclehr.com', status: 'active', signUpDate: '16 Feb 2026', commission: 2000, settledDown: 'Incomplete' },
-        { id: '2', name: 'Nova Tech Labs', email: 'hello@novalabs.io', status: 'pending', signUpDate: '15 Feb 2026', commission: 0, settledDown: 'Incomplete' },
-        { id: '3', name: 'Global Edu Services', email: 'contact@globaledu.com', status: 'converted', signUpDate: '14 Feb 2026', commission: 7500, settledDown: 'Completed' },
-        { id: '4', name: 'StartUp Hub', email: 'team@startuphub.io', status: 'pending', signUpDate: '12 Feb 2026', commission: 0, settledDown: 'Incomplete' },
-        { id: '5', name: 'Digital Academy', email: 'admin@digitala.com', status: 'active', signUpDate: '10 Feb 2026', commission: 3500, settledDown: 'Incomplete' },
-        { id: '6', name: 'TechCorp Solutions', email: 'hr@techcorp.com', status: 'converted', signUpDate: '08 Feb 2026', commission: 5000, settledDown: 'Completed' },
-        { id: '7', name: 'Bright Minds Edu', email: 'admin@brightminds.in', status: 'converted', signUpDate: '05 Feb 2026', commission: 4200, settledDown: 'Completed' },
-        { id: '8', name: 'Apex Recruiters', email: 'ops@apexhr.com', status: 'active', signUpDate: '02 Feb 2026', commission: 1800, settledDown: 'Incomplete' },
-    ];
+
 
     const statusBadge = (status: string) => {
         switch (status) {
@@ -484,7 +496,7 @@ const ReferralsTable = () => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-[#F5F5F5] dark:divide-white/5">
-                        {tableData.map((row, i) => (
+                        {data.map((row, i) => (
                             <tr key={i} className="group hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                                 <td className="py-3.5 pl-6 pr-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">
                                     {row.name}
@@ -523,10 +535,41 @@ const AffiliateDashboard: React.FC = () => {
         try {
             const storedUser = localStorage.getItem('affiliate_user');
             if (storedUser) {
-                setAffiliateUser(JSON.parse(storedUser));
+                const user = JSON.parse(storedUser);
+                setAffiliateUser(user);
+
+                // user.id IS the affiliate_accounts.id (stored by LoginForm)
+                const affId = user.id;
+                if (affId) {
+                    fetchData(affId);
+                }
             }
         } catch { /* empty */ }
     }, []);
+
+    const [stats, setStats] = useState<AffiliateStats>({
+        totalEarnings: 0,
+        pendingEarnings: 0,
+        activeReferrals: 0,
+        totalClicks: 0,
+        conversionRate: 0,
+        thisMonthEarnings: 0
+    });
+
+    const [referrals, setReferrals] = useState<(Referral & { settledDown: 'Completed' | 'Incomplete' })[]>([]);
+
+    const fetchData = async (affiliateId: string) => {
+        try {
+            const [statsRes, referralsRes] = await Promise.all([
+                api.get('/affiliates/portal/dashboard', { params: { affiliateId } }),
+                api.get('/affiliates/portal/referrals', { params: { affiliateId } })
+            ]);
+            setStats(statsRes.data);
+            setReferrals(referralsRes.data);
+        } catch (error) {
+            console.error("Failed to fetch dashboard data", error);
+        }
+    };
 
     const userName = affiliateUser?.name || "Affiliate Partner";
 
@@ -542,20 +585,40 @@ const AffiliateDashboard: React.FC = () => {
 
                 {/* Header Stats */}
                 <div className="flex flex-wrap sm:flex-nowrap w-full xl:w-auto xl:mt-6">
-                    <MiniStat label="Total Referrals" value="42" trend="18%" isPositive={true} />
-                    <MiniStat label="This Month" value="₹28K" trend="24%" isPositive={true} />
-                    <MiniStat label="Conversion Rate" value="12.5%" trend="3%" isPositive={true} />
-                    <MiniStat label="Pending Payouts" value="₹8K" trend="5%" isPositive={false} />
+                    <MiniStat
+                        label="Total Referrals"
+                        value={stats.activeReferrals.toString()}
+                        trend={`${Math.abs(stats.trends?.referrals || 0)}%`}
+                        isPositive={(stats.trends?.referrals || 0) >= 0}
+                    />
+                    <MiniStat
+                        label="This Month"
+                        value={`₹${stats.thisMonthEarnings.toLocaleString('en-IN')}`}
+                        trend={`${Math.abs(stats.trends?.earnings || 0)}%`}
+                        isPositive={(stats.trends?.earnings || 0) >= 0}
+                    />
+                    <MiniStat
+                        label="Conversion Rate"
+                        value={`${stats.conversionRate}%`}
+                        trend=""
+                        isPositive={true}
+                    />
+                    <MiniStat
+                        label="Pending Payouts"
+                        value={`₹${stats.pendingEarnings.toLocaleString('en-IN')}`}
+                        trend=""
+                        isPositive={true}
+                    />
                 </div>
             </div>
 
             {/* 2. Top Grid: Earnings, Chart, Share */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
                 <div className="lg:col-span-3">
-                    <EarningsCard earnings={95000} />
+                    <EarningsCard earnings={stats.totalEarnings} />
                 </div>
                 <div className="lg:col-span-6 relative z-20">
-                    <EarningsChart />
+                    <EarningsChart affiliateId={affiliateUser?.id} />
                 </div>
                 <div className="lg:col-span-3 relative z-10">
                     <ReferralLinkCard />
@@ -564,7 +627,7 @@ const AffiliateDashboard: React.FC = () => {
 
             {/* 3. Referrals Table (Full Width) */}
             <div className="mb-8">
-                <ReferralsTable />
+                <ReferralsTable data={referrals} />
             </div>
 
             {/* Footer */}

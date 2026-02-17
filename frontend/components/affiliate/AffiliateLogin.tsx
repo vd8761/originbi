@@ -1,6 +1,6 @@
 import React from "react";
 import Logo from '../ui/Logo';
-import AffiliateLoginForm from "./AffiliateLoginForm";
+import LoginForm from '../admin/LoginForm';
 import AffiliateTestimonial from "./AffiliateTestimonial";
 import ThemeToggle from '../ui/ThemeToggle';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -49,7 +49,11 @@ const AffiliateLogin: React.FC<AffiliateLoginProps> = ({
                             </p>
                             <div className="w-full h-px bg-brand-light-tertiary dark:bg-white/10 mt-[clamp(24px,3vw,48px)]" />
                         </div>
-                        <AffiliateLoginForm onLoginSuccess={onLoginSuccess} />
+                        <LoginForm
+                            onLoginSuccess={onLoginSuccess}
+                            portalMode="affiliate"
+                            buttonClass="bg-brand-green hover:bg-brand-green/90 text-black font-bold shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_30px_rgba(34,197,94,0.5)] border border-brand-green/50"
+                        />
                     </div>
 
                     {/* Footer */}

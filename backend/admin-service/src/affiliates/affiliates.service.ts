@@ -5,15 +5,17 @@ import {
     Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, Between, DataSource } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import * as nodemailer from 'nodemailer';
-import { SES } from 'aws-sdk';
+import * as AWS from 'aws-sdk';
 
 import {
     User as AdminUser,
     AffiliateAccount,
+    AffiliateReferralTransaction,
+    Registration,
 } from '@originbi/shared-entities';
 import { CreateAffiliateDto, UpdateAffiliateDto } from './dto/create-affiliate.dto';
 import { R2Service, R2UploadResult } from '../r2/r2.service';
@@ -30,6 +32,9 @@ export class AffiliatesService {
 
         @InjectRepository(AffiliateAccount)
         private readonly affiliateRepo: Repository<AffiliateAccount>,
+
+        @InjectRepository(AffiliateReferralTransaction)
+        private readonly transactionRepo: Repository<AffiliateReferralTransaction>,
 
         private readonly dataSource: DataSource,
         private readonly http: HttpService,
@@ -298,7 +303,7 @@ export class AffiliatesService {
         referralLink: string,
         loginUrl: string,
     ) {
-        const ses = new SES({
+        const ses = new AWS.SES({
             accessKeyId: process.env.AWS_ACCESS_KEY_ID,
             secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
             sessionToken: process.env.AWS_SESSION_TOKEN,
@@ -346,5 +351,428 @@ export class AffiliatesService {
         };
 
         return transporter.sendMail(mailOptions);
+    }
+
+
+    // ---------------------------------------------------------
+    // Affiliate Portal Methods (Dashboard & Earnings)
+    // ---------------------------------------------------------
+
+    async getDashboardStats(affiliateId: number) {
+        // 1. Fetch affiliate account — direct fields
+        const account = await this.affiliateRepo.findOne({
+            where: { id: affiliateId },
+        });
+
+        if (!account) {
+            return {
+                totalEarnings: 0,
+                pendingEarnings: 0,
+                activeReferrals: 0,
+                thisMonthEarnings: 0,
+                conversionRate: 0,
+                trends: { earnings: 0, referrals: 0 }
+            };
+        }
+
+        // Dates for Month-over-Month comparison
+        const now = new Date();
+        const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
+        // 2. Earnings (This Month vs Last Month)
+        const { thisMonthEarnings } = await this.transactionRepo
+            .createQueryBuilder('t')
+            .select('COALESCE(SUM(t.earnedCommissionAmount), 0)', 'thisMonthEarnings')
+            .where('t.affiliateAccountId = :id', { id: affiliateId })
+            .andWhere('t.createdAt >= :start', { start: startOfThisMonth })
+            .getRawOne();
+
+        const { lastMonthEarnings } = await this.transactionRepo
+            .createQueryBuilder('t')
+            .select('COALESCE(SUM(t.earnedCommissionAmount), 0)', 'lastMonthEarnings')
+            .where('t.affiliateAccountId = :id', { id: affiliateId })
+            .andWhere('t.createdAt >= :start AND t.createdAt <= :end', { start: startOfLastMonth, end: endOfLastMonth })
+            .getRawOne();
+
+        const currentEarnings = Number(thisMonthEarnings) || 0;
+        const previousEarnings = Number(lastMonthEarnings) || 0;
+        const earningsTrend = previousEarnings === 0 ? (currentEarnings > 0 ? 100 : 0) : Math.round(((currentEarnings - previousEarnings) / previousEarnings) * 100);
+
+        // 3. Referrals Trend (This Month vs Last Month)
+        // We track 'referrals' via transactions creation (or registration creation via relation)
+        // Using transactions is easier as it's the main link
+        const thisMonthReferrals = await this.transactionRepo.count({
+            where: {
+                affiliateAccountId: affiliateId,
+                createdAt: Between(startOfThisMonth.toISOString(), now.toISOString()) as any
+            }
+        });
+
+        const lastMonthReferrals = await this.transactionRepo.count({
+            where: {
+                affiliateAccountId: affiliateId,
+                createdAt: Between(startOfLastMonth.toISOString(), endOfLastMonth.toISOString()) as any
+            }
+        });
+
+        const referralsTrend = lastMonthReferrals === 0 ? (thisMonthReferrals > 0 ? 100 : 0) : Math.round(((thisMonthReferrals - lastMonthReferrals) / lastMonthReferrals) * 100);
+
+        // 4. Conversion Rate
+        const totalCount = await this.transactionRepo.count({
+            where: { affiliateAccountId: affiliateId },
+        });
+
+        const settledCount = await this.transactionRepo.count({
+            where: { affiliateAccountId: affiliateId, settlementStatus: 2 },
+        });
+
+        const conversionRate = totalCount > 0
+            ? Math.round((settledCount / totalCount) * 100)
+            : 0;
+
+        return {
+            totalEarnings: Number(account.totalEarnedCommission) || 0,
+            pendingEarnings: Number(account.totalPendingCommission) || 0,
+            activeReferrals: Number(account.referralCount) || 0,
+            thisMonthEarnings: currentEarnings,
+            conversionRate,
+            trends: {
+                earnings: earningsTrend,
+                referrals: referralsTrend
+            }
+        };
+    }
+
+    /**
+     * Profile endpoint: returns affiliate account details + live transaction stats
+     * Data from both affiliate_accounts AND affiliate_referral_transactions tables
+     */
+    async getProfileWithStats(affiliateId: number) {
+        // 1. Get affiliate account info (from affiliate_accounts)
+        const affiliate = await this.affiliateRepo.findOne({
+            where: { id: affiliateId },
+            relations: ['user'],
+        });
+        if (!affiliate) throw new BadRequestException('Affiliate not found');
+
+        // 2. Get live transaction stats (from affiliate_referral_transactions)
+        const { totalEarned } = await this.transactionRepo
+            .createQueryBuilder('t')
+            .select('COALESCE(SUM(t.earnedCommissionAmount), 0)', 'totalEarned')
+            .where('t.affiliateAccountId = :id', { id: affiliateId })
+            .getRawOne();
+
+        // Settled (settlement_status = 2)
+        const { totalSettled } = await this.transactionRepo
+            .createQueryBuilder('t')
+            .select('COALESCE(SUM(t.earnedCommissionAmount), 0)', 'totalSettled')
+            .where('t.affiliateAccountId = :id', { id: affiliateId })
+            .andWhere('t.settlementStatus = :status', { status: 2 })
+            .getRawOne();
+
+        // Pending (settlement_status = 0)
+        const { totalPending } = await this.transactionRepo
+            .createQueryBuilder('t')
+            .select('COALESCE(SUM(t.earnedCommissionAmount), 0)', 'totalPending')
+            .where('t.affiliateAccountId = :id', { id: affiliateId })
+            .andWhere('t.settlementStatus = :status', { status: 0 })
+            .getRawOne();
+
+        const referralCount = await this.transactionRepo.count({
+            where: { affiliateAccountId: affiliateId },
+        });
+
+        // 3. Get recent transactions for activity context
+        const recentTransactions = await this.transactionRepo.find({
+            where: { affiliateAccountId: affiliateId },
+            order: { createdAt: 'DESC' },
+            take: 5,
+            relations: ['registration'],
+        });
+
+        return {
+            // From affiliate_accounts table
+            id: affiliate.id,
+            user_id: affiliate.userId,
+            name: affiliate.name,
+            email: affiliate.email,
+            country_code: affiliate.countryCode,
+            mobile_number: affiliate.mobileNumber,
+            address: affiliate.address,
+            referral_code: affiliate.referralCode,
+            commission_percentage: Number(affiliate.commissionPercentage),
+            upi_id: affiliate.upiId,
+            upi_number: affiliate.upiNumber,
+            banking_name: affiliate.bankingName,
+            account_number: affiliate.accountNumber,
+            ifsc_code: affiliate.ifscCode,
+            branch_name: affiliate.branchName,
+            is_active: affiliate.isActive,
+            created_at: affiliate.createdAt,
+            updated_at: affiliate.updatedAt,
+
+            // From affiliate_referral_transactions table (live computed)
+            referral_count: referralCount,
+            total_earned_commission: Number(totalEarned) || 0,
+            total_settled_commission: Number(totalSettled) || 0,
+            total_pending_commission: Number(totalPending) || 0,
+
+            // Recent activity (from transactions table)
+            recent_transactions: recentTransactions.map(t => ({
+                id: t.id,
+                settlement_status: t.settlementStatus,
+                amount: Number(t.earnedCommissionAmount),
+                date: t.createdAt,
+                payment_at: t.paymentAt,
+                registration_id: t.registrationId,
+                metadata: t.metadata,
+            })),
+        };
+    }
+
+    async getRecentReferrals(affiliateId: number, limit = 10) {
+        const transactions = await this.transactionRepo.find({
+            where: { affiliateAccountId: affiliateId },
+            relations: ['registration'],
+            order: { createdAt: 'DESC' },
+            take: limit
+        });
+
+        return transactions.map(t => ({
+            id: t.id.toString(),
+            name: t.metadata?.orgName || t.registration?.fullName || 'Unknown',
+            email: t.registration?.metadata?.email || 'N/A',
+            status: t.settlementStatus === 2 ? 'converted' : 'active',
+            signUpDate: t.createdAt,
+            commission: Number(t.earnedCommissionAmount),
+            settledDown: t.settlementStatus === 2 ? 'Completed' : t.settlementStatus === 1 ? 'Processing' : 'Incomplete'
+        }));
+    }
+
+    async getEarningsHistory(affiliateId: number, page = 1, limit = 10) {
+        const [transactions, total] = await this.transactionRepo.findAndCount({
+            where: { affiliateAccountId: affiliateId },
+            order: { createdAt: 'DESC' },
+            skip: (page - 1) * limit,
+            take: limit
+        });
+
+        return {
+            data: transactions.map(t => ({
+                id: t.id.toString(),
+                date: t.createdAt,
+                description: `Commission - ${t.metadata?.planName || 'Referral'}`,
+                paymentMode: t.settlementStatus === 2 ? 'Bank Transfer' : 'Pending',
+                amount: Number(t.earnedCommissionAmount),
+                settlement_status: t.settlementStatus,
+                payment_at: t.paymentAt,
+            })),
+            total,
+            page,
+            limit
+        };
+    }
+
+    // ---------------------------------------------------------
+    // Referrals Page — cards + full table
+    // ---------------------------------------------------------
+    async getReferralsPage(affiliateId: number, page = 1, limit = 10, status?: string, search?: string) {
+        // Get affiliate account for referral_count
+        const account = await this.affiliateRepo.findOne({ where: { id: affiliateId } });
+        const totalReferrals = account ? Number(account.referralCount) : 0;
+
+        // Build query
+        const qb = this.transactionRepo
+            .createQueryBuilder('t')
+            .leftJoinAndSelect('t.registration', 'r')
+            .leftJoinAndSelect('r.user', 'u')
+            .where('t.affiliateAccountId = :id', { id: affiliateId });
+
+        // Status filter
+        if (status === 'converted') {
+            qb.andWhere('r.assessmentSessionId IS NOT NULL');
+        } else if (status === 'pending') {
+            qb.andWhere('(r.assessmentSessionId IS NULL)');
+        }
+
+        // Search filter
+        if (search) {
+            qb.andWhere('(r.fullName ILIKE :search OR u.email ILIKE :search)', { search: `%${search}%` });
+        }
+
+        qb.orderBy('t.createdAt', 'DESC')
+            .skip((page - 1) * limit)
+            .take(limit);
+
+        const [transactions, total] = await qb.getManyAndCount();
+
+        // Completed = has assessmentSessionId, Pending = no assessmentSessionId
+        const completedCount = await this.transactionRepo
+            .createQueryBuilder('t')
+            .leftJoin('t.registration', 'r')
+            .where('t.affiliateAccountId = :id', { id: affiliateId })
+            .andWhere('r.assessmentSessionId IS NOT NULL')
+            .getCount();
+
+        const pendingCount = await this.transactionRepo
+            .createQueryBuilder('t')
+            .leftJoin('t.registration', 'r')
+            .where('t.affiliateAccountId = :id', { id: affiliateId })
+            .andWhere('(r.assessmentSessionId IS NULL)')
+            .getCount();
+
+        return {
+            stats: {
+                totalReferrals,
+                completedCount,
+                pendingCount,
+            },
+            data: transactions.map(t => ({
+                id: t.id.toString(),
+                name: t.registration?.fullName || 'Unknown',
+                email: t.registration?.user?.email || t.registration?.metadata?.email || 'N/A',
+                status: t.registration?.assessmentSessionId ? 'converted' : 'pending',
+                registeredOn: t.createdAt,
+                studentBoard: t.registration?.metadata?.board || 'N/A',
+                schoolLevel: t.registration?.schoolLevel || 'N/A',
+                schoolStream: t.registration?.schoolStream || 'N/A',
+                commissionPercentage: Number(t.commissionPercentage),
+                totalEarnedCommission: Number(t.earnedCommissionAmount),
+            })),
+            total,
+            page,
+            limit,
+        };
+    }
+
+    // ---------------------------------------------------------
+    // Earnings Page — Stats Cards
+    // ---------------------------------------------------------
+    async getEarningsStats(affiliateId: number) {
+        const account = await this.affiliateRepo.findOne({ where: { id: affiliateId } });
+        if (!account) {
+            return { totalEarned: 0, totalPending: 0, totalSettled: 0 };
+        }
+
+        // Compute totalSettled from transactions (settlement_status = 2)
+        const { totalSettled } = await this.transactionRepo
+            .createQueryBuilder('t')
+            .select('COALESCE(SUM(t.earnedCommissionAmount), 0)', 'totalSettled')
+            .where('t.affiliateAccountId = :id', { id: affiliateId })
+            .andWhere('t.settlementStatus = :status', { status: 2 })
+            .getRawOne();
+
+        return {
+            totalEarned: Number(account.totalEarnedCommission) || 0,
+            totalPending: Number(account.totalPendingCommission) || 0,
+            totalSettled: Number(totalSettled) || 0,
+        };
+    }
+
+    // ---------------------------------------------------------
+    // Earnings Page — Chart (last 12 months)
+    // ---------------------------------------------------------
+    async getEarningsChart(affiliateId: number) {
+        const months: { label: string; earned: number; pending: number }[] = [];
+        const now = new Date();
+
+        for (let i = 11; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const start = new Date(d.getFullYear(), d.getMonth(), 1);
+            const end = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+            const label = d.toLocaleString('en-US', { month: 'short' });
+
+            // Earned total for that month
+            const { earned } = await this.transactionRepo
+                .createQueryBuilder('t')
+                .select('COALESCE(SUM(t.earnedCommissionAmount), 0)', 'earned')
+                .where('t.affiliateAccountId = :id', { id: affiliateId })
+                .andWhere('t.createdAt >= :start AND t.createdAt < :end', { start, end })
+                .getRawOne();
+
+            // Pending (settlement_status = 0) for that month
+            const { pending } = await this.transactionRepo
+                .createQueryBuilder('t')
+                .select('COALESCE(SUM(t.earnedCommissionAmount), 0)', 'pending')
+                .where('t.affiliateAccountId = :id', { id: affiliateId })
+                .andWhere('t.settlementStatus = :status', { status: 0 })
+                .andWhere('t.createdAt >= :start AND t.createdAt < :end', { start, end })
+                .getRawOne();
+
+            months.push({ label, earned: Number(earned) || 0, pending: Number(pending) || 0 });
+        }
+
+        return months;
+    }
+
+    // ---------------------------------------------------------
+    // Settings — Update Profile
+    // ---------------------------------------------------------
+    async updateProfile(affiliateId: number, dto: { name?: string; mobileNumber?: string; countryCode?: string; address?: string }) {
+        const affiliate = await this.affiliateRepo.findOne({ where: { id: affiliateId } });
+        if (!affiliate) throw new BadRequestException('Affiliate not found');
+
+        if (dto.name !== undefined) affiliate.name = dto.name;
+        if (dto.mobileNumber !== undefined) affiliate.mobileNumber = dto.mobileNumber;
+        if (dto.countryCode !== undefined) affiliate.countryCode = dto.countryCode;
+        if (dto.address !== undefined) affiliate.address = dto.address;
+
+        await this.affiliateRepo.save(affiliate);
+        return { message: 'Profile updated successfully' };
+    }
+
+    // ---------------------------------------------------------
+    // Settings — Update Payout
+    // ---------------------------------------------------------
+    async updatePayoutSettings(affiliateId: number, dto: {
+        bankingName?: string; accountNumber?: string; ifscCode?: string; branchName?: string;
+        upiId?: string; upiNumber?: string;
+    }) {
+        const affiliate = await this.affiliateRepo.findOne({ where: { id: affiliateId } });
+        if (!affiliate) throw new BadRequestException('Affiliate not found');
+
+        if (dto.bankingName !== undefined) affiliate.bankingName = dto.bankingName;
+        if (dto.accountNumber !== undefined) affiliate.accountNumber = dto.accountNumber;
+        if (dto.ifscCode !== undefined) affiliate.ifscCode = dto.ifscCode;
+        if (dto.branchName !== undefined) affiliate.branchName = dto.branchName;
+        if (dto.upiId !== undefined) affiliate.upiId = dto.upiId;
+        if (dto.upiNumber !== undefined) affiliate.upiNumber = dto.upiNumber;
+
+        await this.affiliateRepo.save(affiliate);
+        return { message: 'Payout settings updated successfully' };
+    }
+
+    // ---------------------------------------------------------
+    // Settings — Change Password (Cognito)
+    // ---------------------------------------------------------
+    async changePassword(affiliateId: number, dto: { currentPassword: string; newPassword: string }) {
+        const affiliate = await this.affiliateRepo.findOne({
+            where: { id: affiliateId },
+            relations: ['user'],
+        });
+        if (!affiliate || !affiliate.user) throw new BadRequestException('Affiliate not found');
+
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const CognitoISP = require('aws-sdk/clients/cognitoidentityserviceprovider');
+            const cognito = new CognitoISP({
+                region: process.env.COGNITO_REGION || 'ap-south-1',
+            });
+
+            // Admin set user password (simpler approach for affiliate portal)
+            await cognito.adminSetUserPassword({
+                UserPoolId: process.env.COGNITO_USER_POOL_ID!,
+                Username: affiliate.user.email,
+                Password: dto.newPassword,
+                Permanent: true,
+            }).promise();
+
+            return { message: 'Password changed successfully' };
+        } catch (error: any) {
+            this.logger.error('Password change failed', error);
+            throw new BadRequestException(error.message || 'Password change failed');
+        }
     }
 }

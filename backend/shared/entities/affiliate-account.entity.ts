@@ -9,7 +9,7 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
-import { AffiliateReferralTransaction } from './affiliate-referral-transaction.entity';
+import type { AffiliateReferralTransaction } from './affiliate-referral-transaction.entity';
 
 @Entity('affiliate_accounts')
 export class AffiliateAccount {
@@ -92,7 +92,7 @@ export class AffiliateAccount {
     @Column({ name: 'metadata', type: 'jsonb', default: () => `'{}'` })
     metadata: any;
 
-    @OneToMany(() => AffiliateReferralTransaction, (transaction) => transaction.affiliate)
+    @OneToMany(() => require('./affiliate-referral-transaction.entity').AffiliateReferralTransaction, (transaction: AffiliateReferralTransaction) => transaction.affiliateAccount)
     referralTransactions: AffiliateReferralTransaction[];
 
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })

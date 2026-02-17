@@ -1,19 +1,26 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { api } from "../../lib/api";
 
 // --- Types ---
 interface Referral {
     id: string;
     name: string;
     email: string;
-    status: 'pending' | 'converted'; // Simplified as per request: Pending Assessment / Completed Assessment
+    status: 'pending' | 'converted';
     registeredOn: string;
     studentBoard: string;
     schoolLevel: string;
     schoolStream: string;
     commissionPercentage: number;
     totalEarnedCommission: number;
+}
+
+interface ReferralStats {
+    totalReferrals: number;
+    completedCount: number;
+    pendingCount: number;
 }
 
 // --- Sub Components ---
@@ -32,106 +39,68 @@ const StatCard = ({ label, value, subtext, color }: { label: string; value: stri
     </div>
 );
 
-const statusBadge = (status: string) => {
-    switch (status) {
-        case 'converted':
-            return <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-[#1ED36A]/10 text-[#1ED36A] border border-[#1ED36A]/20">Completed</span>;
-        case 'pending':
-            return <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-yellow-500/10 text-yellow-600 border border-yellow-500/20">Pending</span>;
-        default:
-            return null;
-    }
-};
-
 // --- Main Component ---
 const AffiliateReferrals: React.FC = () => {
     const [filterStatus, setFilterStatus] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [copied, setCopied] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
+    const [loading, setLoading] = useState(true);
     const itemsPerPage = 10;
 
-    const referralLink = "https://originbi.com/ref/aff_001";
+    const [referrals, setReferrals] = useState<Referral[]>([]);
+    const [stats, setStats] = useState<ReferralStats>({ totalReferrals: 0, completedCount: 0, pendingCount: 0 });
+    const [totalItems, setTotalItems] = useState(0);
+    const [affiliateId, setAffiliateId] = useState<string | null>(null);
+    const [referralLink, setReferralLink] = useState("https://discover.originbi.com/register?ref=affiliate");
 
-    const allReferrals: Referral[] = [
-        {
-            id: '1',
-            name: 'Aarav Gupta',
-            email: 'aarav.g@example.com',
-            status: 'pending',
-            registeredOn: '16 Feb 2026',
-            studentBoard: 'CBSE',
-            schoolLevel: 'Grade 12',
-            schoolStream: 'Science (PCM)',
-            commissionPercentage: 10,
-            totalEarnedCommission: 0
-        },
-        {
-            id: '2',
-            name: 'Ishita Sharma',
-            email: 'ishita.s@example.com',
-            status: 'converted',
-            registeredOn: '15 Feb 2026',
-            studentBoard: 'ICSE',
-            schoolLevel: 'Grade 10',
-            schoolStream: 'N/A',
-            commissionPercentage: 15,
-            totalEarnedCommission: 1500
-        },
-        {
-            id: '3',
-            name: 'Rohan Mehta',
-            email: 'rohan.m@example.com',
-            status: 'pending',
-            registeredOn: '14 Feb 2026',
-            studentBoard: 'State Board',
-            schoolLevel: 'Grade 11',
-            schoolStream: 'Commerce',
-            commissionPercentage: 10,
-            totalEarnedCommission: 0
-        },
-        {
-            id: '4',
-            name: 'Sneha Patel',
-            email: 'sneha.p@example.com',
-            status: 'converted',
-            registeredOn: '12 Feb 2026',
-            studentBoard: 'CBSE',
-            schoolLevel: 'Grade 12',
-            schoolStream: 'Humanities',
-            commissionPercentage: 12,
-            totalEarnedCommission: 1200
-        },
-        {
-            id: '5',
-            name: 'Vivaan Singh',
-            email: 'vivaan.s@example.com',
-            status: 'converted',
-            registeredOn: '10 Feb 2026',
-            studentBoard: 'IGCSE',
-            schoolLevel: 'Grade 9',
-            schoolStream: 'N/A',
-            commissionPercentage: 15,
-            totalEarnedCommission: 2500
-        },
-    ];
+    useEffect(() => {
+        try {
+            const storedUser = localStorage.getItem('affiliate_user');
+            if (storedUser) {
+                const user = JSON.parse(storedUser);
+                // user.id IS the affiliate_accounts.id (stored by LoginForm)
+                const affId = user.id;
+                if (affId) {
+                    setAffiliateId(affId);
+                    if (user.referralCode) {
+                        setReferralLink(`https://discover.originbi.com/register?ref=${user.referralCode}`);
+                    }
+                }
+            }
+        } catch { /* empty */ }
+    }, []);
 
-    const filteredReferrals = allReferrals.filter(r => {
-        const matchesStatus = filterStatus === 'all' || r.status === filterStatus;
-        const matchesSearch = r.name.toLowerCase().includes(searchQuery.toLowerCase()) || r.email.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesStatus && matchesSearch;
-    });
+    useEffect(() => {
+        if (affiliateId) {
+            fetchData();
+        }
+    }, [affiliateId, currentPage, filterStatus, searchQuery]);
 
-    const totalReferrals = allReferrals.length;
-    const totalCompleted = allReferrals.filter(r => r.status === 'converted').length;
-    const totalPending = allReferrals.filter(r => r.status === 'pending').length;
+    const fetchData = async () => {
+        if (!affiliateId) return;
+        setLoading(true);
+        try {
+            const res = await api.get('/affiliates/portal/referrals-full', {
+                params: {
+                    affiliateId,
+                    page: currentPage,
+                    limit: itemsPerPage,
+                    status: filterStatus === 'all' ? undefined : filterStatus,
+                    search: searchQuery || undefined,
+                },
+            });
+            setStats(res.data.stats);
+            setReferrals(res.data.data);
+            setTotalItems(res.data.total);
+        } catch (error) {
+            console.error("Failed to fetch referrals", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-    // Pagination Logic
-    const totalPages = Math.ceil(filteredReferrals.length / itemsPerPage);
-    const paginatedReferrals = filteredReferrals.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-    );
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
 
     const handlePageChange = (page: number) => {
         if (page >= 1 && page <= totalPages) {
@@ -160,7 +129,7 @@ const AffiliateReferrals: React.FC = () => {
                             type="text"
                             placeholder="Search referrals..."
                             value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
+                            onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                             className="pl-10 pr-4 py-2.5 rounded-full bg-white/60 dark:bg-white/5 border border-[#E0E0E0] dark:border-white/10 text-[clamp(14px,1vw,16px)] text-[#19211C] dark:text-white placeholder:text-[#19211C]/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#1ED36A]/30 focus:border-[#1ED36A] transition-all w-[200px] sm:w-[280px] font-normal"
                         />
                     </div>
@@ -169,9 +138,9 @@ const AffiliateReferrals: React.FC = () => {
 
             {/* Stats Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <StatCard label="Total Referrals" value={totalReferrals.toString()} subtext="All time" color="#150089" />
-                <StatCard label="Completed Assessment" value={totalCompleted.toString()} subtext="Converted users" color="#1ED36A" />
-                <StatCard label="Pending Assessment" value={totalPending.toString()} subtext="Yet to complete" color="#F59E0B" />
+                <StatCard label="Total Referrals" value={stats.totalReferrals.toString()} subtext="All time" color="#150089" />
+                <StatCard label="Completed Assessment" value={stats.completedCount.toString()} subtext="Converted users" color="#1ED36A" />
+                <StatCard label="Pending Assessment" value={stats.pendingCount.toString()} subtext="Yet to complete" color="#F59E0B" />
             </div>
 
             {/* Filter Tabs */}
@@ -192,7 +161,7 @@ const AffiliateReferrals: React.FC = () => {
                         {tab.label}
                     </button>
                 ))}
-                <span className="ml-2 text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white opacity-70 font-normal">{filteredReferrals.length} results</span>
+                <span className="ml-2 text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white opacity-70 font-normal">{totalItems} results</span>
             </div>
 
             <div className="flex justify-end mb-4">
@@ -201,10 +170,10 @@ const AffiliateReferrals: React.FC = () => {
                         const headers = ["Name", "Email", "Registered On", "Student Board", "School Level", "School Stream", "Commission (%)", "Total Earned Commission"];
                         const csvContent = [
                             headers.join(","),
-                            ...filteredReferrals.map(row => [
+                            ...referrals.map(row => [
                                 `"${row.name}"`,
                                 row.email,
-                                row.registeredOn,
+                                new Date(row.registeredOn).toLocaleDateString('en-IN'),
                                 row.studentBoard,
                                 row.schoolLevel,
                                 row.schoolStream,
@@ -247,7 +216,11 @@ const AffiliateReferrals: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#F5F5F5] dark:divide-white/5">
-                            {paginatedReferrals.map((row) => (
+                            {loading ? (
+                                <tr><td colSpan={8} className="py-12 text-center text-[#19211C] dark:text-white opacity-50 text-[clamp(14px,1vw,16px)]">Loading...</td></tr>
+                            ) : referrals.length === 0 ? (
+                                <tr><td colSpan={8} className="py-12 text-center text-[#19211C] dark:text-white opacity-50 text-[clamp(14px,1vw,16px)]">No referrals found matching your criteria</td></tr>
+                            ) : referrals.map((row) => (
                                 <tr key={row.id} className="group hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                                     <td className="py-3.5 pl-6 pr-4">
                                         <div className="flex items-center gap-3">
@@ -258,7 +231,9 @@ const AffiliateReferrals: React.FC = () => {
                                         </div>
                                     </td>
                                     <td className="py-3.5 px-4 font-medium text-[clamp(13px,0.9vw,15px)] text-brand-text-light-secondary dark:text-brand-text-secondary leading-none">{row.email}</td>
-                                    <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{row.registeredOn}</td>
+                                    <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">
+                                        {new Date(row.registeredOn).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    </td>
                                     <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{row.studentBoard}</td>
                                     <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{row.schoolLevel}</td>
                                     <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{row.schoolStream}</td>
@@ -268,30 +243,21 @@ const AffiliateReferrals: React.FC = () => {
                                     </td>
                                 </tr>
                             ))}
-                            {filteredReferrals.length === 0 && (
-                                <tr>
-                                    <td colSpan={8} className="py-12 text-center text-[#19211C] dark:text-white opacity-50 text-[clamp(14px,1vw,16px)]">No referrals found matching your criteria</td>
-                                </tr>
-                            )}
                         </tbody>
                     </table>
                 </div>
             </div>
 
             {/* Pagination Controls */}
-            {filteredReferrals.length > 0 && (
+            {totalItems > 0 && (
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-xs sm:text-sm text-brand-text-light-secondary dark:text-brand-text-secondary mb-8">
                     <div className="w-full sm:w-1/3 order-2 sm:order-1"></div>
                     <div className="flex justify-center w-full sm:w-1/3 order-1 sm:order-2">
                         <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => handlePageChange(currentPage - 1)}
-                                disabled={currentPage === 1}
-                                className="p-2 flex items-center justify-center text-[#19211C] dark:text-white hover:text-[#1ED36A] dark:hover:text-[#1ED36A] transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                            >
+                            <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}
+                                className="p-2 flex items-center justify-center text-[#19211C] dark:text-white hover:text-[#1ED36A] dark:hover:text-[#1ED36A] transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
                             </button>
-
                             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                                 let page = i + 1;
                                 if (totalPages > 5 && currentPage > 3) {
@@ -299,34 +265,25 @@ const AffiliateReferrals: React.FC = () => {
                                     if (start + 4 > totalPages) start = Math.max(1, totalPages - 4);
                                     page = start + i;
                                 }
-
                                 if (page > totalPages) return null;
-
                                 return (
-                                    <button
-                                        key={page}
-                                        onClick={() => handlePageChange(page)}
+                                    <button key={page} onClick={() => handlePageChange(page)}
                                         className={`min-w-[32px] h-8 px-1 rounded-md font-medium text-sm flex items-center justify-center transition-all border cursor-pointer ${currentPage === page
                                             ? "bg-[#150089] border-[#150089] text-white shadow-md"
                                             : "bg-transparent border-[#E0E0E0] dark:border-white/10 text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/5"
-                                            }`}
-                                    >
+                                            }`}>
                                         {page}
                                     </button>
                                 );
                             })}
-
-                            <button
-                                onClick={() => handlePageChange(currentPage + 1)}
-                                disabled={currentPage === totalPages}
-                                className="p-2 flex items-center justify-center text-[#19211C] dark:text-white hover:text-[#1ED36A] dark:hover:text-[#1ED36A] transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                            >
+                            <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages || totalPages === 0}
+                                className="p-2 flex items-center justify-center text-[#19211C] dark:text-white hover:text-[#1ED36A] dark:hover:text-[#1ED36A] transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                             </button>
                         </div>
                     </div>
                     <div className="text-center sm:text-right w-full sm:w-1/3 order-3 font-medium text-[#19211C] dark:text-white">
-                        Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, filteredReferrals.length)} of {filteredReferrals.length} referrals
+                        Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} referrals
                     </div>
                 </div>
             )}
@@ -342,10 +299,8 @@ const AffiliateReferrals: React.FC = () => {
                         <p className="text-white/80 text-[clamp(14px,1vw,16px)] font-normal mt-0.5">{referralLink}</p>
                     </div>
                 </div>
-                <button
-                    onClick={handleCopy}
-                    className="px-10 py-3.5 rounded-full bg-white text-[#150089] font-semibold text-[clamp(14px,1vw,16px)] hover:bg-white/90 transition-all shadow-md shrink-0"
-                >
+                <button onClick={handleCopy}
+                    className="px-10 py-3.5 rounded-full bg-white text-[#150089] font-semibold text-[clamp(14px,1vw,16px)] hover:bg-white/90 transition-all shadow-md shrink-0">
                     {copied ? '✓ Copied!' : 'Copy Link'}
                 </button>
             </div>

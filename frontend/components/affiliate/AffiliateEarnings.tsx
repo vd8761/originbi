@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { TrendUpIcon, TrendDownIcon } from '../icons';
+import React, { useState, useEffect } from "react";
+import { api } from "../../lib/api";
 
 // --- Types ---
 interface Transaction {
@@ -10,6 +10,20 @@ interface Transaction {
     description: string;
     paymentMode: string;
     amount: number;
+    type: string;
+    status: string;
+}
+
+interface EarningsStats {
+    totalEarned: number;
+    totalPending: number;
+    totalSettled: number;
+}
+
+interface ChartDataPoint {
+    label: string;
+    earned: number;
+    pending: number;
 }
 
 // --- Sub Components ---
@@ -27,23 +41,16 @@ const EarningStat = ({ label, value, icon }: { label: string; value: string; ico
     </div>
 );
 
-// --- Earnings Chart (Large version) ---
-const LargeEarningsChart = () => {
-    const chartData = [
-        { label: 'Mar', earned: 9000, pending: 2000 },
-        { label: 'Apr', earned: 11000, pending: 2500 },
-        { label: 'May', earned: 10000, pending: 2200 },
-        { label: 'Jun', earned: 13000, pending: 3000 },
-        { label: 'Jul', earned: 14000, pending: 3100 },
-        { label: 'Aug', earned: 8000, pending: 2000 },
-        { label: 'Sep', earned: 12000, pending: 3000 },
-        { label: 'Oct', earned: 18000, pending: 5000 },
-        { label: 'Nov', earned: 15000, pending: 4000 },
-        { label: 'Dec', earned: 22000, pending: 6000 },
-        { label: 'Jan', earned: 28000, pending: 8000 },
-        { label: 'Feb', earned: 24000, pending: 5000 },
+// --- Earnings Chart ---
+const LargeEarningsChart = ({ chartData }: { chartData: ChartDataPoint[] }) => {
+    const allValues = chartData.flatMap(d => [d.earned, d.pending]);
+    const max = Math.max(...allValues, 1000) * 1.2; // 20% headroom
+    const yLabels = [
+        `${Math.round(max / 1000)}K`,
+        `${Math.round((max * 0.66) / 1000)}K`,
+        `${Math.round((max * 0.33) / 1000)}K`,
+        '0',
     ];
-    const max = 35000;
 
     return (
         <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-8 border border-[#E0E0E0] dark:border-white/10 font-['Haskoy'] shadow-sm h-full flex flex-col overflow-visible">
@@ -56,12 +63,9 @@ const LargeEarningsChart = () => {
             </div>
 
             <div className="flex-1 flex gap-4 h-[280px]">
-                {/* Y Axis */}
                 <div className="flex flex-col justify-between text-[#19211C] dark:text-white font-light text-[clamp(14px,1vw,17px)] pb-8 pt-2">
-                    <span>35K</span><span>25K</span><span>15K</span><span>5K</span>
+                    {yLabels.map((l, i) => <span key={i}>{l}</span>)}
                 </div>
-
-                {/* Chart */}
                 <div className="flex-1 flex justify-between items-end pb-1 relative">
                     <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-8 pt-4">
                         {[0, 1, 2, 3].map(i => <div key={i} className="border-b border-dashed border-gray-200 dark:border-white/5 w-full h-0"></div>)}
@@ -70,10 +74,10 @@ const LargeEarningsChart = () => {
                     {chartData.map((d, i) => (
                         <div key={i} className="relative flex flex-col items-center justify-end h-full gap-4 flex-1 group z-10 w-full cursor-pointer">
                             <div className="flex items-end gap-1 sm:gap-2 h-full relative justify-center w-full">
-                                <div className="w-[clamp(14px,1.5vw,28px)] bg-[#150089] dark:bg-white rounded-full transition-all duration-500 hover:opacity-90 relative" style={{ height: `${(d.earned / max) * 100}%` }}>
+                                <div className="w-[clamp(14px,1.5vw,28px)] bg-[#150089] dark:bg-white rounded-full transition-all duration-500 hover:opacity-90 relative" style={{ height: `${Math.max((d.earned / max) * 100, 1)}%` }}>
                                     <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#19211C] dark:bg-white border-2 border-white dark:border-[#19211C] rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-40"></div>
                                 </div>
-                                <div className="w-[clamp(14px,1.5vw,28px)] bg-[#1ED36A] rounded-full transition-all duration-500 hover:opacity-90 relative" style={{ height: `${(d.pending / max) * 100}%` }}>
+                                <div className="w-[clamp(14px,1.5vw,28px)] bg-[#1ED36A] rounded-full transition-all duration-500 hover:opacity-90 relative" style={{ height: `${Math.max((d.pending / max) * 100, 1)}%` }}>
                                     <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#19211C] dark:bg-[#1ED36A] border-2 border-white dark:border-[#111111] rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-40"></div>
                                 </div>
 
@@ -96,7 +100,7 @@ const LargeEarningsChart = () => {
                                         <div className="px-4 py-3 bg-[#19211C] dark:bg-[#1ED36A]/20 backdrop-blur-sm border-t border-[#19211C] dark:border-white/5">
                                             <div className="text-[12px] font-medium text-white dark:text-[#1ED36A] flex justify-between items-center w-full">
                                                 <span>Earned %</span>
-                                                <span className="text-[#1ED36A]">{Math.round((d.earned / (d.earned + d.pending)) * 100)}%</span>
+                                                <span className="text-[#1ED36A]">{(d.earned + d.pending) > 0 ? Math.round((d.earned / (d.earned + d.pending)) * 100) : 0}%</span>
                                             </div>
                                         </div>
                                     </div>
@@ -112,21 +116,54 @@ const LargeEarningsChart = () => {
     );
 };
 
-// --- Transaction Status Badge ---
-
-
 // --- Main Component ---
 const AffiliateEarnings: React.FC = () => {
-    const transactions: Transaction[] = [
-        { id: '1', date: '16 Feb 2026', description: 'Commission - Pro Plan', paymentMode: 'Bank Transfer', amount: 2000 },
-        { id: '2', date: '14 Feb 2026', description: 'Commission - Enterprise Plan', paymentMode: 'UPI', amount: 7500 },
-        { id: '3', date: '12 Feb 2026', description: 'Bonus - 5 Referrals Milestone', paymentMode: 'Wallet', amount: 3000 },
-        { id: '4', date: '10 Feb 2026', description: 'Commission - Business Plan', paymentMode: 'Bank Transfer', amount: 3500 },
-        { id: '5', date: '08 Feb 2026', description: 'Commission - Enterprise Plan', paymentMode: 'UPI', amount: 5000 },
-        { id: '6', date: '05 Feb 2026', description: 'Commission - Pro Plan', paymentMode: 'Wallet', amount: 4200 },
-        { id: '7', date: '02 Feb 2026', description: 'Commission - Business Plan', paymentMode: 'Bank Transfer', amount: 1800 },
-        { id: '8', date: '25 Jan 2026', description: 'Commission - Enterprise Plan', paymentMode: 'UPI', amount: 6000 },
-    ];
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [stats, setStats] = useState<EarningsStats>({
+        totalEarned: 0,
+        totalPending: 0,
+        totalSettled: 0,
+    });
+    const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalItems, setTotalItems] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const itemsPerPage = 10;
+
+    useEffect(() => {
+        try {
+            const storedUser = localStorage.getItem('affiliate_user');
+            if (storedUser) {
+                const user = JSON.parse(storedUser);
+                // user.id IS the affiliate_accounts.id (stored by LoginForm)
+                const affId = user.id;
+                if (affId) {
+                    fetchAll(affId);
+                }
+            }
+        } catch { /* empty */ }
+    }, []);
+
+    const fetchAll = async (affiliateId: string) => {
+        setLoading(true);
+        try {
+            const [statsRes, chartRes, historyRes] = await Promise.all([
+                api.get('/affiliates/portal/earnings-stats', { params: { affiliateId } }),
+                api.get('/affiliates/portal/earnings-chart', { params: { affiliateId } }),
+                api.get('/affiliates/portal/earnings', { params: { affiliateId, page: currentPage, limit: itemsPerPage } }),
+            ]);
+            setStats(statsRes.data);
+            setChartData(chartRes.data);
+            setTransactions(historyRes.data.data);
+            setTotalItems(historyRes.data.total);
+        } catch (error) {
+            console.error("Failed to fetch earnings data", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
 
     // --- Export CSV ---
     const handleExportCSV = () => {
@@ -134,8 +171,8 @@ const AffiliateEarnings: React.FC = () => {
         const csvContent = [
             headers.join(","),
             ...transactions.map(txn => [
-                txn.date,
-                `"${txn.description}"`, // Quote description to handle commas
+                new Date(txn.date).toLocaleDateString('en-IN'),
+                `"${txn.description}"`,
                 txn.paymentMode,
                 txn.amount
             ].join(","))
@@ -160,31 +197,37 @@ const AffiliateEarnings: React.FC = () => {
                 <p className="text-[clamp(14px,1vw,16px)] text-[#19211C] dark:text-white opacity-80 mt-1 font-normal">Track your commissions and payouts</p>
             </div>
 
-            {/* Stats Row — Matching corporate MiniStat layout */}
+            {/* Stats Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <EarningStat
                     label="Total Earned"
-                    value="₹95,000"
+                    value={`₹${stats.totalEarned.toLocaleString('en-IN')}`}
                     icon={<svg className="w-5 h-5 text-[#150089] dark:text-[#1ED36A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>}
                 />
                 <EarningStat
                     label="Total Pending"
-                    value="₹8,000"
+                    value={`₹${stats.totalPending.toLocaleString('en-IN')}`}
                     icon={<svg className="w-5 h-5 text-[#150089] dark:text-[#1ED36A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>}
                 />
                 <EarningStat
                     label="Total Settled"
-                    value="₹67,000"
+                    value={`₹${stats.totalSettled.toLocaleString('en-IN')}`}
                     icon={<svg className="w-5 h-5 text-[#150089] dark:text-[#1ED36A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
                 />
             </div>
 
             {/* Chart */}
             <div className="mb-8">
-                <LargeEarningsChart />
+                {chartData.length > 0 ? (
+                    <LargeEarningsChart chartData={chartData} />
+                ) : (
+                    <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-8 border border-[#E0E0E0] dark:border-white/10 text-center text-[#19211C]/50 dark:text-white/50">
+                        {loading ? 'Loading chart...' : 'No earnings data yet'}
+                    </div>
+                )}
             </div>
 
-            {/* Transaction History (Full Width) */}
+            {/* Transaction History */}
             <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] border border-[#E0E0E0] dark:border-white/10 overflow-hidden shadow-sm h-full flex flex-col mb-8">
                 <div className="flex justify-between items-center p-6">
                     <h3 className="font-semibold text-[clamp(16px,1.04vw,20px)] text-[#19211C] dark:text-white leading-none">Transaction History</h3>
@@ -207,18 +250,44 @@ const AffiliateEarnings: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#F5F5F5] dark:divide-white/5">
-                            {transactions.map((txn) => (
+                            {loading ? (
+                                <tr><td colSpan={4} className="py-12 text-center text-[#19211C] dark:text-white opacity-50">Loading...</td></tr>
+                            ) : transactions.length === 0 ? (
+                                <tr><td colSpan={4} className="py-12 text-center text-[#19211C] dark:text-white opacity-50">No transactions yet</td></tr>
+                            ) : transactions.map((txn) => (
                                 <tr key={txn.id} className="group hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                                    <td className="py-3.5 pl-6 pr-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{txn.date}</td>
-                                    <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{txn.description}</td>
+                                    <td className="py-3.5 pl-6 pr-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">
+                                        {new Date(txn.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    </td>
+                                    <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">
+                                        {txn.description}
+                                        {txn.status === 'PENDING' && <span className="ml-2 text-xs text-yellow-500">(Pending)</span>}
+                                    </td>
                                     <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{txn.paymentMode}</td>
-                                    <td className="py-3.5 pl-4 pr-6 text-right font-semibold text-[clamp(14px,1.1vw,17px)] text-[#1ED36A] leading-none">+₹{txn.amount.toLocaleString('en-IN')}</td>
+                                    <td className={`py-3.5 pl-4 pr-6 text-right font-semibold text-[clamp(14px,1.1vw,17px)] leading-none text-[#1ED36A]`}>
+                                        +₹{txn.amount.toLocaleString('en-IN')}
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
             </div>
+
+            {/* Pagination */}
+            {totalItems > itemsPerPage && (
+                <div className="flex justify-center items-center gap-2 mb-8">
+                    <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                        className="p-2 text-[#19211C] dark:text-white hover:text-[#1ED36A] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    <span className="text-sm text-[#19211C] dark:text-white font-medium">Page {currentPage} of {totalPages}</span>
+                    <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+                        className="p-2 text-[#19211C] dark:text-white hover:text-[#1ED36A] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                </div>
+            )}
 
             {/* Footer */}
             <div className="mt-12 border-t border-gray-200 dark:border-white/5 pt-6 flex flex-col sm:flex-row justify-between text-[clamp(13px,1vw,15px)] font-medium items-center gap-4">

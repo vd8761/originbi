@@ -19,6 +19,7 @@ import { HealthController } from './health.controller';
 import { KeepAliveModule } from './keepalive/keepalive.module';
 import { AdministratorCounsellingModule } from './counselling/counselling.module';
 import { AffiliatesModule } from './affiliates/affiliates.module';
+import { AffiliateLoginModule } from './affiliatelogin/affiliatelogin.module';
 import { R2Module } from './r2/r2.module';
 
 @Module({
@@ -110,6 +111,7 @@ import { R2Module } from './r2/r2.module';
     KeepAliveModule,
     AdministratorCounsellingModule,
     AffiliatesModule,
+    AffiliateLoginModule,
     R2Module,
   ],
   controllers: [TestController, MailAssetsController, HealthController],
