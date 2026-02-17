@@ -16,6 +16,7 @@ import { AssessmentAnswer } from '../entities/assessment_answer.entity';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { Program } from '../entities/program.entity';
 import { Registration } from '../entities/registration.entity';
+import { AffiliateAccount } from '@originbi/shared-entities';
 import * as nodemailer from 'nodemailer';
 import { SES } from 'aws-sdk';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
@@ -48,6 +49,8 @@ export class StudentService {
     private readonly levelRepo: Repository<AssessmentLevel>,
     @InjectRepository(AssessmentAnswer)
     private readonly answerRepo: Repository<AssessmentAnswer>,
+    @InjectRepository(AffiliateAccount)
+    private readonly affiliateRepo: Repository<AffiliateAccount>,
     private readonly http: HttpService,
     private readonly configService: ConfigService,
   ) { }
@@ -593,6 +596,7 @@ export class StudentService {
       paymentStatus: 'NOT_REQUIRED',
       metadata: {
         groupCode: dto.group_code,
+        referralCode: dto.referral_code,
         sendEmail: true, // User requirement
       },
       createdAt: new Date(),
@@ -768,6 +772,18 @@ export class StudentService {
     }
 
     return { isValid: true, message: 'Available' };
+  }
+
+  async validateReferralCode(code: string) {
+    const affiliate = await this.affiliateRepo.findOne({
+      where: { referralCode: code, isActive: true },
+    });
+
+    if (!affiliate) {
+      throw new BadRequestException('Invalid URL');
+    }
+
+    return { isValid: true, code: affiliate.referralCode };
   }
 
   // ---------------------------------------------------------

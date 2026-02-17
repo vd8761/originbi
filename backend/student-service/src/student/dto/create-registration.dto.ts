@@ -62,4 +62,8 @@ export class CreateRegistrationDto {
   @IsString()
   @IsOptional()
   group_code: string;
+
+  @IsString()
+  @IsOptional()
+  referral_code?: string;
 }
