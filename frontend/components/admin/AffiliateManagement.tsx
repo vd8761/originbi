@@ -29,6 +29,7 @@ const AffiliateManagement: React.FC = () => {
     const [entriesPerPage, setEntriesPerPage] = useState(10);
     const [showEntriesDropdown, setShowEntriesDropdown] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const [refreshing, setRefreshing] = useState(false);
 
     // Fetch affiliates from real API
     const fetchAffiliates = useCallback(async () => {
@@ -187,6 +188,37 @@ const AffiliateManagement: React.FC = () => {
                     </div>
 
                     <button
+                        onClick={async () => {
+                            setRefreshing(true);
+                            try {
+                                await fetch(`${API_BASE}/admin/affiliates/refresh-ready-status`, { method: 'POST' });
+                                await fetchAffiliates();
+                            } catch (err) {
+                                console.error('Failed to refresh ready status', err);
+                            } finally {
+                                setRefreshing(false);
+                            }
+                        }}
+                        disabled={refreshing}
+                        title="Refresh Ready to Payment"
+                        className="flex items-center justify-center w-8 h-8 bg-white dark:bg-[#FFFFFF1F] border border-[#19211C]/20 dark:border-[#FFFFFF1F] rounded-lg text-brand-green hover:bg-brand-green/10 dark:hover:bg-brand-green/20 transition-all shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <svg
+                            className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                            />
+                        </svg>
+                    </button>
+
+                    <button
                         onClick={() => {
                             setSelectedAffiliate(null);
                             setView("form");
@@ -212,6 +244,9 @@ const AffiliateManagement: React.FC = () => {
                     onView={(affiliate) => {
                         setSelectedAffiliate(affiliate);
                         setView("details");
+                    }}
+                    onSettled={() => {
+                        fetchAffiliates();
                     }}
                 />
             </div>

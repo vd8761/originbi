@@ -9,8 +9,8 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
-import type { AffiliateReferralTransaction } from './affiliate-referral-transaction.entity';
-
+import { AffiliateReferralTransaction } from './affiliate-referral-transaction.entity';
+import { AffiliateSettlementTransaction } from './affiliate-settlement-transaction.entity';
 
 @Entity('affiliate_accounts')
 export class AffiliateAccount {
@@ -95,6 +95,9 @@ export class AffiliateAccount {
 
     @OneToMany(() => require('./affiliate-referral-transaction.entity').AffiliateReferralTransaction, (transaction: any) => transaction.affiliateAccount)
     referralTransactions: AffiliateReferralTransaction[];
+
+    @OneToMany(() => AffiliateSettlementTransaction, (transaction) => transaction.affiliateAccount)
+    settlementTransactions: AffiliateSettlementTransaction[];
 
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
