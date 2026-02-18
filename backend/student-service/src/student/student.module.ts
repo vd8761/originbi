@@ -8,9 +8,11 @@ import { AssessmentSession } from '../entities/assessment_session.entity';
 import { AssessmentAttempt } from '../entities/assessment_attempt.entity';
 import { AssessmentLevel } from '../entities/assessment_level.entity';
 import { AssessmentAnswer } from '../entities/assessment_answer.entity';
-import { Registration } from '../entities/registration.entity';
+
+
 import { Program } from '../entities/program.entity';
 import { AssessmentReport } from '../entities/assessment-report.entity';
+import { AffiliateReferralTransaction, AffiliateAccount, Registration, Groups, AffiliateSettlementTransaction } from '@originbi/shared-entities';
 
 @Module({
   imports: [
@@ -19,11 +21,15 @@ import { AssessmentReport } from '../entities/assessment-report.entity';
       AssessmentSession,
       AssessmentAttempt,
       AssessmentLevel,
-      AssessmentLevel,
+
       AssessmentAnswer,
       Registration,
       Program,
       AssessmentReport,
+      AffiliateReferralTransaction,
+      AffiliateAccount,
+      AffiliateSettlementTransaction,
+      Groups,
     ]),
     HttpModule,
   ],
@@ -31,4 +37,4 @@ import { AssessmentReport } from '../entities/assessment-report.entity';
   providers: [StudentService],
   exports: [StudentService],
 })
-export class StudentModule {}
+export class StudentModule { }

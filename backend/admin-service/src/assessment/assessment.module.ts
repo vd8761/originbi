@@ -14,6 +14,7 @@ import {
   AciTraitValueNote,
   AciTrait,
   AciValue,
+  Program,
   Registration,
 } from '@originbi/shared-entities';
 import { Department } from '../departments/department.entity';
@@ -40,6 +41,7 @@ import { AssessmentController } from './assessment.controller';
       AciValue,
       Department,
       DepartmentDegree,
+      Program,
       Registration,
     ]),
   ],

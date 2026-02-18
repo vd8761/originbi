@@ -17,6 +17,7 @@ import {
     CoinIcon,
     OriginDataIcon,
     MyEmployeesIcon,
+    UsersIcon,
 } from '../icons';
 import Script from "next/script";
 import { useTheme } from '../../contexts/ThemeContext';
@@ -24,7 +25,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 interface HeaderProps {
     onLogout: () => void;
     // Combined views for flexibility, or just string
-    currentView?: "dashboard" | "assessment" | "registrations" | "jobs" | "origindata" | "settings" | "programs" | "corporate" | "counselling";
+    currentView?: "dashboard" | "assessment" | "registrations" | "jobs" | "origindata" | "settings" | "programs" | "corporate" | "counselling" | "affiliates";
     portalMode?: "student" | "corporate" | "admin";
     onSwitchPortal?: () => void;
     onNavigate?: (view: any) => void;
@@ -52,7 +53,7 @@ const NavItem: React.FC<NavItemProps> = ({
 
     const spacingClass = isMobile
         ? "gap-3"
-        : "justify-center gap-1 lg:gap-2 2xl:gap-3";
+        : "justify-center gap-2";
 
     return (
         <div className="relative group">
@@ -61,9 +62,9 @@ const NavItem: React.FC<NavItemProps> = ({
                 // SCALING: 
                 // LG/XL: Ultra-Compact Mode (h-8, px-2.5) to fit 5 items on laptop
                 // 2XL: Robust Mode (h-10, px-6) for large screens
-                className={`flex items-center ${spacingClass} rounded-full transition-all duration-200 w-full ${isMobile ? "py-3.5" : "lg:h-8 2xl:h-9"} cursor-pointer ${active
-                    ? "bg-brand-green text-white shadow-[0_4px_14px_0_rgba(30,211,106,0.3)] border border-transparent px-2.5 2xl:px-4"
-                    : "bg-white border border-gray-200 text-[#19211C] hover:bg-gray-50 hover:text-black hover:border-gray-300 dark:bg-transparent dark:border-white/10 dark:text-white/80 dark:hover:bg-white/5 dark:hover:text-white px-2.5 2xl:px-4"
+                className={`flex items-center ${spacingClass} rounded-full transition-all duration-200 w-full ${isMobile ? "py-3.5" : "lg:h-8 2xl:h-8"} cursor-pointer ${active
+                    ? "bg-brand-green text-white shadow-[0_4px_14px_0_rgba(30,211,106,0.3)] border border-transparent px-2.5 2xl:px-3"
+                    : "bg-white border border-gray-200 text-[#19211C] hover:bg-gray-50 hover:text-black hover:border-gray-300 dark:bg-transparent dark:border-white/10 dark:text-white/80 dark:hover:bg-white/5 dark:hover:text-white px-2.5 2xl:px-3"
                     }`}
             >
                 <div className={`${active ? "text-white" : "text-brand-green dark:text-white"}`}>
@@ -71,7 +72,7 @@ const NavItem: React.FC<NavItemProps> = ({
                 </div>
                 <span
                     // TEXT SCALING: text-xs on Laptop, text-sm on 2XL
-                    className={`font-medium ${isMobile ? "text-sm" : "text-xs 2xl:text-sm"} whitespace-nowrap ml-1.5 2xl:ml-2 ${isMobile ? "inline" : showDesktopText
+                    className={`font-medium ${isMobile ? "text-sm ml-2" : "text-xs 2xl:text-[12px]"} whitespace-nowrap ${isMobile ? "inline" : showDesktopText
                         }`}
                 >
                     {label}
@@ -201,6 +202,7 @@ const Header: React.FC<HeaderProps> = ({
     const pathname = usePathname();
     const activeView = (() => {
         // More specific checks first
+        if (pathname.includes('/affiliates')) return 'affiliates';
         if (pathname.includes('/corporate')) return 'corporate';
         if (pathname.includes('/registrations')) return 'registrations';
         if (pathname.includes('/programs')) return 'programs';
@@ -261,6 +263,13 @@ const Header: React.FC<HeaderProps> = ({
                         isMobile={isMobile}
                         onClick={() => handleNavClick('counselling')}
                     />
+                    <NavItem
+                        icon={<UsersIcon className="w-4 h-4" />}
+                        label="Affiliates"
+                        active={activeView === 'affiliates'}
+                        isMobile={isMobile}
+                        onClick={() => handleNavClick('affiliates')}
+                    />
                     <NavItem icon={<SettingsIcon />} label="Settings" isMobile={isMobile} />
                 </>
             ) : portalMode === "corporate" ? (
@@ -301,21 +310,21 @@ const Header: React.FC<HeaderProps> = ({
                         </button>
                     )}
 
-                    {/* Logo Scaling: h-6 (Laptop) -> h-7 (2XL) */}
-                    <img src="/Origin-BI-Logo-01.png" alt="OriginBI Logo" className="h-5 lg:h-6 2xl:h-7 w-auto dark:hidden" />
-                    <img src="/Origin-BI-white-logo.png" alt="OriginBI Logo" className="h-5 lg:h-6 2xl:h-7 w-auto hidden dark:block" />
+                    {/* Logo Scaling: h-5 (Laptop) -> h-6 (2XL) */}
+                    <img src="/Origin-BI-Logo-01.png" alt="OriginBI Logo" className="h-5 lg:h-5.5 2xl:h-6 w-auto dark:hidden" />
+                    <img src="/Origin-BI-white-logo.png" alt="OriginBI Logo" className="h-5 lg:h-5.5 2xl:h-6 w-auto hidden dark:block" />
 
                     {!hideNav && (
-                        <nav className="hidden md:flex items-center space-x-1 lg:space-x-1 2xl:space-x-2 ml-2 lg:ml-2 2xl:ml-6">
+                        <nav className="hidden md:flex items-center space-x-1 lg:space-x-1 2xl:space-x-1.5 ml-1.5 lg:ml-1.5 2xl:ml-3">
                             {renderNavItems(false)}
                         </nav>
                     )}
                 </div>
 
-                <div className="flex items-center gap-1 sm:gap-2 lg:gap-2 2xl:gap-4">
+                <div className="flex items-center gap-1 lg:gap-1.5 2xl:gap-1.5">
                     <div className="hidden sm:block">
                         {/* Theme Toggle: Scale to h-8 (Laptop) / h-9 (2XL) */}
-                        <div className="scale-90 lg:scale-100 2xl:scale-110 origin-right">
+                        <div className="scale-90 lg:scale-100 2xl:scale-100 origin-right">
                             <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
                         </div>
                     </div>
@@ -330,10 +339,10 @@ const Header: React.FC<HeaderProps> = ({
                                     <>
                                         <button
                                             onClick={() => setLangOpen((p) => !p)}
-                                            className="bg-white border border-brand-green text-[#19211C] hover:bg-green-50 dark:bg-brand-dark-tertiary dark:border-transparent dark:text-white dark:hover:bg-gray-800 flex items-center justify-center space-x-1.5 px-3 h-8 2xl:h-9 rounded-full font-semibold text-xs 2xl:text-sm transition-all cursor-pointer"
+                                            className="bg-white border border-brand-green text-[#19211C] hover:bg-green-50 dark:bg-brand-dark-tertiary dark:border-transparent dark:text-white dark:hover:bg-gray-800 flex items-center justify-center space-x-1 px-2 h-8 2xl:h-8 rounded-full font-semibold text-xs 2xl:text-[12px] transition-all cursor-pointer"
                                         >
                                             <span>{language}</span>
-                                            <ChevronDownIcon className="w-3 h-3" />
+                                            <ChevronDownIcon className="w-2.5 h-2.5" />
                                         </button>
                                         {isLangOpen && (
                                             <div className="absolute right-0 top-full mt-2 w-32 bg-white dark:bg-brand-dark-tertiary rounded-lg shadow-xl py-1 ring-1 ring-black ring-opacity-5 z-50 border border-gray-100 dark:border-transparent">
@@ -349,7 +358,7 @@ const Header: React.FC<HeaderProps> = ({
                             <div className="relative" ref={notificationsMenuRef}>
                                 <button
                                     onClick={handleNotificationClick}
-                                    className="bg-white border border-gray-200 text-[#150089] hover:bg-gray-50 hover:border-gray-300 dark:bg-brand-dark-tertiary dark:border-transparent dark:text-white dark:hover:bg-gray-800 w-8 h-8 2xl:w-9 2xl:h-9 rounded-full flex items-center justify-center transition-all relative cursor-pointer"
+                                    className="bg-white border border-gray-200 text-[#150089] hover:bg-gray-50 hover:border-gray-300 dark:bg-brand-dark-tertiary dark:border-transparent dark:text-white dark:hover:bg-gray-800 w-8 h-8 2xl:w-8.5 2xl:h-8.5 rounded-full flex items-center justify-center transition-all relative cursor-pointer"
                                 >
                                     <NotificationIcon className="w-4 h-4 2xl:w-5 2xl:h-5 fill-current" />
                                     {hasNotification && (
@@ -373,13 +382,13 @@ const Header: React.FC<HeaderProps> = ({
                         </>
                     )}
 
-                    <div className="w-px h-6 lg:h-6 2xl:h-8 bg-gray-300 dark:bg-brand-dark-tertiary hidden lg:block mx-2 2xl:mx-3"></div>
+                    <div className="w-px h-6 lg:h-6 2xl:h-7 bg-gray-300 dark:bg-brand-dark-tertiary hidden lg:block mx-1 2xl:mx-2"></div>
 
                     {/* User Profile Section */}
                     <div className="relative" ref={profileMenuRef}>
                         <button
                             onClick={() => setProfileOpen((prev) => !prev)}
-                            className="flex items-center gap-2 sm:space-x-3 focus:outline-none text-left cursor-pointer"
+                            className="flex items-center gap-1.5 lg:gap-2 focus:outline-none text-left cursor-pointer"
                         >
                             {!corporateData ? (
                                 <div className="w-8 h-8 2xl:w-9 2xl:h-9 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse border border-brand-light-tertiary dark:border-transparent flex-shrink-0"></div>
@@ -398,10 +407,10 @@ const Header: React.FC<HeaderProps> = ({
                                     </div>
                                 ) : (
                                     <>
-                                        <p className="font-semibold text-sm 2xl:text-base leading-tight text-[#19211C] dark:text-brand-text-primary">
+                                        <p className="font-semibold text-sm 2xl:text-sm leading-tight text-[#19211C] dark:text-brand-text-primary">
                                             {corporateData.full_name || corporateData.name || 'User'}
                                         </p>
-                                        <p className="text-xs 2xl:text-sm text-[#19211C] dark:text-brand-text-secondary leading-tight">
+                                        <p className="text-xs 2xl:text-[12px] text-[#19211C] dark:text-brand-text-secondary leading-tight">
                                             {corporateData.email || ''}
                                         </p>
                                     </>
