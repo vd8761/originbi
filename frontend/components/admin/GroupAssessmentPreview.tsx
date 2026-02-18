@@ -35,6 +35,14 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
     const [statusFilter, setStatusFilter] = useState('All');
     const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
+    const [showDownloadModal, setShowDownloadModal] = useState(false);
+    const [departmentStats, setDepartmentStats] = useState<any[]>([]);
+    const [selectedDepartment, setSelectedDepartment] = useState<number | null>(null);
+    const [downloadLoading, setDownloadLoading] = useState(false);
+
+    const [generating, setGenerating] = useState(false);
+    const [progress, setProgress] = useState('');
+
     // Fetch Data
     const fetchGroupData = useCallback(async () => {
         setLoading(true);
@@ -49,9 +57,87 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
     }, [sessionId]);
 
     useEffect(() => {
+        // ... existing useEffect
         fetchGroupData();
     }, [fetchGroupData]);
 
+    const handleDownloadReportClick = async () => {
+        setDownloadLoading(true);
+        try {
+            const stats = await assessmentService.getGroupDepartmentStats(sessionId);
+            setDepartmentStats(stats.departments || []);
+            // If single department, select it automatically
+            if (stats.departments?.length > 0) {
+                 setSelectedDepartment(stats.departments[0].id);
+            }
+            setShowDownloadModal(true);
+        } catch (error) {
+            console.error("Failed to fetch department stats", error);
+            // Optionally show toast error
+        } finally {
+            setDownloadLoading(false);
+        }
+    };
+
+    const handleConfirmDownload = async () => {
+        if (!selectedDepartment || !groupData?.group?.id) return;
+        
+        setGenerating(true);
+        setProgress('Initializing...');
+        
+        try {
+            const apiBase = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || 'http://localhost:4006';
+            
+            // 1. Start Job
+            const startRes = await fetch(`${apiBase}/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true`);
+            const startData = await startRes.json();
+            
+            if (!startData.success || !startData.jobId) {
+                throw new Error("Failed to start report generation");
+            }
+            
+            const jobId = startData.jobId;
+            
+            // 2. Poll Status
+            const pollInterval = setInterval(async () => {
+                try {
+                    const statusRes = await fetch(`${apiBase}/download/status/${jobId}?json=true`);
+                    const statusData = await statusRes.json();
+                    
+                    if (statusData.status === 'PROCESSING') {
+                        setProgress(statusData.progress || 'Processing...');
+                    } else if (statusData.status === 'COMPLETED') {
+                        clearInterval(pollInterval);
+                        setProgress('Download Starting...');
+                        
+                        // Trigger Download
+                        window.location.href = `${apiBase}${statusData.downloadUrl}`;
+                        
+                        // Close Modal after a delay
+                        setTimeout(() => {
+                            setGenerating(false);
+                            setProgress('');
+                            setShowDownloadModal(false);
+                        }, 2000);
+                    } else if (statusData.status === 'ERROR') {
+                        clearInterval(pollInterval);
+                        throw new Error(statusData.error || 'Generation failed');
+                    }
+                } catch (err) {
+                    clearInterval(pollInterval);
+                    console.error("Polling error", err);
+                    setProgress('Error!');
+                    setGenerating(false);
+                }
+            }, 1000);
+            
+        } catch (error) {
+            console.error("Download failed", error);
+            setProgress('Failed');
+            setGenerating(false);
+        }
+    };
+    
     if (loading) {
         return (
             <div className="flex items-center justify-center h-full">
@@ -193,7 +279,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                         <ArrowRightWithoutLineIcon className="w-3 h-3 text-black dark:text-white" />
                     </span>
                     <span onClick={onBack} className="cursor-pointer hover:underline">Registrations</span>
-                    <span className="mx-2 text-gray-400 dark:text-gray-600">
+                     <span className="mx-2 text-gray-400 dark:text-gray-600">
                         <ArrowRightWithoutLineIcon className="w-3 h-3 text-black dark:text-white" />
                     </span>
                     <span className="text-brand-green font-semibold">Group Assessment Preview</span>
@@ -331,6 +417,25 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                 </div>
                 {/* Actions */}
                 <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+                    {/* Download Report Button - Updated Style */}
+                    <button
+                        onClick={handleDownloadReportClick}
+                        disabled={downloadLoading}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] rounded-lg text-sm font-medium text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/30 transition-all shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                        <span>{downloadLoading ? "Loading..." : "Download Report"}</span>
+                         {downloadLoading ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-green"></div>
+                        ) : (
+                            // Download Icon on the right
+                            <svg className="w-5 h-5 text-brand-green" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 16L12 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M9 13L12 16L15 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M17 19H7C5.89543 19 5 18.1046 5 17V7C5 5.89543 5.89543 5 7 5H17C18.1046 5 19 5.89543 19 7V17C19 18.1046 18.1046 19 17 19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                        )}
+                    </button>
+
                     <div className="relative">
                         <button
                             onClick={() => setShowFilterDropdown(!showFilterDropdown)}
@@ -463,6 +568,107 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
 
                 <div className="w-full sm:w-1/3 sm:block hidden order-3"></div>
             </div>
+
+            {/* Download Modal - Redesigned */}
+            {showDownloadModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowDownloadModal(false)}></div>
+                    <div className="bg-white dark:bg-[#19211C] rounded-2xl w-full max-w-lg p-0 shadow-2xl relative z-10 animate-fade-in-up overflow-hidden flex flex-col max-h-[90vh]">
+                        {/* Modal Header */}
+                        <div className="flex justify-between items-center p-6 border-b border-gray-100 dark:border-white/10">
+                            <div>
+                                <h3 className="text-xl font-bold text-brand-dark-primary dark:text-white">Download Report</h3>
+                                <p className="text-sm text-gray-500 mt-1">Select a department to download the placement report.</p>
+                            </div>
+                            <button
+                                onClick={() => setShowDownloadModal(false)}
+                                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                            >
+                                <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Modal Body - List of Departments */}
+                        <div className="p-6 overflow-y-auto">
+                            {departmentStats.length === 0 ? (
+                                <div className="text-center py-8 text-gray-500">
+                                    No departments found for this group.
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {departmentStats.map((dept) => (
+                                        <div
+                                            key={dept.id}
+                                            onClick={() => setSelectedDepartment(dept.id)}
+                                            className={`p-4 rounded-xl border cursor-pointer transition-all flex items-center justify-between group
+                                                ${selectedDepartment === dept.id
+                                                    ? 'border-brand-green bg-brand-green/10 ring-1 ring-brand-green'
+                                                    : 'border-gray-200 dark:border-white/10 hover:border-brand-green/50 hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className={`w-5 h-5 rounded-full border flex items-center justify-center
+                                                    ${selectedDepartment === dept.id ? 'border-brand-green bg-brand-green' : 'border-gray-400'}`}>
+                                                    {selectedDepartment === dept.id && <div className="w-2 h-2 rounded-full bg-brand-dark-primary"></div>}
+                                                </div>
+                                                <div>
+                                                    <p className={`font-semibold ${selectedDepartment === dept.id ? 'text-brand-green' : 'text-brand-dark-primary dark:text-white'}`}>
+                                                        {dept.name}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500 mt-0.5">
+                                                        {dept.completed} candidates completed
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="text-right">
+                                                <span className={`text-xs font-bold px-2 py-1 rounded-md ${
+                                                    dept.completed === dept.total 
+                                                    ? 'bg-green-100 text-green-700' 
+                                                    : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'
+                                                }`}>
+                                                    {Math.round((dept.completed / (dept.total || 1)) * 100)}% Done
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-6 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-[#FFFFFF05] flex gap-3">
+                            <button
+                                onClick={() => !generating && setShowDownloadModal(false)}
+                                disabled={generating}
+                                className="flex-1 px-4 py-3 rounded-xl border border-gray-300 dark:border-white/10 text-brand-text-light-primary dark:text-gray-300 font-medium hover:bg-white dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleConfirmDownload}
+                                disabled={!selectedDepartment || generating}
+                                className="flex-1 px-4 py-3 rounded-xl bg-brand-green text-brand-dark-primary font-bold hover:bg-brand-green/90 transition-colors shadow-lg shadow-brand-green/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                {generating ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-dark-primary"></div>
+                                        <span>{progress}</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span>Download Report</span>
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     );

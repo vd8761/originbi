@@ -40,6 +40,11 @@ export class AssessmentController {
     return this.assessmentService.findGroupSessionDetails(Number(id));
   }
 
+  @Get('group/:id/department-stats')
+  async getGroupDepartmentStats(@Param('id') id: string) {
+    return this.assessmentService.findGroupDepartmentStats(Number(id));
+  }
+
   @Get('sessions/:id')
   async getSessionDetails(@Param('id') id: string) {
     return this.assessmentService.getSessionDetails(Number(id));

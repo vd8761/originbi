@@ -11,6 +11,7 @@ import { AssessmentAnswer } from '../entities/assessment_answer.entity';
 
 
 import { Program } from '../entities/program.entity';
+import { AssessmentReport } from '../entities/assessment-report.entity';
 import { AffiliateReferralTransaction, AffiliateAccount, Registration, Groups, AffiliateSettlementTransaction } from '@originbi/shared-entities';
 
 @Module({
@@ -24,6 +25,7 @@ import { AffiliateReferralTransaction, AffiliateAccount, Registration, Groups, A
       AssessmentAnswer,
       Registration,
       Program,
+      AssessmentReport,
       AffiliateReferralTransaction,
       AffiliateAccount,
       AffiliateSettlementTransaction,

@@ -1,0 +1,30 @@
+{
+  "name": "pdf-report-generator",
+  "version": "1.0.0",
+  "description": "PDF Report Generator using PDFKit",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "ts-node src/index.ts",
+    "serve": "ts-node src/server.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.4",
+    "express": "^5.2.1",
+    "pdfkit": "^0.15.2",
+    "pg": "^8.17.2"
+  },
+  "devDependencies": {
+    "@types/archiver": "^7.0.0",
+    "@types/cors": "^2.8.19",
+    "@types/dotenv": "^6.1.1",
+    "@types/express": "^5.0.6",
+    "@types/node": "^20.0.0",
+    "@types/pdfkit": "^0.13.9",
+    "@types/pg": "^8.16.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.0"
+  }
+}

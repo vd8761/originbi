@@ -22,7 +22,11 @@ Write-Host "Launched Student Service..."
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend/exam-engine; go run cmd/api/main.go"
 Write-Host "Launched Exam Engine..."
 
-# 6. Frontend (Port 3000)
+# 6. Report Service (Port 4006)
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend/report-service; npm run serve"
+Write-Host "Launched Report Service..."
+
+# 7. Frontend (Port 3000)
 # We add a small delay to let backends initialize
 Start-Sleep -Seconds 5
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
