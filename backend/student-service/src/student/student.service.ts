@@ -15,8 +15,7 @@ import { AssessmentLevel } from '../entities/assessment_level.entity';
 import { AssessmentAnswer } from '../entities/assessment_answer.entity';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { Program } from '../entities/program.entity';
-import { Registration } from '../entities/registration.entity';
-import { AffiliateAccount, AffiliateReferralTransaction } from '@originbi/shared-entities';
+import { Registration, Gender, RegistrationStatus, PaymentStatus, AffiliateAccount, AffiliateReferralTransaction } from '@originbi/shared-entities';
 import * as nodemailer from 'nodemailer';
 import { SES } from 'aws-sdk';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
@@ -548,10 +547,7 @@ export class StudentService {
       // 3. Create User Entity
       // (In a real scenario, we might call Cognito here, but for now we assume
       // auth-service handles login via simple Db check or the user will be created in Cognito later)
-      // Actually, the requirement says "Call auth-service to create Cognito User".
-      // For this implementation, we will skip the external auth-service call to avoid complexity
-      // and assume the user can login if the DB record exists (or we rely on the existing auth flow).
-      // *Self-correction*: The implementation plan says "Call auth-service...". To keep it simple and robust
+      // Actually, the requirement says "Call auth-service...". To keep it simple and robust
       // for this specific codebase state, we'll focus on DB creation. The auth-service likely has a trigger or
       // we can add the call if needed.
 
@@ -591,16 +587,15 @@ export class StudentService {
         fullName: dto.full_name,
         mobileNumber: dto.mobile_number,
         countryCode: dto.country_code ?? '+91',
-        gender: dto.gender,
+        gender: dto.gender as Gender,
         schoolLevel: dto.school_level,
         schoolStream: dto.school_stream,
         programId: program.id,
-        status: 'COMPLETED', // Auto-complete for self-registration
-        paymentStatus: 'NOT_REQUIRED',
+        status: 'COMPLETED' as RegistrationStatus,
+        paymentStatus: 'NOT_REQUIRED' as PaymentStatus,
         metadata: {
           groupCode: dto.group_code,
-          referralCode: dto.referral_code,
-          sendEmail: true
+          sendEmail: true,
         },
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -610,50 +605,47 @@ export class StudentService {
         registration,
       );
 
-      // 5b. Create Affiliate Referral Transaction (if referral_code is present)
+      // Handle Affiliate Referral if code is provided
       if (dto.referral_code) {
-        try {
-          const affiliate = await this.affiliateRepo.findOne({
-            where: { referralCode: dto.referral_code, isActive: true },
-          });
+        const affiliate = await this.affiliateRepo.findOne({
+          where: { referralCode: dto.referral_code, isActive: true },
+        });
 
-          if (affiliate) {
-            const registrationAmount = Number(this.configService.get('REGISTRATION_COST') || 500);
-            const commissionPercentage = Number(affiliate.commissionPercentage) || 0;
-            const earnedCommission = (registrationAmount * commissionPercentage) / 100;
+        if (affiliate) {
+          this.logger.log(`Referral code ${dto.referral_code} found for affiliate ${affiliate.id}`);
 
-            // Create the referral transaction record
-            const transactionData = {
-              affiliateAccountId: Number(affiliate.id),
-              registrationId: Number(savedReg.id),
-              registrationAmount,
-              commissionPercentage,
-              earnedCommissionAmount: earnedCommission,
-              settlementStatus: 0, // 0 - Not Settled
-              metadata: {
-                studentName: dto.full_name,
-                studentEmail: dto.email,
-                referralCode: dto.referral_code,
-              },
-            };
+          // Determine commission
+          const registrationAmount = Number(this.configService.get('REGISTRATION_COST') || 500);
+          const commissionPercentage = affiliate.commissionPercentage || 0;
+          const earnedCommission = (registrationAmount * commissionPercentage) / 100;
 
-            const transaction = this.affiliateTransactionRepo.create(transactionData as any);
-            await this.affiliateTransactionRepo.save(transaction);
+          // Create the referral transaction record
+          const transactionData = {
+            affiliateAccountId: Number(affiliate.id),
+            registrationId: Number(savedReg.id),
+            registrationAmount,
+            commissionPercentage,
+            earnedCommissionAmount: earnedCommission,
+            settlementStatus: 0 as any, // 0 - Not Settled
+            metadata: {
+              studentName: dto.full_name,
+              studentEmail: dto.email,
+              referralCode: dto.referral_code,
+            },
+          };
 
-            // Update affiliate stats
-            affiliate.referralCount = (Number(affiliate.referralCount) || 0) + 1;
-            affiliate.totalEarnedCommission = (Number(affiliate.totalEarnedCommission) || 0) + earnedCommission;
-            affiliate.totalPendingCommission = (Number(affiliate.totalPendingCommission) || 0) + earnedCommission;
+          const referralTransaction = this.affiliateTransactionRepo.create(transactionData);
+          await this.affiliateTransactionRepo.save(referralTransaction);
+          this.logger.log(`Affiliate referral transaction recorded for registration ${savedReg.id}`);
 
-            await this.affiliateRepo.save(affiliate);
-
-            this.logger.log(`[Referral] Successfully processed referral for ${dto.referral_code}. Affiliate ID: ${affiliate.id}`);
-          } else {
-            this.logger.warn(`[Referral] Referral code '${dto.referral_code}' not found or inactive.`);
-          }
-        } catch (refErr) {
-          this.logger.error(`[Referral Error] Failed at step 5b: ${refErr.message}`, refErr.stack);
-          // Do not fail the whole registration if referral tracking fails
+          // Update aggregate fields on AffiliateAccount
+          affiliate.referralCount = (Number(affiliate.referralCount) || 0) + 1;
+          affiliate.totalEarnedCommission = (Number(affiliate.totalEarnedCommission) || 0) + earnedCommission;
+          affiliate.totalPendingCommission = (Number(affiliate.totalPendingCommission) || 0) + earnedCommission;
+          await this.affiliateRepo.save(affiliate);
+          this.logger.log(`Affiliate ${affiliate.id} aggregates updated: referralCount=${affiliate.referralCount}, totalEarned=${affiliate.totalEarnedCommission}, totalPending=${affiliate.totalPendingCommission}`);
+        } else {
+          this.logger.warn(`Invalid or inactive referral code provided: ${dto.referral_code}`);
         }
       }
 

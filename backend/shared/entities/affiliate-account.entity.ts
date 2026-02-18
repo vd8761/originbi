@@ -9,8 +9,9 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
-import { AffiliateReferralTransaction } from './affiliate-referral-transaction.entity';
-import { AffiliateSettlementTransaction } from './affiliate-settlement-transaction.entity';
+import type { AffiliateReferralTransaction } from './affiliate-referral-transaction.entity';
+import type { AffiliateSettlementTransaction } from './affiliate-settlement-transaction.entity';
+
 
 @Entity('affiliate_accounts')
 export class AffiliateAccount {
@@ -93,10 +94,10 @@ export class AffiliateAccount {
     @Column({ name: 'metadata', type: 'jsonb', default: () => `'{}'` })
     metadata: any;
 
-    @OneToMany(() => AffiliateReferralTransaction, (transaction) => transaction.affiliateAccount)
+    @OneToMany(() => require('./affiliate-referral-transaction.entity').AffiliateReferralTransaction, (transaction: AffiliateReferralTransaction) => transaction.affiliateAccount)
     referralTransactions: AffiliateReferralTransaction[];
 
-    @OneToMany(() => AffiliateSettlementTransaction, (transaction) => transaction.affiliateAccount)
+    @OneToMany(() => require('./affiliate-settlement-transaction.entity').AffiliateSettlementTransaction, (transaction: AffiliateSettlementTransaction) => transaction.affiliateAccount)
     settlementTransactions: AffiliateSettlementTransaction[];
 
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })

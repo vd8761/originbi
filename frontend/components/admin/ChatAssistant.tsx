@@ -63,7 +63,7 @@ const TypeWriter = memo(({ text, onDone }: { text: string; onDone?: () => void }
         indexRef.current = 0;
         const animate = () => {
             if (indexRef.current < text.length) {
-                indexRef.current = Math.min(indexRef.current + 3, text.length);
+                indexRef.current = Math.min(indexRef.current + 10, text.length);
                 setDisplay(text.slice(0, indexRef.current));
                 frameRef.current = requestAnimationFrame(animate);
             } else {
