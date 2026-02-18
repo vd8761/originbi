@@ -198,6 +198,11 @@ export class AffiliatesService {
 
     async findAll(page: number, limit: number, search?: string, sortBy?: string, sortOrder: 'ASC' | 'DESC' = 'DESC') {
         try {
+            // Auto-refresh 48-hour ready-to-process statuses before fetching
+            await this.updateReadyToProcessStatus().catch((err) =>
+                this.logger.warn(`Non-critical: Failed to refresh ready-to-process statuses: ${err.message}`)
+            );
+
             const qb = this.affiliateRepo.createQueryBuilder('a').leftJoinAndSelect('a.user', 'u');
 
             if (search) {
@@ -416,6 +421,92 @@ export class AffiliatesService {
     }
 
     // ---------------------------------------------------------
+    // Preview Settlement — shows which transactions will be settled
+    // ---------------------------------------------------------
+    async previewSettlement(affiliateId: number, amount: number) {
+        const affiliate = await this.affiliateRepo.findOne({ where: { id: affiliateId } });
+        if (!affiliate) throw new BadRequestException('Affiliate not found');
+
+        const processingTransactions = await this.referralTransactionRepo
+            .createQueryBuilder('t')
+            .where('t.affiliate_account_id = :affiliateAccountId', { affiliateAccountId: affiliateId })
+            .andWhere('t.settlement_status = 1')
+            .orderBy('t.created_at', 'ASC')
+            .getMany();
+
+        // Calculate current unpaid overflow (amount paid but not yet enough to clear a transaction)
+        const settledTxnSumRes = await this.referralTransactionRepo
+            .createQueryBuilder('t')
+            .select('SUM(CAST(t.earned_commission_amount AS NUMERIC))', 'sum')
+            .where('t.affiliate_account_id = :affiliateAccountId', { affiliateAccountId: affiliateId })
+            .andWhere('t.settlement_status = 2')
+            .getRawOne();
+        const settledTxnSum = parseFloat(settledTxnSumRes?.sum) || 0;
+        const currentUnpaidOverflow = Math.max(0, (Number(affiliate.totalSettledCommission) || 0) - settledTxnSum);
+
+        let pool = currentUnpaidOverflow + amount;
+        let fullySettledCount = 0;
+        const transactionBreakdown: Array<{
+            id: number; studentName: string; amount: number;
+            coveredAmount: number; remainingAmount: number;
+            status: 'fully_settled' | 'partial' | 'not_settled';
+        }> = [];
+        const cumulativeBoundaries: number[] = [];
+        let runningTotal = 0;
+
+        for (const txn of processingTransactions) {
+            const txnAmount = parseFloat(String(txn.earnedCommissionAmount)) || 0;
+            runningTotal += txnAmount;
+
+            // Boundary is the amount needed from ENTERED amount to settle this
+            // neededAmount = total_needed_for_this_and_previous - existing_overflow
+            const boundary = Math.max(0, runningTotal - currentUnpaidOverflow);
+            if (boundary > 0) cumulativeBoundaries.push(boundary);
+
+            let status: 'fully_settled' | 'partial' | 'not_settled' = 'not_settled';
+            let coveredAmount = 0;
+
+            if (pool >= txnAmount) {
+                status = 'fully_settled';
+                coveredAmount = txnAmount;
+                pool -= txnAmount;
+                fullySettledCount++;
+            } else if (pool > 0) {
+                status = 'partial';
+                coveredAmount = pool;
+                pool = 0;
+            }
+
+            transactionBreakdown.push({
+                id: Number(txn.id),
+                studentName: txn.metadata?.studentName || 'Unknown',
+                amount: txnAmount,
+                coveredAmount: Math.round(coveredAmount * 100) / 100,
+                remainingAmount: Math.round((txnAmount - coveredAmount) * 100) / 100,
+                status,
+            });
+        }
+
+        let suggestedLower: number | null = null;
+        let suggestedUpper: number | null = null;
+        for (const b of cumulativeBoundaries) {
+            if (b <= amount + 0.01) suggestedLower = b;
+            if (b >= amount - 0.01 && suggestedUpper === null) suggestedUpper = b;
+        }
+
+        if (suggestedLower !== null && Math.abs(suggestedLower - amount) < 0.01) suggestedLower = null;
+        if (suggestedUpper !== null && Math.abs(suggestedUpper - amount) < 0.01) suggestedUpper = null;
+
+        return {
+            fullySettledCount,
+            isCleanBoundary: cumulativeBoundaries.some(b => Math.abs(b - amount) < 0.01),
+            transactions: transactionBreakdown,
+            suggestedLower: suggestedLower ? Math.round(suggestedLower * 100) / 100 : null,
+            suggestedUpper: suggestedUpper ? Math.round(suggestedUpper * 100) / 100 : null,
+        };
+    }
+
+    // ---------------------------------------------------------
     // Settle Affiliate Commission
     // ---------------------------------------------------------
     async settleAffiliate(affiliateId: number, dto: CreateSettlementDto) {
@@ -469,7 +560,20 @@ export class AffiliatesService {
                 await manager.save(settlement);
 
                 // 2. Update referral transactions: mark as settled (status = 2)
-                // We settle up to the dto.settleAmount, marking ready-to-process transactions
+                // We calculate how much "unpaid overflow" exists from previous partial settlements
+                const settledTxnSumRes = await manager
+                    .getRepository(AffiliateReferralTransaction)
+                    .createQueryBuilder('t')
+                    .select('SUM(CAST(t.earned_commission_amount AS NUMERIC))', 'sum')
+                    .where('t.affiliate_account_id = :affiliateAccountId', { affiliateAccountId: affiliateId })
+                    .andWhere('t.settlement_status = 2')
+                    .getRawOne();
+                const settledTxnSum = parseFloat(settledTxnSumRes?.sum) || 0;
+
+                // Overflow available to clear new transactions = (Already Settled - Already officially marked status 2) + New Settle Amount
+                const currentUnpaidOverflow = Math.max(0, (Number(affiliate.totalSettledCommission) || 0) - settledTxnSum);
+                let remainingAmountForStatusUpdate = currentUnpaidOverflow + dto.settleAmount;
+
                 // Get all processing transactions ordered by oldest first
                 const processingTransactions = await manager
                     .getRepository(AffiliateReferralTransaction)
@@ -479,15 +583,19 @@ export class AffiliatesService {
                     .orderBy('t.created_at', 'ASC')
                     .getMany();
 
-                let remainingAmount = dto.settleAmount;
                 const idsToSettle: number[] = [];
 
                 for (const txn of processingTransactions) {
-                    if (remainingAmount <= 0) break;
+                    if (remainingAmountForStatusUpdate <= 0) break;
                     const txnAmount = parseFloat(String(txn.earnedCommissionAmount)) || 0;
-                    if (txnAmount <= remainingAmount) {
+
+                    // Using a small epsilon or rounding to handle potential precision floating point issues
+                    if (txnAmount <= remainingAmountForStatusUpdate + 0.01) {
                         idsToSettle.push(Number(txn.id));
-                        remainingAmount -= txnAmount;
+                        remainingAmountForStatusUpdate -= txnAmount;
+                    } else {
+                        // We settle in strict chronological order
+                        break;
                     }
                 }
 

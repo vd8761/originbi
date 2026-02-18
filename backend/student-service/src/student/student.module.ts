@@ -10,7 +10,7 @@ import { AssessmentLevel } from '../entities/assessment_level.entity';
 import { AssessmentAnswer } from '../entities/assessment_answer.entity';
 import { Registration } from '../entities/registration.entity';
 import { Program } from '../entities/program.entity';
-import { AffiliateReferralTransaction, AffiliateAccount } from '@originbi/shared-entities';
+import { AffiliateReferralTransaction, AffiliateAccount, AffiliateSettlementTransaction } from '@originbi/shared-entities';
 
 @Module({
   imports: [
@@ -25,6 +25,7 @@ import { AffiliateReferralTransaction, AffiliateAccount } from '@originbi/shared
       Program,
       AffiliateReferralTransaction,
       AffiliateAccount,
+      AffiliateSettlementTransaction,
     ]),
     HttpModule,
   ],
