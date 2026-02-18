@@ -85,7 +85,7 @@ const EarningsCard = ({ earnings }: { earnings: number }) => {
                 <div className="flex-1 flex flex-col justify-center items-center py-6">
                     <div className="flex flex-col items-center text-center">
                         <div className="font-['Haskoy'] font-bold text-[clamp(64px,6vw,120px)] text-[#150089] dark:text-white leading-[0.9] tracking-tight">
-                            ₹{earnings.toLocaleString('en-IN')}
+                            ₹{(earnings ?? 0).toLocaleString('en-IN')}
                         </div>
                     </div>
                 </div>
@@ -112,7 +112,7 @@ const EarningsChart = ({ affiliateId }: { affiliateId?: string }) => {
 
     useEffect(() => {
         if (affiliateId) {
-            api.get(`/affiliates/portal/earnings-chart?affiliateId=${affiliateId}`)
+            api.get(`/affiliates/portal/earnings-chart`, { params: { affiliateId } })
                 .then(res => {
                     if (Array.isArray(res.data)) {
                         setChartData(res.data.map((d: any) => ({
@@ -418,7 +418,11 @@ const ReferralsTable = ({ data }: { data: (Referral & { settledDown: 'Completed'
                                     {row.email}
                                 </td>
                                 <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">
-                                    {new Date(row.signUpDate).toISOString().split('T')[0]}
+                                    {(() => {
+                                        if (!row.signUpDate) return 'N/A';
+                                        const date = new Date(row.signUpDate);
+                                        return isNaN(date.getTime()) ? 'N/A' : date.toISOString().split('T')[0];
+                                    })()}
                                 </td>
                                 <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] leading-none">
                                     <span className={row.settledDown === 'Completed' ? 'text-[#1ED36A]' : 'text-[#FF5457]'}>
@@ -500,13 +504,13 @@ const AffiliateDashboard: React.FC = () => {
                 <div className="flex flex-wrap sm:flex-nowrap w-full xl:w-auto xl:mt-6">
                     <MiniStat
                         label="Total Referrals"
-                        value={stats.activeReferrals.toString()}
+                        value={(stats.activeReferrals ?? 0).toString()}
                         trend={`${Math.abs(stats.trends?.referrals || 0)}%`}
                         isPositive={(stats.trends?.referrals || 0) >= 0}
                     />
                     <MiniStat
                         label="This Month"
-                        value={`₹${stats.thisMonthEarnings.toLocaleString('en-IN')}`}
+                        value={`₹${(stats.thisMonthEarnings ?? 0).toLocaleString('en-IN')}`}
                         trend={`${Math.abs(stats.trends?.earnings || 0)}%`}
                         isPositive={(stats.trends?.earnings || 0) >= 0}
                     />
@@ -518,7 +522,7 @@ const AffiliateDashboard: React.FC = () => {
                     />
                     <MiniStat
                         label="Pending Payouts"
-                        value={`₹${stats.pendingEarnings.toLocaleString('en-IN')}`}
+                        value={`₹${(stats.pendingEarnings ?? 0).toLocaleString('en-IN')}`}
                         trend=""
                         isPositive={true}
                     />

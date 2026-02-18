@@ -2,7 +2,9 @@
 
 import React from 'react';
 import AffiliateHeader from '../../components/affiliate/AffiliateHeader';
+import RequireAffiliate from '../../components/auth/RequireAffiliate';
 import { usePathname, useRouter } from 'next/navigation';
+import { signOut } from 'aws-amplify/auth';
 import { useTheme } from '../../contexts/ThemeContext';
 
 export default function AffiliateLayout({
@@ -45,11 +47,17 @@ export default function AffiliateLayout({
         }
     };
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        try {
+            await signOut();
+        } catch {
+            // ignore
+        }
         if (typeof window !== 'undefined') {
             sessionStorage.clear();
             localStorage.removeItem('affiliate_user');
             localStorage.removeItem('affiliate_token');
+            localStorage.removeItem('originbi_id_token');
         }
         router.push('/affiliate/login');
     };
@@ -74,7 +82,7 @@ export default function AffiliateLayout({
 
                 {/* --- PROTECTED LAYOUT (Header + Content) --- */}
                 {showHeader ? (
-                    <>
+                    <RequireAffiliate>
                         <div className="fixed top-0 left-0 right-0 z-50">
                             <AffiliateHeader
                                 onNavigate={handleNavigate}
@@ -87,7 +95,7 @@ export default function AffiliateLayout({
                                 {children}
                             </div>
                         </div>
-                    </>
+                    </RequireAffiliate>
                 ) : (
                     /* --- PUBLIC LAYOUT (No Header, No Guard) --- */
                     <div className="relative z-10 w-full min-h-screen">

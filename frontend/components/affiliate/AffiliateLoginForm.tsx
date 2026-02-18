@@ -3,6 +3,11 @@
 import React, { useState, FormEvent, FocusEvent } from 'react';
 import Link from 'next/link';
 import { EyeIcon, EyeOffIcon } from '../icons';
+import { signIn, fetchAuthSession, signOut } from 'aws-amplify/auth';
+import { configureAmplify } from '../../lib/aws-amplify-config.js';
+import { api } from '../../lib/api';
+
+configureAmplify();
 
 interface AffiliateLoginFormProps {
     onLoginSuccess: () => void;
@@ -81,21 +86,96 @@ const AffiliateLoginForm: React.FC<AffiliateLoginFormProps> = ({
             setIsSubmitting(true);
             setGeneralError('');
 
-            // --- UI-Only Mode: Simulate login ---
-            // In future, this will integrate with backend auth
-            await new Promise(resolve => setTimeout(resolve, 1200));
+            // 1. Sign out any existing session
+            try {
+                await signOut();
+            } catch {
+                // ignore
+            }
 
-            // Store mock affiliate user for dashboard
-            const mockUser = {
-                id: 'aff_001',
-                email: values.email,
-                name: values.email.split('@')[0],
-                role: 'AFFILIATE',
-            };
-            localStorage.setItem('affiliate_user', JSON.stringify(mockUser));
+            // 2. Sign in with Cognito
+            const signInResult = await signIn({
+                username: values.email,
+                password: values.password,
+            });
+
+            if (!signInResult.isSignedIn) {
+                setGeneralError('Your account login needs an additional step. Please contact support.');
+                return;
+            }
+
+            // 3. Get session tokens
+            const session = await fetchAuthSession();
+            const { tokens } = session;
+
+            if (!tokens || !tokens.accessToken || !tokens.idToken) {
+                setGeneralError('Login session could not be created. Please try again.');
+                return;
+            }
+
+            // 4. Check Cognito group is AFFILIATE
+            const idGroups = (tokens.idToken?.payload['cognito:groups'] as string[] | undefined) || [];
+            const accessGroups = (tokens.accessToken?.payload['cognito:groups'] as string[] | undefined) || [];
+            const groups = [...new Set([...idGroups, ...accessGroups])];
+
+            if (!groups.includes('AFFILIATE')) {
+                await signOut();
+                setGeneralError('You are not authorized to access the affiliate portal.');
+                return;
+            }
+
+            const accessToken = tokens.accessToken.toString();
+            const idToken = tokens.idToken.toString();
+
+            // Store tokens for session
+            sessionStorage.setItem('accessToken', accessToken);
+            sessionStorage.setItem('idToken', idToken);
             sessionStorage.setItem('affiliateEmail', values.email);
+            localStorage.setItem('originbi_id_token', idToken);
 
-            onLoginSuccess();
+            // 5. Fetch affiliate profile from /affiliates/me
+            try {
+                const meRes = await api.get('/affiliates/me', {
+                    headers: { Authorization: `Bearer ${idToken}` },
+                });
+
+                const meData = meRes.data;
+                const affiliate = meData.user?.affiliate || meData.user?.affiliateAccount || meData.affiliate;
+
+                if (!affiliate) {
+                    await signOut();
+                    setGeneralError('Affiliate account not found. Please contact support.');
+                    return;
+                }
+
+                // Check if account is active
+                if (!affiliate.isActive && affiliate.isActive !== undefined) {
+                    await signOut();
+                    setGeneralError('Your affiliate account is currently inactive. Please contact support.');
+                    return;
+                }
+
+                // Store the affiliate user with REAL affiliate_accounts.id
+                const affiliateUser = {
+                    id: affiliate.id,                           // affiliate_accounts.id
+                    userId: meData.user?.id || affiliate.userId, // users.id
+                    email: affiliate.email || meData.user?.email || values.email,
+                    name: affiliate.name || values.email.split('@')[0],
+                    referralCode: affiliate.referralCode,
+                    commissionPercentage: affiliate.commissionPercentage,
+                    role: 'AFFILIATE',
+                };
+                localStorage.setItem('affiliate_user', JSON.stringify(affiliateUser));
+
+                onLoginSuccess();
+            } catch (profileErr: any) {
+                console.error('Failed to fetch affiliate profile:', profileErr);
+                await signOut();
+                setGeneralError(
+                    profileErr.response?.data?.message ||
+                    'Affiliate account not found. Please contact support.',
+                );
+            }
         } catch (err: unknown) {
             console.error('Login error:', err);
             const message =

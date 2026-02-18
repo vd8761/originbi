@@ -238,7 +238,7 @@ const AffiliateSettings: React.FC = () => {
             <div className="max-w-3xl">
                 {activeTab === 'profile' && (
                     <div className="space-y-6 animate-fade-in">
-                        <div className="flex items-center gap-6 mb-8">
+                        <div className="flex flex-col sm:flex-row items-center gap-6 mb-8 text-center sm:text-left">
                             <img
                                 src={`https://ui-avatars.com/api/?name=${encodeURIComponent(fullName || 'A')}&background=150089&color=fff&size=128`}
                                 alt="Avatar"
