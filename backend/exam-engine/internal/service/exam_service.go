@@ -451,10 +451,37 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 
 					// Generate Questions for Next Level (Trait Based for Level 2)
 					if nextLevel.LevelNumber == 2 && traitID != nil {
-						// 1. Clear existing generic questions (if any)
+						// 1. Fetch Session Metadata for constraints (Board, Set)
+						var session models.AssessmentSession
+						var setNumber int = 1 // Default
+						var studentBoard string = ""
+
+						if err := tx.First(&session, nextAttempt.AssessmentSessionID).Error; err == nil {
+							var meta map[string]interface{}
+							if session.Metadata != "" && session.Metadata != "{}" {
+								if err := json.Unmarshal([]byte(session.Metadata), &meta); err == nil {
+									if val, ok := meta["setNumber"]; ok {
+										// JSON numbers are often float64
+										if v, ok := val.(float64); ok {
+											setNumber = int(v)
+										} else if v, ok := val.(int); ok {
+											setNumber = v
+										}
+									}
+									if val, ok := meta["studentBoard"]; ok {
+										if v, ok := val.(string); ok {
+											studentBoard = v
+										}
+									}
+								}
+							}
+						}
+
+						// 2. Clear existing generic questions (if any)
 						tx.Exec("DELETE FROM assessment_answers WHERE assessment_attempt_id = ?", nextAttempt.ID)
 
-						// 2. Insert new questions based on Trait (Limit 25)
+						// 3. Insert new questions based on Trait + Constraints
+						// Limit 25 is standard logic here
 						query := `
 							INSERT INTO assessment_answers (
 								assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
@@ -462,11 +489,24 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 							)
 							SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
 							FROM assessment_questions 
-							WHERE assessment_level_id = ? AND personality_trait_id = ?
-							ORDER BY RANDOM()
-							LIMIT 25
+							WHERE assessment_level_id = ? 
+							  AND personality_trait_id = ?
 						`
-						tx.Exec(query, nextAttempt.ID, nextAttempt.AssessmentSessionID, nextAttempt.UserID, nextAttempt.RegistrationID, nextAttempt.ProgramID, nextLevel.ID, nextLevel.ID, *traitID)
+						args := []interface{}{nextAttempt.ID, nextAttempt.AssessmentSessionID, nextAttempt.UserID, nextAttempt.RegistrationID, nextAttempt.ProgramID, nextLevel.ID, nextLevel.ID, *traitID}
+
+						// Apply Board Constraint if present
+						if studentBoard != "" {
+							query += ` AND metadata->>'board' = ?`
+							args = append(args, studentBoard)
+						}
+
+						// Apply Set Constraint (Always apply set logic if it's Level 2 generation flow, assuming set 1 default if missing)
+						query += ` AND set_number = ?`
+						args = append(args, setNumber)
+
+						query += ` ORDER BY RANDOM() LIMIT 25`
+
+						tx.Exec(query, args...)
 					}
 				}
 			}

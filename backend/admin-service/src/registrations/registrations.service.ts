@@ -45,7 +45,7 @@ export class RegistrationsService {
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
-  ) {}
+  ) { }
 
   async withRetry<T>(
     operation: () => Promise<T>,
@@ -233,6 +233,7 @@ export class RegistrationsService {
             examStart: dto.examStart,
             examEnd: dto.examEnd,
             departmentId: dto.departmentId ?? null,
+            studentBoard: dto.studentBoard,
           },
         });
         await manager.save(registration);
@@ -438,6 +439,7 @@ export class RegistrationsService {
           examStart: dto.examStart,
           examEnd: dto.examEnd,
           departmentId: dto.departmentId ?? null,
+          studentBoard: dto.studentBoard,
         },
       });
       await manager.save(registration);

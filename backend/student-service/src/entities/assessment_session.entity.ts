@@ -49,6 +49,9 @@ export class AssessmentSession {
   @Column({ name: 'group_assessment_id', type: 'bigint', nullable: true })
   groupAssessmentId: number | null;
 
+  @Column({ name: 'metadata', type: 'jsonb', default: () => `'{}'` })
+  metadata: any;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

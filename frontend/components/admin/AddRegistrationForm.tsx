@@ -14,6 +14,7 @@ import { registrationService } from '../../lib/services';
 import { CreateRegistrationDto } from '../../lib/services/registration.service';
 import { Program, Department } from '../../lib/types';
 import BulkUploadRegistration from "./BulkUploadRegistration";
+import { getEnabledBoards } from '../../lib/constants';
 
 interface AddRegistrationFormProps {
   onCancel: () => void;
@@ -40,6 +41,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     school_stream: undefined,
     current_year: "",
     department_degree_id: "",
+    student_board: "",
     password: "",
   });
 
@@ -65,6 +67,8 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     { value: "COMMERCE", label: "Commerce" },
     { value: "HUMANITIES", label: "Humanities" },
   ];
+
+  const boardOptions = getEnabledBoards();
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -126,6 +130,11 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
         if (!formData.school_stream) errors.school_stream = "Required";
         if (!formData.current_year) errors.current_year = "Required";
       }
+      if (formData.school_level === "HSC") {
+        if (!formData.school_stream) errors.school_stream = "Required";
+        if (!formData.current_year) errors.current_year = "Required";
+      }
+      if (!formData.student_board) errors.student_board = "Required";
     }
 
     if (isCollegeProgram) {
@@ -410,6 +419,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                   handleInputChange("school_stream", "");
                   handleInputChange("current_year", "");
                   handleInputChange("department_degree_id", "");
+                  handleInputChange("student_board", "");
                 }}
                 placeholder="Choose Program Type"
               />
@@ -443,6 +453,30 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                 {formErrors.school_level && (
                   <p className="text-xs text-red-500 ml-1 mt-1">
                     {formErrors.school_level}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Student Board (for School Students) */}
+            {isSchoolProgram && (
+              <div
+                className={`relative animate-fade-in ${activeField === "board" ? "z-50" : "z-auto"
+                  }`}
+                onMouseEnter={() => setActiveField("board")}
+                onMouseLeave={() => setActiveField(null)}
+              >
+                <CustomSelect
+                  label="Board"
+                  required
+                  options={boardOptions}
+                  value={formData.student_board || ""}
+                  onChange={(val) => handleInputChange("student_board", val)}
+                  placeholder="Select Board"
+                />
+                {formErrors.student_board && (
+                  <p className="text-xs text-red-500 ml-1 mt-1">
+                    {formErrors.student_board}
                   </p>
                 )}
               </div>
