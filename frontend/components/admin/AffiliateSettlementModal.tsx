@@ -1,14 +1,26 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { XIcon } from '../icons';
 
 const API_BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "";
 
-/* ==================== Settlement Date Picker ==================== */
+/* ==================== Types ==================== */
 
-
+interface SettlementPreview {
+    fullySettledCount: number;
+    isCleanBoundary: boolean;
+    transactions: Array<{
+        id: number;
+        studentName: string;
+        amount: number;
+        coveredAmount: number;
+        remainingAmount: number;
+        status: 'fully_settled' | 'partial' | 'not_settled';
+    }>;
+    suggestedLower: number | null;
+    suggestedUpper: number | null;
+}
 
 /* ==================== Settlement Modal ==================== */
 
@@ -34,7 +46,13 @@ export const AffiliateSettlementModal: React.FC<AffiliateSettlementModalProps> =
     const [errorMsg, setErrorMsg] = useState("");
     const [successMsg, setSuccessMsg] = useState("");
 
-    const maxAmount = parseFloat(affiliate.ready_to_process_commission) || 0;
+    // Preview state
+    const [preview, setPreview] = useState<SettlementPreview | null>(null);
+    const [previewLoading, setPreviewLoading] = useState(false);
+    const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Safety: ensure maxAmount is a valid number
+    const maxAmount = parseFloat(affiliate?.ready_to_process_commission) || 0;
 
     const formatCurrency = (amount: any) => {
         const num = parseFloat(amount) || 0;
@@ -43,6 +61,11 @@ export const AffiliateSettlementModal: React.FC<AffiliateSettlementModalProps> =
             currency: 'INR',
             maximumFractionDigits: 2,
         }).format(num);
+    };
+
+    const safeToFixed = (val: any) => {
+        const num = parseFloat(val);
+        return isNaN(num) ? "0.00" : num.toFixed(2);
     };
 
     useEffect(() => {
@@ -60,30 +83,92 @@ export const AffiliateSettlementModal: React.FC<AffiliateSettlementModalProps> =
         return () => document.removeEventListener("keydown", handleEscape);
     }, [submitting, onClose]);
 
+    // Fetch settlement preview (debounced)
+    const fetchPreview = useCallback(async (amount: number) => {
+        if (!affiliate?.id || amount <= 0) {
+            setPreview(null);
+            return;
+        }
+
+        setPreviewLoading(true);
+        try {
+            const res = await fetch(
+                `${API_BASE}/admin/affiliates/${affiliate.id}/settle-preview?amount=${amount}`
+            );
+            if (res.ok) {
+                const data = await res.json();
+                // Ensure numbers are numbers
+                const sanitized: SettlementPreview = {
+                    ...data,
+                    fullySettledCount: Number(data.fullySettledCount) || 0,
+                    suggestedLower: data.suggestedLower ? Number(data.suggestedLower) : null,
+                    suggestedUpper: data.suggestedUpper ? Number(data.suggestedUpper) : null,
+                    transactions: (data.transactions || []).map((t: any) => ({
+                        ...t,
+                        amount: Number(t.amount) || 0,
+                        coveredAmount: Number(t.coveredAmount) || 0,
+                        remainingAmount: Number(t.remainingAmount) || 0,
+                    }))
+                };
+                setPreview(sanitized);
+            } else {
+                setPreview(null);
+            }
+        } catch (err) {
+            console.error("Preview fetch error:", err);
+            setPreview(null);
+        } finally {
+            setPreviewLoading(false);
+        }
+    }, [affiliate?.id, maxAmount]);
+
+    // Debounced amount change handler
+    const handleAmountChange = (val: string) => {
+        setSettleAmount(val); // Allow raw typing, validate later
+        setErrorMsg("");
+
+        if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+
+        const numVal = parseFloat(val);
+        if (!isNaN(numVal) && numVal > 0) {
+            const clampedVal = Math.min(numVal, maxAmount);
+            previewTimerRef.current = setTimeout(() => {
+                fetchPreview(clampedVal);
+            }, 300);
+        } else {
+            setPreview(null);
+        }
+    };
+
+    // Apply suggested amount
+    const applySuggestedAmount = (amount: number) => {
+        const val = amount.toFixed(2);
+        setSettleAmount(val);
+        setErrorMsg("");
+        if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+        fetchPreview(amount);
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrorMsg("");
         setSuccessMsg("");
 
         const amount = parseFloat(settleAmount);
-        if (!amount || amount <= 0) {
-            setErrorMsg("Please enter a valid settlement amount");
+        if (isNaN(amount) || amount <= 0) {
+            setErrorMsg("Please enter a valid amount");
             return;
         }
-        if (amount > maxAmount) {
-            setErrorMsg(`Amount cannot exceed ready to payment amount (${formatCurrency(maxAmount)})`);
+        if (amount > maxAmount + 0.1) {
+            setErrorMsg(`Amount cannot exceed ${formatCurrency(maxAmount)}`);
             return;
         }
         if (!transactionMode) {
-            setErrorMsg("Please select a payment mode");
+            setErrorMsg("Select a payment method");
             return;
         }
         if (!transactionId.trim()) {
-            setErrorMsg("Please enter a transaction ID");
-            return;
-        }
-        if (!paymentDate) {
-            setErrorMsg("Please select a payment date");
+            setErrorMsg("Enter Transaction ID");
             return;
         }
 
@@ -102,28 +187,20 @@ export const AffiliateSettlementModal: React.FC<AffiliateSettlementModalProps> =
 
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.message || `Settlement failed (${res.status})`);
+                throw new Error(errData.message || "Settlement failed");
             }
 
-            setSuccessMsg("Settlement completed successfully!");
-            setTimeout(() => {
-                onSuccess();
-            }, 1200);
+            setSuccessMsg("Settled successfully!");
+            setTimeout(() => onSuccess(), 1000);
         } catch (err: any) {
-            setErrorMsg(err.message || "Settlement failed. Please try again.");
+            setErrorMsg(err.message);
         } finally {
             setSubmitting(false);
         }
     };
 
-    const paymentModes = [
-        { value: "UPI_ID", label: "UPI ID" },
-        { value: "UPI_NUMBER", label: "UPI Number" },
-        { value: "BANK_TRANSFER", label: "Bank Transfer" },
-    ];
-
-    const inputClasses = "w-full h-[50px] bg-gray-50 dark:bg-white/10 border border-transparent dark:border-transparent rounded-xl px-4 text-sm text-brand-text-light-primary dark:text-white placeholder-black/40 dark:placeholder-white/60 focus:border-brand-green focus:outline-none transition-all";
-    const labelClasses = "text-xs text-black/70 dark:text-white font-semibold ml-1 mb-1.5 block";
+    const enteredAmount = parseFloat(settleAmount) || 0;
+    const showPreview = enteredAmount > 0 && preview !== null && !previewLoading;
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
@@ -131,179 +208,150 @@ export const AffiliateSettlementModal: React.FC<AffiliateSettlementModalProps> =
 
             <div
                 ref={modalRef}
-                className="relative w-full max-w-[95%] sm:max-w-[480px] lg:max-w-[520px] bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl animate-fade-in flex flex-col max-h-[90vh]"
+                className="relative w-full max-w-[500px] bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]"
             >
-                {/* Header Section */}
-                <div className="flex items-center justify-between px-8 py-8 border-b border-gray-100 dark:border-white/5 flex-shrink-0">
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-brand-green/10 flex items-center justify-center">
-                            <svg className="w-5 h-5 text-brand-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-6 border-b border-gray-100 dark:border-white/5 shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-brand-green/10 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-brand-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
                         </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-brand-text-light-primary dark:text-white">
-                                Settle Commission
-                            </h3>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
-                                    {affiliate.name}
-                                </span>
-                            </div>
-                        </div>
+                        <h3 className="font-bold text-brand-text-light-primary dark:text-white">Settle Commission</h3>
                     </div>
-                    <button
-                        onClick={onClose}
-                        disabled={submitting}
-                        className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-all cursor-pointer text-gray-400 hover:text-gray-600 disabled:opacity-50"
-                    >
-                        <XIcon className="w-5 h-5" />
-                    </button>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white"><XIcon className="w-5 h-5" /></button>
                 </div>
 
-                {/* Scrollable Content */}
-                <div className="overflow-y-auto custom-scrollbar flex-1">
-                    {/* Amount Highlight Section */}
-                    <div className="px-8 pt-8">
-                        <div className="bg-[#1A56DB] dark:bg-blue-600/20 border border-blue-500/20 rounded-2xl p-3 flex items-center justify-between group">
-                            <div>
-                                <p className="text-[10px] uppercase font-bold text-blue-100 dark:text-blue-400 tracking-wider">
-                                    Available for Settlement
-                                </p>
-                                <p className="text-xl font-black text-white dark:text-blue-300">
-                                    {formatCurrency(maxAmount)}
-                                </p>
-                            </div>
-                            <div className="w-8 h-8 rounded-full bg-white/20 dark:bg-blue-500/20 flex items-center justify-center">
-                                <svg className="w-4 h-4 text-white dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
+                <div className="overflow-y-auto custom-scrollbar flex-1 p-6 space-y-6">
+                    {/* Summary */}
+                    <div className="bg-blue-600/10 border border-blue-500/20 rounded-xl p-4 flex items-center justify-between">
+                        <div>
+                            <p className="text-[10px] uppercase font-bold text-blue-500 tracking-wider">Available</p>
+                            <p className="text-xl font-black dark:text-blue-300">{formatCurrency(maxAmount)}</p>
                         </div>
+                        <button
+                            type="button"
+                            onClick={() => applySuggestedAmount(maxAmount)}
+                            className="text-[10px] font-bold px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all"
+                        >
+                            MAX
+                        </button>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="px-8 py-8 space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                            <div className="sm:col-span-2">
-                                <label className={labelClasses}>
-                                    Settlement Amount <span className="text-red-500">*</span>
-                                </label>
-                                <div className="relative group">
-                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400 dark:text-white/30 group-focus-within:text-brand-green transition-colors">₹</span>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        max={maxAmount}
-                                        value={settleAmount}
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            const numVal = parseFloat(val);
-                                            if (val === "") {
-                                                setSettleAmount("");
-                                            } else if (!isNaN(numVal)) {
-                                                setSettleAmount(Math.min(numVal, maxAmount).toString());
-                                            }
-                                            setErrorMsg("");
-                                        }}
-                                        placeholder={`Max ${formatCurrency(maxAmount)}`}
-                                        className={`${inputClasses} pl-8`}
-                                        required
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="sm:col-span-2">
-                                <label className={labelClasses}>
-                                    Payment Method <span className="text-red-500">*</span>
-                                </label>
-                                <div className="p-1.5 bg-gray-50 dark:bg-white/5 rounded-2xl flex gap-1 border border-gray-100 dark:border-white/5">
-                                    {paymentModes.map((mode) => (
-                                        <button
-                                            key={mode.value}
-                                            type="button"
-                                            onClick={() => {
-                                                setTransactionMode(mode.value);
-                                                setErrorMsg("");
-                                            }}
-                                            className={`flex-1 py-2.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${transactionMode === mode.value
-                                                ? "bg-brand-green text-white shadow-lg shadow-green-900/20"
-                                                : "text-gray-500 dark:text-gray-400 hover:text-brand-text-light-primary dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5"
-                                                }`}
-                                        >
-                                            {mode.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="sm:col-span-2">
-                                <label className={labelClasses}>
-                                    Transaction ID / UTR <span className="text-red-500">*</span>
-                                </label>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <label className={labelClasses}>Settlement Amount *</label>
+                            <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">₹</span>
                                 <input
-                                    type="text"
-                                    value={transactionId}
-                                    onChange={(e) => {
-                                        setTransactionId(e.target.value);
-                                        setErrorMsg("");
-                                    }}
-                                    placeholder="Ref number"
-                                    className={inputClasses}
+                                    type="number"
+                                    step="0.01"
+                                    value={settleAmount}
+                                    onChange={(e) => handleAmountChange(e.target.value)}
+                                    className={`${inputClasses} pl-8`}
+                                    placeholder="Enter amount..."
                                     required
                                 />
                             </div>
 
+                            {/* PREVIEW BOX */}
+                            {showPreview && preview && (
+                                <div className="mt-4 space-y-4 animate-fade-in">
+                                    {/* Suggestions */}
+                                    {!preview.isCleanBoundary && (
+                                        <div className="flex gap-2">
+                                            {preview.suggestedLower !== null && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => applySuggestedAmount(preview.suggestedLower!)}
+                                                    className="flex-1 p-2 bg-amber-500/5 border border-amber-500/20 rounded-xl text-[10px] text-amber-500 font-bold"
+                                                >
+                                                    Set to ₹{preview.suggestedLower.toFixed(2)}
+                                                </button>
+                                            )}
+                                            {preview.suggestedUpper !== null && preview.suggestedUpper <= maxAmount && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => applySuggestedAmount(preview.suggestedUpper!)}
+                                                    className="flex-1 p-2 bg-brand-green/5 border border-brand-green/20 rounded-xl text-[10px] text-brand-green font-bold"
+                                                >
+                                                    Set to ₹{preview.suggestedUpper.toFixed(2)}
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
 
+                                    {/* Breakdown */}
+                                    <div className="bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5 divide-y divide-gray-100 dark:divide-white/5">
+                                        <div className="p-3 text-[10px] uppercase font-bold text-gray-400 tracking-wider bg-gray-100/30 dark:bg-white/5">Breakdown</div>
+                                        {preview.transactions.map((txn) => (
+                                            <div key={txn.id} className="p-4 space-y-2">
+                                                <div className="flex justify-between text-[11px] font-bold">
+                                                    <span className="uppercase text-gray-500">{txn.studentName}</span>
+                                                    <span>₹{safeToFixed(txn.amount)}</span>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex-1 h-1 bg-gray-200 dark:bg-white/10 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-brand-green" style={{ width: `${Math.min(100, (txn.coveredAmount / txn.amount) * 100)}%` }} />
+                                                    </div>
+                                                    <span className="text-[11px] font-black text-brand-green">
+                                                        + ₹{safeToFixed(txn.coveredAmount)}
+                                                    </span>
+                                                </div>
+                                                {txn.remainingAmount > 0 && (
+                                                    <p className="text-[9px] font-bold text-amber-500 text-right">
+                                                        PENDING: ₹{safeToFixed(txn.remainingAmount)}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        {errorMsg && (
-                            <div className="flex items-center gap-3 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 rounded-2xl px-5 py-3 text-sm text-red-600 dark:text-red-400 animate-shake">
-                                <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                </svg>
-                                <span className="font-semibold text-xs">{errorMsg}</span>
+                        <div>
+                            <label className={labelClasses}>Payment Method *</label>
+                            <div className="flex gap-2">
+                                {["UPI_ID", "BANK_TRANSFER"].map((m) => (
+                                    <button
+                                        key={m}
+                                        type="button"
+                                        onClick={() => setTransactionMode(m)}
+                                        className={`flex-1 py-3 rounded-xl text-[10px] font-bold border transition-all ${transactionMode === m
+                                                ? "bg-brand-green border-brand-green text-white"
+                                                : "border-gray-100 dark:border-white/10 text-gray-500"
+                                            }`}
+                                    >
+                                        {m.replace("_", " ")}
+                                    </button>
+                                ))}
                             </div>
-                        )}
-
-                        {successMsg && (
-                            <div className="flex items-center gap-3 bg-emerald-50 dark:bg-brand-green/10 border border-emerald-100 dark:border-brand-green/20 rounded-2xl px-5 py-3 text-sm text-brand-green font-bold animate-fade-in justify-center">
-                                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                                </svg>
-                                <span className="text-xs">{successMsg}</span>
-                            </div>
-                        )}
-
-                        <div className="flex items-center justify-end gap-3 pt-2">
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                disabled={submitting}
-                                className="px-6 py-3 text-xs font-bold text-gray-500 dark:text-white/70 hover:text-brand-text-light-primary dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-all cursor-pointer disabled:opacity-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={submitting || !!successMsg || maxAmount <= 0}
-                                className="px-8 py-3 bg-brand-green text-white text-xs font-bold rounded-full hover:bg-brand-green/90 transition-all cursor-pointer shadow-lg shadow-green-900/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                            >
-                                {submitting ? (
-                                    <>
-                                        <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white/30 border-t-white"></div>
-                                        Processing...
-                                    </>
-                                ) : (
-                                    <>
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                                        </svg>
-                                        <span>Settle Payment</span>
-                                    </>
-                                )}
-                            </button>
                         </div>
+
+                        <div>
+                            <label className={labelClasses}>Transaction ID / UTR *</label>
+                            <input
+                                type="text"
+                                value={transactionId}
+                                onChange={(e) => setTransactionId(e.target.value)}
+                                className={inputClasses}
+                                placeholder="Ref number..."
+                                required
+                            />
+                        </div>
+
+                        {errorMsg && <div className="p-3 bg-red-500/10 text-red-500 text-[11px] font-bold rounded-xl text-center">{errorMsg}</div>}
+                        {successMsg && <div className="p-3 bg-brand-green/10 text-brand-green text-[11px] font-bold rounded-xl text-center">{successMsg}</div>}
+
+                        <button
+                            type="submit"
+                            disabled={submitting || !!successMsg}
+                            className="w-full py-4 bg-brand-green text-white text-[11px] font-black uppercase rounded-xl shadow-lg shadow-green-900/20 disabled:opacity-50"
+                        >
+                            {submitting ? "Processing..." : "Confirm Settlement"}
+                        </button>
                     </form>
                 </div>
             </div>

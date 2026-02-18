@@ -121,6 +121,15 @@ export class AffiliatesController {
         );
     }
 
+    @Get(':id/settle-preview')
+    async settlePreview(@Param('id') id: string, @Query('amount') amount: string) {
+        const numAmount = parseFloat(amount);
+        if (isNaN(numAmount) || numAmount <= 0) {
+            throw new BadRequestException('Amount must be a positive number');
+        }
+        return this.affiliatesService.previewSettlement(Number(id), numAmount);
+    }
+
     @Get(':id')
     async findById(@Param('id') id: string) {
         return this.affiliatesService.findById(Number(id));
