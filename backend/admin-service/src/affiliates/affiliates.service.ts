@@ -229,6 +229,79 @@ export class AffiliatesService {
         }
     }
 
+    private async calculateReadyToProcessAmount(affiliateId: number, totalSettledCommission: number): Promise<number> {
+        // Calculate ready-to-process amount (settlement_status = 1)
+        const readyToProcessRes = await this.referralTransactionRepo
+            .createQueryBuilder('t')
+            .select('SUM(CAST(t.earned_commission_amount AS NUMERIC))', 'sum')
+            .where('t.affiliate_account_id = :affiliateAccountId', { affiliateAccountId: affiliateId })
+            .andWhere('t.settlement_status = 1')
+            .getRawOne();
+
+        const rawReadyAmount = parseFloat(readyToProcessRes?.sum) || 0;
+
+        // Sum of transactions already officially marked as settled (status = 2)
+        const settledTxnSumRes = await this.referralTransactionRepo
+            .createQueryBuilder('t')
+            .select('SUM(CAST(t.earned_commission_amount AS NUMERIC))', 'sum')
+            .where('t.affiliate_account_id = :affiliateAccountId', { affiliateAccountId: affiliateId })
+            .andWhere('t.settlement_status = 2')
+            .getRawOne();
+        const settledTxnSum = parseFloat(settledTxnSumRes?.sum) || 0;
+
+        // Total amount actually paid per account record
+        const totalPaid = Number(totalSettledCommission) || 0;
+
+        // Amount paid that hasn't yet exhausted whole transactions into status 2
+        const unpaidOverflow = Math.max(0, totalPaid - settledTxnSum);
+
+        // Net Ready to Process = Raw Ready - Overflow Paid
+        return Math.max(0, rawReadyAmount - unpaidOverflow);
+    }
+
+    async getAdminDashboardStats() {
+        try {
+            await this.updateReadyToProcessStatus().catch((err) =>
+                this.logger.warn(`Non-critical: Failed to refresh ready-to-process statuses: ${err.message}`)
+            );
+
+            const affiliates = await this.affiliateRepo.find();
+
+            let totalReadyToPayment = 0;
+            const affiliatesWithPayment: any[] = [];
+
+            // We can optimize this with a single complex query if performance becomes an issue
+            // For now, consistent logic via helper is preferred
+            for (const a of affiliates) {
+                const amount = await this.calculateReadyToProcessAmount(a.id, Number(a.totalSettledCommission) || 0);
+                if (amount > 0) {
+                    totalReadyToPayment += amount;
+                    affiliatesWithPayment.push({
+                        id: a.id,
+                        name: a.name,
+                        email: a.email,
+                        countryCode: a.countryCode || '+91',
+                        mobileNumber: a.mobileNumber,
+                        amount: amount,
+                        upiId: a.upiId,
+                        bankName: a.bankingName
+                    });
+                }
+            }
+
+            // Sort descending by amount
+            affiliatesWithPayment.sort((a, b) => b.amount - a.amount);
+
+            return {
+                totalReadyToPayment,
+                affiliates: affiliatesWithPayment
+            };
+        } catch (error: any) {
+            this.logger.error(`Error getting admin dashboard stats: ${error.message}`);
+            throw new InternalServerErrorException('Failed to get dashboard stats');
+        }
+    }
+
     private async formatAffiliate(a: AffiliateAccount) {
         // Generate presigned URLs for Aadhar documents
         const aadharWithSignedUrls = await Promise.all(
@@ -246,33 +319,7 @@ export class AffiliatesService {
             }))
         );
 
-        // Calculate ready-to-process amount (settlement_status = 1)
-        const readyToProcessRes = await this.referralTransactionRepo
-            .createQueryBuilder('t')
-            .select('SUM(CAST(t.earned_commission_amount AS NUMERIC))', 'sum')
-            .where('t.affiliate_account_id = :affiliateAccountId', { affiliateAccountId: a.id })
-            .andWhere('t.settlement_status = 1')
-            .getRawOne();
-
-        const rawReadyAmount = parseFloat(readyToProcessRes?.sum) || 0;
-
-        // Sum of transactions already officially marked as settled (status = 2)
-        const settledTxnSumRes = await this.referralTransactionRepo
-            .createQueryBuilder('t')
-            .select('SUM(CAST(t.earned_commission_amount AS NUMERIC))', 'sum')
-            .where('t.affiliate_account_id = :affiliateAccountId', { affiliateAccountId: a.id })
-            .andWhere('t.settlement_status = 2')
-            .getRawOne();
-        const settledTxnSum = parseFloat(settledTxnSumRes?.sum) || 0;
-
-        // Total amount actually paid per account record
-        const totalPaid = Number(a.totalSettledCommission) || 0;
-
-        // Amount paid that hasn't yet exhausted whole transactions into status 2
-        const unpaidOverflow = Math.max(0, totalPaid - settledTxnSum);
-
-        // Net Ready to Process = Raw Ready - Overflow Paid
-        const readyToProcessAmount = Math.max(0, rawReadyAmount - unpaidOverflow);
+        const readyToProcessAmount = await this.calculateReadyToProcessAmount(a.id, Number(a.totalSettledCommission) || 0);
 
         // Fetch settlement history
         const settlements = await this.settlementTransactionRepo.find({
