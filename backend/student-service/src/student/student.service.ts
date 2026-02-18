@@ -71,7 +71,7 @@ export class StudentService {
     private readonly affiliateTransactionRepo: Repository<AffiliateReferralTransaction>,
     private readonly http: HttpService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   async onModuleInit() {
     // Check if imported functions are used to avoid TS error, or just use them
@@ -792,34 +792,6 @@ export class StudentService {
     reg: Registration,
     level: AssessmentLevel,
   ) {
-    // Fetch random questions
-    await this.answerRepo.query(
-      `
-            INSERT INTO assessment_answers (
-              assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
-              main_question_id, question_source, status, question_sequence, created_at, updated_at
-            )
-            SELECT $1, $2, $3, $4, $6, $5, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
-            FROM assessment_questions 
-            WHERE assessment_level_id = $5 
-              AND is_active = true
-              AND is_deleted = false
-              AND (metadata->>'school_level' IS NULL OR metadata->>'school_level' = $7)
-              AND (metadata->>'school_stream' IS NULL OR metadata->>'school_stream' = $8)
-            ORDER BY RANDOM()
-            LIMIT 60
-        `,
-      [
-        attempt.id,
-        attempt.assessmentSessionId,
-        user.id,
-        reg.id,
-        level.id,
-        attempt.programId,
-        reg.schoolLevel,
-        reg.schoolStream,
-      ],
-    );
     // 1. Determine Program Type (Logic moved to rely on Program Code)
 
     // Check if it is really SCHOOL_STUDENT program
@@ -915,7 +887,39 @@ export class StudentService {
       query += ` AND (metadata->>'school_stream' IS NULL OR metadata->>'school_stream' = $${params.length + 1})`;
       params.push(reg.schoolStream);
     } else {
-      // Generic / College Logic (Existing)
+      // Generic / College / Employee / CXO Logic
+      // 1. Pick a Random Set for this Level
+      const loadedSets = await this.answerRepo.query(
+        `SELECT DISTINCT set_number FROM assessment_questions 
+         WHERE assessment_level_id = $1 
+           AND is_active = true`,
+        [level.id],
+      );
+
+      if (loadedSets && loadedSets.length > 0) {
+        const randomIndex = Math.floor(Math.random() * loadedSets.length);
+        selectedSetNumber = loadedSets[randomIndex].set_number;
+        this.logger.log(
+          `[Assessment] Selected Random Set ${selectedSetNumber} for Non-School Program`,
+        );
+
+        // Update Session Metadata
+        const session = await this.sessionRepo.findOne({
+          where: { id: attempt.assessmentSessionId },
+        });
+        if (session) {
+          if (!session.metadata) session.metadata = {};
+          session.metadata.setNumber = selectedSetNumber;
+          await this.sessionRepo.save(session);
+        }
+      } else {
+        selectedSetNumber = 1; // Default
+      }
+
+      // 2. Filter Query by Set Number
+      query += ` AND set_number = $${params.length + 1}`;
+      params.push(selectedSetNumber);
+
       query += ` AND (metadata->>'school_level' IS NULL OR metadata->>'school_level' = $${params.length + 1})`;
       params.push(reg.schoolLevel);
 
@@ -1220,7 +1224,7 @@ export class StudentService {
         assets,
         dateStr,
         ((registration as any).program?.reportTitle as string) ||
-          'Self Discovery Report',
+        'Self Discovery Report',
       );
 
       // --- Transporter Setup ---
