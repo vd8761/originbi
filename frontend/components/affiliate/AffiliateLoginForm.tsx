@@ -1,0 +1,344 @@
+'use client';
+
+import React, { useState, FormEvent, FocusEvent } from 'react';
+import Link from 'next/link';
+import { EyeIcon, EyeOffIcon } from '../icons';
+import { signIn, fetchAuthSession, signOut } from 'aws-amplify/auth';
+import { configureAmplify } from '../../lib/aws-amplify-config.js';
+import { api } from '../../lib/api';
+
+configureAmplify();
+
+interface AffiliateLoginFormProps {
+    onLoginSuccess: () => void;
+    buttonClass?: string;
+}
+
+const AffiliateLoginForm: React.FC<AffiliateLoginFormProps> = ({
+    onLoginSuccess,
+    buttonClass,
+}) => {
+    const [passwordVisible, setPasswordVisible] = useState(false);
+    const [values, setValues] = useState({ email: '', password: '' });
+    const [errors, setErrors] = useState({ email: '', password: '' });
+    const [touched, setTouched] = useState({ email: false, password: false });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [generalError, setGeneralError] = useState('');
+
+    const togglePasswordVisibility = () => {
+        setPasswordVisible(!passwordVisible);
+    };
+
+    const validateEmail = (email: string) => {
+        if (!email) return 'Email ID is required.';
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return 'Please enter a valid email address.';
+        }
+        return '';
+    };
+
+    const validatePassword = (password: string) => {
+        if (!password) return 'Password is required.';
+        return '';
+    };
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setValues((prev) => ({ ...prev, [name]: value }));
+        setGeneralError('');
+
+        if (touched[name as keyof typeof touched]) {
+            if (name === 'email') {
+                setErrors((prev) => ({ ...prev, email: validateEmail(value) }));
+            }
+            if (name === 'password') {
+                setErrors((prev) => ({ ...prev, password: validatePassword(value) }));
+            }
+        }
+    };
+
+    const handleBlur = (e: FocusEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setTouched((prev) => ({ ...prev, [name]: true }));
+
+        if (name === 'email' && value) {
+            setErrors((prev) => ({ ...prev, email: validateEmail(value) }));
+        } else if (name === 'email' && !value) {
+            setErrors((prev) => ({ ...prev, email: '' }));
+        }
+        if (name === 'password') {
+            setErrors((prev) => ({ ...prev, password: validatePassword(value) }));
+        }
+    };
+
+    const handleSubmit = async (e: FormEvent) => {
+        e.preventDefault();
+
+        const emailError = validateEmail(values.email);
+        const passwordError = validatePassword(values.password);
+
+        setErrors({ email: emailError, password: passwordError });
+        setTouched({ email: true, password: true });
+
+        if (emailError || passwordError) return;
+
+        try {
+            setIsSubmitting(true);
+            setGeneralError('');
+
+            // 1. Sign out any existing session
+            try {
+                await signOut();
+            } catch {
+                // ignore
+            }
+
+            // 2. Sign in with Cognito
+            const signInResult = await signIn({
+                username: values.email,
+                password: values.password,
+            });
+
+            if (!signInResult.isSignedIn) {
+                setGeneralError('Your account login needs an additional step. Please contact support.');
+                return;
+            }
+
+            // 3. Get session tokens
+            const session = await fetchAuthSession();
+            const { tokens } = session;
+
+            if (!tokens || !tokens.accessToken || !tokens.idToken) {
+                setGeneralError('Login session could not be created. Please try again.');
+                return;
+            }
+
+            // 4. Check Cognito group is AFFILIATE
+            const idGroups = (tokens.idToken?.payload['cognito:groups'] as string[] | undefined) || [];
+            const accessGroups = (tokens.accessToken?.payload['cognito:groups'] as string[] | undefined) || [];
+            const groups = [...new Set([...idGroups, ...accessGroups])];
+
+            if (!groups.includes('AFFILIATE')) {
+                await signOut();
+                setGeneralError('You are not authorized to access the affiliate portal.');
+                return;
+            }
+
+            const accessToken = tokens.accessToken.toString();
+            const idToken = tokens.idToken.toString();
+
+            // Store tokens for session
+            sessionStorage.setItem('accessToken', accessToken);
+            sessionStorage.setItem('idToken', idToken);
+            sessionStorage.setItem('affiliateEmail', values.email);
+            localStorage.setItem('originbi_id_token', idToken);
+
+            // 5. Fetch affiliate profile from /affiliates/me
+            try {
+                const meRes = await api.get('/affiliates/me', {
+                    headers: { Authorization: `Bearer ${idToken}` },
+                });
+
+                const meData = meRes.data;
+                const affiliate = meData.user?.affiliate || meData.user?.affiliateAccount || meData.affiliate;
+
+                if (!affiliate) {
+                    await signOut();
+                    setGeneralError('Affiliate account not found. Please contact support.');
+                    return;
+                }
+
+                // Check if account is active
+                if (!affiliate.isActive && affiliate.isActive !== undefined) {
+                    await signOut();
+                    setGeneralError('Your affiliate account is currently inactive. Please contact support.');
+                    return;
+                }
+
+                // Store the affiliate user with REAL affiliate_accounts.id
+                const affiliateUser = {
+                    id: affiliate.id,                           // affiliate_accounts.id
+                    userId: meData.user?.id || affiliate.userId, // users.id
+                    email: affiliate.email || meData.user?.email || values.email,
+                    name: affiliate.name || values.email.split('@')[0],
+                    referralCode: affiliate.referralCode,
+                    commissionPercentage: affiliate.commissionPercentage,
+                    role: 'AFFILIATE',
+                };
+                localStorage.setItem('affiliate_user', JSON.stringify(affiliateUser));
+
+                onLoginSuccess();
+            } catch (profileErr: any) {
+                console.error('Failed to fetch affiliate profile:', profileErr);
+                await signOut();
+                setGeneralError(
+                    profileErr.response?.data?.message ||
+                    'Affiliate account not found. Please contact support.',
+                );
+            }
+        } catch (err: unknown) {
+            console.error('Login error:', err);
+            const message =
+                err && typeof err === 'object' && 'message' in err
+                    ? String((err as any).message)
+                    : 'Login failed. Please check your credentials.';
+            setGeneralError(message);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const isEmailInvalid = touched.email && !!errors.email;
+    const isPasswordInvalid = touched.password && !!errors.password;
+
+    return (
+        <form className="flex flex-col gap-[clamp(16px,2.5vw,48px)] animate-fade-in" style={{ animationDelay: '100ms' }} onSubmit={handleSubmit} noValidate>
+
+            {generalError && (
+                <div className="flex items-center gap-2 px-1 animate-fade-in text-red-500 dark:text-red-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-sm font-medium">{generalError}</span>
+                </div>
+            )}
+
+            <div>
+                <label
+                    htmlFor="affiliate-email"
+                    className="block font-sans text-[clamp(14px,0.9vw,18px)] font-semibold text-brand-text-light-secondary dark:text-white mb-2 leading-none tracking-[0px]"
+                >
+                    Email ID <span className="text-red-500">*</span>
+                </label>
+                <input
+                    type="email"
+                    name="email"
+                    id="affiliate-email"
+                    value={values.email}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className={`bg-brand-light-secondary dark:bg-brand-dark-tertiary border text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] font-normal leading-none tracking-[0px] rounded-full block w-full h-[clamp(56px,3.5vw,68px)] px-[clamp(20px,1.2vw,30px)] transition-colors duration-300 ${isEmailInvalid
+                        ? "border-red-500 focus:ring-red-500 focus:border-red-500"
+                        : "border-brand-light-tertiary dark:border-brand-dark-tertiary focus:ring-brand-green focus:border-brand-green"
+                        }`}
+                    placeholder="example@domain.com"
+                    required
+                    disabled={isSubmitting}
+                    aria-invalid={isEmailInvalid}
+                />
+                {isEmailInvalid && (
+                    <div className="flex items-center gap-2 px-1 animate-fade-in text-red-500 dark:text-red-400 mt-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-sm font-medium">{errors.email}</span>
+                    </div>
+                )}
+            </div>
+
+            <div>
+                <label
+                    htmlFor="affiliate-password"
+                    className="block font-sans text-[clamp(14px,0.9vw,18px)] font-semibold text-brand-text-light-secondary dark:text-white mb-2 leading-none tracking-[0px]"
+                >
+                    Password <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                    <input
+                        type={passwordVisible ? "text" : "password"}
+                        name="password"
+                        id="affiliate-password"
+                        value={values.password}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        placeholder="Enter your password"
+                        className={`bg-brand-light-secondary dark:bg-brand-dark-tertiary border text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] font-normal leading-none tracking-[0px] rounded-full block w-full h-[clamp(56px,3.5vw,68px)] pl-[clamp(20px,1.2vw,30px)] pr-16 transition-colors duration-300 ${isPasswordInvalid
+                            ? "border-red-500 focus:ring-red-500 focus:border-red-500"
+                            : "border-brand-light-tertiary dark:border-brand-dark-tertiary focus:ring-brand-green focus:border-brand-green"
+                            }`}
+                        required
+                        disabled={isSubmitting}
+                        aria-invalid={isPasswordInvalid}
+                    />
+                    <button
+                        type="button"
+                        onClick={togglePasswordVisibility}
+                        className="absolute inset-y-0 right-0 cursor-pointer flex items-center pr-4 text-brand-text-light-secondary hover:text-brand-text-light-primary dark:text-brand-text-secondary dark:hover:text-white transition-colors duration-300"
+                        aria-label={passwordVisible ? "Hide password" : "Show password"}
+                    >
+                        {passwordVisible ? (
+                            <EyeIcon className="h-5 w-5 text-brand-green" />
+                        ) : (
+                            <EyeOffIcon className="h-5 w-5 text-brand-green" />
+                        )}
+                    </button>
+                </div>
+                {isPasswordInvalid && (
+                    <div className="flex items-center gap-2 px-1 animate-fade-in text-red-500 dark:text-red-400 mt-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-sm font-medium">{errors.password}</span>
+                    </div>
+                )}
+
+                {/* Forgot Password Link */}
+                <div className="flex justify-end mt-3">
+                    <Link
+                        href="/affiliate/forgot-password"
+                        className="text-sm text-brand-text-light-secondary dark:text-brand-text-secondary hover:text-brand-green transition-colors font-medium"
+                    >
+                        Forgot Password?
+                    </Link>
+                </div>
+            </div>
+
+            <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`w-full text-white bg-brand-green hover:bg-brand-green/90 focus:ring-4 focus:outline-none focus:ring-brand-green/30 font-sans font-semibold rounded-full text-[clamp(16px,1vw,20px)] leading-none tracking-[0px] text-center transition-colors duration-300 disabled:bg-brand-green/50 disabled:cursor-not-allowed flex justify-center items-center h-[clamp(56px,3.5vw,68px)] px-[clamp(20px,1.2vw,30px)] shadow-lg hover:shadow-xl transform active:scale-[0.99] ${buttonClass}`}
+                aria-busy={isSubmitting}
+            >
+                {isSubmitting ? (
+                    <svg
+                        className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                    >
+                        <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                        ></circle>
+                        <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                    </svg>
+                ) : (
+                    'Login'
+                )}
+            </button>
+
+            {/* Registration Link */}
+            <div className="text-center">
+                <p className="text-center text-sm text-brand-text-light-secondary dark:text-brand-text-secondary">
+                    Want to become an affiliate?{" "}
+                    <Link
+                        href="/affiliate/register"
+                        className="text-brand-green font-medium hover:text-brand-green/80 transition-colors"
+                    >
+                        Join our program
+                    </Link>
+                </p>
+            </div>
+        </form>
+    );
+};
+
+export default AffiliateLoginForm;

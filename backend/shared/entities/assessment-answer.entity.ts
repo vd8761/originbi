@@ -38,8 +38,8 @@ export class AssessmentAnswer {
     @Column({ name: 'program_id', type: 'bigint' })
     programId: number;
 
-    @Column({ name: 'assessment_level_id', type: 'bigint' })
-    assessmentLevelId: number;
+    @Column({ name: 'assessment_level_id', type: 'bigint', nullable: true })
+    assessmentLevelId: number | null;
 
     @Column({ name: 'question_source', type: 'varchar', length: 10 })
     questionSource: 'MAIN' | 'OPEN';
