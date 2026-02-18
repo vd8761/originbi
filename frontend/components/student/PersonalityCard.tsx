@@ -1,4 +1,5 @@
 import React from 'react';
+import ReportDownloadButton from './ReportDownloadButton';
 
 const PersonalityCard: React.FC = () => {
     return (
@@ -33,6 +34,11 @@ const PersonalityCard: React.FC = () => {
                 <h2 className="text-white font-sans font-bold text-3xl lg:text-[2.5vw] leading-[1] drop-shadow-lg">
                     Analytical <br /> Leader
                 </h2>
+                
+                {/* Download Report Button */}
+                <div className="mt-auto">
+                    <ReportDownloadButton className="mt-4 pointer-events-auto" />
+                </div>
             </div>
         </div>
     );

@@ -12,6 +12,8 @@ import {
   AciTrait,
   AciValue,
 } from '@originbi/shared-entities';
+import { Department } from '../departments/department.entity';
+import { DepartmentDegree } from '../departments/department-degree.entity';
 
 @Injectable()
 export class AssessmentService {
@@ -30,7 +32,11 @@ export class AssessmentService {
     private readonly aciTraitRepo: Repository<AciTrait>,
     @InjectRepository(AciValue)
     private readonly aciValueRepo: Repository<AciValue>,
-  ) { }
+    @InjectRepository(Department)
+    private readonly deptRepo: Repository<Department>,
+    @InjectRepository(DepartmentDegree)
+    private readonly deptDegreeRepo: Repository<DepartmentDegree>,
+  ) {}
 
   async findAllSessions(
     page: number,
@@ -358,7 +364,7 @@ export class AssessmentService {
               (aciAttempt as any).aciBand = {
                 levelName: trait.traitTitle,
                 compatibilityTag: trait.shortSummary, // Mapping summary to tag?
-                interpretation: trait.personalizedInsight
+                interpretation: trait.personalizedInsight,
               };
             }
           }
@@ -400,6 +406,38 @@ export class AssessmentService {
     } catch (error) {
       console.error('Error fetching levels:', error);
       return [];
+    }
+  }
+
+  async findGroupDepartmentStats(groupId: number) {
+    try {
+      const stats = await this.sessionRepo
+        .createQueryBuilder('s')
+        .leftJoin('s.registration', 'r')
+        .leftJoin(DepartmentDegree, 'dd', 'dd.id = r.departmentDegreeId')
+        .leftJoin(Department, 'd', 'd.id = dd.departmentId')
+        .select([
+          'r.departmentDegreeId AS "id"',
+          'd.name AS "name"',
+          'COUNT(s.id) AS "total"',
+          `SUM(CASE WHEN s.status = 'COMPLETED' THEN 1 ELSE 0 END) AS "completed"`,
+        ])
+        .where('s.groupAssessmentId = :groupId', { groupId })
+        .andWhere('r.departmentDegreeId IS NOT NULL')
+        .groupBy('r.departmentDegreeId, d.name')
+        .getRawMany();
+
+      return {
+        departments: stats.map((s) => ({
+          id: Number(s.id),
+          name: s.name,
+          total: Number(s.total),
+          completed: Number(s.completed),
+        })),
+      };
+    } catch (error) {
+      console.error('Error fetching group department stats:', error);
+      return { departments: [] };
     }
   }
 }
