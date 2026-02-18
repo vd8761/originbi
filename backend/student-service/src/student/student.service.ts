@@ -18,7 +18,14 @@ import { AssessmentLevel } from '../entities/assessment_level.entity';
 import { AssessmentAnswer } from '../entities/assessment_answer.entity';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { Program } from '../entities/program.entity';
-import { Registration, Gender, RegistrationStatus, PaymentStatus, AffiliateAccount, AffiliateReferralTransaction } from '@originbi/shared-entities';
+import {
+  Registration,
+  Gender,
+  RegistrationStatus,
+  PaymentStatus,
+  AffiliateAccount,
+  AffiliateReferralTransaction,
+} from '@originbi/shared-entities';
 import * as nodemailer from 'nodemailer';
 import { SES } from 'aws-sdk';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
@@ -551,7 +558,10 @@ export class StudentService {
       // 2. Create User in Cognito
       let cognitoSub = '';
       try {
-        const cognitoRes = await this.createCognitoUser(dto.email, dto.password);
+        const cognitoRes = await this.createCognitoUser(
+          dto.email,
+          dto.password,
+        );
         cognitoSub = cognitoRes.sub || '';
       } catch (e) {
         this.logger.error('Cognito creation failed', e);
@@ -628,12 +638,17 @@ export class StudentService {
         });
 
         if (affiliate) {
-          this.logger.log(`Referral code ${dto.referral_code} found for affiliate ${affiliate.id}`);
+          this.logger.log(
+            `Referral code ${dto.referral_code} found for affiliate ${affiliate.id}`,
+          );
 
           // Determine commission
-          const registrationAmount = Number(this.configService.get('REGISTRATION_COST') || 500);
+          const registrationAmount = Number(
+            this.configService.get('REGISTRATION_COST') || 500,
+          );
           const commissionPercentage = affiliate.commissionPercentage || 0;
-          const earnedCommission = (registrationAmount * commissionPercentage) / 100;
+          const earnedCommission =
+            (registrationAmount * commissionPercentage) / 100;
 
           // Create the referral transaction record
           const transactionData = {
@@ -650,18 +665,27 @@ export class StudentService {
             },
           };
 
-          const referralTransaction = this.affiliateTransactionRepo.create(transactionData);
+          const referralTransaction =
+            this.affiliateTransactionRepo.create(transactionData);
           await this.affiliateTransactionRepo.save(referralTransaction);
-          this.logger.log(`Affiliate referral transaction recorded for registration ${savedReg.id}`);
+          this.logger.log(
+            `Affiliate referral transaction recorded for registration ${savedReg.id}`,
+          );
 
           // Update aggregate fields on AffiliateAccount
           affiliate.referralCount = (Number(affiliate.referralCount) || 0) + 1;
-          affiliate.totalEarnedCommission = (Number(affiliate.totalEarnedCommission) || 0) + earnedCommission;
-          affiliate.totalPendingCommission = (Number(affiliate.totalPendingCommission) || 0) + earnedCommission;
+          affiliate.totalEarnedCommission =
+            (Number(affiliate.totalEarnedCommission) || 0) + earnedCommission;
+          affiliate.totalPendingCommission =
+            (Number(affiliate.totalPendingCommission) || 0) + earnedCommission;
           await this.affiliateRepo.save(affiliate);
-          this.logger.log(`Affiliate ${affiliate.id} aggregates updated: referralCount=${affiliate.referralCount}, totalEarned=${affiliate.totalEarnedCommission}, totalPending=${affiliate.totalPendingCommission}`);
+          this.logger.log(
+            `Affiliate ${affiliate.id} aggregates updated: referralCount=${affiliate.referralCount}, totalEarned=${affiliate.totalEarnedCommission}, totalPending=${affiliate.totalPendingCommission}`,
+          );
         } else {
-          this.logger.warn(`Invalid or inactive referral code provided: ${dto.referral_code}`);
+          this.logger.warn(
+            `Invalid or inactive referral code provided: ${dto.referral_code}`,
+          );
         }
       }
 
@@ -753,7 +777,10 @@ export class StudentService {
         message: 'Registration successful. Exam scheduled.',
       };
     } catch (error) {
-      this.logger.error(`[Register Critical Error] ${error.message}`, error.stack);
+      this.logger.error(
+        `[Register Critical Error] ${error.message}`,
+        error.stack,
+      );
       throw new BadRequestException(`Registration failed: ${error.message}`);
     }
   }
@@ -796,7 +823,9 @@ export class StudentService {
     // 1. Determine Program Type (Logic moved to rely on Program Code)
 
     // Check if it is really SCHOOL_STUDENT program
-    const program = await this.sessionRepo.manager.findOne(Program, { where: { id: attempt.programId } });
+    const program = await this.sessionRepo.manager.findOne(Program, {
+      where: { id: attempt.programId },
+    });
     const isSchool = program?.code === 'SCHOOL_STUDENT';
 
     let selectedSetNumber = 1;
@@ -811,17 +840,21 @@ export class StudentService {
          WHERE assessment_level_id = $1 
            AND is_active = true 
            AND board = $2`,
-        [level.id, studentBoard]
+        [level.id, studentBoard],
       );
 
       if (loadedSets && loadedSets.length > 0) {
         // Randomly pick one
         const randomIndex = Math.floor(Math.random() * loadedSets.length);
         selectedSetNumber = loadedSets[randomIndex].set_number;
-        this.logger.log(`[Assessment] Selected Set ${selectedSetNumber} for Board ${studentBoard}`);
+        this.logger.log(
+          `[Assessment] Selected Set ${selectedSetNumber} for Board ${studentBoard}`,
+        );
 
         // Update Session Metadata ONLY if we successfully picked a Board-specific set
-        const session = await this.sessionRepo.findOne({ where: { id: attempt.assessmentSessionId } });
+        const session = await this.sessionRepo.findOne({
+          where: { id: attempt.assessmentSessionId },
+        });
         if (session) {
           if (!session.metadata) session.metadata = {};
           session.metadata.setNumber = selectedSetNumber;
@@ -829,7 +862,9 @@ export class StudentService {
           await this.sessionRepo.save(session);
         }
       } else {
-        this.logger.warn(`[Assessment] No sets found for Board ${studentBoard}, defaulting to Generic Set 1`);
+        this.logger.warn(
+          `[Assessment] No sets found for Board ${studentBoard}, defaulting to Generic Set 1`,
+        );
         selectedSetNumber = 1;
         fallbackToGeneric = true;
       }
@@ -857,7 +892,7 @@ export class StudentService {
       user.id,
       reg.id,
       level.id,
-      attempt.programId
+      attempt.programId,
     ];
 
     if (isSchool) {
@@ -879,7 +914,6 @@ export class StudentService {
       // Stream is only for HSC usually, but good to filter if present
       query += ` AND (metadata->>'school_stream' IS NULL OR metadata->>'school_stream' = $${params.length + 1})`;
       params.push(reg.schoolStream);
-
     } else {
       // Generic / College Logic (Existing)
       query += ` AND (metadata->>'school_level' IS NULL OR metadata->>'school_level' = $${params.length + 1})`;
@@ -1164,7 +1198,8 @@ export class StudentService {
       const pdfResponse = await lastValueFrom(
         this.httpService.get(downloadUrl, { responseType: 'arraybuffer' }),
       );
-      const pdfBuffer = Buffer.from(pdfResponse.data as any, 'binary');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      const pdfBuffer = Buffer.from(pdfResponse.data, 'binary');
 
       // 7. Send Email
       const dateStr = new Date().toLocaleDateString('en-US', {
@@ -1184,7 +1219,8 @@ export class StudentService {
         this.configService.get('FRONTEND_APP_URL') || 'http://localhost:3000',
         assets,
         dateStr,
-        registration.program?.reportTitle || 'Self Discovery Report',
+        ((registration as any).program?.reportTitle as string) ||
+          'Self Discovery Report',
       );
 
       // --- Transporter Setup ---
@@ -1206,6 +1242,7 @@ export class StudentService {
         region,
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const transporter = nodemailer.createTransport({
         SES: ses,
       } as any);
@@ -1215,7 +1252,7 @@ export class StudentService {
         from: `"${process.env.EMAIL_SEND_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
         to: user.email,
         cc: [process.env.EMAIL_CC],
-        subject: `Your Assessment Report is Ready - ${registration.program?.reportTitle || 'Origin BI'}`,
+        subject: `Your Assessment Report is Ready - ${((registration as any).program?.reportTitle as string) || 'Origin BI'}`,
         html: emailHtml,
         attachments: [
           {
