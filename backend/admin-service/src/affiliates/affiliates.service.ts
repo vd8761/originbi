@@ -446,8 +446,12 @@ export class AffiliatesService {
 
         let pool = currentUnpaidOverflow + amount;
         let fullySettledCount = 0;
-        const transactionBreakdown = [];
-        const cumulativeBoundaries = [];
+        const transactionBreakdown: Array<{
+            id: number; studentName: string; amount: number;
+            coveredAmount: number; remainingAmount: number;
+            status: 'fully_settled' | 'partial' | 'not_settled';
+        }> = [];
+        const cumulativeBoundaries: number[] = [];
         let runningTotal = 0;
 
         for (const txn of processingTransactions) {
@@ -483,8 +487,8 @@ export class AffiliatesService {
             });
         }
 
-        let suggestedLower = null;
-        let suggestedUpper = null;
+        let suggestedLower: number | null = null;
+        let suggestedUpper: number | null = null;
         for (const b of cumulativeBoundaries) {
             if (b <= amount + 0.01) suggestedLower = b;
             if (b >= amount - 0.01 && suggestedUpper === null) suggestedUpper = b;
