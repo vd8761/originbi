@@ -67,3 +67,6 @@ run-all.sh
 run-all-private.ps1
 
 /originbi-schools
+
+dev.ps1
+dev-start.ps1
