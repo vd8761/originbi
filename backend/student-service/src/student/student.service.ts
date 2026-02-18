@@ -64,7 +64,7 @@ export class StudentService {
     private readonly affiliateTransactionRepo: Repository<AffiliateReferralTransaction>,
     private readonly http: HttpService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   async onModuleInit() {
     // Check if imported functions are used to avoid TS error, or just use them
@@ -1164,6 +1164,7 @@ export class StudentService {
       const pdfResponse = await lastValueFrom(
         this.httpService.get(downloadUrl, { responseType: 'arraybuffer' }),
       );
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const pdfBuffer = Buffer.from(pdfResponse.data as any, 'binary');
 
       // 7. Send Email
@@ -1184,7 +1185,7 @@ export class StudentService {
         this.configService.get('FRONTEND_APP_URL') || 'http://localhost:3000',
         assets,
         dateStr,
-        registration.program?.reportTitle || 'Self Discovery Report',
+        (registration as any).program?.reportTitle || 'Self Discovery Report',
       );
 
       // --- Transporter Setup ---
@@ -1206,6 +1207,7 @@ export class StudentService {
         region,
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const transporter = nodemailer.createTransport({
         SES: ses,
       } as any);
@@ -1215,7 +1217,7 @@ export class StudentService {
         from: `"${process.env.EMAIL_SEND_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
         to: user.email,
         cc: [process.env.EMAIL_CC],
-        subject: `Your Assessment Report is Ready - ${registration.program?.reportTitle || 'Origin BI'}`,
+        subject: `Your Assessment Report is Ready - ${(registration as any).program?.reportTitle || 'Origin BI'}`,
         html: emailHtml,
         attachments: [
           {
