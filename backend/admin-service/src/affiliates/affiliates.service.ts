@@ -871,21 +871,22 @@ export class AffiliatesService {
         const affiliate = await this.affiliateRepo.findOne({ where: { id: affiliateId } });
         if (!affiliate) throw new BadRequestException('Affiliate not found');
 
-        return this.dataSource.transaction(async (manager) => {
-            // Create settlement transaction record
-            const settlement = manager.create(AffiliateSettlementTransaction, {
-                affiliateAccountId: affiliateId,
-                settleAmount: dto.settleAmount,
-                transactionMode: dto.transactionMode,
-                settlementTransactionId: dto.transactionId,
-                paymentDate: new Date(dto.paymentDate),
-                metadata: {
-                    earnedAsOfSettlement: Number(affiliate.totalEarnedCommission) || 0,
-                    pendingAsOfSettlement: Number(affiliate.totalPendingCommission) || 0,
-                    settledAsOfSettlement: Number(affiliate.totalSettledCommission) || 0,
-                },
-            });
-            await manager.save(settlement);
+        try {
+            return await this.dataSource.transaction(async (manager) => {
+                // Create settlement transaction record
+                const settlement = manager.create(AffiliateSettlementTransaction, {
+                    affiliateAccountId: affiliateId,
+                    settleAmount: dto.settleAmount,
+                    transactionMode: dto.transactionMode,
+                    settlementTransactionId: dto.transactionId,
+                    paymentDate: new Date(dto.paymentDate),
+                    metadata: {
+                        earnedAsOfSettlement: Number(affiliate.totalEarnedCommission) || 0,
+                        pendingAsOfSettlement: Number(affiliate.totalPendingCommission) || 0,
+                        settledAsOfSettlement: Number(affiliate.totalSettledCommission) || 0,
+                    },
+                });
+                await manager.save(settlement);
 
                 // 2. Update referral transactions: mark as settled (status = 2)
                 // We calculate how much "unpaid overflow" exists from previous partial settlements
