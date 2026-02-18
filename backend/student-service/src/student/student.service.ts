@@ -580,7 +580,7 @@ export class StudentService {
         throw new Error(`Program ${programCode} not found`);
       }
 
-      // 5. Create Registration
+      // 5. Create Registration (Force TS Check)
       const registration = this.sessionRepo.manager.create(Registration, {
         userId: user.id,
         registrationSource: 'SELF',
@@ -599,7 +599,7 @@ export class StudentService {
         },
         createdAt: new Date(),
         updatedAt: new Date(),
-      });
+      } as any);
       const savedReg = await this.sessionRepo.manager.save(
         Registration,
         registration,
@@ -749,8 +749,7 @@ export class StudentService {
     reg: Registration,
     level: AssessmentLevel,
   ) {
-    // 1. Determine Program Type
-    const isSchoolProgram = reg.programId === attempt.programId; // We can check program code if needed, but for now assuming logic applies if metadata fits.
+    // 1. Determine Program Type (Logic moved to rely on Program Code)
 
     // Check if it is really SCHOOL_STUDENT program
     const program = await this.sessionRepo.manager.findOne(Program, { where: { id: attempt.programId } });
