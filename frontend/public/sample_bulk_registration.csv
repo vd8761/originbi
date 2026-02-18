@@ -1,3 +1,5 @@
-full_name,gender,email,country_code,mobile_number,group_name,program_code,school_level,school_stream,department,degree,current_year,exam_start_date,exam_end_date,password,send_email
-Student 1,Female,student1@example.com,91,8876543219,IIT,COLLEGE_STUDENT,COLLEGE_STUDENT,CSE,CSE,B.Tech,1,2025-01-01 09:00:00,2025-12-31 18:00:00,Admin@123,TRUE
-Employee 1,Female,employee1@example.com,91,8234567890,TDS,EMPLOYEE,,,,,,2025-01-01 09:00:00,2025-12-31 18:00:00,Admin@123,TRUE
+full_name,gender,email,country_code,mobile_number,group_name,program_code,school_level,student_board,school_stream,department,degree,current_year,exam_start_date,exam_end_date,password,send_email
+Student College,Female,college.student@example.com,91,9876543201,CollegeGroup,COLLEGE_STUDENT,,,,CSE,B.Tech,1,2025-01-01 09:00:00,2025-12-31 18:00:00,Student@123,TRUE
+Student School HSC,Male,school.hsc@example.com,91,9876543202,SchoolGroup,SCHOOL_STUDENT,HSC,STATE_BOARD,SCIENCE,,,1,2025-01-01 09:00:00,2025-12-31 18:00:00,Student@123,TRUE
+Student School SSLC,Female,school.sslc@example.com,91,9876543203,SchoolGroup,SCHOOL_STUDENT,SSLC,CBSE,,,,,2025-01-01 09:00:00,2025-12-31 18:00:00,Student@123,TRUE
+Employee User,Male,employee@example.com,91,9876543204,CorporateGroup,EMPLOYEE,,,,,,,2025-01-01 09:00:00,2025-12-31 18:00:00,Employee@123,TRUE

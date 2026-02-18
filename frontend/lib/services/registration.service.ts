@@ -34,6 +34,7 @@ export interface CreateRegistrationDto {
   school_stream?: SchoolStream;
   department_degree_id?: string; // For college
   current_year?: string;
+  student_board?: string;
   group_name?: string;
 
   password?: string;
@@ -164,6 +165,7 @@ export const registrationService = {
       schoolStream: payload.school_stream,
       departmentId: payload.department_degree_id,
       currentYear: payload.current_year,
+      studentBoard: payload.student_board,
       password: payload.password,
     };
 

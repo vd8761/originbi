@@ -4,7 +4,7 @@ import { CreateRegistrationDto } from './dto/create-registration.dto';
 
 @Controller('student')
 export class StudentController {
-  constructor(private readonly studentService: StudentService) { }
+  constructor(private readonly studentService: StudentService) {}
 
   @Post('profile')
   async getProfile(@Body() body: { email: string }) {
@@ -47,6 +47,15 @@ export class StudentController {
     @Body() dto: { email: string; mobile_number?: string },
   ) {
     return this.studentService.validateRegistration(dto);
+  }
+
+  @Post('assessment-complete')
+  completeAssessment(@Body() body: { userId: number }) {
+    // Fire and forget - don't block the caller
+    this.studentService
+      .handleAssessmentCompletion(body.userId)
+      .catch((err) => console.error('Async email sending error:', err));
+    return { message: 'Assessment completion processing started' };
   }
 
   @Post('affiliate/validate')
