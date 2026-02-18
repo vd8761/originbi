@@ -9,9 +9,15 @@ import { AssessmentAttempt } from '../entities/assessment_attempt.entity';
 import { AssessmentLevel } from '../entities/assessment_level.entity';
 import { AssessmentAnswer } from '../entities/assessment_answer.entity';
 
-
 import { Program } from '../entities/program.entity';
-import { AffiliateReferralTransaction, AffiliateAccount, Registration, Groups, AffiliateSettlementTransaction } from '@originbi/shared-entities';
+import { AssessmentReport } from '../entities/assessment-report.entity';
+import {
+  AffiliateReferralTransaction,
+  AffiliateAccount,
+  Registration,
+  Groups,
+  AffiliateSettlementTransaction,
+} from '@originbi/shared-entities';
 
 @Module({
   imports: [
@@ -24,6 +30,7 @@ import { AffiliateReferralTransaction, AffiliateAccount, Registration, Groups, A
       AssessmentAnswer,
       Registration,
       Program,
+      AssessmentReport,
       AffiliateReferralTransaction,
       AffiliateAccount,
       AffiliateSettlementTransaction,
@@ -35,4 +42,4 @@ import { AffiliateReferralTransaction, AffiliateAccount, Registration, Groups, A
   providers: [StudentService],
   exports: [StudentService],
 })
-export class StudentModule { }
+export class StudentModule {}

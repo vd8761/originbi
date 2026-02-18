@@ -5,6 +5,9 @@ import { Injectable, ConsoleLogger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, ILike } from 'typeorm';
+import { AssessmentReport } from '../entities/assessment-report.entity';
+import { getAssessmentCompletionEmailTemplate } from '../mail/templates/assessment-completion.template';
+import { lastValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { User } from '../entities/student.entity';
@@ -15,7 +18,14 @@ import { AssessmentLevel } from '../entities/assessment_level.entity';
 import { AssessmentAnswer } from '../entities/assessment_answer.entity';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { Program } from '../entities/program.entity';
-import { Registration, Gender, RegistrationStatus, PaymentStatus, AffiliateAccount, AffiliateReferralTransaction } from '@originbi/shared-entities';
+import {
+  Registration,
+  Gender,
+  RegistrationStatus,
+  PaymentStatus,
+  AffiliateAccount,
+  AffiliateReferralTransaction,
+} from '@originbi/shared-entities';
 import * as nodemailer from 'nodemailer';
 import { SES } from 'aws-sdk';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
@@ -48,20 +58,31 @@ export class StudentService {
     private readonly levelRepo: Repository<AssessmentLevel>,
     @InjectRepository(AssessmentAnswer)
     private readonly answerRepo: Repository<AssessmentAnswer>,
+    @InjectRepository(AssessmentReport)
+    private assessmentReportRepository: Repository<AssessmentReport>,
+    @InjectRepository(Registration)
+    private readonly registrationRepo: Repository<Registration>,
+    @InjectRepository(Program)
+    private readonly programRepo: Repository<Program>,
+    private readonly httpService: HttpService,
     @InjectRepository(AffiliateAccount)
     private readonly affiliateRepo: Repository<AffiliateAccount>,
     @InjectRepository(AffiliateReferralTransaction)
     private readonly affiliateTransactionRepo: Repository<AffiliateReferralTransaction>,
     private readonly http: HttpService,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
+  async onModuleInit() {
+    // Check if imported functions are used to avoid TS error, or just use them
+    // They are used in handleAssessmentCompletion
+  }
   private async createCognitoUser(email: string, password: string) {
     const authServiceUrl =
       process.env.AUTH_SERVICE_URL || 'http://localhost:4000'; // Default or Env
     try {
       const res = await firstValueFrom(
-        this.http.post(
+        this.httpService.post(
           `${authServiceUrl}/internal/cognito/users`,
           { email, password },
           { proxy: false },
@@ -474,16 +495,16 @@ export class StudentService {
       // This ensures Level 1 gets questions, and if Level 2 has questions in DB, it gets them too.
       await this.answerRepo.query(
         `
-           INSERT INTO assessment_answers (
+            INSERT INTO assessment_answers (
               assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
               main_question_id, question_source, status, question_sequence, created_at, updated_at
-           )
-           SELECT $1, $2, $3, $4, $6, $5, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
-           FROM assessment_questions 
-           WHERE assessment_level_id = $5 
-           ORDER BY RANDOM()
-           LIMIT 12
-       `,
+            )
+            SELECT $1, $2, $3, $4, $6, $5, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
+            FROM assessment_questions 
+            WHERE assessment_level_id = $5 
+            ORDER BY RANDOM()
+            LIMIT 12
+        `,
         [
           savedAttempt.id,
           savedSession.id,
@@ -518,7 +539,9 @@ export class StudentService {
   async register(dto: CreateRegistrationDto) {
     this.logger.log(`[Register Debug] Register called for: ${dto.email}`);
     this.logger.log(`[Register Debug] Payload: ${JSON.stringify(dto)}`);
-    this.logger.log(`[Register Debug] Public registration attempt for: ${dto.email}`);
+    this.logger.log(
+      `[Register Debug] Public registration attempt for: ${dto.email}`,
+    );
 
     try {
       // 1. Check if User exists
@@ -535,7 +558,10 @@ export class StudentService {
       // 2. Create User in Cognito
       let cognitoSub = '';
       try {
-        const cognitoRes = await this.createCognitoUser(dto.email, dto.password);
+        const cognitoRes = await this.createCognitoUser(
+          dto.email,
+          dto.password,
+        );
         cognitoSub = cognitoRes.sub || '';
       } catch (e) {
         this.logger.error('Cognito creation failed', e);
@@ -580,7 +606,7 @@ export class StudentService {
         throw new Error(`Program ${programCode} not found`);
       }
 
-      // 5. Create Registration
+      // 5. Create Registration (Force TS Check)
       const registration = this.sessionRepo.manager.create(Registration, {
         userId: user.id,
         registrationSource: 'SELF',
@@ -599,7 +625,7 @@ export class StudentService {
         },
         createdAt: new Date(),
         updatedAt: new Date(),
-      });
+      } as any);
       const savedReg = await this.sessionRepo.manager.save(
         Registration,
         registration,
@@ -612,12 +638,17 @@ export class StudentService {
         });
 
         if (affiliate) {
-          this.logger.log(`Referral code ${dto.referral_code} found for affiliate ${affiliate.id}`);
+          this.logger.log(
+            `Referral code ${dto.referral_code} found for affiliate ${affiliate.id}`,
+          );
 
           // Determine commission
-          const registrationAmount = Number(this.configService.get('REGISTRATION_COST') || 500);
+          const registrationAmount = Number(
+            this.configService.get('REGISTRATION_COST') || 500,
+          );
           const commissionPercentage = affiliate.commissionPercentage || 0;
-          const earnedCommission = (registrationAmount * commissionPercentage) / 100;
+          const earnedCommission =
+            (registrationAmount * commissionPercentage) / 100;
 
           // Create the referral transaction record
           const transactionData = {
@@ -634,18 +665,27 @@ export class StudentService {
             },
           };
 
-          const referralTransaction = this.affiliateTransactionRepo.create(transactionData);
+          const referralTransaction =
+            this.affiliateTransactionRepo.create(transactionData);
           await this.affiliateTransactionRepo.save(referralTransaction);
-          this.logger.log(`Affiliate referral transaction recorded for registration ${savedReg.id}`);
+          this.logger.log(
+            `Affiliate referral transaction recorded for registration ${savedReg.id}`,
+          );
 
           // Update aggregate fields on AffiliateAccount
           affiliate.referralCount = (Number(affiliate.referralCount) || 0) + 1;
-          affiliate.totalEarnedCommission = (Number(affiliate.totalEarnedCommission) || 0) + earnedCommission;
-          affiliate.totalPendingCommission = (Number(affiliate.totalPendingCommission) || 0) + earnedCommission;
+          affiliate.totalEarnedCommission =
+            (Number(affiliate.totalEarnedCommission) || 0) + earnedCommission;
+          affiliate.totalPendingCommission =
+            (Number(affiliate.totalPendingCommission) || 0) + earnedCommission;
           await this.affiliateRepo.save(affiliate);
-          this.logger.log(`Affiliate ${affiliate.id} aggregates updated: referralCount=${affiliate.referralCount}, totalEarned=${affiliate.totalEarnedCommission}, totalPending=${affiliate.totalPendingCommission}`);
+          this.logger.log(
+            `Affiliate ${affiliate.id} aggregates updated: referralCount=${affiliate.referralCount}, totalEarned=${affiliate.totalEarnedCommission}, totalPending=${affiliate.totalPendingCommission}`,
+          );
         } else {
-          this.logger.warn(`Invalid or inactive referral code provided: ${dto.referral_code}`);
+          this.logger.warn(
+            `Invalid or inactive referral code provided: ${dto.referral_code}`,
+          );
         }
       }
 
@@ -737,7 +777,10 @@ export class StudentService {
         message: 'Registration successful. Exam scheduled.',
       };
     } catch (error) {
-      this.logger.error(`[Register Critical Error] ${error.message}`, error.stack);
+      this.logger.error(
+        `[Register Critical Error] ${error.message}`,
+        error.stack,
+      );
       throw new BadRequestException(`Registration failed: ${error.message}`);
     }
   }
@@ -752,6 +795,86 @@ export class StudentService {
     // Fetch random questions
     await this.answerRepo.query(
       `
+            INSERT INTO assessment_answers (
+              assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
+              main_question_id, question_source, status, question_sequence, created_at, updated_at
+            )
+            SELECT $1, $2, $3, $4, $6, $5, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
+            FROM assessment_questions 
+            WHERE assessment_level_id = $5 
+              AND is_active = true
+              AND is_deleted = false
+              AND (metadata->>'school_level' IS NULL OR metadata->>'school_level' = $7)
+              AND (metadata->>'school_stream' IS NULL OR metadata->>'school_stream' = $8)
+            ORDER BY RANDOM()
+            LIMIT 60
+        `,
+      [
+        attempt.id,
+        attempt.assessmentSessionId,
+        user.id,
+        reg.id,
+        level.id,
+        attempt.programId,
+        reg.schoolLevel,
+        reg.schoolStream,
+      ],
+    );
+    // 1. Determine Program Type (Logic moved to rely on Program Code)
+
+    // Check if it is really SCHOOL_STUDENT program
+    const program = await this.sessionRepo.manager.findOne(Program, {
+      where: { id: attempt.programId },
+    });
+    const isSchool = program?.code === 'SCHOOL_STUDENT';
+
+    let selectedSetNumber = 1;
+    let fallbackToGeneric = false;
+    const studentBoard = reg.metadata?.studentBoard || null;
+
+    if (isSchool && studentBoard) {
+      // Logic: Pick a random set from available sets for this Board & Level
+      // FIX: Use 'board' column
+      const loadedSets = await this.answerRepo.query(
+        `SELECT DISTINCT set_number FROM assessment_questions 
+         WHERE assessment_level_id = $1 
+           AND is_active = true 
+           AND board = $2`,
+        [level.id, studentBoard],
+      );
+
+      if (loadedSets && loadedSets.length > 0) {
+        // Randomly pick one
+        const randomIndex = Math.floor(Math.random() * loadedSets.length);
+        selectedSetNumber = loadedSets[randomIndex].set_number;
+        this.logger.log(
+          `[Assessment] Selected Set ${selectedSetNumber} for Board ${studentBoard}`,
+        );
+
+        // Update Session Metadata ONLY if we successfully picked a Board-specific set
+        const session = await this.sessionRepo.findOne({
+          where: { id: attempt.assessmentSessionId },
+        });
+        if (session) {
+          if (!session.metadata) session.metadata = {};
+          session.metadata.setNumber = selectedSetNumber;
+          session.metadata.studentBoard = studentBoard;
+          await this.sessionRepo.save(session);
+        }
+      } else {
+        this.logger.warn(
+          `[Assessment] No sets found for Board ${studentBoard}, defaulting to Generic Set 1`,
+        );
+        selectedSetNumber = 1;
+        fallbackToGeneric = true;
+      }
+    }
+
+    // Fetch questions with Updated Logic
+    // If School: Filter by Board (if found) + Set Number + Level + Stream/SchoolLevel
+    // Else: Keep existing logic
+
+    let query = `
            INSERT INTO assessment_answers (
               assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
               main_question_id, question_source, status, question_sequence, created_at, updated_at
@@ -761,22 +884,48 @@ export class StudentService {
            WHERE assessment_level_id = $5::bigint 
              AND is_active = true
              AND is_deleted = false
-             AND (metadata->>'school_level' IS NULL OR metadata->>'school_level' = $7)
-             AND (metadata->>'school_stream' IS NULL OR metadata->>'school_stream' = $8)
-           ORDER BY RANDOM()
-           LIMIT 60
-       `,
-      [
-        Number(attempt.id),
-        Number(attempt.assessmentSessionId),
-        Number(user.id),
-        Number(reg.id),
-        Number(level.id),
-        Number(attempt.programId),
-        reg.schoolLevel || '',
-        reg.schoolStream || '',
-      ],
-    );
+    `;
+
+    const params: any[] = [
+      attempt.id,
+      attempt.assessmentSessionId,
+      user.id,
+      reg.id,
+      level.id,
+      attempt.programId,
+    ];
+
+    if (isSchool) {
+      // Application of Constraints
+
+      // Only apply Board filter if we actually found sets for it
+      // FIX: Use 'board' column
+      if (studentBoard && !fallbackToGeneric) {
+        query += ` AND board = $${params.length + 1}`;
+        params.push(studentBoard);
+      }
+
+      query += ` AND set_number = $${params.length + 1}`;
+      params.push(selectedSetNumber);
+
+      query += ` AND (metadata->>'school_level' IS NULL OR metadata->>'school_level' = $${params.length + 1})`;
+      params.push(reg.schoolLevel);
+
+      // Stream is only for HSC usually, but good to filter if present
+      query += ` AND (metadata->>'school_stream' IS NULL OR metadata->>'school_stream' = $${params.length + 1})`;
+      params.push(reg.schoolStream);
+    } else {
+      // Generic / College Logic (Existing)
+      query += ` AND (metadata->>'school_level' IS NULL OR metadata->>'school_level' = $${params.length + 1})`;
+      params.push(reg.schoolLevel);
+
+      query += ` AND (metadata->>'school_stream' IS NULL OR metadata->>'school_stream' = $${params.length + 1})`;
+      params.push(reg.schoolStream);
+    }
+
+    query += ` ORDER BY RANDOM() LIMIT 60`;
+
+    await this.answerRepo.query(query, params);
   }
 
   async validateRegistration(dto: { email: string; mobile_number?: string }) {
@@ -835,15 +984,25 @@ export class StudentService {
     startDateTime?: Date | string,
     assessmentTitle?: string,
   ) {
-    const region = this.configService.get<string>('AWS_REGION') || this.configService.get<string>('AWS_DEFAULT_REGION');
+    const region =
+      this.configService.get<string>('AWS_REGION') ||
+      this.configService.get<string>('AWS_DEFAULT_REGION');
     const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-    const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
+    const secretAccessKey = this.configService.get<string>(
+      'AWS_SECRET_ACCESS_KEY',
+    );
 
-    this.logger.log(`[Email Debug] AWS Config Check: Region=${region}, KeyPresent=${!!accessKeyId}`);
+    this.logger.log(
+      `[Email Debug] AWS Config Check: Region=${region}, KeyPresent=${!!accessKeyId}`,
+    );
 
     if (!region) {
-      this.logger.error('[Email Critical] AWS_REGION is missing in environment variables.');
-      throw new Error('Configuration Error: AWS_REGION is not defined in the environment.');
+      this.logger.error(
+        '[Email Critical] AWS_REGION is missing in environment variables.',
+      );
+      throw new Error(
+        'Configuration Error: AWS_REGION is not defined in the environment.',
+      );
     }
 
     const ses = new SES({
@@ -858,8 +1017,11 @@ export class StudentService {
     } as any);
 
     const ccEmail = this.configService.get<string>('EMAIL_CC') || '';
-    const fromName = this.configService.get<string>('EMAIL_SEND_FROM_NAME') || 'Origin BI Mind Works';
-    const fromEmail = this.configService.get<string>('EMAIL_FROM') || 'no-reply@originbi.com';
+    const fromName =
+      this.configService.get<string>('EMAIL_SEND_FROM_NAME') ||
+      'Origin BI Mind Works';
+    const fromEmail =
+      this.configService.get<string>('EMAIL_FROM') || 'no-reply@originbi.com';
     const fromAddress = `"${fromName}" <${fromEmail}>`;
 
     this.logger.log(`[Email Debug] Sending from: ${fromAddress}, to: ${to}`);
@@ -892,8 +1054,219 @@ export class StudentService {
       this.logger.log(`[Email Debug] Email sent: ${JSON.stringify(info)}`);
       return info;
     } catch (err) {
-      this.logger.error(`[Email Debug] SendMail threw: ${err.message}`, err.stack);
+      this.logger.error(
+        `[Email Debug] SendMail threw: ${err.message}`,
+        err.stack,
+      );
       throw err;
+    }
+  }
+
+  async handleAssessmentCompletion(userId: number): Promise<void> {
+    interface GenerateResponse {
+      success: boolean;
+      jobId: string;
+      statusUrl: string;
+    }
+
+    interface StatusResponse {
+      status: 'PROCESSING' | 'COMPLETED' | 'ERROR';
+      progress?: string;
+      error?: string;
+      downloadUrl?: string;
+    }
+
+    this.logger.log(`Handling assessment completion for user ${userId}`);
+
+    try {
+      // 1. Verify User and Registration
+      const registration = await this.registrationRepo.findOne({
+        where: { userId: userId, registrationSource: 'SELF' },
+        relations: ['program'],
+      });
+
+      if (!registration) {
+        this.logger.warn(
+          `Skipping email: No SELF registration found for user ${userId}`,
+        );
+        return;
+      }
+
+      const user = await this.userRepo.findOne({ where: { id: userId } });
+      if (!user) {
+        this.logger.error(`User not found: ${userId}`);
+        return;
+      }
+
+      // 2. Trigger Report Generation
+      const reportServiceUrl =
+        process.env.REPORT_SERVICE_URL || 'http://localhost:4006';
+      const generateUrl = `${reportServiceUrl}/generate/student/${userId}`;
+
+      this.logger.log(`Triggering report generation: ${generateUrl}`);
+
+      const generateResponse = await lastValueFrom(
+        this.httpService.get(generateUrl),
+      );
+
+      const responseData = generateResponse.data as GenerateResponse;
+
+      if (!responseData.success || !responseData.jobId) {
+        throw new Error('Failed to initiate report generation');
+      }
+
+      const jobId = responseData.jobId;
+      this.logger.log(`Report generation started. Job ID: ${jobId}`);
+
+      // 3. Poll for Completion (using json=true to avoid HTML parsing)
+      let jobStatus: 'PROCESSING' | 'COMPLETED' | 'ERROR' = 'PROCESSING';
+      let attempts = 0;
+      const maxAttempts = 30; // 30 * 3s = 90 seconds timeout
+      const pollUrl = `${reportServiceUrl}/download/status/${jobId}?json=true`;
+
+      while (jobStatus === 'PROCESSING' && attempts < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 3000)); // Wait 3s
+
+        try {
+          const statusRes = await lastValueFrom(this.httpService.get(pollUrl));
+          const statusData = statusRes.data as StatusResponse;
+
+          jobStatus = statusData.status;
+
+          if (jobStatus === 'ERROR') {
+            throw new Error(`Report generation failed: ${statusData.error}`);
+          }
+
+          if (jobStatus === 'PROCESSING') {
+            this.logger.debug(
+              `Job ${jobId} processing... (${attempts + 1}/${maxAttempts})`,
+            );
+          }
+        } catch (err) {
+          // If polling fails (e.g. network blip), log and continue/retry, or throw
+          this.logger.warn(`Polling failed for job ${jobId}: ${err.message}`);
+          // Optional: decide to break or continue. We continue counting attempts.
+        }
+
+        attempts++;
+      }
+
+      if (jobStatus !== 'COMPLETED') {
+        throw new Error(
+          `Report generation timed out or failed. Final Status: ${jobStatus}`,
+        );
+      }
+
+      // 4. Download PDF Content
+      // Now that status is COMPLETED, calling the URL without ?json=true will return the file stream (res.download)
+      const downloadUrl = `${reportServiceUrl}/download/status/${jobId}`;
+      this.logger.log(`Downloading PDF from: ${downloadUrl}`);
+
+      // 5. Fetch Report Entity for Password
+      const session = await this.sessionRepo.findOne({
+        where: { userId: userId, registrationId: registration.id },
+        order: { createdAt: 'DESC' },
+      });
+
+      if (!session) {
+        throw new Error('No assessment session found');
+      }
+
+      let password = '';
+      // Quick retry for password persistence (in case report service updates DB slightly after file gen)
+      for (let i = 0; i < 5; i++) {
+        const reportEntity = await this.assessmentReportRepository.findOne({
+          where: { assessmentSessionId: session.id },
+        });
+        if (reportEntity && reportEntity.reportPassword) {
+          password = reportEntity.reportPassword;
+          reportEntity.emailSent = true;
+          reportEntity.emailSentAt = new Date();
+          reportEntity.emailSentTo = user.email;
+          await this.assessmentReportRepository.save(reportEntity);
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
+      if (!password) {
+        this.logger.warn(`Report password not found for session ${session.id}`);
+        password = 'Please contact support';
+      }
+
+      // 6. Get the PDF Buffer
+      const pdfResponse = await lastValueFrom(
+        this.httpService.get(downloadUrl, { responseType: 'arraybuffer' }),
+      );
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      const pdfBuffer = Buffer.from(pdfResponse.data, 'binary');
+
+      // 7. Send Email
+      const dateStr = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+
+      const assets = {
+        logo: `https://mind.originbi.com/Origin-BI-Logo-01.png`,
+        reportCover: `https://mind.originbi.com/Origin-BI-Logo-01.png`,
+      };
+
+      const emailHtml = getAssessmentCompletionEmailTemplate(
+        registration.fullName || 'Student',
+        password,
+        this.configService.get('FRONTEND_APP_URL') || 'http://localhost:3000',
+        assets,
+        dateStr,
+        ((registration as any).program?.reportTitle as string) ||
+          'Self Discovery Report',
+      );
+
+      // --- Transporter Setup ---
+      const region =
+        this.configService.get<string>('AWS_REGION') ||
+        this.configService.get<string>('AWS_DEFAULT_REGION');
+      const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
+      const secretAccessKey = this.configService.get<string>(
+        'AWS_SECRET_ACCESS_KEY',
+      );
+
+      if (!region || !accessKeyId || !secretAccessKey) {
+        throw new Error('AWS SES Config Missing');
+      }
+
+      const ses = new SES({
+        accessKeyId,
+        secretAccessKey,
+        region,
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      const transporter = nodemailer.createTransport({
+        SES: ses,
+      } as any);
+      // -------------------------
+
+      const mailOptions = {
+        from: `"${process.env.EMAIL_SEND_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
+        to: user.email,
+        cc: [process.env.EMAIL_CC],
+        subject: `Your Assessment Report is Ready - ${((registration as any).program?.reportTitle as string) || 'Origin BI'}`,
+        html: emailHtml,
+        attachments: [
+          {
+            filename: `${(registration.fullName || 'Student').replace(/\s/g, '_')}_Report.pdf`,
+            content: pdfBuffer,
+            contentType: 'application/pdf',
+          },
+        ],
+      };
+
+      await transporter.sendMail(mailOptions);
+      this.logger.log(`Assessment completion email sent to ${user.email}`);
+    } catch (error) {
+      this.logger.error('Failed to send assessment completion email', error);
     }
   }
 }
