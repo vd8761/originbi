@@ -780,7 +780,7 @@ export class SchoolReport extends BaseReport {
             type: "number",
         });
 
-        this.h2("Trait Mapping", { ensureSpace: 0.15 });
+        this.h2("Trait Mapping", { ensureSpace: 0.2 });
 
         const headers = [
             "Trait Combination",

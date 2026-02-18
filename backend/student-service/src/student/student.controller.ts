@@ -48,4 +48,13 @@ export class StudentController {
   ) {
     return this.studentService.validateRegistration(dto);
   }
+
+  @Post('assessment-complete')
+  async completeAssessment(@Body() body: { userId: number }) {
+    // Fire and forget - don't block the caller
+    this.studentService
+      .handleAssessmentCompletion(body.userId)
+      .catch((err) => console.error('Async email sending error:', err));
+    return { message: 'Assessment completion processing started' };
+  }
 }

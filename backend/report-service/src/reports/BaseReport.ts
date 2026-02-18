@@ -424,7 +424,8 @@ export class BaseReport {
     }
 
     protected h2(text: string, opts: TextOptions = {}) {
-        this.ensureSpace(0.15, true);
+        const ensureSpace = opts.ensureSpace ?? 0.15;
+        this.ensureSpace(ensureSpace, true);
 
         const topMargin = this.doc.page.margins.top;
         if (this.doc.y > topMargin + this.DEFAULT_GAP) {
@@ -442,7 +443,8 @@ export class BaseReport {
     }
 
     protected h3(text: string, opts: TextOptions = {}) {
-        this.ensureSpace(0.08, true);
+        const ensureSpace = opts.ensureSpace ?? 0.08;
+        this.ensureSpace(ensureSpace, true);
 
         const topMargin = this.doc.page.margins.top;
         if (this.doc.y > topMargin + this.DEFAULT_GAP) {
