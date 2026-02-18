@@ -580,7 +580,7 @@ export class StudentService {
         throw new Error(`Program ${programCode} not found`);
       }
 
-      // 5. Create Registration
+      // 5. Create Registration (Force TS Check)
       const registration = this.sessionRepo.manager.create(Registration, {
         userId: user.id,
         registrationSource: 'SELF',
@@ -599,7 +599,7 @@ export class StudentService {
         },
         createdAt: new Date(),
         updatedAt: new Date(),
-      });
+      } as any);
       const savedReg = await this.sessionRepo.manager.save(
         Registration,
         registration,
@@ -749,9 +749,53 @@ export class StudentService {
     reg: Registration,
     level: AssessmentLevel,
   ) {
-    // Fetch random questions
-    await this.answerRepo.query(
-      `
+    // 1. Determine Program Type (Logic moved to rely on Program Code)
+
+    // Check if it is really SCHOOL_STUDENT program
+    const program = await this.sessionRepo.manager.findOne(Program, { where: { id: attempt.programId } });
+    const isSchool = program?.code === 'SCHOOL_STUDENT';
+
+    let selectedSetNumber = 1;
+    let fallbackToGeneric = false;
+    const studentBoard = reg.metadata?.studentBoard || null;
+
+    if (isSchool && studentBoard) {
+      // Logic: Pick a random set from available sets for this Board & Level
+      // FIX: Use 'board' column
+      const loadedSets = await this.answerRepo.query(
+        `SELECT DISTINCT set_number FROM assessment_questions 
+         WHERE assessment_level_id = $1 
+           AND is_active = true 
+           AND board = $2`,
+        [level.id, studentBoard]
+      );
+
+      if (loadedSets && loadedSets.length > 0) {
+        // Randomly pick one
+        const randomIndex = Math.floor(Math.random() * loadedSets.length);
+        selectedSetNumber = loadedSets[randomIndex].set_number;
+        this.logger.log(`[Assessment] Selected Set ${selectedSetNumber} for Board ${studentBoard}`);
+
+        // Update Session Metadata ONLY if we successfully picked a Board-specific set
+        const session = await this.sessionRepo.findOne({ where: { id: attempt.assessmentSessionId } });
+        if (session) {
+          if (!session.metadata) session.metadata = {};
+          session.metadata.setNumber = selectedSetNumber;
+          session.metadata.studentBoard = studentBoard;
+          await this.sessionRepo.save(session);
+        }
+      } else {
+        this.logger.warn(`[Assessment] No sets found for Board ${studentBoard}, defaulting to Generic Set 1`);
+        selectedSetNumber = 1;
+        fallbackToGeneric = true;
+      }
+    }
+
+    // Fetch questions with Updated Logic
+    // If School: Filter by Board (if found) + Set Number + Level + Stream/SchoolLevel
+    // Else: Keep existing logic
+
+    let query = `
            INSERT INTO assessment_answers (
               assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
               main_question_id, question_source, status, question_sequence, created_at, updated_at
@@ -761,22 +805,49 @@ export class StudentService {
            WHERE assessment_level_id = $5::bigint 
              AND is_active = true
              AND is_deleted = false
-             AND (metadata->>'school_level' IS NULL OR metadata->>'school_level' = $7)
-             AND (metadata->>'school_stream' IS NULL OR metadata->>'school_stream' = $8)
-           ORDER BY RANDOM()
-           LIMIT 60
-       `,
-      [
-        Number(attempt.id),
-        Number(attempt.assessmentSessionId),
-        Number(user.id),
-        Number(reg.id),
-        Number(level.id),
-        Number(attempt.programId),
-        reg.schoolLevel || '',
-        reg.schoolStream || '',
-      ],
-    );
+    `;
+
+    const params: any[] = [
+      attempt.id,
+      attempt.assessmentSessionId,
+      user.id,
+      reg.id,
+      level.id,
+      attempt.programId
+    ];
+
+    if (isSchool) {
+      // Application of Constraints
+
+      // Only apply Board filter if we actually found sets for it
+      // FIX: Use 'board' column
+      if (studentBoard && !fallbackToGeneric) {
+        query += ` AND board = $${params.length + 1}`;
+        params.push(studentBoard);
+      }
+
+      query += ` AND set_number = $${params.length + 1}`;
+      params.push(selectedSetNumber);
+
+      query += ` AND (metadata->>'school_level' IS NULL OR metadata->>'school_level' = $${params.length + 1})`;
+      params.push(reg.schoolLevel);
+
+      // Stream is only for HSC usually, but good to filter if present
+      query += ` AND (metadata->>'school_stream' IS NULL OR metadata->>'school_stream' = $${params.length + 1})`;
+      params.push(reg.schoolStream);
+
+    } else {
+      // Generic / College Logic (Existing)
+      query += ` AND (metadata->>'school_level' IS NULL OR metadata->>'school_level' = $${params.length + 1})`;
+      params.push(reg.schoolLevel);
+
+      query += ` AND (metadata->>'school_stream' IS NULL OR metadata->>'school_stream' = $${params.length + 1})`;
+      params.push(reg.schoolStream);
+    }
+
+    query += ` ORDER BY RANDOM() LIMIT 60`;
+
+    await this.answerRepo.query(query, params);
   }
 
   async validateRegistration(dto: { email: string; mobile_number?: string }) {
