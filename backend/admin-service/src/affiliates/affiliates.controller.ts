@@ -102,6 +102,11 @@ export class AffiliatesController {
         return this.affiliatesService.updateReadyToProcessStatus();
     }
 
+    @Get('dashboard-stats')
+    async getDashboardStats() {
+        return this.affiliatesService.getAdminDashboardStats();
+    }
+
     @Get()
     async list(
         @Query('page') page = '1',

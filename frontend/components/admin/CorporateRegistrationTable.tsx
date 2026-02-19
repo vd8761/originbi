@@ -3,6 +3,7 @@ import { CorporateAccount } from '../../lib/types';
 import ToggleSwitch from '../ui/ToggleSwitch';
 import { EyeVisibleIcon, SortIcon, EditIcon } from '../icons';
 import { COUNTRY_CODES } from '../../lib/countryCodes';
+import { capitalizeWords } from "../../lib/utils";
 
 // Extend CorporateAccount to include user details if they are separate in types.ts
 // But typically for table display we might need a joined type.
@@ -202,7 +203,7 @@ const CorporateRegistrationTable: React.FC<RegistrationTableProps> = ({
                         className="w-8 h-8 rounded-full object-cover border border-brand-light-tertiary dark:border-brand-dark-tertiary"
                       />
                       <span className="text-sm font-medium text-brand-text-light-primary dark:text-white">
-                        {user.full_name || 'N/A'}
+                        {capitalizeWords(user.full_name) || 'N/A'}
                       </span>
                     </div>
                   </td>
@@ -246,10 +247,10 @@ const CorporateRegistrationTable: React.FC<RegistrationTableProps> = ({
                     </div>
                   </td>
                   <td className="p-4 text-sm text-brand-text-light-primary dark:text-white align-middle">
-                    {user.company_name || "-"}
+                    {capitalizeWords(user.company_name) || "-"}
                   </td>
                   <td className="p-4 text-sm text-brand-text-light-primary dark:text-white align-middle">
-                    {user.job_title || "-"}
+                    {capitalizeWords(user.job_title) || "-"}
                   </td>
                   <td className="pt-1 text-center align-middle">
                     <ToggleSwitch
