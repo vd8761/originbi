@@ -86,6 +86,14 @@ export class Registration {
     })
     schoolStream: string | null;
 
+    @Column({
+        name: 'student_board',
+        type: 'varchar',
+        length: 20,
+        nullable: true,
+    })
+    studentBoard: string | null;
+
     @Column({ name: 'department_degree_id', type: 'bigint', nullable: true })
     departmentDegreeId: number | null;
 

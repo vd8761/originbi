@@ -14,9 +14,9 @@ import { AssessmentReport } from '../entities/assessment-report.entity';
 import {
   AffiliateReferralTransaction,
   AffiliateAccount,
-  Registration,
   Groups,
   AffiliateSettlementTransaction,
+  Registration,
 } from '@originbi/shared-entities';
 
 @Module({
@@ -42,4 +42,4 @@ import {
   providers: [StudentService],
   exports: [StudentService],
 })
-export class StudentModule {}
+export class StudentModule { }

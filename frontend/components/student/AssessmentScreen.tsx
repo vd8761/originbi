@@ -462,9 +462,9 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
         attemptId: foundAttemptId,
         title: step.stepName,
         description: step.description || step.stepName,
-        totalQuestions: step.totalQuestions || ((step.levelNumber === 1 || step.stepName.includes('Level 1')) ? 60 : 40),
+        totalQuestions: step.totalQuestions || ((step.levelNumber === 1 || step.stepName.includes('Level 1')) ? 60 : (step.levelNumber === 2 || step.stepName.includes('ACI') ? 25 : 40)),
         completedQuestions: status === 'completed'
-          ? (step.totalQuestions || ((step.levelNumber === 1 || step.stepName.includes('Level 1')) ? 60 : 40))
+          ? (step.totalQuestions || ((step.levelNumber === 1 || step.stepName.includes('Level 1')) ? 60 : (step.levelNumber === 2 || step.stepName.includes('ACI') ? 25 : 40)))
           : (step.completedQuestions || 0),
         status: status,
         unlockTime: step.unlockTime,
