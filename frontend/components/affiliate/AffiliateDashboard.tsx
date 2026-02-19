@@ -536,7 +536,6 @@ Scan the QR code in the image or register here: ${referralLink}`;
                 {/* Card Image Preview */}
                 {shareCardImageUrl && (
                     <div className="rounded-2xl overflow-hidden mb-4 shadow-xl border border-gray-100 dark:border-white/10">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={shareCardImageUrl} alt="Promo Card" className="w-full" />
                     </div>
                 )}
