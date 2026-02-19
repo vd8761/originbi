@@ -621,7 +621,6 @@ export class StudentService {
         schoolLevel: dto.school_level,
         schoolStream: dto.school_stream,
         programId: program.id,
-        // @ts-ignore: Assuming studentBoard exists on entity
         studentBoard: dto.student_board || dto.studentBoard, // Explicit assignment
         // metadata: { ... } below also stores it
         status: 'COMPLETED' as RegistrationStatus,

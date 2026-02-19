@@ -226,7 +226,6 @@ export class RegistrationsService {
           schoolStream,
           departmentDegreeId,
           group: groupId ? { id: groupId } : undefined, // Assign relation object, or undefined
-          // @ts-ignore: Assuming studentBoard exists on entity based on DB column
           studentBoard: dto.studentBoard,
           metadata: {
             programType: dto.programType,
