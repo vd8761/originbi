@@ -72,8 +72,8 @@ export class AffiliatesController {
         @Param('id') id: string,
         @UploadedFiles()
         files: {
-            aadhar?: Express.Multer.File[];
-            pan?: Express.Multer.File[];
+            aadhar?: any[];
+            pan?: any[];
         },
     ) {
         if (!files.aadhar?.length && !files.pan?.length) {
