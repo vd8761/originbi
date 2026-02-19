@@ -230,7 +230,7 @@ Scan the QR code in the image or register here: ${referralLink}`;
                 img.crossOrigin = 'anonymous';
                 img.onload = () => resolve(img);
                 img.onerror = () => reject(new Error('Failed to load poster image'));
-                img.src = '/After +2 OriginBI without QR.jpg.jpeg';
+                img.src = '/after-plus-2-originbi-without-qr.jpeg';
             });
 
             // Create canvas matching the image dimensions
