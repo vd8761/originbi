@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { XIcon } from '../icons';
+import { capitalizeWords } from "../../lib/utils";
 
 const API_BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "";
 
@@ -48,6 +49,7 @@ export const AffiliateSettlementModal: React.FC<AffiliateSettlementModalProps> =
     const [submitting, setSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState("");
     const [successMsg, setSuccessMsg] = useState("");
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
     const [preview, setPreview] = useState<SettlementPreview | null>(null);
     const [previewLoading, setPreviewLoading] = useState(false);
@@ -60,6 +62,7 @@ export const AffiliateSettlementModal: React.FC<AffiliateSettlementModalProps> =
         return new Intl.NumberFormat('en-IN', {
             style: 'currency',
             currency: 'INR',
+            minimumFractionDigits: 0,
             maximumFractionDigits: 2,
         }).format(num);
     };
@@ -138,6 +141,13 @@ export const AffiliateSettlementModal: React.FC<AffiliateSettlementModalProps> =
             }, 300);
         }
         setErrorMsg("");
+        if (fieldErrors.amount) {
+            setFieldErrors(prev => {
+                const copy = { ...prev };
+                delete copy.amount;
+                return copy;
+            });
+        }
     };
 
     const applySuggestedAmount = (amount: number) => {
@@ -146,6 +156,24 @@ export const AffiliateSettlementModal: React.FC<AffiliateSettlementModalProps> =
         setErrorMsg("");
         if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
         fetchPreview(clamped);
+        if (fieldErrors.amount) {
+            setFieldErrors(prev => {
+                const copy = { ...prev };
+                delete copy.amount;
+                return copy;
+            });
+        }
+    };
+
+    const validateForm = () => {
+        const errors: Record<string, string> = {};
+        const amount = parseFloat(settleAmount);
+        if (isNaN(amount) || amount <= 0) errors.amount = "Required";
+        if (!transactionMode) errors.transactionMode = "Required";
+        if (!transactionId.trim()) errors.transactionId = "Required";
+
+        setFieldErrors(errors);
+        return Object.keys(errors).length === 0;
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -153,19 +181,7 @@ export const AffiliateSettlementModal: React.FC<AffiliateSettlementModalProps> =
         setErrorMsg("");
         setSuccessMsg("");
 
-        const amount = parseFloat(settleAmount);
-        if (isNaN(amount) || amount <= 0) {
-            setErrorMsg("Please enter a valid amount");
-            return;
-        }
-        if (!transactionMode) {
-            setErrorMsg("Please select a payment method");
-            return;
-        }
-        if (!transactionId.trim()) {
-            setErrorMsg("Please enter a transaction ID");
-            return;
-        }
+        if (!validateForm()) return;
 
         setSubmitting(true);
         try {
@@ -173,7 +189,7 @@ export const AffiliateSettlementModal: React.FC<AffiliateSettlementModalProps> =
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    settleAmount: amount,
+                    settleAmount: parseFloat(settleAmount),
                     transactionMode,
                     transactionId: transactionId.trim(),
                     paymentDate,
@@ -227,7 +243,7 @@ export const AffiliateSettlementModal: React.FC<AffiliateSettlementModalProps> =
                         </div>
                         <div>
                             <h3 className="text-base font-bold text-brand-text-light-primary dark:text-white leading-tight">Settle Commission</h3>
-                            <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 block mt-0.5">{affiliate.name}</span>
+                            <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 block mt-0.5">{capitalizeWords(affiliate.name)}</span>
                         </div>
                     </div>
                     <button onClick={onClose} disabled={submitting} className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-all text-gray-400 hover:text-gray-600 disabled:opacity-50">
@@ -235,154 +251,181 @@ export const AffiliateSettlementModal: React.FC<AffiliateSettlementModalProps> =
                     </button>
                 </div>
 
-                <div className="overflow-y-auto custom-scrollbar flex-1 px-6 py-5">
-                    {/* Ready Balance - More Compact */}
-                    <div className="bg-[#1A56DB] dark:bg-blue-600/20 border border-blue-500/20 rounded-xl p-3.5 flex items-center justify-between">
-                        <div>
-                            <p className="text-[10px] font-bold text-blue-100 dark:text-blue-400">Ready for Payment</p>
-                            <p className="text-lg font-black text-white dark:text-blue-300 leading-tight">{formatCurrency(maxAmount)}</p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => applySuggestedAmount(maxAmount)}
-                            className="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white text-[10px] font-bold rounded-lg border border-white/20 transition-all"
-                        >
-                            Maximize
-                        </button>
-                    </div>
-
-                    <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-                        {/* Amount Input */}
-                        <div>
-                            <label className={labelClasses}>Settlement Amount *</label>
-                            <div className="relative group">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400 group-focus-within:text-brand-green transition-colors">₹</span>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    max={maxAmount}
-                                    value={settleAmount}
-                                    onChange={(e) => handleAmountChange(e.target.value)}
-                                    placeholder={`Max ${formatCurrency(maxAmount)}`}
-                                    className={`${inputClasses} pl-8 font-bold`}
-                                    required
-                                />
+                <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden" noValidate>
+                    <div className="overflow-y-auto custom-scrollbar flex-1 px-6 py-5">
+                        {/* Ready Balance - More Compact */}
+                        <div className="bg-[#1A56DB] dark:bg-blue-600/20 border border-blue-500/20 rounded-xl p-3.5 flex items-center justify-between">
+                            <div>
+                                <p className="text-[10px] font-bold text-blue-100 dark:text-blue-400">Ready for Payment</p>
+                                <p className="text-lg font-black text-white dark:text-blue-300 leading-tight">{formatCurrency(maxAmount)}</p>
                             </div>
+                            <button
+                                type="button"
+                                onClick={() => applySuggestedAmount(maxAmount)}
+                                className="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white text-[10px] font-bold rounded-lg border border-white/20 transition-all"
+                            >
+                                Maximize
+                            </button>
+                        </div>
 
-                            {/* Dynamic Message Box - More Compact */}
-                            {showPreview && preview && (
-                                <div className="mt-3 animate-fade-in space-y-2.5">
-                                    <div className="p-3 bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl">
-                                        <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300">
-                                            {preview.fullySettledCount > 0 ? (
-                                                <>
-                                                    Settling <span className="text-brand-green font-black">{preview.fullySettledCount} referral{preview.fullySettledCount !== 1 ? 's' : ''}</span> fully.
-                                                </>
-                                            ) : (
-                                                "Payment doesn't cover a full referral yet."
+                        <div className="mt-5 space-y-4">
+                            {/* Amount Input */}
+                            <div>
+                                <label className={labelClasses}>
+                                    Settlement Amount <span className="text-red-500">*</span>
+                                </label>
+                                <div className="relative group">
+                                    <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold transition-colors ${fieldErrors.amount ? "text-red-500" : "text-gray-400 group-focus-within:text-brand-green"}`}>₹</span>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        max={maxAmount}
+                                        value={settleAmount}
+                                        onChange={(e) => handleAmountChange(e.target.value)}
+                                        placeholder={`Max ${formatCurrency(maxAmount)}`}
+                                        className={`${inputClasses} pl-8 font-bold ${fieldErrors.amount ? "border-red-500/50" : ""}`}
+                                    />
+                                </div>
+                                {fieldErrors.amount && <p className="text-[10px] text-red-500 ml-1 mt-1 font-bold">{fieldErrors.amount}</p>}
+
+                                {/* Dynamic Message Box - More Compact */}
+                                {showPreview && preview && (
+                                    <div className="mt-3 animate-fade-in space-y-2.5">
+                                        <div className="p-3 bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl">
+                                            <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300">
+                                                {preview.fullySettledCount > 0 ? (
+                                                    <>
+                                                        Settling <span className="text-brand-green font-black">{preview.fullySettledCount} referral{preview.fullySettledCount !== 1 ? 's' : ''}</span> fully.
+                                                    </>
+                                                ) : (
+                                                    "Payment doesn't cover a full referral yet."
+                                                )}
+                                            </p>
+
+                                            {partialTxn && (
+                                                <div className="mt-2.5 pt-2.5 border-t border-gray-100 dark:border-white/5">
+                                                    <div className="flex justify-between items-center text-[10px] font-bold mb-1.5">
+                                                        <span className="text-gray-400">Next referral:</span>
+                                                        <span className="text-amber-500">₹{safeToFixed(partialTxn.coveredAmount)} Paid</span>
+                                                    </div>
+                                                    <div className="w-full h-1 bg-gray-200 dark:bg-white/10 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-amber-500" style={{ width: `${(partialTxn.coveredAmount / partialTxn.amount) * 100}%` }} />
+                                                    </div>
+                                                    <p className="text-[9px] font-bold text-amber-500 mt-1 text-right italic">
+                                                        ₹{safeToFixed(partialTxn.remainingAmount)} balance left locally
+                                                    </p>
+                                                </div>
                                             )}
-                                        </p>
+                                        </div>
 
-                                        {partialTxn && (
-                                            <div className="mt-2.5 pt-2.5 border-t border-gray-100 dark:border-white/5">
-                                                <div className="flex justify-between items-center text-[10px] font-bold mb-1.5">
-                                                    <span className="text-gray-400">Next referral:</span>
-                                                    <span className="text-amber-500">₹{safeToFixed(partialTxn.coveredAmount)} Paid</span>
-                                                </div>
-                                                <div className="w-full h-1 bg-gray-200 dark:bg-white/10 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-amber-500" style={{ width: `${(partialTxn.coveredAmount / partialTxn.amount) * 100}%` }} />
-                                                </div>
-                                                <p className="text-[9px] font-bold text-amber-500 mt-1 text-right italic">
-                                                    ₹{safeToFixed(partialTxn.remainingAmount)} balance left locally
-                                                </p>
+                                        {/* Shortcuts - Smaller */}
+                                        {!preview.isCleanBoundary && (
+                                            <div className="flex gap-2">
+                                                {preview.suggestedLower !== null && (
+                                                    <button type="button" onClick={() => applySuggestedAmount(preview.suggestedLower!)} className="flex-1 py-1.5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg text-[10px] font-bold text-amber-600 hover:scale-[0.98] transition-all">
+                                                        Set to ₹{safeToFixed(preview.suggestedLower)} (Full)
+                                                    </button>
+                                                )}
+                                                {preview.suggestedUpper !== null && preview.suggestedUpper <= maxAmount && (
+                                                    <button type="button" onClick={() => applySuggestedAmount(preview.suggestedUpper!)} className="flex-1 py-1.5 bg-emerald-50 dark:bg-brand-green/10 border border-emerald-200 dark:border-brand-green/20 rounded-lg text-[10px] font-bold text-brand-green hover:scale-[0.98] transition-all">
+                                                        Set to ₹{safeToFixed(preview.suggestedUpper)} (+1)
+                                                    </button>
+                                                )}
                                             </div>
                                         )}
                                     </div>
+                                )}
+                            </div>
 
-                                    {/* Shortcuts - Smaller */}
-                                    {!preview.isCleanBoundary && (
-                                        <div className="flex gap-2">
-                                            {preview.suggestedLower !== null && (
-                                                <button type="button" onClick={() => applySuggestedAmount(preview.suggestedLower!)} className="flex-1 py-1.5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg text-[10px] font-bold text-amber-600 hover:scale-[0.98] transition-all">
-                                                    Set to ₹{safeToFixed(preview.suggestedLower)} (Full)
-                                                </button>
-                                            )}
-                                            {preview.suggestedUpper !== null && preview.suggestedUpper <= maxAmount && (
-                                                <button type="button" onClick={() => applySuggestedAmount(preview.suggestedUpper!)} className="flex-1 py-1.5 bg-emerald-50 dark:bg-brand-green/10 border border-emerald-200 dark:border-brand-green/20 rounded-lg text-[10px] font-bold text-brand-green hover:scale-[0.98] transition-all">
-                                                    Set to ₹{safeToFixed(preview.suggestedUpper)} (+1)
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
+                            {/* Payment Toggle - More Compact */}
+                            <div>
+                                <label className={labelClasses}>
+                                    Payment Method <span className="text-red-500">*</span>
+                                </label>
+                                <div className={`p-1 bg-gray-100/50 dark:bg-white/5 rounded-xl flex gap-1 border transition-all ${fieldErrors.transactionMode ? "border-red-500/50" : "border-gray-100 dark:border-white/5"}`}>
+                                    {paymentModes.map((mode) => (
+                                        <button
+                                            key={mode.value}
+                                            type="button"
+                                            onClick={() => {
+                                                setTransactionMode(mode.value);
+                                                if (fieldErrors.transactionMode) {
+                                                    setFieldErrors(prev => {
+                                                        const copy = { ...prev };
+                                                        delete copy.transactionMode;
+                                                        return copy;
+                                                    });
+                                                }
+                                            }}
+                                            className={`flex-1 py-2.5 rounded-lg text-[10px] font-bold transition-all ${transactionMode === mode.value
+                                                ? "bg-brand-green text-white shadow-md shadow-green-900/10"
+                                                : "text-gray-500 hover:text-brand-text-light-primary dark:hover:text-white"
+                                                }`}
+                                        >
+                                            {mode.label}
+                                        </button>
+                                    ))}
+                                </div>
+                                {fieldErrors.transactionMode && <p className="text-[10px] text-red-500 ml-1 mt-1 font-bold">{fieldErrors.transactionMode}</p>}
+                            </div>
+
+                            {/* ID Input */}
+                            <div>
+                                <label className={labelClasses}>
+                                    Transaction ID / UTR <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={transactionId}
+                                    onChange={(e) => {
+                                        setTransactionId(e.target.value);
+                                        if (fieldErrors.transactionId) {
+                                            setFieldErrors(prev => {
+                                                const copy = { ...prev };
+                                                delete copy.transactionId;
+                                                return copy;
+                                            });
+                                        }
+                                    }}
+                                    placeholder="Reference number"
+                                    className={`${inputClasses} ${fieldErrors.transactionId ? "border-red-500/50" : ""}`}
+                                />
+                                {fieldErrors.transactionId && <p className="text-[10px] text-red-500 ml-1 mt-1 font-bold">{fieldErrors.transactionId}</p>}
+                            </div>
+
+                            {errorMsg && (
+                                <div className="bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/10 rounded-xl py-2.5 text-[10px] text-red-600 dark:text-red-400 font-bold text-center">
+                                    {errorMsg}
+                                </div>
+                            )}
+
+                            {successMsg && (
+                                <div className="bg-emerald-50 dark:bg-brand-green/10 border border-emerald-100 dark:border-brand-green/10 rounded-xl py-2.5 text-[10px] text-brand-green font-bold text-center">
+                                    {successMsg}
                                 </div>
                             )}
                         </div>
+                    </div>
 
-                        {/* Payment Toggle - More Compact */}
-                        <div>
-                            <label className={labelClasses}>Payment Method *</label>
-                            <div className="p-1 bg-gray-100/50 dark:bg-white/5 rounded-xl flex gap-1 border border-gray-100 dark:border-white/5">
-                                {paymentModes.map((mode) => (
-                                    <button
-                                        key={mode.value}
-                                        type="button"
-                                        onClick={() => setTransactionMode(mode.value)}
-                                        className={`flex-1 py-2.5 rounded-lg text-[10px] font-bold transition-all ${transactionMode === mode.value
-                                            ? "bg-brand-green text-white shadow-md shadow-green-900/10"
-                                            : "text-gray-500 hover:text-brand-text-light-primary dark:hover:text-white"
-                                            }`}
-                                    >
-                                        {mode.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* ID Input */}
-                        <div>
-                            <label className={labelClasses}>Transaction ID / UTR *</label>
-                            <input
-                                type="text"
-                                value={transactionId}
-                                onChange={(e) => setTransactionId(e.target.value)}
-                                placeholder="Reference number"
-                                className={inputClasses}
-                                required
-                            />
-                        </div>
-
-                        {errorMsg && (
-                            <div className="bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/10 rounded-xl py-2.5 text-[10px] text-red-600 dark:text-red-400 font-bold text-center">
-                                {errorMsg}
-                            </div>
-                        )}
-
-                        {successMsg && (
-                            <div className="bg-emerald-50 dark:bg-brand-green/10 border border-emerald-100 dark:border-brand-green/10 rounded-xl py-2.5 text-[10px] text-brand-green font-bold text-center">
-                                {successMsg}
-                            </div>
-                        )}
-
-                        {/* Footer - More Compact */}
-                        <div className="flex items-center justify-end gap-5 pt-3">
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                disabled={submitting}
-                                className="text-[11px] font-bold text-gray-400 hover:text-gray-600 dark:hover:text-white transition-all disabled:opacity-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={submitting || !!successMsg || maxAmount <= 0}
-                                className="px-8 py-2.5 bg-brand-green text-white text-[11px] font-bold rounded-full hover:bg-brand-green/90 transition-all shadow-lg shadow-green-900/10 disabled:opacity-50"
-                            >
-                                {submitting ? "Processing..." : "Settle Payment"}
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                    {/* Footer - More Compact */}
+                    <div className="flex items-center justify-end gap-5 px-6 py-4 border-t border-gray-100 dark:border-white/5 shrink-0">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={submitting}
+                            className="text-[11px] font-bold text-gray-400 hover:text-gray-600 dark:hover:text-white transition-all disabled:opacity-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={submitting || !!successMsg || maxAmount <= 0}
+                            className="px-8 py-2.5 bg-brand-green text-white text-[11px] font-bold rounded-full hover:bg-brand-green/90 transition-all shadow-lg shadow-green-900/10 disabled:opacity-50"
+                        >
+                            {submitting ? "Processing..." : "Settle Payment"}
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     );

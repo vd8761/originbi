@@ -72,8 +72,8 @@ export class AffiliatesController {
         @Param('id') id: string,
         @UploadedFiles()
         files: {
-            aadhar?: Express.Multer.File[];
-            pan?: Express.Multer.File[];
+            aadhar?: any[];
+            pan?: any[];
         },
     ) {
         if (!files.aadhar?.length && !files.pan?.length) {
@@ -100,6 +100,11 @@ export class AffiliatesController {
     @Post('refresh-ready-status')
     async refreshReadyStatus() {
         return this.affiliatesService.updateReadyToProcessStatus();
+    }
+
+    @Get('dashboard-stats')
+    async getDashboardStats() {
+        return this.affiliatesService.getAdminDashboardStats();
     }
 
     @Get()
