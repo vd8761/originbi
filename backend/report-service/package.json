@@ -4,7 +4,8 @@
   "description": "PDF Report Generator using PDFKit",
   "main": "src/index.ts",
   "scripts": {
-    "start": "ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
     "serve": "ts-node src/server.ts",
     "build": "tsc"
   },
