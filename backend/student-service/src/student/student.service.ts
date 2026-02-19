@@ -4,7 +4,7 @@
 import { Injectable, ConsoleLogger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, ILike } from 'typeorm';
+import { Repository, In, ILike, Not, IsNull } from 'typeorm';
 import { AssessmentReport } from '../entities/assessment-report.entity';
 import { getAssessmentCompletionEmailTemplate } from '../mail/templates/assessment-completion.template';
 import { lastValueFrom } from 'rxjs';
@@ -400,7 +400,9 @@ export class StudentService {
         status: status,
         levelNumber: level?.levelNumber,
         completedQuestions: answeredCount,
-        totalQuestions: totalCount > 0 ? totalCount : 60,
+        totalQuestions: totalCount > 0
+          ? totalCount
+          : (level?.levelNumber === 2 || level?.name.includes('ACI') || level?.patternType === 'ACI' ? 25 : 60),
         unlockTime: unlockTime,
         dateCompleted: attempt.completedAt || attempt.updatedAt,
         attemptId: attempt.id, // Ensure attemptId is passed
@@ -597,6 +599,8 @@ export class StudentService {
       await this.userRepo.save(user);
 
       // 4. Find Program
+      this.logger.log(`[Register] Payload: ${JSON.stringify(dto)}`);
+
       const programCode = dto.program_code || 'SCHOOL_STUDENT';
       const program = await this.sessionRepo.manager.findOne(Program, {
         where: { code: programCode },
@@ -617,10 +621,14 @@ export class StudentService {
         schoolLevel: dto.school_level,
         schoolStream: dto.school_stream,
         programId: program.id,
+        // @ts-ignore: Assuming studentBoard exists on entity
+        studentBoard: dto.student_board || dto.studentBoard, // Explicit assignment
+        // metadata: { ... } below also stores it
         status: 'COMPLETED' as RegistrationStatus,
         paymentStatus: 'NOT_REQUIRED' as PaymentStatus,
         metadata: {
           groupCode: dto.group_code,
+          studentBoard: dto.student_board || dto.studentBoard, // Store in metadata as well
           sendEmail: true,
         },
         createdAt: new Date(),
@@ -714,7 +722,10 @@ export class StudentService {
         order: { levelNumber: 'ASC' },
       });
 
+      this.logger.log(`[Register Debug] Found ${levels.length} mandatory levels`);
+
       for (const level of levels) {
+        this.logger.log(`[Register Debug] Processing Level: ${level.id} - ${level.name}`);
         const attempt = this.attemptRepo.create({
           assessmentSessionId: savedSession.id,
           assessmentLevelId: level.id,
@@ -729,6 +740,7 @@ export class StudentService {
 
         // Generate Questions for Level 1
         if (level.levelNumber === 1 || level.name.includes('Level 1')) {
+          this.logger.log(`[Register Debug] Generating questions for Level 1 (Attempt ID: ${savedAttempt.id})`);
           await this.generateQuestionsForAttempt(
             savedAttempt,
             user,
@@ -792,103 +804,120 @@ export class StudentService {
     reg: Registration,
     level: AssessmentLevel,
   ) {
-    // 1. Determine Program Type (Logic moved to rely on Program Code)
+    // ---------------------------------------------------------
+    // LEVEL 2 (ACI) LOGIC
+    // ---------------------------------------------------------
+    if (level.levelNumber === 2 || level.name.includes('Level 2') || level.name.includes('ACI')) {
+      this.logger.log(`[Assessment] Generating Level 2 (ACI) questions for User ${user.id}`);
 
-    // Check if it is really SCHOOL_STUDENT program
+      // 1. Get Personality Trait ID from previous session metadata or report
+      // Assumption: Level 1 completion stored the dominant trait ID in session metadata
+      const session = await this.sessionRepo.findOne({
+        where: { id: attempt.assessmentSessionId },
+      });
+
+      let traitId = session?.metadata?.personalityTraitId || session?.metadata?.dominantTraitId;
+
+      if (!traitId) {
+        // Fallback: Check for a completed attempt in this session that has a dominant trait (Level 1)
+        this.logger.log(`[Assessment] Trait ID not in metadata. Checking previous attempts for Session ${attempt.assessmentSessionId}...`);
+        const previousAttempt = await this.attemptRepo.findOne({
+          where: {
+            assessmentSessionId: attempt.assessmentSessionId,
+            dominantTraitId: Not(IsNull()),
+            status: 'COMPLETED'
+          },
+          order: { completedAt: 'DESC' }
+        });
+
+        if (previousAttempt && previousAttempt.dominantTraitId) {
+          traitId = previousAttempt.dominantTraitId;
+          this.logger.log(`[Assessment] Found Trait ID ${traitId} from previous attempt ${previousAttempt.id}`);
+        }
+      }
+
+      if (!traitId) {
+        this.logger.error(`[Assessment Error] Level 2 requires a Personality Trait ID, but none found in session metadata or previous attempts for User ${user.id}`);
+        throw new Error('Personality Trait not found. Please complete Level 1 first.');
+      }
+
+      this.logger.log(`[Assessment] Fetching 25 questions for Trait ID: ${traitId}`);
+
+      let query = `
+        INSERT INTO assessment_answers (
+          assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
+          main_question_id, question_source, status, question_sequence, created_at, updated_at
+        )
+        SELECT $1::bigint, $2::bigint, $3::bigint, $4::bigint, $6::bigint, $5::bigint, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
+        FROM assessment_questions 
+        WHERE assessment_level_id = $5::bigint 
+          AND is_active = true
+          AND is_deleted = false
+          AND personality_trait_id = $7::bigint
+      `;
+
+      const queryParams = [
+        attempt.id,
+        attempt.assessmentSessionId,
+        user.id,
+        reg.id,
+        level.id,
+        attempt.programId,
+        traitId
+      ];
+
+      // Board Filtering strictly for School Programs (ID 1)
+      // Check attempt.programId or reg.program.id. Assuming 1 is School based on groupReportHelper usage.
+      if (Number(attempt.programId) === 1) {
+        const studentBoard = session?.metadata?.studentBoard || reg.metadata?.studentBoard;
+        if (studentBoard) {
+          this.logger.log(`[Assessment] Applying Board Filter for School Program: ${studentBoard}`);
+          query += ` AND board = $8`;
+          queryParams.push(studentBoard);
+        } else {
+          this.logger.warn(`[Assessment] School Program detected but no Student Board found in metadata. Generating without board filter.`);
+        }
+      }
+
+      query += ` ORDER BY RANDOM() LIMIT 25`;
+
+      await this.answerRepo.query(query, queryParams);
+
+      return; // Done for Level 2
+    }
+
+    // ---------------------------------------------------------
+    // LEVEL 1 (BEHAVIORAL) LOGIC
+    // ---------------------------------------------------------
+    // 1. Determine Program Type & Board
     const program = await this.sessionRepo.manager.findOne(Program, {
       where: { id: attempt.programId },
     });
     const isSchool = program?.code === 'SCHOOL_STUDENT';
-
-    let selectedSetNumber = 1;
-    let fallbackToGeneric = false;
     const studentBoard = reg.metadata?.studentBoard || null;
+    let selectedSetNumber = 1;
 
+    // 2. Select Set Number
     if (isSchool && studentBoard) {
-      // Logic: Pick a random set from available sets for this Board & Level
-      // FIX: Use 'board' column
+      // School: Strict Board Filter
       const loadedSets = await this.answerRepo.query(
         `SELECT DISTINCT set_number FROM assessment_questions 
          WHERE assessment_level_id = $1 
            AND is_active = true 
-           AND board = $2`,
+           AND board = $2`, // Ensure we look for MAIN questions for sets
         [level.id, studentBoard],
       );
 
       if (loadedSets && loadedSets.length > 0) {
-        // Randomly pick one
         const randomIndex = Math.floor(Math.random() * loadedSets.length);
         selectedSetNumber = loadedSets[randomIndex].set_number;
-        this.logger.log(
-          `[Assessment] Selected Set ${selectedSetNumber} for Board ${studentBoard}`,
-        );
-
-        // Update Session Metadata ONLY if we successfully picked a Board-specific set
-        const session = await this.sessionRepo.findOne({
-          where: { id: attempt.assessmentSessionId },
-        });
-        if (session) {
-          if (!session.metadata) session.metadata = {};
-          session.metadata.setNumber = selectedSetNumber;
-          session.metadata.studentBoard = studentBoard;
-          await this.sessionRepo.save(session);
-        }
+        this.logger.log(`[Assessment] Selected Set ${selectedSetNumber} for Board ${studentBoard}`);
       } else {
-        this.logger.warn(
-          `[Assessment] No sets found for Board ${studentBoard}, defaulting to Generic Set 1`,
-        );
+        this.logger.warn(`[Assessment] No sets found for Board ${studentBoard}, defaulting to Set 1`);
         selectedSetNumber = 1;
-        fallbackToGeneric = true;
       }
-    }
-
-    // Fetch questions with Updated Logic
-    // If School: Filter by Board (if found) + Set Number + Level + Stream/SchoolLevel
-    // Else: Keep existing logic
-
-    let query = `
-           INSERT INTO assessment_answers (
-              assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
-              main_question_id, question_source, status, question_sequence, created_at, updated_at
-           )
-           SELECT $1::bigint, $2::bigint, $3::bigint, $4::bigint, $6::bigint, $5::bigint, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
-           FROM assessment_questions 
-           WHERE assessment_level_id = $5::bigint 
-             AND is_active = true
-             AND is_deleted = false
-    `;
-
-    const params: any[] = [
-      attempt.id,
-      attempt.assessmentSessionId,
-      user.id,
-      reg.id,
-      level.id,
-      attempt.programId,
-    ];
-
-    if (isSchool) {
-      // Application of Constraints
-
-      // Only apply Board filter if we actually found sets for it
-      // FIX: Use 'board' column
-      if (studentBoard && !fallbackToGeneric) {
-        query += ` AND board = $${params.length + 1}`;
-        params.push(studentBoard);
-      }
-
-      query += ` AND set_number = $${params.length + 1}`;
-      params.push(selectedSetNumber);
-
-      query += ` AND (metadata->>'school_level' IS NULL OR metadata->>'school_level' = $${params.length + 1})`;
-      params.push(reg.schoolLevel);
-
-      // Stream is only for HSC usually, but good to filter if present
-      query += ` AND (metadata->>'school_stream' IS NULL OR metadata->>'school_stream' = $${params.length + 1})`;
-      params.push(reg.schoolStream);
     } else {
-      // Generic / College / Employee / CXO Logic
-      // 1. Pick a Random Set for this Level
+      // Non-School or No Board: Random available set
       const loadedSets = await this.answerRepo.query(
         `SELECT DISTINCT set_number FROM assessment_questions 
          WHERE assessment_level_id = $1 
@@ -899,37 +928,80 @@ export class StudentService {
       if (loadedSets && loadedSets.length > 0) {
         const randomIndex = Math.floor(Math.random() * loadedSets.length);
         selectedSetNumber = loadedSets[randomIndex].set_number;
-        this.logger.log(
-          `[Assessment] Selected Random Set ${selectedSetNumber} for Non-School Program`,
-        );
-
-        // Update Session Metadata
-        const session = await this.sessionRepo.findOne({
-          where: { id: attempt.assessmentSessionId },
-        });
-        if (session) {
-          if (!session.metadata) session.metadata = {};
-          session.metadata.setNumber = selectedSetNumber;
-          await this.sessionRepo.save(session);
-        }
-      } else {
-        selectedSetNumber = 1; // Default
+        this.logger.log(`[Assessment] Selected Random Set ${selectedSetNumber}`);
       }
-
-      // 2. Filter Query by Set Number
-      query += ` AND set_number = $${params.length + 1}`;
-      params.push(selectedSetNumber);
-
-      query += ` AND (metadata->>'school_level' IS NULL OR metadata->>'school_level' = $${params.length + 1})`;
-      params.push(reg.schoolLevel);
-
-      query += ` AND (metadata->>'school_stream' IS NULL OR metadata->>'school_stream' = $${params.length + 1})`;
-      params.push(reg.schoolStream);
     }
 
-    query += ` ORDER BY RANDOM() LIMIT 60`;
+    // Save Set Number to Metadata
+    const session = await this.sessionRepo.findOne({ where: { id: attempt.assessmentSessionId } });
+    if (session) {
+      if (!session.metadata) session.metadata = {};
+      session.metadata.setNumber = selectedSetNumber;
+      if (studentBoard) session.metadata.studentBoard = studentBoard;
+      await this.sessionRepo.save(session);
+    }
 
-    await this.answerRepo.query(query, params);
+    // 3. Fetch Questions (40 Main + 20 Open)
+    // Fetch MAIN Questions (Limit 40)
+    let mainQuery = `
+      SELECT id FROM assessment_questions 
+      WHERE assessment_level_id = $1 
+        AND is_active = true 
+        AND is_deleted = false
+        AND set_number = $2
+    `;
+    const mainParams: any[] = [level.id, selectedSetNumber];
+
+    if (isSchool && studentBoard) {
+      mainQuery += ` AND board = $3`;
+      mainParams.push(studentBoard);
+    }
+    // Add School Level / Stream filters if needed, similar to before
+
+    mainQuery += ` ORDER BY RANDOM() LIMIT 40`;
+    const mainQuestions = await this.answerRepo.query(mainQuery, mainParams);
+
+    // Fetch OPEN Questions (Limit 20)
+    // Fetch OPEN Questions (Limit 20)
+    const openQuery = `
+      SELECT id FROM open_questions 
+      WHERE is_active = true 
+        AND is_deleted = false
+      ORDER BY RANDOM() LIMIT 20
+    `;
+    const openQuestions = await this.answerRepo.query(openQuery);
+
+    // 4. Interleave Questions (2 Main : 1 Open)
+    const finalQuestions: { id: number; type: 'MAIN' | 'OPEN' }[] = [];
+    let mainIdx = 0;
+    let openIdx = 0;
+
+    // We want 20 chunks of (2 Main + 1 Open) = 60 questions
+    for (let i = 0; i < 20; i++) {
+      if (mainIdx < mainQuestions.length) finalQuestions.push({ id: mainQuestions[mainIdx++].id, type: 'MAIN' });
+      if (mainIdx < mainQuestions.length) finalQuestions.push({ id: mainQuestions[mainIdx++].id, type: 'MAIN' });
+      if (openIdx < openQuestions.length) finalQuestions.push({ id: openQuestions[openIdx++].id, type: 'OPEN' });
+    }
+
+    this.logger.log(`[Assessment] Generated ${finalQuestions.length} interleaved questions (Main: ${mainIdx}, Open: ${openIdx})`);
+
+    // 5. Bulk Insert Answers
+    if (finalQuestions.length > 0) {
+      const values: string[] = [];
+      finalQuestions.forEach((q, index) => {
+        const mainId = q.type === 'MAIN' ? q.id : 'NULL';
+        const openId = q.type === 'OPEN' ? q.id : 'NULL';
+        values.push(`(${attempt.id}, ${attempt.assessmentSessionId}, ${user.id}, ${reg.id}, ${attempt.programId}, ${level.id}, ${mainId}, ${openId}, '${q.type}', 'NOT_ANSWERED', ${index + 1}, NOW(), NOW())`);
+      });
+
+      const insertQuery = `
+            INSERT INTO assessment_answers (
+                assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
+                main_question_id, open_question_id, question_source, status, question_sequence, created_at, updated_at
+            ) VALUES ${values.join(',')}
+        `;
+      await this.answerRepo.query(insertQuery);
+    }
   }
 
   async validateRegistration(dto: { email: string; mobile_number?: string }) {
