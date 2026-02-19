@@ -53,6 +53,12 @@ const AffiliateReferrals: React.FC = () => {
     const [totalItems, setTotalItems] = useState(0);
     const [affiliateId, setAffiliateId] = useState<string | null>(null);
     const [referralLink, setReferralLink] = useState("https://discover.originbi.com/register?ref=affiliate");
+    const [referralCode, setReferralCode] = useState('AFFILIATE');
+    const [qrDataUrl, setQrDataUrl] = useState<string>('');
+    const [shareCardImageUrl, setShareCardImageUrl] = useState<string | null>(null);
+    const [showShareCardModal, setShowShareCardModal] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [sharingPlatform, setSharingPlatform] = useState<string | null>(null);
 
     useEffect(() => {
         try {
@@ -64,6 +70,7 @@ const AffiliateReferrals: React.FC = () => {
                 if (affId) {
                     setAffiliateId(affId);
                     if (user.referralCode) {
+                        setReferralCode(user.referralCode);
                         setReferralLink(`https://discover.originbi.com/register?ref=${user.referralCode}`);
                     }
                 }
@@ -112,6 +119,234 @@ const AffiliateReferrals: React.FC = () => {
         navigator.clipboard.writeText(referralLink);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+    };
+
+    // QR code as data URL once referralLink is set
+    useEffect(() => {
+        if (!referralLink) return;
+        import('qrcode').then(QRCode => {
+            QRCode.toDataURL(referralLink, {
+                width: 300,
+                margin: 1,
+                color: { dark: '#150089', light: '#ffffff' },
+                errorCorrectionLevel: 'H',
+            }).then(url => setQrDataUrl(url));
+        });
+    }, [referralLink]);
+
+
+
+    // --- Formatted share text templates ---
+    const getShareText = (format: 'whatsapp' | 'email' | 'telegram' | 'plain') => {
+        if (format === 'whatsapp') {
+            return `🎯 *What Next After +2?*
+
+Your Marks show your Past.
+*OriginBI reveals your Future.*
+
+✨ *What you will get:*
+✦ Career Direction Clarity
+✦ Course Fitment
+✦ Growth Roadmap
+✦ Confident Career Decision
+
+💰 It's just *₹749* to reveal your future!
+
+👆 *Scan the QR code in the image above* or click below to register:
+👉 ${referralLink}`;
+        }
+        if (format === 'email') {
+            return `Hi,
+
+I'd like to share something exciting with you!
+
+🎯 What Next After +2?
+
+Your Marks show your Past. OriginBI reveals your Future.
+
+What you will get:
+  ✦ Career Direction Clarity
+  ✦ Course Fitment
+  ✦ Growth Roadmap
+  ✦ Confident Career Decision
+
+It's just ₹749 to reveal your future!
+
+👉 Register here: ${referralLink}
+
+Please find the promotional card attached above. Scan the QR code in the image to register directly!
+
+See you on the other side!`;
+        }
+        if (format === 'telegram') {
+            return `🎯 What Next After +2?
+
+Your Marks show your Past.
+OriginBI reveals your Future.
+
+✨ What you will get:
+✦ Career Direction Clarity
+✦ Course Fitment
+✦ Growth Roadmap
+✦ Confident Career Decision
+
+💰 It's just ₹749 to reveal your future!
+
+👆 Scan the QR code in the image or click below:
+👉 ${referralLink}`;
+        }
+        // plain
+        return `🎯 What Next After +2?
+
+Your Marks show your Past. OriginBI reveals your Future.
+
+What you will get:
+✦ Career Direction Clarity
+✦ Course Fitment
+✦ Growth Roadmap
+✦ Confident Career Decision
+
+It's just ₹749 to reveal your future!
+
+Scan the QR code in the image or register here: ${referralLink}`;
+    };
+
+    // Clear cached card when QR code regenerates
+    useEffect(() => {
+        setShareCardImageUrl(null);
+    }, [qrDataUrl]);
+
+    // --- Generate promo card: load poster image + overlay QR code ---
+    const ensureCardGenerated = async (): Promise<string | null> => {
+        if (shareCardImageUrl) return shareCardImageUrl;
+        if (!referralLink) return null;
+
+        try {
+            const QRCode = await import('qrcode');
+
+            // Load the poster image
+            const bgImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('Failed to load poster image'));
+                img.src = '/After +2 OriginBI without QR.jpg.jpeg';
+            });
+
+            // Create canvas matching the image dimensions
+            const canvas = document.createElement('canvas');
+            canvas.width = bgImg.naturalWidth;
+            canvas.height = bgImg.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return null;
+
+            // Draw the poster as background
+            ctx.drawImage(bgImg, 0, 0);
+
+            // Generate QR code onto a temp canvas
+            const qrTempCanvas = document.createElement('canvas');
+            await QRCode.toCanvas(qrTempCanvas, referralLink, {
+                width: 400,
+                margin: 1,
+                color: { dark: '#150089', light: '#ffffff' },
+                errorCorrectionLevel: 'H',
+            });
+
+            // Position QR in the blank "Scan Here" area of the poster (1080x1920)
+            const qrSize = 220;
+            const qrX = 440;
+            const qrY = 1560;
+
+            // White background behind QR
+            ctx.fillStyle = '#ffffff';
+            const pad = 10;
+            ctx.beginPath();
+            ctx.roundRect(qrX - pad, qrY - pad, qrSize + pad * 2, qrSize + pad * 2, 16);
+            ctx.fill();
+
+            // Draw QR code
+            ctx.drawImage(qrTempCanvas, qrX, qrY, qrSize, qrSize);
+
+            const imgUrl = canvas.toDataURL('image/png');
+            setShareCardImageUrl(imgUrl);
+            return imgUrl;
+        } catch (e) {
+            console.error('Promo card generation failed', e);
+            return null;
+        }
+    };
+
+    const downloadCard = (imgUrl?: string | null) => {
+        const url = imgUrl || shareCardImageUrl;
+        if (!url) return;
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `OriginBI-Referral-${referralCode}.png`;
+        a.click();
+    };
+
+    // Main share function — generates card, then shares via the chosen platform
+    const shareVia = async (platform: 'native' | 'whatsapp' | 'email' | 'linkedin' | 'telegram') => {
+        setSharingPlatform(platform);
+        setIsGenerating(true);
+
+        const imgUrl = await ensureCardGenerated();
+        setIsGenerating(false);
+        setSharingPlatform(null);
+
+        if (!imgUrl) return;
+
+        if (platform === 'native') {
+            try {
+                const res = await fetch(imgUrl);
+                const blob = await res.blob();
+                const file = new File([blob], `OriginBI-${referralCode}.png`, { type: 'image/png' });
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    // Send image + text as one single message
+                    await navigator.share({
+                        title: 'What Next After +2? — OriginBI',
+                        text: getShareText('plain'),
+                        files: [file],
+                    });
+                    return;
+                }
+            } catch { /* fallback to text-only */ }
+            // Fallback: share just text + link in one message (no separate download)
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'What Next After +2? — OriginBI',
+                        text: getShareText('plain'),
+                        url: referralLink,
+                    });
+                } catch { /* cancelled */ }
+            }
+            return;
+        }
+
+        // For all other platforms: download card first, then open platform with formatted text
+        downloadCard(imgUrl);
+        await new Promise(r => setTimeout(r, 300));
+
+        if (platform === 'whatsapp') {
+            window.open(`https://wa.me/?text=${encodeURIComponent(getShareText('whatsapp'))}`, '_blank');
+        } else if (platform === 'email') {
+            window.location.href = `mailto:?subject=${encodeURIComponent('🎯 What Next After +2? — Discover your future with OriginBI')}&body=${encodeURIComponent(getShareText('email'))}`;
+        } else if (platform === 'linkedin') {
+            window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(referralLink)}`, '_blank');
+        } else if (platform === 'telegram') {
+            window.open(`https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(getShareText('telegram'))}`, '_blank');
+        }
+    };
+
+    // Open the preview modal (generate first if needed)
+    const openPreviewModal = async () => {
+        setIsGenerating(true);
+        const imgUrl = await ensureCardGenerated();
+        setIsGenerating(false);
+        if (imgUrl) {
+            setShowShareCardModal(true);
+        }
     };
 
     return (
@@ -288,6 +523,68 @@ const AffiliateReferrals: React.FC = () => {
                 </div>
             )}
 
+            {/* Share Card Modal */}
+            {showShareCardModal && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={() => setShowShareCardModal(false)}>
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-md" />
+                    <div className="relative bg-white dark:bg-[#1a1a2e] rounded-[32px] shadow-2xl max-w-sm w-full max-h-[90vh] overflow-y-auto p-6 border border-white/10" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setShowShareCardModal(false)} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white dark:bg-[#2a2a40] shadow-lg border border-gray-100 dark:border-white/10 flex items-center justify-center hover:bg-gray-50 transition-all z-50">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                        <div className="text-center mb-4">
+                            <h3 className="font-['Haskoy'] font-bold text-lg text-[#150089] dark:text-white">Share Promo Card</h3>
+                            <p className="text-xs text-[#19211C]/60 dark:text-white/50 mt-1">Image + text + referral link will be shared together</p>
+                        </div>
+                        {/* Card Image Preview */}
+                        {shareCardImageUrl && (
+                            <div className="rounded-2xl overflow-hidden mb-4 shadow-xl border border-gray-100 dark:border-white/10">
+                                <img src={shareCardImageUrl} alt="Promo Card" className="w-full" />
+                            </div>
+                        )}
+                        {/* Text Preview that will be sent along */}
+                        <div className="bg-gray-50 dark:bg-white/5 rounded-2xl p-4 mb-4 border border-gray-100 dark:border-white/10">
+                            <p className="text-[11px] uppercase tracking-wider font-semibold text-[#150089] dark:text-white/60 mb-2">📝 Text that will be sent:</p>
+                            <div className="text-[13px] text-[#19211C] dark:text-white/80 leading-relaxed whitespace-pre-line font-medium">
+                                🎯 <span className="font-bold">What Next After +2?</span>{'\n\n'}
+                                Your Marks show your Past.{'\n'}
+                                <span className="text-[#1ED36A] font-bold">OriginBI</span> reveals your Future.{'\n\n'}
+                                ✨ What you will get:{'\n'}
+                                ✦ Career Direction Clarity{'\n'}
+                                ✦ Course Fitment{'\n'}
+                                ✦ Growth Roadmap{'\n'}
+                                ✦ Confident Career Decision{'\n\n'}
+                                💰 It&apos;s just <span className="font-bold">₹749</span> to reveal your future!{'\n\n'}
+                                👉 <a href={referralLink} className="text-[#150089] underline break-all">{referralLink}</a>
+                            </div>
+                        </div>
+                        {/* Share Buttons */}
+                        <div className="space-y-3">
+                            {/* Native Share (Mobile) */}
+                            <button
+                                onClick={() => shareVia('native')}
+                                disabled={isGenerating}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-full font-bold text-sm bg-gradient-to-r from-[#1ED36A] to-[#16b058] text-white hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+                                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                                </svg>
+                                Share Image + Text + Link
+                            </button>
+                            {/* Download only */}
+                            <button
+                                onClick={() => downloadCard()}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-full font-bold text-sm bg-[#150089] text-white hover:shadow-lg hover:-translate-y-0.5 transition-all"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                Download Card
+                            </button>
+
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Referral Link Quick Banner */}
             <div className="bg-gradient-to-r from-[#150089] to-[#1ED36A] rounded-[32px] p-8 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
                 <div className="flex items-center gap-4">
@@ -299,10 +596,12 @@ const AffiliateReferrals: React.FC = () => {
                         <p className="text-white/80 text-[clamp(14px,1vw,16px)] font-normal mt-0.5">{referralLink}</p>
                     </div>
                 </div>
-                <button onClick={handleCopy}
-                    className="px-10 py-3.5 rounded-full bg-white text-[#150089] font-semibold text-[clamp(14px,1vw,16px)] hover:bg-white/90 transition-all shadow-md shrink-0">
-                    {copied ? '✓ Copied!' : 'Copy Link'}
-                </button>
+                <div className="flex flex-wrap gap-3 shrink-0">
+                    <button onClick={handleCopy}
+                        className="px-8 py-3.5 rounded-full bg-white text-[#150089] font-semibold text-[clamp(14px,1vw,16px)] hover:bg-white/90 transition-all shadow-md">
+                        {copied ? '✓ Copied!' : 'Copy Link'}
+                    </button>
+                </div>
             </div>
 
             {/* Footer */}
