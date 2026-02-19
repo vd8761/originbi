@@ -71,6 +71,10 @@ export class CreateRegistrationDto {
 
   @IsOptional()
   @IsString()
+  studentBoard?: string;
+
+  @IsOptional()
+  @IsString()
   departmentId?: string;
 
   @IsOptional()

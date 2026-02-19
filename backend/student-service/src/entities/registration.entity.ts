@@ -39,6 +39,9 @@ export class Registration {
   @Column({ name: 'school_stream', nullable: true })
   schoolStream: string;
 
+  @Column({ name: 'student_board', nullable: true })
+  studentBoard: string;
+
   @Column({ name: 'program_id', nullable: true })
   programId: number;
 

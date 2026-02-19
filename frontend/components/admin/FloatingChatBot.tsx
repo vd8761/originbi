@@ -33,7 +33,8 @@ const TypeWriter = memo(({ text, onDone }: { text: string; onDone?: () => void }
         if (completedRef.current) return;
 
         indexRef.current = 0;
-        const charsPerFrame = 3; // Fast typing speed
+        const charsPerFrame = 8; // Faster typing speed
+
 
         const animate = () => {
             if (indexRef.current < text.length) {

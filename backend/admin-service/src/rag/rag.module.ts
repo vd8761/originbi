@@ -11,6 +11,7 @@ import { CustomReportService } from './custom-report.service';
 import { ConversationService } from './conversation.service';
 import { ChatMemoryService } from './chat-memory.service';
 import { OriIntelligenceService } from './ori-intelligence.service';
+import { JDMatchingService } from './jd-matching.service';
 
 // RBAC Services
 import { AccessPolicyFactory } from './policies';
@@ -26,6 +27,8 @@ import {
   AssessmentSession,
   User,
   PersonalityTrait,
+  Program,
+  Groups,
 } from '@originbi/shared-entities';
 import { PdfModule } from '../common/pdf/pdf.module';
 
@@ -37,6 +40,8 @@ import { PdfModule } from '../common/pdf/pdf.module';
       AssessmentSession,
       User,
       PersonalityTrait,
+      Program,
+      Groups,
     ]),
     PdfModule,
     AuthModule,
@@ -52,6 +57,7 @@ import { PdfModule } from '../common/pdf/pdf.module';
     ConversationService,
     ChatMemoryService,
     OriIntelligenceService,
+    JDMatchingService,
     // RBAC Providers
     AccessPolicyFactory,
     SecureQueryExecutor,
@@ -66,6 +72,7 @@ import { PdfModule } from '../common/pdf/pdf.module';
     ConversationService,
     ChatMemoryService,
     OriIntelligenceService,
+    JDMatchingService,
     // RBAC Exports
     AccessPolicyFactory,
     SecureQueryExecutor,

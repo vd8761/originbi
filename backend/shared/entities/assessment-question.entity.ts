@@ -45,6 +45,9 @@ export class AssessmentQuestion {
     @Column({ name: 'category', type: 'varchar', length: 100, nullable: true })
     category: string | null;
 
+    @Column({ name: 'board', type: 'varchar', length: 50, nullable: true })
+    board: string | null;
+
     @Column({ name: 'personality_trait_id', type: 'bigint', nullable: true })
     personalityTraitId: number | null;
 

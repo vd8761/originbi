@@ -819,6 +819,9 @@ export class BulkRegistrationsService {
       schoolStream: isSchool
         ? this.getValue(rawData, ['SchoolStream', 'school_stream'])
         : undefined,
+      studentBoard: isSchool
+        ? this.getValue(rawData, ['StudentBoard', 'student_board', 'board'])
+        : undefined,
 
       departmentId: departmentDegreeId, // Correctly mapped to DepartmentDegree ID
       degreeId: undefined, // Not used in registration directly, inferred via DepartmentDegree

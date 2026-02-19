@@ -87,6 +87,9 @@ export class AssessmentAttempt {
   })
   sincerityIndex: string | null;
 
+  @Column({ name: 'dominant_trait_id', type: 'bigint', nullable: true })
+  dominantTraitId: number | null;
+
   @Column({ name: 'metadata', type: 'jsonb', default: () => `'{}'` })
   metadata: any;
 

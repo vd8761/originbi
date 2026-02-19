@@ -61,5 +61,17 @@ export class CreateRegistrationDto {
 
   @IsString()
   @IsOptional()
+  student_board: string;
+
+  @IsString()
+  @IsOptional()
+  studentBoard: string; // Add camelCase support just in case
+
+  @IsString()
+  @IsOptional()
   group_code: string;
+
+  @IsString()
+  @IsOptional()
+  referral_code?: string;
 }

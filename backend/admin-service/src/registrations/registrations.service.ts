@@ -45,7 +45,7 @@ export class RegistrationsService {
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
-  ) {}
+  ) { }
 
   async withRetry<T>(
     operation: () => Promise<T>,
@@ -158,6 +158,7 @@ export class RegistrationsService {
   // ---------------------------------------------------------
   async create(dto: CreateRegistrationDto) {
     dto.email = dto.email.toLowerCase();
+    this.logger.log(`[AdminRegister] Payload: ${JSON.stringify(dto)}`);
     this.logger.log(`Creating registration for ${dto.email}`);
 
     // 1. Basic Validation
@@ -225,6 +226,7 @@ export class RegistrationsService {
           schoolStream,
           departmentDegreeId,
           group: groupId ? { id: groupId } : undefined, // Assign relation object, or undefined
+          studentBoard: dto.studentBoard,
           metadata: {
             programType: dto.programType,
             groupName: dto.groupName,
@@ -233,6 +235,7 @@ export class RegistrationsService {
             examStart: dto.examStart,
             examEnd: dto.examEnd,
             departmentId: dto.departmentId ?? null,
+            studentBoard: dto.studentBoard, // Keep in metadata too
           },
         });
         await manager.save(registration);
@@ -339,6 +342,9 @@ export class RegistrationsService {
                 `Failed to generate questions for Attempt ${attempt.id} (Level ${level.id}):`,
                 err,
               );
+              // CRITICAL: Re-throw to cause transaction rollback.
+              // We cannot allow a registration without questions for Level 1.
+              throw err;
             }
           }
         }
@@ -438,6 +444,7 @@ export class RegistrationsService {
           examStart: dto.examStart,
           examEnd: dto.examEnd,
           departmentId: dto.departmentId ?? null,
+          studentBoard: dto.studentBoard,
         },
       });
       await manager.save(registration);
@@ -507,10 +514,14 @@ export class RegistrationsService {
         });
         await manager.save(attempt);
 
-        // NOTE: This logic applies to Bulk Upload for Existing Users as well.
         // Strictly generate questions ONLY for Level 1.
         if (level.levelNumber === 1 || level.name === 'Level 1') {
-          await this.assessmentGenService.generateQuestions(attempt, manager);
+          try {
+            await this.assessmentGenService.generateQuestions(attempt, manager);
+          } catch (err) {
+            this.logger.error(`Failed to generate questions for Attempt ${attempt.id} (Level 1) in Existing User flow:`, err);
+            throw err;
+          }
         }
       }
 

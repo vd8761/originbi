@@ -48,4 +48,18 @@ export class StudentController {
   ) {
     return this.studentService.validateRegistration(dto);
   }
+
+  @Post('assessment-complete')
+  completeAssessment(@Body() body: { userId: number }) {
+    // Fire and forget - don't block the caller
+    this.studentService
+      .handleAssessmentCompletion(body.userId)
+      .catch((err) => console.error('Async email sending error:', err));
+    return { message: 'Assessment completion processing started' };
+  }
+
+  @Post('affiliate/validate')
+  async validateAffiliate(@Body() body: { code: string }) {
+    return this.studentService.validateReferralCode(body.code);
+  }
 }

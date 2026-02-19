@@ -11,7 +11,7 @@ configureAmplify(); // ensure Amplify is configured
 interface LoginFormProps {
   onLoginSuccess: () => void;
   buttonClass?: string;
-  portalMode?: 'student' | 'corporate' | 'admin';
+  portalMode?: 'student' | 'corporate' | 'admin' | 'affiliate';
 }
 
 const LoginForm: React.FC<LoginFormProps> = ({
@@ -156,6 +156,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
       if (portalMode === 'admin') requiredGroup = 'ADMIN';
       if (portalMode === 'student') requiredGroup = 'STUDENT';
       if (portalMode === 'corporate') requiredGroup = 'CORPORATE';
+      if (portalMode === 'affiliate') requiredGroup = 'AFFILIATE';
 
       //console.log('Required group for this portal:', requiredGroup);
 
@@ -180,6 +181,9 @@ const LoginForm: React.FC<LoginFormProps> = ({
       }
       if (portalMode === 'corporate') {
         backendUrl = `${apiBase}/admin/me`; // change later when corporate-service is ready
+      }
+      if (portalMode === 'affiliate') {
+        backendUrl = `${apiBase}/affiliates/me`;
       }
 
       const res = await fetch(backendUrl, {
@@ -222,13 +226,27 @@ const LoginForm: React.FC<LoginFormProps> = ({
       sessionStorage.setItem('idToken', idTokenJwt);
       sessionStorage.setItem('accessToken', idTokenJwt);
 
-      // Store user with all fields needed by auth-helpers (id, role, email, name)
-      localStorage.setItem('user', JSON.stringify({
-        id: backendUser.id || 0,
-        name: metadata.fullName || backendUser.email?.split('@')[0] || 'User',
-        email: backendUser.email || '',
-        role: backendUser.role || 'ADMIN',
-      }));
+      if (portalMode === 'affiliate') {
+        // Store affiliate-specific user data
+        const affiliateData = backendUser.affiliate || {};
+        localStorage.setItem('affiliate_user', JSON.stringify({
+          id: affiliateData.id || 0,
+          userId: backendUser.id || 0,
+          name: affiliateData.name || backendUser.email?.split('@')[0] || 'Affiliate',
+          email: backendUser.email || '',
+          role: 'AFFILIATE',
+          referralCode: affiliateData.referralCode || '',
+        }));
+        sessionStorage.setItem('affiliateEmail', backendUser.email || '');
+      } else {
+        // Store user with all fields needed by auth-helpers (id, role, email, name)
+        localStorage.setItem('user', JSON.stringify({
+          id: backendUser.id || 0,
+          name: metadata.fullName || backendUser.email?.split('@')[0] || 'User',
+          email: backendUser.email || '',
+          role: backendUser.role || 'ADMIN',
+        }));
+      }
 
       onLoginSuccess();
     } catch (err: unknown) {

@@ -14,6 +14,11 @@ export { PersonalityTrait } from './personality-trait.entity';
 export { CorporateAccount } from './corporate-account.entity';
 export { CorporateCreditLedger } from './corporate-credit-ledger.entity';
 
+// Affiliate entities
+export { AffiliateAccount } from './affiliate-account.entity';
+export { AffiliateReferralTransaction } from './affiliate-referral-transaction.entity';
+export { AffiliateSettlementTransaction } from './affiliate-settlement-transaction.entity';
+
 // Group & Registration
 export { GroupAssessment } from './group-assessment.entity';
 export { Registration, RegistrationSource, RegistrationStatus, PaymentStatus, Gender } from './registration.entity';
