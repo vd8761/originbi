@@ -85,7 +85,7 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
         const days = [];
         // Empty slots
         for (let i = 0; i < firstDay; i++) {
-            days.push(<div key={`empty - ${i} `} className="h-9 w-9" />);
+            days.push(<div key={`empty-${i}`} className="h-9 w-9" />);
         }
 
         // Days
@@ -108,8 +108,7 @@ const DateRangePickerModal: React.FC<DateRangePickerModalProps> = ({ isOpen, onC
                     key={d}
                     disabled={isFuture}
                     onClick={() => !isFuture && handleDateClick(date)}
-                    className={`
-h - 9 w - 9 text - xs font - medium rounded - full flex items - center justify - center transition - all relative
+                    className={`h-9 w-9 text-xs font-medium rounded-full flex items-center justify-center transition-all relative
                         ${isFuture ? 'text-gray-400 dark:text-gray-700 cursor-not-allowed opacity-30' : ''}
                         
                         ${/* Selected State (Start or End) */ ''}
@@ -128,7 +127,7 @@ h - 9 w - 9 text - xs font - medium rounded - full flex items - center justify -
                         ${isInRange && !isSelected ? 'rounded-none' : ''}
                         ${isSelectedStart && endDate && endDate.getTime() !== startDate?.getTime() ? 'rounded-r-none' : ''}
                         ${isSelectedEnd && startDate && endDate.getTime() !== startDate.getTime() ? 'rounded-l-none' : ''}
-`}
+                    }`}
                 >
                     {d}
                 </button>
@@ -269,10 +268,10 @@ h - 9 w - 9 text - xs font - medium rounded - full flex items - center justify -
                                 <button
                                     key={preset}
                                     onClick={() => handlePresetClick(preset)}
-                                    className={`text - left px - 4 py - 3 rounded - lg text - sm font - medium transition - all ${activePreset === preset
+                                    className={`text-left px-4 py-3 rounded-lg text-sm font-medium transition-all ${activePreset === preset
                                         ? 'bg-white dark:bg-[#24272B] text-brand-text-light-primary dark:text-white shadow-sm'
                                         : 'text-gray-500 dark:text-gray-400 hover:text-brand-text-light-primary dark:hover:text-white hover:bg-white dark:hover:bg-white/5'
-                                        } `}
+                                        }`}
                                 >
                                     {preset}
                                 </button>
@@ -283,10 +282,10 @@ h - 9 w - 9 text - xs font - medium rounded - full flex items - center justify -
                         <div className="pt-4 border-t border-gray-200 dark:border-white/5 mt-2">
                             <button
                                 onClick={() => setActivePreset('Custom Range')}
-                                className={`w - full text - center px - 4 py - 3 rounded - lg text - sm font - bold transition - all ${activePreset === 'Custom Range'
+                                className={`w-full text-center px-4 py-3 rounded-lg text-sm font-bold transition-all ${activePreset === 'Custom Range'
                                     ? 'bg-brand-green text-white shadow-lg shadow-brand-green/20'
                                     : 'bg-brand-green/10 text-brand-green hover:bg-brand-green/20'
-                                    } `}
+                                    }`}
                             >
                                 Custom Range
                             </button>
@@ -332,10 +331,10 @@ h - 9 w - 9 text - xs font - medium rounded - full flex items - center justify -
                                 }
                             }}
                             disabled={!startDate}
-                            className={`flex - 1 sm: flex - none px - 8 py - 2.5 rounded - full text - white text - sm font - bold shadow - lg transition - colors ${startDate
+                            className={`flex-1 sm:flex-none px-8 py-2.5 rounded-full text-white text-sm font-bold shadow-lg transition-colors ${startDate
                                 ? 'bg-brand-green hover:bg-brand-green/90 shadow-brand-green/20'
                                 : 'bg-brand-green/50 cursor-not-allowed opacity-50'
-                                } `}
+                                }`}
                         >
                             Apply changes
                         </button>

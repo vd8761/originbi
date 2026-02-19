@@ -68,7 +68,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
             setDepartmentStats(stats.departments || []);
             // If single department, select it automatically
             if (stats.departments?.length > 0) {
-                 setSelectedDepartment(stats.departments[0].id);
+                setSelectedDepartment(stats.departments[0].id);
             }
             setShowDownloadModal(true);
         } catch (error) {
@@ -81,38 +81,38 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
 
     const handleConfirmDownload = async () => {
         if (!selectedDepartment || !groupData?.group?.id) return;
-        
+
         setGenerating(true);
         setProgress('Initializing...');
-        
+
         try {
             const apiBase = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || 'http://localhost:4006';
-            
+
             // 1. Start Job
             const startRes = await fetch(`${apiBase}/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true`);
             const startData = await startRes.json();
-            
+
             if (!startData.success || !startData.jobId) {
                 throw new Error("Failed to start report generation");
             }
-            
+
             const jobId = startData.jobId;
-            
+
             // 2. Poll Status
             const pollInterval = setInterval(async () => {
                 try {
                     const statusRes = await fetch(`${apiBase}/download/status/${jobId}?json=true`);
                     const statusData = await statusRes.json();
-                    
+
                     if (statusData.status === 'PROCESSING') {
                         setProgress(statusData.progress || 'Processing...');
                     } else if (statusData.status === 'COMPLETED') {
                         clearInterval(pollInterval);
                         setProgress('Download Starting...');
-                        
+
                         // Trigger Download
                         window.location.href = `${apiBase}${statusData.downloadUrl}`;
-                        
+
                         // Close Modal after a delay
                         setTimeout(() => {
                             setGenerating(false);
@@ -130,14 +130,14 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                     setGenerating(false);
                 }
             }, 1000);
-            
+
         } catch (error) {
             console.error("Download failed", error);
             setProgress('Failed');
             setGenerating(false);
         }
     };
-    
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-full">
@@ -279,70 +279,73 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                         <ArrowRightWithoutLineIcon className="w-3 h-3 text-black dark:text-white" />
                     </span>
                     <span onClick={onBack} className="cursor-pointer hover:underline">Registrations</span>
-                     <span className="mx-2 text-gray-400 dark:text-gray-600">
+                    <span className="mx-2 text-gray-400 dark:text-gray-600">
                         <ArrowRightWithoutLineIcon className="w-3 h-3 text-black dark:text-white" />
                     </span>
                     <span className="text-brand-green font-semibold">Group Assessment Preview</span>
                 </div>
                 <div className="flex items-center gap-4">
                     <button onClick={onBack} className="p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
-                        <ArrowLeftWithoutLineIcon className="w-6 h-6 text-[#150089] dark:text-white" />
+                        <ArrowLeftWithoutLineIcon className="w-6 h-6 text-brand-purple dark:text-white" />
                     </button>
-                    <h1 className="text-2xl sm:text-3xl font-semibold text-[#150089] dark:text-white">
+                    <h1 className="text-2xl sm:text-3xl font-semibold text-brand-purple dark:text-white">
                         Group Assessment Preview
                     </h1>
                 </div>
             </div>
 
             {/* Assessment Summary Card */}
-            <div className="bg-[#19211C] p-6 rounded-2xl text-white relative shadow-lg">
-                <h2 className="text-sm text-gray-400 mb-6 font-medium uppercase tracking-wider">Assessment Summary</h2>
+            <div className="bg-brand-dark-primary p-6 rounded-2xl text-white relative shadow-lg ring-1 ring-white/5">
+                <div className="flex items-center gap-2 mb-6">
+                    <div className="w-1 h-4 bg-brand-green rounded-full"></div>
+                    <h2 className="text-sm text-white/70 font-semibold uppercase tracking-wider">Assessment Summary</h2>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-y-8 gap-x-6">
                     <div>
-                        <p className="text-xs text-brand-text-secondary dark:text-gray-400 mb-1.5">Exam Title</p>
+                        <p className="text-xs text-white/50 mb-1.5 font-medium">Exam Title</p>
                         <p className="text-base font-semibold text-white">{groupData.program?.assessment_title || 'N/A'}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-brand-text-secondary dark:text-gray-400 mb-1.5">Exam Status</p>
-                        <span className={`inline-block px-3 py-1 rounded text-[10px] font-bold border tracking-wide
-                            ${groupData.status === 'COMPLETED' ? 'bg-[#00B69B] text-white border-[#00B69B]' :
-                                groupData.status === 'IN_PROGRESS' || groupData.status === 'ON_GOING' ? 'bg-[#00B69B]/20 text-[#00B69B] border-[#00B69B]' :
-                                    groupData.status === 'EXPIRED' ? 'bg-[#EF3826]/20 text-[#EF3826] border-[#EF3826]' :
-                                        groupData.status === 'NOT_STARTED' ? 'bg-[#F2F2F2]/10 text-white border-[#F2F2F2]/20' :
+                        <p className="text-xs text-white/50 mb-1.5 font-medium">Exam Status</p>
+                        <span className={`inline-block px-3 py-1 rounded-md text-[10px] font-bold border tracking-wide uppercase
+                            ${groupData.status === 'COMPLETED' ? 'bg-brand-green text-brand-dark-primary border-brand-green' :
+                                groupData.status === 'IN_PROGRESS' || groupData.status === 'ON_GOING' ? 'bg-brand-green/10 text-brand-green border-brand-green/30' :
+                                    groupData.status === 'EXPIRED' ? 'bg-brand-red/20 text-brand-red border-brand-red/30' :
+                                        groupData.status === 'NOT_STARTED' ? 'bg-white/10 text-white border-white/20' :
                                             'bg-gray-100 text-gray-600 border-gray-200'}`}>
                             {groupData.status?.replace(/_/g, " ")}
                         </span>
                     </div>
                     <div>
-                        <p className="text-xs text-brand-text-secondary dark:text-gray-400 mb-1.5">Exam Type</p>
-                        <p className="text-base font-medium text-white">WebApp</p>
+                        <p className="text-xs text-white/50 mb-1.5 font-medium">Exam Type</p>
+                        <p className="text-base font-semibold text-white">WebApp</p>
                     </div>
                     <div>
-                        <p className="text-xs text-brand-text-secondary dark:text-gray-400 mb-1.5">Program Name</p>
-                        <p className="text-base font-medium text-white">{groupData.program?.name || 'N/A'}</p>
+                        <p className="text-xs text-white/50 mb-1.5 font-medium">Program Name</p>
+                        <p className="text-base font-semibold text-white">{groupData.program?.name || 'N/A'}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-brand-text-secondary dark:text-gray-400 mb-1.5">Group Name</p>
-                        <p className="text-base font-medium text-white">{groupData.group?.name || 'N/A'}</p>
+                        <p className="text-xs text-white/50 mb-1.5 font-medium">Group Name</p>
+                        <p className="text-base font-semibold text-white">{groupData.group?.name || 'N/A'}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-brand-text-secondary dark:text-gray-400 mb-1.5">No. of Candidates</p>
-                        <p className="text-base font-medium text-white">{groupData.totalCandidates || allSessions.length}</p>
+                        <p className="text-xs text-white/50 mb-1.5 font-medium">No. of Candidates</p>
+                        <p className="text-base font-semibold text-white">{groupData.totalCandidates || allSessions.length}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-brand-text-secondary dark:text-gray-400 mb-1.5">Exam Starts On</p>
-                        <p className="text-base font-medium text-white">{formatDate(groupData.validFrom)}</p>
+                        <p className="text-xs text-white/50 mb-1.5 font-medium">Exam Starts On</p>
+                        <p className="text-base font-semibold text-white">{formatDate(groupData.validFrom)}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-brand-text-secondary dark:text-gray-400 mb-1.5">Exam Ends On</p>
-                        <p className="text-base font-medium text-white">{formatDate(groupData.validTo)}</p>
+                        <p className="text-xs text-white/50 mb-1.5 font-medium">Exam Ends On</p>
+                        <p className="text-base font-semibold text-white">{formatDate(groupData.validTo)}</p>
                     </div>
                 </div>
             </div>
 
             {/* Candidates List Header */}
             <div className='flex flex-col sm:flex-row justify-between items-end sm:items-center gap-4 pt-4'>
-                <h2 className="text-xl font-semibold text-[#150089] dark:text-white">List of Candidates</h2>
+                <h2 className="text-xl font-semibold text-brand-purple dark:text-white">List of Candidates</h2>
 
                 <div className="flex items-center gap-3">
                     <span className="text-sm text-[#19211C] dark:text-brand-text-secondary hidden sm:inline font-[300]">
@@ -424,14 +427,14 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                         className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] rounded-lg text-sm font-medium text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/30 transition-all shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                         <span>{downloadLoading ? "Loading..." : "Download Report"}</span>
-                         {downloadLoading ? (
+                        {downloadLoading ? (
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-green"></div>
                         ) : (
                             // Download Icon on the right
                             <svg className="w-5 h-5 text-brand-green" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M12 16L12 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                <path d="M9 13L12 16L15 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                <path d="M17 19H7C5.89543 19 5 18.1046 5 17V7C5 5.89543 5.89543 5 7 5H17C18.1046 5 19 5.89543 19 7V17C19 18.1046 18.1046 19 17 19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M12 16L12 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="M9 13L12 16L15 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="M17 19H7C5.89543 19 5 18.1046 5 17V7C5 5.89543 5.89543 5 7 5H17C18.1046 5 19 5.89543 19 7V17C19 18.1046 18.1046 19 17 19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                         )}
                     </button>
@@ -506,10 +509,10 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                                             <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-primary font-medium">{session.userFullName}</td>
                                             <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-secondary">{session.userEmail}</td>
                                             <td className="p-4 text-center">
-                                                <span className={`px-3 py-1 rounded text-[10px] font-bold border tracking-wide uppercase 
-                                                    ${session.status === 'COMPLETED' ? 'bg-[#00B69B] text-white border-[#00B69B]' :
-                                                        session.status === 'IN_PROGRESS' || session.status === 'ON_GOING' ? 'bg-[#00B69B]/20 text-[#00B69B] border-[#00B69B]' :
-                                                            session.status === 'EXPIRED' ? 'bg-[#EF3826]/20 text-[#EF3826] border-[#EF3826]' :
+                                                <span className={`px-3 py-1 rounded-md text-[10px] font-bold border tracking-wide uppercase 
+                                                    ${session.status === 'COMPLETED' ? 'bg-brand-green text-brand-dark-primary border-brand-green' :
+                                                        session.status === 'IN_PROGRESS' || session.status === 'ON_GOING' ? 'bg-brand-green/10 text-brand-green border-brand-green/30' :
+                                                            session.status === 'EXPIRED' ? 'bg-brand-red/20 text-brand-red border-brand-red/30' :
                                                                 'bg-gray-100 text-gray-600 border-gray-200'}`}>
                                                     {session.status?.replace(/_/g, " ")}
                                                 </span>
@@ -621,13 +624,12 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                                                     </p>
                                                 </div>
                                             </div>
-                                            
+
                                             <div className="text-right">
-                                                <span className={`text-xs font-bold px-2 py-1 rounded-md ${
-                                                    dept.completed === dept.total 
-                                                    ? 'bg-green-100 text-green-700' 
-                                                    : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'
-                                                }`}>
+                                                <span className={`text-xs font-bold px-2 py-1 rounded-md ${dept.completed === dept.total
+                                                        ? 'bg-green-100 text-green-700'
+                                                        : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'
+                                                    }`}>
                                                     {Math.round((dept.completed / (dept.total || 1)) * 100)}% Done
                                                 </span>
                                             </div>
