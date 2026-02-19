@@ -39,10 +39,13 @@ const CircleArrowUpRightFilled = ({ className = "w-6 h-6" }: { className?: strin
     </div>
 );
 
-const MiniStat = ({ label, value, trend, isPositive }: { label: string, value: string, trend?: string, isPositive?: boolean }) => (
+const MiniStat = ({ label, sublabel, value, trend, isPositive }: { label: string, sublabel?: string, value: string, trend?: string, isPositive?: boolean }) => (
     <div className="flex flex-col pr-6 pl-0 sm:px-6 sm:first:pl-0 w-full sm:w-auto flex-1 border-b sm:border-b-0 sm:border-r border-[#E0E0E0] dark:border-white/10 last:border-0 sm:last:border-r-0 h-full justify-between py-4 sm:py-1">
         <div className="flex justify-between items-start gap-3">
-            <span className="text-xs text-[#19211C]/60 dark:text-white/60 font-normal whitespace-nowrap">{label}</span>
+            <div className="flex flex-row items-baseline gap-1">
+                <span className="text-xs text-[#19211C]/60 dark:text-white/60 font-normal whitespace-nowrap">{label}</span>
+                {sublabel && <span className="text-[9px] text-[#9CA3AF] dark:text-white/35 font-normal whitespace-nowrap">({sublabel})</span>}
+            </div>
             <CircleArrowUpRightFilled className="w-6 h-6" />
         </div>
         <div className="flex flex-row items-baseline gap-3">
@@ -95,7 +98,7 @@ const EarningsCard = ({ earnings }: { earnings: number }) => {
                         onClick={() => router.push('/affiliate/earnings')}
                         className="font-['Haskoy'] font-semibold text-[clamp(15px,1vw,18px)] text-white bg-gradient-to-r from-[#1ED36A] to-[#16b058] hover:from-[#16b058] hover:to-[#1ED36A] px-14 py-4 rounded-full shadow-[0_8px_24px_-4px_rgba(30,211,106,0.4)] hover:shadow-[0_12px_32px_-4px_rgba(30,211,106,0.5)] transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]"
                     >
-                        Earnings
+                        View
                     </button>
                 </div>
             </div>
@@ -199,11 +202,15 @@ const EarningsChart = ({ affiliateId }: { affiliateId?: string }) => {
 // --- Referral Link Card (Redesigned as Share Card) ---
 const ReferralLinkCard = () => {
     const [copied, setCopied] = useState(false);
-    const [showShareMenu, setShowShareMenu] = useState(false);
     const [showQRModal, setShowQRModal] = useState(false);
+    const [showShareCardModal, setShowShareCardModal] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [referralLink, setReferralLink] = useState("https://discover.originbi.com/register?ref=affiliate");
     const [referralCode, setReferralCode] = useState('AFFILIATE');
+    const [qrDataUrl, setQrDataUrl] = useState<string>('');
+    const [shareCardImageUrl, setShareCardImageUrl] = useState<string | null>(null);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [sharingPlatform, setSharingPlatform] = useState<string | null>(null);
 
     useEffect(() => {
         setMounted(true);
@@ -219,31 +226,247 @@ const ReferralLinkCard = () => {
         } catch { /* empty */ }
     }, []);
 
+    // Generate QR code as base64 data URL (no CORS issues for html2canvas)
+    useEffect(() => {
+        if (!referralLink || !mounted) return;
+        import('qrcode').then(QRCode => {
+            QRCode.toDataURL(referralLink, {
+                width: 300,
+                margin: 1,
+                color: { dark: '#150089', light: '#ffffff' },
+                errorCorrectionLevel: 'H',
+            }).then(url => setQrDataUrl(url));
+        });
+    }, [referralLink, mounted]);
+
     const handleCopy = () => {
         navigator.clipboard.writeText(referralLink);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const handleShare = async () => {
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: 'Join OriginBI via my referral',
-                    text: 'Sign up for OriginBI using my referral link and get started!',
-                    url: referralLink,
-                });
-            } catch { /* user cancelled */ }
-        } else {
-            setShowShareMenu(!showShareMenu);
+    // --- Formatted share text templates ---
+    const getShareText = (format: 'whatsapp' | 'email' | 'telegram' | 'plain') => {
+        if (format === 'whatsapp') {
+            return `🎯 *What Next After +2?*
+
+Your Marks show your Past.
+*OriginBI reveals your Future.*
+
+✨ *What you will get:*
+✦ Career Direction Clarity
+✦ Course Fitment
+✦ Growth Roadmap
+✦ Confident Career Decision
+
+💰 It's just *₹749* to reveal your future!
+
+👆 *Scan the QR code in the image above* or click below to register:
+👉 ${referralLink}`;
+        }
+        if (format === 'email') {
+            return `Hi,
+
+I'd like to share something exciting with you!
+
+🎯 What Next After +2?
+
+Your Marks show your Past. OriginBI reveals your Future.
+
+What you will get:
+  ✦ Career Direction Clarity
+  ✦ Course Fitment
+  ✦ Growth Roadmap
+  ✦ Confident Career Decision
+
+It's just ₹749 to reveal your future!
+
+👉 Register here: ${referralLink}
+
+Please find the promotional card attached above. Scan the QR code in the image to register directly!
+
+See you on the other side!`;
+        }
+        if (format === 'telegram') {
+            return `🎯 What Next After +2?
+
+Your Marks show your Past.
+OriginBI reveals your Future.
+
+✨ What you will get:
+✦ Career Direction Clarity
+✦ Course Fitment
+✦ Growth Roadmap
+✦ Confident Career Decision
+
+💰 It's just ₹749 to reveal your future!
+
+👆 Scan the QR code in the image or click below:
+👉 ${referralLink}`;
+        }
+        // plain
+        return `🎯 What Next After +2?
+
+Your Marks show your Past. OriginBI reveals your Future.
+
+What you will get:
+✦ Career Direction Clarity
+✦ Course Fitment
+✦ Growth Roadmap
+✦ Confident Career Decision
+
+It's just ₹749 to reveal your future!
+
+Scan the QR code in the image or register here: ${referralLink}`;
+    };
+
+    // Clear cached card when QR code regenerates
+    useEffect(() => {
+        setShareCardImageUrl(null);
+    }, [qrDataUrl]);
+
+    // --- Generate promo card: load poster image + overlay QR code ---
+    const ensureCardGenerated = async (): Promise<string | null> => {
+        if (shareCardImageUrl) return shareCardImageUrl;
+        if (!referralLink) return null;
+
+        try {
+            const QRCode = await import('qrcode');
+
+            // Load the poster image
+            const bgImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('Failed to load poster image'));
+                img.src = '/After +2 OriginBI without QR.jpg.jpeg';
+            });
+
+            // Create canvas matching the image dimensions
+            const canvas = document.createElement('canvas');
+            canvas.width = bgImg.naturalWidth;
+            canvas.height = bgImg.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return null;
+
+            // Draw the poster as background
+            ctx.drawImage(bgImg, 0, 0);
+
+            // Generate QR code onto a temp canvas
+            const qrTempCanvas = document.createElement('canvas');
+            await QRCode.toCanvas(qrTempCanvas, referralLink, {
+                width: 400,
+                margin: 1,
+                color: { dark: '#150089', light: '#ffffff' },
+                errorCorrectionLevel: 'H',
+            });
+
+            // Position QR in the blank "Scan Here" area of the poster (1080x1920)
+            const qrSize = 220;
+            const qrX = 440;
+            const qrY = 1560;
+
+            // White background behind QR
+            ctx.fillStyle = '#ffffff';
+            const pad = 10;
+            ctx.beginPath();
+            ctx.roundRect(qrX - pad, qrY - pad, qrSize + pad * 2, qrSize + pad * 2, 16);
+            ctx.fill();
+
+            // Draw QR code
+            ctx.drawImage(qrTempCanvas, qrX, qrY, qrSize, qrSize);
+
+            const imgUrl = canvas.toDataURL('image/png');
+            setShareCardImageUrl(imgUrl);
+            return imgUrl;
+        } catch (e) {
+            console.error('Promo card generation failed', e);
+            return null;
         }
     };
 
-    const ModalContent = () => (
+    const downloadCard = (imgUrl?: string | null) => {
+        const url = imgUrl || shareCardImageUrl;
+        if (!url) return;
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `OriginBI-Referral-${referralCode}.png`;
+        a.click();
+    };
+
+    // Main share function — generates card, then shares via the chosen platform
+    const shareVia = async (platform: 'native' | 'whatsapp' | 'email' | 'linkedin' | 'telegram') => {
+        setSharingPlatform(platform);
+        setIsGenerating(true);
+
+        const imgUrl = await ensureCardGenerated();
+        setIsGenerating(false);
+        setSharingPlatform(null);
+
+        if (!imgUrl) return;
+
+        if (platform === 'native') {
+            try {
+                const res = await fetch(imgUrl);
+                const blob = await res.blob();
+                const file = new File([blob], `OriginBI-${referralCode}.png`, { type: 'image/png' });
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    // Send image + text as one single message
+                    await navigator.share({
+                        title: 'What Next After +2? — OriginBI',
+                        text: getShareText('plain'),
+                        files: [file],
+                    });
+                    return;
+                }
+            } catch { /* fallback to text-only */ }
+            // Fallback: share just text + link in one message (no separate download)
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'What Next After +2? — OriginBI',
+                        text: getShareText('plain'),
+                        url: referralLink,
+                    });
+                } catch { /* cancelled */ }
+            }
+            return;
+        }
+
+        // For all other platforms: download card first, then open platform with formatted text
+        downloadCard(imgUrl);
+
+        // Small delay so download completes before redirect
+        await new Promise(r => setTimeout(r, 300));
+
+        if (platform === 'whatsapp') {
+            window.open(`https://wa.me/?text=${encodeURIComponent(getShareText('whatsapp'))}`, '_blank');
+        } else if (platform === 'email') {
+            window.location.href = `mailto:?subject=${encodeURIComponent('🎯 What Next After +2? — Discover your future with OriginBI')}&body=${encodeURIComponent(getShareText('email'))}`;
+        } else if (platform === 'linkedin') {
+            window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(referralLink)}`, '_blank');
+        } else if (platform === 'telegram') {
+            window.open(`https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(getShareText('telegram'))}`, '_blank');
+        }
+    };
+
+    // Open the preview modal (generate first if needed)
+    const openPreviewModal = async () => {
+        setIsGenerating(true);
+        const imgUrl = await ensureCardGenerated();
+        setIsGenerating(false);
+        if (imgUrl) {
+            setShowQRModal(false);
+            setShowShareCardModal(true);
+        }
+    };
+
+    // Inline hidden promotional card captured by html2canvas (NOT a nested component to keep ref stable)
+
+    const QRModalContent = () => (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={() => setShowQRModal(false)}>
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-fade-in"></div>
-            <div className="relative bg-white dark:bg-[#1a1a2e] rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-scale-up border border-white/10" onClick={e => e.stopPropagation()}>
-                {/* Close Button - More prominent */}
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-md"></div>
+            <div className="relative bg-white dark:bg-[#1a1a2e] rounded-[32px] shadow-2xl max-w-md w-full p-8 border border-white/10" onClick={e => e.stopPropagation()}>
                 <button
                     onClick={() => setShowQRModal(false)}
                     className="absolute -top-3 -right-3 sm:top-5 sm:right-5 w-10 h-10 rounded-full bg-white dark:bg-[#2a2a40] shadow-lg border border-gray-100 dark:border-white/10 flex items-center justify-center text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/20 transition-all transform hover:scale-110 z-50"
@@ -251,27 +474,22 @@ const ReferralLinkCard = () => {
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
 
-                {/* Header */}
                 <div className="text-center mb-8">
                     <h3 className="font-['Haskoy'] font-bold text-[clamp(20px,1.5vw,28px)] text-[#150089] dark:text-white">Affiliate Card</h3>
                     <p className="text-sm text-[#19211C]/60 dark:text-white/50 mt-1">Scan or share your referral details</p>
                 </div>
 
-                {/* QR Code - Larger */}
                 <div className="flex justify-center mb-8">
                     <div className="p-5 bg-white rounded-[24px] shadow-xl border border-gray-100">
-                        <img
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(referralLink)}&bgcolor=ffffff&color=150089&margin=8`}
-                            alt="Referral QR Code"
-                            className="w-[220px] h-[220px] rounded-xl"
-                        />
+                        {qrDataUrl ? (
+                            <img src={qrDataUrl} alt="Referral QR Code" className="w-[220px] h-[220px] rounded-xl" />
+                        ) : (
+                            <div className="w-[220px] h-[220px] rounded-xl bg-gray-100 animate-pulse" />
+                        )}
                     </div>
                 </div>
 
-                {/* Affiliate Details - REMOVED as per request */}
-
-                {/* Actions */}
-                <div className="flex gap-4">
+                <div className="flex gap-3 mb-3">
                     <button
                         onClick={() => { navigator.clipboard.writeText(referralLink); handleCopy(); }}
                         className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-full font-bold text-sm bg-[#150089] text-white hover:shadow-lg hover:-translate-y-0.5 transition-all"
@@ -280,15 +498,91 @@ const ReferralLinkCard = () => {
                         {copied ? 'Copied!' : 'Copy Link'}
                     </button>
                     <button
-                        onClick={handleShare}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-full font-bold text-sm bg-gradient-to-r from-[#1ED36A] to-[#16b058] text-white hover:shadow-lg hover:-translate-y-0.5 transition-all"
+                        onClick={() => shareVia('native')}
+                        disabled={isGenerating}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-full font-bold text-sm bg-gradient-to-r from-[#1ED36A] to-[#16b058] text-white hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50"
+                    >
+                        {isGenerating && sharingPlatform === 'native' ? (
+                            <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" /></svg>
+                        ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+                                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                            </svg>
+                        )}
+                        Share
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
+    const ShareCardModalContent = () => (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={() => setShowShareCardModal(false)}>
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-md"></div>
+            <div className="relative bg-white dark:bg-[#1a1a2e] rounded-[32px] shadow-2xl max-w-sm w-full max-h-[90vh] overflow-y-auto p-6 border border-white/10" onClick={e => e.stopPropagation()}>
+                <button
+                    onClick={() => setShowShareCardModal(false)}
+                    className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white dark:bg-[#2a2a40] shadow-lg border border-gray-100 dark:border-white/10 flex items-center justify-center text-[#19211C] dark:text-white hover:bg-gray-50 transition-all z-50"
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+
+                <div className="text-center mb-4">
+                    <h3 className="font-['Haskoy'] font-bold text-lg text-[#150089] dark:text-white">Share Promo Card</h3>
+                    <p className="text-xs text-[#19211C]/60 dark:text-white/50 mt-1">Image + text + referral link will be shared together</p>
+                </div>
+
+                {/* Card Image Preview */}
+                {shareCardImageUrl && (
+                    <div className="rounded-2xl overflow-hidden mb-4 shadow-xl border border-gray-100 dark:border-white/10">
+                        <img src={shareCardImageUrl} alt="Promo Card" className="w-full" />
+                    </div>
+                )}
+
+                {/* Text Preview that will be sent along */}
+                <div className="bg-gray-50 dark:bg-white/5 rounded-2xl p-4 mb-4 border border-gray-100 dark:border-white/10">
+                    <p className="text-[11px] uppercase tracking-wider font-semibold text-[#150089] dark:text-white/60 mb-2">📝 Text that will be sent:</p>
+                    <div className="text-[13px] text-[#19211C] dark:text-white/80 leading-relaxed whitespace-pre-line font-medium">
+                        🎯 <span className="font-bold">What Next After +2?</span>{'\n\n'}
+                        Your Marks show your Past.{'\n'}
+                        <span className="text-[#1ED36A] font-bold">OriginBI</span> reveals your Future.{'\n\n'}
+                        ✨ What you will get:{'\n'}
+                        ✦ Career Direction Clarity{'\n'}
+                        ✦ Course Fitment{'\n'}
+                        ✦ Growth Roadmap{'\n'}
+                        ✦ Confident Career Decision{'\n\n'}
+                        💰 It&apos;s just <span className="font-bold">₹749</span> to reveal your future!{'\n\n'}
+                        👉 <a href={referralLink} className="text-[#150089] underline break-all">{referralLink}</a>
+                    </div>
+                </div>
+
+                {/* Share Buttons - Each generates card + downloads + opens platform */}
+                <div className="space-y-3">
+                    {/* Native Share (Mobile) — sends image + text together */}
+                    <button
+                        onClick={() => shareVia('native')}
+                        disabled={isGenerating}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-full font-bold text-sm bg-gradient-to-r from-[#1ED36A] to-[#16b058] text-white hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
                             <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
                         </svg>
-                        Share
+                        Share Image + Text + Link
                     </button>
+
+                    {/* Download only */}
+                    <button
+                        onClick={() => downloadCard()}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-full font-bold text-sm bg-[#150089] text-white hover:shadow-lg hover:-translate-y-0.5 transition-all"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                        Download Card
+                    </button>
+
+
+
                 </div>
             </div>
         </div>
@@ -308,11 +602,11 @@ const ReferralLinkCard = () => {
                     <div className="flex flex-col items-center gap-6 flex-1 justify-center">
                         {/* QR Trigger */}
                         <button onClick={() => setShowQRModal(true)} className="p-3 bg-white rounded-2xl shadow-md border border-gray-100 dark:border-white/10 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 group">
-                            <img
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(referralLink)}&bgcolor=ffffff&color=150089&margin=6`}
-                                alt="Referral QR Code"
-                                className="w-[120px] h-[120px] rounded-lg"
-                            />
+                            {qrDataUrl ? (
+                                <img src={qrDataUrl} alt="Referral QR Code" className="w-[120px] h-[120px] rounded-lg" />
+                            ) : (
+                                <div className="w-[120px] h-[120px] rounded-lg bg-gray-100 animate-pulse" />
+                            )}
                         </button>
 
                         {/* Buttons */}
@@ -328,39 +622,28 @@ const ReferralLinkCard = () => {
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
                             </button>
 
-                            <div className="relative w-full">
-                                <button
-                                    onClick={handleShare}
-                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm transition-all bg-white dark:bg-white/5 border border-[#E0E0E0] dark:border-white/10 text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/10"
-                                >
-                                    Share
+                            <button
+                                onClick={() => shareVia('native')}
+                                disabled={isGenerating}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm transition-all bg-gradient-to-r from-[#1ED36A] to-[#16b058] text-white hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-50"
+                            >
+                                {isGenerating ? (
+                                    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" /></svg>
+                                ) : (
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
                                         <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
                                     </svg>
-                                </button>
-                                {showShareMenu && (
-                                    <div className="absolute bottom-full left-0 w-full mb-2 bg-white dark:bg-brand-dark-secondary rounded-xl shadow-xl border border-gray-100 dark:border-brand-dark-tertiary p-1.5 z-50">
-                                        <a href={`https://wa.me/?text=${encodeURIComponent('Check out OriginBI! ' + referralLink)}`} target="_blank" rel="noopener noreferrer"
-                                            className="flex items-center gap-3 px-3.5 py-2.5 text-sm font-medium text-[#19211C] dark:text-white rounded-lg hover:bg-[#25D366]/10 transition-colors">
-                                            <span className="text-base">💬</span> WhatsApp
-                                        </a>
-                                        <a href={`mailto:?subject=Join OriginBI&body=${encodeURIComponent('Sign up using my referral: ' + referralLink)}`}
-                                            className="flex items-center gap-3 px-3.5 py-2.5 text-sm font-medium text-[#19211C] dark:text-white rounded-lg hover:bg-blue-500/10 transition-colors">
-                                            <span className="text-base">📧</span> Email
-                                        </a>
-                                        <a href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(referralLink)}`} target="_blank" rel="noopener noreferrer"
-                                            className="flex items-center gap-3 px-3.5 py-2.5 text-sm font-medium text-[#19211C] dark:text-white rounded-lg hover:bg-[#0A66C2]/10 transition-colors">
-                                            <span className="text-base">💼</span> LinkedIn
-                                        </a>
-                                    </div>
                                 )}
-                            </div>
+                                {isGenerating ? 'Sharing...' : 'Share'}
+                            </button>
+
                         </div>
                     </div>
                 </div>
             </div>
-            {showQRModal && mounted && ReactDOM.createPortal(<ModalContent />, document.body)}
+            {showQRModal && mounted && ReactDOM.createPortal(<QRModalContent />, document.body)}
+            {showShareCardModal && mounted && ReactDOM.createPortal(<ShareCardModalContent />, document.body)}
         </>
     );
 };
@@ -509,7 +792,8 @@ const AffiliateDashboard: React.FC = () => {
                         isPositive={(stats.trends?.referrals || 0) >= 0}
                     />
                     <MiniStat
-                        label="This Month"
+                        label="Total Earning"
+                        sublabel="This Month"
                         value={`₹${(stats.thisMonthEarnings ?? 0).toLocaleString('en-IN')}`}
                         trend={`${Math.abs(stats.trends?.earnings || 0)}%`}
                         isPositive={(stats.trends?.earnings || 0) >= 0}

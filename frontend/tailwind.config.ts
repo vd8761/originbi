@@ -19,6 +19,7 @@ const config: Config = {
                 "brand-green": "#1ED36A",
                 "brand-dark-green": "#1A3A2C",
                 "brand-red": "#C63232",
+                "brand-purple": "#150089",
                 "brand-text-primary": "#FFFFFF",
                 "brand-text-secondary": "#A0AEC0",
                 "brand-text-light-primary": "#2D3748",

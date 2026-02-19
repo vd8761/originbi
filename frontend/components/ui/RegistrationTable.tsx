@@ -4,6 +4,7 @@ import { COUNTRY_CODES } from '../../lib/countryCodes';
 import ReactCountryFlag from "react-country-flag";
 import { EyeSolidIcon, SortIcon } from '../icons';
 import ToggleSwitch from './ToggleSwitch';
+import { capitalizeWords } from "../../lib/utils";
 
 interface RegistrationTableProps {
     users: Registration[];
@@ -136,7 +137,7 @@ const RegistrationTable: React.FC<RegistrationTableProps> = ({
                                                 alt=""
                                                 className="w-9 h-9 rounded-full object-cover border border-brand-light-tertiary dark:border-brand-dark-tertiary"
                                             />
-                                            <span className="text-sm font-medium text-brand-text-light-primary dark:text-white">{user.full_name}</span>
+                                            <span className="text-sm font-medium text-brand-text-light-primary dark:text-white">{capitalizeWords(user.full_name)}</span>
                                         </div>
                                     </td>
                                     <td className="p-4 text-sm text-brand-text-light-primary dark:text-white align-middle">
