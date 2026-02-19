@@ -23,7 +23,7 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend/exam-e
 Write-Host "Launched Exam Engine..."
 
 # 6. Report Service (Port 4006)
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend/report-service; npm run serve"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend/report-service; npm run start"
 Write-Host "Launched Report Service..."
 
 # 7. Frontend (Port 3000)
