@@ -583,7 +583,7 @@ export class AffiliatesService {
             const reg = t.registration as any;
             const studentName = reg?.fullName || reg?.user?.email?.split('@')[0] || 'N/A';
             const studentEmail = reg?.user?.email || 'N/A';
-            const settledDown: string = t.settlementStatus === 2 ? 'Completed' : 'Incomplete';
+            const settledDown: string = t.settlementStatus === 2 ? 'Settled' : t.settlementStatus === 1 ? 'Processing' : 'Not Settled';
             return {
                 id: t.id,
                 name: studentName,
@@ -740,9 +740,9 @@ export class AffiliatesService {
     }
 
     async getEarningsHistory(affiliateId: number, page: number, limit: number) {
-        // Show commission transactions from affiliate_referral_transactions
+        // Show only admin-completed (settled) transactions
         const [rows, total] = await this.referralTransactionRepo.findAndCount({
-            where: { affiliateAccountId: affiliateId },
+            where: { affiliateAccountId: affiliateId, settlementStatus: 2 },
             order: { createdAt: 'DESC' },
             skip: (page - 1) * limit,
             take: limit,
