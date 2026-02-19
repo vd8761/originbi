@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Link from 'next/link';
 import { AffiliateSettlementModal } from "./AffiliateSettlementModal";
+import { capitalizeWords } from "../../lib/utils";
 
 type StatCardProps = {
   title: string;
@@ -199,7 +200,7 @@ const AdminDashboard: React.FC = () => {
                           />
                           <div>
                             <h4 className="font-semibold text-[#19211C] dark:text-white text-sm line-clamp-1">
-                              {aff.name}
+                              {capitalizeWords(aff.name)}
                             </h4>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Ready to Payment:</span>
