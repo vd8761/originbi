@@ -27,6 +27,7 @@ interface Referral {
     status: 'active' | 'pending' | 'converted';
     signUpDate: string;
     commission: number;
+    settledDown: 'Not Settled' | 'Processing' | 'Settled';
 }
 
 // --- Sub Components ---
@@ -339,7 +340,7 @@ Scan the QR code in the image or register here: ${referralLink}`;
                 img.crossOrigin = 'anonymous';
                 img.onload = () => resolve(img);
                 img.onerror = () => reject(new Error('Failed to load poster image'));
-                img.src = '/After +2 OriginBI without QR.jpg.jpeg';
+                img.src = '/after-plus-2-originbi-without-qr.jpeg';
             });
 
             // Create canvas matching the image dimensions
@@ -649,7 +650,7 @@ Scan the QR code in the image or register here: ${referralLink}`;
 };
 
 // --- Referrals Table ---
-const ReferralsTable = ({ data }: { data: (Referral & { settledDown: 'Completed' | 'Incomplete' })[] }) => {
+const ReferralsTable = ({ data }: { data: Referral[] }) => {
     const router = useRouter();
 
 
@@ -684,7 +685,7 @@ const ReferralsTable = ({ data }: { data: (Referral & { settledDown: 'Completed'
                 <table className="w-full min-w-[800px]">
                     <thead>
                         <tr className="bg-[#EAEAEA] dark:bg-white/5">
-                            <th className="text-left py-3 pl-6 pr-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[25%]">Organization</th>
+                            <th className="text-left py-3 pl-6 pr-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[25%]">Name</th>
                             <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[25%]">Email</th>
                             <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[15%]">Sign-up Date</th>
                             <th className="text-left py-3 px-4 font-normal text-[clamp(11px,0.73vw,14px)] text-[#19211C] dark:text-white leading-none w-[15%]">Settled Down</th>
@@ -704,11 +705,15 @@ const ReferralsTable = ({ data }: { data: (Referral & { settledDown: 'Completed'
                                     {(() => {
                                         if (!row.signUpDate) return 'N/A';
                                         const date = new Date(row.signUpDate);
-                                        return isNaN(date.getTime()) ? 'N/A' : date.toISOString().split('T')[0];
+                                        return isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, ' ');
                                     })()}
                                 </td>
                                 <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] leading-none">
-                                    <span className={row.settledDown === 'Completed' ? 'text-[#1ED36A]' : 'text-[#FF5457]'}>
+                                    <span className={
+                                        row.settledDown === 'Settled' ? 'text-[#1ED36A]'
+                                        : row.settledDown === 'Processing' ? 'text-[#F59E0B]'
+                                        : 'text-[#FF5457]'
+                                    }>
                                         {row.settledDown}
                                     </span>
                                 </td>
@@ -756,7 +761,7 @@ const AffiliateDashboard: React.FC = () => {
         thisMonthEarnings: 0
     });
 
-    const [referrals, setReferrals] = useState<(Referral & { settledDown: 'Completed' | 'Incomplete' })[]>([]);
+    const [referrals, setReferrals] = useState<Referral[]>([]);
 
     const fetchData = async (affiliateId: string) => {
         try {
