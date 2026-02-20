@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import Link from 'next/link';
 import { AffiliateSettlementModal } from "./AffiliateSettlementModal";
 import { capitalizeWords } from "../../lib/utils";
+import { api } from "../../lib/api";
 
 type StatCardProps = {
   title: string;
@@ -45,6 +46,9 @@ const StatCard: React.FC<StatCardProps> = ({
 
 interface DashboardData {
   totalReadyToPayment: number;
+  totalUsers: number;
+  activeAssessments: number;
+  corporateClients: number;
   affiliates: Array<{
     id: number;
     name: string;
@@ -72,11 +76,8 @@ const AdminDashboard: React.FC = () => {
   const fetchStats = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE}/admin/affiliates/dashboard-stats`);
-      if (res.ok) {
-        const json = await res.json();
-        setData(json);
-      }
+      const res = await api.get("/admin/dashboard-stats");
+      setData(res.data);
     } catch (error) {
       console.error("Failed to fetch dashboard stats", error);
     } finally {
@@ -114,9 +115,27 @@ const AdminDashboard: React.FC = () => {
 
   // Hardcoded stats mixed with dynamic one
   const stats: StatCardProps[] = [
-    { title: "Total Users", value: "24,592", change: "+12% this month", isPositive: true },
-    { title: "Active Assessments", value: "1,840", change: "+5% this week", isPositive: true },
-    { title: "Corporate Clients", value: "142", change: "+2 new", isPositive: true },
+    {
+      title: "Total Users",
+      value: loading ? "..." : (data?.totalUsers || 0).toLocaleString(),
+      change: "Total",
+      isPositive: true,
+      isLoading: loading
+    },
+    {
+      title: "Active Assessments",
+      value: loading ? "..." : (data?.activeAssessments || 0).toLocaleString(),
+      change: "This Week",
+      isPositive: true,
+      isLoading: loading
+    },
+    {
+      title: "Corporate Clients",
+      value: loading ? "..." : (data?.corporateClients || 0).toLocaleString(),
+      change: "Total",
+      isPositive: true,
+      isLoading: loading
+    },
     {
       title: "Ready to Payment",
       value: loading ? "..." : formatCurrency(data?.totalReadyToPayment || 0),

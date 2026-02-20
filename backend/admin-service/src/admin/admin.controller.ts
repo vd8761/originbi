@@ -1,5 +1,6 @@
 import { Controller, Get, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
+import { AdminService } from './admin.service';
 import { AdminLoginGuard } from '../adminlogin/adminlogin.guard';
 
 interface AdminRequest extends Request {
@@ -9,6 +10,8 @@ interface AdminRequest extends Request {
 @Controller('admin')
 @UseGuards(AdminLoginGuard) // 👈 all routes require ADMIN login
 export class AdminController {
+  constructor(private readonly adminService: AdminService) { }
+
   @Get('me')
   getMe(@Req() req: AdminRequest) {
     return {
@@ -16,6 +19,11 @@ export class AdminController {
 
       user: req.user, // set in AdminLoginGuard
     };
+  }
+
+  @Get('dashboard-stats')
+  async getDashboardStats() {
+    return this.adminService.getDashboardStats();
   }
 
   @Get('dashboard')
