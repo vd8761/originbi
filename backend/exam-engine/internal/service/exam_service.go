@@ -496,7 +496,7 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 
 						// Apply Board Constraint if present
 						if studentBoard != "" {
-							query += ` AND metadata->>'board' = ?`
+							query += ` AND board = ?`
 							args = append(args, studentBoard)
 						}
 
