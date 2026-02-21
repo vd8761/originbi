@@ -85,6 +85,126 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 		return nil, result.Error
 	}
 
+	// 3. Fallback Generation (Self-Healing)
+	// If no answers exist, check if this is Level 2 and needs dynamic generation
+	if len(answers) == 0 && attempt.AssessmentLevelID != nil {
+		var level models.AssessmentLevel
+		if err := db.First(&level, *attempt.AssessmentLevelID).Error; err == nil && (level.LevelNumber == 2 || level.Name == "Level 2") {
+			// Extract necessary metadata from session
+			var setNumber int = 1 // Default
+			var studentBoard string = ""
+			var traitID *int64 = attempt.DominantTraitID
+
+			if err := db.First(&session, attempt.AssessmentSessionID).Error; err == nil {
+				if traitID == nil {
+					// Check session metadata for Trait ID
+					var meta map[string]interface{}
+					if session.Metadata != "" && session.Metadata != "{}" {
+						if err := json.Unmarshal([]byte(session.Metadata), &meta); err == nil {
+							if val, ok := meta["personalityTraitId"]; ok {
+								if v, ok := val.(float64); ok {
+									tId := int64(v)
+									traitID = &tId
+								}
+							}
+						}
+					}
+				}
+
+				// Check previous completed attempt if Trait ID is still nil
+				if traitID == nil {
+					var previousAttempt models.AssessmentAttempt
+					if err := db.Where("assessment_session_id = ? AND dominant_trait_id IS NOT NULL AND status = 'COMPLETED'", attempt.AssessmentSessionID).Order("completed_at DESC").First(&previousAttempt).Error; err == nil {
+						traitID = previousAttempt.DominantTraitID
+					}
+				}
+
+				// Extract board and set info
+				var meta map[string]interface{}
+				if session.Metadata != "" && session.Metadata != "{}" {
+					if err := json.Unmarshal([]byte(session.Metadata), &meta); err == nil {
+						if val, ok := meta["setNumber"]; ok {
+							if v, ok := val.(float64); ok {
+								setNumber = int(v)
+							} else if v, ok := val.(int); ok {
+								setNumber = v
+							}
+						}
+						// If board is in session meta (less likely but possible)
+						if val, ok := meta["studentBoard"]; ok {
+							if v, ok := val.(string); ok {
+								studentBoard = v
+							}
+						}
+					}
+				}
+
+				// Also try picking board from Registration metadata as a fallback
+				if studentBoard == "" {
+					var reg models.Registration
+					if err := db.First(&reg, attempt.RegistrationID).Error; err == nil {
+						var regMeta map[string]interface{}
+						if reg.Metadata != "" && reg.Metadata != "{}" {
+							if err := json.Unmarshal([]byte(reg.Metadata), &regMeta); err == nil {
+								if val, ok := regMeta["studentBoard"]; ok {
+									if v, ok := val.(string); ok {
+										studentBoard = v
+									}
+								}
+							}
+						}
+					}
+				}
+
+				if traitID != nil {
+					// 3. Clear existing generic answers for this attempt (just in case of dirty state)
+					db.Exec("DELETE FROM assessment_answers WHERE assessment_attempt_id = ?", attempt.ID)
+
+					// 4. Generate questions based on constraints
+					query := `
+						INSERT INTO assessment_answers (
+							assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
+							main_question_id, question_source, status, question_sequence, created_at, updated_at
+						)
+						SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY (board = ?) DESC, RANDOM()), NOW(), NOW()
+						FROM assessment_questions 
+						WHERE assessment_level_id = ? 
+							AND personality_trait_id = ?
+							AND (board = ? OR board IS NULL)
+							AND set_number = ?
+						ORDER BY (board = ?) DESC, RANDOM()
+						LIMIT 25
+					`
+					args := []interface{}{
+						attempt.ID, attempt.AssessmentSessionID, attempt.UserID, attempt.RegistrationID, attempt.ProgramID, *attempt.AssessmentLevelID,
+						studentBoard, // for first ORDER BY clause in SELECT
+						*attempt.AssessmentLevelID, *traitID, studentBoard, setNumber,
+						studentBoard, // for ORDER BY clause
+					}
+
+					fmt.Printf("[GetExamQuestions - Fallback] Generating Level 2 Questions for Attempt %d. Trait=%d, Board=%s, Set=%d\n", attempt.ID, *traitID, studentBoard, setNumber)
+					db.Exec(query, args...)
+
+					// Re-fetch questions after generation
+					result = db.Where("assessment_attempt_id = ?", attemptID).
+						Preload("MainQuestion").
+						Preload("MainQuestion.Options").
+						Preload("OpenQuestion").
+						Preload("OpenQuestion.Options").
+						Preload("OpenQuestion.Images").
+						Order("question_sequence ASC").
+						Find(&answers)
+
+					if result.Error != nil {
+						return nil, result.Error
+					}
+				} else {
+					fmt.Printf("[GetExamQuestions - Fallback Error] Cannot generate questions for Attempt %d: Trait ID is nil.\n", attempt.ID)
+				}
+			}
+		}
+	}
+
 	return answers, nil
 }
 
@@ -477,6 +597,23 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 							}
 						}
 
+						// Fallback to Registration metadata for board
+						if studentBoard == "" {
+							var reg models.Registration
+							if err := tx.First(&reg, nextAttempt.RegistrationID).Error; err == nil {
+								var regMeta map[string]interface{}
+								if reg.Metadata != "" && reg.Metadata != "{}" {
+									if err := json.Unmarshal([]byte(reg.Metadata), &regMeta); err == nil {
+										if val, ok := regMeta["studentBoard"]; ok {
+											if v, ok := val.(string); ok {
+												studentBoard = v
+											}
+										}
+									}
+								}
+							}
+						}
+
 						// 2. Clear existing generic questions (if any)
 						tx.Exec("DELETE FROM assessment_answers WHERE assessment_attempt_id = ?", nextAttempt.ID)
 
@@ -487,24 +624,21 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 								assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
 								main_question_id, question_source, status, question_sequence, created_at, updated_at
 							)
-							SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
+							SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY (board = ?) DESC, RANDOM()), NOW(), NOW()
 							FROM assessment_questions 
 							WHERE assessment_level_id = ? 
 							  AND personality_trait_id = ?
+							  AND (board = ? OR board IS NULL)
+							  AND set_number = ?
+							ORDER BY (board = ?) DESC, RANDOM()
+							LIMIT 25
 						`
-						args := []interface{}{nextAttempt.ID, nextAttempt.AssessmentSessionID, nextAttempt.UserID, nextAttempt.RegistrationID, nextAttempt.ProgramID, nextLevel.ID, nextLevel.ID, *traitID}
-
-						// Apply Board Constraint if present
-						if studentBoard != "" {
-							query += ` AND board = ?`
-							args = append(args, studentBoard)
+						args := []interface{}{
+							nextAttempt.ID, nextAttempt.AssessmentSessionID, nextAttempt.UserID, nextAttempt.RegistrationID, nextAttempt.ProgramID, nextLevel.ID,
+							studentBoard, // for first ORDER BY clause in SELECT
+							nextLevel.ID, *traitID, studentBoard, setNumber,
+							studentBoard, // for ORDER BY clause
 						}
-
-						// Apply Set Constraint (Always apply set logic if it's Level 2 generation flow, assuming set 1 default if missing)
-						query += ` AND set_number = ?`
-						args = append(args, setNumber)
-
-						query += ` ORDER BY RANDOM() LIMIT 25`
 
 						tx.Exec(query, args...)
 					}
