@@ -1,10 +1,15 @@
 import { Controller, Post, Body } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { StudentService } from './student.service';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 
 @Controller('student')
 export class StudentController {
-  constructor(private readonly studentService: StudentService) {}
+  constructor(
+    private readonly studentService: StudentService,
+    @InjectQueue('assessment-email-queue') private emailQueue: Queue,
+  ) {}
 
   @Post('profile')
   async getProfile(@Body() body: { email: string }) {
@@ -50,11 +55,19 @@ export class StudentController {
   }
 
   @Post('assessment-complete')
-  completeAssessment(@Body() body: { userId: number }) {
-    // Fire and forget - don't block the caller
-    this.studentService
-      .handleAssessmentCompletion(body.userId)
-      .catch((err) => console.error('Async email sending error:', err));
+  async completeAssessment(@Body() body: { userId: number }) {
+    await this.emailQueue.add(
+      'send-report-email',
+      {
+        userId: body.userId,
+      },
+      {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: true,
+      },
+    );
+
     return { message: 'Assessment completion processing started' };
   }
 
