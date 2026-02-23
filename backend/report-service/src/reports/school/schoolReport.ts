@@ -1588,22 +1588,39 @@ export class SchoolReport extends BaseReport {
     }
 
     private getTopTwoTraits(): [string, string] {
+        let scores: { type: string; val: number }[] = [];
+
         if (
             this.data.most_answered_answer_type &&
-            this.data.most_answered_answer_type.length >= 2
+            this.data.most_answered_answer_type.length >= 4
         ) {
-            return [
-                this.data.most_answered_answer_type[0].ANSWER_TYPE,
-                this.data.most_answered_answer_type[1].ANSWER_TYPE,
+            scores = this.data.most_answered_answer_type.map((item) => ({
+                type: item.ANSWER_TYPE,
+                val: item.COUNT,
+            }));
+        } else {
+            scores = [
+                { type: "D", val: this.data.score_D },
+                { type: "I", val: this.data.score_I },
+                { type: "S", val: this.data.score_S },
+                { type: "C", val: this.data.score_C },
             ];
         }
-        const scores = [
-            { type: "D", val: this.data.score_D },
-            { type: "I", val: this.data.score_I },
-            { type: "S", val: this.data.score_S },
-            { type: "C", val: this.data.score_C },
-        ];
-        scores.sort((a, b) => b.val - a.val);
+
+        const PRIORITY = ["C", "D", "I", "S"];
+        scores.sort((a, b) => {
+            const diff = b.val - a.val; // Primary: Value Descending
+            if (diff !== 0) return diff;
+
+            // Secondary: Priority Index Ascending (Low index = High Priority)
+            const pA = PRIORITY.indexOf(a.type);
+            const pB = PRIORITY.indexOf(b.type);
+            return pA - pB;
+        });
+
+        // Debug Log to verify sorting
+        // console.log("Sorted Traits:", scores);
+
         return [scores[0].type, scores[1].type];
     }
 

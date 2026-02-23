@@ -30,6 +30,26 @@ export interface JobState {
 
 const jobStore = new Map<string, JobState>();
 
+const scheduleCleanup = (
+    jobId: string,
+    pathsToClean: string[],
+    delayMs = 15 * 60 * 1000,
+) => {
+    setTimeout(() => {
+        try {
+            for (const p of pathsToClean) {
+                if (fs.existsSync(p)) {
+                    fs.rmSync(p, { recursive: true, force: true });
+                }
+            }
+            jobStore.delete(jobId);
+            logger.info(`[JOB:${jobId}] Cleaned up temp files (TTL Expired).`);
+        } catch (e) {
+            logger.error(`[JOB:${jobId}] Cleanup failed`, e);
+        }
+    }, delayMs);
+};
+
 export const reportQueueService = {
     getJob: (jobId: string) => jobStore.get(jobId),
     removeJob: (jobId: string) => jobStore.delete(jobId),
@@ -101,12 +121,14 @@ export const reportQueueService = {
                 status: "COMPLETED",
                 filePath: filePath, // Store as single file path
             });
+            scheduleCleanup(jobId, [jobDir]);
         } catch (error) {
             console.error(`[JOB:${jobId}] Failed:`, error);
             jobStore.set(jobId, {
                 status: "ERROR",
                 error: (error as Error).message,
             });
+            scheduleCleanup(jobId, [jobDir]);
         }
     },
 
@@ -207,6 +229,7 @@ export const reportQueueService = {
                 try {
                     fs.rmSync(jobDir, { recursive: true, force: true });
                 } catch (e) {}
+                scheduleCleanup(jobId, [zipFilePath]);
             });
 
             archive.on("error", function (err) {
@@ -222,6 +245,7 @@ export const reportQueueService = {
                 status: "ERROR",
                 error: (error as Error).message,
             });
+            scheduleCleanup(jobId, [jobDir]);
         }
     },
 
@@ -313,6 +337,7 @@ export const reportQueueService = {
                 try {
                     fs.rmSync(jobDir, { recursive: true, force: true });
                 } catch (e) {}
+                scheduleCleanup(jobId, [zipFilePath]);
             });
 
             archive.on("error", function (err) {
@@ -327,6 +352,7 @@ export const reportQueueService = {
                 status: "ERROR",
                 error: (error as Error).message,
             });
+            scheduleCleanup(jobId, [jobDir]);
         }
     },
 
@@ -388,12 +414,14 @@ export const reportQueueService = {
                 filePath: filePath, // Store as single file path
                 password: password,
             });
+            scheduleCleanup(jobId, [jobDir]);
         } catch (error) {
             console.error(`[JOB:${jobId}] Failed:`, error);
             jobStore.set(jobId, {
                 status: "ERROR",
                 error: (error as Error).message,
             });
+            scheduleCleanup(jobId, [jobDir]);
         }
     },
 };
