@@ -520,7 +520,7 @@ const ProfileResult = ({ data }: { data: ReportData }) => {
                             alt={`${trait.name} Character`}
                             className="w-full h-full object-contain drop-shadow-2xl relative z-10"
                             onError={(e) => {
-                                e.currentTarget.src = `/traits/${trait.imageKey}.png`;
+                                e.currentTarget.src = `/traits/Corporate_${trait.imageKey}.png`;
                             }}
                         />
                     </div>
@@ -572,29 +572,7 @@ const ProfileResult = ({ data }: { data: ReportData }) => {
                         </div>
                     </div>
 
-                    {/* DISC Scores Mini Chart */}
-                    <div className="mt-6 p-4 bg-[#F9F9F9] dark:bg-white/5 rounded-xl">
-                        <h4 className="text-[clamp(14px,1vw,16px)] font-semibold text-[#19211C] dark:text-white mb-3">DISC Profile</h4>
-                        <div className="grid grid-cols-4 gap-2">
-                            {Object.entries(data.discScores).map(([key, value]) => (
-                                <div key={key} className="text-center">
-                                    <div className="text-[clamp(18px,1.3vw,22px)] font-bold text-[#150089] dark:text-[#1ED36A]">{value}</div>
-                                    <div className="text-[clamp(11px,0.8vw,13px)] font-medium text-[#19211C] dark:text-white opacity-70">
-                                        {key === 'D' ? 'Dominance' : key === 'I' ? 'Influence' : key === 'S' ? 'Steadiness' : 'Compliance'}
-                                    </div>
-                                    <div className="h-1.5 bg-gray-200 dark:bg-white/10 rounded-full mt-1 overflow-hidden">
-                                        <div
-                                            className="h-full rounded-full transition-all duration-700"
-                                            style={{
-                                                width: `${Math.min((value / 100) * 100, 100)}%`,
-                                                backgroundColor: key === 'D' ? '#EF4444' : key === 'I' ? '#FBC02D' : key === 'S' ? '#1ED36A' : '#3B82F6'
-                                            }}
-                                        ></div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+
                 </div>
             </div>
 

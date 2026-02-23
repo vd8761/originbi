@@ -1382,7 +1382,7 @@ export class CorporateDashboardService {
     const regMeta = row.registration_metadata || {};
 
     // Build the trait name for image mapping (e.g., "Supportive Energizer" -> "Supportive_Energizer")
-    const traitName = row.blended_style_name || '';
+    const traitName = (row.blended_style_name || '').trim();
     const traitImageKey = traitName.replace(/\s+/g, '_');
 
     return {
