@@ -438,7 +438,7 @@ export class RagController {
         }
       }
 
-      const result = await this.ragService.query(question, user);
+      const result = await this.ragService.query(question, user, convId);
       this.logger.log(`✅ RAG query completed`);
 
       // ── Chat memory: save assistant reply + auto-title ──

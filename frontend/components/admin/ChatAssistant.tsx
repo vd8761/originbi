@@ -134,7 +134,7 @@ const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
         <div className="space-y-2 leading-relaxed text-[15px]">
             {lines.map((line, i) => {
                 const downloadMatch = line.match(/\[([^\]]+)\]\(([^)]+)\)/);
-                if (downloadMatch && (line.includes('Download') || line.includes('report'))) {
+                if (downloadMatch && (line.includes('Download') || line.includes('report') || line.includes('download') || line.includes('Click here'))) {
                     return (
                         <button
                             key={i}
@@ -147,11 +147,30 @@ const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
                     );
                 }
 
+                // Horizontal separator lines (━━━, ───, etc.)
+                if (/^[━─═─\-]{5,}$/.test(line.trim())) {
+                    return <hr key={i} className="border-gray-200 my-1" />;
+                }
+
                 let processed: React.ReactNode = line;
                 if (line.includes('**')) {
                     processed = line.split(/(\*\*[^*]+\*\*)/g).map((part, j) =>
                         part.startsWith('**') ? (
                             <strong key={j} className="font-semibold text-gray-900">{part.slice(2, -2)}</strong>
+                        ) : part
+                    );
+                }
+
+                // Italic text with _..._
+                if (typeof processed === 'string' && line.includes('_') && /_.+_/.test(line)) {
+                    processed = line.split(/(_[^_]+_)/g).map((part, j) =>
+                        part.startsWith('_') && part.endsWith('_') ? (
+                            <em key={j} className="text-gray-500 italic">{part.slice(1, -1)}</em>
+                        ) : part.includes('**') ? (
+                            // Handle bold within non-italic parts
+                            <React.Fragment key={j}>{part.split(/(\*\*[^*]+\*\*)/g).map((bp, bj) =>
+                                bp.startsWith('**') ? <strong key={bj} className="font-semibold text-gray-900">{bp.slice(2, -2)}</strong> : bp
+                            )}</React.Fragment>
                         ) : part
                     );
                 }

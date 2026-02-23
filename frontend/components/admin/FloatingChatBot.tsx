@@ -111,7 +111,7 @@ const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
         <div className="space-y-1.5 leading-relaxed text-[13px]">
             {lines.map((line, i) => {
                 const downloadMatch = line.match(/\[([^\]]+)\]\(([^)]+)\)/);
-                if (downloadMatch && (line.includes('Download') || line.includes('report'))) {
+                if (downloadMatch && (line.includes('Download') || line.includes('report') || line.includes('download') || line.includes('Click here'))) {
                     const [, linkText, linkUrl] = downloadMatch;
                     return (
                         <button
@@ -126,10 +126,25 @@ const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
                 }
 
                 let processed: React.ReactNode = line;
+
+                // Horizontal separator lines (━━━, ───, etc.)
+                if (/^[━─═─\-]{5,}$/.test(line.trim())) {
+                    return <hr key={i} className="border-gray-200 dark:border-gray-600 my-1" />;
+                }
+
                 if (line.includes('**')) {
                     processed = line.split(/(\*\*[^*]+\*\*)/g).map((part, j) =>
                         part.startsWith('**') ? (
                             <strong key={j} className="font-semibold text-gray-900 dark:text-white">{part.slice(2, -2)}</strong>
+                        ) : part
+                    );
+                }
+
+                // Italic text with _..._
+                if (typeof processed === 'string' && line.includes('_') && /_.+_/.test(line)) {
+                    processed = line.split(/(_[^_]+_)/g).map((part, j) =>
+                        part.startsWith('_') && part.endsWith('_') ? (
+                            <em key={j} className="text-gray-400 dark:text-gray-500 italic text-[12px]">{part.slice(1, -1)}</em>
                         ) : part
                     );
                 }
@@ -177,6 +192,7 @@ export default function FloatingChatBot({
     const [loading, setLoading] = useState(false);
     const [copied, setCopied] = useState<string | null>(null);
     const [hasUnread, setHasUnread] = useState(false);
+    const [conversationId, setConversationId] = useState<number | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -220,10 +236,16 @@ export default function FloatingChatBot({
             const res = await fetch(`${apiUrl}/rag/query`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
-                body: JSON.stringify({ question: userMsg.content }),
+                body: JSON.stringify({ question: userMsg.content, conversationId: conversationId || undefined }),
             });
 
             const data = await res.json();
+
+            // Capture conversationId from first response for follow-up context
+            if (!conversationId && data.conversationId) {
+                setConversationId(data.conversationId);
+            }
+
             setMessages(prev => [...prev, {
                 id: botId,
                 role: 'assistant',
@@ -244,13 +266,16 @@ export default function FloatingChatBot({
         } finally {
             setLoading(false);
         }
-    }, [input, loading, apiUrl, isOpen, isMinimized]);
+    }, [input, loading, apiUrl, isOpen, isMinimized, conversationId]);
 
     const finishStreaming = useCallback((id: string) => {
         setMessages(prev => prev.map(m => m.id === id ? { ...m, isStreaming: false } : m));
     }, []);
 
-    const clearChat = useCallback(() => setMessages([]), []);
+    const clearChat = useCallback(() => {
+        setMessages([]);
+        setConversationId(null);
+    }, []);
 
     const suggestions = [
         { icon: '👋', text: 'Hello MITHRA' },
