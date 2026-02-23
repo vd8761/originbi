@@ -25,6 +25,7 @@ export interface JobState {
     filePath?: string; // For single file reports (Placement)
     error?: string;
     progress?: string;
+    password?: string;
 }
 
 const jobStore = new Map<string, JobState>();
@@ -378,13 +379,14 @@ export const reportQueueService = {
 
             logger.info(`[JOB:${jobId}] Generating ${fileName}...`);
 
-            await generateReportForUser(user, filePath);
+            const password = await generateReportForUser(user, filePath);
 
             // Complete
             logger.info(`[JOB:${jobId}] PDF Created.`);
             jobStore.set(jobId, {
                 status: "COMPLETED",
                 filePath: filePath, // Store as single file path
+                password: password,
             });
         } catch (error) {
             console.error(`[JOB:${jobId}] Failed:`, error);

@@ -47,6 +47,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     const [downloading, setDownloading] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState('');
     const isDownloadingRef = useRef(false);
+    const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchLevels = async () => {
@@ -123,7 +124,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
         gender: session?.registration?.gender || '-',
         email: session?.user?.email || '-',
         mobile: session?.registration?.mobileNumber ? `${session?.registration?.countryCode || ''} ${session?.registration?.mobileNumber}` : '-',
-        reportPassword: session?.metadata?.reportPassword || '-',
+        reportPassword: generatedPassword || session?.metadata?.reportPassword || '-',
         reportSent: session?.metadata?.isReportSent ? 'Yes' : 'No',
         isReportReady: session?.isReportReady
     };
@@ -259,6 +260,11 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                                 isComplete = true;
                                                 setDownloadProgress('Downloading...');
                                                 
+                                                const extendedData = statusData as any;
+                                                if (extendedData.password) {
+                                                    setGeneratedPassword(extendedData.password);
+                                                }
+
                                                 // Trigger Download
                                                  const REPORT_API_URL = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || '';
                                                 window.location.href = `${REPORT_API_URL}${statusData.downloadUrl}`;
@@ -302,6 +308,9 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                     <div className="grid grid-cols-2 gap-3">
                         <InfoItem icon={EmailIcon} label="Email" value={displayData.email} />
                         <InfoItem icon={ProfileIcon} label="Mobile" value={displayData.mobile} />
+                    </div>
+                    <div className="grid grid-cols-1 gap-3">
+                        <InfoItem icon={LockIcon} label="Report Password" value={displayData.reportPassword} />
                     </div>
                     {displayData.isReportReady && (
                         <div className="p-4 rounded-xl bg-gradient-to-r from-[#19211C] to-brand-green/5 border border-brand-green/20 mt-2">

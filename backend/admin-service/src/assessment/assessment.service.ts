@@ -307,6 +307,22 @@ export class AssessmentService {
 
       if (!session) return null;
 
+      // Rehydrate transient report password for frontend candidate preview components
+      try {
+        const report = await this.sessionRepo.manager.query(
+          `SELECT report_password as "reportPassword" FROM assessment_reports WHERE assessment_session_id = $1 LIMIT 1`,
+          [id],
+        );
+        if (report && report.length > 0 && report[0].reportPassword) {
+          if (!session.metadata) {
+            session.metadata = {};
+          }
+          session.metadata.reportPassword = report[0].reportPassword;
+        }
+      } catch (err) {
+        console.error('Failed to fetch password from assessment_reports:', err);
+      }
+
       // Fetch all attempts for the session to populate level-wise reports
       const attempts = await this.attemptRepo.find({
         where: { assessmentSessionId: id },
@@ -433,7 +449,9 @@ export class AssessmentService {
       return {
         departments: stats.map((s) => ({
           id: Number(s.id),
-          name: s.degreeName ? `${s.degreeName} ${s.departmentName}` : s.departmentName,
+          name: s.degreeName
+            ? `${s.degreeName} ${s.departmentName}`
+            : s.departmentName,
           total: Number(s.total),
           completed: Number(s.completed),
         })),
