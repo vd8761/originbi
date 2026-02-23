@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 import fs from "fs";
 import path from "path";
+import { logger } from "./logger";
 import {
     CollegeData,
     SchoolData,
@@ -360,8 +361,8 @@ async function processSessionRows(
                 // Case B: SSLC - Stream undefined (handled by default)
             }
         }
-        console.log("Processing for Program:", reportTitleMap[programId]);
-        console.log("User Data:", userData);
+        logger.debug("Processing for Program:", reportTitleMap[programId]);
+        logger.debug("User Data:", userData);
 
         validUsersData.push(userData);
     }
