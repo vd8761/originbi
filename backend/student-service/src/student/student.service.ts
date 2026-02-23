@@ -1336,6 +1336,15 @@ export class StudentService {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const pdfBuffer = Buffer.from(pdfResponse.data, 'binary');
 
+      let attachmentFileName = `${(registration.fullName || 'Student').replace(/\s/g, '_')}_Report.pdf`;
+      const contentDisposition = pdfResponse.headers['content-disposition'];
+      if (contentDisposition && typeof contentDisposition === 'string') {
+        const match = contentDisposition.match(/filename="?([^";]+)"?/);
+        if (match && match[1]) {
+          attachmentFileName = match[1];
+        }
+      }
+
       // 7. Send Email
       const dateStr = new Date().toLocaleDateString('en-US', {
         year: 'numeric',
@@ -1391,7 +1400,7 @@ export class StudentService {
         html: emailHtml,
         attachments: [
           {
-            filename: `${(registration.fullName || 'Student').replace(/\s/g, '_')}_Report.pdf`,
+            filename: attachmentFileName,
             content: pdfBuffer,
             contentType: 'application/pdf',
           },
