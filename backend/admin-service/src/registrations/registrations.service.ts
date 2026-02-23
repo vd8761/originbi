@@ -45,7 +45,7 @@ export class RegistrationsService {
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
-  ) { }
+  ) {}
 
   async withRetry<T>(
     operation: () => Promise<T>,
@@ -531,7 +531,10 @@ export class RegistrationsService {
           try {
             await this.assessmentGenService.generateQuestions(attempt, manager);
           } catch (err) {
-            this.logger.error(`Failed to generate questions for Attempt ${attempt.id} (Level 1) in Existing User flow:`, err);
+            this.logger.error(
+              `Failed to generate questions for Attempt ${attempt.id} (Level 1) in Existing User flow:`,
+              err,
+            );
             throw err;
           }
         }

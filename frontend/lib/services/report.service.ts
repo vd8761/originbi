@@ -1,8 +1,7 @@
 import { AuthService } from "./auth.service";
 
 const USE_REAL_API = process.env.NEXT_PUBLIC_USE_MOCKS === "false";
-const API_URL =
-    process.env.NEXT_PUBLIC_REPORT_API_URL || "http://localhost:4006";
+const API_URL = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || "";
 
 const simulateDelay = (ms: number) =>
     new Promise((resolve) => setTimeout(resolve, ms));

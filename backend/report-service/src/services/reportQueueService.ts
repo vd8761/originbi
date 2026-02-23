@@ -25,9 +25,30 @@ export interface JobState {
     filePath?: string; // For single file reports (Placement)
     error?: string;
     progress?: string;
+    password?: string;
 }
 
 const jobStore = new Map<string, JobState>();
+
+const scheduleCleanup = (
+    jobId: string,
+    pathsToClean: string[],
+    delayMs = 15 * 60 * 1000,
+) => {
+    setTimeout(() => {
+        try {
+            for (const p of pathsToClean) {
+                if (fs.existsSync(p)) {
+                    fs.rmSync(p, { recursive: true, force: true });
+                }
+            }
+            jobStore.delete(jobId);
+            logger.info(`[JOB:${jobId}] Cleaned up temp files (TTL Expired).`);
+        } catch (e) {
+            logger.error(`[JOB:${jobId}] Cleanup failed`, e);
+        }
+    }, delayMs);
+};
 
 export const reportQueueService = {
     getJob: (jobId: string) => jobStore.get(jobId),
@@ -100,12 +121,14 @@ export const reportQueueService = {
                 status: "COMPLETED",
                 filePath: filePath, // Store as single file path
             });
+            scheduleCleanup(jobId, [jobDir]);
         } catch (error) {
             console.error(`[JOB:${jobId}] Failed:`, error);
             jobStore.set(jobId, {
                 status: "ERROR",
                 error: (error as Error).message,
             });
+            scheduleCleanup(jobId, [jobDir]);
         }
     },
 
@@ -206,6 +229,7 @@ export const reportQueueService = {
                 try {
                     fs.rmSync(jobDir, { recursive: true, force: true });
                 } catch (e) {}
+                scheduleCleanup(jobId, [zipFilePath]);
             });
 
             archive.on("error", function (err) {
@@ -221,6 +245,7 @@ export const reportQueueService = {
                 status: "ERROR",
                 error: (error as Error).message,
             });
+            scheduleCleanup(jobId, [jobDir]);
         }
     },
 
@@ -312,6 +337,7 @@ export const reportQueueService = {
                 try {
                     fs.rmSync(jobDir, { recursive: true, force: true });
                 } catch (e) {}
+                scheduleCleanup(jobId, [zipFilePath]);
             });
 
             archive.on("error", function (err) {
@@ -326,6 +352,7 @@ export const reportQueueService = {
                 status: "ERROR",
                 error: (error as Error).message,
             });
+            scheduleCleanup(jobId, [jobDir]);
         }
     },
 
@@ -369,29 +396,46 @@ export const reportQueueService = {
                 progress: "Generating PDF...",
             });
 
-            const safeName = user.full_name
-                .replace(/[^a-zA-Z0-9 ]/g, "_")
-                .trim();
-            // Naming convention for single download can be simpler or same
-            const fileName = `${safeName}_Report.pdf`;
+            const formattedName = (user.full_name || "")
+                .replace(/[^a-zA-Z]+/g, " ")
+                .trim()
+                .split(/\s+/)
+                .filter(Boolean)
+                .map(
+                    (word) =>
+                        word.charAt(0).toUpperCase() +
+                        word.slice(1).toLowerCase(),
+                )
+                .join("_");
+
+            const formattedReportNo = (user.exam_ref_no || "")
+                .replace(/[^a-zA-Z0-9]+/g, "_")
+                .replace(/_+/g, "_")
+                .replace(/^_|_$/g, "");
+
+            // Naming convention: <full_name>_<report_number>.pdf
+            const fileName = `${formattedName}_${formattedReportNo}.pdf`;
             const filePath = path.join(jobDir, fileName);
 
             logger.info(`[JOB:${jobId}] Generating ${fileName}...`);
 
-            await generateReportForUser(user, filePath);
+            const password = await generateReportForUser(user, filePath);
 
             // Complete
             logger.info(`[JOB:${jobId}] PDF Created.`);
             jobStore.set(jobId, {
                 status: "COMPLETED",
                 filePath: filePath, // Store as single file path
+                password: password,
             });
+            scheduleCleanup(jobId, [jobDir]);
         } catch (error) {
             console.error(`[JOB:${jobId}] Failed:`, error);
             jobStore.set(jobId, {
                 status: "ERROR",
                 error: (error as Error).message,
             });
+            scheduleCleanup(jobId, [jobDir]);
         }
     },
 };

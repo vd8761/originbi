@@ -114,9 +114,21 @@ export class StudentService {
       return { isCompleted: false, status: 'NO_SESSION' };
     }
 
+    let reportPassword = null;
+    if (session.status === 'COMPLETED') {
+      const report = await this.assessmentReportRepository.findOne({
+        where: { assessmentSessionId: session.id },
+        select: ['reportPassword'],
+      });
+      if (report) {
+        reportPassword = report.reportPassword;
+      }
+    }
+
     return {
       isCompleted: session.status === 'COMPLETED',
       status: session.status,
+      reportPassword: reportPassword,
     };
   }
 
@@ -1245,8 +1257,7 @@ export class StudentService {
       }
 
       // 2. Trigger Report Generation
-      const reportServiceUrl =
-        process.env.REPORT_SERVICE_URL || 'http://localhost:4006';
+      const reportServiceUrl = process.env.REPORT_SERVICE_URL;
       const generateUrl = `${reportServiceUrl}/generate/student/${userId}`;
 
       this.logger.log(`Triggering report generation: ${generateUrl}`);

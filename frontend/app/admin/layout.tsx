@@ -73,7 +73,7 @@ export default function AdminLayout({
             {/* BACKGROUND LAYERS - Only Show on Protected Pages */}
             {!isPublic && (
                 <div className="fixed inset-0 pointer-events-none z-0">
-                    <div className="absolute inset-0 bg-[url('/Background_Light_Theme.png')] bg-cover bg-center bg-no-repeat opacity-100 dark:hidden" />
+                    <div className="absolute inset-0 bg-[url('/Background_Light_Theme.svg')] bg-cover bg-center bg-no-repeat opacity-100 dark:hidden" />
                     <div className="absolute inset-0 bg-[url('/Background_Dark_Theme.svg')] bg-cover bg-center bg-no-repeat opacity-100 hidden dark:block" />
                 </div>
             )}
