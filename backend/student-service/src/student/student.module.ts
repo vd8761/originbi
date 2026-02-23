@@ -42,4 +42,4 @@ import {
   providers: [StudentService],
   exports: [StudentService],
 })
-export class StudentModule { }
+export class StudentModule {}
