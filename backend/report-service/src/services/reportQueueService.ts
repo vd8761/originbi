@@ -396,11 +396,25 @@ export const reportQueueService = {
                 progress: "Generating PDF...",
             });
 
-            const safeName = user.full_name
-                .replace(/[^a-zA-Z0-9 ]/g, "_")
-                .trim();
-            // Naming convention for single download can be simpler or same
-            const fileName = `${safeName}_Report.pdf`;
+            const formattedName = (user.full_name || "")
+                .replace(/[^a-zA-Z]+/g, " ")
+                .trim()
+                .split(/\s+/)
+                .filter(Boolean)
+                .map(
+                    (word) =>
+                        word.charAt(0).toUpperCase() +
+                        word.slice(1).toLowerCase(),
+                )
+                .join("_");
+
+            const formattedReportNo = (user.exam_ref_no || "")
+                .replace(/[^a-zA-Z0-9]+/g, "_")
+                .replace(/_+/g, "_")
+                .replace(/^_|_$/g, "");
+
+            // Naming convention: <full_name>_<report_number>.pdf
+            const fileName = `${formattedName}_${formattedReportNo}.pdf`;
             const filePath = path.join(jobDir, fileName);
 
             logger.info(`[JOB:${jobId}] Generating ${fileName}...`);

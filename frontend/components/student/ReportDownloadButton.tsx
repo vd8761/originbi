@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Download, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Download, Loader2, CheckCircle, AlertCircle, Copy, Check } from 'lucide-react';
 import { reportService } from '../../lib/services/report.service';
 import { studentService } from '../../lib/services/student.service';
 
@@ -11,7 +11,36 @@ const ReportDownloadButton: React.FC<ReportDownloadButtonProps> = ({ className }
     const [status, setStatus] = useState<'IDLE' | 'STARTING' | 'POLLING' | 'DOWNLOADING' | 'COMPLETED' | 'ERROR'>('IDLE');
     const [progress, setProgress] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
+    const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+    const [copied, setCopied] = useState(false);
     const isDownloadingRef = useRef(false);
+
+    const handleCopy = () => {
+        if (!generatedPassword) return;
+        navigator.clipboard.writeText(generatedPassword);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    useEffect(() => {
+        const fetchInitialPassword = async () => {
+            try {
+                const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
+                if (!email) return;
+                
+                const profile = await studentService.getProfile(email);
+                if (!profile || !profile.id) return;
+                
+                const statusRes = await studentService.getAssessmentStatus(profile.id);
+                if (statusRes && statusRes.reportPassword) {
+                    setGeneratedPassword(statusRes.reportPassword);
+                }
+            } catch (err) {
+                console.error("Failed to fetch initial report password", err);
+            }
+        };
+        fetchInitialPassword();
+    }, []);
 
     const handleDownload = async () => {
         if (status !== 'IDLE' && status !== 'ERROR' && status !== 'COMPLETED') return;
@@ -73,7 +102,7 @@ const ReportDownloadButton: React.FC<ReportDownloadButtonProps> = ({ className }
                         // Best approach: create a hidden link and click it
                         // But we need the full URL.
                         // Assuming report service URL is base.
-                        const API_URL = process.env.NEXT_PUBLIC_REPORT_API_URL;
+                        const API_URL = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || "";
                         const fullDownloadUrl = `${API_URL}${downloadUrl}`;
                         
                         // Trigger download
@@ -83,6 +112,11 @@ const ReportDownloadButton: React.FC<ReportDownloadButtonProps> = ({ className }
                         document.body.appendChild(link);
                         link.click();
                         document.body.removeChild(link);
+                        
+                        // Update password from the finalized job
+                        if (jobStatus.password) {
+                            setGeneratedPassword(jobStatus.password);
+                        }
 
                         setStatus('COMPLETED');
                         setTimeout(() => setStatus('IDLE'), 3000); // Reset after 3s
@@ -111,6 +145,21 @@ const ReportDownloadButton: React.FC<ReportDownloadButtonProps> = ({ className }
 
     return (
         <div className={`flex flex-col items-start ${className}`}>
+            <div className="mb-4 flex flex-col items-start gap-1">
+                <p className="text-white/70 font-sans text-xs tracking-widest uppercase">
+                    Report Password:
+                </p>
+                <div className="flex items-center gap-2 group/copy cursor-pointer" onClick={handleCopy}>
+                    <p className="font-mono text-white/90 text-sm font-medium tracking-wide">
+                        {generatedPassword || '-'}
+                    </p>
+                    {generatedPassword && (
+                        <div className="text-white/40 group-hover/copy:text-white transition-colors duration-200">
+                            {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        </div>
+                    )}
+                </div>
+            </div>
             <button
                 onClick={handleDownload}
                 disabled={status === 'STARTING' || status === 'POLLING' || status === 'DOWNLOADING'}
