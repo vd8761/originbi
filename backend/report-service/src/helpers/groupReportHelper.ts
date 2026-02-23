@@ -249,16 +249,16 @@ async function processSessionRows(
             return 40 - val + percent;
         };
 
-        const scoreD = calcScore(discData.disc_scores.D);
-        const scoreI = calcScore(discData.disc_scores.I);
-        const scoreS = calcScore(discData.disc_scores.S);
-        const scoreC = calcScore(discData.disc_scores.C);
+        const scoreD = calcScore(discData.disc_scores.D || 0);
+        const scoreI = calcScore(discData.disc_scores.I || 0);
+        const scoreS = calcScore(discData.disc_scores.S || 0);
+        const scoreC = calcScore(discData.disc_scores.C || 0);
 
         const typeCounts: AnswerTypeCount[] = [
-            { ANSWER_TYPE: "D", COUNT: discData.disc_scores.D },
-            { ANSWER_TYPE: "I", COUNT: discData.disc_scores.I },
-            { ANSWER_TYPE: "S", COUNT: discData.disc_scores.S },
-            { ANSWER_TYPE: "C", COUNT: discData.disc_scores.C },
+            { ANSWER_TYPE: "D", COUNT: discData.disc_scores.D || 0 },
+            { ANSWER_TYPE: "I", COUNT: discData.disc_scores.I || 0 },
+            { ANSWER_TYPE: "S", COUNT: discData.disc_scores.S || 0 },
+            { ANSWER_TYPE: "C", COUNT: discData.disc_scores.C || 0 },
         ];
 
         // Agile Scores mapping
@@ -360,6 +360,8 @@ async function processSessionRows(
                 // Case B: SSLC - Stream undefined (handled by default)
             }
         }
+        console.log("Processing for Program:", reportTitleMap[programId]);
+        console.log("User Data:", userData);
 
         validUsersData.push(userData);
     }
