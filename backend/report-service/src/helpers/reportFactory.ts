@@ -38,7 +38,7 @@ function generateRandomPassword(length: number = 15): string {
 export async function generateReportForUser(
     user: MergedUserData,
     filePath: string,
-): Promise<void> {
+): Promise<string> {
     logger.info(
         `[ReportFactory] Generating Type ${user.program_type} for ${user.full_name}`,
     );
@@ -124,4 +124,6 @@ export async function generateReportForUser(
             );
             throw new Error(`Unknown program_type: ${user.program_type}`);
     }
+
+    return userPassword;
 }

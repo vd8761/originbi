@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Download, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { reportService } from '../../lib/services/report.service';
 import { studentService } from '../../lib/services/student.service';
@@ -11,11 +11,14 @@ const ReportDownloadButton: React.FC<ReportDownloadButtonProps> = ({ className }
     const [status, setStatus] = useState<'IDLE' | 'STARTING' | 'POLLING' | 'DOWNLOADING' | 'COMPLETED' | 'ERROR'>('IDLE');
     const [progress, setProgress] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
+    const isDownloadingRef = useRef(false);
 
     const handleDownload = async () => {
         if (status !== 'IDLE' && status !== 'ERROR' && status !== 'COMPLETED') return;
+        if (isDownloadingRef.current) return;
 
         try {
+            isDownloadingRef.current = true;
             setStatus('STARTING');
             setError(null);
             setProgress('Initiating...');
@@ -40,14 +43,16 @@ const ReportDownloadButton: React.FC<ReportDownloadButtonProps> = ({ className }
             setProgress('Generating Report...');
 
             // 3. Poll Status
-            const pollInterval = setInterval(async () => {
+            let isComplete = false;
+            while (!isComplete && isDownloadingRef.current) {
                 try {
                     const jobStatus = await reportService.checkStatus(jobId);
 
                     if (jobStatus.status === 'PROCESSING') {
                         setProgress(jobStatus.progress || 'Processing...');
+                        await new Promise(resolve => setTimeout(resolve, 2000));
                     } else if (jobStatus.status === 'COMPLETED') {
-                        clearInterval(pollInterval);
+                        isComplete = true;
                         setStatus('DOWNLOADING');
                         setProgress('Downloading...');
 
@@ -82,7 +87,7 @@ const ReportDownloadButton: React.FC<ReportDownloadButtonProps> = ({ className }
                         setStatus('COMPLETED');
                         setTimeout(() => setStatus('IDLE'), 3000); // Reset after 3s
                     } else if (jobStatus.status === 'ERROR') {
-                        clearInterval(pollInterval);
+                        isComplete = true;
                         setStatus('ERROR');
                         setError(jobStatus.error || "Generation Failed");
                     }
@@ -91,13 +96,16 @@ const ReportDownloadButton: React.FC<ReportDownloadButtonProps> = ({ className }
                     // Continue polling? Or fail?
                     // Let's count failures or just log
                     console.error("Polling error", e);
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                 }
-            }, 2000);
+            }
 
         } catch (err) {
             console.error("Download failed", err);
             setStatus('ERROR');
             setError((err as Error).message);
+        } finally {
+            isDownloadingRef.current = false;
         }
     };
 

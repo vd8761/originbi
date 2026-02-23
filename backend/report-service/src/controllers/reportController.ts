@@ -127,6 +127,7 @@ export const reportController = {
                 res.json({
                     status: "COMPLETED",
                     downloadUrl: `/download/status/${jobId}?download=true`,
+                    password: job.password,
                 });
                 return;
             }
