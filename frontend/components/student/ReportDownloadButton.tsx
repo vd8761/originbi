@@ -27,10 +27,10 @@ const ReportDownloadButton: React.FC<ReportDownloadButtonProps> = ({ className }
             try {
                 const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
                 if (!email) return;
-
+                
                 const profile = await studentService.getProfile(email);
                 if (!profile || !profile.id) return;
-
+                
                 const statusRes = await studentService.getAssessmentStatus(profile.id);
                 if (statusRes && statusRes.reportPassword) {
                     setGeneratedPassword(statusRes.reportPassword);
@@ -90,21 +90,21 @@ const ReportDownloadButton: React.FC<ReportDownloadButtonProps> = ({ className }
                         // The statusUrl returned is relative, we need full path
                         // Assume same base URL as report service
                         const downloadUrl = jobStatus.downloadUrl; // e.g. /download/status/jobId?download=true
-
+                        
                         // We can use window.location if absolute, but report service might be different domain/port
                         // Use fetch blob approach to be safe or window.open
-
+                        
                         // Since we are inside the component, let's try direct download link creation
                         // Modify reportService to handle actual download or use window.location
                         // Given reportController handling:
                         // res.download sends file content.
-
+                        
                         // Best approach: create a hidden link and click it
                         // But we need the full URL.
                         // Assuming report service URL is base.
                         const API_URL = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || "";
                         const fullDownloadUrl = `${API_URL}${downloadUrl}`;
-
+                        
                         // Trigger download
                         const link = document.createElement('a');
                         link.href = fullDownloadUrl;
@@ -112,7 +112,7 @@ const ReportDownloadButton: React.FC<ReportDownloadButtonProps> = ({ className }
                         document.body.appendChild(link);
                         link.click();
                         document.body.removeChild(link);
-
+                        
                         // Update password from the finalized job
                         if (jobStatus.password) {
                             setGeneratedPassword(jobStatus.password);
@@ -145,7 +145,21 @@ const ReportDownloadButton: React.FC<ReportDownloadButtonProps> = ({ className }
 
     return (
         <div className={`flex flex-col items-start ${className}`}>
-
+            <div className="mb-4 flex flex-col items-start gap-1">
+                <p className="text-white/70 font-sans text-xs tracking-widest uppercase">
+                    Report Password:
+                </p>
+                <div className="flex items-center gap-2 group/copy cursor-pointer" onClick={handleCopy}>
+                    <p className="font-mono text-white/90 text-sm font-medium tracking-wide">
+                        {generatedPassword || '-'}
+                    </p>
+                    {generatedPassword && (
+                        <div className="text-white/40 group-hover/copy:text-white transition-colors duration-200">
+                            {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        </div>
+                    )}
+                </div>
+            </div>
             <button
                 onClick={handleDownload}
                 disabled={status === 'STARTING' || status === 'POLLING' || status === 'DOWNLOADING'}
@@ -154,11 +168,11 @@ const ReportDownloadButton: React.FC<ReportDownloadButtonProps> = ({ className }
                     px-6 py-3 rounded-xl
                     transition-all duration-300
                     flex items-center justify-center gap-3
-                    ${status === 'ERROR'
-                        ? 'bg-red-500/20 text-red-200 border border-red-500/50 hover:bg-red-500/30'
+                    ${status === 'ERROR' 
+                        ? 'bg-red-500/20 text-red-200 border border-red-500/50 hover:bg-red-500/30' 
                         : status === 'COMPLETED'
-                            ? 'bg-green-500/20 text-green-200 border border-green-500/50 hover:bg-green-500/30'
-                            : 'bg-white/10 text-white backdrop-blur-md border border-white/20 hover:bg-white/20 hover:border-white/40 shadow-lg hover:shadow-xl hover:-translate-y-0.5'
+                        ? 'bg-green-500/20 text-green-200 border border-green-500/50 hover:bg-green-500/30'
+                        : 'bg-white/10 text-white backdrop-blur-md border border-white/20 hover:bg-white/20 hover:border-white/40 shadow-lg hover:shadow-xl hover:-translate-y-0.5'
                     }
                     disabled:opacity-80 disabled:cursor-not-allowed disabled:hover:translate-y-0
                 `}
@@ -184,7 +198,7 @@ const ReportDownloadButton: React.FC<ReportDownloadButtonProps> = ({ className }
                         <span className="font-medium tracking-wide">Downloading...</span>
                     </>
                 )}
-
+                
                 {status === 'COMPLETED' && (
                     <>
                         <CheckCircle className="w-5 h-5 text-green-400" />
@@ -198,11 +212,11 @@ const ReportDownloadButton: React.FC<ReportDownloadButtonProps> = ({ className }
                         <span className="font-medium tracking-wide text-red-100">Failed</span>
                     </>
                 )}
-
+                
                 {/* Shine Effect */}
                 <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent z-10 pointer-events-none" />
             </button>
-
+            
             {/* Error Message */}
             {error && (
                 <p className="mt-2 text-xs text-red-300 bg-red-900/40 px-2 py-1 rounded backdrop-blur-sm border border-red-500/30 animate-in fade-in slide-in-from-top-1">
