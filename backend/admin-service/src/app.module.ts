@@ -39,11 +39,16 @@ import { R2Module } from './r2/r2.module';
       useFactory: (config: ConfigService) => {
         const databaseUrl = config.get<string>('DATABASE_URL');
         console.log('DEBUG: NODE_ENV is:', config.get('NODE_ENV'));
-        console.log('DEBUG: DATABASE_URL is:', databaseUrl ? 'PRESENT' : 'MISSING');
+        console.log(
+          'DEBUG: DATABASE_URL is:',
+          databaseUrl ? 'PRESENT' : 'MISSING',
+        );
         console.log('DEBUG: DB_HOST is:', config.get('DB_HOST'));
 
         if (databaseUrl) {
-          const isLocal = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
+          const isLocal =
+            databaseUrl.includes('localhost') ||
+            databaseUrl.includes('127.0.0.1');
 
           let url = databaseUrl;
           if (!isLocal) {
@@ -64,12 +69,12 @@ import { R2Module } from './r2/r2.module';
             schema: 'public',
             // Connection pooling for better performance
             extra: {
-              max: 20,                    // Maximum number of connections in pool
-              min: 5,                     // Minimum number of connections in pool
-              acquire: 30000,             // Maximum time (ms) to try getting connection
-              idle: 10000,                // Maximum time (ms) a connection can be idle
-              connectionTimeoutMillis: 5000,  // Connection timeout
-              query_timeout: 30000,       // Query timeout
+              max: 20, // Maximum number of connections in pool
+              min: 5, // Minimum number of connections in pool
+              acquire: 30000, // Maximum time (ms) to try getting connection
+              idle: 10000, // Maximum time (ms) a connection can be idle
+              connectionTimeoutMillis: 5000, // Connection timeout
+              query_timeout: 30000, // Query timeout
             },
           };
         }
@@ -87,12 +92,12 @@ import { R2Module } from './r2/r2.module';
           schema: 'public',
           // Connection pooling for better performance
           extra: {
-            max: 20,                    // Maximum number of connections in pool
-            min: 5,                     // Minimum number of connections in pool
-            acquire: 30000,             // Maximum time (ms) to try getting connection
-            idle: 10000,                // Maximum time (ms) a connection can be idle
-            connectionTimeoutMillis: 5000,  // Connection timeout
-            query_timeout: 30000,       // Query timeout
+            max: 20, // Maximum number of connections in pool
+            min: 5, // Minimum number of connections in pool
+            acquire: 30000, // Maximum time (ms) to try getting connection
+            idle: 10000, // Maximum time (ms) a connection can be idle
+            connectionTimeoutMillis: 5000, // Connection timeout
+            query_timeout: 30000, // Query timeout
           },
         };
       },
@@ -116,4 +121,4 @@ import { R2Module } from './r2/r2.module';
   ],
   controllers: [TestController, MailAssetsController, HealthController],
 })
-export class AppModule { }
+export class AppModule {}

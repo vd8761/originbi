@@ -433,7 +433,9 @@ export class AssessmentService {
       return {
         departments: stats.map((s) => ({
           id: Number(s.id),
-          name: s.degreeName ? `${s.degreeName} ${s.departmentName}` : s.departmentName,
+          name: s.degreeName
+            ? `${s.degreeName} ${s.departmentName}`
+            : s.departmentName,
           total: Number(s.total),
           completed: Number(s.completed),
         })),

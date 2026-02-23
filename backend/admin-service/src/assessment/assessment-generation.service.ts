@@ -23,7 +23,7 @@ export class AssessmentGenerationService {
     private questionRepo: Repository<AssessmentQuestion>,
     @InjectRepository(OpenQuestion)
     private openQuestionRepo: Repository<OpenQuestion>,
-  ) { }
+  ) {}
 
   /**
    * Generates Level 1 questions following the 2:1 pattern (2 Main : 1 Open).
@@ -65,15 +65,17 @@ export class AssessmentGenerationService {
     });
 
     const studentBoard = registration?.metadata?.studentBoard || null;
-    this.logger.log(`[Assessment] Context -> Board: ${studentBoard || 'N/A'}, Registration: ${attempt.registrationId}`);
+    this.logger.log(
+      `[Assessment] Context -> Board: ${studentBoard || 'N/A'}, Registration: ${attempt.registrationId}`,
+    );
 
     const session = await manager.findOne(AssessmentSession, {
       where: { id: attempt.assessmentSessionId },
     });
 
-    let traitId = session?.metadata?.personalityTraitId || session?.metadata?.dominantTraitId;
-
-
+    let traitId =
+      session?.metadata?.personalityTraitId ||
+      session?.metadata?.dominantTraitId;
 
     // 1. Identify Level Type
     const level = await manager.findOne(AssessmentLevel, {
@@ -81,12 +83,21 @@ export class AssessmentGenerationService {
     });
 
     // Check Level 2 (ACI)
-    const isLevel2 = level && (level.levelNumber === 2 || level.name.trim().includes('Level 2') || level.name.includes('ACI'));
+    const isLevel2 =
+      level &&
+      (level.levelNumber === 2 ||
+        level.name.trim().includes('Level 2') ||
+        level.name.includes('ACI'));
     // Check Level 1
-    const isLevel1 = level && !isLevel2 && (level.levelNumber === 1 || level.name.trim().includes('Level 1'));
+    const isLevel1 =
+      level &&
+      !isLevel2 &&
+      (level.levelNumber === 1 || level.name.trim().includes('Level 1'));
 
     // Check Program (School vs Other)
-    const program = await manager.findOne(Program, { where: { id: attempt.programId } });
+    const program = await manager.findOne(Program, {
+      where: { id: attempt.programId },
+    });
     const isSchool = program?.code === 'SCHOOL_STUDENT';
 
     // ---------------------------------------------------------
@@ -95,32 +106,44 @@ export class AssessmentGenerationService {
     if (isLevel2) {
       if (!traitId) {
         // Fallback: Check for a completed attempt in this session that has a dominant trait (Level 1)
-        this.logger.log(`[Assessment] Trait ID not in metadata. Checking previous attempts for Session ${attempt.assessmentSessionId}...`);
+        this.logger.log(
+          `[Assessment] Trait ID not in metadata. Checking previous attempts for Session ${attempt.assessmentSessionId}...`,
+        );
         const previousAttempt = await manager.findOne(AssessmentAttempt, {
           where: {
             assessmentSessionId: attempt.assessmentSessionId,
             dominantTraitId: Not(IsNull()),
-            status: 'COMPLETED'
+            status: 'COMPLETED',
           },
-          order: { completedAt: 'DESC' }
+          order: { completedAt: 'DESC' },
         });
 
         if (previousAttempt && previousAttempt.dominantTraitId) {
           traitId = previousAttempt.dominantTraitId;
-          this.logger.log(`[Assessment] Found Trait ID ${traitId} from previous attempt ${previousAttempt.id}`);
+          this.logger.log(
+            `[Assessment] Found Trait ID ${traitId} from previous attempt ${previousAttempt.id}`,
+          );
         }
       }
 
       if (!traitId) {
-        this.logger.error(`[Assessment Error] Level 2 requires a Personality Trait ID, but none found in session metadata or previous attempts for User ${attempt.userId}`);
-        throw new Error('Personality Trait not found. Please complete Level 1 first.');
+        this.logger.error(
+          `[Assessment Error] Level 2 requires a Personality Trait ID, but none found in session metadata or previous attempts for User ${attempt.userId}`,
+        );
+        throw new Error(
+          'Personality Trait not found. Please complete Level 1 first.',
+        );
       }
 
-      this.logger.log(`Generating Level 2 Questions for Trait ID: ${traitId} (Limit 25)`);
+      this.logger.log(
+        `Generating Level 2 Questions for Trait ID: ${traitId} (Limit 25)`,
+      );
 
       let aciQuery = manager
         .createQueryBuilder(AssessmentQuestion, 'q')
-        .where('q.assessment_level_id = :levelId', { levelId: attempt.assessmentLevelId })
+        .where('q.assessment_level_id = :levelId', {
+          levelId: attempt.assessmentLevelId,
+        })
         .andWhere('q.personality_trait_id = :traitId', { traitId })
         .andWhere('q.is_active = true')
         .andWhere('q.is_deleted = false');
@@ -128,38 +151,42 @@ export class AssessmentGenerationService {
       // Board Filtering strictly for School Programs
       if (isSchool) {
         if (studentBoard) {
-          this.logger.log(`[Assessment] Applying Board Filter for School Program: ${studentBoard}`);
-          aciQuery = aciQuery.andWhere("q.board = :board", { board: studentBoard });
+          this.logger.log(
+            `[Assessment] Applying Board Filter for School Program: ${studentBoard}`,
+          );
+          aciQuery = aciQuery.andWhere('q.board = :board', {
+            board: studentBoard,
+          });
         } else {
-          this.logger.warn(`[Assessment] School Program detected but no Student Board found in metadata. Generating without board filter.`);
+          this.logger.warn(
+            `[Assessment] School Program detected but no Student Board found in metadata. Generating without board filter.`,
+          );
         }
       }
 
-      let aciQuestions = await aciQuery
-        .orderBy('RANDOM()')
-        .limit(25)
-        .getMany();
+      let aciQuestions = await aciQuery.orderBy('RANDOM()').limit(25).getMany();
 
       // Fallback: If School Board specific questions are missing, try generic
       if (aciQuestions.length === 0 && isSchool && studentBoard) {
-        this.logger.warn(`No Level 2 questions found for Board ${studentBoard}. Falling back to generic questions.`);
+        this.logger.warn(
+          `No Level 2 questions found for Board ${studentBoard}. Falling back to generic questions.`,
+        );
         aciQuery = manager
           .createQueryBuilder(AssessmentQuestion, 'q')
-          .where('q.assessment_level_id = :levelId', { levelId: attempt.assessmentLevelId })
+          .where('q.assessment_level_id = :levelId', {
+            levelId: attempt.assessmentLevelId,
+          })
           .andWhere('q.personality_trait_id = :traitId', { traitId })
           .andWhere('q.is_active = true')
           .andWhere('q.is_deleted = false');
 
-        // Strict Program Filter (if applicable/desired, user said "Level 2 only trait id based", but let's keep it safe if we added it before? 
+        // Strict Program Filter (if applicable/desired, user said "Level 2 only trait id based", but let's keep it safe if we added it before?
         // User said: "Level 2 Question Selection: Based on the Level 1 Result Trait ID to Pick the 25 question. In case of School Program Addtionally want to Check the Board".
         // They didn't explicitly say "Check Program", but usually we should?
-        // Actually, user said "level 2 only trait id based" in previous turn. 
+        // Actually, user said "level 2 only trait id based" in previous turn.
         // I will stick to Trait ID + Board (optional). So for fallback, just Trait ID.
 
-        aciQuestions = await aciQuery
-          .orderBy('RANDOM()')
-          .limit(25)
-          .getMany();
+        aciQuestions = await aciQuery.orderBy('RANDOM()').limit(25).getMany();
       }
 
       const answersToInsert: Partial<AssessmentAnswer>[] = [];
@@ -176,7 +203,9 @@ export class AssessmentGenerationService {
           questionSource: 'MAIN',
           mainQuestionId: q.id,
           questionSequence: seq++,
-          questionOptionsOrder: JSON.stringify(this.shuffleOptions([1, 2, 3, 4])),
+          questionOptionsOrder: JSON.stringify(
+            this.shuffleOptions([1, 2, 3, 4]),
+          ),
           status: 'NOT_ANSWERED',
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -189,7 +218,6 @@ export class AssessmentGenerationService {
       return;
     }
 
-
     // ---------------------------------------------------------
     // LEVEL 1 & GENERIC LOGIC
     // ---------------------------------------------------------
@@ -199,7 +227,9 @@ export class AssessmentGenerationService {
     let setQuery = manager
       .createQueryBuilder(AssessmentQuestion, 'q')
       .select('DISTINCT q.set_number', 'setNumber')
-      .where('q.assessment_level_id = :levelId', { levelId: attempt.assessmentLevelId })
+      .where('q.assessment_level_id = :levelId', {
+        levelId: attempt.assessmentLevelId,
+      })
       .andWhere('q.program_id = :programId', { programId: attempt.programId })
       .andWhere('q.is_active = true')
       .andWhere('q.is_deleted = false');
@@ -215,13 +245,19 @@ export class AssessmentGenerationService {
 
     if (!setsResult || setsResult.length === 0) {
       if (isSchool && studentBoard) {
-        this.logger.warn(`No sets found for Board ${studentBoard}, falling back to generic/any sets.`);
+        this.logger.warn(
+          `No sets found for Board ${studentBoard}, falling back to generic/any sets.`,
+        );
         // Fallback logic
         const fallbackSets = await manager
           .createQueryBuilder(AssessmentQuestion, 'q')
           .select('DISTINCT q.set_number', 'setNumber')
-          .where('q.assessment_level_id = :levelId', { levelId: attempt.assessmentLevelId })
-          .andWhere('q.program_id = :programId', { programId: attempt.programId })
+          .where('q.assessment_level_id = :levelId', {
+            levelId: attempt.assessmentLevelId,
+          })
+          .andWhere('q.program_id = :programId', {
+            programId: attempt.programId,
+          })
           .andWhere('q.is_active = true')
           .getRawMany<{ setNumber: number }>();
 
@@ -241,7 +277,7 @@ export class AssessmentGenerationService {
     }
 
     this.logger.log(
-      `Selected Set ${selectedSet} for Attempt ${attempt.id} (Level ${isLevel1 ? '1' : 'Other'})`
+      `Selected Set ${selectedSet} for Attempt ${attempt.id} (Level ${isLevel1 ? '1' : 'Other'})`,
     );
     // Update Metadata with Set Info
     if (session) {
@@ -251,11 +287,12 @@ export class AssessmentGenerationService {
       await manager.save(session);
     }
 
-
     // 4. Fetch Main Questions (Set-Based)
     let mainQuestionsQuery = manager
       .createQueryBuilder(AssessmentQuestion, 'q')
-      .where('q.assessment_level_id = :levelId', { levelId: attempt.assessmentLevelId })
+      .where('q.assessment_level_id = :levelId', {
+        levelId: attempt.assessmentLevelId,
+      })
       .andWhere('q.program_id = :programId', { programId: attempt.programId })
       .andWhere('q.set_number = :setNumber', { setNumber: selectedSet })
       .andWhere('q.is_active = true')
@@ -263,7 +300,9 @@ export class AssessmentGenerationService {
       .orderBy('RANDOM()');
 
     if (isSchool && studentBoard && useBoardFilter) {
-      mainQuestionsQuery = mainQuestionsQuery.andWhere('q.board = :board', { board: studentBoard });
+      mainQuestionsQuery = mainQuestionsQuery.andWhere('q.board = :board', {
+        board: studentBoard,
+      });
     }
 
     if (isLevel1) {
@@ -273,8 +312,12 @@ export class AssessmentGenerationService {
     const mainQuestions = await mainQuestionsQuery.getMany();
 
     if (!mainQuestions || mainQuestions.length === 0) {
-      this.logger.error(`Set ${selectedSet} has no active questions for Level ${attempt.assessmentLevelId} (Program: ${program?.code || 'Unknown'}, Board: ${studentBoard || 'None'}).`);
-      throw new Error(`No active questions found for the selected set (${selectedSet}) and board (${studentBoard || 'None'}).`);
+      this.logger.error(
+        `Set ${selectedSet} has no active questions for Level ${attempt.assessmentLevelId} (Program: ${program?.code || 'Unknown'}, Board: ${studentBoard || 'None'}).`,
+      );
+      throw new Error(
+        `No active questions found for the selected set (${selectedSet}) and board (${studentBoard || 'None'}).`,
+      );
     }
 
     const answersToInsert: Partial<AssessmentAnswer>[] = [];

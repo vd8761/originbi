@@ -1,35 +1,41 @@
-import { IsString, IsNotEmpty, IsBoolean, IsOptional, IsJSON } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsBoolean,
+  IsOptional,
+  IsJSON,
+} from 'class-validator';
 
 export class CreateCounsellingTypeDto {
-    @IsString()
-    @IsNotEmpty()
-    name: string;
+  @IsString()
+  @IsNotEmpty()
+  name: string;
 
-    @IsString()
-    @IsNotEmpty()
-    prompt: string;
+  @IsString()
+  @IsNotEmpty()
+  prompt: string;
 
-    @IsBoolean()
-    @IsOptional()
-    isActive?: boolean;
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
 
-    @IsOptional()
-    courseDetails?: any;
+  @IsOptional()
+  courseDetails?: any;
 }
 
 export class UpdateCounsellingTypeDto {
-    @IsString()
-    @IsOptional()
-    name?: string;
+  @IsString()
+  @IsOptional()
+  name?: string;
 
-    @IsString()
-    @IsOptional()
-    prompt?: string;
+  @IsString()
+  @IsOptional()
+  prompt?: string;
 
-    @IsBoolean()
-    @IsOptional()
-    isActive?: boolean;
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
 
-    @IsOptional()
-    courseDetails?: any;
+  @IsOptional()
+  courseDetails?: any;
 }

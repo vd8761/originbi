@@ -41,4 +41,4 @@ import { DepartmentDegree } from '../departments/department-degree.entity';
   providers: [RegistrationsService, BulkRegistrationsService],
   controllers: [RegistrationsController],
 })
-export class RegistrationsModule { }
+export class RegistrationsModule {}
