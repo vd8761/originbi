@@ -1,11 +1,14 @@
 package service
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"exam-engine/internal/models"
 	"exam-engine/internal/repository"
 	"fmt"
+	"net/http"
+	"os"
 	"sort"
 	"time"
 
@@ -348,6 +351,9 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 	db.Model(&models.AssessmentAnswer{}).Where("assessment_attempt_id = ? AND status = ?", answerRecord.AssessmentAttemptID, "ANSWERED").Count(&answeredCounts)
 
 	if totalCounts > 0 && answeredCounts == totalCounts {
+		var sessionCompleted bool
+		var completedUserID int64
+
 		// Start Transaction (Concurrency Fix)
 		err := db.Transaction(func(tx *gorm.DB) error {
 			now := time.Now()
@@ -647,6 +653,9 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 
 			// CASE B: No Next Level (System-wide) OR No Attempt for Next Level (Program-specific) -> Mark Completed
 			if !hasNextLevel {
+				sessionCompleted = true
+				completedUserID = lockedAttempt.UserID
+
 				// This session is FULLY COMPLETED
 				var session models.AssessmentSession
 				if err := tx.First(&session, answerRecord.AssessmentSessionID).Error; err == nil {
@@ -798,6 +807,27 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 		if err != nil {
 			fmt.Printf("[SubmitAnswer] ERROR: Transaction Failed: %v\n", err)
 			return err
+		}
+
+		if sessionCompleted && completedUserID > 0 {
+			go func(userID int64) {
+				studentServiceURL := os.Getenv("STUDENT_SERVICE_URL")
+				if studentServiceURL == "" {
+					studentServiceURL = "http://localhost:4004"
+				}
+				endpoint := fmt.Sprintf("%s/student/assessment-complete", studentServiceURL)
+				payload := map[string]interface{}{"userId": userID}
+				jsonPayload, _ := json.Marshal(payload)
+
+				fmt.Printf("[SubmitAnswer] Triggering student service for user %d at %s\n", userID, endpoint)
+				resp, err := http.Post(endpoint, "application/json", bytes.NewBuffer(jsonPayload))
+				if err != nil {
+					fmt.Printf("[SubmitAnswer] ERROR HTTP Post to student service: %v\n", err)
+				} else {
+					fmt.Printf("[SubmitAnswer] Triggered student service, status: %s\n", resp.Status)
+					resp.Body.Close()
+				}
+			}(completedUserID)
 		}
 	}
 
