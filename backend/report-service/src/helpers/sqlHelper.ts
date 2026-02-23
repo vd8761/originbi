@@ -11,6 +11,21 @@ const pool = new Pool({
     port: parseInt(process.env.DB_PORT || "5432"),
 });
 
+export async function testDbConnection() {
+    try {
+        const client = await pool.connect();
+        logger.info(
+            "[DB] ✅ Successfully connected to the PostgreSQL database",
+        );
+        client.release();
+    } catch (error) {
+        logger.error(
+            "[DB] ❌ Failed to connect to the PostgreSQL database:",
+            error,
+        );
+    }
+}
+
 interface GuidanceSectionJSON {
     title: string;
     content: string | GuidanceSubContent[];
