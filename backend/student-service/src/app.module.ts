@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { StudentModule } from './student/student.module';
 import { ForgotPasswordModule } from './forgotpassword/forgotpassword.module';
 import { CounsellingModule } from './modules/counselling/counselling.module';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -40,6 +41,21 @@ import { CounsellingModule } from './modules/counselling/counselling.module';
           autoLoadEntities: true,
           synchronize: false,
           ssl: false,
+        };
+      },
+    }),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const redisHost = config.get<string>('REDIS_HOST');
+        return {
+          connection: {
+            host: redisHost || 'localhost',
+            port: config.get<number>('REDIS_PORT') || 6379,
+            password: config.get<string>('REDIS_PASSWORD'),
+            tls: redisHost?.includes('upstash.io') ? {} : undefined,
+          },
         };
       },
     }),
