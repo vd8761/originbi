@@ -86,7 +86,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
         setProgress('Initializing...');
 
         try {
-            const apiBase = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL;
+            const apiBase = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || '';
 
             // 1. Start Job
             const startRes = await fetch(`${apiBase}/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true`);

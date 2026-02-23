@@ -24,4 +24,13 @@ router.get(
 // 4. Unified Status & Download Route
 router.get("/download/status/:job_id", reportController.getDownloadStatus);
 
+// 5. Health Check Route
+router.get("/report-status", (req, res) => {
+    res.json({
+        status: "alive",
+        service: "report-service",
+        timestamp: new Date().toISOString(),
+    });
+});
+
 export { router as reportRoutes };

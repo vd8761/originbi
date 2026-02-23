@@ -255,7 +255,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                                 setDownloadProgress('Downloading...');
                                                 
                                                 // Trigger Download
-                                                 const REPORT_API_URL = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL;
+                                                 const REPORT_API_URL = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || '';
                                                 window.location.href = `${REPORT_API_URL}${statusData.downloadUrl}`;
                                                 
                                                 setTimeout(() => {

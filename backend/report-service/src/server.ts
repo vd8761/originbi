@@ -41,5 +41,6 @@ app.listen(PORT, () => {
     logger.info(
         `[GET] Student:   http://localhost:${PORT}/generate/student/:student_id`,
     );
+    logger.info(`[GET] Status:    http://localhost:${PORT}/report-status`);
     logger.info(`-----------------------------------------------------`);
 });
