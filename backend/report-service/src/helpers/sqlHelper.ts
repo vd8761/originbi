@@ -18,6 +18,21 @@ const poolConfig = process.env.DATABASE_URL
 
 const pool = new Pool(poolConfig);
 
+export async function testDbConnection() {
+    try {
+        const client = await pool.connect();
+        logger.info(
+            "[DB] ✅ Successfully connected to the PostgreSQL database",
+        );
+        client.release();
+    } catch (error) {
+        logger.error(
+            "[DB] ❌ Failed to connect to the PostgreSQL database:",
+            error,
+        );
+    }
+}
+
 interface GuidanceSectionJSON {
     title: string;
     content: string | GuidanceSubContent[];

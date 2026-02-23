@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import { logger } from "./helpers/logger";
 import { reportRoutes } from "./routes/reportRoutes";
+import { testDbConnection } from "./helpers/sqlHelper";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -29,9 +30,13 @@ app.use(express.json());
 // --- ROUTES ---
 app.use("/", reportRoutes);
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     logger.info(`Server running on port ${PORT}`);
     logger.info(`Debug logs enabled: ${process.env.DEBUG_LOGS === "true"}`);
+
+    // Test DB connection on startup
+    await testDbConnection();
+
     logger.info(`-----------------------------------------------------`);
     logger.info(
         `[GET] Placement: http://localhost:${PORT}/generate/placement/:group_id/:dept_degree_id`,
