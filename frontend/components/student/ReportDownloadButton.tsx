@@ -68,7 +68,7 @@ const ReportDownloadButton: React.FC<ReportDownloadButtonProps> = ({ className }
                         // Best approach: create a hidden link and click it
                         // But we need the full URL.
                         // Assuming report service URL is base.
-                        const API_URL = process.env.NEXT_PUBLIC_REPORT_API_URL || "http://localhost:4006";
+                        const API_URL = process.env.NEXT_PUBLIC_REPORT_API_URL;
                         const fullDownloadUrl = `${API_URL}${downloadUrl}`;
                         
                         // Trigger download

@@ -1223,8 +1223,7 @@ export class StudentService {
       }
 
       // 2. Trigger Report Generation
-      const reportServiceUrl =
-        process.env.REPORT_SERVICE_URL || 'http://localhost:4006';
+      const reportServiceUrl = process.env.REPORT_SERVICE_URL;
       const generateUrl = `${reportServiceUrl}/generate/student/${userId}`;
 
       this.logger.log(`Triggering report generation: ${generateUrl}`);
