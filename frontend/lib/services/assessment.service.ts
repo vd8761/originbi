@@ -153,9 +153,7 @@ export const assessmentService = {
         // If not, we might need a separate REPORT_API_URL.
         // Looking at GroupAssessmentPreview.tsx, it uses process.env.NEXT_PUBLIC_REPORT_API_BASE_URL
 
-        const REPORT_API_URL =
-            process.env.NEXT_PUBLIC_REPORT_API_BASE_URL ||
-            "http://localhost:4006";
+        const REPORT_API_URL = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL;
 
         const res = await fetch(
             `${REPORT_API_URL}/generate/student/${studentId}?json=true`,
@@ -173,9 +171,7 @@ export const assessmentService = {
         return res.json();
     },
 
-    async getDownloadStatus(
-        jobId: string,
-    ): Promise<{
+    async getDownloadStatus(jobId: string): Promise<{
         status: string;
         progress?: string;
         downloadUrl?: string;

@@ -7,7 +7,19 @@ import { reportRoutes } from "./routes/reportRoutes";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors({ origin: "http://localhost:3000" })); // Allow all origins for dev, or specify http://localhost:3000
+// Allow origins from port 3000, 4001, 4002, 4003, 4004, 4005
+app.use(
+    cors({
+        origin: [
+            "http://localhost:3000",
+            "http://localhost:4001",
+            "http://localhost:4002",
+            "http://localhost:4003",
+            "http://localhost:4004",
+            "http://localhost:4005",
+        ],
+    }),
+);
 app.use(express.json());
 
 // --- ROUTES ---
