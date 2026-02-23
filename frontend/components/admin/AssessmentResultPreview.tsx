@@ -10,7 +10,9 @@ import {
     EmailIcon,
     ProfileIcon,
     JobsIcon,
-    ClockIcon
+    ClockIcon,
+    LoadingIcon,
+    DownloadIcon
 } from '../icons';
 
 interface AssessmentResultPreviewProps {
@@ -38,6 +40,10 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
     const [session, setSession] = useState<AssessmentSession | null>(initialSession);
     const [levels, setLevels] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState(0);
+
+    // Download State
+    const [downloading, setDownloading] = useState(false);
+    const [downloadProgress, setDownloadProgress] = useState('');
 
     useEffect(() => {
         const fetchLevels = async () => {
@@ -205,7 +211,84 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
 
             {/* Candidate & Report */}
             <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-6 flex flex-col gap-4">
-                <h3 className="text-sm font-semibold border-b border-gray-200 dark:border-white/10 pb-4 mb-2">Candidate & Report</h3>
+                <div className="flex justify-between items-center border-b border-gray-200 dark:border-white/10 pb-4 mb-2">
+                    <h3 className="text-sm font-semibold">Candidate & Report</h3>
+                    {downloading ? (
+                         <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10">
+                            <LoadingIcon className="w-3 h-3 text-brand-green animate-spin" />
+                            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{downloadProgress}</span>
+                         </div>
+                    ) : (
+                        <button
+                            onClick={async () => {
+                                if (!session?.userId) {
+                                    alert("User ID not found for this session.");
+                                    return;
+                                }
+                                try {
+                                    setDownloading(true);
+                                    setDownloadProgress('Initializing...');
+                                    
+                                    // 1. Start Generation
+                                    const studentId = session.userId; 
+                                    const startData = await assessmentService.generateStudentReport(studentId);
+                                    
+                                    if (!startData.success || !startData.jobId) {
+                                        throw new Error("Failed to start report generation");
+                                    }
+                                    
+                                    const jobId = startData.jobId;
+                                    
+                                    // 2. Poll
+                                    const pollInterval = setInterval(async () => {
+                                        try {
+                                            const statusData = await assessmentService.getDownloadStatus(jobId);
+                                            
+                                            if (statusData.status === 'PROCESSING') {
+                                                setDownloadProgress(statusData.progress || 'Processing...');
+                                            } else if (statusData.status === 'COMPLETED') {
+                                                clearInterval(pollInterval);
+                                                setDownloadProgress('Downloading...');
+                                                
+                                                // Trigger Download
+                                                 const REPORT_API_URL = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || 'http://localhost:4006';
+                                                window.location.href = `${REPORT_API_URL}${statusData.downloadUrl}`;
+                                                
+                                                setTimeout(() => {
+                                                    setDownloading(false);
+                                                    setDownloadProgress('');
+                                                }, 2000);
+                                            } else if (statusData.status === 'ERROR') {
+                                                clearInterval(pollInterval);
+                                                throw new Error(statusData.error || 'Generation failed');
+                                            }
+                                        } catch (err) {
+                                            clearInterval(pollInterval);
+                                            console.error("Polling error", err);
+                                            setDownloading(false);
+                                            alert("Failed to download report. Please try again.");
+                                        }
+                                    }, 1000);
+                                    
+                                } catch (error) {
+                                    console.error("Download failed", error);
+                                    setDownloading(false);
+                                    alert("Failed to initiate download.");
+                                }
+                            }}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                status === 'COMPLETED' 
+                                ? 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green cursor-pointer' 
+                                : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
+                            }`}
+                            disabled={status !== 'COMPLETED'}
+                            title={status !== 'COMPLETED' ? 'Exam must be completed to download report' : ''}
+                        >
+                            <DownloadIcon className="w-3 h-3" />
+                            Download Report
+                        </button>
+                    )}
+                </div>
                 <div className="flex flex-col gap-3">
                     <div className="grid grid-cols-2 gap-3">
                         <InfoItem icon={ProfileIcon} label="Student Name" value={displayData.studentName} />
