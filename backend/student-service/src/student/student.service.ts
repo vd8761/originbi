@@ -114,9 +114,21 @@ export class StudentService {
       return { isCompleted: false, status: 'NO_SESSION' };
     }
 
+    let reportPassword = null;
+    if (session.status === 'COMPLETED') {
+      const report = await this.assessmentReportRepository.findOne({
+        where: { assessmentSessionId: session.id },
+        select: ['reportPassword'],
+      });
+      if (report) {
+        reportPassword = report.reportPassword;
+      }
+    }
+
     return {
       isCompleted: session.status === 'COMPLETED',
       status: session.status,
+      reportPassword: reportPassword,
     };
   }
 
