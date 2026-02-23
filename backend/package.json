@@ -15,7 +15,7 @@
         "reflect-metadata": "^0.2.1"
     },
     "scripts": {
-        "build:shared": "cd shared && npm run build",
+        "build:shared": "npm --prefix shared install && npm --prefix shared run build",
         "build:all": "npm run build:shared && npm run build:services",
         "build:services": "npm run build:admin && npm run build:auth && npm run build:corporate && npm run build:student",
         "build:admin": "cd admin-service && npm run build",
