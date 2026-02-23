@@ -178,6 +178,13 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
     const totalPages = Math.ceil(total / limit) || 1;
     const paginatedSessions = filteredSessions.slice((page - 1) * limit, page * limit);
 
+    // Safely determine program ID (fallback to session programId if group-level program is missing/misconfigured)
+    const actualProgramId = groupData?.program?.id 
+        ? Number(groupData.program.id) 
+        : (allSessions.length > 0 ? Number(allSessions[0].programId) : null);
+    
+    const isCollegeStudentProgram = actualProgramId === 2;
+
     const handlePageChange = (newPage: number) => {
         if (newPage >= 1 && newPage <= totalPages) {
             setPage(newPage);
@@ -423,15 +430,19 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                     {/* Download Report Button - Updated Style */}
                     <button
                         onClick={handleDownloadReportClick}
-                        disabled={downloadLoading}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] rounded-lg text-sm font-medium text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/30 transition-all shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
+                        disabled={downloadLoading || !isCollegeStudentProgram}
+                        title={!isCollegeStudentProgram ? "Download available for College Students only" : ""}
+                        className={`flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] rounded-lg text-sm font-medium transition-all shadow-sm disabled:opacity-70 disabled:cursor-not-allowed 
+                            ${!isCollegeStudentProgram 
+                                ? 'text-gray-400 dark:text-gray-500' 
+                                : 'text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/30'}`}
                     >
                         <span>{downloadLoading ? "Loading..." : "Download Report"}</span>
                         {downloadLoading ? (
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-green"></div>
                         ) : (
                             // Download Icon on the right
-                            <svg className="w-5 h-5 text-brand-green" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <svg className={`w-5 h-5 ${!isCollegeStudentProgram ? 'text-gray-400' : 'text-brand-green'}`} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M12 16L12 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                 <path d="M9 13L12 16L15 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                 <path d="M17 19H7C5.89543 19 5 18.1046 5 17V7C5 5.89543 5.89543 5 7 5H17C18.1046 5 19 5.89543 19 7V17C19 18.1046 18.1046 19 17 19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
