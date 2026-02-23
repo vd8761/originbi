@@ -133,8 +133,8 @@ export async function fetchUserAssessmentData(
             LEFT JOIN assessment_reports ar ON s.id = ar.assessment_session_id
             WHERE s.user_id = ANY($1)
             `;
-        } else {
-            // --- STANDARD QUERY (College/Others with Departments) ---
+        } else if (programId === 2) {
+            // --- COLLEGE QUERY (Join with Departments) ---
             sessionsQuery = `
             SELECT 
                 s.id as session_id, 
@@ -154,6 +154,25 @@ export async function fetchUserAssessmentData(
             LEFT JOIN assessment_reports ar ON s.id = ar.assessment_session_id
             JOIN department_degrees dd ON r.department_degree_id = dd.id
             JOIN departments d ON dd.department_id = d.id
+            WHERE s.user_id = ANY($1)
+        `;
+        } else {
+            // --- OTHER PROGRAMS (No Department Joins, No School Joins) ---
+            sessionsQuery = `
+            SELECT 
+                s.id as session_id, 
+                s.user_id, 
+                s.registration_id, 
+                s.program_id,
+                s.started_at, 
+                s.completed_at,
+                r.full_name,
+                u.email,
+                ar.report_number
+            FROM assessment_sessions s
+            JOIN registrations r ON s.registration_id = r.id
+            JOIN users u ON s.user_id = u.id
+            LEFT JOIN assessment_reports ar ON s.id = ar.assessment_session_id
             WHERE s.user_id = ANY($1)
         `;
         }

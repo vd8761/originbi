@@ -71,7 +71,7 @@ export class StudentService {
     private readonly affiliateTransactionRepo: Repository<AffiliateReferralTransaction>,
     private readonly http: HttpService,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   async onModuleInit() {
     // Check if imported functions are used to avoid TS error, or just use them
@@ -400,9 +400,14 @@ export class StudentService {
         status: status,
         levelNumber: level?.levelNumber,
         completedQuestions: answeredCount,
-        totalQuestions: totalCount > 0
-          ? totalCount
-          : (level?.levelNumber === 2 || level?.name.includes('ACI') || level?.patternType === 'ACI' ? 25 : 60),
+        totalQuestions:
+          totalCount > 0
+            ? totalCount
+            : level?.levelNumber === 2 ||
+                level?.name.includes('ACI') ||
+                level?.patternType === 'ACI'
+              ? 25
+              : 60,
         unlockTime: unlockTime,
         dateCompleted: attempt.completedAt || attempt.updatedAt,
         attemptId: attempt.id, // Ensure attemptId is passed
@@ -721,10 +726,14 @@ export class StudentService {
         order: { levelNumber: 'ASC' },
       });
 
-      this.logger.log(`[Register Debug] Found ${levels.length} mandatory levels`);
+      this.logger.log(
+        `[Register Debug] Found ${levels.length} mandatory levels`,
+      );
 
       for (const level of levels) {
-        this.logger.log(`[Register Debug] Processing Level: ${level.id} - ${level.name}`);
+        this.logger.log(
+          `[Register Debug] Processing Level: ${level.id} - ${level.name}`,
+        );
         const attempt = this.attemptRepo.create({
           assessmentSessionId: savedSession.id,
           assessmentLevelId: level.id,
@@ -739,7 +748,9 @@ export class StudentService {
 
         // Generate Questions for Level 1
         if (level.levelNumber === 1 || level.name.includes('Level 1')) {
-          this.logger.log(`[Register Debug] Generating questions for Level 1 (Attempt ID: ${savedAttempt.id})`);
+          this.logger.log(
+            `[Register Debug] Generating questions for Level 1 (Attempt ID: ${savedAttempt.id})`,
+          );
           await this.generateQuestionsForAttempt(
             savedAttempt,
             user,
@@ -806,8 +817,14 @@ export class StudentService {
     // ---------------------------------------------------------
     // LEVEL 2 (ACI) LOGIC
     // ---------------------------------------------------------
-    if (level.levelNumber === 2 || level.name.includes('Level 2') || level.name.includes('ACI')) {
-      this.logger.log(`[Assessment] Generating Level 2 (ACI) questions for User ${user.id}`);
+    if (
+      level.levelNumber === 2 ||
+      level.name.includes('Level 2') ||
+      level.name.includes('ACI')
+    ) {
+      this.logger.log(
+        `[Assessment] Generating Level 2 (ACI) questions for User ${user.id}`,
+      );
 
       // 1. Get Personality Trait ID from previous session metadata or report
       // Assumption: Level 1 completion stored the dominant trait ID in session metadata
@@ -815,32 +832,44 @@ export class StudentService {
         where: { id: attempt.assessmentSessionId },
       });
 
-      let traitId = session?.metadata?.personalityTraitId || session?.metadata?.dominantTraitId;
+      let traitId =
+        session?.metadata?.personalityTraitId ||
+        session?.metadata?.dominantTraitId;
 
       if (!traitId) {
         // Fallback: Check for a completed attempt in this session that has a dominant trait (Level 1)
-        this.logger.log(`[Assessment] Trait ID not in metadata. Checking previous attempts for Session ${attempt.assessmentSessionId}...`);
+        this.logger.log(
+          `[Assessment] Trait ID not in metadata. Checking previous attempts for Session ${attempt.assessmentSessionId}...`,
+        );
         const previousAttempt = await this.attemptRepo.findOne({
           where: {
             assessmentSessionId: attempt.assessmentSessionId,
             dominantTraitId: Not(IsNull()),
-            status: 'COMPLETED'
+            status: 'COMPLETED',
           },
-          order: { completedAt: 'DESC' }
+          order: { completedAt: 'DESC' },
         });
 
         if (previousAttempt && previousAttempt.dominantTraitId) {
           traitId = previousAttempt.dominantTraitId;
-          this.logger.log(`[Assessment] Found Trait ID ${traitId} from previous attempt ${previousAttempt.id}`);
+          this.logger.log(
+            `[Assessment] Found Trait ID ${traitId} from previous attempt ${previousAttempt.id}`,
+          );
         }
       }
 
       if (!traitId) {
-        this.logger.error(`[Assessment Error] Level 2 requires a Personality Trait ID, but none found in session metadata or previous attempts for User ${user.id}`);
-        throw new Error('Personality Trait not found. Please complete Level 1 first.');
+        this.logger.error(
+          `[Assessment Error] Level 2 requires a Personality Trait ID, but none found in session metadata or previous attempts for User ${user.id}`,
+        );
+        throw new Error(
+          'Personality Trait not found. Please complete Level 1 first.',
+        );
       }
 
-      this.logger.log(`[Assessment] Fetching 25 questions for Trait ID: ${traitId}`);
+      this.logger.log(
+        `[Assessment] Fetching 25 questions for Trait ID: ${traitId}`,
+      );
 
       let query = `
         INSERT INTO assessment_answers (
@@ -862,19 +891,24 @@ export class StudentService {
         reg.id,
         level.id,
         attempt.programId,
-        traitId
+        traitId,
       ];
 
       // Board Filtering strictly for School Programs (ID 1)
       // Check attempt.programId or reg.program.id. Assuming 1 is School based on groupReportHelper usage.
       if (Number(attempt.programId) === 1) {
-        const studentBoard = session?.metadata?.studentBoard || reg.metadata?.studentBoard;
+        const studentBoard =
+          session?.metadata?.studentBoard || reg.metadata?.studentBoard;
         if (studentBoard) {
-          this.logger.log(`[Assessment] Applying Board Filter for School Program: ${studentBoard}`);
+          this.logger.log(
+            `[Assessment] Applying Board Filter for School Program: ${studentBoard}`,
+          );
           query += ` AND board = $8`;
           queryParams.push(studentBoard);
         } else {
-          this.logger.warn(`[Assessment] School Program detected but no Student Board found in metadata. Generating without board filter.`);
+          this.logger.warn(
+            `[Assessment] School Program detected but no Student Board found in metadata. Generating without board filter.`,
+          );
         }
       }
 
@@ -910,9 +944,13 @@ export class StudentService {
       if (loadedSets && loadedSets.length > 0) {
         const randomIndex = Math.floor(Math.random() * loadedSets.length);
         selectedSetNumber = loadedSets[randomIndex].set_number;
-        this.logger.log(`[Assessment] Selected Set ${selectedSetNumber} for Board ${studentBoard}`);
+        this.logger.log(
+          `[Assessment] Selected Set ${selectedSetNumber} for Board ${studentBoard}`,
+        );
       } else {
-        this.logger.warn(`[Assessment] No sets found for Board ${studentBoard}, defaulting to Set 1`);
+        this.logger.warn(
+          `[Assessment] No sets found for Board ${studentBoard}, defaulting to Set 1`,
+        );
         selectedSetNumber = 1;
       }
     } else {
@@ -927,12 +965,16 @@ export class StudentService {
       if (loadedSets && loadedSets.length > 0) {
         const randomIndex = Math.floor(Math.random() * loadedSets.length);
         selectedSetNumber = loadedSets[randomIndex].set_number;
-        this.logger.log(`[Assessment] Selected Random Set ${selectedSetNumber}`);
+        this.logger.log(
+          `[Assessment] Selected Random Set ${selectedSetNumber}`,
+        );
       }
     }
 
     // Save Set Number to Metadata
-    const session = await this.sessionRepo.findOne({ where: { id: attempt.assessmentSessionId } });
+    const session = await this.sessionRepo.findOne({
+      where: { id: attempt.assessmentSessionId },
+    });
     if (session) {
       if (!session.metadata) session.metadata = {};
       session.metadata.setNumber = selectedSetNumber;
@@ -977,12 +1019,17 @@ export class StudentService {
 
     // We want 20 chunks of (2 Main + 1 Open) = 60 questions
     for (let i = 0; i < 20; i++) {
-      if (mainIdx < mainQuestions.length) finalQuestions.push({ id: mainQuestions[mainIdx++].id, type: 'MAIN' });
-      if (mainIdx < mainQuestions.length) finalQuestions.push({ id: mainQuestions[mainIdx++].id, type: 'MAIN' });
-      if (openIdx < openQuestions.length) finalQuestions.push({ id: openQuestions[openIdx++].id, type: 'OPEN' });
+      if (mainIdx < mainQuestions.length)
+        finalQuestions.push({ id: mainQuestions[mainIdx++].id, type: 'MAIN' });
+      if (mainIdx < mainQuestions.length)
+        finalQuestions.push({ id: mainQuestions[mainIdx++].id, type: 'MAIN' });
+      if (openIdx < openQuestions.length)
+        finalQuestions.push({ id: openQuestions[openIdx++].id, type: 'OPEN' });
     }
 
-    this.logger.log(`[Assessment] Generated ${finalQuestions.length} interleaved questions (Main: ${mainIdx}, Open: ${openIdx})`);
+    this.logger.log(
+      `[Assessment] Generated ${finalQuestions.length} interleaved questions (Main: ${mainIdx}, Open: ${openIdx})`,
+    );
 
     // 5. Bulk Insert Answers
     if (finalQuestions.length > 0) {
@@ -990,7 +1037,9 @@ export class StudentService {
       finalQuestions.forEach((q, index) => {
         const mainId = q.type === 'MAIN' ? q.id : 'NULL';
         const openId = q.type === 'OPEN' ? q.id : 'NULL';
-        values.push(`(${attempt.id}, ${attempt.assessmentSessionId}, ${user.id}, ${reg.id}, ${attempt.programId}, ${level.id}, ${mainId}, ${openId}, '${q.type}', 'NOT_ANSWERED', ${index + 1}, NOW(), NOW())`);
+        values.push(
+          `(${attempt.id}, ${attempt.assessmentSessionId}, ${user.id}, ${reg.id}, ${attempt.programId}, ${level.id}, ${mainId}, ${openId}, '${q.type}', 'NOT_ANSWERED', ${index + 1}, NOW(), NOW())`,
+        );
       });
 
       const insertQuery = `
@@ -1295,7 +1344,7 @@ export class StudentService {
         assets,
         dateStr,
         ((registration as any).program?.reportTitle as string) ||
-        'Self Discovery Report',
+          'Self Discovery Report',
       );
 
       // --- Transporter Setup ---

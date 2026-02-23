@@ -14,6 +14,7 @@ import {
 } from '@originbi/shared-entities';
 import { Department } from '../departments/department.entity';
 import { DepartmentDegree } from '../departments/department-degree.entity';
+import { DegreeType } from '../departments/degree-type.entity';
 
 @Injectable()
 export class AssessmentService {
@@ -416,21 +417,23 @@ export class AssessmentService {
         .leftJoin('s.registration', 'r')
         .leftJoin(DepartmentDegree, 'dd', 'dd.id = r.departmentDegreeId')
         .leftJoin(Department, 'd', 'd.id = dd.departmentId')
+        .leftJoin(DegreeType, 'dt', 'dt.id = dd.degreeTypeId')
         .select([
           'r.departmentDegreeId AS "id"',
-          'd.name AS "name"',
+          'd.name AS "departmentName"',
+          'dt.name AS "degreeName"',
           'COUNT(s.id) AS "total"',
           `SUM(CASE WHEN s.status = 'COMPLETED' THEN 1 ELSE 0 END) AS "completed"`,
         ])
         .where('s.groupAssessmentId = :groupId', { groupId })
         .andWhere('r.departmentDegreeId IS NOT NULL')
-        .groupBy('r.departmentDegreeId, d.name')
+        .groupBy('r.departmentDegreeId, d.name, dt.name')
         .getRawMany();
 
       return {
         departments: stats.map((s) => ({
           id: Number(s.id),
-          name: s.name,
+          name: s.degreeName ? `${s.degreeName} ${s.departmentName}` : s.departmentName,
           total: Number(s.total),
           completed: Number(s.completed),
         })),
