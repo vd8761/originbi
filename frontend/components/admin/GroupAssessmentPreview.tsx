@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { assessmentService } from '../../lib/services/assessment.service';
 import { ArrowLeftWithoutLineIcon, ArrowRightWithoutLineIcon, ChevronDownIcon, EyeVisibleIcon, FilterFunnelIcon } from '../icons';
 import ExcelExportButton from '../ui/ExcelExportButton';
@@ -42,6 +42,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
 
     const [generating, setGenerating] = useState(false);
     const [progress, setProgress] = useState('');
+    const isDownloadingRef = useRef(false);
 
     // Fetch Data
     const fetchGroupData = useCallback(async () => {
@@ -81,11 +82,13 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
 
     const handleConfirmDownload = async () => {
         if (!selectedDepartment || !groupData?.group?.id) return;
-
-        setGenerating(true);
-        setProgress('Initializing...');
+        if (isDownloadingRef.current) return;
 
         try {
+            isDownloadingRef.current = true;
+            setGenerating(true);
+            setProgress('Initializing...');
+
             const apiBase = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || '';
 
             // 1. Start Job
@@ -99,15 +102,17 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
             const jobId = startData.jobId;
 
             // 2. Poll Status
-            const pollInterval = setInterval(async () => {
+            let isComplete = false;
+            while (!isComplete && isDownloadingRef.current) {
                 try {
                     const statusRes = await fetch(`${apiBase}/download/status/${jobId}?json=true`);
                     const statusData = await statusRes.json();
 
                     if (statusData.status === 'PROCESSING') {
                         setProgress(statusData.progress || 'Processing...');
+                        await new Promise(resolve => setTimeout(resolve, 1000));
                     } else if (statusData.status === 'COMPLETED') {
-                        clearInterval(pollInterval);
+                        isComplete = true;
                         setProgress('Download Starting...');
 
                         // Trigger Download
@@ -120,21 +125,23 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                             setShowDownloadModal(false);
                         }, 2000);
                     } else if (statusData.status === 'ERROR') {
-                        clearInterval(pollInterval);
+                        isComplete = true;
                         throw new Error(statusData.error || 'Generation failed');
                     }
                 } catch (err) {
-                    clearInterval(pollInterval);
+                    isComplete = true;
                     console.error("Polling error", err);
                     setProgress('Error!');
                     setGenerating(false);
                 }
-            }, 1000);
+            }
 
         } catch (error) {
             console.error("Download failed", error);
             setProgress('Failed');
             setGenerating(false);
+        } finally {
+            isDownloadingRef.current = false;
         }
     };
 

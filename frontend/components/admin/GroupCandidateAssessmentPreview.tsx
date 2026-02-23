@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { AssessmentSession } from '../../lib/services/assessment.service';
 import { assessmentService } from '../../lib/services/assessment.service';
 import {
@@ -46,6 +46,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     // Download State
     const [downloading, setDownloading] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState('');
+    const isDownloadingRef = useRef(false);
 
     useEffect(() => {
         const fetchLevels = async () => {
@@ -224,11 +225,13 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                     ) : (
                         <button
                             onClick={async () => {
+                                if (isDownloadingRef.current) return;
                                 if (!session?.userId) {
                                     alert("User ID not found for this session.");
                                     return;
                                 }
                                 try {
+                                    isDownloadingRef.current = true;
                                     setDownloading(true);
                                     setDownloadProgress('Initializing...');
                                     
@@ -244,14 +247,16 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                     const jobId = startData.jobId;
                                     
                                     // 2. Poll
-                                    const pollInterval = setInterval(async () => {
+                                    let isComplete = false;
+                                    while (!isComplete && isDownloadingRef.current) {
                                         try {
                                             const statusData = await assessmentService.getDownloadStatus(jobId);
                                             
                                             if (statusData.status === 'PROCESSING') {
                                                 setDownloadProgress(statusData.progress || 'Processing...');
+                                                await new Promise(resolve => setTimeout(resolve, 1000));
                                             } else if (statusData.status === 'COMPLETED') {
-                                                clearInterval(pollInterval);
+                                                isComplete = true;
                                                 setDownloadProgress('Downloading...');
                                                 
                                                 // Trigger Download
@@ -263,21 +268,23 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                                     setDownloadProgress('');
                                                 }, 2000);
                                             } else if (statusData.status === 'ERROR') {
-                                                clearInterval(pollInterval);
+                                                isComplete = true;
                                                 throw new Error(statusData.error || 'Generation failed');
                                             }
                                         } catch (err) {
-                                            clearInterval(pollInterval);
+                                            isComplete = true;
                                             console.error("Polling error", err);
                                             setDownloading(false);
                                             alert("Failed to download report. Please try again.");
                                         }
-                                    }, 1000);
+                                    }
                                     
                                 } catch (error) {
                                     console.error("Download failed", error);
                                     setDownloading(false);
                                     alert("Failed to initiate download.");
+                                } finally {
+                                    isDownloadingRef.current = false;
                                 }
                             }}
                             className="flex items-center gap-2 px-3 py-1.5 bg-brand-green/10 hover:bg-brand-green/20 text-brand-green rounded-lg text-xs font-medium transition-colors"
