@@ -14,8 +14,8 @@ import { CognitoAdminGuard } from './cognito-auth.guard';
  *   - Use the CognitoUniversalGuard or CognitoAdminGuard
  */
 @Module({
-    imports: [ConfigModule],
-    providers: [UserEnrichmentService, CognitoUniversalGuard, CognitoAdminGuard],
-    exports: [UserEnrichmentService, CognitoUniversalGuard, CognitoAdminGuard],
+  imports: [ConfigModule],
+  providers: [UserEnrichmentService, CognitoUniversalGuard, CognitoAdminGuard],
+  exports: [UserEnrichmentService, CognitoUniversalGuard, CognitoAdminGuard],
 })
 export class AuthModule {}

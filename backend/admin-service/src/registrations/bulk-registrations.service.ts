@@ -56,7 +56,7 @@ export class BulkRegistrationsService {
     private groupAssessmentRepo: Repository<GroupAssessment>,
     private dataSource: DataSource,
     private readonly registrationsService: RegistrationsService,
-  ) { }
+  ) {}
 
   /**
    * Phase 1: Preview & Validate
@@ -549,10 +549,11 @@ export class BulkRegistrationsService {
                 note: 'Used default program',
               },
             });
-            const savedGA = await this.groupAssessmentRepo.save(groupAssessment);
+            const savedGA =
+              await this.groupAssessmentRepo.save(groupAssessment);
             groupAssessmentId = Number(savedGA.id);
 
-            // Important: Update the DTOs in this batch to use this program ID, 
+            // Important: Update the DTOs in this batch to use this program ID,
             // otherwise registrationsService.create might look for null
             for (const d of batch.dtos) {
               if (!d.programType) d.programType = defaultProgram.id;
@@ -827,11 +828,11 @@ export class BulkRegistrationsService {
       degreeId: undefined, // Not used in registration directly, inferred via DepartmentDegree
       currentYear: isCollege
         ? this.getValue(rawData, [
-          'current_year',
-          'CurrentYear',
-          'Year',
-          'year',
-        ])
+            'current_year',
+            'CurrentYear',
+            'Year',
+            'year',
+          ])
         : undefined,
 
       password: this.getValue(rawData, ['Password', 'password']) || 'Admin@123',

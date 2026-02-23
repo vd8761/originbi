@@ -8,13 +8,20 @@ import {
     AgileScore,
 } from "../types/types";
 
-const pool = new Pool({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
-    port: parseInt(process.env.DB_PORT || "5432"),
-});
+const poolConfig = process.env.DATABASE_URL
+    ? {
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
+    }
+    : {
+        user: process.env.DB_USER,
+        host: process.env.DB_HOST,
+        database: process.env.DB_NAME,
+        password: process.env.DB_PASSWORD,
+        port: parseInt(process.env.DB_PORT || "5432"),
+    };
+
+const pool = new Pool(poolConfig);
 
 const LOG_FILE_PATH = path.join(__dirname, "../../sql_logs.txt");
 
@@ -308,15 +315,15 @@ async function processSessionRows(
             email_id: session.email,
             exam_start: session.started_at
                 ? new Date(session.started_at)
-                      .toISOString()
-                      .replace("T", " ")
-                      .split(".")[0]
+                    .toISOString()
+                    .replace("T", " ")
+                    .split(".")[0]
                 : "",
             exam_end: session.completed_at
                 ? new Date(session.completed_at)
-                      .toISOString()
-                      .replace("T", " ")
-                      .split(".")[0]
+                    .toISOString()
+                    .replace("T", " ")
+                    .split(".")[0]
                 : "",
             bi_registration_ID: session.registration_id,
             assigned_exam_id: session.session_id,
