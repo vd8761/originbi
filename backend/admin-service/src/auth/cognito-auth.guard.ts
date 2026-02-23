@@ -49,7 +49,9 @@ export class CognitoAdminGuard implements CanActivate {
       const userContext = await this.userEnrichment.enrichFromCognito(payload);
       request.user = userContext;
 
-      this.logger.debug(`Admin auth: user=${userContext.id}, email=${userContext.email}`);
+      this.logger.debug(
+        `Admin auth: user=${userContext.id}, email=${userContext.email}`,
+      );
       return true;
     } catch (err) {
       if (err instanceof UnauthorizedException) throw err;
