@@ -55,6 +55,8 @@ import { BullModule } from '@nestjs/bullmq';
             port: config.get<number>('REDIS_PORT') || 6379,
             password: config.get<string>('REDIS_PASSWORD'),
             tls: redisHost?.includes('upstash.io') ? {} : undefined,
+            enableReadyCheck: false,
+            maxRetriesPerRequest: null,
           },
         };
       },
