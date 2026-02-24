@@ -1,15 +1,15 @@
 export const getAffiliateWelcomeEmailTemplate = (
-    name: string,
-    email: string,
-    pass: string,
-    mobile: string,
-    countryCode: string,
-    commissionPercentage: number,
-    referralLink: string,
-    loginUrl: string,
-    assets: { footer: string; popper: string; pattern: string; logo: string },
+  name: string,
+  email: string,
+  pass: string,
+  mobile: string,
+  countryCode: string,
+  commissionPercentage: number,
+  referralLink: string,
+  loginUrl: string,
+  assets: { footer: string; popper: string; pattern: string; logo: string },
 ) => {
-    return `
+  return `
 <!DOCTYPE html>
 <html>
 <head>

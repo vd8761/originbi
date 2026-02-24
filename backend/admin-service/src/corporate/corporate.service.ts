@@ -120,8 +120,8 @@ export class CorporateService {
         typeof authErr === 'string'
           ? authErr
           : (authErr as { message?: string })?.message ||
-          JSON.stringify(authErr) ||
-          'Failed to create Cognito user';
+            JSON.stringify(authErr) ||
+            'Failed to create Cognito user';
 
       if (status === 429) {
         throw new HttpException(errorMessage, 429);
@@ -255,15 +255,15 @@ export class CorporateService {
       .getRepository(CorporateCounsellingAccess)
       .find({
         where: { corporateAccountId: id, isEnabled: true },
-        select: ['counsellingTypeId']
+        select: ['counsellingTypeId'],
       });
 
     return {
       ...account,
       email: account.user?.email,
-      counsellingAccess: accessRecords.map(a => Number(a.counsellingTypeId)),
+      counsellingAccess: accessRecords.map((a) => Number(a.counsellingTypeId)),
       // Map to snake_case to match findAll and potentially frontend expectations
-      full_name: account.fullName || (account.user?.metadata as any)?.fullName || '',
+      full_name: account.fullName || account.user?.metadata?.fullName || '',
       company_name: account.companyName, // Explicitly mapping these ensures they exist even if spread
       job_title: account.jobTitle,
       employee_ref_id: account.employeeRefId,
@@ -407,15 +407,17 @@ export class CorporateService {
       // 3. Update Counselling Access if provided
       if (dto.counsellingAccess && Array.isArray(dto.counsellingAccess)) {
         // Hard Reset strategy: Delete all previous for this corp, insert new
-        await manager.delete(CorporateCounsellingAccess, { corporateAccountId: account.id });
+        await manager.delete(CorporateCounsellingAccess, {
+          corporateAccountId: account.id,
+        });
 
         if (dto.counsellingAccess.length > 0) {
           const accessEntities = dto.counsellingAccess.map((typeId: number) =>
             manager.create(CorporateCounsellingAccess, {
               corporateAccountId: account.id,
               counsellingTypeId: typeId,
-              isEnabled: true
-            })
+              isEnabled: true,
+            }),
           );
           await manager.save(accessEntities);
         }
@@ -733,12 +735,12 @@ export class CorporateService {
 
         // D. Counselling Access
         if (dto.counsellingAccess && Array.isArray(dto.counsellingAccess)) {
-          const accessEntities = dto.counsellingAccess.map(typeId =>
+          const accessEntities = dto.counsellingAccess.map((typeId) =>
             manager.create(CorporateCounsellingAccess, {
               corporateAccountId: corporateAccount.id,
               counsellingTypeId: typeId,
-              isEnabled: true
-            })
+              isEnabled: true,
+            }),
           );
           await manager.save(accessEntities);
         }
