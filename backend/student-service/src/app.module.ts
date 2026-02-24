@@ -4,7 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { StudentModule } from './student/student.module';
 import { ForgotPasswordModule } from './forgotpassword/forgotpassword.module';
 import { CounsellingModule } from './modules/counselling/counselling.module';
-import { BullModule } from '@nestjs/bullmq';
+import { PgBossModule } from '@wavezync/nestjs-pgboss';
 
 @Module({
   imports: [
@@ -44,20 +44,25 @@ import { BullModule } from '@nestjs/bullmq';
         };
       },
     }),
-    BullModule.forRootAsync({
+    PgBossModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const redisHost = config.get<string>('REDIS_HOST');
+        const databaseUrl = config.get<string>('DATABASE_URL');
+        let connectionString = databaseUrl;
+
+        if (!connectionString) {
+          const host = config.get<string>('DB_HOST') || 'localhost';
+          const port = config.get<number>('DB_PORT') || 5432;
+          const user = config.get<string>('DB_USER') || 'origin_user';
+          const pass = config.get<string>('DB_PASS') || '';
+          const dbName = config.get<string>('DB_NAME') || 'originbi';
+          connectionString = `postgresql://${user}:${pass}@${host}:${port}/${dbName}`;
+        }
+
         return {
-          connection: {
-            host: redisHost || 'localhost',
-            port: config.get<number>('REDIS_PORT') || 6379,
-            password: config.get<string>('REDIS_PASSWORD'),
-            tls: redisHost?.includes('upstash.io') ? {} : undefined,
-            enableReadyCheck: false,
-            maxRetriesPerRequest: null,
-          },
+          connectionString,
+          application_name: 'student-service-boss',
         };
       },
     }),

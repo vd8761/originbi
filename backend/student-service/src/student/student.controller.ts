@@ -1,6 +1,5 @@
-import { Controller, Post, Body } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
+import { Controller, Post, Body, Logger } from '@nestjs/common';
+import { PgBossService } from '@wavezync/nestjs-pgboss';
 import { StudentService } from './student.service';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 
@@ -8,7 +7,7 @@ import { CreateRegistrationDto } from './dto/create-registration.dto';
 export class StudentController {
   constructor(
     private readonly studentService: StudentService,
-    @InjectQueue('assessment-email-queue') private emailQueue: Queue,
+    private readonly boss: PgBossService,
   ) {}
 
   @Post('profile')
@@ -56,17 +55,25 @@ export class StudentController {
 
   @Post('assessment-complete')
   async completeAssessment(@Body() body: { userId: number }) {
-    await this.emailQueue.add(
-      'send-report-email',
-      {
-        userId: body.userId,
-      },
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 5000 },
-        removeOnComplete: true,
-      },
-    );
+    const logger = new Logger('AssessmentComplete');
+    logger.log(`Received assessment-complete for userId: ${body.userId}`);
+    try {
+      const result = await this.boss.scheduleJob(
+        'assessment-email-queue',
+        { userId: body.userId },
+        {
+          retryLimit: 3,
+          retryBackoff: true,
+        },
+      );
+      logger.log(
+        `Job enqueued successfully. Result: ${JSON.stringify(result)}`,
+      );
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      logger.error(`Failed to enqueue job: ${error.message}`, error.stack);
+      throw err;
+    }
 
     return { message: 'Assessment completion processing started' };
   }
