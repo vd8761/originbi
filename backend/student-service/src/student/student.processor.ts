@@ -8,18 +8,23 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(StudentProcessor.name);
   private checkTimer: ReturnType<typeof setTimeout> | null = null;
+  private keepAliveTimer: ReturnType<typeof setInterval> | null = null;
   private isProcessing = false;
   private checkIntervalMs: number;
+  private readonly KEEP_ALIVE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 
   constructor(
     private readonly studentService: StudentService,
     private readonly pgBossService: PgBossService,
     private readonly configService: ConfigService,
+    private readonly httpService: HttpService,
   ) {
     const checkMinutes =
       Number(this.configService.get('QUEUE_CHECK_INTERVAL')) || 15;
@@ -46,10 +51,14 @@ export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
 
     // Start the first recovery check
     this.scheduleRecoveryCheck();
+
+    // Start keep-alive pings to report-service
+    this.startKeepAlive();
   }
 
   onModuleDestroy() {
     this.clearRecoveryCheck();
+    this.stopKeepAlive();
   }
 
   async handleJobs(jobs: PgBoss.Job<{ userId: number }>[]): Promise<void> {
@@ -157,5 +166,44 @@ export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
 
     // Schedule the next check
     this.scheduleRecoveryCheck();
+  }
+
+  // ── Report-service keep-alive ──────────────────────────────────────
+
+  private startKeepAlive() {
+    const reportServiceUrl =
+      this.configService.get<string>('REPORT_SERVICE_URL');
+    if (!reportServiceUrl) {
+      this.logger.warn('REPORT_SERVICE_URL not set — keep-alive ping disabled');
+      return;
+    }
+
+    const url = `${reportServiceUrl}/report-status`;
+    this.logger.log(
+      `Starting report-service keep-alive ping every 10 min → ${url}`,
+    );
+
+    // Fire immediately on startup, then every 10 minutes
+    void this.pingReportService(url);
+    this.keepAliveTimer = setInterval(() => {
+      void this.pingReportService(url);
+    }, this.KEEP_ALIVE_INTERVAL_MS);
+  }
+
+  private stopKeepAlive() {
+    if (this.keepAliveTimer) {
+      clearInterval(this.keepAliveTimer);
+      this.keepAliveTimer = null;
+    }
+  }
+
+  private async pingReportService(url: string) {
+    try {
+      await firstValueFrom(this.httpService.get(url));
+      this.logger.debug('Report-service keep-alive ping OK');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Report-service keep-alive ping failed: ${message}`);
+    }
   }
 }
