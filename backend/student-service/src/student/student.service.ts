@@ -1315,10 +1315,6 @@ export class StudentService {
         });
         if (reportEntity && reportEntity.reportPassword) {
           password = reportEntity.reportPassword;
-          reportEntity.emailSent = true;
-          reportEntity.emailSentAt = new Date();
-          reportEntity.emailSentTo = user.email;
-          await this.assessmentReportRepository.save(reportEntity);
           break;
         }
         await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -1409,6 +1405,22 @@ export class StudentService {
 
       await transporter.sendMail(mailOptions);
       this.logger.log(`Assessment completion email sent to ${user.email}`);
+
+      // Update assessment_reports to track the sent email
+      if (session) {
+        const reportEntity = await this.assessmentReportRepository.findOne({
+          where: { assessmentSessionId: session.id },
+        });
+        if (reportEntity) {
+          reportEntity.emailSent = true;
+          reportEntity.emailSentAt = new Date();
+          reportEntity.emailSentTo = user.email;
+          await this.assessmentReportRepository.save(reportEntity);
+          this.logger.log(
+            `assessment_reports updated: email_sent=true for session ${session.id}`,
+          );
+        }
+      }
     } catch (error) {
       this.logger.error('Failed to send assessment completion email', error);
       throw error; // Re-throw so pg-boss marks the job as failed and retries
