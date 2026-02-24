@@ -4,7 +4,7 @@ import { StudentService } from './student.service';
 import { Logger } from '@nestjs/common';
 
 @Processor('assessment-email-queue', {
-  concurrency: 5,
+  concurrency: 2,
   stalledInterval: 300000,
   maxStalledCount: 1,
 })
