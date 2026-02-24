@@ -1411,6 +1411,7 @@ export class StudentService {
       this.logger.log(`Assessment completion email sent to ${user.email}`);
     } catch (error) {
       this.logger.error('Failed to send assessment completion email', error);
+      throw error; // Re-throw so pg-boss marks the job as failed and retries
     }
   }
 }
