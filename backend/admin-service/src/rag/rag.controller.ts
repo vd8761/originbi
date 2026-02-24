@@ -162,6 +162,53 @@ export class OverallReportDto {
   @IsOptional()
   @IsString()
   title?: string;
+
+  // ── Advanced filters ──
+  @IsOptional()
+  @IsString()
+  dateFrom?: string;
+
+  @IsOptional()
+  @IsString()
+  dateTo?: string;
+
+  @IsOptional()
+  @IsString()
+  collegeName?: string;
+
+  @IsOptional()
+  @IsString()
+  affiliateName?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  affiliateId?: number;
+
+  @IsOptional()
+  @IsString()
+  schoolLevel?: string;
+
+  @IsOptional()
+  @IsString()
+  schoolStream?: string;
+
+  @IsOptional()
+  @IsString()
+  departmentName?: string;
+
+  @IsOptional()
+  @IsString()
+  gender?: string;
+
+  @IsOptional()
+  @IsString()
+  registrationSource?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  limit?: number;
 }
 
 // Response interface

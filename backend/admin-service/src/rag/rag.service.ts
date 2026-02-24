@@ -351,7 +351,7 @@ export class RagService {
       // SPECIAL HANDLER: OVERALL ROLE FITMENT REPORT
       // ═══════════════════════════════════════════════════════════════
       if (interpretation.intent === 'overall_report') {
-        return await this.handleOverallReport(user);
+        return await this.handleOverallReport(user, question);
       }
 
       // ═══════════════════════════════════════════════════════════════
@@ -782,9 +782,9 @@ export class RagService {
 
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // HANDLER: OVERALL ROLE FITMENT
+  // HANDLER: OVERALL ROLE FITMENT (WITH ADVANCED FILTERS)
   // ═══════════════════════════════════════════════════════════════════════════
-  private async handleOverallReport(user: any): Promise<QueryResult> {
+  private async handleOverallReport(user: any, question?: string): Promise<QueryResult> {
     try {
       const userRole = user?.role || 'STUDENT';
       const corporateId = user?.corporateId;
@@ -800,43 +800,178 @@ export class RagService {
 
       this.logger.log(`📊 Generating Overall Role Fitment Report | role=${userRole} corporateId=${corporateId || 'ALL'}`);
 
-      const reportTitle = 'Placement Guidance Report';
-      const input: any = { title: reportTitle };
+      // ── Extract filters from natural language query ──
+      const filters = question ? await this.extractReportFilters(question) : {};
+
+      const reportTitle = filters.title || 'Placement Guidance Report';
+      const input: any = {
+        title: reportTitle,
+        ...filters,
+      };
 
       // RBAC: Corporate users → scope to their company
       if (userRole === 'CORPORATE' && corporateId) {
         input.corporateId = corporateId;
       }
 
-      // Only filter by group if the user has a group
-      if (user?.group_id) {
+      // Only filter by group if the user has a group and no explicit college filter
+      if (user?.group_id && !input.collegeName) {
         input.groupId = user.group_id;
       }
 
-      // Build download URL with appropriate scoping params
+      // Build download URL with all filter parameters
       let downloadUrl = `/rag/overall-report/pdf?title=${encodeURIComponent(reportTitle)}`;
-      if (user?.group_id) {
-        downloadUrl += `&groupId=${user.group_id}`;
-      }
-      if (userRole === 'CORPORATE' && corporateId) {
-        downloadUrl += `&corporateId=${corporateId}`;
-      }
+      if (input.groupId) downloadUrl += `&groupId=${input.groupId}`;
+      if (input.corporateId) downloadUrl += `&corporateId=${input.corporateId}`;
+      if (input.dateFrom) downloadUrl += `&dateFrom=${encodeURIComponent(input.dateFrom)}`;
+      if (input.dateTo) downloadUrl += `&dateTo=${encodeURIComponent(input.dateTo)}`;
+      if (input.collegeName) downloadUrl += `&collegeName=${encodeURIComponent(input.collegeName)}`;
+      if (input.affiliateName) downloadUrl += `&affiliateName=${encodeURIComponent(input.affiliateName)}`;
+      if (input.schoolLevel) downloadUrl += `&schoolLevel=${encodeURIComponent(input.schoolLevel)}`;
+      if (input.schoolStream) downloadUrl += `&schoolStream=${encodeURIComponent(input.schoolStream)}`;
+      if (input.departmentName) downloadUrl += `&departmentName=${encodeURIComponent(input.departmentName)}`;
+      if (input.gender) downloadUrl += `&gender=${encodeURIComponent(input.gender)}`;
 
       const report = await this.overallRoleFitmentService.generateReport(input);
 
       return {
-        answer: `I've generated the **Overall Role Fitment Report** for you. \n\n📄 **[Click here to download the PDF Report](${downloadUrl})**\n\nSince I can't display the full graphical report here, please download the PDF for the complete analysis including charts and tables.\n\nSummary:\n${this.overallRoleFitmentService.formatForChat(report)}`,
+        answer: `I've generated the **Overall Role Fitment Report** for you.\n\n📄 **[Click here to download the PDF Report](${downloadUrl})**\n\nSince I can't display the full graphical report here, please download the PDF for the complete analysis including charts and tables.\n\nSummary:\n${this.overallRoleFitmentService.formatForChat(report, input)}`,
         searchType: 'overall_report',
         confidence: 0.95,
       };
     } catch (error) {
       this.logger.error(`Overall report error: ${error.message}`);
       return {
-        answer: `**❌ Error generating overall report:** ${error.message}\n\nPlease ensure there are completed assessments with personality data.`,
+        answer: `**❌ Error generating overall report:** ${error.message}\n\nPlease ensure there are completed assessments with personality data.\n\n💡 **Tip:** Try refining your query, for example:\n- "Generate overall report for students completed on 2024-01-15"\n- "Report for ABC college students"\n- "Overall report for SSLC students"\n- "Generate report for affiliate John's referrals"`,
         searchType: 'error',
         confidence: 0,
       };
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FILTER EXTRACTION: Natural language → structured filters
+  // ═══════════════════════════════════════════════════════════════════════════
+  private async extractReportFilters(question: string): Promise<any> {
+    const q = question.toLowerCase();
+    const filters: any = {};
+
+    // ── Date extraction (regex-based for speed) ──
+    // "on 2024-01-15", "from 2024-01-01 to 2024-01-31", "today", "this month", "last week"
+    const isoDatePattern = /(\d{4}-\d{2}-\d{2})/g;
+    const dates = q.match(isoDatePattern);
+    if (dates) {
+      if (dates.length === 1) {
+        // Single date: both from and to = same day
+        filters.dateFrom = dates[0];
+        filters.dateTo = dates[0];
+      } else if (dates.length >= 2) {
+        filters.dateFrom = dates[0];
+        filters.dateTo = dates[1];
+      }
+    }
+
+    // "today"
+    if (/\btoday\b/.test(q)) {
+      const today = new Date().toISOString().split('T')[0];
+      filters.dateFrom = today;
+      filters.dateTo = today;
+    }
+    // "yesterday"
+    if (/\byesterday\b/.test(q)) {
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+      filters.dateFrom = yesterday;
+      filters.dateTo = yesterday;
+    }
+    // "this week"
+    if (/\bthis\s+week\b/.test(q)) {
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+      filters.dateFrom = monday.toISOString().split('T')[0];
+      filters.dateTo = now.toISOString().split('T')[0];
+    }
+    // "this month"
+    if (/\bthis\s+month\b/.test(q)) {
+      const now = new Date();
+      filters.dateFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+      filters.dateTo = now.toISOString().split('T')[0];
+    }
+    // "last month"
+    if (/\blast\s+month\b/.test(q)) {
+      const now = new Date();
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+      filters.dateFrom = lastMonth.toISOString().split('T')[0];
+      filters.dateTo = lastMonthEnd.toISOString().split('T')[0];
+    }
+
+    // ── School level ──
+    if (/\bsslc\b/.test(q)) {
+      filters.schoolLevel = 'SSLC';
+    } else if (/\bhsc\b/.test(q)) {
+      filters.schoolLevel = 'HSC';
+    } else if (/\bschool\b/.test(q) && !filters.schoolLevel) {
+      // Generic "school students" — include both
+      // Don't set filter; let it include all school levels
+    }
+
+    // ── School stream ──
+    if (/\bscience\b/.test(q)) filters.schoolStream = 'SCIENCE';
+    else if (/\bcommerce\b/.test(q)) filters.schoolStream = 'COMMERCE';
+    else if (/\bhumanities\b|\barts\b/.test(q)) filters.schoolStream = 'HUMANITIES';
+
+    // ── Gender ──
+    if (/\b(male|boys?|men)\b/.test(q) && !/\bfemale\b/.test(q)) filters.gender = 'MALE';
+    else if (/\b(female|girls?|women)\b/.test(q)) filters.gender = 'FEMALE';
+
+    // ── Affiliate ──
+    const affiliateMatch = q.match(/\baffiliate\s+([a-z][a-z\s]+?)(?:'s|\s+referral|\s+student|\s+report|\b)/);
+    if (affiliateMatch) {
+      const name = affiliateMatch[1].trim();
+      if (name.length > 1 && !/\b(student|report|overall|referral|list|all)\b/.test(name)) {
+        filters.affiliateName = name;
+      }
+    }
+
+    // ── College / group name — use LLM if regex doesn't capture clean enough ──
+    // Try common patterns: "for [college name] students", "[college] college", "group [name]"
+    const collegeMatch = q.match(
+      /(?:for|from|of|in)\s+([a-z][a-z\s&.]+?)\s*(?:college|university|institute|school|group|students|batch)/i
+    );
+    if (collegeMatch) {
+      const name = collegeMatch[1].trim();
+      // Exclude generic words that aren't college names
+      if (name.length > 2 && !/\b(all|the|every|each|our|my|sslc|hsc|overall|completed)\b/.test(name)) {
+        filters.collegeName = name;
+      }
+    }
+
+    // ── Department ──
+    const deptMatch = q.match(
+      /(?:department|dept|degree|branch)\s+(?:of\s+)?([a-z][a-z\s&.]+?)(?:\s+student|\s+report|$)/i
+    );
+    if (deptMatch) {
+      filters.departmentName = deptMatch[1].trim();
+    }
+
+    // ── Build dynamic title based on filters ──
+    const titleParts: string[] = [];
+    if (filters.schoolLevel) titleParts.push(filters.schoolLevel);
+    if (filters.schoolStream) titleParts.push(filters.schoolStream);
+    if (filters.collegeName) titleParts.push(filters.collegeName);
+    if (filters.affiliateName) titleParts.push(`Affiliate: ${filters.affiliateName}`);
+    if (filters.dateFrom) titleParts.push(`From: ${filters.dateFrom}`);
+    if (filters.dateTo && filters.dateTo !== filters.dateFrom) titleParts.push(`To: ${filters.dateTo}`);
+    if (filters.gender) titleParts.push(filters.gender);
+
+    if (titleParts.length > 0) {
+      filters.title = `Career Fitment Report — ${titleParts.join(' | ')}`;
+    }
+
+    this.logger.log(`🔍 Extracted report filters: ${JSON.stringify(filters)}`);
+    return filters;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
