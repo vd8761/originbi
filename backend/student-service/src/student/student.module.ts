@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { HttpModule } from '@nestjs/axios';
-import { BullModule } from '@nestjs/bullmq';
 import { StudentController } from './student.controller';
 import { StudentService } from './student.service';
 import { StudentProcessor } from './student.processor';
@@ -39,12 +38,6 @@ import {
       Groups,
     ]),
     HttpModule,
-    BullModule.registerQueue({
-      name: 'assessment-email-queue',
-      defaultJobOptions: {
-        removeOnComplete: true,
-      },
-    }),
   ],
   controllers: [StudentController],
   providers: [StudentService, StudentProcessor],

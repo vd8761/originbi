@@ -11,9 +11,9 @@
         "report-service"
     ],
     "dependencies": {
-        "typeorm": "^0.3.28",
         "pg": "^8.11.3",
-        "reflect-metadata": "^0.2.1"
+        "reflect-metadata": "^0.2.1",
+        "typeorm": "^0.3.28"
     },
     "scripts": {
         "build:shared": "cd shared && npm run build",
@@ -29,6 +29,9 @@
         "start:corporate": "cd corporate-service && npm run start:dev",
         "start:student": "cd student-service && npm run start:dev",
         "start:report": "cd report-service && npm run dev",
-        "postinstall": "npm run build:shared"
+        "postinstall": "node patch-pgboss.js && npm run build:shared"
+    },
+    "devDependencies": {
+        "@types/jest": "^30.0.0"
     }
 }
