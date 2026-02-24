@@ -3,7 +3,11 @@ import { Job } from 'bullmq';
 import { StudentService } from './student.service';
 import { Logger } from '@nestjs/common';
 
-@Processor('assessment-email-queue', { concurrency: 1 })
+@Processor('assessment-email-queue', {
+  concurrency: 2,
+  stalledInterval: 300000,
+  maxStalledCount: 1,
+})
 export class StudentProcessor extends WorkerHost {
   private readonly logger = new Logger(StudentProcessor.name);
 

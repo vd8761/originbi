@@ -41,6 +41,9 @@ import {
     HttpModule,
     BullModule.registerQueue({
       name: 'assessment-email-queue',
+      defaultJobOptions: {
+        removeOnComplete: true,
+      },
     }),
   ],
   controllers: [StudentController],
