@@ -64,8 +64,12 @@ export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
         try {
           await this.studentService.handleAssessmentCompletion(job.data.userId);
           this.logger.log(`Job ${job.id} completed successfully.`);
-        } catch (err: any) {
-          this.logger.error(`Job ${job.id} FAILED: ${err.message}`, err.stack);
+        } catch (err) {
+          const error = err instanceof Error ? err : new Error(String(err));
+          this.logger.error(
+            `Job ${job.id} FAILED: ${error.message}`,
+            error.stack,
+          );
           throw err;
         }
       }
@@ -116,12 +120,12 @@ export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
           queued: false,
         });
         const jobsToRetry = failedJobs.filter(
-          (j) => j.state === 'failed' || j.state === 'expired',
+          (j) => j.state === 'failed' || j.state === 'cancelled',
         );
 
         if (jobsToRetry.length > 0) {
           this.logger.warn(
-            `Found ${jobsToRetry.length} failed/expired job(s). Re-queuing...`,
+            `Found ${jobsToRetry.length} failed/cancelled job(s). Re-queuing...`,
           );
           for (const failedJob of jobsToRetry) {
             try {
@@ -130,9 +134,13 @@ export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
               this.logger.log(
                 `Re-queued job ${failedJob.id} for user ${String(jobData?.userId)}`,
               );
-            } catch (retryErr: any) {
+            } catch (retryErr) {
+              const error =
+                retryErr instanceof Error
+                  ? retryErr
+                  : new Error(String(retryErr));
               this.logger.error(
-                `Failed to re-queue job ${failedJob.id}: ${retryErr.message}`,
+                `Failed to re-queue job ${failedJob.id}: ${error.message}`,
               );
             }
           }
@@ -142,8 +150,9 @@ export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
       } else {
         this.logger.log('Recovery check: queue is empty. Nothing to do.');
       }
-    } catch (err: any) {
-      this.logger.error(`Recovery check failed: ${err.message}`, err.stack);
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.error(`Recovery check failed: ${error.message}`, error.stack);
     }
 
     // Schedule the next check

@@ -70,7 +70,8 @@ export class StudentController {
         `Job enqueued successfully. Result: ${JSON.stringify(result)}`,
       );
     } catch (err) {
-      logger.error(`Failed to enqueue job: ${err.message}`, err.stack);
+      const error = err instanceof Error ? err : new Error(String(err));
+      logger.error(`Failed to enqueue job: ${error.message}`, error.stack);
       throw err;
     }
 
