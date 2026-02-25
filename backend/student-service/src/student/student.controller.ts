@@ -82,4 +82,83 @@ export class StudentController {
   async validateAffiliate(@Body() body: { code: string }) {
     return this.studentService.validateReferralCode(body.code);
   }
+
+  @Post('send-report-email')
+  async sendReportEmail(@Body() body: { userId: number; toEmail?: string }) {
+    const logger = new Logger('SendReportEmail');
+    logger.log(
+      `Received send-report-email for userId: ${body.userId}${body.toEmail ? ` to ${body.toEmail}` : ''}`,
+    );
+    try {
+      const result = await this.boss.scheduleJob(
+        'manual-report-email-queue',
+        { userId: body.userId, toEmail: body.toEmail },
+        {
+          retryLimit: 3,
+          retryBackoff: true,
+        },
+      );
+      logger.log(
+        `Manual email job enqueued. Result: ${JSON.stringify(result)}`,
+      );
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      logger.error(
+        `Failed to enqueue manual email job: ${error.message}`,
+        error.stack,
+      );
+      throw err;
+    }
+
+    return { message: 'Report email sending started' };
+  }
+
+  @Post('send-placement-report-email')
+  async sendPlacementReportEmail(
+    @Body()
+    body: {
+      groupId: number;
+      departmentId: number;
+      toEmail: string;
+      downloadUrl: string;
+      studentCount: number;
+      degreeType: string;
+      departmentName: string;
+    },
+  ) {
+    const logger = new Logger('SendPlacementReportEmail');
+    logger.log(
+      `Received send-placement-report-email for group ${body.groupId}, dept ${body.departmentId} to ${body.toEmail}`,
+    );
+    try {
+      const result = await this.boss.scheduleJob(
+        'placement-report-email-queue',
+        {
+          groupId: body.groupId,
+          departmentId: body.departmentId,
+          toEmail: body.toEmail,
+          downloadUrl: body.downloadUrl,
+          studentCount: body.studentCount,
+          degreeType: body.degreeType,
+          departmentName: body.departmentName,
+        },
+        {
+          retryLimit: 3,
+          retryBackoff: true,
+        },
+      );
+      logger.log(
+        `Placement report email job enqueued. Result: ${JSON.stringify(result)}`,
+      );
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      logger.error(
+        `Failed to enqueue placement report email job: ${error.message}`,
+        error.stack,
+      );
+      throw err;
+    }
+
+    return { message: 'Placement report email sending started' };
+  }
 }

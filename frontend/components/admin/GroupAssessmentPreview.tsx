@@ -44,6 +44,11 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
     const [progress, setProgress] = useState('');
     const isDownloadingRef = useRef(false);
 
+    // Email State
+    const [reportEmail, setReportEmail] = useState('');
+    const [sendingReportEmail, setSendingReportEmail] = useState(false);
+    const [reportEmailSent, setReportEmailSent] = useState(false);
+
     // Fetch Data
     const fetchGroupData = useCallback(async () => {
         setLoading(true);
@@ -142,6 +147,78 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
             setGenerating(false);
         } finally {
             isDownloadingRef.current = false;
+        }
+    };
+
+    const handleSendReportEmail = async () => {
+        if (!selectedDepartment || !groupData?.group?.id) return;
+        if (!reportEmail || !reportEmail.includes('@')) {
+            alert('Please enter a valid email address.');
+            return;
+        }
+
+        try {
+            setSendingReportEmail(true);
+            const apiBase = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || '';
+
+            // 1. Start Generation
+            const startRes = await fetch(`${apiBase}/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true`);
+            const startData = await startRes.json();
+
+            if (!startData.success || !startData.jobId) {
+                throw new Error('Failed to start report generation');
+            }
+
+            const jobId = startData.jobId;
+
+            // 2. Poll until complete
+            let isComplete = false;
+            while (!isComplete) {
+                const statusRes = await fetch(`${apiBase}/download/status/${jobId}?json=true`);
+                const statusData = await statusRes.json();
+
+                if (statusData.status === 'PROCESSING') {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                } else if (statusData.status === 'COMPLETED') {
+                    isComplete = true;
+
+                    // 3. Trigger send email with the download URL
+                    const selectedDept = departmentStats.find((d: any) => d.id === selectedDepartment);
+                    const deptFullName = selectedDept?.name || '';
+                    // Extract degree type from name (e.g. "B.Tech. Information Technology" -> degreeType="B.Tech.", dept="Information Technology")
+                    const deptNameParts = deptFullName.match(/^(B\.Tech\.|M\.Tech\.|B\.E\.|M\.E\.|B\.Sc\.|M\.Sc\.|BCA|MCA|MBA|B\.Com|M\.Com|B\.A\.|M\.A\.)\s*(.+)$/i);
+                    const degreeType = deptNameParts ? deptNameParts[1] : '';
+                    const deptName = deptNameParts ? deptNameParts[2] : deptFullName;
+
+                    const studentApiBase = process.env.NEXT_PUBLIC_STUDENT_API_URL || '';
+                    const sendRes = await fetch(`${studentApiBase}/student/send-placement-report-email`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            groupId: groupData.group.id,
+                            departmentId: selectedDepartment,
+                            toEmail: reportEmail,
+                            downloadUrl: `${apiBase}${statusData.downloadUrl}`,
+                            studentCount: selectedDept?.completed || 0,
+                            degreeType,
+                            departmentName: deptName,
+                        }),
+                    });
+
+                    if (!sendRes.ok) throw new Error('Failed to send email');
+
+                    setReportEmailSent(true);
+                    setTimeout(() => setReportEmailSent(false), 5000);
+                } else if (statusData.status === 'ERROR') {
+                    isComplete = true;
+                    throw new Error(statusData.error || 'Generation failed');
+                }
+            }
+        } catch (error) {
+            console.error('Send report email failed', error);
+            alert('Failed to send report email. Please try again.');
+        } finally {
+            setSendingReportEmail(false);
         }
     };
 
@@ -434,25 +511,23 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                 </div>
                 {/* Actions */}
                 <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-                    {/* Download Report Button - Updated Style */}
+                    {/* Process Report Button */}
                     <button
                         onClick={handleDownloadReportClick}
                         disabled={downloadLoading || !isCollegeStudentProgram}
-                        title={!isCollegeStudentProgram ? "Download available for College Students only" : ""}
+                        title={!isCollegeStudentProgram ? "Available for College Students only" : ""}
                         className={`flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] rounded-lg text-sm font-medium transition-all shadow-sm disabled:opacity-70 disabled:cursor-not-allowed 
                             ${!isCollegeStudentProgram 
                                 ? 'text-gray-400 dark:text-gray-500' 
                                 : 'text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/30'}`}
                     >
-                        <span>{downloadLoading ? "Loading..." : "Download Report"}</span>
+                        <span>{downloadLoading ? "Loading..." : "Process Report"}</span>
                         {downloadLoading ? (
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-green"></div>
                         ) : (
-                            // Download Icon on the right
                             <svg className={`w-5 h-5 ${!isCollegeStudentProgram ? 'text-gray-400' : 'text-brand-green'}`} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M12 16L12 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                <path d="M9 13L12 16L15 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                <path d="M17 19H7C5.89543 19 5 18.1046 5 17V7C5 5.89543 5.89543 5 7 5H17C18.1046 5 19 5.89543 19 7V17C19 18.1046 18.1046 19 17 19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                         )}
                     </button>
@@ -598,8 +673,8 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                         {/* Modal Header */}
                         <div className="flex justify-between items-center p-6 border-b border-gray-100 dark:border-white/10">
                             <div>
-                                <h3 className="text-xl font-bold text-brand-dark-primary dark:text-white">Download Report</h3>
-                                <p className="text-sm text-gray-500 mt-1">Select a department to download the placement report.</p>
+                                <h3 className="text-xl font-bold text-brand-dark-primary dark:text-white">Process Report</h3>
+                                <p className="text-sm text-gray-500 mt-1">Select a department, then download or send via email.</p>
                             </div>
                             <button
                                 onClick={() => setShowDownloadModal(false)}
@@ -611,14 +686,15 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                             </button>
                         </div>
 
-                        {/* Modal Body - List of Departments */}
+                        {/* Modal Body */}
                         <div className="p-6 overflow-y-auto">
+                            {/* Department List */}
                             {departmentStats.length === 0 ? (
                                 <div className="text-center py-8 text-gray-500">
                                     No departments found for this group.
                                 </div>
                             ) : (
-                                <div className="space-y-3">
+                                <div className="space-y-3 mb-6">
                                     {departmentStats.map((dept) => (
                                         <div
                                             key={dept.id}
@@ -655,20 +731,48 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                                     ))}
                                 </div>
                             )}
+
+                            {/* Email Input */}
+                            <div>
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1.5 block">Send to Email (optional)</label>
+                                <input
+                                    type="email"
+                                    value={reportEmail}
+                                    onChange={(e) => setReportEmail(e.target.value)}
+                                    placeholder="Enter email address to send report"
+                                    className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-sm text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-green/30 focus:border-brand-green transition-colors"
+                                />
+                            </div>
                         </div>
 
-                        {/* Modal Footer */}
                         <div className="p-6 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-[#FFFFFF05] flex gap-3">
+                            {/* Send Email Button */}
                             <button
-                                onClick={() => !generating && setShowDownloadModal(false)}
-                                disabled={generating}
-                                className="flex-1 px-4 py-3 rounded-xl border border-gray-300 dark:border-white/10 text-brand-text-light-primary dark:text-gray-300 font-medium hover:bg-white dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={handleSendReportEmail}
+                                disabled={!selectedDepartment || !reportEmail || sendingReportEmail || generating}
+                                className="flex-1 px-4 py-3 rounded-xl border border-brand-green text-brand-green font-bold hover:bg-brand-green/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
-                                Cancel
+                                {sendingReportEmail ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-green"></div>
+                                        <span>Sending...</span>
+                                    </>
+                                ) : reportEmailSent ? (
+                                    <>
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                        <span>Email Sent!</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                        <span>Send Email</span>
+                                    </>
+                                )}
                             </button>
+                            {/* Download Report Button */}
                             <button
                                 onClick={handleConfirmDownload}
-                                disabled={!selectedDepartment || generating}
+                                disabled={!selectedDepartment || generating || sendingReportEmail}
                                 className="flex-1 px-4 py-3 rounded-xl bg-brand-green text-brand-dark-primary font-bold hover:bg-brand-green/90 transition-colors shadow-lg shadow-brand-green/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {generating ? (
