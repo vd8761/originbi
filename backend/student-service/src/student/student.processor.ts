@@ -49,6 +49,24 @@ export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
 
     this.logger.log('assessment-email-queue worker registered successfully');
 
+    // Register manual report email queue worker
+    await this.pgBossService.registerJob(
+      'manual-report-email-queue',
+      this.handleManualEmailJobs.bind(this),
+      { batchSize: 1 },
+    );
+    this.logger.log('manual-report-email-queue worker registered successfully');
+
+    // Register placement report email queue worker
+    await this.pgBossService.registerJob(
+      'placement-report-email-queue',
+      this.handlePlacementEmailJobs.bind(this),
+      { batchSize: 1 },
+    );
+    this.logger.log(
+      'placement-report-email-queue worker registered successfully',
+    );
+
     // Start the first recovery check
     this.scheduleRecoveryCheck();
 
@@ -85,6 +103,69 @@ export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
     } finally {
       this.isProcessing = false;
       this.scheduleRecoveryCheck();
+    }
+  }
+
+  async handleManualEmailJobs(
+    jobs: PgBoss.Job<{ userId: number; toEmail?: string }>[],
+  ): Promise<void> {
+    for (const job of jobs) {
+      this.logger.log(
+        `Processing manual email job ${job.id} for user ${job.data.userId}...`,
+      );
+      try {
+        await this.studentService.sendManualReportEmail(
+          job.data.userId,
+          job.data.toEmail,
+        );
+        this.logger.log(`Manual email job ${job.id} completed successfully.`);
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        this.logger.error(
+          `Manual email job ${job.id} FAILED: ${error.message}`,
+          error.stack,
+        );
+        throw err;
+      }
+    }
+  }
+
+  async handlePlacementEmailJobs(
+    jobs: PgBoss.Job<{
+      groupId: number;
+      departmentId: number;
+      toEmail: string;
+      downloadUrl: string;
+      studentCount: number;
+      degreeType: string;
+      departmentName: string;
+    }>[],
+  ): Promise<void> {
+    for (const job of jobs) {
+      this.logger.log(
+        `Processing placement email job ${job.id} for group ${job.data.groupId}, dept ${job.data.departmentId}...`,
+      );
+      try {
+        await this.studentService.sendPlacementReportEmail(
+          job.data.groupId,
+          job.data.departmentId,
+          job.data.toEmail,
+          job.data.downloadUrl,
+          job.data.studentCount,
+          job.data.degreeType,
+          job.data.departmentName,
+        );
+        this.logger.log(
+          `Placement email job ${job.id} completed successfully.`,
+        );
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        this.logger.error(
+          `Placement email job ${job.id} FAILED: ${error.message}`,
+          error.stack,
+        );
+        throw err;
+      }
     }
   }
 
