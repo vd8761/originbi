@@ -9,11 +9,13 @@
         "watch": "tsc --watch",
         "prepublishOnly": "npm run build"
     },
+    "dependencies": {
+        "typeorm": "^0.3.28"
+    },
     "peerDependencies": {
         "typeorm": "^0.3.0"
     },
     "devDependencies": {
-        "typeorm": "^0.3.28",
         "typescript": "^5.9.3"
     },
     "files": [
