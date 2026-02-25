@@ -188,7 +188,7 @@ export class RagService {
   // ═══════════════════════════════════════════════════════════════════════════
   // MAIN QUERY ENTRY POINT
   // ═══════════════════════════════════════════════════════════════════════════
-  async query(question: string, user: any, conversationId: number = 0): Promise<QueryResult> {
+  async query(question: string, user: any, conversationId: number = 0, mode?: string): Promise<QueryResult> {
     this.logger.log(`🚀 RAG Query Started at ${new Date().toISOString()}`);
     this.logger.log(`📝 Input Question: "${question}"`);
     this.logger.log(`👤 User:`, JSON.stringify(user));
@@ -200,6 +200,56 @@ export class RagService {
         searchType: 'none',
         confidence: 0,
       };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // AI COUNSELLOR MODE — Premium career counselling for students
+    // Bypasses normal intent classification and routes directly to
+    // the advanced counsellor prompt engine.
+    // ═══════════════════════════════════════════════════════════════
+    if (mode === 'counsellor') {
+      this.logger.log('🎓 AI Counsellor mode activated — premium career guidance');
+      try {
+        const userId = user?.id || 0;
+        const userEmail = user?.email || user?.sub || '';
+        this.logger.log(`🎓 Counsellor: userId=${userId}, email=${userEmail}`);
+
+        let userProfile: any = null;
+        try {
+          userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
+          this.logger.log(`🎓 Counsellor: profile found = ${!!userProfile}`);
+        } catch (profileErr) {
+          this.logger.warn(`🎓 Profile lookup failed (non-blocking): ${profileErr.message}`);
+        }
+
+        // Build conversation context from memory + chat history
+        let conversationHistory = '';
+        if (userId > 0) {
+          try {
+            this.oriIntelligence.extractAndStoreFacts(userId, question);
+            conversationHistory = this.oriIntelligence.getConversationContext(userId);
+          } catch { /* non-blocking */ }
+        }
+        if (conversationId > 0) {
+          try {
+            const history = await this.chatMemory.buildLlmHistory(conversationId);
+            if (history) conversationHistory += '\n' + history;
+          } catch { /* non-blocking */ }
+        }
+
+        const answer = await this.oriIntelligence.answerCounsellorQuestion(
+          question, userProfile, conversationHistory,
+        );
+        this.logger.log(`🎓 Counsellor answer generated (${answer.length} chars)`);
+        return { answer, searchType: 'ai_counsellor', confidence: 0.97 };
+      } catch (counsellorError) {
+        this.logger.error(`🎓 AI Counsellor error: ${counsellorError.message}`, counsellorError.stack);
+        return {
+          answer: 'I apologize for the inconvenience. The AI Counsellor is experiencing a temporary issue. Please try again in a moment.',
+          searchType: 'ai_counsellor',
+          confidence: 0,
+        };
+      }
     }
 
     this.logger.log(`\n${'═'.repeat(70)}`);
@@ -3531,10 +3581,65 @@ JSON:`;
   // ═══════════════════════════════════════════════════════════════════════════
   generateFollowUpSuggestions(question: string, answer: string, searchType: string): string[] {
     const q = question.toLowerCase();
+    const a = answer.toLowerCase();
     const suggestions: string[] = [];
 
     // Context-aware suggestions based on search type
     switch (searchType) {
+
+      // ── AI COUNSELLOR MODE — context-driven follow-ups ──
+      case 'ai_counsellor': {
+        // Detect what topic was discussed and suggest natural follow-ups
+
+        const talkedAboutCareer = q.includes('career') || q.includes('job') || q.includes('role') || a.includes('career') || a.includes('job role');
+        const talkedAboutSkills = q.includes('skill') || q.includes('learn') || q.includes('course') || a.includes('skill') || a.includes('develop');
+        const talkedAboutPersonality = q.includes('personality') || q.includes('trait') || q.includes('style') || a.includes('personality') || a.includes('disc') || a.includes('strength');
+        const talkedAboutAssessment = q.includes('score') || q.includes('assessment') || q.includes('result') || q.includes('test') || a.includes('assessment') || a.includes('score');
+        const talkedAboutSalary = q.includes('salary') || q.includes('pay') || q.includes('package') || a.includes('salary') || a.includes('lpa') || a.includes('package');
+        const talkedAboutRoadmap = q.includes('roadmap') || q.includes('plan') || q.includes('steps') || q.includes('how to') || a.includes('roadmap') || a.includes('step');
+        const talkedAboutInterview = q.includes('interview') || q.includes('resume') || q.includes('cv') || a.includes('interview') || a.includes('resume');
+
+        if (talkedAboutCareer && talkedAboutSkills) {
+          suggestions.push('What certifications will help me the most?');
+          suggestions.push('How long will it take to be job-ready?');
+          suggestions.push('What projects should I build for my portfolio?');
+        } else if (talkedAboutCareer) {
+          suggestions.push('What skills do I need for this career?');
+          suggestions.push('What is the salary range for this role?');
+          suggestions.push('How do I get started in this field?');
+        } else if (talkedAboutPersonality) {
+          suggestions.push('What careers best match my personality?');
+          suggestions.push('How can I use my strengths at work?');
+          suggestions.push('What work environments suit me?');
+        } else if (talkedAboutAssessment) {
+          suggestions.push('What do my assessment scores say about me?');
+          suggestions.push('How can I improve my weak areas?');
+          suggestions.push('Which careers match my assessment profile?');
+        } else if (talkedAboutSkills) {
+          suggestions.push('Show me a learning roadmap');
+          suggestions.push('Which online platforms do you recommend?');
+          suggestions.push('How can I practice these skills?');
+        } else if (talkedAboutSalary) {
+          suggestions.push('Which skills command higher salaries?');
+          suggestions.push('How do I negotiate a better offer?');
+          suggestions.push('What is the career growth trajectory?');
+        } else if (talkedAboutRoadmap) {
+          suggestions.push('What should I focus on this month?');
+          suggestions.push('How do I stay on track with my goals?');
+          suggestions.push('Who can mentor me in this field?');
+        } else if (talkedAboutInterview) {
+          suggestions.push('What are common interview questions?');
+          suggestions.push('How do I write a strong resume?');
+          suggestions.push('How should I prepare for my first interview?');
+        } else {
+          // General counsellor follow-ups
+          suggestions.push('What careers match my profile?');
+          suggestions.push('What are my strongest skills?');
+          suggestions.push('How do I plan my career path?');
+        }
+        break;
+      }
+
       case 'list_candidates':
       case 'list_registrations':
         suggestions.push('Show top performers');
@@ -3559,7 +3664,6 @@ JSON:`;
         break;
       case 'intelligent_response':
       case 'general_knowledge':
-        // Analyze the question topic for relevant follow-ups
         if (q.includes('skill') || q.includes('learn') || q.includes('course')) {
           suggestions.push('Show me a learning roadmap');
           suggestions.push('What certifications should I get?');

@@ -17,7 +17,7 @@ const Dashboard: React.FC = () => {
               - Consultant:  25% (3 cols) | Tablet: 50% (1 col)
               
               Row 2:
-              - Roadmaps:    33% (4 cols) | Tablet: 100% (2 cols) -> Consider 50%? No, content needs space.
+              - Roadmaps:    33% (4 cols) | Tablet: 100% (2 cols)
               - Mood:        66% (8 cols) | Tablet: 100% (2 cols)
             */}
 

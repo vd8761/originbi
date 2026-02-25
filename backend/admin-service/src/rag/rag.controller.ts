@@ -52,6 +52,10 @@ export class RagQueryDto {
   @IsNumber()
   @Type(() => Number)
   conversationId?: number;
+
+  @IsOptional()
+  @IsString()
+  mode?: string;
 }
 
 // DTO for Career Report
@@ -489,7 +493,7 @@ export class RagController {
         }
       }
 
-      const result = await this.ragService.query(question, user, convId);
+      const result = await this.ragService.query(question, user, convId, queryDto.mode);
       this.logger.log(`✅ RAG query completed`);
 
       // ── Generate follow-up suggestions ──

@@ -120,6 +120,7 @@ export interface Registration {
   is_deleted: boolean;
   created_at: string;
   updated_at: string;
+  has_ai_counsellor?: boolean;
 }
 
 export interface CorporateAccount {

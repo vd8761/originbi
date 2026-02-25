@@ -17,6 +17,8 @@ import { CounsellingModule } from './modules/counselling/counselling.module';
       useFactory: (config: ConfigService) => {
         const databaseUrl = config.get<string>('DATABASE_URL');
 
+        const shouldSync = config.get<string>('DB_SYNC') === 'true';
+
         if (databaseUrl) {
           const isLocal =
             databaseUrl.includes('localhost') ||
@@ -25,7 +27,7 @@ import { CounsellingModule } from './modules/counselling/counselling.module';
             type: 'postgres',
             url: databaseUrl,
             autoLoadEntities: true,
-            synchronize: false,
+            synchronize: shouldSync,
             ssl: isLocal ? false : { rejectUnauthorized: false },
           };
         }
@@ -38,7 +40,7 @@ import { CounsellingModule } from './modules/counselling/counselling.module';
           password: config.get<string>('DB_PASS') || '',
           database: config.get<string>('DB_NAME') || 'originbi',
           autoLoadEntities: true,
-          synchronize: false,
+          synchronize: shouldSync,
           ssl: false,
         };
       },

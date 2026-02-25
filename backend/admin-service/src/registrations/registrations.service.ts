@@ -623,6 +623,7 @@ export class RegistrationsService {
         examStart: r.metadata?.examStart,
         examEnd: r.metadata?.examEnd,
         createdAt: r.createdAt,
+        has_ai_counsellor: r.hasAiCounsellor ?? false,
       }));
 
       return { data, total, page, limit };
@@ -653,6 +654,52 @@ export class RegistrationsService {
     // If we need to sync with User.isActive, do it here.
     // e.g. if status === 'CANCELLED', user.isActive = false.
     return this.regRepo.save(reg);
+  }
+
+  // ---------------------------------------------------------
+  // TOGGLE AI COUNSELLOR
+  // ---------------------------------------------------------
+  async toggleAiCounsellor(id: string, enabled: boolean) {
+    const value = !!enabled;
+
+    // Ensure column exists (safe idempotent ALTER)
+    await this.dataSource.query(
+      `ALTER TABLE registrations ADD COLUMN IF NOT EXISTS has_ai_counsellor BOOLEAN NOT NULL DEFAULT false`,
+    ).catch(() => { /* column already exists */ });
+
+    // Use raw SQL to avoid BigInt/entity serialization issues
+    const result = await this.dataSource.query(
+      `UPDATE registrations SET has_ai_counsellor = $1, updated_at = NOW() WHERE id = $2 RETURNING id, has_ai_counsellor`,
+      [value, id],
+    );
+
+    if (!result || result.length === 0) {
+      throw new BadRequestException('Registration not found');
+    }
+
+    return { success: true, hasAiCounsellor: result[0].has_ai_counsellor };
+  }
+
+  // ---------------------------------------------------------
+  // CHECK AI COUNSELLOR ACCESS (public, by email)
+  // ---------------------------------------------------------
+  async checkCounsellorAccess(email: string): Promise<{ hasAccess: boolean }> {
+    try {
+      const result = await this.dataSource.query(
+        `SELECT r.has_ai_counsellor
+         FROM registrations r
+         JOIN users u ON r.user_id = u.id
+         WHERE LOWER(u.email) = LOWER($1) AND r.is_deleted = false
+         ORDER BY r.created_at DESC LIMIT 1`,
+        [email],
+      );
+      if (result && result.length > 0) {
+        return { hasAccess: !!result[0].has_ai_counsellor };
+      }
+      return { hasAccess: false };
+    } catch (error) {
+      return { hasAccess: false };
+    }
   }
 
   // ---------------------------------------------------------

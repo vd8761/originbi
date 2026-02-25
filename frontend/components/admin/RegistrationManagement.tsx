@@ -246,6 +246,21 @@ const RegistrationManagement: React.FC = () => {
     }
   };
 
+  const handleToggleAiCounsellor = async (id: string, currentState: boolean) => {
+    // Optimistic update — flip the toggle instantly in the UI
+    setUsers(prev => prev.map(u => u.id === id ? { ...u, has_ai_counsellor: !currentState } : u));
+    try {
+      await registrationService.toggleAiCounsellor(id, !currentState);
+      // Refetch to sync with backend
+      fetchData();
+    } catch (error) {
+      console.error("Failed to toggle AI Counsellor", error);
+      // Revert optimistic update on failure
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, has_ai_counsellor: currentState } : u));
+      alert("Failed to toggle AI Counsellor. Please try again.");
+    }
+  };
+
   const handlePageChange = (page: number) => {
     const totalPages = Math.ceil(totalCount / entriesPerPage) || 1;
     if (page >= 1 && page <= totalPages) {
@@ -808,6 +823,7 @@ const RegistrationManagement: React.FC = () => {
             loading={loading}
             error={error}
             onToggleStatus={handleToggleStatus}
+            onToggleAiCounsellor={handleToggleAiCounsellor}
             onViewDetails={handleViewDetails}
             sortColumn={sortColumn}
             sortOrder={sortOrder}

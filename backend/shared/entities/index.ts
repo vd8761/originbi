@@ -51,6 +51,9 @@ export { CounsellingSession } from './counselling-session.entity';
 export { CounsellingResponse } from './counselling-response.entity';
 export { CorporateCounsellingAccess } from './corporate-counselling-access.entity';
 
+// Student Subscription
+export { StudentSubscription, SubscriptionPlan, SubscriptionStatus } from './student-subscription.entity';
+
 // ============================================
 // Usage in services:
 //
