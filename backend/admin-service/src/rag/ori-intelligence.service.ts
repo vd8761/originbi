@@ -6,7 +6,7 @@ import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
- * ║                    MITHRA INTELLIGENCE SERVICE                            ║
+ * ║                    BI INTELLIGENCE SERVICE                                ║
  * ║       Advanced AI Brain — Professional Career Intelligence               ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
  * ║  CAPABILITIES:                                                            ║
@@ -43,7 +43,7 @@ interface CareerSuitability {
 
 interface UserMemory {
     userId: number;
-    facts: Map<string, string>; // Things MITHRA learned about the user
+    facts: Map<string, string>; // Things BI learned about the user
     preferences: Map<string, string>;
     conversationHistory: string[];
     lastInteraction: Date;
@@ -51,7 +51,7 @@ interface UserMemory {
 
 @Injectable()
 export class OriIntelligenceService {
-    private readonly logger = new Logger('MITHRA-Intelligence');
+    private readonly logger = new Logger('BI-Intelligence');
     private llm: ChatGroq | null = null;
     private userMemories: Map<number, UserMemory> = new Map();
 
@@ -126,7 +126,7 @@ export class OriIntelligenceService {
     };
 
     constructor(private dataSource: DataSource) {
-        this.logger.log('🧠 MITHRA Intelligence Service activated');
+        this.logger.log('🧠 BI Intelligence Service activated');
     }
 
     private getLlm(): ChatGroq {
@@ -366,7 +366,7 @@ export class OriIntelligenceService {
 
         // Use LLM to provide nuanced advice
         const prompt = `
-You are MITHRA, a professional career advisor integrated into the OriginBI platform. A user with "${profile.personalityStyle || 'undetermined'}" personality style (Behavioral Assessment Score: ${profile.agileScore || 'N/A'}) wants to know if they can pursue a career as "${jobTitle}".
+You are BI, a professional career advisor integrated into the OriginBI platform. A user with "${profile.personalityStyle || 'undetermined'}" personality style (Behavioral Assessment Score: ${profile.agileScore || 'N/A'}) wants to know if they can pursue a career as "${jobTitle}".
 
 Provide a professional, honest, and encouraging assessment:
 1. Start with whether this is a STRONG FIT, GOOD FIT, or DEVELOPMENT OPPORTUNITY for their personality type
@@ -406,7 +406,7 @@ Keep response under 200 words. Be specific and actionable. Do not use excessive 
         const userName = profile?.name || 'there';
         const personality = profile?.personalityStyle || 'not yet assessed';
 
-        const systemPrompt = `You are **MITHRA** (OriginBI Intelligent Assistant) — a professional career advisor and knowledge expert. You are the intelligent assistant built into the OriginBI platform.
+        const systemPrompt = `You are **BI** (OriginBI Intelligent Assistant) — a professional career advisor and knowledge expert. You are the intelligent assistant built into the OriginBI platform.
 
 ═══════════════════════════════════════════════════
 USER CONTEXT
@@ -490,6 +490,9 @@ CRITICAL RULES
 4. **NO DATABASE REFERENCES**: You are answering as a knowledge expert. Do NOT mention databases, SQL, tables, or platform internals.
 5. **PROFESSIONAL TONE**: Be confident, articulate, and advisory — like a senior career consultant. Avoid being casual or chatty.
 6. **MINIMAL EMOJIS**: Do NOT use emojis in the response body. Keep the output clean and professional.
+7. **NO BIOGRAPHICAL DATA ABOUT REAL PEOPLE**: You are NOT a search engine or encyclopedia. NEVER provide biographical information, personal history, achievements, or career details about specific real or historical people (e.g., actors, politicians, directors, executives). If the user asks about a specific person by name, respond with: "I can only provide information about candidates registered on the OriginBI platform. For person-specific data, please search for their name directly and I will look them up in our database."
+8. **ONLY PROVIDE GENERIC CAREER/SKILL KNOWLEDGE**: Your expertise is in career advice, skills, technologies, certifications, and professional development. You do NOT have access to information about specific individuals. All person-specific data must come from the OriginBI database, not from your training data.
+9. **NEVER FABRICATE PERSON DATA**: If conversation context mentions a person's name and the user asks about their suitability for a role, do NOT synthesize or invent data about that person. Instead say: "To give you an accurate assessment, I need to look up [Name]'s profile from our database. Please try asking: 'Show me [Name]'s career report'."
 
 Now answer the user's question comprehensively:`;
 
@@ -500,8 +503,35 @@ Now answer the user's question comprehensively:`;
             ]);
             return response.content.toString();
         } catch (error) {
-            this.logger.error(`LLM error: ${error.message}`);
-            return `I'm unable to generate a detailed response at the moment. Could you provide a bit more context about what you're looking for? That will help me give you the most relevant guidance.`;
+            this.logger.warn(`Groq LLM error: ${error.message} — trying Gemini fallback...`);
+
+            // ── Gemini fallback ──
+            try {
+                const googleApiKey = process.env.GOOGLE_API_KEY;
+                if (googleApiKey) {
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${googleApiKey}`;
+                    const resp = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Referer': 'https://originbi.com' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: `system: ${systemPrompt}\n\nuser: ${question}` }] }],
+                            generationConfig: { temperature: 0.6, maxOutputTokens: 4096 },
+                        }),
+                    });
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        const geminiAnswer = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (geminiAnswer) {
+                            this.logger.log('✅ Gemini fallback succeeded');
+                            return geminiAnswer;
+                        }
+                    }
+                }
+            } catch (geminiErr) {
+                this.logger.warn(`Gemini fallback also failed: ${geminiErr.message}`);
+            }
+
+            return `I'm experiencing high demand at the moment. Please try again in a minute — I'll be ready to help with your question then.`;
         }
     }
 

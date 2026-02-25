@@ -7,7 +7,9 @@ import {
     Download, Sparkles, ArrowLeft, Brain, Zap, Target, TrendingUp,
     Clock, ChevronRight, Star, Briefcase, GraduationCap,
     MessageSquare, Plus, MoreHorizontal, PenLine,
-    Search, PanelLeftClose, PanelLeft, X
+    Search, PanelLeftClose, PanelLeft, X,
+    RefreshCw, Code, ExternalLink,
+    Lightbulb, CornerDownRight, Table, AlertCircle
 } from 'lucide-react';
 import { getAuthHeaders, getStoredUser, snapshotUserToSession } from '../../lib/auth-helpers';
 
@@ -18,6 +20,10 @@ interface Message {
     content: string;
     timestamp: Date;
     isStreaming?: boolean;
+    suggestions?: string[];
+    searchType?: string;
+    confidence?: number;
+    feedback?: 'up' | 'down' | null;
 }
 
 interface Conversation {
@@ -86,6 +92,68 @@ const TypeWriter = memo(({ text, onDone }: { text: string; onDone?: () => void }
 });
 TypeWriter.displayName = 'TypeWriter';
 
+/* ───────────────────────── Code Block with Copy ─────────────── */
+const CodeBlock = memo(({ code, language }: { code: string; language?: string }) => {
+    const [copied, setCopied] = useState(false);
+    const handleCopy = () => {
+        navigator.clipboard.writeText(code);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+    return (
+        <div className="relative group/code rounded-xl overflow-hidden my-2 border border-gray-200 bg-gray-900">
+            <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
+                <div className="flex items-center gap-2">
+                    <Code className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="text-xs text-gray-400 font-mono">{language || 'code'}</span>
+                </div>
+                <button
+                    onClick={handleCopy}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-gray-400 hover:text-white hover:bg-gray-700 transition-all"
+                >
+                    {copied ? <><Check className="w-3 h-3 text-emerald-400" /><span className="text-emerald-400">Copied</span></> : <><Copy className="w-3 h-3" /><span>Copy</span></>}
+                </button>
+            </div>
+            <pre className="p-4 overflow-x-auto text-sm leading-relaxed">
+                <code className="text-gray-100 font-mono">{code}</code>
+            </pre>
+        </div>
+    );
+});
+CodeBlock.displayName = 'CodeBlock';
+
+/* ───────────────────── Inline Formatting Helper ─────────────── */
+function formatInline(text: string): React.ReactNode[] {
+    // Process: inline code `...`, bold **...**, italic _..._, links [text](url)
+    const parts: React.ReactNode[] = [];
+    const regex = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\[[^\]]+\]\([^)]+\))|(_[^_]+_)/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    let key = 0;
+
+    while ((match = regex.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+            parts.push(text.slice(lastIndex, match.index));
+        }
+        const m = match[0];
+        if (m.startsWith('`')) {
+            parts.push(<code key={key++} className="px-1.5 py-0.5 bg-gray-100 text-emerald-700 rounded-md text-[13px] font-mono border border-gray-200">{m.slice(1, -1)}</code>);
+        } else if (m.startsWith('**')) {
+            parts.push(<strong key={key++} className="font-semibold text-gray-900">{m.slice(2, -2)}</strong>);
+        } else if (m.startsWith('[')) {
+            const linkMatch = m.match(/\[([^\]]+)\]\(([^)]+)\)/);
+            if (linkMatch) {
+                parts.push(<a key={key++} href={linkMatch[2]} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:text-emerald-700 underline decoration-emerald-300 underline-offset-2 inline-flex items-center gap-1">{linkMatch[1]}<ExternalLink className="w-3 h-3" /></a>);
+            }
+        } else if (m.startsWith('_') && m.endsWith('_')) {
+            parts.push(<em key={key++} className="text-gray-500 italic">{m.slice(1, -1)}</em>);
+        }
+        lastIndex = match.index + m.length;
+    }
+    if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+    return parts;
+}
+
 /* ───────────────────────── Content Renderer ──────────────────── */
 const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
     content: string;
@@ -98,7 +166,6 @@ const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
     const handleDownload = async (reportPath: string) => {
         try {
             const baseUrl = apiUrl || process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
-            // Include auth headers for protected endpoints
             const headers: Record<string, string> = {};
             const token = sessionStorage.getItem('idToken') || sessionStorage.getItem('accessToken');
             if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -129,15 +196,93 @@ const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
         }
     };
 
-    const lines = content.split('\n');
+    // ── Parse into blocks: code blocks, tables, regular lines ──
+    const blocks: { type: 'code' | 'table' | 'lines'; content: string; lang?: string }[] = [];
+    const rawLines = content.split('\n');
+    let i = 0;
+
+    while (i < rawLines.length) {
+        const line = rawLines[i];
+
+        // Fenced code block ```lang ... ```
+        const codeStart = line.match(/^```(\w*)/);
+        if (codeStart) {
+            const lang = codeStart[1] || '';
+            const codeLines: string[] = [];
+            i++;
+            while (i < rawLines.length && !rawLines[i].startsWith('```')) {
+                codeLines.push(rawLines[i]);
+                i++;
+            }
+            blocks.push({ type: 'code', content: codeLines.join('\n'), lang });
+            i++; // skip closing ```
+            continue;
+        }
+
+        // Markdown table (|...|)
+        if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+            const tableLines: string[] = [line];
+            i++;
+            while (i < rawLines.length && rawLines[i].trim().startsWith('|') && rawLines[i].trim().endsWith('|')) {
+                tableLines.push(rawLines[i]);
+                i++;
+            }
+            blocks.push({ type: 'table', content: tableLines.join('\n') });
+            continue;
+        }
+
+        // Regular line
+        blocks.push({ type: 'lines', content: line });
+        i++;
+    }
+
     return (
-        <div className="space-y-2 leading-relaxed text-[15px]">
-            {lines.map((line, i) => {
+        <div className="space-y-1.5 leading-relaxed text-[15px]">
+            {blocks.map((block, bi) => {
+                // ── Code blocks ──
+                if (block.type === 'code') {
+                    return <CodeBlock key={bi} code={block.content} language={block.lang} />;
+                }
+
+                // ── Tables ──
+                if (block.type === 'table') {
+                    const rows = block.content.split('\n').filter(r => !r.match(/^\|[\s\-:]+\|$/));
+                    const parseRow = (r: string) => r.split('|').filter((_, ci, arr) => ci > 0 && ci < arr.length - 1).map(c => c.trim());
+                    const header = rows[0] ? parseRow(rows[0]) : [];
+                    const body = rows.slice(1).map(parseRow);
+                    return (
+                        <div key={bi} className="overflow-x-auto my-3 rounded-xl border border-gray-200">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="bg-gradient-to-r from-gray-50 to-gray-100">
+                                        {header.map((h, hi) => (
+                                            <th key={hi} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-b border-gray-200">{formatInline(h)}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {body.map((row, ri) => (
+                                        <tr key={ri} className="hover:bg-gray-50/60 transition-colors">
+                                            {row.map((cell, ci) => (
+                                                <td key={ci} className="px-4 py-2.5 text-gray-700">{formatInline(cell)}</td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    );
+                }
+
+                // ── Regular content lines ──
+                const line = block.content;
+
+                // Download links
                 const downloadMatch = line.match(/\[([^\]]+)\]\(([^)]+)\)/);
                 if (downloadMatch && (line.includes('Download') || line.includes('report') || line.includes('download') || line.includes('Click here'))) {
                     return (
                         <button
-                            key={i}
+                            key={bi}
                             onClick={() => handleDownload(downloadMatch[2])}
                             className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl text-sm font-semibold transition-all shadow-md hover:shadow-lg hover:shadow-emerald-200 active:scale-[0.98] mt-1"
                         >
@@ -147,57 +292,79 @@ const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
                     );
                 }
 
-                // Horizontal separator lines (━━━, ───, etc.)
+                // Horizontal separator
                 if (/^[━─═─\-]{5,}$/.test(line.trim())) {
-                    return <hr key={i} className="border-gray-200 my-1" />;
+                    return <hr key={bi} className="border-gray-200 my-2" />;
                 }
 
-                let processed: React.ReactNode = line;
-                if (line.includes('**')) {
-                    processed = line.split(/(\*\*[^*]+\*\*)/g).map((part, j) =>
-                        part.startsWith('**') ? (
-                            <strong key={j} className="font-semibold text-gray-900">{part.slice(2, -2)}</strong>
-                        ) : part
-                    );
-                }
-
-                // Italic text with _..._
-                if (typeof processed === 'string' && line.includes('_') && /_.+_/.test(line)) {
-                    processed = line.split(/(_[^_]+_)/g).map((part, j) =>
-                        part.startsWith('_') && part.endsWith('_') ? (
-                            <em key={j} className="text-gray-500 italic">{part.slice(1, -1)}</em>
-                        ) : part.includes('**') ? (
-                            // Handle bold within non-italic parts
-                            <React.Fragment key={j}>{part.split(/(\*\*[^*]+\*\*)/g).map((bp, bj) =>
-                                bp.startsWith('**') ? <strong key={bj} className="font-semibold text-gray-900">{bp.slice(2, -2)}</strong> : bp
-                            )}</React.Fragment>
-                        ) : part
-                    );
-                }
-
-                if (line.trim().startsWith('•') || line.trim().startsWith('-')) {
+                // Headings
+                const h3Match = line.match(/^###\s+(.+)/);
+                if (h3Match) {
                     return (
-                        <div key={i} className="flex items-start gap-2.5 pl-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-[9px] flex-shrink-0" />
-                            <span className="text-gray-700">{typeof processed === 'string' ? processed.replace(/^[-•]\s*/, '') : processed}</span>
+                        <h5 key={bi} className="text-sm font-semibold text-gray-700 mt-3 mb-1 flex items-center gap-2">
+                            <span className="w-0.5 h-3.5 bg-gradient-to-b from-emerald-200 to-teal-300 rounded-full" />
+                            {formatInline(h3Match[1].replace(/\*\*/g, ''))}
+                        </h5>
+                    );
+                }
+                const h2Match = line.match(/^##\s+(.+)/);
+                if (h2Match) {
+                    return (
+                        <h4 key={bi} className="text-[15px] font-bold text-gray-800 mt-3.5 mb-1 flex items-center gap-2">
+                            <span className="w-1 h-4 bg-gradient-to-b from-emerald-300 to-teal-400 rounded-full" />
+                            {formatInline(h2Match[1].replace(/\*\*/g, ''))}
+                        </h4>
+                    );
+                }
+                const h1Match = line.match(/^#\s+(.+)/);
+                if (h1Match) {
+                    return (
+                        <h3 key={bi} className="text-base font-bold text-gray-900 mt-4 mb-1.5 flex items-center gap-2">
+                            <span className="w-1 h-5 bg-gradient-to-b from-emerald-400 to-teal-500 rounded-full" />
+                            {formatInline(h1Match[1].replace(/\*\*/g, ''))}
+                        </h3>
+                    );
+                }
+
+                // Blockquote > ...
+                if (line.trim().startsWith('>')) {
+                    return (
+                        <div key={bi} className="flex items-start gap-0 my-1">
+                            <div className="w-1 self-stretch bg-gradient-to-b from-emerald-300 to-teal-400 rounded-full flex-shrink-0" />
+                            <div className="pl-3 py-1 text-gray-600 italic text-[14px]">{formatInline(line.replace(/^>\s*/, ''))}</div>
                         </div>
                     );
                 }
 
-                const numMatch = line.match(/^(\d+)\.\s/);
+                // Bullet points
+                if (line.trim().startsWith('•') || line.trim().startsWith('- ')) {
+                    const bulletText = line.replace(/^\s*[-•]\s*/, '');
+                    return (
+                        <div key={bi} className="flex items-start gap-2.5 pl-1 py-0.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-[9px] flex-shrink-0" />
+                            <span className="text-gray-700">{formatInline(bulletText)}</span>
+                        </div>
+                    );
+                }
+
+                // Numbered list
+                const numMatch = line.match(/^(\d+)\.\s(.+)/);
                 if (numMatch) {
                     return (
-                        <div key={i} className="flex items-start gap-3">
-                            <span className="w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 text-xs font-bold flex items-center justify-center flex-shrink-0 border border-emerald-200">
+                        <div key={bi} className="flex items-start gap-3 py-0.5">
+                            <span className="w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 text-xs font-bold flex items-center justify-center flex-shrink-0 border border-emerald-200 mt-0.5">
                                 {numMatch[1]}
                             </span>
-                            <span className="text-gray-700">{line.replace(/^\d+\.\s/, '')}</span>
+                            <span className="text-gray-700 flex-1">{formatInline(numMatch[2])}</span>
                         </div>
                     );
                 }
 
-                if (!line.trim()) return <div key={i} className="h-2" />;
-                return <p key={i} className="text-gray-700">{processed}</p>;
+                // Empty line
+                if (!line.trim()) return <div key={bi} className="h-1.5" />;
+
+                // Default paragraph
+                return <p key={bi} className="text-gray-700">{formatInline(line)}</p>;
             }).filter(Boolean)}
         </div>
     );
@@ -205,23 +372,35 @@ const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
 RenderContent.displayName = 'RenderContent';
 
 /* ───────────────────────── Thinking Indicator ───────────────── */
-const ThinkingIndicator = () => (
-    <div className="flex items-center gap-3.5 animate-chatSlideIn">
-        <div className="flex-shrink-0 w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-200">
-            <Brain className="w-4 h-4 text-white" />
-        </div>
-        <div className="bg-white border border-gray-100 shadow-sm rounded-2xl rounded-tl-md px-5 py-3.5">
-            <div className="flex items-center gap-2">
-                <div className="flex gap-1">
-                    {[0, 1, 2].map(i => (
-                        <span key={i} className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms`, animationDuration: '0.8s' }} />
-                    ))}
+const ThinkingIndicator = () => {
+    const [stage, setStage] = useState(0);
+    const stages = ['Analyzing your question...', 'Searching knowledge base...', 'Generating response...'];
+    useEffect(() => {
+        const t1 = setTimeout(() => setStage(1), 1500);
+        const t2 = setTimeout(() => setStage(2), 4000);
+        return () => { clearTimeout(t1); clearTimeout(t2); };
+    }, []);
+    return (
+        <div className="flex items-start gap-3.5 animate-chatSlideIn">
+            <div className="flex-shrink-0 w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-200">
+                <Brain className="w-4 h-4 text-white animate-pulse" />
+            </div>
+            <div className="bg-white border border-gray-100 shadow-sm rounded-2xl rounded-tl-md px-5 py-3.5 max-w-xs">
+                <div className="flex items-center gap-3">
+                    <div className="flex gap-1">
+                        {[0, 1, 2].map(i => (
+                            <span key={i} className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms`, animationDuration: '0.8s' }} />
+                        ))}
+                    </div>
+                    <span className="text-xs text-gray-500 transition-all duration-300">{stages[stage]}</span>
                 </div>
-                <span className="text-xs text-gray-400 ml-1">Thinking...</span>
+                <div className="mt-2 w-full bg-gray-100 rounded-full h-1 overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full animate-progressBar" />
+                </div>
             </div>
         </div>
-    </div>
-);
+    );
+};
 
 /* ───────────────────────── Date grouping ─────────────────────── */
 function groupLabel(dateStr: string): string {
@@ -439,6 +618,9 @@ export default function ChatAssistant({
                 content: data.answer || 'Sorry, I could not process that request.',
                 timestamp: new Date(),
                 isStreaming: true,
+                suggestions: data.suggestions || [],
+                searchType: data.searchType,
+                confidence: data.confidence,
             }]);
         } catch {
             setMessages(prev => [...prev, {
@@ -517,7 +699,7 @@ export default function ChatAssistant({
 
     /* ───────────────────────── RENDER ───────────────────────── */
     return (
-        <div className="fixed inset-0 z-[9999] bg-gray-50 flex overflow-hidden">
+        <div className="fixed left-0 right-0 bottom-0 top-[61px] sm:top-[69px] z-[100] bg-gray-50 flex overflow-hidden">
 
             {/* ═══════════════ SIDEBAR ═══════════════ */}
             <aside className={`
@@ -527,6 +709,13 @@ export default function ChatAssistant({
             `}>
                 {/* Sidebar Header */}
                 <div className="flex items-center justify-between p-3 border-b border-gray-700/50">
+                    <button
+                        onClick={() => router.back()}
+                        className="p-2 rounded-lg hover:bg-gray-800 transition-colors"
+                        title="Go back"
+                    >
+                        <ArrowLeft className="w-4 h-4 text-gray-400" />
+                    </button>
                     <button
                         onClick={newChat}
                         className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm font-medium transition-all hover:border-gray-600"
@@ -679,16 +868,16 @@ export default function ChatAssistant({
                             <ArrowLeft className="w-5 h-5 text-gray-500" />
                         </button>
                         <div className="flex items-center gap-3">
-                            <div className="relative">
+                            <div className="relative group/avatar cursor-pointer">
                                 <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-200/60">
                                     <Brain className="w-5 h-5 text-white" />
                                 </div>
                                 <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white shadow-sm">
-                                    <span className="absolute inset-0 bg-emerald-400 rounded-full animate-ping opacity-40" />
+                                    <span className="absolute inset-0 bg-emerald-400 rounded-full opacity-0 group-hover/avatar:animate-ping group-hover/avatar:opacity-40" />
                                 </span>
                             </div>
                             <div>
-                                <h1 className="text-lg font-bold text-gray-900 tracking-tight">MITHRA</h1>
+                                <h1 className="text-lg font-bold text-gray-900 tracking-tight">BI</h1>
                                 <p className="text-xs text-gray-400 flex items-center gap-1">
                                     <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" />
                                     AI Career Intelligence
@@ -728,7 +917,7 @@ export default function ChatAssistant({
                                     Hello{userName ? `, ${userName}` : ''}!
                                 </h1>
                                 <p className="text-gray-500 text-lg mb-2">
-                                    I&apos;m <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500 font-bold">MITHRA</span>, your intelligent career companion.
+                                    I&apos;m <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500 font-bold">BI</span>, your intelligent career companion.
                                 </p>
                                 <p className="text-gray-400 text-sm mb-10">
                                     Ask me anything about talent analytics, career insights, and more.
@@ -778,7 +967,7 @@ export default function ChatAssistant({
                                 </div>
 
                                 <p className="text-xs text-gray-300 mt-6">
-                                    Powered by <span className="font-semibold text-emerald-400">MITHRA</span> · OriginBI Intelligence Engine
+                                    Powered by <span className="font-semibold text-emerald-400">BI</span> · OriginBI Intelligence Engine
                                 </p>
                             </div>
                         </div>
@@ -786,52 +975,65 @@ export default function ChatAssistant({
                         /* ─────── MESSAGES VIEW ─────── */
                         <div className="max-w-3xl mx-auto p-6 space-y-5">
                             {messages.map((m, idx) => (
-                                <div
-                                    key={m.id}
-                                    className={`flex gap-3.5 ${m.role === 'user' ? 'flex-row-reverse' : ''} animate-chatSlideIn`}
-                                    style={{ animationDelay: `${Math.min(idx * 50, 300)}ms` }}
-                                >
-                                    {m.role === 'assistant' ? (
-                                        <div className="flex-shrink-0 w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-200/40">
-                                            <Brain className="w-4 h-4 text-white" />
-                                        </div>
-                                    ) : (
-                                        <div className="flex-shrink-0 w-9 h-9 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center border border-gray-200">
-                                            <User className="w-4 h-4 text-gray-500" />
-                                        </div>
-                                    )}
-
-                                    <div className={`group flex flex-col max-w-[80%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                        <div className={`rounded-2xl px-4 py-3 ${m.role === 'user'
-                                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-200/40 rounded-tr-md'
-                                            : 'bg-white border border-gray-100 shadow-sm rounded-tl-md'
-                                            }`}>
-                                            {m.role === 'assistant' ? (
-                                                <RenderContent content={m.content} streaming={m.isStreaming} onDone={() => finishStreaming(m.id)} apiUrl={apiUrl} />
-                                            ) : (
-                                                <p className="text-[15px] leading-relaxed">{m.content}</p>
-                                            )}
-                                        </div>
-
-                                        {m.role === 'assistant' && !m.isStreaming && (
-                                            <div className="flex items-center gap-3 mt-1.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                                <button
-                                                    onClick={() => copyText(m.content, m.id)}
-                                                    className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-emerald-500 transition-colors"
-                                                >
-                                                    {copied === m.id ? (
-                                                        <><Check className="w-3.5 h-3.5 text-emerald-500" /><span className="text-emerald-500">Copied!</span></>
-                                                    ) : (
-                                                        <><Copy className="w-3.5 h-3.5" /><span>Copy</span></>
-                                                    )}
-                                                </button>
-                                                <span className="text-[11px] text-gray-300 flex items-center gap-1">
-                                                    <Clock className="w-3 h-3" />
-                                                    {m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </span>
+                                <div key={m.id} className="animate-chatSlideIn" style={{ animationDelay: `${Math.min(idx * 50, 300)}ms` }}>
+                                    <div className={`flex gap-3.5 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                                        {m.role === 'assistant' ? (
+                                            <div className="flex-shrink-0 w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-200/40">
+                                                <Brain className="w-4 h-4 text-white" />
+                                            </div>
+                                        ) : (
+                                            <div className="flex-shrink-0 w-9 h-9 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center border border-gray-200">
+                                                <User className="w-4 h-4 text-gray-500" />
                                             </div>
                                         )}
+
+                                        <div className={`group flex flex-col max-w-[85%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                            <div className={`rounded-2xl px-4 py-3 ${m.role === 'user'
+                                                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-200/40 rounded-tr-md'
+                                                : 'bg-white border border-gray-100 shadow-sm rounded-tl-md'
+                                                }`}>
+                                                {m.role === 'assistant' ? (
+                                                    <RenderContent content={m.content} streaming={m.isStreaming} onDone={() => finishStreaming(m.id)} apiUrl={apiUrl} />
+                                                ) : (
+                                                    <p className="text-[15px] leading-relaxed">{m.content}</p>
+                                                )}
+                                            </div>
+
+                                            {/* ── Assistant message actions ── */}
+                                            {m.role === 'assistant' && !m.isStreaming && (
+                                                <div className="flex items-center gap-1 mt-1.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                                    <button
+                                                        onClick={() => copyText(m.content, m.id)}
+                                                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 transition-all"
+                                                        title="Copy response"
+                                                    >
+                                                        {copied === m.id ? <><Check className="w-3 h-3 text-emerald-500" /><span className="text-emerald-500">Copied</span></> : <><Copy className="w-3 h-3" /><span>Copy</span></>}
+                                                    </button>
+                                                    <div className="w-px h-3 bg-gray-200 mx-0.5" />
+                                                    <span className="text-[10px] text-gray-300 flex items-center gap-1 ml-1">
+                                                        <Clock className="w-2.5 h-2.5" />
+                                                        {m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
+
+                                    {/* ── Follow-up Suggestions (after last assistant message) ── */}
+                                    {m.role === 'assistant' && !m.isStreaming && m.suggestions && m.suggestions.length > 0 && idx === messages.length - 1 && (
+                                        <div className="ml-[52px] mt-3 flex flex-wrap gap-2 animate-chatFadeIn">
+                                            {m.suggestions.map((s, si) => (
+                                                <button
+                                                    key={si}
+                                                    onClick={() => { setInput(s); setTimeout(() => inputRef.current?.focus(), 50); }}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-50 hover:bg-emerald-50 border border-gray-200 hover:border-emerald-300 text-xs text-gray-600 hover:text-emerald-600 transition-all hover:shadow-sm"
+                                                >
+                                                    <CornerDownRight className="w-3 h-3" />
+                                                    {s}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             ))}
 
@@ -865,7 +1067,7 @@ export default function ChatAssistant({
                                 </button>
                             </div>
                             <p className="text-center text-[10px] text-gray-300 mt-2.5">
-                                Powered by <span className="font-semibold text-emerald-400">MITHRA</span> · OriginBI Intelligence Engine
+                                Powered by <span className="font-semibold text-emerald-400">BI</span> · OriginBI Intelligence Engine
                             </p>
                         </div>
                     </footer>
@@ -885,9 +1087,15 @@ export default function ChatAssistant({
                         0%, 100% { transform: translateY(0px); }
                         50%      { transform: translateY(-6px); }
                     }
+                    @keyframes progressBar {
+                        0%   { width: 0%; }
+                        50%  { width: 70%; }
+                        100% { width: 95%; }
+                    }
                     .animate-chatFadeIn  { animation: chatFadeIn  0.5s ease-out both; }
                     .animate-chatSlideIn { animation: chatSlideIn 0.35s ease-out both; }
                     .animate-chatLogoFloat { animation: chatLogoFloat 3s ease-in-out infinite; }
+                    .animate-progressBar { animation: progressBar 8s ease-out forwards; }
                     .scrollbar-thin::-webkit-scrollbar { width: 4px; }
                     .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
                     .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }

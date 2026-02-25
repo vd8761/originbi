@@ -16,13 +16,13 @@ import { AccessPolicyFactory } from './policies';
 import { AuditLoggerService } from './audit';
 import { UserContext } from '../common/interfaces/user-context.interface';
 
-import { MITHRA_PERSONA, getRandomResponse, getSignOff } from './ori-persona';
+import { BI_PERSONA, getRandomResponse, getSignOff } from './ori-persona';
 import * as fs from 'fs';
 import * as path from 'path';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
- * ║                          🤖 MITHRA v2.0 - JARVIS EDITION                  ║
+ * ║                          🤖 BI v2.0 - JARVIS EDITION                      ║
  * ║              OriginBI Intelligent - Your Career Guide                    ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
  * ║  FEATURES:                                                                ║
@@ -42,6 +42,7 @@ interface QueryResult {
   confidence: number;
   reportUrl?: string;
   reportId?: string;
+  suggestions?: string[];
 }
 
 // Complete Database Schema
@@ -119,7 +120,7 @@ const AGILE_LEVELS = {
 
 @Injectable()
 export class RagService {
-  private readonly logger = new Logger('MITHRA');
+  private readonly logger = new Logger('BI');
   private llm: ChatGroq | null = null;
   private reportsDir: string;
 
@@ -128,8 +129,8 @@ export class RagService {
   private readonly CACHE_EXPIRY = 60 * 60 * 1000; // 1 hour (was 30 minutes)
 
   // Disambiguation follow-up cache: remembers the search term when multiple candidates are shown
-  // so that a bare number reply ("1", "#2") re-routes to the correct career report.
-  private disambiguationCache = new Map<string, { searchTerm: string; timestamp: number }>();
+  // so that a bare number reply ("1", "#2") re-routes to the correct handler.
+  private disambiguationCache = new Map<string, { searchTerm: string; timestamp: number; handler?: string }>();
   private readonly DISAMBIG_EXPIRY = 5 * 60 * 1000; // 5 minutes
 
   // ── PAGINATION STATE ──
@@ -167,7 +168,7 @@ export class RagService {
     if (!fs.existsSync(this.reportsDir)) {
       fs.mkdirSync(this.reportsDir, { recursive: true });
     }
-    this.logger.log('🤖 MITHRA v2.0 initialized with RBAC - Your intelligent career guide!');
+    this.logger.log('🤖 BI v2.0 initialized with RBAC - Your intelligent career guide!');
   }
 
   private getLlm(): ChatGroq {
@@ -213,7 +214,7 @@ export class RagService {
       if (['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'].includes(normalizedQ)) {
         this.logger.log('🎯 Intent: greeting (bypassed LLM)');
         return {
-          answer: getRandomResponse(MITHRA_PERSONA.greetings),
+          answer: getRandomResponse(BI_PERSONA.greetings),
           searchType: 'greeting',
           confidence: 1.0,
         };
@@ -222,7 +223,7 @@ export class RagService {
       if (['help', 'what can you do', 'what can you help me with'].includes(normalizedQ)) {
         this.logger.log('🎯 Intent: help (bypassed LLM)');
         return {
-          answer: MITHRA_PERSONA.help,
+          answer: BI_PERSONA.help,
           searchType: 'help',
           confidence: 1.0,
         };
@@ -296,16 +297,21 @@ export class RagService {
         const disambigKey = this.getDisambiguationKey(user);
         const ctx = this.disambiguationCache.get(disambigKey);
         if (ctx && Date.now() - ctx.timestamp < this.DISAMBIG_EXPIRY) {
-          this.logger.log(`🔢 Bare number "${normalizedQ}" detected — resuming disambiguation for "${ctx.searchTerm}"`);
+          this.logger.log(`🔢 Bare number "${normalizedQ}" detected — resuming disambiguation for "${ctx.searchTerm}" (handler=${ctx.handler || 'career_report'})`);
           this.disambiguationCache.delete(disambigKey);
+          // Route to the correct handler based on what created the disambiguation
+          if (ctx.handler === 'person_lookup') {
+            return await this.handlePersonLookup(`${ctx.searchTerm} #${bareNumberMatch[1]}`, user);
+          }
           return await this.handleCareerReport(`${ctx.searchTerm} #${bareNumberMatch[1]}`, user);
         }
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // STEP 1: LLM QUERY UNDERSTANDING (role-aware for better routing)
+      // STEP 1: CONVERSATION CONTEXT + QUERY UNDERSTANDING
       // ═══════════════════════════════════════════════════════════════
       const userRole = (user?.role || 'STUDENT').toUpperCase();
+      const sessionId = conversationId > 0 ? `conv_${conversationId}` : `user_${user?.id || 0}`;
 
       // Build conversation history for context-aware intent classification
       let conversationHistory = '';
@@ -317,16 +323,72 @@ export class RagService {
         }
       }
 
-      const interpretation = await this.understandQuery(question, userRole, conversationHistory);
+      // Enrich conversation history with tracked entity context
+      const session = this.conversationService.getSession(sessionId);
+      const ctx = session.currentContext;
+      if (ctx.lastPersonMentioned || ctx.entitiesDiscussed.length > 0) {
+        let entityContext = '--- ENTITY CONTEXT ---\n';
+        if (ctx.lastPersonMentioned) {
+          entityContext += `Last person discussed: ${ctx.lastPersonMentioned}\n`;
+        }
+        if (ctx.entitiesDiscussed.length > 0) {
+          entityContext += `People mentioned in this conversation: ${ctx.entitiesDiscussed.join(', ')}\n`;
+        }
+        if (ctx.lastIntent) {
+          entityContext += `Last topic: ${ctx.lastIntent}\n`;
+        }
+        entityContext += '---\n';
+        conversationHistory = entityContext + conversationHistory;
+      }
+
+      // ── Smart Pronoun Resolution & Entity Tracking ──
+      // Resolve "him", "her", "that person" → actual name from conversation context
+      let resolvedQuestion = question;
+      const isFollowUp = this.conversationService.isFollowUp(sessionId, question);
+      if (isFollowUp) {
+        resolvedQuestion = this.conversationService.resolveReferences(sessionId, question);
+        if (resolvedQuestion !== question) {
+          this.logger.log(`🔄 Pronoun resolved: "${question}" → "${resolvedQuestion}"`);
+        }
+      }
+
+      const interpretation = await this.understandQuery(resolvedQuestion, userRole, conversationHistory);
       this.logger.log(`🎯 Intent: ${interpretation.intent}`);
       this.logger.log(`🔍 Search: ${interpretation.searchTerm || 'general'}`);
+
+      // Track entities: extract person names from the question for future pronoun resolution
+      const mentionedEntities: string[] = [];
+      if (interpretation.searchTerm) {
+        mentionedEntities.push(interpretation.searchTerm);
+      }
+      // Extract names from the raw question for entity tracking
+      const nameFromQuestion = this.extractName(resolvedQuestion);
+      if (nameFromQuestion && !mentionedEntities.includes(nameFromQuestion)) {
+        mentionedEntities.push(nameFromQuestion);
+      }
+      // Also extract "Name: XYZ" format (from chat_profile_report messages)
+      const nameFieldMatch = resolvedQuestion.match(/name[:\s]+([^\n,]+)/i);
+      if (nameFieldMatch && nameFieldMatch[1]) {
+        const profileName = nameFieldMatch[1].trim().replace(/[.,;:!?]+$/, '');
+        if (profileName.length >= 2 && !mentionedEntities.includes(profileName)) {
+          mentionedEntities.push(profileName);
+        }
+      }
+
+      // Add user message to conversation session with tracked entities
+      this.conversationService.addUserMessage(
+        sessionId,
+        question,
+        interpretation.intent,
+        mentionedEntities,
+      );
 
       // ═══════════════════════════════════════════════════════════════
       // ORI GREETING & HELP - Jarvis-like personality
       // ═══════════════════════════════════════════════════════════════
       if (interpretation.intent === 'greeting') {
         return {
-          answer: getRandomResponse(MITHRA_PERSONA.greetings),
+          answer: getRandomResponse(BI_PERSONA.greetings),
           searchType: 'greeting',
           confidence: 1.0,
         };
@@ -334,7 +396,7 @@ export class RagService {
 
       if (interpretation.intent === 'help') {
         return {
-          answer: MITHRA_PERSONA.help,
+          answer: BI_PERSONA.help,
           searchType: 'help',
           confidence: 1.0,
         };
@@ -345,6 +407,13 @@ export class RagService {
       // ═══════════════════════════════════════════════════════════════
       if (interpretation.intent === 'career_report') {
         return await this.handleCareerReport(interpretation.searchTerm, user);
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // SPECIAL HANDLER: PERSON LOOKUP (name search + disambiguation)
+      // ═══════════════════════════════════════════════════════════════
+      if (interpretation.intent === 'person_lookup' && interpretation.searchTerm) {
+        return await this.handlePersonLookup(interpretation.searchTerm, user);
       }
 
       // ═══════════════════════════════════════════════════════════════
@@ -414,10 +483,83 @@ export class RagService {
       const userId = user?.id || user?.user_id || 0;
       const userEmail = user?.email || user?.sub || '';
 
+      // ═══════════════════════════════════════════════════════════════
+      // PERSON-SPECIFIC QUERY GUARD
+      // If the query mentions a person's name (from current question or
+      // conversation context), verify they exist in our DB before routing
+      // to general_knowledge. This prevents the LLM from searching the
+      // web for biographical info about people.
+      // ═══════════════════════════════════════════════════════════════
+      if (interpretation.intent === 'general_knowledge' || interpretation.intent === 'career_guidance') {
+        const personNameToCheck = interpretation.searchTerm
+          || this.extractName(resolvedQuestion)
+          || (nameFieldMatch && nameFieldMatch[1]?.trim());
+
+        // Detect if this is a person-specific query (not a generic concept question)
+        const isPersonSpecificQuery = this.isPersonSpecificQuery(resolvedQuestion, ctx);
+
+        if (isPersonSpecificQuery && personNameToCheck) {
+          this.logger.log(`🔍 Person guard: checking if "${personNameToCheck}" exists in DB`);
+          // Word-boundary match first for precision, then ILIKE fallback
+          let personCheck = await this.dataSource.query(
+            `SELECT r.full_name, 
+                    (SELECT COUNT(*) FROM assessment_attempts aa WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
+             FROM registrations r
+             WHERE r.full_name ~* $1 AND r.is_deleted = false
+             LIMIT 3`,
+            [`\\m${personNameToCheck}\\M`]
+          );
+          let usedILIKEFallback = false;
+          if (!personCheck || personCheck.length === 0) {
+            personCheck = await this.dataSource.query(
+              `SELECT r.full_name, 
+                      (SELECT COUNT(*) FROM assessment_attempts aa WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
+               FROM registrations r
+               WHERE LOWER(r.full_name) LIKE $1 AND r.is_deleted = false
+               LIMIT 5`,
+              [`%${personNameToCheck.toLowerCase()}%`]
+            );
+            usedILIKEFallback = true;
+          }
+
+          if (!personCheck || personCheck.length === 0) {
+            this.logger.warn(`⚠️ Person guard: "${personNameToCheck}" not found in DB — blocking web fallback`);
+            return {
+              answer: `**"${personNameToCheck}" was not found in our database.**\n\nI can only provide information about candidates who are registered on the OriginBI platform and have completed assessments.\n\n**You can:**\n• Check the spelling and try again\n• Ask me to **"list candidates"** to see available names\n• Ask general career questions like *"what skills are needed for a CFO?"*\n\nI don't look up information about people from the web — all person-specific data comes from our platform.`,
+              searchType: 'person_not_found',
+              confidence: 0.95,
+            };
+          }
+
+          // If ILIKE fallback was used, verify we have an exact word-token match
+          // to prevent "jai" → "JAISHREE" style substring mismatches
+          if (usedILIKEFallback && !this.hasExactTokenMatch(personNameToCheck, personCheck)) {
+            this.logger.log(`⚠️ Person guard: ILIKE matched but no exact token for "${personNameToCheck}" — showing disambiguation`);
+            return this.buildFuzzyDisambiguation(personNameToCheck, personCheck, 'disambiguation');
+          }
+
+          // Person found but user asked general_knowledge → redirect to person_lookup or career_report
+          this.logger.log(`✅ Person guard: "${personNameToCheck}" found in DB — redirecting to person_lookup`);
+          const matchedName = personCheck[0].full_name;
+          const hasAssessment = parseInt(personCheck[0].completed_count) > 0;
+
+          if (hasAssessment) {
+            // Redirect to career_report or person_lookup
+            return await this.handleCareerReport(matchedName, user);
+          } else {
+            return {
+              answer: `**Found "${matchedName}" in our database**, but they haven't completed any assessments yet.\n\nOnce the assessment is completed, I can provide:\n• Personality profile & behavioral insights\n• Career fitment analysis\n• Role readiness scores\n• Personalized career recommendations\n\nWould you like to see their registration details instead?`,
+              searchType: 'person_no_assessment',
+              confidence: 0.9,
+            };
+          }
+        }
+      }
+
       if (interpretation.intent === 'general_knowledge') {
         this.logger.log('🧠 Intent: general_knowledge → using LLM directly');
         const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
-        const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, conversationHistory);
+        const answer = await this.oriIntelligence.answerAnyQuestion(resolvedQuestion, userProfile, conversationHistory);
         return {
           answer,
           searchType: 'intelligent_response',
@@ -435,7 +577,7 @@ export class RagService {
       if ((!user || (user.id === 0 && !user.email && !user.sub)) && (user?.role === 'STUDENT' || !user?.role)) {
         this.logger.log('🔒 RBAC: Anonymous user detected — prompting to log in');
         return {
-          answer: 'Welcome to MITHRA. To access your personalized data and results, please log in first. If you have any general career questions, feel free to ask.',
+          answer: 'Welcome to BI. To access your personalized data and results, please log in first. If you have any general career questions, feel free to ask.',
           searchType: 'auth_required',
           confidence: 1.0,
         };
@@ -646,11 +788,12 @@ export class RagService {
           paramIndex++;
         }
       } else {
-        // Only search by full_name when the term is a plain name.
-        // Do NOT match email substrings — e.g. searching "ajay" must NOT
-        // match "yesodharanramajayam@gmail.com".
-        whereParts.push(`(r.full_name ILIKE $${paramIndex})`);
-        params.push(`%${nameSearch}%`);
+        // Smart name matching with word-boundary precision:
+        // 1. Use PostgreSQL regex \m (word start) and \M (word end) for exact word matching
+        // 2. This prevents "jai" from matching "JAISHREE" (substring match was too broad)
+        // 3. Falls back to ILIKE if word-boundary match returns 0 results (handled below)
+        whereParts.push(`(r.full_name ~* $${paramIndex})`);
+        params.push(`\\m${nameSearch}\\M`);
         paramIndex++;
       }
 
@@ -668,7 +811,7 @@ export class RagService {
         paramIndex++;
       }
 
-      const personData = await this.dataSource.query(`
+      const careerReportSql = `
                 SELECT 
                     r.id,
                     r.full_name,
@@ -688,8 +831,41 @@ export class RagService {
                 WHERE (${whereClause})
                 AND r.is_deleted = false${rbacFilter}
                 ORDER BY r.id, aa.total_score DESC NULLS LAST
-                LIMIT 10
-            `, params);
+                LIMIT 10`;
+
+      let personData = await this.dataSource.query(careerReportSql, params);
+
+      // Fallback: if word-boundary match returned 0 and we used ~*, try ILIKE fuzzy match
+      let usedCareerILIKEFallback = false;
+      if (!personData.length && !emailSearch) {
+        this.logger.log(`🔄 Word-boundary match for "${nameSearch}" returned 0, falling back to ILIKE`);
+        usedCareerILIKEFallback = true;
+        const fallbackParams: any[] = [`%${nameSearch}%`];
+        let fallbackRbac = '';
+        if (userRole === 'CORPORATE' && corporateId) {
+          fallbackRbac = ` AND r.corporate_account_id = $2`;
+          fallbackParams.push(corporateId);
+        } else if (userRole === 'STUDENT' && userId) {
+          fallbackRbac = ` AND r.user_id = $2`;
+          fallbackParams.push(userId);
+        }
+        personData = await this.dataSource.query(`
+                SELECT 
+                    r.id, r.full_name, r.gender, r.mobile_number, u.email,
+                    aa.total_score,
+                    pt.blended_style_name as behavioral_style,
+                    pt.blended_style_desc as behavior_description,
+                    (SELECT MAX(aa2.total_score) FROM assessment_attempts aa2 WHERE aa2.registration_id = r.id) as best_score,
+                    (SELECT COUNT(*) FROM assessment_attempts aa3 WHERE aa3.registration_id = r.id AND aa3.status = 'COMPLETED') as attempt_count
+                FROM registrations r
+                LEFT JOIN users u ON r.user_id = u.id
+                LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id 
+                    AND aa.id = (SELECT id FROM assessment_attempts WHERE registration_id = r.id ORDER BY completed_at DESC LIMIT 1)
+                LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+                WHERE r.full_name ILIKE $1 AND r.is_deleted = false${fallbackRbac}
+                ORDER BY r.id, aa.total_score DESC NULLS LAST
+                LIMIT 10`, fallbackParams);
+      }
 
       if (!personData.length) {
         return {
@@ -697,6 +873,13 @@ export class RagService {
           searchType: 'career_report',
           confidence: 0.3,
         };
+      }
+
+      // If ILIKE fallback was used, verify exact word-token match
+      // Prevents "jai" from auto-matching "JAISHREE M" — shows "did you mean?" instead
+      if (usedCareerILIKEFallback && !numberMatch && !this.hasExactTokenMatch(nameSearch, personData)) {
+        this.logger.log(`⚠️ Career report: ILIKE matched but no exact token for "${nameSearch}" — showing fuzzy disambiguation`);
+        return this.buildFuzzyDisambiguation(nameSearch, personData, 'career_report');
       }
 
       // If email was provided and exactly one match found, skip disambiguation
@@ -774,6 +957,244 @@ export class RagService {
       this.logger.error(`Career report error: ${error.message}`);
       return {
         answer: `**❌ Error generating report:** ${error.message}`,
+        searchType: 'error',
+        confidence: 0,
+      };
+    }
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HANDLER: PERSON LOOKUP (with smart matching + disambiguation)
+  // ═══════════════════════════════════════════════════════════════════════════
+  private async handlePersonLookup(
+    searchTerm: string,
+    user?: any,
+  ): Promise<QueryResult> {
+    const userRole = user?.role || 'STUDENT';
+    const corporateId = user?.corporateId;
+    const userId = user?.id;
+
+    // Check for disambiguation number (e.g., "jai #2" or bare "2")
+    const numberMatch = searchTerm.match(/(.+?)\s*[#]?\s*(\d+)$/);
+    let targetIndex = -1;
+    let cleanSearch = searchTerm;
+    if (numberMatch && numberMatch[1].trim().length > 0) {
+      cleanSearch = numberMatch[1].trim();
+      targetIndex = parseInt(numberMatch[2]) - 1; // 0-based
+    }
+
+    try {
+      // ── Step 1: Smart name search (word-boundary first, ILIKE fallback) ──
+      const rbacFilter = userRole === 'CORPORATE' && corporateId
+        ? ` AND r.corporate_account_id = ${corporateId}`
+        : userRole === 'STUDENT' && userId
+          ? ` AND r.user_id = ${userId}`
+          : '';
+
+      const lookupSql = (whereNameClause: string, nameParam: string) => `
+        SELECT 
+          r.id as reg_id,
+          r.full_name,
+          r.gender,
+          r.mobile_number,
+          u.email,
+          aa.total_score,
+          aa.sincerity_index,
+          aa.sincerity_class,
+          aa.status,
+          aa.completed_at,
+          pt.blended_style_name as behavioral_style,
+          pt.blended_style_desc as behavior_description,
+          p.name as program_name,
+          (SELECT MAX(aa2.total_score) FROM assessment_attempts aa2 WHERE aa2.registration_id = r.id AND aa2.status = 'COMPLETED') as best_score,
+          (SELECT COUNT(*) FROM assessment_attempts aa3 WHERE aa3.registration_id = r.id AND aa3.status = 'COMPLETED') as attempt_count
+        FROM registrations r
+        LEFT JOIN users u ON r.user_id = u.id
+        LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id AND aa.status = 'COMPLETED'
+        LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+        LEFT JOIN programs p ON aa.program_id = p.id
+        WHERE r.is_deleted = false AND ${whereNameClause}${rbacFilter}
+        ORDER BY r.full_name, aa.completed_at DESC NULLS LAST
+        LIMIT 20`;
+
+      // Try word-boundary match first
+      let data = await this.executeDatabaseQuery(
+        lookupSql(`r.full_name ~* $1`, ''),
+        [`\\m${cleanSearch}\\M`],
+      );
+
+      // Fallback to ILIKE if no results
+      let usedLookupILIKEFallback = false;
+      if (data.length === 0) {
+        this.logger.log(`🔄 person_lookup: word-boundary for "${cleanSearch}" → 0, trying ILIKE`);
+        usedLookupILIKEFallback = true;
+        data = await this.executeDatabaseQuery(
+          lookupSql(`r.full_name ILIKE $1`, ''),
+          [`%${cleanSearch}%`],
+        );
+      }
+
+      if (data.length === 0) {
+        return {
+          answer: `**No results found for "${cleanSearch}".** Please check the name and try again.\n\nYou can ask:\n• "show [full name]'s results"\n• "details for [name]"\n• "list candidates" to see available names`,
+          searchType: 'person_not_found',
+          confidence: 0.7,
+        };
+      }
+
+      // If ILIKE fallback was used, verify exact word-token match
+      // Prevents "jai" from auto-matching "JAISHREE M" — shows "did you mean?" instead
+      if (usedLookupILIKEFallback && targetIndex < 0 && !this.hasExactTokenMatch(cleanSearch, data)) {
+        this.logger.log(`⚠️ Person lookup: ILIKE matched but no exact token for "${cleanSearch}" — showing fuzzy disambiguation`);
+        // Deduplicate by full_name for the disambiguation prompt
+        const seen = new Set<string>();
+        const uniqueForPrompt = data.filter((r: any) => {
+          if (seen.has(r.full_name)) return false;
+          seen.add(r.full_name);
+          return true;
+        });
+        return this.buildFuzzyDisambiguation(cleanSearch, uniqueForPrompt, 'person_lookup');
+      }
+
+      // ── Step 2: Group by unique person (by registration ID) ──
+      const personMap = new Map<number, { person: any; attempts: any[] }>();
+      for (const row of data) {
+        const regId = parseInt(row.reg_id);
+        if (!personMap.has(regId)) {
+          personMap.set(regId, {
+            person: {
+              full_name: row.full_name,
+              gender: row.gender,
+              mobile_number: row.mobile_number,
+              email: row.email,
+              best_score: row.best_score,
+              attempt_count: parseInt(row.attempt_count) || 0,
+            },
+            attempts: [],
+          });
+        }
+        if (row.status === 'COMPLETED') {
+          personMap.get(regId)!.attempts.push({
+            total_score: row.total_score,
+            behavioral_style: row.behavioral_style,
+            behavior_description: row.behavior_description,
+            sincerity_index: row.sincerity_index,
+            sincerity_class: row.sincerity_class,
+            completed_at: row.completed_at,
+            program_name: row.program_name,
+          });
+        }
+      }
+
+      const uniquePersons = Array.from(personMap.values());
+
+      // ── Step 3: Disambiguation if multiple unique people ──
+      if (uniquePersons.length > 1 && targetIndex < 0) {
+        let response = `**👥 Multiple candidates found matching "${cleanSearch}":**\n\n`;
+        response += `Please specify which one:\n\n`;
+
+        uniquePersons.forEach((entry, index) => {
+          const p = entry.person;
+          const email = p.email ? ` | ${p.email}` : '';
+          const attempts = p.attempt_count > 0 ? ` (${p.attempt_count} assessment${p.attempt_count > 1 ? 's' : ''})` : ' (no assessments)';
+          const bestStyle = entry.attempts.length > 0 ? ` | ${entry.attempts[0].behavioral_style || 'N/A'}` : '';
+          response += `**${index + 1}.** ${p.full_name}${email}${bestStyle}${attempts}\n`;
+        });
+
+        response += `\n**Reply with a number** (e.g. **1** or **2**) or try:\n• "${cleanSearch} #1"\n• "${cleanSearch} #2"`;
+
+        // Store disambiguation context for follow-up
+        this.disambiguationCache.set(this.getDisambiguationKey(user), {
+          searchTerm: cleanSearch,
+          timestamp: Date.now(),
+          handler: 'person_lookup',
+        });
+
+        return {
+          answer: response,
+          searchType: 'disambiguation',
+          confidence: 0.7,
+        };
+      }
+
+      // Validate index for numbered selections
+      if (targetIndex >= uniquePersons.length) {
+        return {
+          answer: `**❌ Invalid selection.** Only ${uniquePersons.length} candidate(s) found matching "${cleanSearch}".\nPlease use a number between 1 and ${uniquePersons.length}.`,
+          searchType: 'person_lookup',
+          confidence: 0.3,
+        };
+      }
+
+      // ── Step 4: Format consolidated results for the selected person ──
+      const selected = targetIndex >= 0 ? uniquePersons[targetIndex] : uniquePersons[0];
+      const person = selected.person;
+      const attempts = selected.attempts;
+
+      let response = `**📊 Assessment Results for ${person.full_name}**\n\n`;
+
+      if (person.email) response += `📧 **Email:** ${person.email}\n`;
+      if (person.gender) response += `👤 **Gender:** ${person.gender}\n`;
+
+      if (attempts.length === 0) {
+        response += `\n⚠️ **No completed assessments found.** This candidate has registered but hasn't completed any tests yet.\n`;
+      } else {
+        // Show the latest/best attempt details
+        const latest = attempts[0];
+        const scoreNum = latest.total_score ? parseFloat(latest.total_score) : NaN;
+
+        if (latest.behavioral_style) {
+          response += `\n📋 **Behavioral Style: ${latest.behavioral_style}**\n`;
+          if (latest.behavior_description) {
+            response += `${latest.behavior_description}\n`;
+          }
+        }
+
+        if (!isNaN(scoreNum)) {
+          const agile = this.getAgileLevel(scoreNum);
+          response += `\n🎯 **Agile Compatibility: ${agile.name}** (Score: ${scoreNum}/125)\n`;
+          response += `${agile.desc}\n`;
+        }
+
+        if (latest.sincerity_class) {
+          response += `\n🔒 **Sincerity:** ${latest.sincerity_class}`;
+          if (latest.sincerity_index) response += ` (Index: ${parseFloat(latest.sincerity_index).toFixed(1)})`;
+          response += '\n';
+        }
+
+        if (latest.program_name) {
+          response += `📚 **Program:** ${latest.program_name}\n`;
+        }
+
+        if (latest.completed_at) {
+          response += `📅 **Completed:** ${new Date(latest.completed_at).toLocaleDateString()}\n`;
+        }
+
+        // Show additional attempts if any
+        if (attempts.length > 1) {
+          response += `\n---\n📊 **All ${attempts.length} Completed Assessments:**\n\n`;
+          attempts.forEach((att, i) => {
+            const s = att.total_score ? parseFloat(att.total_score) : 0;
+            const style = att.behavioral_style || 'N/A';
+            const date = att.completed_at ? new Date(att.completed_at).toLocaleDateString() : 'N/A';
+            response += `**${i + 1}.** Score: ${s}/125 | Style: ${style} | Date: ${date}\n`;
+          });
+        }
+      }
+
+      response += `\n💡 *Want a detailed analysis? Try: "generate career report for ${person.full_name}"*`;
+
+      return {
+        answer: response,
+        searchType: 'person_lookup',
+        confidence: 0.95,
+      };
+
+    } catch (error) {
+      this.logger.error(`Person lookup error: ${error.message}`);
+      return {
+        answer: `**❌ Error looking up person:** ${error.message}`,
         searchType: 'error',
         confidence: 0,
       };
@@ -1121,9 +1542,71 @@ export class RagService {
         };
       }
 
-      // Encode the profile data as base64 for the URL
+      // ══════════════════════════════════════════════════════════
+      // DB VALIDATION: Verify the person exists in our database
+      // with completed assessment data before generating a report.
+      // We NEVER generate reports for people not in our system.
+      // Uses word-boundary matching for precision (prevents "jai" → "JAISHREE")
+      // ══════════════════════════════════════════════════════════
+      let dbCheck = await this.dataSource.query(
+        `SELECT r.id, r.full_name, r.user_id,
+                (SELECT COUNT(*) FROM assessment_attempts aa
+                 WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
+         FROM registrations r
+         WHERE r.full_name ~* $1 AND r.is_deleted = false
+         ORDER BY r.created_at DESC LIMIT 5`,
+        [`\\m${profileData.name}\\M`]
+      );
+
+      // Fallback to ILIKE if word-boundary returned 0
+      let usedProfileILIKEFallback = false;
+      if (!dbCheck || dbCheck.length === 0) {
+        usedProfileILIKEFallback = true;
+        dbCheck = await this.dataSource.query(
+          `SELECT r.id, r.full_name, r.user_id,
+                  (SELECT COUNT(*) FROM assessment_attempts aa
+                   WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
+           FROM registrations r
+           WHERE LOWER(r.full_name) LIKE $1 AND r.is_deleted = false
+           ORDER BY r.created_at DESC LIMIT 5`,
+          [`%${profileData.name.toLowerCase()}%`]
+        );
+      }
+
+      if (!dbCheck || dbCheck.length === 0) {
+        this.logger.warn(`❌ Chat profile report: "${profileData.name}" not found in database`);
+        return {
+          answer: `**⚠️ "${profileData.name}" was not found in our database.**\n\nI can only generate Career Fitment Reports for candidates who are registered on the OriginBI platform.\n\n**What you can do:**\n• Check if the name is spelled correctly\n• Ask me to **"list candidates"** to see registered users\n• The person needs to register and complete an assessment first\n\nI cannot generate reports for people outside our system — the report must be based on real assessment data to be meaningful.`,
+          searchType: 'person_not_found',
+          confidence: 0.95,
+        };
+      }
+
+      // If ILIKE fallback was used, verify exact word-token match
+      if (usedProfileILIKEFallback && !this.hasExactTokenMatch(profileData.name, dbCheck)) {
+        this.logger.log(`⚠️ Chat profile: ILIKE matched but no exact token for "${profileData.name}" — showing fuzzy disambiguation`);
+        return this.buildFuzzyDisambiguation(profileData.name, dbCheck, 'career_report');
+      }
+
+      // Check if at least one match has completed assessments
+      const withAssessment = dbCheck.filter((r: any) => parseInt(r.completed_count) > 0);
+      if (withAssessment.length === 0) {
+        const names = dbCheck.map((r: any) => r.full_name).join(', ');
+        this.logger.warn(`❌ Chat profile report: "${profileData.name}" found but no completed assessments`);
+        return {
+          answer: `**⚠️ Found "${names}" in our database, but they have not completed any assessments yet.**\n\nA Career Fitment Report requires completed assessment data (DISC personality profiling + Agile scoring) to generate meaningful career recommendations.\n\n**The candidate needs to:**\n1. Complete the behavioral assessment\n2. Complete the aptitude/agile assessment\n\nOnce the assessment is completed, I can generate a comprehensive report with career path recommendations, role fitment scores, and skill gap analysis.`,
+          searchType: 'no_assessment_data',
+          confidence: 0.95,
+        };
+      }
+
+      // Use the best match from DB (person with completed assessment)
+      const bestMatch = withAssessment[0];
+      this.logger.log(`✅ DB validated: ${bestMatch.full_name} (userId: ${bestMatch.user_id}, assessments: ${bestMatch.completed_count})`);
+
+      // Encode the profile data as base64 for the URL — merge DB data with provided profile
       const reportPayload = {
-        name: profileData.name,
+        name: bestMatch.full_name, // Use the DB name for accuracy
         currentRole: profileData.currentRole,
         currentJobDescription: profileData.currentJobDescription,
         yearsOfExperience: profileData.yearsOfExperience,
@@ -1137,7 +1620,7 @@ export class RagService {
       const downloadUrl = `/rag/chat-report/download?profile=${encodedProfile}`;
 
       return {
-        answer: `**✅ Profile Captured Successfully for ${profileData.name}!** 🎯\n\n📊 **Profile Summary:**\n- **Name:** ${profileData.name}\n- **Current Role:** ${profileData.currentRole}\n- **Experience:** ${profileData.yearsOfExperience} years\n- **Industry:** ${profileData.currentIndustry}\n- **Target Role:** ${profileData.expectedFutureRole}\n\n📄 **[Click here to download your personalized Career Fitment Report](${downloadUrl})**`,
+        answer: `**✅ Profile Captured Successfully for ${bestMatch.full_name}!** 🎯\n\n📊 **Profile Summary:**\n- **Name:** ${bestMatch.full_name}\n- **Current Role:** ${profileData.currentRole}\n- **Experience:** ${profileData.yearsOfExperience} years\n- **Industry:** ${profileData.currentIndustry}\n- **Target Role:** ${profileData.expectedFutureRole}\n- **Assessments Completed:** ${bestMatch.completed_count}\n\n📄 **[Click here to download your personalized Career Fitment Report](${downloadUrl})**\n\n*Report is generated using real assessment data from our platform combined with the profile details you provided.*`,
         searchType: 'chat_profile_report',
         confidence: 0.95,
         reportUrl: downloadUrl,
@@ -1446,7 +1929,45 @@ JSON:`;
       if (this.queryCache.size > 200) this.cleanCache();
       return result;
     } catch (error) {
-      this.logger.warn(`Query interpretation failed: ${error.message}, using fallback`);
+      this.logger.warn(`Query interpretation failed: ${error.message}, trying Gemini fallback...`);
+      
+      // ── Gemini fallback for query understanding ──
+      try {
+        const googleApiKey = process.env.GOOGLE_API_KEY;
+        if (googleApiKey) {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${googleApiKey}`;
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Referer': 'https://originbi.com' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0, maxOutputTokens: 200 },
+            }),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            const geminiText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            if (geminiText) {
+              const cleanJson = geminiText.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
+              const parsed = JSON.parse(cleanJson);
+              let result = {
+                intent: parsed.intent || 'general_knowledge',
+                searchTerm: parsed.searchTerm || null,
+                table: parsed.table || 'none',
+                includePersonality: parsed.includePersonality || false,
+              };
+              result = this.applyDomainOverrides(question, result);
+              this.logger.log('✅ Gemini query understanding fallback succeeded');
+              this.queryCache.set(cacheKey, { result, timestamp: Date.now() });
+              return result;
+            }
+          }
+        }
+      } catch (geminiErr) {
+        this.logger.warn(`Gemini fallback also failed: ${geminiErr.message}`);
+      }
+
+      this.logger.warn('Using keyword-based fallback interpretation');
       return this.fallbackInterpretation(question);
     }
   }
@@ -1930,6 +2451,73 @@ JSON:`;
     return null;
   }
 
+  /**
+   * Determines if the query is asking about a specific person
+   * (as opposed to a generic concept question like "what is a CFO?").
+   * Uses pronoun signals, conversation context, and name detection.
+   */
+  /**
+   * Check if searchTerm matches as a complete word/token in any result's name.
+   * Returns true if at least one result contains the search term as a whole word.
+   * Used to distinguish exact matches ("jai" in "JAI KUMAR") from fuzzy substring
+   * matches ("jai" in "JAISHREE M") when falling back to ILIKE.
+   */
+  private hasExactTokenMatch(searchTerm: string, results: any[], nameField = 'full_name'): boolean {
+    const escaped = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+    return results.some(r => regex.test(r[nameField]));
+  }
+
+  /**
+   * Build a "Did you mean?" disambiguation response for fuzzy ILIKE matches.
+   */
+  private buildFuzzyDisambiguation(searchTerm: string, results: any[], searchType: string): QueryResult {
+    let response = `**🔍 No exact match found for "${searchTerm}".**\n\n`;
+    if (results.length === 1) {
+      response += `Did you mean **${results[0].full_name}**?\n\n`;
+      response += `If yes, try: *"${searchTerm === results[0].full_name ? searchTerm : results[0].full_name}"*\n`;
+      response += `Or use the full name for a precise match.`;
+    } else {
+      response += `These candidates have similar names:\n\n`;
+      results.slice(0, 5).forEach((person: any, index: number) => {
+        const email = person.email ? ` | ${person.email}` : '';
+        response += `**${index + 1}.** ${person.full_name}${email}\n`;
+      });
+      response += `\nPlease use the **full name** or reply with the number (e.g. **1** or **2**).`;
+    }
+    return { answer: response, searchType, confidence: 0.6 };
+  }
+
+  private isPersonSpecificQuery(question: string, ctx: any): boolean {
+    const q = question.toLowerCase();
+
+    // Pronoun references to a person in conversation
+    const pronounPatterns = /\b(him|her|his|hers|he|she|that person|that candidate|that student|this person)\b/i;
+    if (pronounPatterns.test(q)) return true;
+
+    // Explicit "about <name>" or "asking about" patterns
+    if (/\b(about|regarding|for)\s+[A-Z][a-z]+/i.test(question)) {
+      // But exclude generic concept queries like "about becoming a CFO"
+      if (/\b(about|regarding)\s+(becoming|being|working|learning|studying|getting)/i.test(q)) return false;
+      return true;
+    }
+
+    // "does it suit him/her" or "is he/she suitable" patterns
+    if (/\b(suit|suitable|fit|good for|ready for)\s+(him|her|them)\b/i.test(q)) return true;
+    if (/\b(is|does)\s+(he|she)\b/i.test(q)) return true;
+
+    // Conversation context has a person being discussed
+    if (ctx?.lastPersonMentioned) {
+      // Check if question references qualitative traits about a person
+      if (/\b(make|become|role|position|suited|career|job|fitment|readiness)\b/i.test(q)) return true;
+    }
+
+    // "I'm asking about <name>" pattern
+    if (/\b(asking|talking|enquiring|inquiring)\s+(about|regarding)\b/i.test(q)) return true;
+
+    return false;
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // TOTAL COUNT FOR PAGINATION
   // ═══════════════════════════════════════════════════════════════════════════
@@ -2145,28 +2733,58 @@ JSON:`;
         const searchName = interpretation.searchTerm || '';
         const baseLookupSql = `
           SELECT 
+            registrations.id as reg_id,
             registrations.full_name,
             registrations.gender,
             registrations.mobile_number,
             assessment_attempts.total_score,
+            assessment_attempts.sincerity_index,
+            assessment_attempts.sincerity_class,
             assessment_attempts.status,
+            assessment_attempts.completed_at,
             personality_traits.blended_style_name as behavioral_style,
             personality_traits.blended_style_desc as behavior_description,
-            programs.name as program_name
+            programs.name as program_name,
+            users.email
           FROM registrations
+          LEFT JOIN users ON registrations.user_id = users.id
           LEFT JOIN assessment_attempts ON assessment_attempts.registration_id = registrations.id
+            AND assessment_attempts.status = 'COMPLETED'
           LEFT JOIN personality_traits ON assessment_attempts.dominant_trait_id = personality_traits.id
           LEFT JOIN programs ON assessment_attempts.program_id = programs.id
           WHERE registrations.is_deleted = false`;
 
+        // Use word-boundary regex for precise name matching (prevents "jai" → "JAISHREE")
         if (userRole === 'ADMIN') {
-          sql = `${baseLookupSql} AND registrations.full_name ILIKE $1 LIMIT 10`;
-          params.push(`%${searchName}%`);
+          sql = `${baseLookupSql} AND registrations.full_name ~* $1 ORDER BY registrations.full_name, assessment_attempts.completed_at DESC NULLS LAST LIMIT 20`;
+          params.push(`\\m${searchName}\\M`);
         } else if (userRole === 'CORPORATE' && corporateId) {
-          sql = `${baseLookupSql} AND registrations.full_name ILIKE $1 AND registrations.corporate_account_id = $2 LIMIT 10`;
-          params.push(`%${searchName}%`, corporateId);
+          sql = `${baseLookupSql} AND registrations.full_name ~* $1 AND registrations.corporate_account_id = $2 ORDER BY registrations.full_name, assessment_attempts.completed_at DESC NULLS LAST LIMIT 20`;
+          params.push(`\\m${searchName}\\M`, corporateId);
         } else {
           // Students can only see themselves — ignore search term
+          sql = `${baseLookupSql} AND registrations.user_id = $1 LIMIT 1`;
+          params.push(userId);
+        }
+
+        // Execute the word-boundary query
+        try {
+          const exactResults = await this.executeDatabaseQuery(sql, params);
+          if (exactResults.length > 0) return exactResults;
+        } catch (e) {
+          this.logger.warn(`Word-boundary search failed: ${e.message}`);
+        }
+
+        // Fallback: ILIKE fuzzy match if word-boundary returned 0
+        this.logger.log(`🔄 person_lookup: word-boundary match for "${searchName}" returned 0, falling back to ILIKE`);
+        params.length = 0;
+        if (userRole === 'ADMIN') {
+          sql = `${baseLookupSql} AND registrations.full_name ILIKE $1 ORDER BY registrations.full_name, assessment_attempts.completed_at DESC NULLS LAST LIMIT 20`;
+          params.push(`%${searchName}%`);
+        } else if (userRole === 'CORPORATE' && corporateId) {
+          sql = `${baseLookupSql} AND registrations.full_name ILIKE $1 AND registrations.corporate_account_id = $2 ORDER BY registrations.full_name, assessment_attempts.completed_at DESC NULLS LAST LIMIT 20`;
+          params.push(`%${searchName}%`, corporateId);
+        } else {
           sql = `${baseLookupSql} AND registrations.user_id = $1 LIMIT 1`;
           params.push(userId);
         }
@@ -2909,6 +3527,73 @@ JSON:`;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // FOLLOW-UP SUGGESTION GENERATOR
+  // ═══════════════════════════════════════════════════════════════════════════
+  generateFollowUpSuggestions(question: string, answer: string, searchType: string): string[] {
+    const q = question.toLowerCase();
+    const suggestions: string[] = [];
+
+    // Context-aware suggestions based on search type
+    switch (searchType) {
+      case 'list_candidates':
+      case 'list_registrations':
+        suggestions.push('Show top performers');
+        suggestions.push('How many candidates completed assessments?');
+        suggestions.push('Generate career report for a candidate');
+        break;
+      case 'person_lookup':
+      case 'career_report':
+        suggestions.push('Show their personality traits');
+        suggestions.push('What careers suit this person?');
+        suggestions.push('Generate a detailed career report');
+        break;
+      case 'test_results':
+        suggestions.push('Who are the top scorers?');
+        suggestions.push('Show average scores');
+        suggestions.push('Compare performance across groups');
+        break;
+      case 'career_guidance':
+        suggestions.push('What skills should I develop?');
+        suggestions.push('Show recommended courses');
+        suggestions.push('What certifications are valuable?');
+        break;
+      case 'intelligent_response':
+      case 'general_knowledge':
+        // Analyze the question topic for relevant follow-ups
+        if (q.includes('skill') || q.includes('learn') || q.includes('course')) {
+          suggestions.push('Show me a learning roadmap');
+          suggestions.push('What certifications should I get?');
+          suggestions.push('Compare online learning platforms');
+        } else if (q.includes('career') || q.includes('job') || q.includes('role')) {
+          suggestions.push('What skills are needed?');
+          suggestions.push('Show salary ranges');
+          suggestions.push('How to prepare for interviews?');
+        } else if (q.includes('technology') || q.includes('programming') || q.includes('framework')) {
+          suggestions.push('Show me a getting started guide');
+          suggestions.push('What projects should I build?');
+          suggestions.push('Compare with alternatives');
+        } else {
+          suggestions.push('Tell me more about this');
+          suggestions.push('How can I apply this?');
+          suggestions.push('What are the next steps?');
+        }
+        break;
+      case 'list_users':
+        suggestions.push('Show active users');
+        suggestions.push('How many admins are there?');
+        suggestions.push('Show user activity summary');
+        break;
+      default:
+        suggestions.push('List all candidates');
+        suggestions.push('Show top performers');
+        suggestions.push('Ask me about career paths');
+        break;
+    }
+
+    return suggestions.slice(0, 3);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // SERVICE METHODS
   // ═══════════════════════════════════════════════════════════════════════════
   async getStatus(): Promise<any> {
@@ -2922,7 +3607,7 @@ JSON:`;
 
     return {
       status: 'ok',
-      name: 'MITHRA',
+      name: 'BI',
       version: '2.0.0-jarvis',
       description: 'OriginBI Intelligent - Your Career Guide (JARVIS Edition)',
       features: [

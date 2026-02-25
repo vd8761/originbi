@@ -30,6 +30,7 @@ import { FutureRoleReportService } from './future-role-report.service';
 import { OverallRoleFitmentService } from './overall-role-fitment.service';
 import { CustomReportService } from './custom-report.service';
 import { ChatMemoryService } from './chat-memory.service';
+import { ConversationService } from './conversation.service';
 import { PdfService } from '../common/pdf/pdf.service';
 
 // RBAC: Auth guard & user context
@@ -223,6 +224,8 @@ export interface RagResponse {
   searchType?: string;
   sql?: string;
   confidence?: number;
+  suggestions?: string[];
+  reportId?: string;
 }
 
 @Controller('rag')
@@ -236,6 +239,7 @@ export class RagController {
     private readonly overallRoleFitmentService: OverallRoleFitmentService,
     private readonly customReportService: CustomReportService,
     private readonly chatMemory: ChatMemoryService,
+    private readonly conversationService: ConversationService,
     private readonly pdfService: PdfService,
   ) { }
 
@@ -488,6 +492,9 @@ export class RagController {
       const result = await this.ragService.query(question, user, convId);
       this.logger.log(`✅ RAG query completed`);
 
+      // ── Generate follow-up suggestions ──
+      const suggestions = this.ragService.generateFollowUpSuggestions(question, result.answer, result.searchType);
+
       // ── Chat memory: save assistant reply + auto-title ──
       if (user.id > 0 && convId > 0) {
         try {
@@ -502,7 +509,15 @@ export class RagController {
         }
       }
 
-      return { ...result, conversationId: convId || undefined };
+      // ── Track BI's response in ConversationService for entity context ──
+      try {
+        const sessionId = convId > 0 ? `conv_${convId}` : `user_${user.id || 0}`;
+        this.conversationService.addBiResponse(sessionId, result.answer, result.searchType);
+      } catch (e) {
+        // Non-blocking
+      }
+
+      return { ...result, suggestions, conversationId: convId || undefined };
     } catch (error) {
       this.logger.error(`❌ RAG Controller error: ${error.message}`);
       throw new HttpException(
