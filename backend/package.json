@@ -7,25 +7,31 @@
         "admin-service",
         "auth-service",
         "corporate-service",
-        "student-service"
+        "student-service",
+        "report-service"
     ],
     "dependencies": {
-        "typeorm": "^0.3.28",
         "pg": "^8.11.3",
-        "reflect-metadata": "^0.2.1"
+        "reflect-metadata": "^0.2.1",
+        "typeorm": "^0.3.28"
     },
     "scripts": {
-        "build:shared": "npm --prefix shared install && npm --prefix shared run build",
+        "build:shared": "cd shared && npm run build",
         "build:all": "npm run build:shared && npm run build:services",
-        "build:services": "npm run build:admin && npm run build:auth && npm run build:corporate && npm run build:student",
+        "build:services": "npm run build:admin && npm run build:auth && npm run build:corporate && npm run build:student && npm run build:report",
         "build:admin": "cd admin-service && npm run build",
         "build:auth": "cd auth-service && npm run build",
         "build:corporate": "cd corporate-service && npm run build",
         "build:student": "cd student-service && npm run build",
+        "build:report": "cd report-service && npm run build",
         "start:admin": "cd admin-service && npm run start:dev",
         "start:auth": "cd auth-service && npm run start:dev",
         "start:corporate": "cd corporate-service && npm run start:dev",
         "start:student": "cd student-service && npm run start:dev",
-        "postinstall": "npm run build:shared"
+        "start:report": "cd report-service && npm run dev",
+        "postinstall": "node patch-pgboss.js"
+    },
+    "devDependencies": {
+        "@types/jest": "^30.0.0"
     }
 }

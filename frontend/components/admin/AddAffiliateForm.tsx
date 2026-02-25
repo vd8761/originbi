@@ -1,10 +1,13 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
     ArrowRightWithoutLineIcon,
     EyeVisibleIcon,
     EyeOffIcon,
+    XIcon,
+    WarningIcon,
 } from '../icons';
 import MobileInput from '../ui/MobileInput';
 
@@ -60,6 +63,13 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
     const [error, setError] = useState<string | null>(null);
     const [formErrors, setFormErrors] = useState<Record<string, string>>({});
     const [createdReferralCode, setCreatedReferralCode] = useState<string | null>(null);
+
+    // Delete confirmation modal state
+    const [confirmDelete, setConfirmDelete] = useState<{
+        show: boolean;
+        type: "aadhar" | "pan" | null;
+        index: number | null;
+    }>({ show: false, type: null, index: null });
 
     const aadharInputRef = useRef<HTMLInputElement>(null);
     const panInputRef = useRef<HTMLInputElement>(null);
@@ -171,11 +181,19 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
     };
 
     const removeExistingDoc = (type: "aadhar" | "pan", index: number) => {
-        if (type === "aadhar") {
-            setExistingAadharDocs((prev) => prev.filter((_, i) => i !== index));
-        } else {
-            setExistingPanDocs((prev) => prev.filter((_, i) => i !== index));
+        setConfirmDelete({ show: true, type, index });
+    };
+
+    const handleConfirmDelete = () => {
+        const { type, index } = confirmDelete;
+        if (type && index !== null) {
+            if (type === "aadhar") {
+                setExistingAadharDocs((prev) => prev.filter((_, i) => i !== index));
+            } else {
+                setExistingPanDocs((prev) => prev.filter((_, i) => i !== index));
+            }
         }
+        setConfirmDelete({ show: false, type: null, index: null });
     };
 
     // Drag and drop handlers
@@ -235,6 +253,15 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
         if (!formData.accountNumber.trim()) errors.accountNumber = "Required";
         if (!formData.ifscCode.trim()) errors.ifscCode = "Required";
         if (!formData.branchName.trim()) errors.branchName = "Required";
+
+        // KYC Documents validation
+        if (aadharFiles.length + existingAadharDocs.length === 0) {
+            errors.aadhar = "Required";
+        }
+        if (panFiles.length + existingPanDocs.length === 0) {
+            errors.pan = "Required";
+        }
+
         setFormErrors(errors);
         return Object.keys(errors).length === 0;
     };
@@ -359,7 +386,7 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
             <div className="space-y-3">
                 <div className="flex items-center justify-between">
                     <label className={baseLabelClasses}>
-                        {label}{" "}
+                        {label} <span className="text-red-500">*</span>{" "}
                         <span className="text-xs font-normal text-gray-400">
                             (Max {MAX_FILES_PER_TYPE} files, 5MB each)
                         </span>
@@ -805,6 +832,45 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
                     )}
                 </button>
             </div>
+
+            {/* Document Delete Confirmation Modal - Rendered via Portal */}
+            {confirmDelete.show && (typeof document !== 'undefined') && createPortal(
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+                    <div
+                        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
+                        onClick={() => setConfirmDelete({ show: false, type: null, index: null })}
+                    />
+                    <div className="relative w-full max-w-[320px] bg-white dark:bg-[#1A1F23] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl animate-scale-in overflow-hidden transform scale-100 opacity-100 translate-y-0">
+                        {/* Header/Icon */}
+                        <div className="pt-8 pb-4 flex flex-col items-center">
+                            <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+                                <WarningIcon className="w-7 h-7 text-red-500" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Remove Document?</h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 text-center px-6 leading-relaxed">
+                                Are you sure you want to delete this file?
+                            </p>
+                        </div>
+
+                        {/* Footer Actions */}
+                        <div className="grid grid-cols-2 border-t border-gray-100 dark:border-white/5 mt-4">
+                            <button
+                                onClick={() => setConfirmDelete({ show: false, type: null, index: null })}
+                                className="px-4 py-3.5 text-xs font-bold text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5 border-r border-gray-100 dark:border-white/5 transition-all outline-none focus:bg-gray-50 dark:focus:bg-white/5 uppercase tracking-wide"
+                            >
+                                No, Cancel
+                            </button>
+                            <button
+                                onClick={handleConfirmDelete}
+                                className="px-4 py-3.5 text-xs font-bold text-red-500 hover:bg-red-500/5 transition-all outline-none focus:bg-red-50 dark:focus:bg-red-900/10 uppercase tracking-wide"
+                            >
+                                Yes, Remove
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
         </div>
     );
 };

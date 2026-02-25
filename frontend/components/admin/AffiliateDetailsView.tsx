@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { capitalizeWords } from "../../lib/utils";
 
 interface AffiliateDocument {
     key: string;
@@ -136,7 +137,7 @@ const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBac
                             className="w-32 h-32 rounded-full mb-4 border-4 border-brand-light-tertiary dark:border-brand-dark-tertiary"
                         />
                         <h3 className="text-xl font-bold text-brand-text-light-primary dark:text-white mb-1">
-                            {data.name}
+                            {capitalizeWords(data.name)}
                         </h3>
                         <p className="text-sm text-brand-text-light-secondary dark:text-brand-text-secondary mb-2">
                             Affiliate Partner
@@ -169,7 +170,7 @@ const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBac
                         </h4>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                            <DetailItem label="Full Name" value={data.name} />
+                            <DetailItem label="Full Name" value={capitalizeWords(data.name)} />
                             <DetailItem label="Email Address" value={data.email} />
                             <DetailItem label="Mobile Number" value={`${data.country_code || '+91'} ${data.mobile_number}`} />
                             <DetailItem label="Referral Code" value={data.referral_code} />
@@ -242,7 +243,7 @@ const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBac
                             Bank Account Details
                         </h5>
                         <div className="space-y-4 pl-4">
-                            <DetailItem label="Account Holder Name" value={data.banking_name} />
+                            <DetailItem label="Account Holder Name" value={capitalizeWords(data.banking_name)} />
                             <DetailItem label="Account Number" value={data.account_number} />
                             <DetailItem label="IFSC Code" value={data.ifsc_code} />
                             <DetailItem label="Branch Name" value={data.branch_name} />

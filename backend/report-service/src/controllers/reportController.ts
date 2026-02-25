@@ -127,6 +127,7 @@ export const reportController = {
                 res.json({
                     status: "COMPLETED",
                     downloadUrl: `/download/status/${jobId}?download=true`,
+                    password: job.password,
                 });
                 return;
             }
@@ -182,30 +183,21 @@ export const reportController = {
             if (downloadPath && fs.existsSync(downloadPath)) {
                 res.download(downloadPath, (err) => {
                     if (err) {
-                        logger.error(
-                            `[API] Download failed for job ${jobId}:`,
-                            err,
-                        );
-                    }
-
-                    // --- Clean up: Delete file and remove job from store ---
-                    // Add a small delay for Windows file locking and to ensure stream is fully closed
-                    setTimeout(() => {
-                        try {
-                            if (fs.existsSync(downloadPath)) {
-                                logger.info(
-                                    `[API] Deleting temporary report file: ${downloadPath}`,
-                                );
-                                fs.unlinkSync(downloadPath);
-                            }
-                            reportQueueService.removeJob(jobId);
-                        } catch (cleanupErr) {
+                        // Suppress expected client aborts like byte-range limits or closed sockets
+                        if (
+                            err.message === "Request aborted" ||
+                            (err as any).code === "ECONNABORTED" ||
+                            (err as any).code === "ECONNRESET"
+                        ) {
+                            // Intentionally silent
+                        } else {
                             logger.error(
-                                `[API] Failed to cleanup job ${jobId}`,
-                                cleanupErr,
+                                `[API] Download failed for job ${jobId}:`,
+                                err,
                             );
                         }
-                    }, 10000); // 10 seconds delay to be safe
+                    }
+                    // Note: Cleanup is handled asynchronously via a TTL in the reportQueueService
                 });
             } else {
                 res.status(404).send(

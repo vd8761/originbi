@@ -1,5 +1,5 @@
 import React from 'react';
-import ReportDownloadButton from './ReportDownloadButton';
+// import ReportDownloadButton from './ReportDownloadButton';
 
 const PersonalityCard: React.FC = () => {
     return (
@@ -36,9 +36,11 @@ const PersonalityCard: React.FC = () => {
                 </h2>
                 
                 {/* Download Report Button */}
+                {/* 
                 <div className="mt-auto">
                     <ReportDownloadButton className="mt-4 pointer-events-auto" />
                 </div>
+                */}
             </div>
         </div>
     );

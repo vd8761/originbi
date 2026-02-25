@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 import fs from "fs";
 import path from "path";
+import { logger } from "./logger";
 import {
     CollegeData,
     SchoolData,
@@ -8,13 +9,20 @@ import {
     AgileScore,
 } from "../types/types";
 
-const pool = new Pool({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
-    port: parseInt(process.env.DB_PORT || "5432"),
-});
+const poolConfig = process.env.DATABASE_URL
+    ? {
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
+    }
+    : {
+        user: process.env.DB_USER,
+        host: process.env.DB_HOST,
+        database: process.env.DB_NAME,
+        password: process.env.DB_PASSWORD,
+        port: parseInt(process.env.DB_PORT || "5432"),
+    };
+
+const pool = new Pool(poolConfig);
 
 const LOG_FILE_PATH = path.join(__dirname, "../../sql_logs.txt");
 
@@ -133,8 +141,8 @@ export async function fetchUserAssessmentData(
             LEFT JOIN assessment_reports ar ON s.id = ar.assessment_session_id
             WHERE s.user_id = ANY($1)
             `;
-        } else {
-            // --- STANDARD QUERY (College/Others with Departments) ---
+        } else if (programId === 2) {
+            // --- COLLEGE QUERY (Join with Departments) ---
             sessionsQuery = `
             SELECT 
                 s.id as session_id, 
@@ -154,6 +162,25 @@ export async function fetchUserAssessmentData(
             LEFT JOIN assessment_reports ar ON s.id = ar.assessment_session_id
             JOIN department_degrees dd ON r.department_degree_id = dd.id
             JOIN departments d ON dd.department_id = d.id
+            WHERE s.user_id = ANY($1)
+        `;
+        } else {
+            // --- OTHER PROGRAMS (No Department Joins, No School Joins) ---
+            sessionsQuery = `
+            SELECT 
+                s.id as session_id, 
+                s.user_id, 
+                s.registration_id, 
+                s.program_id,
+                s.started_at, 
+                s.completed_at,
+                r.full_name,
+                u.email,
+                ar.report_number
+            FROM assessment_sessions s
+            JOIN registrations r ON s.registration_id = r.id
+            JOIN users u ON s.user_id = u.id
+            LEFT JOIN assessment_reports ar ON s.id = ar.assessment_session_id
             WHERE s.user_id = ANY($1)
         `;
         }
@@ -230,16 +257,16 @@ async function processSessionRows(
             return 40 - val + percent;
         };
 
-        const scoreD = calcScore(discData.disc_scores.D);
-        const scoreI = calcScore(discData.disc_scores.I);
-        const scoreS = calcScore(discData.disc_scores.S);
-        const scoreC = calcScore(discData.disc_scores.C);
+        const scoreD = calcScore(discData.disc_scores.D || 0);
+        const scoreI = calcScore(discData.disc_scores.I || 0);
+        const scoreS = calcScore(discData.disc_scores.S || 0);
+        const scoreC = calcScore(discData.disc_scores.C || 0);
 
         const typeCounts: AnswerTypeCount[] = [
-            { ANSWER_TYPE: "D", COUNT: discData.disc_scores.D },
-            { ANSWER_TYPE: "I", COUNT: discData.disc_scores.I },
-            { ANSWER_TYPE: "S", COUNT: discData.disc_scores.S },
-            { ANSWER_TYPE: "C", COUNT: discData.disc_scores.C },
+            { ANSWER_TYPE: "D", COUNT: discData.disc_scores.D || 0 },
+            { ANSWER_TYPE: "I", COUNT: discData.disc_scores.I || 0 },
+            { ANSWER_TYPE: "S", COUNT: discData.disc_scores.S || 0 },
+            { ANSWER_TYPE: "C", COUNT: discData.disc_scores.C || 0 },
         ];
 
         // Agile Scores mapping
@@ -289,15 +316,15 @@ async function processSessionRows(
             email_id: session.email,
             exam_start: session.started_at
                 ? new Date(session.started_at)
-                      .toISOString()
-                      .replace("T", " ")
-                      .split(".")[0]
+                    .toISOString()
+                    .replace("T", " ")
+                    .split(".")[0]
                 : "",
             exam_end: session.completed_at
                 ? new Date(session.completed_at)
-                      .toISOString()
-                      .replace("T", " ")
-                      .split(".")[0]
+                    .toISOString()
+                    .replace("T", " ")
+                    .split(".")[0]
                 : "",
             bi_registration_ID: session.registration_id,
             assigned_exam_id: session.session_id,
@@ -341,6 +368,8 @@ async function processSessionRows(
                 // Case B: SSLC - Stream undefined (handled by default)
             }
         }
+        logger.debug("Processing for Program:", reportTitleMap[programId]);
+        logger.debug("User Data:", userData);
 
         validUsersData.push(userData);
     }

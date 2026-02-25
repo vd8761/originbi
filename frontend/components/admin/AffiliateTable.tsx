@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { EyeVisibleIcon, XIcon, EditIcon } from '../icons';
 import { COUNTRY_CODES } from '../../lib/countryCodes';
+import { capitalizeWords } from "../../lib/utils";
 
 const API_BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "";
 
@@ -63,7 +64,8 @@ const AffiliateTable: React.FC<AffiliateTableProps> = ({
         return new Intl.NumberFormat('en-IN', {
             style: 'currency',
             currency: 'INR',
-            maximumFractionDigits: 0,
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
         }).format(num);
     };
 
@@ -268,7 +270,7 @@ const AffiliateTable: React.FC<AffiliateTableProps> = ({
                                                     className="w-8 h-8 rounded-full object-cover border border-brand-light-tertiary dark:border-brand-dark-tertiary"
                                                 />
                                                 <span className="text-sm font-medium text-brand-text-light-primary dark:text-white">
-                                                    {affiliate.name || 'N/A'}
+                                                    {capitalizeWords(affiliate.name) || 'N/A'}
                                                 </span>
                                             </div>
                                         </td>
@@ -416,7 +418,7 @@ const AffiliateTable: React.FC<AffiliateTableProps> = ({
                                     Referral Link
                                 </h3>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                    {selectedAffiliate.name} &bull; {selectedAffiliate.referral_code}
+                                    {capitalizeWords(selectedAffiliate.name)} &bull; {selectedAffiliate.referral_code}
                                 </p>
                             </div>
                             <button

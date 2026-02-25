@@ -154,8 +154,7 @@ export const assessmentService = {
         // Looking at GroupAssessmentPreview.tsx, it uses process.env.NEXT_PUBLIC_REPORT_API_BASE_URL
 
         const REPORT_API_URL =
-            process.env.NEXT_PUBLIC_REPORT_API_BASE_URL ||
-            "http://localhost:4006";
+            process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || "";
 
         const res = await fetch(
             `${REPORT_API_URL}/generate/student/${studentId}?json=true`,
@@ -173,17 +172,14 @@ export const assessmentService = {
         return res.json();
     },
 
-    async getDownloadStatus(
-        jobId: string,
-    ): Promise<{
+    async getDownloadStatus(jobId: string): Promise<{
         status: string;
         progress?: string;
         downloadUrl?: string;
         error?: string;
     }> {
         const REPORT_API_URL =
-            process.env.NEXT_PUBLIC_REPORT_API_BASE_URL ||
-            "http://localhost:4006";
+            process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || "";
 
         const res = await fetch(
             `${REPORT_API_URL}/download/status/${jobId}?json=true`,
@@ -197,6 +193,29 @@ export const assessmentService = {
 
         if (!res.ok) {
             throw new Error("Failed to fetch download status");
+        }
+        return res.json();
+    },
+
+    async sendReportEmail(
+        userId: string,
+        toEmail?: string,
+    ): Promise<{ message: string }> {
+        const STUDENT_API_URL = process.env.NEXT_PUBLIC_STUDENT_API_URL || "";
+
+        const res = await fetch(
+            `${STUDENT_API_URL}/student/send-report-email`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ userId: Number(userId), toEmail }),
+            },
+        );
+
+        if (!res.ok) {
+            throw new Error("Failed to send report email");
         }
         return res.json();
     },

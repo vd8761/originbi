@@ -21,6 +21,7 @@ import {
 } from '../icons';
 import Script from "next/script";
 import { useTheme } from '../../contexts/ThemeContext';
+import { capitalizeWords } from "../../lib/utils";
 
 interface HeaderProps {
     onLogout: () => void;
@@ -408,7 +409,7 @@ const Header: React.FC<HeaderProps> = ({
                                 ) : (
                                     <>
                                         <p className="font-semibold text-sm 2xl:text-sm leading-tight text-[#19211C] dark:text-brand-text-primary">
-                                            {corporateData.full_name || corporateData.name || 'User'}
+                                            {capitalizeWords(corporateData.full_name || corporateData.name) || 'User'}
                                         </p>
                                         <p className="text-xs 2xl:text-[12px] text-[#19211C] dark:text-brand-text-secondary leading-tight">
                                             {corporateData.email || ''}

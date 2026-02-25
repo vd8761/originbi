@@ -14,6 +14,7 @@ import {
 } from '@originbi/shared-entities';
 import { Department } from '../departments/department.entity';
 import { DepartmentDegree } from '../departments/department-degree.entity';
+import { DegreeType } from '../departments/degree-type.entity';
 
 @Injectable()
 export class AssessmentService {
@@ -306,6 +307,22 @@ export class AssessmentService {
 
       if (!session) return null;
 
+      // Rehydrate transient report password for frontend candidate preview components
+      try {
+        const report = await this.sessionRepo.manager.query(
+          `SELECT report_password as "reportPassword" FROM assessment_reports WHERE assessment_session_id = $1 LIMIT 1`,
+          [id],
+        );
+        if (report && report.length > 0 && report[0].reportPassword) {
+          if (!session.metadata) {
+            session.metadata = {};
+          }
+          session.metadata.reportPassword = report[0].reportPassword;
+        }
+      } catch (err) {
+        console.error('Failed to fetch password from assessment_reports:', err);
+      }
+
       // Fetch all attempts for the session to populate level-wise reports
       const attempts = await this.attemptRepo.find({
         where: { assessmentSessionId: id },
@@ -416,21 +433,25 @@ export class AssessmentService {
         .leftJoin('s.registration', 'r')
         .leftJoin(DepartmentDegree, 'dd', 'dd.id = r.departmentDegreeId')
         .leftJoin(Department, 'd', 'd.id = dd.departmentId')
+        .leftJoin(DegreeType, 'dt', 'dt.id = dd.degreeTypeId')
         .select([
           'r.departmentDegreeId AS "id"',
-          'd.name AS "name"',
+          'd.name AS "departmentName"',
+          'dt.name AS "degreeName"',
           'COUNT(s.id) AS "total"',
           `SUM(CASE WHEN s.status = 'COMPLETED' THEN 1 ELSE 0 END) AS "completed"`,
         ])
         .where('s.groupAssessmentId = :groupId', { groupId })
         .andWhere('r.departmentDegreeId IS NOT NULL')
-        .groupBy('r.departmentDegreeId, d.name')
+        .groupBy('r.departmentDegreeId, d.name, dt.name')
         .getRawMany();
 
       return {
         departments: stats.map((s) => ({
           id: Number(s.id),
-          name: s.name,
+          name: s.degreeName
+            ? `${s.degreeName} ${s.departmentName}`
+            : s.departmentName,
           total: Number(s.total),
           completed: Number(s.completed),
         })),

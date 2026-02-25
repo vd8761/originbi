@@ -39,6 +39,10 @@ jobs:
           npm config set fetch-retry-maxtimeout 120000
           npm ci
 
+      - name: Build Shared
+        working-directory: ./backend
+        run: npm run build:shared
+
       - name: Lint
         working-directory: ./backend/${{ matrix.service }}
         run: npm run lint --if-present

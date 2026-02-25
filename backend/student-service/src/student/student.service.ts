@@ -7,6 +7,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, ILike, Not, IsNull } from 'typeorm';
 import { AssessmentReport } from '../entities/assessment-report.entity';
 import { getAssessmentCompletionEmailTemplate } from '../mail/templates/assessment-completion.template';
+import { getReportDeliveryEmailTemplate } from '../mail/templates/report-delivery.template';
+import { getPlacementReportEmailTemplate } from '../mail/templates/placement-report.template';
 import { lastValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
@@ -71,7 +73,7 @@ export class StudentService {
     private readonly affiliateTransactionRepo: Repository<AffiliateReferralTransaction>,
     private readonly http: HttpService,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   async onModuleInit() {
     // Check if imported functions are used to avoid TS error, or just use them
@@ -114,9 +116,21 @@ export class StudentService {
       return { isCompleted: false, status: 'NO_SESSION' };
     }
 
+    let reportPassword = null;
+    if (session.status === 'COMPLETED') {
+      const report = await this.assessmentReportRepository.findOne({
+        where: { assessmentSessionId: session.id },
+        select: ['reportPassword'],
+      });
+      if (report) {
+        reportPassword = report.reportPassword;
+      }
+    }
+
     return {
       isCompleted: session.status === 'COMPLETED',
       status: session.status,
+      reportPassword: reportPassword,
     };
   }
 
@@ -400,9 +414,14 @@ export class StudentService {
         status: status,
         levelNumber: level?.levelNumber,
         completedQuestions: answeredCount,
-        totalQuestions: totalCount > 0
-          ? totalCount
-          : (level?.levelNumber === 2 || level?.name.includes('ACI') || level?.patternType === 'ACI' ? 25 : 60),
+        totalQuestions:
+          totalCount > 0
+            ? totalCount
+            : level?.levelNumber === 2 ||
+                level?.name.includes('ACI') ||
+                level?.patternType === 'ACI'
+              ? 25
+              : 60,
         unlockTime: unlockTime,
         dateCompleted: attempt.completedAt || attempt.updatedAt,
         attemptId: attempt.id, // Ensure attemptId is passed
@@ -721,10 +740,14 @@ export class StudentService {
         order: { levelNumber: 'ASC' },
       });
 
-      this.logger.log(`[Register Debug] Found ${levels.length} mandatory levels`);
+      this.logger.log(
+        `[Register Debug] Found ${levels.length} mandatory levels`,
+      );
 
       for (const level of levels) {
-        this.logger.log(`[Register Debug] Processing Level: ${level.id} - ${level.name}`);
+        this.logger.log(
+          `[Register Debug] Processing Level: ${level.id} - ${level.name}`,
+        );
         const attempt = this.attemptRepo.create({
           assessmentSessionId: savedSession.id,
           assessmentLevelId: level.id,
@@ -739,7 +762,9 @@ export class StudentService {
 
         // Generate Questions for Level 1
         if (level.levelNumber === 1 || level.name.includes('Level 1')) {
-          this.logger.log(`[Register Debug] Generating questions for Level 1 (Attempt ID: ${savedAttempt.id})`);
+          this.logger.log(
+            `[Register Debug] Generating questions for Level 1 (Attempt ID: ${savedAttempt.id})`,
+          );
           await this.generateQuestionsForAttempt(
             savedAttempt,
             user,
@@ -806,8 +831,14 @@ export class StudentService {
     // ---------------------------------------------------------
     // LEVEL 2 (ACI) LOGIC
     // ---------------------------------------------------------
-    if (level.levelNumber === 2 || level.name.includes('Level 2') || level.name.includes('ACI')) {
-      this.logger.log(`[Assessment] Generating Level 2 (ACI) questions for User ${user.id}`);
+    if (
+      level.levelNumber === 2 ||
+      level.name.includes('Level 2') ||
+      level.name.includes('ACI')
+    ) {
+      this.logger.log(
+        `[Assessment] Generating Level 2 (ACI) questions for User ${user.id}`,
+      );
 
       // 1. Get Personality Trait ID from previous session metadata or report
       // Assumption: Level 1 completion stored the dominant trait ID in session metadata
@@ -815,32 +846,44 @@ export class StudentService {
         where: { id: attempt.assessmentSessionId },
       });
 
-      let traitId = session?.metadata?.personalityTraitId || session?.metadata?.dominantTraitId;
+      let traitId =
+        session?.metadata?.personalityTraitId ||
+        session?.metadata?.dominantTraitId;
 
       if (!traitId) {
         // Fallback: Check for a completed attempt in this session that has a dominant trait (Level 1)
-        this.logger.log(`[Assessment] Trait ID not in metadata. Checking previous attempts for Session ${attempt.assessmentSessionId}...`);
+        this.logger.log(
+          `[Assessment] Trait ID not in metadata. Checking previous attempts for Session ${attempt.assessmentSessionId}...`,
+        );
         const previousAttempt = await this.attemptRepo.findOne({
           where: {
             assessmentSessionId: attempt.assessmentSessionId,
             dominantTraitId: Not(IsNull()),
-            status: 'COMPLETED'
+            status: 'COMPLETED',
           },
-          order: { completedAt: 'DESC' }
+          order: { completedAt: 'DESC' },
         });
 
         if (previousAttempt && previousAttempt.dominantTraitId) {
           traitId = previousAttempt.dominantTraitId;
-          this.logger.log(`[Assessment] Found Trait ID ${traitId} from previous attempt ${previousAttempt.id}`);
+          this.logger.log(
+            `[Assessment] Found Trait ID ${traitId} from previous attempt ${previousAttempt.id}`,
+          );
         }
       }
 
       if (!traitId) {
-        this.logger.error(`[Assessment Error] Level 2 requires a Personality Trait ID, but none found in session metadata or previous attempts for User ${user.id}`);
-        throw new Error('Personality Trait not found. Please complete Level 1 first.');
+        this.logger.error(
+          `[Assessment Error] Level 2 requires a Personality Trait ID, but none found in session metadata or previous attempts for User ${user.id}`,
+        );
+        throw new Error(
+          'Personality Trait not found. Please complete Level 1 first.',
+        );
       }
 
-      this.logger.log(`[Assessment] Fetching 25 questions for Trait ID: ${traitId}`);
+      this.logger.log(
+        `[Assessment] Fetching 25 questions for Trait ID: ${traitId}`,
+      );
 
       let query = `
         INSERT INTO assessment_answers (
@@ -862,19 +905,24 @@ export class StudentService {
         reg.id,
         level.id,
         attempt.programId,
-        traitId
+        traitId,
       ];
 
       // Board Filtering strictly for School Programs (ID 1)
       // Check attempt.programId or reg.program.id. Assuming 1 is School based on groupReportHelper usage.
       if (Number(attempt.programId) === 1) {
-        const studentBoard = session?.metadata?.studentBoard || reg.metadata?.studentBoard;
+        const studentBoard =
+          session?.metadata?.studentBoard || reg.metadata?.studentBoard;
         if (studentBoard) {
-          this.logger.log(`[Assessment] Applying Board Filter for School Program: ${studentBoard}`);
+          this.logger.log(
+            `[Assessment] Applying Board Filter for School Program: ${studentBoard}`,
+          );
           query += ` AND board = $8`;
           queryParams.push(studentBoard);
         } else {
-          this.logger.warn(`[Assessment] School Program detected but no Student Board found in metadata. Generating without board filter.`);
+          this.logger.warn(
+            `[Assessment] School Program detected but no Student Board found in metadata. Generating without board filter.`,
+          );
         }
       }
 
@@ -910,9 +958,13 @@ export class StudentService {
       if (loadedSets && loadedSets.length > 0) {
         const randomIndex = Math.floor(Math.random() * loadedSets.length);
         selectedSetNumber = loadedSets[randomIndex].set_number;
-        this.logger.log(`[Assessment] Selected Set ${selectedSetNumber} for Board ${studentBoard}`);
+        this.logger.log(
+          `[Assessment] Selected Set ${selectedSetNumber} for Board ${studentBoard}`,
+        );
       } else {
-        this.logger.warn(`[Assessment] No sets found for Board ${studentBoard}, defaulting to Set 1`);
+        this.logger.warn(
+          `[Assessment] No sets found for Board ${studentBoard}, defaulting to Set 1`,
+        );
         selectedSetNumber = 1;
       }
     } else {
@@ -927,12 +979,16 @@ export class StudentService {
       if (loadedSets && loadedSets.length > 0) {
         const randomIndex = Math.floor(Math.random() * loadedSets.length);
         selectedSetNumber = loadedSets[randomIndex].set_number;
-        this.logger.log(`[Assessment] Selected Random Set ${selectedSetNumber}`);
+        this.logger.log(
+          `[Assessment] Selected Random Set ${selectedSetNumber}`,
+        );
       }
     }
 
     // Save Set Number to Metadata
-    const session = await this.sessionRepo.findOne({ where: { id: attempt.assessmentSessionId } });
+    const session = await this.sessionRepo.findOne({
+      where: { id: attempt.assessmentSessionId },
+    });
     if (session) {
       if (!session.metadata) session.metadata = {};
       session.metadata.setNumber = selectedSetNumber;
@@ -977,12 +1033,17 @@ export class StudentService {
 
     // We want 20 chunks of (2 Main + 1 Open) = 60 questions
     for (let i = 0; i < 20; i++) {
-      if (mainIdx < mainQuestions.length) finalQuestions.push({ id: mainQuestions[mainIdx++].id, type: 'MAIN' });
-      if (mainIdx < mainQuestions.length) finalQuestions.push({ id: mainQuestions[mainIdx++].id, type: 'MAIN' });
-      if (openIdx < openQuestions.length) finalQuestions.push({ id: openQuestions[openIdx++].id, type: 'OPEN' });
+      if (mainIdx < mainQuestions.length)
+        finalQuestions.push({ id: mainQuestions[mainIdx++].id, type: 'MAIN' });
+      if (mainIdx < mainQuestions.length)
+        finalQuestions.push({ id: mainQuestions[mainIdx++].id, type: 'MAIN' });
+      if (openIdx < openQuestions.length)
+        finalQuestions.push({ id: openQuestions[openIdx++].id, type: 'OPEN' });
     }
 
-    this.logger.log(`[Assessment] Generated ${finalQuestions.length} interleaved questions (Main: ${mainIdx}, Open: ${openIdx})`);
+    this.logger.log(
+      `[Assessment] Generated ${finalQuestions.length} interleaved questions (Main: ${mainIdx}, Open: ${openIdx})`,
+    );
 
     // 5. Bulk Insert Answers
     if (finalQuestions.length > 0) {
@@ -990,7 +1051,9 @@ export class StudentService {
       finalQuestions.forEach((q, index) => {
         const mainId = q.type === 'MAIN' ? q.id : 'NULL';
         const openId = q.type === 'OPEN' ? q.id : 'NULL';
-        values.push(`(${attempt.id}, ${attempt.assessmentSessionId}, ${user.id}, ${reg.id}, ${attempt.programId}, ${level.id}, ${mainId}, ${openId}, '${q.type}', 'NOT_ANSWERED', ${index + 1}, NOW(), NOW())`);
+        values.push(
+          `(${attempt.id}, ${attempt.assessmentSessionId}, ${user.id}, ${reg.id}, ${attempt.programId}, ${level.id}, ${mainId}, ${openId}, '${q.type}', 'NOT_ANSWERED', ${index + 1}, NOW(), NOW())`,
+        );
       });
 
       const insertQuery = `
@@ -1174,8 +1237,7 @@ export class StudentService {
       }
 
       // 2. Trigger Report Generation
-      const reportServiceUrl =
-        process.env.REPORT_SERVICE_URL || 'http://localhost:4006';
+      const reportServiceUrl = process.env.REPORT_SERVICE_URL;
       const generateUrl = `${reportServiceUrl}/generate/student/${userId}`;
 
       this.logger.log(`Triggering report generation: ${generateUrl}`);
@@ -1255,10 +1317,6 @@ export class StudentService {
         });
         if (reportEntity && reportEntity.reportPassword) {
           password = reportEntity.reportPassword;
-          reportEntity.emailSent = true;
-          reportEntity.emailSentAt = new Date();
-          reportEntity.emailSentTo = user.email;
-          await this.assessmentReportRepository.save(reportEntity);
           break;
         }
         await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -1275,6 +1333,15 @@ export class StudentService {
       );
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const pdfBuffer = Buffer.from(pdfResponse.data, 'binary');
+
+      let attachmentFileName = `${(registration.fullName || 'Student').replace(/\s/g, '_')}_Report.pdf`;
+      const contentDisposition = pdfResponse.headers['content-disposition'];
+      if (contentDisposition && typeof contentDisposition === 'string') {
+        const match = contentDisposition.match(/filename="?([^";]+)"?/);
+        if (match && match[1]) {
+          attachmentFileName = match[1];
+        }
+      }
 
       // 7. Send Email
       const dateStr = new Date().toLocaleDateString('en-US', {
@@ -1295,7 +1362,7 @@ export class StudentService {
         assets,
         dateStr,
         ((registration as any).program?.reportTitle as string) ||
-        'Self Discovery Report',
+          'Self Discovery Report',
       );
 
       // --- Transporter Setup ---
@@ -1331,7 +1398,7 @@ export class StudentService {
         html: emailHtml,
         attachments: [
           {
-            filename: `${(registration.fullName || 'Student').replace(/\s/g, '_')}_Report.pdf`,
+            filename: attachmentFileName,
             content: pdfBuffer,
             contentType: 'application/pdf',
           },
@@ -1340,8 +1407,300 @@ export class StudentService {
 
       await transporter.sendMail(mailOptions);
       this.logger.log(`Assessment completion email sent to ${user.email}`);
+
+      // Update assessment_reports to track the sent email
+      if (session) {
+        const reportEntity = await this.assessmentReportRepository.findOne({
+          where: { assessmentSessionId: session.id },
+        });
+        if (reportEntity) {
+          reportEntity.emailSent = true;
+          reportEntity.emailSentAt = new Date();
+          reportEntity.emailSentTo = user.email;
+          await this.assessmentReportRepository.save(reportEntity);
+          this.logger.log(
+            `assessment_reports updated: email_sent=true for session ${session.id}`,
+          );
+        }
+      }
     } catch (error) {
       this.logger.error('Failed to send assessment completion email', error);
+      throw error; // Re-throw so pg-boss marks the job as failed and retries
+    }
+  }
+
+  async sendManualReportEmail(userId: number, toEmail?: string): Promise<void> {
+    this.logger.log(
+      `Manual report email requested for user ${userId}${toEmail ? ` to ${toEmail}` : ''}`,
+    );
+
+    try {
+      // 1. Look up user
+      const user = await this.userRepo.findOne({ where: { id: userId } });
+      if (!user) {
+        throw new Error(`User not found: ${userId}`);
+      }
+
+      const recipientEmail = toEmail || user.email;
+
+      // 2. Look up registration
+      const registration = await this.registrationRepo.findOne({
+        where: { userId },
+        relations: ['program'],
+      });
+      if (!registration) {
+        throw new Error(`No registration found for user ${userId}`);
+      }
+
+      // 3. Find the latest completed session
+      const session = await this.sessionRepo.findOne({
+        where: { userId, registrationId: registration.id, status: 'COMPLETED' },
+        order: { createdAt: 'DESC' },
+      });
+      if (!session) {
+        throw new Error(`No completed session found for user ${userId}`);
+      }
+
+      // 4. Get report entity for password
+      const reportEntity = await this.assessmentReportRepository.findOne({
+        where: { assessmentSessionId: session.id },
+      });
+
+      const password = reportEntity?.reportPassword || 'Please contact support';
+
+      // 5. Generate + download PDF
+      const reportServiceUrl =
+        this.configService.get<string>('REPORT_SERVICE_URL');
+      const generateUrl = `${reportServiceUrl}/generate/student/${userId}`;
+      this.logger.log(`Triggering report generation: ${generateUrl}`);
+
+      const generateResponse = await lastValueFrom(
+        this.httpService.get(generateUrl),
+      );
+      const responseData = generateResponse.data as {
+        success: boolean;
+        jobId: string;
+      };
+      if (!responseData.success || !responseData.jobId) {
+        throw new Error('Failed to initiate report generation');
+      }
+
+      const jobId = responseData.jobId;
+      this.logger.log(`Report generation started. Job ID: ${jobId}`);
+
+      // Poll for completion
+      let jobStatus: 'PROCESSING' | 'COMPLETED' | 'ERROR' = 'PROCESSING';
+      let attempts = 0;
+      const maxAttempts = 30;
+      const pollUrl = `${reportServiceUrl}/download/status/${jobId}?json=true`;
+
+      while (jobStatus === 'PROCESSING' && attempts < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        try {
+          const statusRes = await lastValueFrom(this.httpService.get(pollUrl));
+          const statusData = statusRes.data as {
+            status: 'PROCESSING' | 'COMPLETED' | 'ERROR';
+            error?: string;
+          };
+          jobStatus = statusData.status;
+          if (jobStatus === 'ERROR') {
+            throw new Error(`Report generation failed: ${statusData.error}`);
+          }
+        } catch (err) {
+          this.logger.warn(
+            `Polling failed for job ${jobId}: ${(err as Error).message}`,
+          );
+        }
+        attempts++;
+      }
+
+      if (jobStatus !== 'COMPLETED') {
+        throw new Error(
+          `Report generation timed out. Final Status: ${jobStatus}`,
+        );
+      }
+
+      // Download PDF
+      const downloadUrl = `${reportServiceUrl}/download/status/${jobId}`;
+      const pdfResponse = await lastValueFrom(
+        this.httpService.get(downloadUrl, { responseType: 'arraybuffer' }),
+      );
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      const pdfBuffer = Buffer.from(pdfResponse.data, 'binary');
+
+      let attachmentFileName = `${(registration.fullName || 'Student').replace(/\s/g, '_')}_Report.pdf`;
+      const contentDisposition = pdfResponse.headers['content-disposition'];
+      if (contentDisposition && typeof contentDisposition === 'string') {
+        const match = contentDisposition.match(/filename="?([^";]+)"?/);
+        if (match && match[1]) {
+          attachmentFileName = match[1];
+        }
+      }
+
+      // 6. Build exam date from session
+      const examDate = session.updatedAt
+        ? new Date(session.updatedAt).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          })
+        : new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          });
+
+      const reportTitle =
+        ((registration as any).program?.reportTitle as string) ||
+        'Self Discovery Report';
+
+      const assets = {
+        logo: 'https://mind.originbi.com/Origin-BI-Logo-01.png',
+        reportCover: 'https://mind.originbi.com/Origin-BI-Logo-01.png',
+      };
+
+      const isThirdParty = !!toEmail;
+
+      const emailHtml = getReportDeliveryEmailTemplate(
+        registration.fullName || 'Student',
+        password,
+        this.configService.get('FRONTEND_APP_URL') || 'http://localhost:3000',
+        assets,
+        examDate,
+        reportTitle,
+        undefined,
+        isThirdParty,
+      );
+
+      // 7. Send email
+      const region =
+        this.configService.get<string>('AWS_REGION') ||
+        this.configService.get<string>('AWS_DEFAULT_REGION');
+      const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
+      const secretAccessKey = this.configService.get<string>(
+        'AWS_SECRET_ACCESS_KEY',
+      );
+
+      if (!region || !accessKeyId || !secretAccessKey) {
+        throw new Error('AWS SES Config Missing');
+      }
+
+      const ses = new SES({ accessKeyId, secretAccessKey, region });
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      const transporter = nodemailer.createTransport({ SES: ses } as any);
+
+      const mailOptions = {
+        from: `"${this.configService.get('EMAIL_SEND_FROM_NAME') || 'Origin BI Mind Works'}" <${this.configService.get('EMAIL_FROM') || 'no-reply@originbi.com'}>`,
+        to: recipientEmail,
+        cc: [this.configService.get('EMAIL_CC') || ''],
+        subject: `Your Assessment Report – ${reportTitle}`,
+        html: emailHtml,
+        attachments: [
+          {
+            filename: attachmentFileName,
+            content: pdfBuffer,
+            contentType: 'application/pdf',
+          },
+        ],
+      };
+
+      await transporter.sendMail(mailOptions);
+      this.logger.log(
+        `Manual report email sent to ${recipientEmail} for user ${userId}`,
+      );
+
+      // 8. Update assessment_reports tracking
+      if (reportEntity) {
+        reportEntity.emailSent = true;
+        reportEntity.emailSentAt = new Date();
+        reportEntity.emailSentTo = recipientEmail;
+        await this.assessmentReportRepository.save(reportEntity);
+        this.logger.log(
+          `assessment_reports updated: email_sent=true for session ${session.id}`,
+        );
+      }
+    } catch (error) {
+      this.logger.error('Failed to send manual report email', error);
+      throw error;
+    }
+  }
+
+  async sendPlacementReportEmail(
+    groupId: number,
+    departmentId: number,
+    toEmail: string,
+    downloadUrl: string,
+    studentCount: number,
+    degreeType: string,
+    departmentName: string,
+  ): Promise<void> {
+    this.logger.log(
+      `Sending placement report email for group ${groupId}, dept ${departmentId} to ${toEmail} (${studentCount} students, ${degreeType} ${departmentName})`,
+    );
+
+    try {
+      // 1. Download the already-generated PDF from the report service
+      const pdfResponse = await lastValueFrom(
+        this.httpService.get(downloadUrl, { responseType: 'arraybuffer' }),
+      );
+      const pdfBuffer = Buffer.from(pdfResponse.data as ArrayBuffer);
+      this.logger.log(
+        `Downloaded placement report PDF: ${pdfBuffer.length} bytes`,
+      );
+
+      // 2. Create email transporter
+      const region =
+        this.configService.get<string>('AWS_REGION') ||
+        this.configService.get<string>('AWS_DEFAULT_REGION');
+      const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
+      const secretAccessKey = this.configService.get<string>(
+        'AWS_SECRET_ACCESS_KEY',
+      );
+
+      if (!region || !accessKeyId || !secretAccessKey) {
+        throw new Error('AWS SES Config Missing');
+      }
+
+      const ses = new SES({ accessKeyId, secretAccessKey, region });
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      const transporter = nodemailer.createTransport({ SES: ses } as any);
+
+      // 3. Build email using template
+      const fromName =
+        this.configService.get('EMAIL_SEND_FROM_NAME') ||
+        'Origin BI Mind Works';
+      const fromEmail =
+        this.configService.get('EMAIL_FROM') || 'no-reply@originbi.com';
+
+      const emailHtml = getPlacementReportEmailTemplate(
+        studentCount,
+        degreeType,
+        departmentName,
+        this.configService.get('FRONTEND_APP_URL') || 'http://localhost:3000',
+      );
+
+      const mailOptions = {
+        from: `"${fromName}" <${fromEmail}>`,
+        to: toEmail,
+        cc: [this.configService.get('EMAIL_CC') || ''],
+        subject: `Students Handbook – ${degreeType} ${departmentName}`,
+        html: emailHtml,
+        attachments: [
+          {
+            filename: `Students_Handbook_${degreeType}_${departmentName.replace(/\s+/g, '_')}.pdf`,
+            content: pdfBuffer,
+            contentType: 'application/pdf',
+          },
+        ],
+      };
+
+      await transporter.sendMail(mailOptions);
+      this.logger.log(
+        `Placement report email sent to ${toEmail} for group ${groupId}, dept ${departmentId}`,
+      );
+    } catch (error) {
+      this.logger.error('Failed to send placement report email', error);
+      throw error;
     }
   }
 }

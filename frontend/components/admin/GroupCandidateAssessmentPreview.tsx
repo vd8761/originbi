@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { AssessmentSession } from '../../lib/services/assessment.service';
 import { assessmentService } from '../../lib/services/assessment.service';
 import {
@@ -46,6 +46,14 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     // Download State
     const [downloading, setDownloading] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState('');
+    const isDownloadingRef = useRef(false);
+    const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+
+    // Send Email State
+    const [sendingEmail, setSendingEmail] = useState(false);
+    const [emailSent, setEmailSent] = useState(false);
+    const [showEmailPopup, setShowEmailPopup] = useState(false);
+    const [customEmail, setCustomEmail] = useState('');
 
     useEffect(() => {
         const fetchLevels = async () => {
@@ -122,7 +130,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
         gender: session?.registration?.gender || '-',
         email: session?.user?.email || '-',
         mobile: session?.registration?.mobileNumber ? `${session?.registration?.countryCode || ''} ${session?.registration?.mobileNumber}` : '-',
-        reportPassword: session?.metadata?.reportPassword || '-',
+        reportPassword: generatedPassword || session?.metadata?.reportPassword || '-',
         reportSent: session?.metadata?.isReportSent ? 'Yes' : 'No',
         isReportReady: session?.isReportReady
     };
@@ -216,6 +224,8 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
             <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-6 flex flex-col gap-4">
                 <div className="flex justify-between items-center border-b border-gray-200 dark:border-white/10 pb-4 mb-2">
                     <h3 className="text-sm font-semibold">Candidate & Report</h3>
+                <div className="flex items-center gap-2">
+                    {/* Download Report Button */}
                     {downloading ? (
                          <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10">
                             <LoadingIcon className="w-3 h-3 text-brand-green animate-spin" />
@@ -224,16 +234,16 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                     ) : (
                         <button
                             onClick={async () => {
+                                if (isDownloadingRef.current) return;
                                 if (!session?.userId) {
                                     alert("User ID not found for this session.");
                                     return;
                                 }
                                 try {
+                                    isDownloadingRef.current = true;
                                     setDownloading(true);
                                     setDownloadProgress('Initializing...');
                                     
-                                    // 1. Start Generation
-                                    // Use session.userId directly
                                     const studentId = session.userId; 
                                     const startData = await assessmentService.generateStudentReport(studentId);
                                     
@@ -243,19 +253,24 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                     
                                     const jobId = startData.jobId;
                                     
-                                    // 2. Poll
-                                    const pollInterval = setInterval(async () => {
+                                    let isComplete = false;
+                                    while (!isComplete && isDownloadingRef.current) {
                                         try {
                                             const statusData = await assessmentService.getDownloadStatus(jobId);
                                             
                                             if (statusData.status === 'PROCESSING') {
                                                 setDownloadProgress(statusData.progress || 'Processing...');
+                                                await new Promise(resolve => setTimeout(resolve, 1000));
                                             } else if (statusData.status === 'COMPLETED') {
-                                                clearInterval(pollInterval);
+                                                isComplete = true;
                                                 setDownloadProgress('Downloading...');
                                                 
-                                                // Trigger Download
-                                                 const REPORT_API_URL = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || 'http://localhost:4006';
+                                                const extendedData = statusData as any;
+                                                if (extendedData.password) {
+                                                    setGeneratedPassword(extendedData.password);
+                                                }
+
+                                                 const REPORT_API_URL = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || '';
                                                 window.location.href = `${REPORT_API_URL}${statusData.downloadUrl}`;
                                                 
                                                 setTimeout(() => {
@@ -263,21 +278,23 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                                     setDownloadProgress('');
                                                 }, 2000);
                                             } else if (statusData.status === 'ERROR') {
-                                                clearInterval(pollInterval);
+                                                isComplete = true;
                                                 throw new Error(statusData.error || 'Generation failed');
                                             }
                                         } catch (err) {
-                                            clearInterval(pollInterval);
+                                            isComplete = true;
                                             console.error("Polling error", err);
                                             setDownloading(false);
                                             alert("Failed to download report. Please try again.");
                                         }
-                                    }, 1000);
+                                    }
                                     
                                 } catch (error) {
                                     console.error("Download failed", error);
                                     setDownloading(false);
                                     alert("Failed to initiate download.");
+                                } finally {
+                                    isDownloadingRef.current = false;
                                 }
                             }}
                             className="flex items-center gap-2 px-3 py-1.5 bg-brand-green/10 hover:bg-brand-green/20 text-brand-green rounded-lg text-xs font-medium transition-colors"
@@ -286,6 +303,66 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                             Download Report
                         </button>
                     )}
+
+                    {/* Send Email Split Button */}
+                    {sendingEmail ? (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10">
+                            <LoadingIcon className="w-3 h-3 text-brand-green animate-spin" />
+                            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Sending...</span>
+                        </div>
+                    ) : emailSent ? (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-brand-green/10 rounded-lg border border-brand-green/20">
+                            <CheckIcon className="w-3 h-3 text-brand-green" />
+                            <span className="text-xs font-medium text-brand-green">Email Queued</span>
+                        </div>
+                    ) : (
+                        <div className="flex items-stretch gap-px">
+                            <button
+                                onClick={async () => {
+                                    if (!session?.userId) {
+                                        alert("User ID not found for this session.");
+                                        return;
+                                    }
+                                    try {
+                                        setSendingEmail(true);
+                                        await assessmentService.sendReportEmail(session.userId);
+                                        setEmailSent(true);
+                                        setTimeout(() => setEmailSent(false), 5000);
+                                    } catch (error) {
+                                        console.error("Send email failed", error);
+                                        alert("Failed to send email. Please try again.");
+                                    } finally {
+                                        setSendingEmail(false);
+                                    }
+                                }}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-l-lg text-xs font-medium transition-colors ${
+                                    status === 'COMPLETED'
+                                    ? 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green cursor-pointer'
+                                    : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
+                                }`}
+                                disabled={status !== 'COMPLETED'}
+                                title={status !== 'COMPLETED' ? 'Exam must be completed to send email' : 'Send report to student email'}
+                            >
+                                <EmailIcon className="w-3 h-3" />
+                                Send Email
+                            </button>
+                            <button
+                                onClick={() => setShowEmailPopup(true)}
+                                className={`flex items-center px-2 py-1.5 rounded-r-lg text-xs font-medium transition-colors ${
+                                    status === 'COMPLETED'
+                                    ? 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green border-brand-green/20 cursor-pointer'
+                                    : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-white/10 cursor-not-allowed opacity-60'
+                                }`}
+                                disabled={status !== 'COMPLETED'}
+                                title="Send to a different email"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                </svg>
+                            </button>
+                        </div>
+                    )}
+                </div>
                 </div>
                 <div className="flex flex-col gap-3">
                     <div className="grid grid-cols-2 gap-3">
@@ -295,6 +372,9 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                     <div className="grid grid-cols-2 gap-3">
                         <InfoItem icon={EmailIcon} label="Email" value={displayData.email} />
                         <InfoItem icon={ProfileIcon} label="Mobile" value={displayData.mobile} />
+                    </div>
+                    <div className="grid grid-cols-1 gap-3">
+                        <InfoItem icon={LockIcon} label="Report Password" value={displayData.reportPassword} />
                     </div>
                     {displayData.isReportReady && (
                         <div className="p-4 rounded-xl bg-gradient-to-r from-[#19211C] to-brand-green/5 border border-brand-green/20 mt-2">
@@ -708,6 +788,71 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                     &copy; 2025 Origin BI, Made with by <span className="text-brand-green">Touchmark Descience Pvt. Ltd.</span>
                 </div>
             </div>
+
+            {/* Send Email to Custom Address Popup */}
+            {showEmailPopup && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowEmailPopup(false)}>
+                    <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-6 w-full max-w-md mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Send Report Email</h3>
+                            <button onClick={() => setShowEmailPopup(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                            Send the assessment report to a different email address.
+                        </p>
+                        <div className="mb-4">
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1 block">To Email</label>
+                            <input
+                                type="email"
+                                value={customEmail}
+                                onChange={(e) => setCustomEmail(e.target.value)}
+                                placeholder="Enter email address"
+                                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-sm text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-green/30 focus:border-brand-green transition-colors"
+                            />
+                        </div>
+                        <div className="flex items-center gap-3 justify-end">
+                            <button
+                                onClick={() => { setShowEmailPopup(false); setCustomEmail(''); }}
+                                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (!customEmail || !customEmail.includes('@')) {
+                                        alert('Please enter a valid email address.');
+                                        return;
+                                    }
+                                    if (!session?.userId) {
+                                        alert("User ID not found for this session.");
+                                        return;
+                                    }
+                                    try {
+                                        setShowEmailPopup(false);
+                                        setSendingEmail(true);
+                                        await assessmentService.sendReportEmail(session.userId, customEmail);
+                                        setCustomEmail('');
+                                        setEmailSent(true);
+                                        setTimeout(() => setEmailSent(false), 5000);
+                                    } catch (error) {
+                                        console.error("Send email failed", error);
+                                        alert("Failed to send email. Please try again.");
+                                    } finally {
+                                        setSendingEmail(false);
+                                    }
+                                }}
+                                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-green hover:bg-brand-green/90 text-black transition-colors"
+                            >
+                                Send Email
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     );

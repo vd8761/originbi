@@ -52,7 +52,7 @@ export class BulkCorporateRegistrationsService {
     private groupAssessmentRepo: Repository<GroupAssessment>,
     private dataSource: DataSource,
     private readonly corporateRegistrationsService: CorporateRegistrationsService,
-  ) { }
+  ) {}
 
   /**
    * Phase 1: Preview & Validate
@@ -769,12 +769,12 @@ export class BulkCorporateRegistrationsService {
         const val = this.getValue(rawData, ['send_email', 'SendEmail']);
         return val ? val.toUpperCase() === 'TRUE' : false;
       })(),
-      examStart: this.parseDateAsIST(this.getValue(rawData, [
-        'ExamStart',
-        'exam_start_date',
-        'valid_from',
-      ])),
-      examEnd: this.parseDateAsIST(this.getValue(rawData, ['ExamEnd', 'exam_end_date', 'valid_to'])),
+      examStart: this.parseDateAsIST(
+        this.getValue(rawData, ['ExamStart', 'exam_start_date', 'valid_from']),
+      ),
+      examEnd: this.parseDateAsIST(
+        this.getValue(rawData, ['ExamEnd', 'exam_end_date', 'valid_to']),
+      ),
     };
   }
 

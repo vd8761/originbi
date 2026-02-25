@@ -3,13 +3,35 @@ import { PlacementData } from "../types/placementTypes";
 
 import { logger } from "./logger";
 
-const pool = new Pool({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
-    port: parseInt(process.env.DB_PORT || "5432"),
-});
+const poolConfig = process.env.DATABASE_URL
+    ? {
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
+    }
+    : {
+        user: process.env.DB_USER,
+        host: process.env.DB_HOST,
+        database: process.env.DB_NAME,
+        password: process.env.DB_PASSWORD,
+        port: parseInt(process.env.DB_PORT || "5432"),
+    };
+
+const pool = new Pool(poolConfig);
+
+export async function testDbConnection() {
+    try {
+        const client = await pool.connect();
+        logger.info(
+            "[DB] ✅ Successfully connected to the PostgreSQL database",
+        );
+        client.release();
+    } catch (error) {
+        logger.error(
+            "[DB] ❌ Failed to connect to the PostgreSQL database:",
+            error,
+        );
+    }
+}
 
 interface GuidanceSectionJSON {
     title: string;
