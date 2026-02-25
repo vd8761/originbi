@@ -24,6 +24,8 @@ export interface TextOptions {
     itemEnsureSpacePercent?: boolean;
     topGap?: number;
     ensureSpace?: number;
+    /** If true, uses the current doc.x position instead of resetting to MARGIN_STD */
+    useExistingXPos?: boolean;
 }
 
 export interface ImageOptions {
@@ -485,7 +487,10 @@ export class BaseReport {
      */
     protected pHtml(text: string, opts: TextOptions = {}) {
         const x =
-            opts.x ?? (this._useStdMargins ? this.doc.x : this.MARGIN_STD);
+            opts.x ??
+            (opts.useExistingXPos && this._useStdMargins
+                ? this.doc.x
+                : this.MARGIN_STD);
 
         const y = opts.y ?? this.doc.y;
         const width = opts.width ?? this.PAGE_WIDTH - 2 * this.MARGIN_STD;
@@ -560,7 +565,10 @@ export class BaseReport {
         const start = opts.start ?? 1;
         const gap = opts.gap ?? this.DEFAULT_GAP;
         const baseX =
-            opts.x ?? (this._useStdMargins ? this.doc.x : this.MARGIN_STD);
+            opts.x ??
+            (opts.useExistingXPos && this._useStdMargins
+                ? this.doc.x
+                : this.MARGIN_STD);
         const listIndent = opts.indent ?? 0;
         const currentX = baseX + listIndent;
         const labelGap = opts.labelGap ?? (type === "bullet" ? 15 : 25);
@@ -639,7 +647,10 @@ export class BaseReport {
     protected complexOrderedList(html: string, opts: TextOptions = {}) {
         const savedX = this.doc.x;
         const x =
-            opts.x ?? (this._useStdMargins ? this.doc.x : this.MARGIN_STD);
+            opts.x ??
+            (opts.useExistingXPos && this._useStdMargins
+                ? this.doc.x
+                : this.MARGIN_STD);
         const gap = opts.gap ?? this.DEFAULT_GAP;
         const itemGap = opts.itemGap ?? 0;
         const ensureSpaceHeight = opts.itemEnsureSpace ?? 0;
@@ -771,7 +782,10 @@ export class BaseReport {
 
     protected renderTextBase(text: string, opts: TextOptions) {
         const x =
-            opts.x ?? (this._useStdMargins ? this.doc.x : this.MARGIN_STD);
+            opts.x ??
+            (opts.useExistingXPos && this._useStdMargins
+                ? this.doc.x
+                : this.MARGIN_STD);
         const y = opts.y ?? this.doc.y;
         const width = opts.width ?? this.PAGE_WIDTH - 2 * this.MARGIN_STD;
         this.doc
