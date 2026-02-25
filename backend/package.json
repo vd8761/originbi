@@ -29,7 +29,7 @@
         "start:corporate": "cd corporate-service && npm run start:dev",
         "start:student": "cd student-service && npm run start:dev",
         "start:report": "cd report-service && npm run dev",
-        "postinstall": "node patch-pgboss.js && cd shared && npm install --ignore-scripts && npm run build"
+        "postinstall": "node patch-pgboss.js && cd shared && npm run build"
     },
     "devDependencies": {
         "@types/jest": "^30.0.0"
