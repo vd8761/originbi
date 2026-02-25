@@ -2,6 +2,7 @@ import "dotenv/config";
 import { CollegeReport } from "./reports/college/collegeReport";
 import { CxoReport } from "./reports/cxo/cxoReport";
 import { SchoolReport } from "./reports/school/schoolReport";
+import { CareerIntelligenceReport } from "./reports/school/schoolReport2";
 import { EmployeeReport } from "./reports/employee/employeeReport";
 import { PlacementReport } from "./reports/placement/placementReport";
 // import { AciReport } from "./reports/aci/aciSample";
@@ -118,24 +119,24 @@ const schoolData: SchoolData = {
     assigned_exam_id: "1001",
     exam_ref_no: "OBI-G2-06/25-WB-CS-0008",
     report_title: "Origin BI ClarityFit - Behavioural Insight",
-    score_D: 85,
-    score_I: 65,
-    score_S: 25,
-    score_C: 40,
+    score_D: 55,
+    score_I: 40,
+    score_S: 30,
+    score_C: 45,
     most_answered_answer_type: [
-        { ANSWER_TYPE: "D", COUNT: 15 },
-        { ANSWER_TYPE: "I", COUNT: 12 },
+        { ANSWER_TYPE: "D", COUNT: 11 },
+        { ANSWER_TYPE: "C", COUNT: 9 },
     ],
     top_answered_types: [],
     program_type: 1,
     school_stream_id: 1,
     agile_scores: [
         {
-            focus: 11,
-            courage: 5,
-            respect: 23,
-            openness: 13,
-            commitment: 9,
+            focus: 18,
+            courage: 12,
+            respect: 20,
+            openness: 15,
+            commitment: 16,
         },
     ],
 };
@@ -2919,6 +2920,14 @@ const main = () => {
 
     console.log("Generating Placement Report...");
     placementReportGenerator.generate(placementOutputPath);
+
+    // Generate Career Intelligence Report
+    const careerIntelReport = new CareerIntelligenceReport(schoolData);
+    const careerIntelFileName = `CareerIntelligence_${schoolData.bi_registration_ID}.pdf`;
+    const careerIntelOutputPath = path.join(outputDir, careerIntelFileName);
+
+    console.log("Generating Career Intelligence Report...");
+    careerIntelReport.generate(careerIntelOutputPath);
 };
 
 main();
