@@ -234,7 +234,10 @@ export class EmbeddingsService implements OnModuleInit {
 
         const response = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Referer': 'https://originbi.com',
+          },
           body: JSON.stringify({
             model: this.MODEL,
             content: { parts: [{ text: text.slice(0, 10000) }] },
@@ -345,7 +348,10 @@ export class EmbeddingsService implements OnModuleInit {
 
           const response = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Referer': 'https://originbi.com',
+            },
             body: JSON.stringify({ requests }),
             signal: controller.signal,
           });

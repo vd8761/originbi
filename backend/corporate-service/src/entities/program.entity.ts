@@ -13,10 +13,10 @@ export class Program {
   id: string;
 
   @Index({ unique: true })
-  @Column({ type: 'varchar', length: 50 })
+  @Column({ type: 'varchar', length: 50, nullable: true })
   code: string;
 
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   name: string;
 
   @Column({ type: 'text', nullable: true })

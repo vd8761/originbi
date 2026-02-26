@@ -11,6 +11,7 @@ interface RegistrationTableProps {
     loading: boolean;
     error: string | null;
     onToggleStatus?: (id: string, currentStatus: boolean) => void;
+    onToggleAiCounsellor?: (id: string, currentState: boolean) => void;
     onViewDetails?: (id: string) => void;
     onSort?: (column: string) => void;
     sortColumn?: string;
@@ -23,6 +24,7 @@ const RegistrationTable: React.FC<RegistrationTableProps> = ({
     error,
     onViewDetails,
     onToggleStatus,
+    onToggleAiCounsellor,
     onSort,
     sortColumn,
     sortOrder
@@ -111,6 +113,9 @@ const RegistrationTable: React.FC<RegistrationTableProps> = ({
                                 </div>
                             </th>
                             <th className="w-[10%] p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider text-center">
+                                AI Counsellor
+                            </th>
+                            <th className="w-[10%] p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider text-center">
                                 Action
                             </th>
                         </tr>
@@ -123,6 +128,7 @@ const RegistrationTable: React.FC<RegistrationTableProps> = ({
                                     <td className="p-4"><div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                                     <td className="p-4"><div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                                     <td className="p-4"><div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
+                                    <td className="p-4 text-center"><div className="h-6 w-12 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto"></div></td>
                                     <td className="p-4 text-center"><div className="h-6 w-12 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto"></div></td>
                                     <td className="p-4 text-center"><div className="h-6 w-6 bg-gray-200 dark:bg-gray-700 rounded mx-auto"></div></td>
                                 </tr>
@@ -171,6 +177,12 @@ const RegistrationTable: React.FC<RegistrationTableProps> = ({
                                             onToggle={() => onToggleStatus && onToggleStatus(user.id, ['COMPLETED', 'ACTIVE'].includes(user.status))}
                                         />
                                     </td>
+                                    <td className="pt-1 text-center align-middle">
+                                        <ToggleSwitch
+                                            isOn={!!user.has_ai_counsellor}
+                                            onToggle={() => onToggleAiCounsellor && onToggleAiCounsellor(user.id, !!user.has_ai_counsellor)}
+                                        />
+                                    </td>
                                     <td className="p-4 text-center align-middle">
                                         <button
                                             onClick={() => onViewDetails && onViewDetails(user.id)}
@@ -183,7 +195,7 @@ const RegistrationTable: React.FC<RegistrationTableProps> = ({
                             ))
                         ) : (
                             <tr>
-                                <td colSpan={6} className="p-8 text-center text-brand-text-light-secondary dark:text-gray-500">
+                                <td colSpan={7} className="p-8 text-center text-brand-text-light-secondary dark:text-gray-500">
                                     {loading ? 'Loading...' : 'No records found.'}
                                     {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
                                 </td>

@@ -10,6 +10,18 @@ export interface GroupReportInput {
   programId?: number;
   corporateId?: number;
   title?: string;
+  // ── Advanced filters ──
+  dateFrom?: string;       // ISO date string: "2024-01-15"
+  dateTo?: string;         // ISO date string: "2024-01-31"
+  collegeName?: string;    // Group name (college/batch) - fuzzy match
+  affiliateName?: string;  // Affiliate who referred the students
+  affiliateId?: number;
+  schoolLevel?: string;    // 'SSLC' | 'HSC'
+  schoolStream?: string;   // 'SCIENCE' | 'COMMERCE' | 'HUMANITIES'
+  departmentName?: string; // Department/degree name - fuzzy match
+  gender?: string;         // 'MALE' | 'FEMALE'
+  registrationSource?: string; // 'SELF' | 'ADMIN' | 'CORPORATE' | 'RESELLER'
+  limit?: number;          // Max students to include (default 50)
 }
 
 @Injectable()
@@ -27,7 +39,20 @@ export class OverallRoleFitmentService {
   ) { }
 
   private getCacheKey(input: GroupReportInput): string {
-    return `${input.groupId || 'all'}_${input.corporateId || 'all'}_${input.title || ''}`;
+    const parts = [
+      input.groupId || 'all',
+      input.corporateId || 'all',
+      input.title || '',
+      input.dateFrom || '',
+      input.dateTo || '',
+      input.collegeName || '',
+      input.affiliateName || input.affiliateId || '',
+      input.schoolLevel || '',
+      input.schoolStream || '',
+      input.departmentName || '',
+      input.gender || '',
+    ];
+    return parts.join('_');
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -109,30 +134,110 @@ export class OverallRoleFitmentService {
   // ═══════════════════════════════════════════════════════════════════════════
 
   private async fetchStudentsInGroup(input: GroupReportInput): Promise<any[]> {
-    let whereClause = 'WHERE r.is_deleted = false';
+    const joins: string[] = [];
+    const conditions: string[] = ['r.is_deleted = false'];
     const params: any[] = [];
 
+    // ── Basic filters ──
     if (input.groupId) {
       params.push(input.groupId);
-      whereClause += ` AND r.group_id = $${params.length}`;
+      conditions.push(`r.group_id = $${params.length}`);
     }
     if (input.corporateId) {
       params.push(input.corporateId);
-      whereClause += ` AND r.corporate_account_id = $${params.length}`;
+      conditions.push(`r.corporate_account_id = $${params.length}`);
+    }
+    if (input.programId) {
+      params.push(input.programId);
+      conditions.push(`r.program_id = $${params.length}`);
     }
 
-    // Select distinct users to avoid duplicates
+    // ── Date-of-completion filter (needs assessment_attempts join) ──
+    const needsAttemptJoin = !!(input.dateFrom || input.dateTo);
+    if (needsAttemptJoin) {
+      joins.push(`JOIN assessment_attempts aa ON aa.registration_id = r.id AND aa.status = 'COMPLETED'`);
+      if (input.dateFrom) {
+        params.push(input.dateFrom);
+        conditions.push(`aa.completed_at >= $${params.length}::date`);
+      }
+      if (input.dateTo) {
+        params.push(input.dateTo);
+        conditions.push(`aa.completed_at < ($${params.length}::date + interval '1 day')`);
+      }
+    }
+
+    // ── College / Group name filter (fuzzy match on groups.name) ──
+    if (input.collegeName) {
+      joins.push(`JOIN groups g ON r.group_id = g.id`);
+      params.push(`%${input.collegeName.toLowerCase()}%`);
+      conditions.push(`LOWER(g.name) LIKE $${params.length}`);
+    }
+
+    // ── Affiliate referral filter ──
+    if (input.affiliateId) {
+      joins.push(`JOIN affiliate_referral_transactions art ON art.referred_user_id = r.user_id`);
+      params.push(input.affiliateId);
+      conditions.push(`art.affiliate_account_id = $${params.length}`);
+    } else if (input.affiliateName) {
+      joins.push(`JOIN affiliate_referral_transactions art ON art.referred_user_id = r.user_id`);
+      joins.push(`JOIN affiliate_accounts aac ON art.affiliate_account_id = aac.id`);
+      params.push(`%${input.affiliateName.toLowerCase()}%`);
+      conditions.push(`LOWER(aac.full_name) LIKE $${params.length}`);
+    }
+
+    // ── School level (SSLC / HSC) ──
+    if (input.schoolLevel) {
+      params.push(input.schoolLevel.toUpperCase());
+      conditions.push(`r.school_level = $${params.length}`);
+    }
+
+    // ── School stream (SCIENCE / COMMERCE / HUMANITIES) — only for HSC ──
+    if (input.schoolStream) {
+      params.push(input.schoolStream.toUpperCase());
+      conditions.push(`r.school_stream = $${params.length}`);
+    }
+
+    // ── Department / Degree name filter ──
+    if (input.departmentName) {
+      joins.push(`JOIN department_degrees dd ON r.department_degree_id = dd.id`);
+      joins.push(`JOIN departments dept ON dd.department_id = dept.id`);
+      params.push(`%${input.departmentName.toLowerCase()}%`);
+      conditions.push(`LOWER(dept.name) LIKE $${params.length}`);
+    }
+
+    // ── Gender filter ──
+    if (input.gender) {
+      params.push(input.gender.toUpperCase());
+      conditions.push(`r.gender = $${params.length}`);
+    }
+
+    // ── Registration source ──
+    if (input.registrationSource) {
+      params.push(input.registrationSource.toUpperCase());
+      conditions.push(`r.registration_source = $${params.length}`);
+    }
+
+    const maxStudents = input.limit || 50;
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const joinClause = joins.join('\n        ');
+
     const query = `
         SELECT DISTINCT ON (r.user_id)
             r.id,
             r.user_id,
             r.full_name,
-            r.group_id
+            r.group_id,
+            r.school_level,
+            r.school_stream,
+            r.department_degree_id
         FROM registrations r
+        ${joinClause}
         ${whereClause}
         ORDER BY r.user_id, r.created_at DESC
+        LIMIT ${maxStudents}
     `;
 
+    this.logger.log(`🔍 Filtered student query with ${conditions.length} conditions, ${params.length} params`);
     return await this.dataSource.query(query, params);
   }
 
@@ -211,12 +316,31 @@ export class OverallRoleFitmentService {
   }
 
   // Format for chat display
-  formatForChat(report: OverallReportData): string {
+  formatForChat(report: OverallReportData, input?: GroupReportInput): string {
     let summary = `**📊 Overall Career Fitment Report**\n\n`;
     summary += `**Report ID:** ${report.reportId}\n`;
-    summary += `**Candidates Processed:** ${report.candidates.length}\n\n`;
+    summary += `**Candidates Processed:** ${report.candidates.length}\n`;
 
-    summary += `**Executive Summary:**\n`;
+    // Show active filters
+    if (input) {
+      const filters: string[] = [];
+      if (input.dateFrom || input.dateTo) {
+        const from = input.dateFrom || 'start';
+        const to = input.dateTo || 'now';
+        filters.push(`📅 Exam completed: ${from} to ${to}`);
+      }
+      if (input.collegeName) filters.push(`🏫 College: ${input.collegeName}`);
+      if (input.affiliateName) filters.push(`🤝 Affiliate: ${input.affiliateName}`);
+      if (input.schoolLevel) filters.push(`🎓 Level: ${input.schoolLevel}`);
+      if (input.schoolStream) filters.push(`📚 Stream: ${input.schoolStream}`);
+      if (input.departmentName) filters.push(`📋 Department: ${input.departmentName}`);
+      if (input.gender) filters.push(`👤 Gender: ${input.gender}`);
+      if (filters.length > 0) {
+        summary += `**Filters Applied:** ${filters.join(' | ')}\n`;
+      }
+    }
+
+    summary += `\n**Executive Summary:**\n`;
 
     report.candidates.slice(0, 5).forEach((c, i) => {
       summary += `${i + 1}. **${c.name}**: ${c.expectedFutureRole} (Score: ${c.futureRoleReadinessScore}%)\n`;
