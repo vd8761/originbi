@@ -2881,45 +2881,45 @@ const main = () => {
     // aciReportGenerator.generate(aciOutputPath);
 
     // Generate College Report
-    const reportGenerator = new CollegeReport(collegeData);
-    const collegeFileName = `CollegeReport_${collegeData.bi_registration_ID}.pdf`;
-    const collegeOutputPath = path.join(outputDir, collegeFileName);
+    // const reportGenerator = new CollegeReport(collegeData);
+    // const collegeFileName = `CollegeReport_${collegeData.bi_registration_ID}.pdf`;
+    // const collegeOutputPath = path.join(outputDir, collegeFileName);
 
-    console.log("Generating College Report...");
-    reportGenerator.generate(collegeOutputPath);
+    // console.log("Generating College Report...");
+    // reportGenerator.generate(collegeOutputPath);
 
-    // // Generate CXO Report
-    const cxoReportGenerator = new CxoReport(cxoData);
-    const cxoFileName = `CXOReport_${cxoData.bi_registration_ID}.pdf`;
-    const cxoOutputPath = path.join(outputDir, cxoFileName);
+    // // // Generate CXO Report
+    // const cxoReportGenerator = new CxoReport(cxoData);
+    // const cxoFileName = `CXOReport_${cxoData.bi_registration_ID}.pdf`;
+    // const cxoOutputPath = path.join(outputDir, cxoFileName);
 
-    console.log("Generating CXO Report...");
-    cxoReportGenerator.generate(cxoOutputPath);
+    // console.log("Generating CXO Report...");
+    // cxoReportGenerator.generate(cxoOutputPath);
 
-    // // Generate Employee Report
-    const employeeReportGenerator = new EmployeeReport(employeeData);
-    const employeeFileName = `EmployeeReport_${employeeData.bi_registration_ID}.pdf`;
-    const employeeOutputPath = path.join(outputDir, employeeFileName);
+    // // // Generate Employee Report
+    // const employeeReportGenerator = new EmployeeReport(employeeData);
+    // const employeeFileName = `EmployeeReport_${employeeData.bi_registration_ID}.pdf`;
+    // const employeeOutputPath = path.join(outputDir, employeeFileName);
 
-    console.log("Generating Employee Report...");
-    employeeReportGenerator.generate(employeeOutputPath);
+    // console.log("Generating Employee Report...");
+    // employeeReportGenerator.generate(employeeOutputPath);
 
-    // // Generate School Report
+    // // // Generate School Report
     const schoolReportGenerator = new SchoolReport(schoolData);
     const schoolFileName = `SchoolReport_${schoolData.bi_registration_ID}.pdf`;
     const schoolOutputPath = path.join(outputDir, schoolFileName);
 
-    console.log("Generating School Report...");
-    schoolReportGenerator.generate(schoolOutputPath);
+    // console.log("Generating School Report...");
+    // schoolReportGenerator.generate(schoolOutputPath);
 
-    // // Generate Placement Report
-    const placementReportGenerator = new PlacementReport(placementData);
-    const placementFileName =
-        `PlacementReport_${placementData.exam_ref_no}.pdf`.replace("/", "");
-    const placementOutputPath = path.join(outputDir, placementFileName);
+    // // // Generate Placement Report
+    // const placementReportGenerator = new PlacementReport(placementData);
+    // const placementFileName =
+    //     `PlacementReport_${placementData.exam_ref_no}.pdf`.replace("/", "");
+    // const placementOutputPath = path.join(outputDir, placementFileName);
 
-    console.log("Generating Placement Report...");
-    placementReportGenerator.generate(placementOutputPath);
+    // console.log("Generating Placement Report...");
+    // placementReportGenerator.generate(placementOutputPath);
 
     // Generate Career Intelligence Report
     const careerIntelReport = new CareerIntelligenceReport(schoolData);

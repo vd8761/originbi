@@ -440,152 +440,214 @@ const ParticipantsTable = ({ participants }: { participants: Participant[] }) =>
     );
 };
 
+// --- Report Data Interface ---
+interface ReportData {
+    reportNumber: string;
+    generatedAt: string;
+    candidateName: string;
+    email: string;
+    mobile: string;
+    gender: string;
+    programName: string;
+    assessmentTitle: string;
+    departmentName: string;
+    degreeTypeName: string;
+    currentYear: string | null;
+    institutionName: string | null;
+    personalityTrait: {
+        id: number;
+        code: string;
+        name: string;
+        description: string;
+        colorRgb: string;
+        imageKey: string;
+        characterImage: string;
+        strengthChartImage: string;
+        metadata: any;
+    };
+    discScores: { D: number; I: number; S: number; C: number };
+    totalScore: string;
+    sincerityIndex: string;
+    sincerityClass: string;
+    attemptStatus: string;
+    completedAt: string;
+    keyStrengths: string[];
+    roleAlignment: string[];
+    careerGrowthTips: { title: string; desc: string }[] | string[];
+    keyBehaviors: string[];
+    typicalScenarios: string[];
+}
+
 // --- Detailed Profile Card (Bottom Search Result) ---
-const ProfileResult = () => (
-    <div className="mt-8 pt-8 text-left border-t border-gray-100 dark:border-white/5 relative overflow-hidden transition-colors">
-        {/* Main Content Area */}
-        {/* Main Content Area */}
-        <div className="flex flex-col lg:flex-row gap-8 items-center lg:items-start mb-8">
+const ProfileResult = ({ data }: { data: ReportData }) => {
+    const trait = data.personalityTrait;
+    const traitNameWords = trait.name ? trait.name.split(' ') : ['Unknown'];
 
-            {/* Left: Personality Title */}
-            <div className="lg:w-1/4 text-center lg:text-left flex flex-col justify-center pt-8 lg:pt-16">
-                <h2 className="text-[clamp(36px,2.5vw,48px)] font-semibold text-[#150089] dark:text-white leading-[1.1] flex flex-col items-center lg:block">
-                    <span>Supportive</span>
-                    <span className="lg:ml-16 block">Energizer</span>
-                </h2>
-            </div>
+    // Build subtitle line (e.g., "B.Tech Information Technology (3rd Year)")
+    const subtitleParts: string[] = [];
+    if (data.degreeTypeName) subtitleParts.push(data.degreeTypeName);
+    if (data.departmentName) subtitleParts.push(data.departmentName);
+    if (data.currentYear) subtitleParts.push(`(${data.currentYear})`);
+    const subtitle = subtitleParts.join(' ') || data.programName || 'Assessment Completed';
 
-            {/* Center: Character Image */}
-            <div className="lg:w-1/3 flex justify-center relative py-6 lg:py-0">
-                {/* Background Glow */}
-                <div className="w-[260px] h-[260px] sm:w-[320px] sm:h-[320px] bg-[#FDE047]/20 dark:bg-yellow-500/10 rounded-full absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 blur-3xl pointer-events-none"></div>
-                <div className="relative w-[300px] h-[300px] sm:w-[350px] sm:h-[350px]">
-                    <img
-                        src="/Corporate_Analytical_Leader.png"
-                        alt="Supportive Energizer Character"
-                        className="w-full h-full object-contain drop-shadow-2xl relative z-10"
-                        onError={(e) => {
-                            // Fallback if image missing - remove this in prod
-                            e.currentTarget.src = "https://via.placeholder.com/350x350/transparent/transparent?text=Character";
-                        }}
-                    />
-                </div>
-            </div>
+    // Normalize career growth tips to always be { title, desc } objects
+    const careerTips = (data.careerGrowthTips || []).map((tip: any) => {
+        if (typeof tip === 'string') return { title: '', desc: tip };
+        return { title: tip.title || '', desc: tip.desc || tip.description || '' };
+    });
 
-            {/* Right: Profile Details & Strengths */}
-            <div className="lg:w-5/12 w-full text-left pl-0 lg:pl-4">
-                {/* Header Info */}
-                <div className="mb-8 border-b border-gray-100 dark:border-white/5 pb-6">
-                    <h1 className="text-[clamp(20px,1.5vw,26px)] font-semibold text-[#19211C] dark:text-white mb-2 leading-tight">Pushparaaj</h1>
-                    <div className="text-[clamp(14px,1.1vw,17px)] font-medium text-[#1ED36A] mb-1 leading-snug">B.Tech Information Technology (3rd Year)</div>
-                    <div className="text-[clamp(13px,1.1vw,16px)] font-normal text-[#19211C] dark:text-white opacity-80 leading-snug">Peri Institute of Engineering and Technology</div>
+    return (
+        <div className="mt-8 pt-8 text-left border-t border-gray-100 dark:border-white/5 relative overflow-hidden transition-colors">
+            {/* Main Content Area */}
+            <div className="flex flex-col lg:flex-row gap-8 items-center lg:items-start mb-8">
+
+                {/* Left: Personality Title */}
+                <div className="lg:w-1/4 text-center lg:text-left flex flex-col justify-center pt-8 lg:pt-16">
+                    <h2 className="text-[clamp(36px,2.5vw,48px)] font-semibold text-[#150089] dark:text-white leading-[1.1] flex flex-col items-center lg:block">
+                        {traitNameWords.map((word, i) => (
+                            <span key={i} className={i > 0 ? "lg:ml-16 block" : ""}>{word}</span>
+                        ))}
+                    </h2>
                 </div>
 
-                {/* Key Strengths Section */}
-                <div className="flex flex-row items-start gap-4 sm:gap-6">
-                    {/* Strength Chart Graphic */}
-                    <div className="shrink-0 pt-1">
+                {/* Center: Character Image */}
+                <div className="lg:w-1/3 flex justify-center relative py-6 lg:py-0">
+                    {/* Background Glow */}
+                    <div className="w-[260px] h-[260px] sm:w-[320px] sm:h-[320px] bg-[#FDE047]/20 dark:bg-yellow-500/10 rounded-full absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 blur-3xl pointer-events-none"></div>
+                    <div className="relative w-[300px] h-[300px] sm:w-[350px] sm:h-[350px]">
                         <img
-                            src="/Analytical_Leader_Strength_Chart.png"
-                            alt="Strength Chart"
-                            className="w-[60px] sm:w-[80px] h-auto object-contain"
+                            src={trait.characterImage}
+                            alt={`${trait.name} Character`}
+                            className="w-full h-full object-contain drop-shadow-2xl relative z-10"
+                            onError={(e) => {
+                                e.currentTarget.src = `/traits/Corporate_${trait.imageKey}.png`;
+                            }}
                         />
                     </div>
+                </div>
 
-                    {/* Strength List */}
-                    <div>
-                        <h4 className="text-[clamp(16px,1.1vw,20px)] font-semibold text-[#19211C] dark:text-white mb-3">Key Strength</h4>
-                        <ul className="space-y-2.5">
-                            {[
-                                "Frequently reviews and aligns goals to stay focused and motivated.",
-                                "Continuously seeks ways to improve and refine processes.",
-                                "Stays informed about the latest trends and developments in the industry.",
-                                "Actively seeks constructive feedback from peers and mentors to grow and develop.",
-                                "Adapts strategies to remain effective in changing circumstances."
-                            ].map((item, i) => (
-                                <li key={i} className="flex items-start gap-2 text-[clamp(14px,1.1vw,17px)] font-normal text-[#19211C] dark:text-white leading-snug">
-                                    <span className="mt-1.5 w-1 h-1 rounded-full bg-[#19211C] dark:bg-white shrink-0"></span>
-                                    <span>{item}</span>
+                {/* Right: Profile Details & Strengths */}
+                <div className="lg:w-5/12 w-full text-left pl-0 lg:pl-4">
+                    {/* Header Info */}
+                    <div className="mb-8 border-b border-gray-100 dark:border-white/5 pb-6">
+                        <h1 className="text-[clamp(20px,1.5vw,26px)] font-semibold text-[#19211C] dark:text-white mb-2 leading-tight">{data.candidateName}</h1>
+                        <div className="text-[clamp(14px,1.1vw,17px)] font-medium text-[#1ED36A] mb-1 leading-snug">{subtitle}</div>
+                        {data.institutionName && (
+                            <div className="text-[clamp(13px,1.1vw,16px)] font-normal text-[#19211C] dark:text-white opacity-80 leading-snug">{data.institutionName}</div>
+                        )}
+                        <div className="text-[clamp(12px,0.9vw,14px)] font-normal text-[#19211C] dark:text-white opacity-60 mt-2">Report ID: {data.reportNumber}</div>
+                    </div>
+
+                    {/* Key Strengths Section */}
+                    <div className="flex flex-row items-start gap-4 sm:gap-6">
+                        {/* Strength Chart Graphic */}
+                        <div className="shrink-0 pt-1">
+                            <img
+                                src={trait.strengthChartImage}
+                                alt="Strength Chart"
+                                className="w-[60px] sm:w-[80px] h-auto object-contain"
+                                onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                }}
+                            />
+                        </div>
+
+                        {/* Strength List */}
+                        <div>
+                            <h4 className="text-[clamp(16px,1.1vw,20px)] font-semibold text-[#19211C] dark:text-white mb-3">Key Strength</h4>
+                            <ul className="space-y-2.5">
+                                {(data.keyStrengths.length > 0 ? data.keyStrengths : [
+                                    "Demonstrates strong analytical and strategic thinking.",
+                                    "Adapts to new environments and challenges with ease.",
+                                    "Builds effective working relationships across teams.",
+                                    "Maintains high standards of work quality and consistency.",
+                                    "Shows resilience and determination in achieving goals."
+                                ]).map((item, i) => (
+                                    <li key={i} className="flex items-start gap-2 text-[clamp(14px,1.1vw,17px)] font-normal text-[#19211C] dark:text-white leading-snug">
+                                        <span className="mt-1.5 w-1 h-1 rounded-full bg-[#19211C] dark:bg-white shrink-0"></span>
+                                        <span>{item}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+
+
+                </div>
+            </div>
+
+            {/* Bottom Section: Role Alignment & Career Tips */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 bg-[#F9F9F9] dark:bg-white/5 rounded-2xl overflow-hidden mb-8">
+                {/* Role Alignment */}
+                <div className="p-6 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-white/5">
+                    <h5 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(18px,1.4vw,22px)] font-semibold mb-4">Role Alignment</h5>
+                    {data.roleAlignment.length > 0 ? (
+                        <ul className="space-y-1">
+                            {data.roleAlignment.map((role, i) => (
+                                <li key={i} className="flex items-center gap-1 text-[clamp(14px,1.1vw,16px)] font-normal text-[#19211C] dark:text-white">
+                                    <span className="w-2 h-2 bg-[#1ED36A] rounded-full"></span> {typeof role === 'string' ? role : (role as any).name || (role as any).title || ''}
                                 </li>
                             ))}
                         </ul>
-                    </div>
+                    ) : (
+                        <p className="text-[clamp(14px,1.1vw,16px)] font-normal text-[#19211C] dark:text-white opacity-60">Role alignment data will be available after full analysis.</p>
+                    )}
                 </div>
-            </div>
-        </div>
 
-        {/* Bottom Section: Role Alignment & Career Tips */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 bg-[#F9F9F9] dark:bg-white/5 rounded-2xl overflow-hidden mb-8">
-            {/* Role Alignment */}
-            <div className="p-6 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-white/5">
-                <h5 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(18px,1.4vw,22px)] font-semibold mb-4">Role Alignment</h5>
-                <ul className="space-y-1">
-                    {["User Experience (UX) Designer", "IT Business Analyst", "Knowledge Management Specialist"].map(role => (
-                        <li key={role} className="flex items-center gap-1 text-[clamp(14px,1.1vw,16px)] font-normal text-[#19211C] dark:text-white">
-                            <span className="w-2 h-2 bg-gray-400 rounded-full"></span> {role}
-                        </li>
-                    ))}
-                </ul>
-            </div>
-
-            {/* Career Growth Tips */}
-            <div className="p-6">
-                <h5 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(16px,1.25vw,20px)] font-semibold mb-4">Career Growth Tips</h5>
-                <div className="space-y-5">
-                    <p className="text-[clamp(16px,1.3vw,19px)] text-[#19211C] dark:text-white leading-relaxed opacity-90 mb-4">
-                        The candidate's vibrant personality and optimistic outlook are among his/her greatest assets, but like any strength, these can be overextended. To ensure continued growth, here are some tailored recommendations for the candidate:
-                    </p>
-                    {[
-                        { title: "Delivering on Promises", desc: "The candidate's enthusiasm can sometimes lead him/her to take on more than can realistically be managed. By learning to prioritize and set boundaries, he/she can ensure commitments are met without feeling overwhelmed." },
-                        { title: "Active Listening", desc: "While the candidate's conversational skills are excellent, focusing more on listening can help build deeper connections. Taking the time to fully understand others' perspectives will enhance relationships and decision-making." },
-                        { title: "Staying Focused", desc: "The candidate's excitement about new ideas can occasionally distract him/her from existing priorities. Adopting tools like task lists or scheduling techniques can help channel energy effectively and maintain consistent productivity." },
-                        { title: "Digging Deeper", desc: "The candidate's natural optimism might lead to quick decisions without analyzing all the details. Developing the habit of gathering more information before acting will strengthen problem-solving skills." },
-                        { title: "Time Management", desc: "With a packed schedule and multiple interests, time management is key. Setting clear timelines and avoiding overcommitment will allow the candidate to balance aspirations with well-being." },
-                    ].map((tip, i) => (
-                        <div key={i}>
-                            <span className="font-bold text-[clamp(16px,1.3vw,19px)] text-[#19211C] dark:text-white block mb-1">{tip.title}</span>
-                            <p className="text-[clamp(16px,1.3vw,19px)] text-[#19211C] dark:text-white leading-relaxed font-normal">{tip.desc}</p>
+                {/* Career Growth Tips */}
+                <div className="p-6">
+                    <h5 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(16px,1.25vw,20px)] font-semibold mb-4">Career Growth Tips</h5>
+                    {careerTips.length > 0 ? (
+                        <div className="space-y-5">
+                            {careerTips.map((tip, i) => (
+                                <div key={i}>
+                                    {tip.title && <span className="font-bold text-[clamp(16px,1.3vw,19px)] text-[#19211C] dark:text-white block mb-1">{tip.title}</span>}
+                                    <p className="text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white leading-relaxed font-normal">{tip.desc}</p>
+                                </div>
+                            ))}
                         </div>
-                    ))}
+                    ) : (
+                        <p className="text-[clamp(14px,1.1vw,16px)] font-normal text-[#19211C] dark:text-white opacity-60">Career growth tips will be available after full analysis.</p>
+                    )}
+                </div>
+            </div>
+
+            {/* Footer Description */}
+            <div className="mt-8 pt-4">
+                <h3 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(24px,2vw,32px)] font-semibold mb-2">{data.candidateName} is {trait.name}</h3>
+                {trait.description && (
+                    <p className="text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white leading-relaxed font-normal mb-6">
+                        <span className="font-semibold text-black dark:text-white opacity-90">Description:</span> {trait.description}
+                    </p>
+                )}
+
+                <div className="space-y-6">
+                    {data.keyBehaviors.length > 0 && (
+                        <div>
+                            <h4 className="text-[clamp(16px,1.3vw,19px)] font-semibold text-[#19211C] dark:text-white mb-2">Key Behaviors:</h4>
+                            <ul className="list-disc pl-5 space-y-1.5 text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white font-normal">
+                                {data.keyBehaviors.map((behavior, i) => (
+                                    <li key={i}>{behavior}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    {data.typicalScenarios.length > 0 && (
+                        <div>
+                            <h4 className="text-[clamp(16px,1.3vw,19px)] font-semibold text-[#19211C] dark:text-white mb-2">Typical Scenarios:</h4>
+                            <ul className="list-disc pl-5 space-y-1.5 text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white font-normal">
+                                {data.typicalScenarios.map((scenario, i) => (
+                                    <li key={i}>{scenario}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
-
-        {/* Footer Description */}
-        <div className="mt-8 pt-4">
-            <h3 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(24px,2vw,32px)] font-semibold mb-2">Pushparaaj is Supportive Energizer</h3>
-            <p className="text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white leading-relaxed font-normal mb-6">
-                <span className="font-semibold text-black dark:text-white opacity-90">Description:</span> A warm, empathetic individual who thrives on fostering harmony and collaboration. Your focus on relationships and positivity makes you an invaluable team player and connector.
-            </p>
-
-            <div className="space-y-6">
-                <div>
-                    <h4 className="text-[clamp(16px,1.3vw,19px)] font-semibold text-[#19211C] dark:text-white mb-2">Key Behaviors:</h4>
-                    <ul className="list-disc pl-5 space-y-1.5 text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white font-normal">
-                        <li>Builds meaningful relationships and fosters trust within teams.</li>
-                        <li>Creates a collaborative environment where everyone feels valued.</li>
-                        <li>Acts as a calming presence in high-stress situations.</li>
-                        <li>Thrives in people-focused roles that require empathy and engagement.</li>
-                        <li>Encourages creativity and collaboration to achieve goals.</li>
-                        <li>Supports team members in their growth and development.</li>
-                        <li>Balances optimism with practicality in decision-making.</li>
-                        <li>Commits to long-term success and loyalty within organizations.</li>
-                    </ul>
-                </div>
-
-                <div>
-                    <h4 className="text-[clamp(16px,1.3vw,19px)] font-semibold text-[#19211C] dark:text-white mb-2">Typical Scenarios:</h4>
-                    <ul className="list-disc pl-5 space-y-1.5 text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white font-normal">
-                        <li>Coordinating a team-building initiative to boost morale.</li>
-                        <li>Leading a customer success program to improve retention rates.</li>
-                        <li>Acting as a mentor to help colleagues achieve their potential.</li>
-                        <li>Supporting recruitment efforts by creating a welcoming candidate experience.</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
-);
+    );
+};
 
 
 const CorporateDashboard: React.FC = () => {
@@ -593,6 +655,9 @@ const CorporateDashboard: React.FC = () => {
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [showResult, setShowResult] = useState(false);
+    const [reportData, setReportData] = useState<ReportData | null>(null);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const [searchError, setSearchError] = useState<string | null>(null);
     const [isBuyCreditsOpen, setIsBuyCreditsOpen] = useState(false);
 
     // Toast State
@@ -633,11 +698,39 @@ const CorporateDashboard: React.FC = () => {
         fetchStats();
     }, []);
 
-    const handleSearch = () => {
-        if (searchQuery.trim()) {
-            setShowResult(true);
-        } else {
+    const handleSearch = async () => {
+        const query = searchQuery.trim();
+        if (!query) {
             setShowResult(false);
+            setReportData(null);
+            setSearchError(null);
+            return;
+        }
+
+        const email = sessionStorage.getItem("userEmail");
+        if (!email) {
+            setSearchError("Please log in to search reports.");
+            return;
+        }
+
+        setSearchLoading(true);
+        setSearchError(null);
+        setShowResult(false);
+        setReportData(null);
+
+        try {
+            const result = await corporateDashboardService.searchByReportNumber(email, query);
+            if (result) {
+                setReportData(result);
+                setShowResult(true);
+            } else {
+                setSearchError(`No report found for ID: ${query}`);
+            }
+        } catch (err: any) {
+            console.error('Search failed:', err);
+            setSearchError(err.message || `No report found for ID: ${query}`);
+        } finally {
+            setSearchLoading(false);
         }
     };
 
@@ -737,8 +830,36 @@ const CorporateDashboard: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Profile Result Card (Only shows after search) */}
-                    {showResult && <ProfileResult />}
+                    {/* Loading State */}
+                    {searchLoading && (
+                        <div className="mt-8 pt-8 text-center">
+                            <div className="inline-flex items-center gap-3 text-[#19211C] dark:text-white">
+                                <svg className="animate-spin h-6 w-6 text-[#1ED36A]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span className="text-[clamp(14px,1vw,16px)] font-medium">Searching for report...</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Error State */}
+                    {searchError && !searchLoading && (
+                        <div className="mt-8 pt-8 text-center">
+                            <div className="inline-flex flex-col items-center gap-2">
+                                <div className="w-16 h-16 rounded-full bg-red-50 dark:bg-red-500/10 flex items-center justify-center mb-2">
+                                    <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <span className="text-[clamp(14px,1vw,16px)] font-medium text-red-400">{searchError}</span>
+                                <span className="text-[clamp(12px,0.8vw,14px)] text-[#19211C] dark:text-white opacity-60">Please check the Origin BI ID and try again</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Profile Result Card (Only shows after successful search) */}
+                    {showResult && reportData && <ProfileResult data={reportData} />}
                 </div>
             </div>
 

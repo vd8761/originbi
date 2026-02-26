@@ -245,14 +245,20 @@ export class RegistrationsService {
         let programTitle: string;
 
         if (dto.programType) {
-          // Strict lookup for selected program
-          const selectedProgram = await manager
-            .getRepository(Program)
-            .findOne({ where: { id: Number(dto.programType) } });
+          // Strict lookup for selected program (by ID or Name)
+          const isNumericId =
+            !isNaN(Number(dto.programType)) &&
+            String(dto.programType).trim() !== '';
+
+          const selectedProgram = await manager.getRepository(Program).findOne({
+            where: isNumericId
+              ? { id: Number(dto.programType) }
+              : { name: dto.programType },
+          });
 
           if (!selectedProgram) {
             throw new BadRequestException(
-              `Selected Program (ID: ${dto.programType}) not found.`,
+              `Selected Program ('${dto.programType}') not found.`,
             );
           }
           if (!selectedProgram.isActive) {
@@ -453,9 +459,15 @@ export class RegistrationsService {
       let programId: number;
 
       if (dto.programType) {
-        const selectedProgram = await manager
-          .getRepository(Program)
-          .findOne({ where: { id: Number(dto.programType) } });
+        const isNumericId =
+          !isNaN(Number(dto.programType)) &&
+          String(dto.programType).trim() !== '';
+
+        const selectedProgram = await manager.getRepository(Program).findOne({
+          where: isNumericId
+            ? { id: Number(dto.programType) }
+            : { name: dto.programType },
+        });
 
         if (!selectedProgram)
           throw new BadRequestException(`Program ${dto.programType} not found`);
@@ -666,9 +678,13 @@ export class RegistrationsService {
     const value = !!enabled;
 
     // Ensure column exists (safe idempotent ALTER)
-    await this.dataSource.query(
-      `ALTER TABLE registrations ADD COLUMN IF NOT EXISTS has_ai_counsellor BOOLEAN NOT NULL DEFAULT false`,
-    ).catch(() => { /* column already exists */ });
+    await this.dataSource
+      .query(
+        `ALTER TABLE registrations ADD COLUMN IF NOT EXISTS has_ai_counsellor BOOLEAN NOT NULL DEFAULT false`,
+      )
+      .catch(() => {
+        /* column already exists */
+      });
 
     // Use raw SQL to avoid BigInt/entity serialization issues
     const result = await this.dataSource.query(
