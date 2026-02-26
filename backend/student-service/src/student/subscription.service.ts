@@ -28,7 +28,8 @@ export interface SubscriptionPlanInfo {
 
 function getErrorMessage(err: unknown): string {
     if (err instanceof Error) return err.message;
-    return String(err);
+    if (typeof err === 'string') return err;
+    return 'Unknown error';
 }
 
 @Injectable()
