@@ -40,6 +40,7 @@ export class CorporateAccessPolicy implements IAccessPolicy {
             'career_guidance',       // General guidance
             'overall_report',        // Their company report
             'count',                 // Count their candidates
+            'count_by_role',         // Role-based breakdown
         ];
     }
 

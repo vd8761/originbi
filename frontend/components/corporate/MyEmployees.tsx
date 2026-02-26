@@ -768,6 +768,7 @@ const MyEmployees: React.FC = () => {
                         loading={loading}
                         error={error}
                         onViewDetails={handleViewDetails}
+                        showAiCounsellor={false}
                         // sortProps passed if RegistrationTable supported sorting, which it doesn't currently seem to fully support here or it's implicitly handled?
                         // checked RegistrationTable properties, it accepts sortColumn/sortOrder/onSort.
                         sortColumn={sortColumn}

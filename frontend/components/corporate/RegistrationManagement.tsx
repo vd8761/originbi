@@ -476,7 +476,7 @@ const RegistrationManagement: React.FC = () => {
 
       {/* Content */}
       {activeTab === 'registrations' ? (
-        <RegistrationTable users={users} loading={loading} error={error} />
+        <RegistrationTable users={users} loading={loading} error={error} showAiCounsellor={false} />
       ) : activeTab === 'individual' ? (
         <AssessmentSessionsTable
           sessions={sessions}
