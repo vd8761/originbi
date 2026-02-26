@@ -26,6 +26,11 @@ export interface SubscriptionPlanInfo {
     daysRemaining?: number;
 }
 
+function getErrorMessage(err: unknown): string {
+    if (err instanceof Error) return err.message;
+    return String(err);
+}
+
 @Injectable()
 export class SubscriptionService {
     private readonly logger = new Logger(SubscriptionService.name);
@@ -39,6 +44,12 @@ export class SubscriptionService {
         private readonly configService: ConfigService,
     ) { }
 
+    private async queryRegistration(sql: string, params: unknown[]): Promise<RegistrationRow[]> {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const result = await this.dataSource.query(sql, params);
+        return result as RegistrationRow[];
+    }
+
     /**
      * Check if a student has an active AI Counsellor subscription
      */
@@ -50,21 +61,21 @@ export class SubscriptionService {
         try {
             // Quick check via registration flag first
             this.logger.log(`Checking subscription status for email: ${email}`);
-            const registration = await this.dataSource.query(
+            const registration = await this.queryRegistration(
                 `SELECT r.id, r.user_id, r.has_ai_counsellor, r.full_name
                  FROM registrations r
                  JOIN users u ON r.user_id = u.id
                  WHERE LOWER(u.email) = LOWER($1) AND r.is_deleted = false
                  ORDER BY r.created_at DESC LIMIT 1`,
                 [email],
-            ) as RegistrationRow[];
+            );
             this.logger.log(`Registration query result: ${JSON.stringify(registration)}`);
 
             if (!registration || registration.length === 0) {
                 return { hasAiCounsellor: false, plan: null };
             }
 
-            const reg: RegistrationRow = registration[0];
+            const reg = registration[0];
 
             if (reg.has_ai_counsellor) {
                 // Try to fetch active subscription details (may not exist for admin-toggled access)
@@ -76,14 +87,13 @@ export class SubscriptionService {
                     });
                 } catch (subErr: unknown) {
                     // student_subscriptions table may not exist yet — that's fine for admin-toggled access
-                    const errMessage = subErr instanceof Error ? subErr.message : String(subErr);
-                    this.logger.warn(`Subscription table query failed (may not exist yet): ${errMessage}`);
+                    this.logger.warn(`Subscription table query failed (may not exist yet): ${getErrorMessage(subErr)}`);
                 }
 
                 if (sub) {
                     // Check if subscription has expired (90-day validity)
                     if (sub.expiresAt && new Date(sub.expiresAt) < new Date()) {
-                        this.logger.log(`⏰ Subscription expired for ${email} (expired: ${sub.expiresAt})`);
+                        this.logger.log(`⏰ Subscription expired for ${email} (expired: ${String(sub.expiresAt)})`);
                         // Mark as expired
                         try {
                             await this.subscriptionRepo.update(sub.id, { status: 'expired' as StudentSubscription['status'] });
@@ -121,8 +131,7 @@ export class SubscriptionService {
 
             return { hasAiCounsellor: false, plan: null };
         } catch (error: unknown) {
-            const errMessage = error instanceof Error ? error.message : String(error);
-            this.logger.error(`Error checking subscription: ${errMessage}`);
+            this.logger.error(`Error checking subscription: ${getErrorMessage(error)}`);
             return { hasAiCounsellor: false, plan: null };
         }
     }
@@ -150,7 +159,7 @@ export class SubscriptionService {
         const orderData = {
             amount,
             currency,
-            receipt: `ai_counsellor_${Date.now()}`,
+            receipt: `ai_counsellor_${String(Date.now())}`,
             notes: { email, plan: 'ai_counsellor' },
         };
 
@@ -207,20 +216,20 @@ export class SubscriptionService {
         }
 
         // Get user and registration
-        const registration = await this.dataSource.query(
+        const registration = await this.queryRegistration(
             `SELECT r.id, r.user_id
              FROM registrations r
              JOIN users u ON r.user_id = u.id
              WHERE u.email = $1 AND r.is_deleted = false
              ORDER BY r.created_at DESC LIMIT 1`,
             [body.email],
-        ) as RegistrationRow[];
+        );
 
         if (!registration || registration.length === 0) {
             return { success: false, message: 'User not found' };
         }
 
-        const reg: RegistrationRow = registration[0];
+        const reg = registration[0];
 
         // Use a transaction to ensure atomicity
         const queryRunner = this.dataSource.createQueryRunner();
@@ -248,8 +257,7 @@ export class SubscriptionService {
             return { success: true, message: 'AI Counsellor activated successfully!' };
         } catch (error: unknown) {
             await queryRunner.rollbackTransaction();
-            const errMessage = error instanceof Error ? error.message : String(error);
-            this.logger.error(`Activation failed: ${errMessage}`);
+            this.logger.error(`Activation failed: ${getErrorMessage(error)}`);
             return { success: false, message: 'Activation failed. Please contact support.' };
         } finally {
             await queryRunner.release();
@@ -261,20 +269,20 @@ export class SubscriptionService {
      */
     async manualActivate(email: string): Promise<{ success: boolean }> {
         try {
-            const registration = await this.dataSource.query(
+            const registration = await this.queryRegistration(
                 `SELECT r.id, r.user_id
                  FROM registrations r
                  JOIN users u ON r.user_id = u.id
                  WHERE u.email = $1 AND r.is_deleted = false
                  ORDER BY r.created_at DESC LIMIT 1`,
                 [email],
-            ) as RegistrationRow[];
+            );
 
             if (!registration || registration.length === 0) {
                 return { success: false };
             }
 
-            const reg: RegistrationRow = registration[0];
+            const reg = registration[0];
 
             await this.dataSource.query(
                 `INSERT INTO student_subscriptions 
@@ -291,8 +299,7 @@ export class SubscriptionService {
             this.logger.log(`✅ AI Counsellor manually activated for ${email}`);
             return { success: true };
         } catch (error: unknown) {
-            const errMessage = error instanceof Error ? error.message : String(error);
-            this.logger.error(`Manual activation failed: ${errMessage}`);
+            this.logger.error(`Manual activation failed: ${getErrorMessage(error)}`);
             return { success: false };
         }
     }
