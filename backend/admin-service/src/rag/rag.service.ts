@@ -453,6 +453,29 @@ export class RagService {
       }
 
       // ═══════════════════════════════════════════════════════════════
+      // MULTI-PERSON QUERY HANDLER: "X and Y report" / "X and Y results"
+      // Split multi-person queries and handle each separately
+      // ═══════════════════════════════════════════════════════════════
+      if (interpretation.searchTerm && /\band\b/i.test(interpretation.searchTerm)) {
+        const names = interpretation.searchTerm.split(/\s+and\s+/i).map((n: string) => n.trim()).filter((n: string) => n.length >= 2);
+        if (names.length >= 2) {
+          this.logger.log(`👥 Multi-person query detected: ${names.join(', ')}`);
+          const results: string[] = [];
+          for (const name of names) {
+            const result = interpretation.intent === 'career_report'
+              ? await this.handleCareerReport(name, user)
+              : await this.handlePersonLookup(name, user);
+            results.push(`### ${name}\n${result.answer}`);
+          }
+          return {
+            answer: results.join('\n\n---\n\n'),
+            searchType: interpretation.intent,
+            confidence: 0.9,
+          };
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════
       // SPECIAL HANDLER: CAREER REPORT GENERATION (RBAC scoped)
       // ═══════════════════════════════════════════════════════════════
       if (interpretation.intent === 'career_report') {
@@ -478,7 +501,7 @@ export class RagService {
       // Detects when user provides profile details in chat
       // ═══════════════════════════════════════════════════════════════
       if (interpretation.intent === 'chat_profile_report') {
-        return await this.handleChatProfileReport(question);
+        return await this.handleChatProfileReport(question, user);
       }
 
       // ═══════════════════════════════════════════════════════════════
@@ -549,33 +572,51 @@ export class RagService {
         const isPersonSpecificQuery = this.isPersonSpecificQuery(resolvedQuestion, ctx);
 
         if (isPersonSpecificQuery && personNameToCheck) {
-          this.logger.log(`🔍 Person guard: checking if "${personNameToCheck}" exists in DB`);
+          this.logger.log(`🔍 Person guard: checking if "${personNameToCheck}" exists in DB (role=${userRole})`);
+          
+          // RBAC: Corporate users can ONLY see people in their organization
+          const guardRole = (user?.role || 'STUDENT').toUpperCase();
+          const guardCorporateId = user?.corporateId;
+          let guardFilter = '';
+          const guardParams: any[] = [`\\m${personNameToCheck}\\M`];
+          if (guardRole === 'CORPORATE' && guardCorporateId) {
+            guardFilter = ' AND r.corporate_account_id = $2';
+            guardParams.push(guardCorporateId);
+          }
+
           // Word-boundary match first for precision, then ILIKE fallback
           let personCheck = await this.dataSource.query(
             `SELECT r.full_name, 
                     (SELECT COUNT(*) FROM assessment_attempts aa WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
              FROM registrations r
-             WHERE r.full_name ~* $1 AND r.is_deleted = false
+             WHERE r.full_name ~* $1 AND r.is_deleted = false${guardFilter}
              LIMIT 3`,
-            [`\\m${personNameToCheck}\\M`]
+            guardParams
           );
           let usedILIKEFallback = false;
           if (!personCheck || personCheck.length === 0) {
+            const iLikeParams: any[] = [`%${personNameToCheck.toLowerCase()}%`];
+            let iLikeFilter = '';
+            if (guardRole === 'CORPORATE' && guardCorporateId) {
+              iLikeFilter = ' AND r.corporate_account_id = $2';
+              iLikeParams.push(guardCorporateId);
+            }
             personCheck = await this.dataSource.query(
               `SELECT r.full_name, 
                       (SELECT COUNT(*) FROM assessment_attempts aa WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
                FROM registrations r
-               WHERE LOWER(r.full_name) LIKE $1 AND r.is_deleted = false
+               WHERE LOWER(r.full_name) LIKE $1 AND r.is_deleted = false${iLikeFilter}
                LIMIT 5`,
-              [`%${personNameToCheck.toLowerCase()}%`]
+              iLikeParams
             );
             usedILIKEFallback = true;
           }
 
           if (!personCheck || personCheck.length === 0) {
-            this.logger.warn(`⚠️ Person guard: "${personNameToCheck}" not found in DB — blocking web fallback`);
+            const scopeMsg = guardRole === 'CORPORATE' ? ' within your organization' : ' in our database';
+            this.logger.warn(`⚠️ Person guard: "${personNameToCheck}" not found${scopeMsg} — blocking web fallback`);
             return {
-              answer: `**"${personNameToCheck}" was not found in our database.**\n\nI can only provide information about candidates who are registered on the OriginBI platform and have completed assessments.\n\n**You can:**\n• Check the spelling and try again\n• Ask me to **"list candidates"** to see available names\n• Ask general career questions like *"what skills are needed for a CFO?"*\n\nI don't look up information about people from the web — all person-specific data comes from our platform.`,
+              answer: `**"${personNameToCheck}" not found${scopeMsg}.** Check the spelling or try "list candidates".`,
               searchType: 'person_not_found',
               confidence: 0.95,
             };
@@ -598,7 +639,7 @@ export class RagService {
             return await this.handleCareerReport(matchedName, user);
           } else {
             return {
-              answer: `**Found "${matchedName}" in our database**, but they haven't completed any assessments yet.\n\nOnce the assessment is completed, I can provide:\n• Personality profile & behavioral insights\n• Career fitment analysis\n• Role readiness scores\n• Personalized career recommendations\n\nWould you like to see their registration details instead?`,
+              answer: `**Found "${matchedName}"**, but they haven't completed any assessments yet. Results will be available once an assessment is completed.`,
               searchType: 'person_no_assessment',
               confidence: 0.9,
             };
@@ -627,7 +668,7 @@ export class RagService {
       if ((!user || (user.id === 0 && !user.email && !user.sub)) && (user?.role === 'STUDENT' || !user?.role)) {
         this.logger.log('🔒 RBAC: Anonymous user detected — prompting to log in');
         return {
-          answer: 'Welcome to BI. To access your personalized data and results, please log in first. If you have any general career questions, feel free to ask.',
+          answer: 'Welcome to Ask BI. To access your personalized data and results, please log in first. If you have any general career questions, feel free to ask.',
           searchType: 'auth_required',
           confidence: 1.0,
         };
@@ -658,6 +699,16 @@ export class RagService {
           searchType: 'rbac_redirect',
           confidence: 1.0,
         };
+      }
+
+      // ── Inject gender filter for count queries ──
+      if (interpretation.intent === 'count') {
+        const qLow = (resolvedQuestion || question).toLowerCase();
+        if (/\b(male|boys?|men)\b/.test(qLow) && !/\bfemale\b/.test(qLow)) {
+          (interpretation as any).gender = 'MALE';
+        } else if (/\b(female|girls?|women)\b/.test(qLow)) {
+          (interpretation as any).gender = 'FEMALE';
+        }
       }
 
       // ── First, get total count for pagination ──
@@ -697,26 +748,46 @@ export class RagService {
       if (data.length === 0) {
         this.logger.log('🧠 No data found for intent: ' + interpretation.intent);
 
-        // For person_lookup without results, give a helpful clarification
-        if (interpretation.intent === 'person_lookup') {
-          const searchedName = interpretation.searchTerm || 'that person';
-          return {
-            answer: `**No results found for "${searchedName}".** Please check the name and try again.\n\nYou can ask:\n• "show [full name]'s results"\n• "details for [name]"\n• "list candidates" to see available names`,
-            searchType: 'clarification',
-            confidence: 0.7,
-          };
-        }
+        const curRole = (user?.role || 'STUDENT').toUpperCase();
+        const scopeMsg = curRole === 'CORPORATE' ? ' in your organization' : '';
 
-        // For self_results with no data
-        if (interpretation.intent === 'self_results') {
+        // ═══════════════════════════════════════════════════════════
+        // DB-BOUND INTENTS: Return clear "no data" — NEVER use LLM
+        // This prevents generic web-like responses for DB queries
+        // ═══════════════════════════════════════════════════════════
+        const dbBoundIntents = [
+          'list_users', 'list_candidates', 'test_results', 'best_performer',
+          'person_lookup', 'self_results', 'career_roles', 'count', 'count_by_role',
+          'affiliate_dashboard', 'affiliate_referrals', 'affiliate_earnings',
+          'affiliate_payments', 'affiliate_list', 'affiliate_lookup',
+          'affiliate_students',
+        ];
+
+        if (dbBoundIntents.includes(interpretation.intent)) {
+          // Specific messages per intent
+          const noDataMessages: Record<string, string> = {
+            person_lookup: `**"${interpretation.searchTerm || 'that person'}" not found${scopeMsg}.** Check the spelling or try "list candidates".`,
+            self_results: `You don't have any completed assessments yet. Complete an assessment to see your results here.`,
+            list_candidates: `No candidates found${scopeMsg}.`,
+            list_users: `No users found.`,
+            test_results: `No completed assessment results found${scopeMsg}.`,
+            best_performer: `No candidates or completed assessments found${scopeMsg}.`,
+            career_roles: `No career roles found in the database.`,
+            count: `**Total: 0**`,
+            count_by_role: `No accounts found.`,
+          };
+
+          const answer = noDataMessages[interpretation.intent]
+            || `No data found for this query${scopeMsg}.`;
+
           return {
-            answer: `You don't have any completed assessments yet. Once you complete an assessment, I'll be able to show your personalized results, career recommendations, and personality insights.\n\n💡 Ask me about career paths or skills while you wait!`,
-            searchType: 'no_data',
+            answer,
+            searchType: interpretation.intent,
             confidence: 0.8,
           };
         }
 
-        // For other intents, use LLM fallback
+        // Only use LLM fallback for non-DB intents (general_knowledge, career_guidance)
         const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
         const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, conversationHistory);
         return {
@@ -918,8 +989,9 @@ export class RagService {
       }
 
       if (!personData.length) {
+        const scopeMsg = userRole === 'CORPORATE' ? ' within your organization' : '';
         return {
-          answer: `**❌ No candidate found matching "${cleanSearchTerm}"**\n\nPlease check the name or email and try again.`,
+          answer: `**"${cleanSearchTerm}" not found${scopeMsg}.** Check the spelling or try "list candidates".`,
           searchType: 'career_report',
           confidence: 0.3,
         };
@@ -1036,13 +1108,18 @@ export class RagService {
 
     try {
       // ── Step 1: Smart name search (word-boundary first, ILIKE fallback) ──
-      const rbacFilter = userRole === 'CORPORATE' && corporateId
-        ? ` AND r.corporate_account_id = ${corporateId}`
-        : userRole === 'STUDENT' && userId
-          ? ` AND r.user_id = ${userId}`
-          : '';
+      // Build RBAC filter with parameterized query for security
+      let rbacFilterClause = '';
+      const extraParams: any[] = [];
+      if (userRole === 'CORPORATE' && corporateId) {
+        rbacFilterClause = ' AND r.corporate_account_id = $2';
+        extraParams.push(corporateId);
+      } else if (userRole === 'STUDENT' && userId) {
+        rbacFilterClause = ' AND r.user_id = $2';
+        extraParams.push(userId);
+      }
 
-      const lookupSql = (whereNameClause: string, nameParam: string) => `
+      const lookupSql = (whereNameClause: string) => `
         SELECT 
           r.id as reg_id,
           r.full_name,
@@ -1064,14 +1141,14 @@ export class RagService {
         LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id AND aa.status = 'COMPLETED'
         LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
         LEFT JOIN programs p ON aa.program_id = p.id
-        WHERE r.is_deleted = false AND ${whereNameClause}${rbacFilter}
+        WHERE r.is_deleted = false AND ${whereNameClause}${rbacFilterClause}
         ORDER BY r.full_name, aa.completed_at DESC NULLS LAST
         LIMIT 20`;
 
       // Try word-boundary match first
       let data = await this.executeDatabaseQuery(
-        lookupSql(`r.full_name ~* $1`, ''),
-        [`\\m${cleanSearch}\\M`],
+        lookupSql(`r.full_name ~* $1`),
+        [`\\m${cleanSearch}\\M`, ...extraParams],
       );
 
       // Fallback to ILIKE if no results
@@ -1080,14 +1157,15 @@ export class RagService {
         this.logger.log(`🔄 person_lookup: word-boundary for "${cleanSearch}" → 0, trying ILIKE`);
         usedLookupILIKEFallback = true;
         data = await this.executeDatabaseQuery(
-          lookupSql(`r.full_name ILIKE $1`, ''),
-          [`%${cleanSearch}%`],
+          lookupSql(`r.full_name ILIKE $1`),
+          [`%${cleanSearch}%`, ...extraParams],
         );
       }
 
       if (data.length === 0) {
+        const scopeMsg = userRole === 'CORPORATE' ? ' within your organization' : '';
         return {
-          answer: `**No results found for "${cleanSearch}".** Please check the name and try again.\n\nYou can ask:\n• "show [full name]'s results"\n• "details for [name]"\n• "list candidates" to see available names`,
+          answer: `**"${cleanSearch}" not found${scopeMsg}.** Check the spelling or try "list candidates".`,
           searchType: 'person_not_found',
           confidence: 0.7,
         };
@@ -1577,7 +1655,7 @@ export class RagService {
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLER: CHAT-BASED PROFILE REPORT (User provides profile data in chat)
   // ═══════════════════════════════════════════════════════════════════════════
-  private async handleChatProfileReport(question: string): Promise<QueryResult> {
+  private async handleChatProfileReport(question: string, user?: any): Promise<QueryResult> {
     try {
       this.logger.log('📋 Processing chat-based profile for custom report generation');
 
@@ -1598,35 +1676,51 @@ export class RagService {
       // We NEVER generate reports for people not in our system.
       // Uses word-boundary matching for precision (prevents "jai" → "JAISHREE")
       // ══════════════════════════════════════════════════════════
+      let corporateFilter = '';
+      const profileGuardParams: any[] = [`\\m${profileData.name}\\M`];
+      const profileUserRole = (user?.role || 'STUDENT').toUpperCase();
+      const profileCorporateId = user?.corporateId;
+      if (profileUserRole === 'CORPORATE' && profileCorporateId) {
+        corporateFilter = ' AND r.corporate_account_id = $2';
+        profileGuardParams.push(profileCorporateId);
+      }
+
       let dbCheck = await this.dataSource.query(
         `SELECT r.id, r.full_name, r.user_id,
                 (SELECT COUNT(*) FROM assessment_attempts aa
                  WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
          FROM registrations r
-         WHERE r.full_name ~* $1 AND r.is_deleted = false
+         WHERE r.full_name ~* $1 AND r.is_deleted = false${corporateFilter}
          ORDER BY r.created_at DESC LIMIT 5`,
-        [`\\m${profileData.name}\\M`]
+        profileGuardParams
       );
 
       // Fallback to ILIKE if word-boundary returned 0
       let usedProfileILIKEFallback = false;
       if (!dbCheck || dbCheck.length === 0) {
         usedProfileILIKEFallback = true;
+        const iLikeParams2: any[] = [`%${profileData.name.toLowerCase()}%`];
+        let iLikeFilter2 = '';
+        if (profileUserRole === 'CORPORATE' && profileCorporateId) {
+          iLikeFilter2 = ' AND r.corporate_account_id = $2';
+          iLikeParams2.push(profileCorporateId);
+        }
         dbCheck = await this.dataSource.query(
           `SELECT r.id, r.full_name, r.user_id,
                   (SELECT COUNT(*) FROM assessment_attempts aa
                    WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
            FROM registrations r
-           WHERE LOWER(r.full_name) LIKE $1 AND r.is_deleted = false
+           WHERE LOWER(r.full_name) LIKE $1 AND r.is_deleted = false${iLikeFilter2}
            ORDER BY r.created_at DESC LIMIT 5`,
-          [`%${profileData.name.toLowerCase()}%`]
+          iLikeParams2
         );
       }
 
       if (!dbCheck || dbCheck.length === 0) {
-        this.logger.warn(`❌ Chat profile report: "${profileData.name}" not found in database`);
+        const scopeMsg = profileUserRole === 'CORPORATE' ? ' within your organization' : ' in our database';
+        this.logger.warn(`❌ Chat profile report: "${profileData.name}" not found${scopeMsg}`);
         return {
-          answer: `**⚠️ "${profileData.name}" was not found in our database.**\n\nI can only generate Career Fitment Reports for candidates who are registered on the OriginBI platform.\n\n**What you can do:**\n• Check if the name is spelled correctly\n• Ask me to **"list candidates"** to see registered users\n• The person needs to register and complete an assessment first\n\nI cannot generate reports for people outside our system — the report must be based on real assessment data to be meaningful.`,
+          answer: `**⚠️ "${profileData.name}" was not found${scopeMsg}.**\n\nI can only generate Career Fitment Reports for candidates who are registered on the OriginBI platform${profileUserRole === 'CORPORATE' ? ' and belong to your organization' : ''}.\n\n**What you can do:**\n• Check if the name is spelled correctly\n• Ask me to **"list candidates"** to see registered users\n• The person needs to register and complete an assessment first\n\nAll reports are based exclusively on real assessment data from our platform.`,
           searchType: 'person_not_found',
           confidence: 0.95,
         };
@@ -1898,7 +1992,7 @@ export class RagService {
       : userRole === 'CORPORATE' ? 'CORPORATE(company-scoped)'
         : 'STUDENT(personal only)';
 
-    const prompt = `You are an intent classifier for OriginBI, a career assessment platform. Your job is to classify user questions into the correct intent for routing.
+    const prompt = `You are the intent classifier for Ask BI (OriginBI's AI talent intelligence assistant). Classify user questions into the correct intent for routing.
 
 User role: ${roleHint}
 ${conversationHistory ? `\n${conversationHistory}\n` : ''}
@@ -1923,6 +2017,7 @@ INTENTS (choose the MOST SPECIFIC one):
 - custom_report: career fitment report (with user profile data)
 - chat_profile_report: message contains structured fields like "Name:", "Current Role:", "Experience:"
 - count: "how many users/candidates"
+- count_by_role: "how many corporate/admin/student accounts" (role-based user breakdown)
 - affiliate_dashboard: Affiliate program overview/stats ("affiliate dashboard", "referral summary", "affiliate overview", "affiliate stats")
 - affiliate_referrals: Referral transactions ("show referrals", "referral list", "referral transactions", "how many referrals")
 - affiliate_earnings: Affiliate commissions/earnings ("affiliate earnings", "commission details", "total earned", "pending commission")
@@ -2182,17 +2277,51 @@ JSON:`;
       return { intent: 'career_report', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
     }
 
+    // "[Name(s)] report" — e.g. "DINESH S J and PRAKASH B report", "dinesh report"
+    if (/\breport\b/i.test(q)) {
+      const beforeReport = question.replace(/\s*report\b.*/i, '').trim();
+      if (beforeReport.length >= 2 && !/^(show|get|list|create|generate|overall|custom|my)$/i.test(beforeReport)) {
+        return { intent: 'career_report', searchTerm: beforeReport, table: 'assessment_attempts', includePersonality: true };
+      }
+    }
+
     // Best/top performer
-    if (/\b(best|top|highest)\s*(performer|score|candidate|student|result)\b/i.test(q) ||
+    if (/\b(best|top|highest)\s*(performer|score|candidate|student|result|employee|resource|member)s?\b/i.test(q) ||
       /\b(show|list|get)\s*(top|best)\b/i.test(q) ||
+      /\b(best|top)\s*(employee|resource|member)s?\b/i.test(q) ||
       /\btop\s*\d+\b/.test(q)) {
       return { intent: 'best_performer', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
     }
 
-    // Count — "how many users/candidates/students"
+    // Count — "how many users/candidates/students/male/female/corporate/admin"
     if (/\b(how\s*many|count|total\s*number)\b/.test(q)) {
-      const table = /user/i.test(q) ? 'users' : /candidate|registration|student/i.test(q) ? 'registrations' : 'assessment_attempts';
-      return { intent: 'count', searchTerm: null, table, includePersonality: false };
+      // Detect role-based count (corporate, admin, student breakdown)
+      const rolesRequested: string[] = [];
+      if (/\bcorporate\b/i.test(q)) rolesRequested.push('CORPORATE');
+      if (/\badmin\b/i.test(q)) rolesRequested.push('ADMIN');
+      if (/\bstudent\b/i.test(q)) rolesRequested.push('STUDENT');
+      if (/\baffiliate\b/i.test(q)) rolesRequested.push('AFFILIATE');
+      if (rolesRequested.length > 0) {
+        const result: any = { intent: 'count_by_role', searchTerm: null, table: 'users', includePersonality: false };
+        result.roles = rolesRequested;
+        return result;
+      }
+
+      // Detect "corporate logins/accounts" specifically
+      if (/\bcorporate\s*(login|account|user)s?\b/i.test(q)) {
+        const result: any = { intent: 'count_by_role', searchTerm: null, table: 'users', includePersonality: false };
+        result.roles = ['CORPORATE'];
+        return result;
+      }
+
+      const table = /user|login|account/i.test(q) ? 'users' : /candidate|registration|student|resource|employee|people|member/i.test(q) ? 'registrations' : 'assessment_attempts';
+      // Extract gender filter
+      let gender: string | undefined;
+      if (/\b(male|boys?|men)\b/i.test(q) && !/\bfemale\b/i.test(q)) gender = 'MALE';
+      else if (/\b(female|girls?|women)\b/i.test(q)) gender = 'FEMALE';
+      const result: any = { intent: 'count', searchTerm: null, table, includePersonality: false };
+      if (gender) result.gender = gender;
+      return result;
     }
 
     // List users (but NOT if the query has domain words — already handled above)
@@ -2461,15 +2590,17 @@ JSON:`;
   private extractName(question: string): string | null {
     const patterns = [
       // "for Jaya Krishna Reddy #1" → "Jaya Krishna Reddy #1"
-      /(?:for|about|of)\s+((?:[A-Za-z]+\.?\s*){1,4}(?:\s*#\s*\d+)?)/i,
+      /(?:for|about|bout|of)\s+((?:[A-Za-z]+\.?\s*){1,4}(?:\s*#\s*\d+)?)/i,
       // "Jaya Krishna's score" → "Jaya Krishna"
       /((?:[A-Za-z]+\.?\s+){0,3}[A-Za-z]+)'s?\s+(?:test|exam|score|result|detail|report|profile|data)/i,
       // "show Jaya Krishna" → "Jaya Krishna"
       /(?:show|get|find|search|display)\s+((?:[A-Za-z]+\.?\s*){1,4})(?:'s)?/i,
       // "results of S. Rajesh" → "S. Rajesh"
       /(?:results?|scores?|details?|report|profile|data)\s+(?:of|for)\s+((?:[A-Z]\.?\s*)?(?:[A-Za-z]+\s*){1,3})/i,
+      // "know about jai" → "jai"
+      /(?:know|tell|learn)\s+(?:about|bout)\s+((?:[A-Za-z]+\.?\s*){1,4})/i,
       // Simple: "for ajay" → "ajay" (single word fallback)
-      /(?:for|about|of)\s+([A-Za-z]+(?:\s*#\s*\d+)?)/i,
+      /(?:for|about|bout|of)\s+([A-Za-z]+(?:\s*#\s*\d+)?)/i,
     ];
 
     const stopWords = new Set([
@@ -2545,8 +2676,13 @@ JSON:`;
     const pronounPatterns = /\b(him|her|his|hers|he|she|that person|that candidate|that student|this person)\b/i;
     if (pronounPatterns.test(q)) return true;
 
+    // "know about/bout" or "want to know about" patterns
+    if (/\b(know|tell|learn|inform)\s+(about|bout|regarding)\b/i.test(q)) return true;
+    if (/\b(want|need|like)\s+to\s+know\b/i.test(q)) return true;
+    if (/\bwhat[s']?\s+.*\b(about|bout)\s+/i.test(q)) return true;
+
     // Explicit "about <name>" or "asking about" patterns
-    if (/\b(about|regarding|for)\s+[A-Z][a-z]+/i.test(question)) {
+    if (/\b(about|bout|regarding|for)\s+[A-Z][a-z]+/i.test(question)) {
       // But exclude generic concept queries like "about becoming a CFO"
       if (/\b(about|regarding)\s+(becoming|being|working|learning|studying|getting)/i.test(q)) return false;
       return true;
@@ -2563,7 +2699,7 @@ JSON:`;
     }
 
     // "I'm asking about <name>" pattern
-    if (/\b(asking|talking|enquiring|inquiring)\s+(about|regarding)\b/i.test(q)) return true;
+    if (/\b(asking|talking|enquiring|inquiring)\s+(about|bout|regarding)\b/i.test(q)) return true;
 
     return false;
   }
@@ -2845,7 +2981,15 @@ JSON:`;
         sql = `SELECT career_role_name, short_description FROM career_roles WHERE is_deleted = false AND is_active = true ORDER BY career_role_name ASC LIMIT ${limit} OFFSET ${offset}`;
         break;
 
-      case 'count':
+      case 'count': {
+        // Extract gender filter from searchTerm (set by ask() method)
+        const genderFilter = (interpretation as any).gender;
+        let genderClause = '';
+        if (genderFilter) {
+          params.push(genderFilter);
+          genderClause = ` AND gender = $${params.length}`;
+        }
+
         if (interpretation.table === 'users') {
           if (userRole !== 'ADMIN') {
             return [{ count: 0 }];
@@ -2853,26 +2997,39 @@ JSON:`;
           sql = `SELECT COUNT(*) as count FROM users`;
         } else if (interpretation.table === 'registrations') {
           if (userRole === 'ADMIN') {
-            sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false`;
+            sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false${genderClause}`;
           } else if (userRole === 'CORPORATE' && corporateId) {
-            sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false AND corporate_account_id = $1`;
             params.push(corporateId);
+            sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false AND corporate_account_id = $${params.length}${genderClause}`;
           } else {
-            sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false AND user_id = $1`;
             params.push(userId);
+            sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false AND user_id = $${params.length}${genderClause}`;
           }
         } else {
           if (userRole === 'ADMIN') {
-            sql = `SELECT COUNT(*) as count FROM assessment_attempts WHERE status = 'COMPLETED'`;
+            sql = `SELECT COUNT(*) as count FROM assessment_attempts aa JOIN registrations r ON aa.registration_id = r.id WHERE aa.status = 'COMPLETED' AND r.is_deleted = false${genderClause ? genderClause.replace('gender', 'r.gender') : ''}`;
           } else if (userRole === 'CORPORATE' && corporateId) {
-            sql = `SELECT COUNT(*) as count FROM assessment_attempts aa JOIN registrations r ON aa.registration_id = r.id WHERE aa.status = 'COMPLETED' AND r.is_deleted = false AND r.corporate_account_id = $1`;
             params.push(corporateId);
+            sql = `SELECT COUNT(*) as count FROM assessment_attempts aa JOIN registrations r ON aa.registration_id = r.id WHERE aa.status = 'COMPLETED' AND r.is_deleted = false AND r.corporate_account_id = $${params.length}${genderClause ? genderClause.replace('gender', 'r.gender') : ''}`;
           } else {
-            sql = `SELECT COUNT(*) as count FROM assessment_attempts WHERE status = 'COMPLETED' AND user_id = $1`;
             params.push(userId);
+            sql = `SELECT COUNT(*) as count FROM assessment_attempts WHERE status = 'COMPLETED' AND user_id = $${params.length}`;
           }
         }
         break;
+      }
+
+      case 'count_by_role': {
+        // Role-based user count breakdown (admin only for full view)
+        if (userRole !== 'ADMIN') {
+          return [{ role: userRole, count: 1, note: 'Only admins can view role breakdown' }];
+        }
+        const requestedRoles = (interpretation as any).roles as string[] || ['ADMIN', 'CORPORATE', 'STUDENT'];
+        const rolePlaceholders = requestedRoles.map((_: string, i: number) => `$${i + 1}`).join(', ');
+        sql = `SELECT role, COUNT(*) as count FROM users WHERE role IN (${rolePlaceholders}) GROUP BY role ORDER BY role`;
+        params.push(...requestedRoles);
+        break;
+      }
 
       // ═══════════════════════════════════════════════════════════════
       // AFFILIATE / REFERRAL INTENTS
@@ -3096,8 +3253,25 @@ JSON:`;
         body = this.formatCareerRoles(data, offset);
         break;
 
-      case 'count':
-        return `**Total: ${data[0]?.count || 0}**`;
+      case 'count': {
+        const cnt = data[0]?.count || 0;
+        const gLabel = (interpretation as any).gender;
+        if (gLabel === 'MALE') return `**Male: ${cnt}**`;
+        if (gLabel === 'FEMALE') return `**Female: ${cnt}**`;
+        return `**Total: ${cnt}**`;
+      }
+
+      case 'count_by_role': {
+        let roleBody = '**Account Breakdown:**\n\n';
+        let total = 0;
+        for (const row of data) {
+          const count = parseInt(row.count) || 0;
+          total += count;
+          roleBody += `• **${row.role}**: ${count}\n`;
+        }
+        roleBody += `\n**Total: ${total}**`;
+        return roleBody;
+      }
 
       // ── Affiliate intents ──
       case 'affiliate_dashboard':
@@ -3711,18 +3885,20 @@ JSON:`;
 
     return {
       status: 'ok',
-      name: 'BI',
-      version: '2.0.0-jarvis',
-      description: 'OriginBI Intelligent - Your Career Guide (JARVIS Edition)',
+      name: 'Ask BI',
+      version: '3.0.0-jarvis',
+      description: 'Ask BI — OriginBI Intelligent Assistant (Jarvis Edition)',
       features: [
+        'corporate_scoped_intelligence',
         'personalized_career_guidance',
         'job_eligibility_analysis',
         'higher_studies_recommendations',
-        'emotional_ai_responses',
         'user_memory',
         'any_question_intelligent',
         'conversation_context',
         'llm_powered',
+        'strict_db_only_person_data',
+        'smart_name_disambiguation',
       ],
       knowledgeBase: { documents: totalDocs },
     };

@@ -368,7 +368,7 @@ const RegistrationManagement: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full w-full gap-6 font-sans">
+    <div className="flex flex-col h-full w-full gap-6 font-sans p-4 sm:p-6 lg:p-8">
       <DateRangePickerModal isOpen={isDateModalOpen} onClose={() => setIsDateModalOpen(false)} onApply={handleDateModalApply} initialRange={{ start: startDate, end: endDate, label: dateRangeLabel }} />
 
       {/* Header */}
@@ -476,7 +476,7 @@ const RegistrationManagement: React.FC = () => {
 
       {/* Content */}
       {activeTab === 'registrations' ? (
-        <RegistrationTable users={users} loading={loading} error={error} />
+        <RegistrationTable users={users} loading={loading} error={error} showAiCounsellor={false} />
       ) : activeTab === 'individual' ? (
         <AssessmentSessionsTable
           sessions={sessions}

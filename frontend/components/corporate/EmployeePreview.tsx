@@ -159,7 +159,7 @@ const EmployeePreview: React.FC<EmployeePreviewProps> = ({ registration, onBack,
     const totalPages = Math.ceil(total / limit) || 1;
 
     return (
-        <div className="flex flex-col gap-6 font-sans h-full">
+        <div className="flex flex-col gap-6 font-sans h-full p-4 sm:p-6 lg:p-8">
             <DateRangePickerModal
                 isOpen={isDateModalOpen}
                 onClose={() => setIsDateModalOpen(false)}
