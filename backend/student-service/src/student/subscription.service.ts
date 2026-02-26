@@ -5,6 +5,27 @@ import { StudentSubscription } from '@originbi/shared-entities';
 import { Registration } from '@originbi/shared-entities';
 import { ConfigService } from '@nestjs/config';
 
+interface RegistrationRow {
+    id: number;
+    user_id: number;
+    has_ai_counsellor?: boolean;
+    full_name?: string;
+}
+
+interface RazorpayOrderResponse {
+    id: string;
+    amount: number;
+    currency: string;
+}
+
+export interface SubscriptionPlanInfo {
+    planType: string;
+    status: string;
+    purchasedAt?: Date | null;
+    expiresAt?: Date | null;
+    daysRemaining?: number;
+}
+
 @Injectable()
 export class SubscriptionService {
     private readonly logger = new Logger(SubscriptionService.name);
@@ -16,14 +37,14 @@ export class SubscriptionService {
         private readonly registrationRepo: Repository<Registration>,
         private readonly dataSource: DataSource,
         private readonly configService: ConfigService,
-    ) {}
+    ) { }
 
     /**
      * Check if a student has an active AI Counsellor subscription
      */
     async getSubscriptionStatus(email: string): Promise<{
         hasAiCounsellor: boolean;
-        plan: any | null;
+        plan: SubscriptionPlanInfo | null;
         daysRemaining?: number;
     }> {
         try {
@@ -36,26 +57,27 @@ export class SubscriptionService {
                  WHERE LOWER(u.email) = LOWER($1) AND r.is_deleted = false
                  ORDER BY r.created_at DESC LIMIT 1`,
                 [email],
-            );
+            ) as RegistrationRow[];
             this.logger.log(`Registration query result: ${JSON.stringify(registration)}`);
 
             if (!registration || registration.length === 0) {
                 return { hasAiCounsellor: false, plan: null };
             }
 
-            const reg = registration[0];
+            const reg: RegistrationRow = registration[0];
 
             if (reg.has_ai_counsellor) {
                 // Try to fetch active subscription details (may not exist for admin-toggled access)
-                let sub: any = null;
+                let sub: StudentSubscription | null = null;
                 try {
                     sub = await this.subscriptionRepo.findOne({
-                        where: { userId: reg.user_id, planType: 'ai_counsellor' as any, status: 'active' as any },
+                        where: { userId: reg.user_id, planType: 'ai_counsellor' as StudentSubscription['planType'], status: 'active' as StudentSubscription['status'] },
                         order: { createdAt: 'DESC' },
                     });
-                } catch (subErr) {
+                } catch (subErr: unknown) {
                     // student_subscriptions table may not exist yet — that's fine for admin-toggled access
-                    this.logger.warn(`Subscription table query failed (may not exist yet): ${subErr.message}`);
+                    const errMessage = subErr instanceof Error ? subErr.message : String(subErr);
+                    this.logger.warn(`Subscription table query failed (may not exist yet): ${errMessage}`);
                 }
 
                 if (sub) {
@@ -64,13 +86,13 @@ export class SubscriptionService {
                         this.logger.log(`⏰ Subscription expired for ${email} (expired: ${sub.expiresAt})`);
                         // Mark as expired
                         try {
-                            await this.subscriptionRepo.update(sub.id, { status: 'expired' as any });
+                            await this.subscriptionRepo.update(sub.id, { status: 'expired' as StudentSubscription['status'] });
                         } catch { /* table may not exist */ }
                         await this.dataSource.query(
                             `UPDATE registrations SET has_ai_counsellor = false WHERE id = $1`,
                             [reg.id],
                         );
-                        return { hasAiCounsellor: false, plan: { ...sub, status: 'expired' } };
+                        return { hasAiCounsellor: false, plan: { planType: sub.planType, status: 'expired', expiresAt: sub.expiresAt } };
                     }
 
                     const daysRemaining = sub.expiresAt
@@ -98,8 +120,9 @@ export class SubscriptionService {
             }
 
             return { hasAiCounsellor: false, plan: null };
-        } catch (error) {
-            this.logger.error(`Error checking subscription: ${error.message}`);
+        } catch (error: unknown) {
+            const errMessage = error instanceof Error ? error.message : String(error);
+            this.logger.error(`Error checking subscription: ${errMessage}`);
             return { hasAiCounsellor: false, plan: null };
         }
     }
@@ -146,7 +169,7 @@ export class SubscriptionService {
             throw new Error('Failed to create payment order');
         }
 
-        const order = await response.json() as any;
+        const order = await response.json() as RazorpayOrderResponse;
 
         return {
             orderId: order.id,
@@ -191,13 +214,13 @@ export class SubscriptionService {
              WHERE u.email = $1 AND r.is_deleted = false
              ORDER BY r.created_at DESC LIMIT 1`,
             [body.email],
-        );
+        ) as RegistrationRow[];
 
         if (!registration || registration.length === 0) {
             return { success: false, message: 'User not found' };
         }
 
-        const reg = registration[0];
+        const reg: RegistrationRow = registration[0];
 
         // Use a transaction to ensure atomicity
         const queryRunner = this.dataSource.createQueryRunner();
@@ -223,9 +246,10 @@ export class SubscriptionService {
 
             this.logger.log(`✅ AI Counsellor activated for ${body.email} (payment: ${body.razorpay_payment_id})`);
             return { success: true, message: 'AI Counsellor activated successfully!' };
-        } catch (error) {
+        } catch (error: unknown) {
             await queryRunner.rollbackTransaction();
-            this.logger.error(`Activation failed: ${error.message}`);
+            const errMessage = error instanceof Error ? error.message : String(error);
+            this.logger.error(`Activation failed: ${errMessage}`);
             return { success: false, message: 'Activation failed. Please contact support.' };
         } finally {
             await queryRunner.release();
@@ -244,13 +268,13 @@ export class SubscriptionService {
                  WHERE u.email = $1 AND r.is_deleted = false
                  ORDER BY r.created_at DESC LIMIT 1`,
                 [email],
-            );
+            ) as RegistrationRow[];
 
             if (!registration || registration.length === 0) {
                 return { success: false };
             }
 
-            const reg = registration[0];
+            const reg: RegistrationRow = registration[0];
 
             await this.dataSource.query(
                 `INSERT INTO student_subscriptions 
@@ -266,8 +290,9 @@ export class SubscriptionService {
 
             this.logger.log(`✅ AI Counsellor manually activated for ${email}`);
             return { success: true };
-        } catch (error) {
-            this.logger.error(`Manual activation failed: ${error.message}`);
+        } catch (error: unknown) {
+            const errMessage = error instanceof Error ? error.message : String(error);
+            this.logger.error(`Manual activation failed: ${errMessage}`);
             return { success: false };
         }
     }

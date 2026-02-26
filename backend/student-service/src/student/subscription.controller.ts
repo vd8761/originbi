@@ -1,9 +1,9 @@
-import { Controller, Post, Body, Get, Query } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
 import { SubscriptionService } from './subscription.service';
 
 @Controller('student/subscription')
 export class SubscriptionController {
-    constructor(private readonly subscriptionService: SubscriptionService) {}
+    constructor(private readonly subscriptionService: SubscriptionService) { }
 
     @Post('status')
     async getStatus(@Body() body: { email: string }) {
