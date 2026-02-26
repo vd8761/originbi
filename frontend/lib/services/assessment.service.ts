@@ -196,4 +196,27 @@ export const assessmentService = {
         }
         return res.json();
     },
+
+    async sendReportEmail(
+        userId: string,
+        toEmail?: string,
+    ): Promise<{ message: string }> {
+        const STUDENT_API_URL = process.env.NEXT_PUBLIC_STUDENT_API_URL || "";
+
+        const res = await fetch(
+            `${STUDENT_API_URL}/student/send-report-email`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ userId: Number(userId), toEmail }),
+            },
+        );
+
+        if (!res.ok) {
+            throw new Error("Failed to send report email");
+        }
+        return res.json();
+    },
 };

@@ -64,9 +64,11 @@ const PersonalityCard: React.FC = () => {
                 </h2>
 
                 {/* Download Report Button */}
+                {/* 
                 <div className="mt-auto">
                     <ReportDownloadButton className="mt-4 pointer-events-auto" />
                 </div>
+                */}
             </div>
         </div>
     );

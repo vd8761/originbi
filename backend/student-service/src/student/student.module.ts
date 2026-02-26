@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { HttpModule } from '@nestjs/axios';
 import { StudentController } from './student.controller';
 import { StudentService } from './student.service';
+import { StudentProcessor } from './student.processor';
 import { User } from '../entities/student.entity';
 import { AssessmentSession } from '../entities/assessment_session.entity';
 import { AssessmentAttempt } from '../entities/assessment_attempt.entity';
@@ -39,7 +40,7 @@ import {
     HttpModule,
   ],
   controllers: [StudentController],
-  providers: [StudentService],
+  providers: [StudentService, StudentProcessor],
   exports: [StudentService],
 })
 export class StudentModule {}
