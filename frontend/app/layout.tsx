@@ -6,6 +6,9 @@ export const metadata: Metadata = {
   title: 'OriginBI Login',
   description:
     'A modern, visually appealing login screen with a testimonial carousel, designed to showcase a professional and engaging user authentication experience.',
+  icons: {
+    icon: '/icon.svg',
+  },
 };
 
 export default function RootLayout({

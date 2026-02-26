@@ -277,7 +277,29 @@ export class StudentService {
     const user = await this.userRepo.findOne({
       where: { email: ILike(email) },
     });
-    return user;
+
+    if (!user) return null;
+
+    // Fetch the dominant trait from the latest completed assessment attempt
+    const traitQuery = `
+      SELECT 
+        pt.id, 
+        pt.blended_style_name as name, 
+        pt.code,
+        pt.color_rgb
+      FROM assessment_attempts aa
+      JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+      WHERE aa.user_id = $1 AND aa.status = 'COMPLETED'
+      ORDER BY aa.completed_at DESC
+      LIMIT 1
+    `;
+    const traitResult = await this.userRepo.query(traitQuery, [user.id]);
+    const trait = traitResult && traitResult.length > 0 ? traitResult[0] : null;
+
+    return {
+      ...user,
+      personalityTrait: trait,
+    };
   }
 
   async createTestStudent(email: string, fullName: string) {

@@ -321,5 +321,32 @@ export const corporateDashboardService = {
             throw new Error("Failed to fetch counselling report");
         }
         return res.json();
+    },
+
+    // ============================================================================
+    // SEARCH REPORT BY REPORT NUMBER (Origin BI ID)
+    // ============================================================================
+
+    async searchByReportNumber(email: string, reportNumber: string): Promise<any | null> {
+        const token = AuthService.getToken();
+        const res = await fetch(
+            `${API_URL}/dashboard/search-report/${encodeURIComponent(reportNumber)}?email=${encodeURIComponent(email)}`,
+            {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+            }
+        );
+
+        if (res.status === 404) {
+            return null;
+        }
+
+        if (!res.ok) {
+            throw new Error("Failed to search report");
+        }
+        return res.json();
     }
 };

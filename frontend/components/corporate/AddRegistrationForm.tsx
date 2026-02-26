@@ -91,7 +91,31 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     }
     setIsLoading(true);
     try {
-      await registrationService.createRegistration(formData);
+      const userStr = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
+      let userIdStr = "0";
+      if (userStr) {
+        try {
+          const userObj = JSON.parse(userStr);
+          userIdStr = userObj.id?.toString() || "0";
+        } catch (e) {
+          // Ignore parse error
+        }
+      }
+
+      const payload = {
+        fullName: formData.full_name,
+        email: formData.email,
+        gender: formData.gender,
+        mobile: formData.mobile_number,
+        programType: formData.program_id,
+        groupName: formData.group_name,
+        sendEmail: formData.send_email,
+        examStart: formData.exam_start,
+        examEnd: formData.exam_end,
+        password: formData.password,
+      };
+
+      await corporateRegistrationService.registerCandidate(payload, userIdStr);
       onRegister();
     } catch (err: any) {
       setError(err.message || "Failed to create registration.");

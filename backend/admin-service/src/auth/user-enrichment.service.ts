@@ -106,31 +106,37 @@ export class UserEnrichmentService {
       }
     }
 
-        // Step 4: If STUDENT, resolve the registration ID (most recent)
-        if (userContext.role === 'STUDENT') {
-            const regInfo = await this.findStudentRegistration(userContext.id);
-            if (regInfo) {
-                userContext.registrationId = regInfo.registrationId;
-                // Use registration name if user row didn't have one
-                if (!userContext.name || userContext.name === email.split('@')[0]) {
-                    userContext.name = regInfo.fullName || userContext.name;
-                }
-                this.logger.debug(`Resolved registrationId=${regInfo.registrationId} for student ${userContext.id}`);
-            }
+    // Step 4: If STUDENT, resolve the registration ID (most recent)
+    if (userContext.role === 'STUDENT') {
+      const regInfo = await this.findStudentRegistration(userContext.id);
+      if (regInfo) {
+        userContext.registrationId = regInfo.registrationId;
+        // Use registration name if user row didn't have one
+        if (!userContext.name || userContext.name === email.split('@')[0]) {
+          userContext.name = regInfo.fullName || userContext.name;
         }
+        this.logger.debug(
+          `Resolved registrationId=${regInfo.registrationId} for student ${userContext.id}`,
+        );
+      }
+    }
 
-        // Step 5: If AFFILIATE, resolve the affiliate_accounts.id
-        if (userContext.role === 'AFFILIATE') {
-            const affiliateAccountId = await this.findAffiliateAccountId(userContext.id);
-            if (affiliateAccountId) {
-                userContext.affiliateId = affiliateAccountId;
-                this.logger.debug(`Resolved affiliateAccountId=${affiliateAccountId} for user ${userContext.id}`);
-            } else {
-                this.logger.warn(
-                    `AFFILIATE user ${userContext.id} has no affiliate_accounts record.`
-                );
-            }
-        }
+    // Step 5: If AFFILIATE, resolve the affiliate_accounts.id
+    if (userContext.role === 'AFFILIATE') {
+      const affiliateAccountId = await this.findAffiliateAccountId(
+        userContext.id,
+      );
+      if (affiliateAccountId) {
+        userContext.affiliateId = affiliateAccountId;
+        this.logger.debug(
+          `Resolved affiliateAccountId=${affiliateAccountId} for user ${userContext.id}`,
+        );
+      } else {
+        this.logger.warn(
+          `AFFILIATE user ${userContext.id} has no affiliate_accounts record.`,
+        );
+      }
+    }
 
     // Cache the enriched context
     this.cache.set(cognitoSub, {
@@ -186,19 +192,21 @@ export class UserEnrichmentService {
         }
       }
 
-            if (userContext.role === 'STUDENT') {
-                const regInfo = await this.findStudentRegistration(userContext.id);
-                if (regInfo) {
-                    userContext.registrationId = regInfo.registrationId;
-                }
-            }
+      if (userContext.role === 'STUDENT') {
+        const regInfo = await this.findStudentRegistration(userContext.id);
+        if (regInfo) {
+          userContext.registrationId = regInfo.registrationId;
+        }
+      }
 
-            if (userContext.role === 'AFFILIATE') {
-                const affiliateAccountId = await this.findAffiliateAccountId(userContext.id);
-                if (affiliateAccountId) {
-                    userContext.affiliateId = affiliateAccountId;
-                }
-            }
+      if (userContext.role === 'AFFILIATE') {
+        const affiliateAccountId = await this.findAffiliateAccountId(
+          userContext.id,
+        );
+        if (affiliateAccountId) {
+          userContext.affiliateId = affiliateAccountId;
+        }
+      }
 
       return userContext;
     }
@@ -352,47 +360,53 @@ export class UserEnrichmentService {
                  WHERE user_id = $1 AND is_deleted = false
                  ORDER BY created_at DESC
                  LIMIT 1`,
-                [userId],
-            );
-            if (rows.length > 0) {
-                return {
-                    registrationId: Number(rows[0].id),
-                    fullName: rows[0].full_name,
-                };
-            }
-            return null;
-        } catch (error) {
-            this.logger.error(`Registration lookup failed for userId=${userId}: ${error.message}`);
-            return null;
-        }
+        [userId],
+      );
+      if (rows.length > 0) {
+        return {
+          registrationId: Number(rows[0].id),
+          fullName: rows[0].full_name,
+        };
+      }
+      return null;
+    } catch (error) {
+      this.logger.error(
+        `Registration lookup failed for userId=${userId}: ${error.message}`,
+      );
+      return null;
     }
+  }
 
-    /**
-     * Find the affiliate_accounts.id for an affiliate user.
-     */
-    private async findAffiliateAccountId(userId: number): Promise<number | null> {
-        try {
-            const rows = await this.dataSource.query(
-                `SELECT id FROM affiliate_accounts
+  /**
+   * Find the affiliate_accounts.id for an affiliate user.
+   */
+  private async findAffiliateAccountId(userId: number): Promise<number | null> {
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT id FROM affiliate_accounts
                  WHERE user_id = $1 AND is_active = true
                  LIMIT 1`,
-                [userId],
-            );
-            return rows.length > 0 ? Number(rows[0].id) : null;
-        } catch (error) {
-            this.logger.error(`Affiliate account lookup failed for userId=${userId}: ${error.message}`);
-            return null;
-        }
+        [userId],
+      );
+      return rows.length > 0 ? Number(rows[0].id) : null;
+    } catch (error) {
+      this.logger.error(
+        `Affiliate account lookup failed for userId=${userId}: ${error.message}`,
+      );
+      return null;
     }
+  }
 
-    /**
-     * Normalize role string to valid UserContext role.
-     */
-    private normalizeRole(role: string): 'ADMIN' | 'CORPORATE' | 'STUDENT' | 'AFFILIATE' {
-        const upper = (role || '').toUpperCase().trim();
-        if (upper === 'ADMIN' || upper === 'SUPER_ADMIN') return 'ADMIN';
-        if (upper === 'CORPORATE') return 'CORPORATE';
-        if (upper === 'AFFILIATE') return 'AFFILIATE';
-        return 'STUDENT'; // Default to most restricted
-    }
+  /**
+   * Normalize role string to valid UserContext role.
+   */
+  private normalizeRole(
+    role: string,
+  ): 'ADMIN' | 'CORPORATE' | 'STUDENT' | 'AFFILIATE' {
+    const upper = (role || '').toUpperCase().trim();
+    if (upper === 'ADMIN' || upper === 'SUPER_ADMIN') return 'ADMIN';
+    if (upper === 'CORPORATE') return 'CORPORATE';
+    if (upper === 'AFFILIATE') return 'AFFILIATE';
+    return 'STUDENT'; // Default to most restricted
+  }
 }

@@ -1316,4 +1316,119 @@ export class CorporateDashboardService {
       selected_option_ta: r.selectedOption.optionTextTa,
     }));
   }
+
+  // ========================================================================
+  // SEARCH BY REPORT NUMBER
+  // ========================================================================
+  async searchByReportNumber(reportNumber: string, corporateAccountId: number) {
+    const query = `
+      SELECT
+        ar.report_number,
+        ar.generated_at,
+        r.full_name,
+        r.mobile_number,
+        r.gender,
+        r.metadata as registration_metadata,
+        u.email,
+        pt.id as trait_id,
+        pt.code as trait_code,
+        pt.blended_style_name,
+        pt.blended_style_desc,
+        pt.color_rgb,
+        pt.metadata as trait_metadata,
+        aa.metadata as attempt_metadata,
+        aa.total_score,
+        aa.sincerity_index,
+        aa.sincerity_class,
+        aa.status as attempt_status,
+        aa.completed_at,
+        p.name as program_name,
+        p.assessment_title,
+        dpt.name as department_name,
+        dt.name as degree_type_name
+      FROM assessment_reports ar
+      JOIN assessment_attempts aa ON aa.assessment_session_id = ar.assessment_session_id
+      JOIN registrations r ON aa.registration_id = r.id
+      JOIN users u ON aa.user_id = u.id
+      LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+      LEFT JOIN programs p ON aa.program_id = p.id
+      LEFT JOIN department_degrees dd ON r.department_degree_id = dd.id
+      LEFT JOIN departments dpt ON dd.department_id = dpt.id
+      LEFT JOIN degree_types dt ON dd.degree_type_id = dt.id
+      WHERE ar.report_number = $1
+        AND r.corporate_account_id = $2
+      LIMIT 1
+    `;
+
+    const result = await this.dataSource.query(query, [
+      reportNumber,
+      corporateAccountId,
+    ]);
+
+    if (!result || result.length === 0) {
+      throw new NotFoundException(`Report not found for ID: ${reportNumber}`);
+    }
+
+    const row = result[0];
+
+    // Parse DISC scores from attempt metadata
+    const attemptMeta = row.attempt_metadata || {};
+    const discScores = attemptMeta.disc_scores || attemptMeta.discScores || {};
+
+    // Parse trait metadata for key strengths, role alignment, etc.
+    const traitMeta = row.trait_metadata || {};
+    const regMeta = row.registration_metadata || {};
+
+    // Build the trait name for image mapping (e.g., "Supportive Energizer" -> "Supportive_Energizer")
+    const traitName = (row.blended_style_name || '').trim();
+    const traitImageKey = traitName.replace(/\s+/g, '_');
+
+    return {
+      reportNumber: row.report_number,
+      generatedAt: row.generated_at,
+      candidateName: row.full_name,
+      email: row.email,
+      mobile: row.mobile_number,
+      gender: row.gender,
+      programName: row.program_name,
+      assessmentTitle: row.assessment_title,
+      departmentName: row.department_name,
+      degreeTypeName: row.degree_type_name,
+      currentYear: regMeta.currentYear || regMeta.year_of_study || null,
+      institutionName:
+        regMeta.institutionName ||
+        regMeta.institution ||
+        regMeta.collegeName ||
+        null,
+      personalityTrait: {
+        id: row.trait_id,
+        code: row.trait_code,
+        name: traitName,
+        description: row.blended_style_desc,
+        colorRgb: row.color_rgb,
+        imageKey: traitImageKey,
+        characterImage: `/traits/Corporate_${traitImageKey}.png`,
+        strengthChartImage: `/charts/${traitImageKey}_Strength_Chart.png`,
+        metadata: traitMeta,
+      },
+      discScores: {
+        D: discScores.D || discScores.d || 0,
+        I: discScores.I || discScores.i || 0,
+        S: discScores.S || discScores.s || 0,
+        C: discScores.C || discScores.c || 0,
+      },
+      totalScore: row.total_score,
+      sincerityIndex: row.sincerity_index,
+      sincerityClass: row.sincerity_class,
+      attemptStatus: row.attempt_status,
+      completedAt: row.completed_at,
+      keyStrengths: traitMeta.key_strengths || traitMeta.keyStrengths || [],
+      roleAlignment: traitMeta.role_alignment || traitMeta.roleAlignment || [],
+      careerGrowthTips:
+        traitMeta.career_growth_tips || traitMeta.careerGrowthTips || [],
+      keyBehaviors: traitMeta.key_behaviors || traitMeta.keyBehaviors || [],
+      typicalScenarios:
+        traitMeta.typical_scenarios || traitMeta.typicalScenarios || [],
+    };
+  }
 }
