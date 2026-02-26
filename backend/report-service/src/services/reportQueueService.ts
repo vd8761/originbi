@@ -149,7 +149,7 @@ export const reportQueueService = {
             if (fs.existsSync(jobDir)) {
                 try {
                     fs.rmSync(jobDir, { recursive: true, force: true });
-                } catch (e) {}
+                } catch (e) { }
             }
             fs.mkdirSync(jobDir, { recursive: true });
 
@@ -228,11 +228,11 @@ export const reportQueueService = {
                 // Optional: Cleanup the raw PDF folder
                 try {
                     fs.rmSync(jobDir, { recursive: true, force: true });
-                } catch (e) {}
+                } catch (e) { }
                 scheduleCleanup(jobId, [zipFilePath]);
             });
 
-            archive.on("error", function (err) {
+            archive.on("error", function (err: Error) {
                 throw err;
             });
 
@@ -264,7 +264,7 @@ export const reportQueueService = {
             if (fs.existsSync(jobDir)) {
                 try {
                     fs.rmSync(jobDir, { recursive: true, force: true });
-                } catch (e) {}
+                } catch (e) { }
             }
             fs.mkdirSync(jobDir, { recursive: true });
 
@@ -336,11 +336,11 @@ export const reportQueueService = {
                 });
                 try {
                     fs.rmSync(jobDir, { recursive: true, force: true });
-                } catch (e) {}
+                } catch (e) { }
                 scheduleCleanup(jobId, [zipFilePath]);
             });
 
-            archive.on("error", function (err) {
+            archive.on("error", function (err: Error) {
                 throw err;
             });
             archive.pipe(output);

@@ -18,6 +18,8 @@ import { PgBossModule } from '@wavezync/nestjs-pgboss';
       useFactory: (config: ConfigService) => {
         const databaseUrl = config.get<string>('DATABASE_URL');
 
+        const shouldSync = config.get<string>('DB_SYNC') === 'true';
+
         if (databaseUrl) {
           const isLocal =
             databaseUrl.includes('localhost') ||
@@ -26,7 +28,7 @@ import { PgBossModule } from '@wavezync/nestjs-pgboss';
             type: 'postgres',
             url: databaseUrl,
             autoLoadEntities: true,
-            synchronize: false,
+            synchronize: shouldSync,
             ssl: isLocal ? false : { rejectUnauthorized: false },
           };
         }
@@ -39,7 +41,7 @@ import { PgBossModule } from '@wavezync/nestjs-pgboss';
           password: config.get<string>('DB_PASS') || '',
           database: config.get<string>('DB_NAME') || 'originbi',
           autoLoadEntities: true,
-          synchronize: false,
+          synchronize: shouldSync,
           ssl: false,
         };
       },

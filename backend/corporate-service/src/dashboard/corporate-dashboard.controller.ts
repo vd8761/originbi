@@ -225,4 +225,24 @@ export class CorporateDashboardController {
       await this.dashboardService.getCorporateAccountIdByEmail(email);
     return this.reportService.getReport(sessionId, corporateAccountId);
   }
+
+  // ============================================================================
+  // SEARCH REPORT BY REPORT NUMBER (Origin BI ID)
+  // ============================================================================
+
+  @Get('search-report/:reportNumber')
+  async searchReport(
+    @Query('email') email: string,
+    @Param('reportNumber') reportNumber: string,
+  ) {
+    if (!email) throw new BadRequestException('Email is required');
+    if (!reportNumber)
+      throw new BadRequestException('Report number is required');
+    const corporateAccountId =
+      await this.dashboardService.getCorporateAccountIdByEmail(email);
+    return this.dashboardService.searchByReportNumber(
+      reportNumber,
+      corporateAccountId,
+    );
+  }
 }

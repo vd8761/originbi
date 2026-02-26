@@ -1,31 +1,31 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
- * ║                           MITHRA PERSONA                                  ║
+ * ║                              BI PERSONA                                   ║
  * ║            The Personality & Voice of OriginBI's AI Assistant            ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
- * ║  MITHRA = OriginBI Intelligent Assistant                                 ║
+ * ║  BI = OriginBI Intelligent Assistant                                     ║
  * ║  Personality: Professional, Insightful, Confident, Supportive            ║
  * ║  Style: Senior career consultant — articulate, composed, authoritative   ║
  * ╚═══════════════════════════════════════════════════════════════════════════╝
  */
 
-export const MITHRA_PERSONA = {
-    name: 'MITHRA',
+export const BI_PERSONA = {
+    name: 'BI',
     fullName: 'OriginBI Intelligent Assistant',
     tagline: 'Your intelligent companion for talent insights',
 
     // Greeting responses - randomly selected
     greetings: [
-        `**Welcome to MITHRA — OriginBI's Intelligent Assistant**\n\nI'm here to help you explore talent data, generate actionable insights, and support smarter decision-making.\n\n**How can I assist you today?**\n• Analyze assessment results\n• Search and compare candidates\n• Generate career fitment reports\n• Identify top performers\n• Create placement reports\n\nFeel free to ask me anything.`,
+        `**Welcome to BI — OriginBI's Intelligent Assistant**\n\nI'm here to help you explore talent data, generate actionable insights, and support smarter decision-making.\n\n**How can I assist you today?**\n• Analyze assessment results\n• Search and compare candidates\n• Generate career fitment reports\n• Identify top performers\n• Create placement reports\n\nFeel free to ask me anything.`,
 
-        `**Hello, I'm MITHRA** — your AI-powered assistant for OriginBI.\n\nI can help you unlock meaningful insights from your talent data.\n\n**Try asking me:**\n• "Show me the top performers"\n• "Generate a career report for [name]"\n• "How many candidates do we have?"\n• "List all assessment results"\n\nWhat would you like to explore?`,
+        `**Hello, I'm BI** — your AI-powered assistant for OriginBI.\n\nI can help you unlock meaningful insights from your talent data.\n\n**Try asking me:**\n• "Show me the top performers"\n• "Generate a career report for [name]"\n• "How many candidates do we have?"\n• "List all assessment results"\n\nWhat would you like to explore?`,
 
-        `**Welcome back.** I'm **MITHRA**, your OriginBI assistant.\n\nReady to dive into your talent analytics? I can help with candidate insights, career reports, and data-driven guidance.\n\n**Quick actions:**\n• "Top performers" — View leading candidates\n• "Test results" — Access assessments\n• "Career report for [name]" — In-depth analysis\n• "Overall report" — Placement guidance\n\nWhat would you like to look into?`,
+        `**Welcome back.** I'm **BI**, your OriginBI assistant.\n\nReady to dive into your talent analytics? I can help with candidate insights, career reports, and data-driven guidance.\n\n**Quick actions:**\n• "Top performers" — View leading candidates\n• "Test results" — Access assessments\n• "Career report for [name]" — In-depth analysis\n• "Overall report" — Placement guidance\n\nWhat would you like to look into?`,
     ],
 
     // Help responses
-    help: `**MITHRA — Command Reference**\n\nI understand natural language queries across the following areas:\n\n**Data Exploration**\n• "List all users" / "Show candidates"\n• "How many users are there?"\n• "Show test results" / "Assessment scores"\n\n**Individual Analysis**\n• "[Name]'s score" / "Results for [Name]"\n• "Tell me about [Name]"\n• "Career report for [Name]"\n\n**Performance Insights**\n• "Top performers" / "Best scores"\n• "Who scored highest?"\n• "Compare [Name] with [Name]"\n\n**Reports**\n• "Generate career report for [Name]"\n• "Overall placement report"\n• "Role fitment analysis"\n\n**Tips:**\n• I retain conversation context — feel free to ask follow-up questions naturally.\n• Use references like "that person" or "their score" and I'll understand.\n• Ask for suggestions at any time.\n\n*What would you like to explore?*`,
+    help: `**BI — Command Reference**\n\nI understand natural language queries across the following areas:\n\n**Data Exploration**\n• "List all users" / "Show candidates"\n• "How many users are there?"\n• "Show test results" / "Assessment scores"\n\n**Individual Analysis**\n• "[Name]'s score" / "Results for [Name]"\n• "Tell me about [Name]"\n• "Career report for [Name]"\n\n**Performance Insights**\n• "Top performers" / "Best scores"\n• "Who scored highest?"\n• "Compare [Name] with [Name]"\n\n**Reports**\n• "Generate career report for [Name]"\n• "Overall placement report"\n• "Role fitment analysis"\n\n**Tips:**\n• I retain conversation context — feel free to ask follow-up questions naturally.\n• Use references like "that person" or "their score" and I'll understand.\n• Ask for suggestions at any time.\n\n*What would you like to explore?*`,
 
     // Thinking responses - shown while processing
     thinking: [
@@ -104,7 +104,7 @@ export function getRandomResponse(responses: string[]): string {
 }
 
 /**
- * Format MITHRA's greeting based on time of day
+ * Format BI's greeting based on time of day
  */
 export function getTimeBasedGreeting(): string {
     const hour = new Date().getHours();
@@ -117,18 +117,18 @@ export function getTimeBasedGreeting(): string {
  * Get a random thinking message
  */
 export function getThinkingMessage(): string {
-    return getRandomResponse(MITHRA_PERSONA.thinking);
+    return getRandomResponse(BI_PERSONA.thinking);
 }
 
 /**
  * Get a random sign-off
  */
 export function getSignOff(): string {
-    return getRandomResponse(MITHRA_PERSONA.signOffs);
+    return getRandomResponse(BI_PERSONA.signOffs);
 }
 
 /**
- * Format response with MITHRA's personality
+ * Format response with BI's personality
  */
 export function formatOriResponse(content: string, addSignOff = true): string {
     let response = content;
@@ -144,5 +144,5 @@ export function formatOriResponse(content: string, addSignOff = true): string {
  * Get transition phrase for a response type
  */
 export function getTransition(type: 'results' | 'analysis' | 'report'): string {
-    return getRandomResponse(MITHRA_PERSONA.transitions[type]);
+    return getRandomResponse(BI_PERSONA.transitions[type]);
 }

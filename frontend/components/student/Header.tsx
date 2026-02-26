@@ -18,6 +18,7 @@ import {
 } from '../icons';
 
 import { useTheme } from '../../contexts/ThemeContext';
+import { Brain } from 'lucide-react';
 
 interface HeaderProps {
     onLogout: () => void;
@@ -147,6 +148,9 @@ const Header: React.FC<HeaderProps> = ({
     const mobileMenuRef = useRef<HTMLDivElement>(null);
 
     const [user, setUser] = useState<{ name: string; email: string } | null>(null);
+    const [counsellorAccess, setCounsellorAccess] = useState(false);
+    const [counsellorDays, setCounsellorDays] = useState<number | null>(null);
+    const [counsellorPurchasing, setCounsellorPurchasing] = useState(false);
 
     useEffect(() => {
         const fetchUserProfile = async () => {
@@ -169,6 +173,13 @@ const Header: React.FC<HeaderProps> = ({
                 } catch (e) {
                     console.error("Error loading profile", e);
                 }
+
+                // Check AI Counsellor subscription
+                try {
+                    const status = await studentService.getSubscriptionStatus(email);
+                    setCounsellorAccess(status.hasAiCounsellor);
+                    if (status.daysRemaining !== undefined) setCounsellorDays(status.daysRemaining);
+                } catch { /* ignore */ }
             } else {
                 // Fallback default if no email found
                 setUser({
@@ -180,6 +191,53 @@ const Header: React.FC<HeaderProps> = ({
 
         fetchUserProfile();
     }, []);
+
+    const handleCounsellorPurchase = async () => {
+        setCounsellorPurchasing(true);
+        try {
+            const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
+            if (!email) return;
+            const order = await studentService.createCounsellorOrder(email);
+            const script = document.createElement('script');
+            script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+            script.onload = () => {
+                const options = {
+                    key: order.keyId,
+                    amount: order.amount,
+                    currency: order.currency,
+                    name: 'OriginBI',
+                    description: 'AI Career Counsellor - 90 Day Access',
+                    order_id: order.orderId,
+                    handler: async (response: any) => {
+                        try {
+                            const result = await studentService.verifyCounsellorPayment({
+                                email: email!,
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature,
+                            });
+                            if (result.success) {
+                                setCounsellorAccess(true);
+                                setCounsellorDays(90);
+                            }
+                        } catch (e) {
+                            console.error('Payment verification failed', e);
+                        }
+                        setCounsellorPurchasing(false);
+                    },
+                    prefill: { email },
+                    theme: { color: '#7c3aed' },
+                    modal: { ondismiss: () => setCounsellorPurchasing(false) },
+                };
+                const rzp = new (window as any).Razorpay(options);
+                rzp.open();
+            };
+            document.body.appendChild(script);
+        } catch (e) {
+            console.error('Purchase initiation failed', e);
+            setCounsellorPurchasing(false);
+        }
+    };
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -211,8 +269,14 @@ const Header: React.FC<HeaderProps> = ({
         setMobileMenuOpen(false);
     };
 
+    const handleCounsellorClick = () => {
+        router.push('/student/counsellor');
+        setMobileMenuOpen(false);
+    };
+
     // Determine if roadmaps is active based on pathname
     const isRoadmapsActive = pathname?.includes('/student/roadmaps') || currentView === 'roadmaps';
+    const isCounsellorActive = pathname?.includes('/student/counsellor');
 
     const notifications = [
         { icon: <RoadmapIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />, title: "New Roadmap Unlocked!", time: "2 hours ago", isNew: true },
@@ -249,6 +313,7 @@ const Header: React.FC<HeaderProps> = ({
                     onClick={() => handleNavClick("assessment")}
                 />
                 <NavItem icon={<RoadmapIcon />} label="Road Map" active={isRoadmapsActive} isMobile={isMobile} onClick={handleRoadmapClick} />
+                <NavItem icon={<Brain className="w-4 h-4" />} label="AI Counsellor" active={isCounsellorActive} isMobile={isMobile} onClick={handleCounsellorClick} />
                 <NavItem icon={<VideosIcon />} label="Videos" isMobile={isMobile} />
                 <NavItem icon={<ProfileIcon />} label="Profile" isMobile={isMobile} />
                 <NavItem icon={<SettingsIcon />} label="Settings" isMobile={isMobile} />
@@ -376,7 +441,7 @@ const Header: React.FC<HeaderProps> = ({
                         </button>
 
                         {isProfileOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-64 bg-brand-light-secondary dark:bg-brand-dark-secondary rounded-xl shadow-2xl z-50 border border-brand-light-tertiary dark:border-brand-dark-tertiary/50 overflow-hidden">
+                            <div className="absolute right-0 top-full mt-2 w-72 bg-brand-light-secondary dark:bg-brand-dark-secondary rounded-xl shadow-2xl z-50 border border-brand-light-tertiary dark:border-brand-dark-tertiary/50 overflow-hidden">
                                 <div className="px-4 py-3 border-b border-brand-light-tertiary dark:border-brand-dark-tertiary">
                                     <p className="text-sm font-semibold text-[#19211C] dark:text-brand-text-primary truncate">
                                         {user?.name || 'Student'}
@@ -385,6 +450,48 @@ const Header: React.FC<HeaderProps> = ({
                                         {user?.email || ''}
                                     </p>
                                 </div>
+
+                                {/* AI Counsellor — Buy or Access */}
+                                <div className="px-3 py-2 border-b border-brand-light-tertiary dark:border-brand-dark-tertiary">
+                                    {counsellorAccess ? (
+                                        <button
+                                            onClick={() => { setProfileOpen(false); handleCounsellorClick(); }}
+                                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10 border border-emerald-200 dark:border-emerald-500/20 hover:from-emerald-100 hover:to-teal-100 dark:hover:from-emerald-500/15 dark:hover:to-teal-500/15 transition-all cursor-pointer group"
+                                        >
+                                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-green to-emerald-500 flex items-center justify-center flex-shrink-0">
+                                                <Brain className="w-4 h-4 text-white" />
+                                            </div>
+                                            <div className="text-left flex-1 min-w-0">
+                                                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 leading-tight">AI Counsellor</p>
+                                                <p className="text-[10px] text-emerald-500/70 dark:text-emerald-400/60 leading-tight mt-0.5">
+                                                    {counsellorDays !== null ? `${counsellorDays} days remaining` : 'Active — Open counsellor'}
+                                                </p>
+                                            </div>
+                                            <ChevronDownIcon className="w-3 h-3 -rotate-90 text-emerald-400 dark:text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={handleCounsellorPurchase}
+                                            disabled={counsellorPurchasing}
+                                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-500/10 dark:to-purple-500/10 border border-violet-200 dark:border-violet-500/20 hover:from-violet-100 hover:to-purple-100 dark:hover:from-violet-500/20 dark:hover:to-purple-500/20 transition-all cursor-pointer group disabled:opacity-60"
+                                        >
+                                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                                                {counsellorPurchasing ? (
+                                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                ) : (
+                                                    <Brain className="w-4 h-4 text-white" />
+                                                )}
+                                            </div>
+                                            <div className="text-left flex-1 min-w-0">
+                                                <p className="text-xs font-semibold text-violet-700 dark:text-violet-300 leading-tight">
+                                                    {counsellorPurchasing ? 'Processing...' : 'AI Counsellor — ₹350'}
+                                                </p>
+                                                <p className="text-[10px] text-violet-500/70 dark:text-violet-400/60 leading-tight mt-0.5">90-day personalised career guidance</p>
+                                            </div>
+                                        </button>
+                                    )}
+                                </div>
+
                                 <div className="p-2">
                                     <button
                                         onClick={onLogout}

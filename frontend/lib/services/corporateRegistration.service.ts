@@ -207,6 +207,38 @@ export const corporateRegistrationService = {
     // We assume backend runs on Port 4003 or via Gateway.
     // For now, let's assume we use a BASE_CORP_URL or similar.
 
+    async registerCandidate(payload: {
+        fullName: string;
+        email: string;
+        gender: string;
+        mobile: string;
+        programType: string;
+        groupName?: string;
+        sendEmail?: boolean;
+        examStart?: string;
+        examEnd?: string;
+        password?: string;
+    }, userId: string): Promise<any> {
+        const token = AuthService.getToken();
+        const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_URL;
+
+        const res = await fetch(`${CORP_API}/corporate/registrations?userId=${userId}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.message || "Failed to create candidate registration");
+        }
+
+        return res.json();
+    },
+
     // Preview CSV
     async bulkPreview(file: File, userId: string): Promise<{ importId: string; rows: any[] }> {
         const token = AuthService.getToken();

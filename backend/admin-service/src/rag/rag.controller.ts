@@ -30,6 +30,7 @@ import { FutureRoleReportService } from './future-role-report.service';
 import { OverallRoleFitmentService } from './overall-role-fitment.service';
 import { CustomReportService } from './custom-report.service';
 import { ChatMemoryService } from './chat-memory.service';
+import { ConversationService } from './conversation.service';
 import { PdfService } from '../common/pdf/pdf.service';
 
 // RBAC: Auth guard & user context
@@ -51,6 +52,10 @@ export class RagQueryDto {
   @IsNumber()
   @Type(() => Number)
   conversationId?: number;
+
+  @IsOptional()
+  @IsString()
+  mode?: string;
 }
 
 // DTO for Career Report
@@ -162,6 +167,53 @@ export class OverallReportDto {
   @IsOptional()
   @IsString()
   title?: string;
+
+  // ── Advanced filters ──
+  @IsOptional()
+  @IsString()
+  dateFrom?: string;
+
+  @IsOptional()
+  @IsString()
+  dateTo?: string;
+
+  @IsOptional()
+  @IsString()
+  collegeName?: string;
+
+  @IsOptional()
+  @IsString()
+  affiliateName?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  affiliateId?: number;
+
+  @IsOptional()
+  @IsString()
+  schoolLevel?: string;
+
+  @IsOptional()
+  @IsString()
+  schoolStream?: string;
+
+  @IsOptional()
+  @IsString()
+  departmentName?: string;
+
+  @IsOptional()
+  @IsString()
+  gender?: string;
+
+  @IsOptional()
+  @IsString()
+  registrationSource?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  limit?: number;
 }
 
 // Response interface
@@ -176,6 +228,8 @@ export interface RagResponse {
   searchType?: string;
   sql?: string;
   confidence?: number;
+  suggestions?: string[];
+  reportId?: string;
 }
 
 @Controller('rag')
@@ -189,6 +243,7 @@ export class RagController {
     private readonly overallRoleFitmentService: OverallRoleFitmentService,
     private readonly customReportService: CustomReportService,
     private readonly chatMemory: ChatMemoryService,
+    private readonly conversationService: ConversationService,
     private readonly pdfService: PdfService,
   ) { }
 
@@ -438,8 +493,11 @@ export class RagController {
         }
       }
 
-      const result = await this.ragService.query(question, user);
+      const result = await this.ragService.query(question, user, convId, queryDto.mode);
       this.logger.log(`✅ RAG query completed`);
+
+      // ── Generate follow-up suggestions ──
+      const suggestions = this.ragService.generateFollowUpSuggestions(question, result.answer, result.searchType);
 
       // ── Chat memory: save assistant reply + auto-title ──
       if (user.id > 0 && convId > 0) {
@@ -455,7 +513,15 @@ export class RagController {
         }
       }
 
-      return { ...result, conversationId: convId || undefined };
+      // ── Track BI's response in ConversationService for entity context ──
+      try {
+        const sessionId = convId > 0 ? `conv_${convId}` : `user_${user.id || 0}`;
+        this.conversationService.addBiResponse(sessionId, result.answer, result.searchType);
+      } catch (e) {
+        // Non-blocking
+      }
+
+      return { ...result, suggestions, conversationId: convId || undefined };
     } catch (error) {
       this.logger.error(`❌ RAG Controller error: ${error.message}`);
       throw new HttpException(
