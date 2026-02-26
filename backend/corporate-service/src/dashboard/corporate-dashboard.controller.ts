@@ -16,7 +16,7 @@ export class CorporateDashboardController {
   constructor(
     private readonly dashboardService: CorporateDashboardService,
     private readonly reportService: CounsellingReportService,
-  ) { }
+  ) {}
 
   @Get('stats')
   getDashboardStats(@Query('email') email: string) {

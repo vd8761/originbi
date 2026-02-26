@@ -1,4 +1,8 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual } from 'typeorm';
 import {
@@ -28,7 +32,7 @@ export class AdminService {
     private readonly sessionRepo: Repository<AssessmentSession>,
 
     private readonly affiliatesService: AffiliatesService,
-  ) { }
+  ) {}
 
   async getDashboardStats() {
     try {
@@ -57,7 +61,8 @@ export class AdminService {
       const corporateClients = await this.corporateRepo.count();
 
       // 4. Affiliate Data (from AffiliatesService)
-      const affiliateStats = await this.affiliatesService.getAdminDashboardStats();
+      const affiliateStats =
+        await this.affiliatesService.getAdminDashboardStats();
 
       return {
         totalUsers: totalUsersCount,
@@ -68,11 +73,16 @@ export class AdminService {
         // Optional: meta for frontend to show date ranges if needed
         statsContext: {
           weekStart: startOfWeek.format('YYYY-MM-DD'),
-        }
+        },
       };
     } catch (error: any) {
-      this.logger.error(`Error calculating dashboard stats: ${error.message}`, error.stack);
-      throw new InternalServerErrorException('Failed to calculate dashboard statistics');
+      this.logger.error(
+        `Error calculating dashboard stats: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException(
+        'Failed to calculate dashboard statistics',
+      );
     }
   }
 

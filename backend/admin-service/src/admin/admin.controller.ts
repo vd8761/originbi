@@ -10,7 +10,7 @@ interface AdminRequest extends Request {
 @Controller('admin')
 @UseGuards(AdminLoginGuard) // 👈 all routes require ADMIN login
 export class AdminController {
-  constructor(private readonly adminService: AdminService) { }
+  constructor(private readonly adminService: AdminService) {}
 
   @Get('me')
   getMe(@Req() req: AdminRequest) {

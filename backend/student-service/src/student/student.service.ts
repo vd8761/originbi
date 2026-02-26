@@ -73,7 +73,7 @@ export class StudentService {
     private readonly affiliateTransactionRepo: Repository<AffiliateReferralTransaction>,
     private readonly http: HttpService,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   async onModuleInit() {
     // Check if imported functions are used to avoid TS error, or just use them
@@ -440,8 +440,8 @@ export class StudentService {
           totalCount > 0
             ? totalCount
             : level?.levelNumber === 2 ||
-              level?.name.includes('ACI') ||
-              level?.patternType === 'ACI'
+                level?.name.includes('ACI') ||
+                level?.patternType === 'ACI'
               ? 25
               : 60,
         unlockTime: unlockTime,
@@ -1384,7 +1384,7 @@ export class StudentService {
         assets,
         dateStr,
         ((registration as any).program?.reportTitle as string) ||
-        'Self Discovery Report',
+          'Self Discovery Report',
       );
 
       // --- Transporter Setup ---

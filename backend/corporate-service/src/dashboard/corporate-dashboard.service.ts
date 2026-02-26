@@ -1366,9 +1366,7 @@ export class CorporateDashboardService {
     ]);
 
     if (!result || result.length === 0) {
-      throw new NotFoundException(
-        `Report not found for ID: ${reportNumber}`,
-      );
+      throw new NotFoundException(`Report not found for ID: ${reportNumber}`);
     }
 
     const row = result[0];
@@ -1397,7 +1395,11 @@ export class CorporateDashboardService {
       departmentName: row.department_name,
       degreeTypeName: row.degree_type_name,
       currentYear: regMeta.currentYear || regMeta.year_of_study || null,
-      institutionName: regMeta.institutionName || regMeta.institution || regMeta.collegeName || null,
+      institutionName:
+        regMeta.institutionName ||
+        regMeta.institution ||
+        regMeta.collegeName ||
+        null,
       personalityTrait: {
         id: row.trait_id,
         code: row.trait_code,
@@ -1422,9 +1424,11 @@ export class CorporateDashboardService {
       completedAt: row.completed_at,
       keyStrengths: traitMeta.key_strengths || traitMeta.keyStrengths || [],
       roleAlignment: traitMeta.role_alignment || traitMeta.roleAlignment || [],
-      careerGrowthTips: traitMeta.career_growth_tips || traitMeta.careerGrowthTips || [],
+      careerGrowthTips:
+        traitMeta.career_growth_tips || traitMeta.careerGrowthTips || [],
       keyBehaviors: traitMeta.key_behaviors || traitMeta.keyBehaviors || [],
-      typicalScenarios: traitMeta.typical_scenarios || traitMeta.typicalScenarios || [],
+      typicalScenarios:
+        traitMeta.typical_scenarios || traitMeta.typicalScenarios || [],
     };
   }
 }

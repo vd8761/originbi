@@ -678,9 +678,13 @@ export class RegistrationsService {
     const value = !!enabled;
 
     // Ensure column exists (safe idempotent ALTER)
-    await this.dataSource.query(
-      `ALTER TABLE registrations ADD COLUMN IF NOT EXISTS has_ai_counsellor BOOLEAN NOT NULL DEFAULT false`,
-    ).catch(() => { /* column already exists */ });
+    await this.dataSource
+      .query(
+        `ALTER TABLE registrations ADD COLUMN IF NOT EXISTS has_ai_counsellor BOOLEAN NOT NULL DEFAULT false`,
+      )
+      .catch(() => {
+        /* column already exists */
+      });
 
     // Use raw SQL to avoid BigInt/entity serialization issues
     const result = await this.dataSource.query(

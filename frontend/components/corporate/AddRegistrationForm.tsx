@@ -97,7 +97,9 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
         try {
           const userObj = JSON.parse(userStr);
           userIdStr = userObj.id?.toString() || "0";
-        } catch (e) { }
+        } catch (e) {
+          // Ignore parse error
+        }
       }
 
       const payload = {
