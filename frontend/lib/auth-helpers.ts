@@ -29,8 +29,6 @@ const DEFAULT_USER: StoredUser = {
 export function snapshotUserToSession(): void {
     const lsUser = localStorage.getItem('user');
     if (lsUser) {
-        // Always refresh: if the user just logged in on this tab, localStorage
-        // is the freshest source. Subsequent reads prefer sessionStorage.
         sessionStorage.setItem('user', lsUser);
     }
 }

@@ -72,5 +72,57 @@ export const studentService = {
             console.error("Fetch progress failed", error);
             return [];
         }
-    }
+    },
+
+    // ── AI Counsellor Subscription ──
+
+    async getSubscriptionStatus(email: string) {
+        try {
+            const res = await fetch(`${API_URL}/student/subscription/status`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email }),
+            });
+            if (!res.ok) return { hasAiCounsellor: false, plan: null };
+            return await res.json();
+        } catch (error) {
+            console.error("Subscription status check failed", error);
+            return { hasAiCounsellor: false, plan: null };
+        }
+    },
+
+    async createCounsellorOrder(email: string) {
+        try {
+            const res = await fetch(`${API_URL}/student/subscription/create-order`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email }),
+            });
+            if (!res.ok) throw new Error("Failed to create order");
+            return await res.json();
+        } catch (error) {
+            console.error("Create order failed", error);
+            throw error;
+        }
+    },
+
+    async verifyCounsellorPayment(payload: {
+        email: string;
+        razorpay_order_id: string;
+        razorpay_payment_id: string;
+        razorpay_signature: string;
+    }) {
+        try {
+            const res = await fetch(`${API_URL}/student/subscription/verify-payment`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            if (!res.ok) throw new Error("Payment verification failed");
+            return await res.json();
+        } catch (error) {
+            console.error("Verify payment failed", error);
+            throw error;
+        }
+    },
 };

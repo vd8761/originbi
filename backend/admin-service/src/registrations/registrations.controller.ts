@@ -127,4 +127,24 @@ export class RegistrationsController {
   async updateStatus(@Param('id') id: string, @Body('status') status: string) {
     return this.registrationsService.updateStatus(id, status);
   }
+
+  @Patch(':id/ai-counsellor')
+  async toggleAiCounsellor(
+    @Param('id') id: string,
+    @Body('enabled') enabled: boolean,
+  ) {
+    return this.registrationsService.toggleAiCounsellor(id, enabled);
+  }
+
+  /**
+   * Public endpoint — check if a student has AI Counsellor access by email.
+   * Used as fallback when student-service is unreachable.
+   */
+  @Post('counsellor-access')
+  async checkCounsellorAccess(@Body('email') email: string) {
+    if (!email) {
+      return { hasAccess: false };
+    }
+    return this.registrationsService.checkCounsellorAccess(email);
+  }
 }

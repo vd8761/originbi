@@ -11,7 +11,7 @@ export class AssessmentReport {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: 'assessment_session_id', unique: true })
+  @Column({ name: 'assessment_session_id', nullable: true })
   assessmentSessionId: number;
 
   @Column({ name: 'report_number', length: 150, unique: true })
