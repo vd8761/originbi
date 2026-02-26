@@ -204,6 +204,27 @@ export const registrationService = {
     }
   },
 
+  // 🔹 Toggle AI Counsellor
+  async toggleAiCounsellor(id: string, enabled: boolean): Promise<any> {
+    const token = AuthService.getToken();
+
+    const res = await fetch(`${API_URL}/admin/registrations/${id}/ai-counsellor`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+      body: JSON.stringify({ enabled }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      throw new Error(err?.message || `Failed to toggle AI Counsellor (${res.status})`);
+    }
+
+    return res.json();
+  },
+
   // 🔹 BULK PREVIEW
   async bulkPreview(file: File): Promise<any> {
     const token = AuthService.getToken();

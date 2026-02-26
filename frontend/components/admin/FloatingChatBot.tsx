@@ -111,7 +111,7 @@ const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
         <div className="space-y-1.5 leading-relaxed text-[13px]">
             {lines.map((line, i) => {
                 const downloadMatch = line.match(/\[([^\]]+)\]\(([^)]+)\)/);
-                if (downloadMatch && (line.includes('Download') || line.includes('report'))) {
+                if (downloadMatch && (line.includes('Download') || line.includes('report') || line.includes('download') || line.includes('Click here'))) {
                     const [, linkText, linkUrl] = downloadMatch;
                     return (
                         <button
@@ -126,10 +126,39 @@ const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
                 }
 
                 let processed: React.ReactNode = line;
+
+                // Horizontal separator lines (━━━, ───, etc.)
+                if (/^[━─═─-]{5,}$/.test(line.trim())) {
+                    return <hr key={i} className="border-gray-200 dark:border-gray-600 my-1" />;
+                }
+
+                // Markdown headings → styled headings (strip # symbols)
+                const h3Match = line.match(/^###\s+(.+)/);
+                if (h3Match) {
+                    return <p key={i} className="text-[12px] font-semibold text-gray-700 dark:text-gray-200 mt-1.5">{h3Match[1].replace(/\*\*/g, '')}</p>;
+                }
+                const h2Match = line.match(/^##\s+(.+)/);
+                if (h2Match) {
+                    return <p key={i} className="text-[13px] font-bold text-gray-800 dark:text-gray-100 mt-2 mb-0.5">{h2Match[1].replace(/\*\*/g, '')}</p>;
+                }
+                const h1Match = line.match(/^#\s+(.+)/);
+                if (h1Match) {
+                    return <p key={i} className="text-sm font-bold text-gray-900 dark:text-white mt-2 mb-0.5">{h1Match[1].replace(/\*\*/g, '')}</p>;
+                }
+
                 if (line.includes('**')) {
                     processed = line.split(/(\*\*[^*]+\*\*)/g).map((part, j) =>
                         part.startsWith('**') ? (
                             <strong key={j} className="font-semibold text-gray-900 dark:text-white">{part.slice(2, -2)}</strong>
+                        ) : part
+                    );
+                }
+
+                // Italic text with _..._
+                if (typeof processed === 'string' && line.includes('_') && /_.+_/.test(line)) {
+                    processed = line.split(/(_[^_]+_)/g).map((part, j) =>
+                        part.startsWith('_') && part.endsWith('_') ? (
+                            <em key={j} className="text-gray-400 dark:text-gray-500 italic text-[12px]">{part.slice(1, -1)}</em>
                         ) : part
                     );
                 }
@@ -177,6 +206,7 @@ export default function FloatingChatBot({
     const [loading, setLoading] = useState(false);
     const [copied, setCopied] = useState<string | null>(null);
     const [hasUnread, setHasUnread] = useState(false);
+    const [conversationId, setConversationId] = useState<number | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -220,10 +250,16 @@ export default function FloatingChatBot({
             const res = await fetch(`${apiUrl}/rag/query`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
-                body: JSON.stringify({ question: userMsg.content }),
+                body: JSON.stringify({ question: userMsg.content, conversationId: conversationId || undefined }),
             });
 
             const data = await res.json();
+
+            // Capture conversationId from first response for follow-up context
+            if (!conversationId && data.conversationId) {
+                setConversationId(data.conversationId);
+            }
+
             setMessages(prev => [...prev, {
                 id: botId,
                 role: 'assistant',
@@ -244,16 +280,19 @@ export default function FloatingChatBot({
         } finally {
             setLoading(false);
         }
-    }, [input, loading, apiUrl, isOpen, isMinimized]);
+    }, [input, loading, apiUrl, isOpen, isMinimized, conversationId]);
 
     const finishStreaming = useCallback((id: string) => {
         setMessages(prev => prev.map(m => m.id === id ? { ...m, isStreaming: false } : m));
     }, []);
 
-    const clearChat = useCallback(() => setMessages([]), []);
+    const clearChat = useCallback(() => {
+        setMessages([]);
+        setConversationId(null);
+    }, []);
 
     const suggestions = [
-        { icon: '👋', text: 'Hello MITHRA' },
+        { icon: '👋', text: 'Hello BI' },
         { icon: '📊', text: 'Generate career report' },
         { icon: '🏆', text: 'Show top performers' },
     ];
@@ -269,9 +308,9 @@ export default function FloatingChatBot({
                 className={`fixed right-6 bottom-6 z-50 group transition-all duration-300 ${isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100'}`}
             >
                 <div className="relative">
-                    {/* Animated rings */}
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 animate-ping opacity-20" />
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 animate-pulse opacity-30" />
+                    {/* Animated rings — play once on page load, then stop */}
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 animate-ping-once opacity-20" />
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 animate-ripple-once opacity-30" />
 
                     {/* Main button */}
                     <div className="relative w-14 h-14 rounded-full bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 shadow-lg shadow-emerald-500/30 flex items-center justify-center hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-105 transition-all duration-300">
@@ -287,7 +326,7 @@ export default function FloatingChatBot({
 
                     {/* Tooltip */}
                     <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                        Chat with MITHRA
+                        Chat with BI
                         <div className="absolute left-full top-1/2 -translate-y-1/2 border-4 border-transparent border-l-gray-900" />
                     </div>
                 </div>
@@ -310,7 +349,7 @@ export default function FloatingChatBot({
                                 <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-white" />
                             </div>
                             <div>
-                                <h3 className="font-bold text-sm">MITHRA</h3>
+                                <h3 className="font-bold text-sm">BI</h3>
                                 <p className="text-[10px] text-white/80">AI Assistant • Online</p>
                             </div>
                         </div>
@@ -370,7 +409,7 @@ export default function FloatingChatBot({
                                             <Bot className="w-8 h-8 text-white" />
                                         </div>
                                         <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
-                                            Hi, I'm <span className="text-emerald-600">MITHRA</span>
+                                            Hi, I'm <span className="text-emerald-600">BI</span>
                                         </h4>
                                         <p className="text-xs text-gray-500 dark:text-gray-400 text-center mb-4">
                                             Your intelligent assistant for talent insights
@@ -498,7 +537,7 @@ export default function FloatingChatBot({
                                     </button>
                                 </div>
                                 <p className="text-center text-[9px] text-gray-400 mt-2">
-                                    Powered by <span className="font-semibold text-emerald-600">MITHRA</span> • OriginBI
+                                    Powered by <span className="font-semibold text-emerald-600">BI</span> • OriginBI
                                 </p>
                             </div>
                         </>

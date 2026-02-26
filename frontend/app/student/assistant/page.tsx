@@ -1,32 +1,19 @@
 'use client';
 
-import ChatAssistant from '../../../components/admin/ChatAssistant';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function StudentAssistantPage() {
+    const router = useRouter();
+
+    useEffect(() => {
+        // Redirect old assistant route to the new AI Counsellor
+        router.replace('/student/counsellor');
+    }, [router]);
+
     return (
-        <>
-            {/* Hide parent layout header for this full-screen page */}
-            <style jsx global>{`
-                /* Hide the header when on assistant page */
-                .fixed.top-0.left-0.right-0.z-50,
-                header.fixed {
-                    display: none !important;
-                }
-                /* Remove padding from parent content area */
-                .pt-\\[90px\\], .pt-\\[98px\\], .pt-\\[105px\\],
-                .sm\\:pt-\\[98px\\], .lg\\:pt-\\[105px\\] {
-                    padding-top: 0 !important;
-                }
-                /* Hide any sidebar */
-                aside, .sidebar {
-                    display: none !important;
-                }
-                main {
-                    margin-left: 0 !important;
-                    padding: 0 !important;
-                }
-            `}</style>
-            <ChatAssistant userRole="STUDENT" />
-        </>
+        <div className="min-h-screen flex items-center justify-center bg-white dark:bg-brand-dark-primary">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-green"></div>
+        </div>
     );
 }

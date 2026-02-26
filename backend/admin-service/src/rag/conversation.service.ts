@@ -3,8 +3,8 @@ import { Injectable, Logger } from '@nestjs/common';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
- * ║                    MITHRA CONVERSATION SERVICE                            ║
- * ║           Intelligent Memory & Context Management for MITHRA             ║
+ * ║                    BI CONVERSATION SERVICE                                ║
+ * ║           Intelligent Memory & Context Management for BI                 ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
  * ║  FEATURES:                                                                ║
  * ║  • Session-based conversation memory                                      ║
@@ -15,7 +15,7 @@ import { Injectable, Logger } from '@nestjs/common';
  */
 
 interface ConversationMessage {
-    role: 'user' | 'mithra';
+    role: 'user' | 'bi';
     content: string;
     timestamp: Date;
     intent?: string;
@@ -129,13 +129,13 @@ export class ConversationService {
     }
 
     /**
-     * Add MITHRA's response to the session
+     * Add BI's response to the session
      */
-    addMithraResponse(sessionId: string, content: string, intent?: string): void {
+    addBiResponse(sessionId: string, content: string, intent?: string): void {
         const session = this.getSession(sessionId);
 
         session.messages.push({
-            role: 'mithra',
+            role: 'bi',
             content,
             timestamp: new Date(),
             intent,
@@ -218,7 +218,7 @@ export class ConversationService {
 
         let history = '--- CONVERSATION HISTORY ---\n';
         recentMessages.forEach(msg => {
-            const roleLabel = msg.role === 'user' ? 'User' : 'MITHRA';
+            const roleLabel = msg.role === 'user' ? 'User' : 'BI';
             // Clean content to avoid massive prompts if message is huge (e.g. previous report)
             let content = msg.content;
             if (content.length > 500) {

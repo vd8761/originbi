@@ -11,7 +11,10 @@
         "report-service"
     ],
     "dependencies": {
+        "@nestjs/platform-express": "^11.1.14",
+        "@wavezync/nestjs-pgboss": "^5.1.1",
         "pg": "^8.11.3",
+        "pg-boss": "^12.13.0",
         "reflect-metadata": "^0.2.1",
         "typeorm": "^0.3.28"
     },

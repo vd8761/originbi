@@ -56,7 +56,10 @@ async function resilientLLMCall(
         try {
             const resp = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Referer': 'https://originbi.com',
+                },
                 body: JSON.stringify(geminiBody),
             });
             if (resp.status === 429) {
