@@ -8,13 +8,13 @@ import {
 
 @Entity('programs')
 export class Program {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn({ type: 'bigint' })
   id: number;
 
-  @Column({ unique: true })
+  @Column({ unique: true, nullable: true })
   code: string;
 
-  @Column()
+  @Column({ nullable: true })
   name: string;
 
   @Column({ type: 'text', nullable: true })
