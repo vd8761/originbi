@@ -182,7 +182,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
     };
 
     return (
-        <div className="flex flex-col gap-6 font-sans h-full">
+        <div className="flex flex-col gap-6 font-sans h-full p-4 sm:p-6 lg:p-8">
             {/* Header */}
             <div>
                 <div className="flex items-center text-xs text-black dark:text-white mb-1.5 font-normal flex-wrap">
