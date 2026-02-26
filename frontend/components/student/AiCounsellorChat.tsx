@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
     Send, User, Loader2, Copy, Check,
     Download, Sparkles, ArrowLeft, Brain,
-    Clock, ChevronRight, 
+    Clock, ChevronRight,
     Code, ExternalLink,
     CornerDownRight, GraduationCap, Heart, Target, TrendingUp, Compass, BookOpen
 } from 'lucide-react';
@@ -197,7 +197,7 @@ const RenderContent = memo(({ content, streaming, onDone }: {
                         </button>
                     );
                 }
-                if (/^[━─═─\-]{5,}$/.test(line.trim())) return <hr key={bi} className="border-gray-200 dark:border-white/10 my-2" />;
+                if (/^[━─═─-]{5,}$/.test(line.trim())) return <hr key={bi} className="border-gray-200 dark:border-white/10 my-2" />;
                 const h3Match = line.match(/^###\s+(.+)/);
                 if (h3Match) return (
                     <h5 key={bi} className="text-sm font-semibold text-gray-700 dark:text-gray-200 mt-3 mb-1 flex items-center gap-2">

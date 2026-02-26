@@ -293,7 +293,7 @@ const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
                 }
 
                 // Horizontal separator
-                if (/^[━─═─\-]{5,}$/.test(line.trim())) {
+                if (/^[━─═─-]{5,}$/.test(line.trim())) {
                     return <hr key={bi} className="border-gray-200 my-2" />;
                 }
 

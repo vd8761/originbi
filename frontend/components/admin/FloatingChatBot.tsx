@@ -128,7 +128,7 @@ const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
                 let processed: React.ReactNode = line;
 
                 // Horizontal separator lines (━━━, ───, etc.)
-                if (/^[━─═─\-]{5,}$/.test(line.trim())) {
+                if (/^[━─═─-]{5,}$/.test(line.trim())) {
                     return <hr key={i} className="border-gray-200 dark:border-gray-600 my-1" />;
                 }
 
