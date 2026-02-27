@@ -309,7 +309,7 @@ export class CxoReport extends BaseReport {
      */
     private generatePersonalizedInsights(): void {
         // most_answered_answer_type is an array of objects {ANSWER_TYPE, COUNT}
-        const primaryType = this.data.most_answered_answer_type[0].ANSWER_TYPE;
+        const primaryType = this.getTopTwoTraits()[0] as "D" | "I" | "S" | "C";
         const content = CXO_DYNAMIC_CONTENT[primaryType];
 
         if (!content) {
@@ -450,8 +450,6 @@ export class CxoReport extends BaseReport {
     }
 
     private generateACI(): void {
-        const dominantType = this.data.most_answered_answer_type[0]
-            .ANSWER_TYPE as "D" | "I" | "S" | "C";
         const contentBlock =
             ACI[this.getTopTwoTraits()[0] + this.getTopTwoTraits()[1]];
         const agileSum =
@@ -697,12 +695,8 @@ export class CxoReport extends BaseReport {
      * - Renders "Nature Style - Word Sketch".
      */
     private generateBusinessVisionSection(): void {
-        const primaryType = this.data.most_answered_answer_type[0].ANSWER_TYPE;
-        const dominantTrait = this.data.most_answered_answer_type
-            .sort((a, b) => b.COUNT - a.COUNT)
-            .slice(0, 2)
-            .map((trait) => trait.ANSWER_TYPE)
-            .join("");
+        const [primaryType, secondaryType] = this.getTopTwoTraits();
+        const dominantTrait = primaryType + secondaryType;
 
         const contentBlock =
             BLENDED_STYLE_MAPPING[
@@ -743,7 +737,9 @@ export class CxoReport extends BaseReport {
             headerFontSize: 8,
             colWidths: ["fit", "fill", "fill", "fill", "fill"],
         });
-        this.generateRespondParameterTable(primaryType);
+        this.generateRespondParameterTable(
+            primaryType as "D" | "I" | "S" | "C",
+        );
         this.doc.moveDown();
         this.h2("Naure Style - Word Sketch");
         this.pHtml(CXO_CONTENT.natural_style_work_sketch_desc);
