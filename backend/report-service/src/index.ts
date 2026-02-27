@@ -88,17 +88,17 @@ const employeeData: CollegeData = {
     assigned_exam_id: "1001",
     exam_ref_no: "OBI-G2-06/25-WB-CS-0008",
     report_title: "Employee Personalized Report",
-    score_D: 85,
+    score_D: 25,
     score_I: 65,
-    score_S: 25,
+    score_S: 85,
     score_C: 40,
     most_answered_answer_type: [
-        { ANSWER_TYPE: "D", COUNT: 15 },
+        { ANSWER_TYPE: "S", COUNT: 15 },
         { ANSWER_TYPE: "I", COUNT: 12 },
     ],
     top_answered_types: [],
     program_type: 1,
-    department_deg_id: 16,
+    // department_deg_id: 16,
     agile_scores: [
         {
             focus: 11,

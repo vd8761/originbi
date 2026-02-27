@@ -699,11 +699,7 @@ export class EmployeeReport extends BaseReport {
      */
     private generateBusinessVisionSection(): void {
         const primaryType = this.getTopTwoTraits()[0] as "D" | "I" | "S" | "C";
-        const dominantTrait = this.data.most_answered_answer_type
-            .sort((a, b) => b.COUNT - a.COUNT)
-            .slice(0, 2)
-            .map((trait) => trait.ANSWER_TYPE)
-            .join("");
+        const dominantTrait = this.getTopTwoTraits().join("");
 
         const contentBlock =
             BLENDED_STYLE_MAPPING[
