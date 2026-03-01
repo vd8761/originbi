@@ -120,8 +120,8 @@ export class CorporateService {
         typeof authErr === 'string'
           ? authErr
           : (authErr as { message?: string })?.message ||
-            JSON.stringify(authErr) ||
-            'Failed to create Cognito user';
+          JSON.stringify(authErr) ||
+          'Failed to create Cognito user';
 
       if (status === 429) {
         throw new HttpException(errorMessage, 429);
@@ -401,6 +401,24 @@ export class CorporateService {
       if (dto.gender) account.gender = dto.gender;
 
       if (dto.status !== undefined) account.isActive = dto.status;
+
+      // 2.5 Update Credits
+      if (dto.credits !== undefined && dto.credits !== account.availableCredits) {
+        const newCredits = Number(dto.credits);
+        if (!isNaN(newCredits)) {
+          const diff = newCredits - account.availableCredits;
+          account.availableCredits = newCredits;
+          account.totalCredits = account.totalCredits + diff;
+
+          const ledger = manager.create(CorporateCreditLedger, {
+            corporateAccountId: account.id,
+            creditDelta: diff,
+            ledgerType: diff > 0 ? 'CREDIT' : 'DEBIT',
+            reason: 'Manual update by admin during account edit',
+          });
+          await manager.save(ledger);
+        }
+      }
 
       await manager.save(account);
 

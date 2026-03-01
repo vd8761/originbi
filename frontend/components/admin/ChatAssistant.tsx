@@ -699,7 +699,7 @@ export default function ChatAssistant({
 
     /* ───────────────────────── RENDER ───────────────────────── */
     return (
-        <div className="fixed left-0 right-0 bottom-0 top-[61px] sm:top-[69px] z-[100] bg-gray-50 flex overflow-hidden">
+        <div className="fixed left-0 right-0 bottom-0 top-[61px] sm:top-[69px] z-[40] bg-gray-50 flex overflow-hidden" style={{ height: 'calc(100vh - 61px)' }}>
 
             {/* ═══════════════ SIDEBAR ═══════════════ */}
             <aside className={`
@@ -877,7 +877,7 @@ export default function ChatAssistant({
                                 </span>
                             </div>
                             <div>
-                                <h1 className="text-lg font-bold text-gray-900 tracking-tight">BI</h1>
+                                <h1 className="text-lg font-bold text-gray-900 tracking-tight">Ask BI</h1>
                                 <p className="text-xs text-gray-400 flex items-center gap-1">
                                     <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" />
                                     AI Career Intelligence
@@ -886,13 +886,13 @@ export default function ChatAssistant({
                         </div>
                     </div>
                     <div className="flex items-center gap-2.5">
-                        <button
+                        {/* <button
                             onClick={newChat}
                             className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gray-50 hover:bg-emerald-50 border border-gray-200 hover:border-emerald-300 text-gray-600 hover:text-emerald-600 text-sm transition-all hover:scale-105 active:scale-95"
                         >
                             <Plus className="w-4 h-4" />
-                            <span className="hidden sm:inline font-medium">New Chat</span>
-                        </button>
+                            {/* <span className="hidden sm:inline font-medium">New Chat</span> */}
+                        {/* </button> */} 
                         <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${roleConfig.color} text-xs font-semibold`}>
                             <RoleIcon className="w-3.5 h-3.5" />
                             {roleConfig.label}
@@ -904,27 +904,27 @@ export default function ChatAssistant({
                 <main className="relative z-10 flex-1 overflow-y-auto">
                     {messages.length === 0 && !activeConvId ? (
                         /* ─────── WELCOME SCREEN ─────── */
-                        <div className="h-full flex flex-col items-center justify-center px-6 py-12 animate-chatFadeIn">
+                        <div className="h-full flex flex-col items-center justify-center px-6 py-4 sm:py-6 animate-chatFadeIn">
                             <div className="max-w-2xl w-full text-center">
-                                <div className="relative mb-8 inline-block">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-3xl blur-2xl opacity-20 animate-pulse" />
-                                    <div className="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-500 flex items-center justify-center shadow-xl shadow-emerald-200/50 animate-chatLogoFloat">
-                                        <Brain className="w-10 h-10 text-white" />
+                                <div className="relative mb-4 sm:mb-6 inline-block">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl sm:rounded-3xl blur-2xl opacity-20 animate-pulse" />
+                                    <div className="relative w-14 h-14 sm:w-18 sm:h-18 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-500 flex items-center justify-center shadow-xl shadow-emerald-200/50 animate-chatLogoFloat">
+                                        <Brain className="w-7 h-7 sm:w-9 sm:h-9 text-white" />
                                     </div>
                                 </div>
 
-                                <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">
+                                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
                                     Hello{userName ? `, ${userName}` : ''}!
                                 </h1>
                                 <p className="text-gray-500 text-lg mb-2">
-                                    I&apos;m <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500 font-bold">BI</span>, your intelligent career companion.
+                                    I&apos;m <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500 font-bold">Ask BI</span>, your intelligent career companion.
                                 </p>
-                                <p className="text-gray-400 text-sm mb-10">
+                                <p className="text-gray-400 text-sm mb-6 sm:mb-8">
                                     Ask me anything about talent analytics, career insights, and more.
                                 </p>
 
                                 {/* Quick Suggestions */}
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-10">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6 sm:mb-8">
                                     {roleConfig.suggestions.map((s, i) => (
                                         <button
                                             key={i}
@@ -967,7 +967,7 @@ export default function ChatAssistant({
                                 </div>
 
                                 <p className="text-xs text-gray-300 mt-6">
-                                    Powered by <span className="font-semibold text-emerald-400">BI</span> · OriginBI Intelligence Engine
+                                    Powered by <span className="font-semibold text-emerald-400">Ask BI</span> · OriginBI Intelligence Engine
                                 </p>
                             </div>
                         </div>
@@ -1067,7 +1067,7 @@ export default function ChatAssistant({
                                 </button>
                             </div>
                             <p className="text-center text-[10px] text-gray-300 mt-2.5">
-                                Powered by <span className="font-semibold text-emerald-400">BI</span> · OriginBI Intelligence Engine
+                                Powered by <span className="font-semibold text-emerald-400">Ask BI</span> · OriginBI Intelligence Engine
                             </p>
                         </div>
                     </footer>

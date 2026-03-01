@@ -1,4 +1,4 @@
-import fs from "fs";
+﻿import fs from "fs";
 import { SchoolData, COLORS } from "../../types/types";
 import { BaseReport } from "../BaseReport";
 import { logger } from "../../helpers/logger";
@@ -314,31 +314,44 @@ const CAREER_DOMAIN_MAP: Record<
 
 // ─── COLORS ────────────────────────────────────────────────────────────────
 
+// ── OriginBi Brand Palette ─────────────────────────────────────────────────
+// Primary: Indigo #2c2a7d | Secondary: Green #4cb966
 const CI_COLORS = {
-    SECTION_BLUE: "#150089",
-    ACCENT_GREEN: "#19D36A",
-    ACCENT_TEAL: "#0097A7",
-    TEAL_LIGHT: "#B2EBF2",
-    TEAL_MID: "#4DD0E1",
-    TILE_BLUE: "#E8F0FE",
-    TILE_TEAL: "#E0F7FA",
+    // Brand primaries
+    INDIGO: "#2c2a7d", // base indigo — high values
+    INDIGO_MID: "#4e4ba6", // medium shade
+    INDIGO_LIGHT: "#9896cc", // light shade — low values / tracks
+    INDIGO_PALE: "#e8e7f5", // very light — backgrounds / row stripes
+    GREEN: "#4cb966", // base green — secondary / accent
+    GREEN_DARK: "#2d8a45", // darker green
+    GREEN_LIGHT: "#a8e0b3", // light green tint
+    // Neutrals
     LIGHT_GRAY: "#F5F5F5",
     DARK_TEXT: "#1A1A1A",
     MEDIUM_TEXT: "#444444",
-    STRONG_GREEN: "#0D7A3E",
+    // Semantic
+    STRONG_GREEN: "#2d8a45",
     MODERATE_AMBER: "#C68A00",
     DEVELOPING_RED: "#D04A4A",
-    BAR_BLUE: "#3366CC",
-    BAR_GREEN: "#19D36A",
-    BAR_TEAL: "#00ACC1",
-    BAR_PURPLE: "#7B1FA2",
-    BAR_INDIGO: "#3949AB",
-    GAUGE_START: "#19D36A",
-    GAUGE_END: "#150089",
-    GAUGE_BG: "#E0E0E0",
-    RADAR_FILL: "#50BA66",
-    RADAR_STROKE: "#150089",
+    // Kept for non-bar usage only
+    SECTION_BLUE: "#2c2a7d", // alias for INDIGO
+    ACCENT_GREEN: "#4cb966", // alias for GREEN
+    ACCENT_TEAL: "#4e4ba6", // remapped to indigo-mid
+    TEAL_LIGHT: "#e8e7f5", // remapped to indigo-pale
+    TEAL_MID: "#9896cc", // remapped to indigo-light
+    TILE_BLUE: "#e8e7f5",
+    TILE_TEAL: "#e8e7f5",
+    GAUGE_START: "#4cb966", // green start
+    GAUGE_END: "#2c2a7d", // indigo end
+    GAUGE_BG: "#e8e7f5",
+    RADAR_FILL: "#9896cc",
+    RADAR_STROKE: "#2c2a7d",
     RADAR_GRID: "#BCBEC0",
+    BAR_BLUE: "#2c2a7d",
+    BAR_GREEN: "#4cb966",
+    BAR_TEAL: "#4e4ba6",
+    BAR_PURPLE: "#2c2a7d",
+    BAR_INDIGO: "#4e4ba6",
 };
 
 // Non-DISC axis labels for the behavioral radar
@@ -728,31 +741,12 @@ export class CareerIntelligenceReport extends BaseReport {
             stream.on("error", reject);
         });
 
+        this.generateCoverPage();
+
         // Setup background & margins
         this._currentBackground = "assets/images/Watermark_Background.jpg";
         this._useStdMargins = true;
-
-        // Force margins on first page
-        this.doc.page.margins = {
-            top: this.MARGIN_STD,
-            bottom: this.MARGIN_STD,
-            left: this.MARGIN_STD,
-            right: this.MARGIN_STD,
-        };
-
-        const bgPath = "assets/images/Watermark_Background.jpg";
-        if (fs.existsSync(bgPath)) {
-            this.doc.image(bgPath, 0, 0, {
-                width: this.PAGE_WIDTH,
-                height: this.PAGE_HEIGHT,
-            });
-        }
-
-        this.doc.y = this.MARGIN_STD;
-        this.doc.x = this.MARGIN_STD;
-
-        // ── Page Header ─────────────────────────────────
-        this.generatePageHeader();
+        this.doc.addPage();
 
         // ── S1: Career Alignment Index + Gauge ──────────
         this.generateCareerAlignmentIndex();
@@ -792,6 +786,104 @@ export class CareerIntelligenceReport extends BaseReport {
     // SECTION RENDERERS
     // ════════════════════════════════════════════════════════════════
 
+    private generateCoverPage(): void {
+        const bgPath = "assets/images/Cover_Background.jpg";
+        if (fs.existsSync(bgPath))
+            this.doc.image(bgPath, 0, 0, {
+                width: this.PAGE_WIDTH,
+                height: this.PAGE_HEIGHT,
+            });
+        else
+            this.doc
+                .rect(0, 0, this.PAGE_WIDTH, this.PAGE_HEIGHT)
+                .fill("#f0f0f0");
+
+        // --- Title Wrapping ---
+        const titleWidth = this.PAGE_WIDTH - 100;
+
+        this.doc
+            .font(this.FONT_SORA_BOLD)
+            .fontSize(38)
+            .fillColor(this.COLOR_DEEP_BLUE)
+            .text(this.data.report_title, 35, 30, {
+                width: titleWidth,
+                align: "left",
+            });
+
+        // --- Vertical Reference Number ---
+        const refNoX = this.PAGE_WIDTH - 47;
+        const refNoY = 150;
+
+        this.doc.save(); // Save state before rotation
+
+        this.doc.translate(refNoX, refNoY);
+        this.doc.rotate(-90, { origin: [0, 0] });
+
+        this.doc
+            .font(this.FONT_REGULAR)
+            .fontSize(8)
+            .fillColor(this.COLOR_BLACK)
+            .opacity(0.4)
+            .text(this.data.exam_ref_no, 0, 0);
+
+        this.doc.restore(); // Restore state (undo rotation)
+
+        // --- Footer Elements ---
+        const footerY = this.PAGE_HEIGHT - 90;
+        this.doc.opacity(1);
+
+        // Draw "Self Guidance" Label
+        this.doc
+            .font(this.FONT_SEMIBOLD)
+            .fontSize(20)
+            .fillColor(this.COLOR_BLACK)
+            .text("Self Guidance", 35, footerY);
+
+        // Draw Date
+        const dateString = new Date(this.data.exam_start).toLocaleDateString(
+            "en-GB",
+            { day: "numeric", month: "long", year: "numeric" },
+        );
+        this.doc
+            .font(this.FONT_REGULAR)
+            .fontSize(16)
+            .text(dateString, 35, footerY + 25);
+
+        // --- FIX 2: Name Alignment with Smart Wrapping ---
+
+        // 1. Set font first so width calculations are accurate
+        this.doc.font(this.FONT_SORA_BOLD).fontSize(22);
+
+        const nameWidthLimit = 300; // Half page limit
+        const rawName = this.data.full_name;
+
+        // 2. Calculate the smart string (returns "First Last" or "First\nLast")
+        const nameText = this.getSmartSplitName(rawName, nameWidthLimit);
+
+        // 3. Define Position
+        const rightMarginLimit = 35;
+        // X position: Page Width - Text Box Width - Margin - Gap
+        const nameX = this.PAGE_WIDTH - nameWidthLimit - rightMarginLimit - 20;
+        const nameBaseY = footerY + 20; // This is where the bottom line should sit
+
+        const nameOptions = {
+            width: nameWidthLimit + 20,
+            align: "right" as const,
+        };
+
+        // 4. Calculate Height for "Bottom-Up" positioning
+        // heightOfString handles the \n correctly
+        const totalNameHeight = this.doc.heightOfString(nameText, nameOptions);
+        const singleLineHeight = this.doc.heightOfString("M", nameOptions);
+
+        // AdjustedY ensures the last line of text is always at nameBaseY
+        const adjustedNameY = nameBaseY - (totalNameHeight - singleLineHeight);
+
+        this.doc
+            .fillColor(this.COLOR_DEEP_BLUE)
+            .text(nameText, nameX, adjustedNameY, nameOptions);
+    }
+
     private generatePageHeader(): void {
         const x = this.MARGIN_STD;
 
@@ -830,10 +922,7 @@ export class CareerIntelligenceReport extends BaseReport {
     private generateCareerAlignmentIndex(): void {
         this.ensureSpace(0.12, true);
 
-        this.h2("CAREER ALIGNMENT INDEX", {
-            color: CI_COLORS.SECTION_BLUE,
-            topGap: 6,
-        });
+        this.h1("Career Alignment Index");
 
         // Draw the visual gauge
         this.drawProgressGauge(
@@ -866,15 +955,12 @@ export class CareerIntelligenceReport extends BaseReport {
     private generateBehavioralRadar(): void {
         this.ensureSpace(0.45, true);
 
-        this.h2("BEHAVIORAL CAPABILITY PROFILE", {
-            color: CI_COLORS.SECTION_BLUE,
-            topGap: 6,
-        });
+        this.h1("Behavioral Capability Profile");
 
         this.p(
             "An overview of core behavioral capabilities derived from assessment responses. Higher values indicate stronger natural orientation in that capability area.",
-            { color: CI_COLORS.MEDIUM_TEXT, gap: 4 },
         );
+        this.doc.moveDown(2);
 
         // Build radar data with non-DISC labels, scale to 0-10
         const radarData: { [key: string]: number } = {};
@@ -913,38 +999,26 @@ export class CareerIntelligenceReport extends BaseReport {
     private generateCoreIdentityAndStrengths(): void {
         this.ensureSpace(0.3, true);
 
-        this.h2("CORE BEHAVIORAL IDENTITY", {
-            color: CI_COLORS.SECTION_BLUE,
-            topGap: 6,
-        });
+        this.h1("Core Behavioral Identity");
 
         const identity = IDENTITY_MAP[this.topTwo] || IDENTITY_MAP["DC"];
 
-        this.renderTextBase(identity.title, {
-            font: this.FONT_SORA_BOLD,
-            fontSize: 14,
-            color: CI_COLORS.SECTION_BLUE,
-            gap: 4,
-        });
+        this.h3(identity.title);
 
-        this.p(identity.description, { gap: 8 });
+        this.p(identity.description);
 
         // ── Strength Intensity Bars ──
-        this.h3("TOP STRENGTH CLUSTERS", {
-            color: CI_COLORS.ACCENT_GREEN,
-            topGap: 4,
-        });
+        this.h2("Top Strength Clusters");
 
         const top1 = this.sortedTraits[0];
         const top2 = this.sortedTraits[1];
 
-        const barColors = [
-            CI_COLORS.BAR_BLUE,
-            CI_COLORS.BAR_GREEN,
-            CI_COLORS.BAR_TEAL,
-            CI_COLORS.BAR_PURPLE,
-            CI_COLORS.BAR_INDIGO,
-        ];
+        // Value-based indigo shades: higher trait score → darker
+        const getBarColor = (val: number): string => {
+            if (val >= 75) return CI_COLORS.INDIGO;
+            if (val >= 55) return CI_COLORS.INDIGO_MID;
+            return CI_COLORS.INDIGO_LIGHT;
+        };
 
         // Collect strengths: 3 from top trait, 2 from second
         const strengths: { label: string; desc: string; value: number }[] = [];
@@ -957,11 +1031,11 @@ export class CareerIntelligenceReport extends BaseReport {
             .slice(0, 2)
             .forEach((s) => strengths.push({ ...s, value: top2.val }));
 
-        // Draw horizontal bars
-        const barData = strengths.map((s, i) => ({
+        // Draw horizontal bars — color based on the underlying trait score
+        const barData = strengths.map((s) => ({
             label: s.label,
             value: s.value,
-            color: barColors[i % barColors.length],
+            color: getBarColor(s.value),
         }));
 
         this.drawHorizontalBars(barData);
@@ -974,14 +1048,10 @@ export class CareerIntelligenceReport extends BaseReport {
     private generateDevelopmentZones(): void {
         this.ensureSpace(0.22, true);
 
-        this.h2("DEVELOPMENT ACCELERATION ZONES", {
-            color: CI_COLORS.ACCENT_TEAL,
-            topGap: 6,
-        });
+        this.h2("Development Acceleration Zones");
 
         this.p(
             "Growth areas identified from your assessment profile. The bar shows your current capability level alongside the growth runway available.",
-            { color: CI_COLORS.MEDIUM_TEXT, gap: 6 },
         );
 
         const bottom1 = this.sortedTraits[2];
@@ -1008,17 +1078,15 @@ export class CareerIntelligenceReport extends BaseReport {
             );
         });
 
-        this.doc.y += 4;
+        this.doc.moveDown(2);
 
-        this.renderTextBase(
-            "These are growth opportunities — not limitations.",
-            {
-                font: this.FONT_ITALIC,
-                fontSize: 9,
-                color: CI_COLORS.MEDIUM_TEXT,
-                gap: 6,
-            },
-        );
+        this.p("These are growth opportunities — not limitations.", {
+            font: this.FONT_ITALIC,
+            fontSize: 9,
+            color: CI_COLORS.MEDIUM_TEXT,
+            gap: 6,
+            align: "center",
+        });
 
         this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
     }
@@ -1028,10 +1096,7 @@ export class CareerIntelligenceReport extends BaseReport {
     private generateWorkReadinessRadar(): void {
         this.ensureSpace(0.45, true);
 
-        this.h2("WORK READINESS INDICATORS", {
-            color: CI_COLORS.SECTION_BLUE,
-            topGap: 6,
-        });
+        this.h2("Work Readiness Indicators");
 
         const agile = this.data.agile_scores?.[0];
         const commitment = agile?.commitment ?? 0;
@@ -1043,12 +1108,14 @@ export class CareerIntelligenceReport extends BaseReport {
 
         // Draw Radar Chart for ACI values (scale 0-25 → 0-10)
         const aciRadar: { [key: string]: number } = {
-            "Completion\nReliability": Math.round((commitment / 25) * 10),
-            "Task\nFocus": Math.round((focus / 25) * 10),
+            "Completion Reliability": Math.round((commitment / 25) * 10),
+            "Task Focus": Math.round((focus / 25) * 10),
             Adaptability: Math.round((openness / 25) * 10),
-            "Team\nSensitivity": Math.round((respect / 25) * 10),
-            "Decision\nCourage": Math.round((courage / 25) * 10),
+            "Team Sensitivity": Math.round((respect / 25) * 10),
+            "Decision Courage": Math.round((courage / 25) * 10),
         };
+
+        this.doc.moveDown(2);
 
         this.drawRadarChart(aciRadar, {
             radius: 85,
@@ -1082,17 +1149,20 @@ export class CareerIntelligenceReport extends BaseReport {
             { label: "Decision Courage", score: courage },
         ];
 
+        // ── Two-column Strength / Growth split ─────────
+        const THRESHOLD = 17; // out of 25
+
+        const strengths: { label: string; score: number }[] = [];
+        const growth: { label: string; score: number }[] = [];
+
         indicators.forEach((ind) => {
-            const level = getLevel(ind.score);
-            this.drawIndicatorRow(
-                ind.label,
-                level.label,
-                level.color,
-                ind.score,
-            );
+            if (ind.score >= THRESHOLD) strengths.push(ind);
+            else growth.push(ind);
         });
 
-        this.doc.y += 6;
+        this.doc.y += 8;
+        this.ensureSpace(0.28);
+        this.drawAgileSplitPanel(strengths, growth);
 
         // Corporate Readiness Level
         let readinessLevel: string;
@@ -1104,12 +1174,7 @@ export class CareerIntelligenceReport extends BaseReport {
             readinessLevel = "Foundational Track";
         }
 
-        this.renderTextBase(`Corporate Readiness Level: ${readinessLevel}`, {
-            font: this.FONT_SORA_BOLD,
-            fontSize: 11,
-            color: CI_COLORS.SECTION_BLUE,
-            gap: 4,
-        });
+        this.h3(`Corporate Readiness Level: ${readinessLevel}`);
 
         let readinessDesc: string;
         if (readinessLevel === "Advanced Track") {
@@ -1132,20 +1197,9 @@ export class CareerIntelligenceReport extends BaseReport {
     private generateCareerDomainTable(): void {
         this.ensureSpace(0.25, true);
 
-        this.h2("FUTURE ROLE DIRECTION", {
-            color: CI_COLORS.SECTION_BLUE,
-            topGap: 6,
-        });
+        this.h2("Future Role Direction");
 
-        this.renderTextBase(
-            "Career domains ranked by behavioral compatibility:",
-            {
-                font: this.FONT_SEMIBOLD,
-                fontSize: 10,
-                color: CI_COLORS.DARK_TEXT,
-                gap: 6,
-            },
-        );
+        this.h3("Career domains ranked by behavioral compatibility:");
 
         const careerData =
             CAREER_DOMAIN_MAP[this.topTwo] || CAREER_DOMAIN_MAP["DC"];
@@ -1208,25 +1262,26 @@ export class CareerIntelligenceReport extends BaseReport {
     // ── S1: Core Personality Visualization ─────────────────────────
 
     private generateCorePersonality(): void {
-        this.ensureSpace(0.2, true);
-
-        this.h2("CORE PERSONALITY PROFILE", {
-            color: CI_COLORS.SECTION_BLUE,
-            topGap: 6,
-        });
+        this.h2("Core Personality Profile");
 
         const p = this.patterns;
 
         if (p.discType === "dominant" && p.dominantTrait) {
             const archetype = ARCHETYPE_DATA[p.dominantTrait]?.dominant;
             if (archetype) {
-                this.drawArchetypeCard(
-                    archetype.title,
-                    archetype.superpower,
-                    archetype.risk,
-                    archetype.environment,
-                    CI_COLORS.SECTION_BLUE,
-                );
+                // this.drawArchetypeCard(
+                //     archetype.title,
+                //     archetype.superpower,
+                //     archetype.risk,
+                //     archetype.environment,
+                //     CI_COLORS.SECTION_BLUE,
+                // );
+                this.h3(`You are ${archetype.title}`);
+                this.list([
+                    `<b>Superpower:</b> ${archetype.superpower}`,
+                    `<b>Risk:</b> ${archetype.risk}`,
+                    `<b>Environment:</b> ${archetype.environment}`,
+                ]);
             }
             this.p(this.tv("disc-dominant"), { gap: 6 });
         } else if (p.discType === "dual" && p.dualTraits) {
@@ -1278,12 +1333,7 @@ export class CareerIntelligenceReport extends BaseReport {
     // ── S2: Agile Maturity Visualization ──────────────────────────
 
     private generateAgileMaturity(): void {
-        this.ensureSpace(0.15, true);
-
-        this.h2("AGILE MATURITY ANALYSIS", {
-            color: CI_COLORS.SECTION_BLUE,
-            topGap: 6,
-        });
+        this.h2("Agile Maturity Analysis");
 
         const agile = this.data.agile_scores?.[0];
         const norm = (v: number) => Math.min(100, Math.round((v / 25) * 100));
@@ -1301,15 +1351,9 @@ export class CareerIntelligenceReport extends BaseReport {
             balanced: "Balanced Agility Profile",
         };
 
-        this.renderTextBase(
-            patternTitles[p.agilePattern] || "Balanced Agility Profile",
-            {
-                font: this.FONT_SORA_BOLD,
-                fontSize: 12,
-                color: CI_COLORS.ACCENT_TEAL,
-                gap: 4,
-            },
-        );
+        this.h3(patternTitles[p.agilePattern], {
+            color: CI_COLORS.ACCENT_TEAL,
+        });
 
         // Draw balance scale for the key pair
         if (p.agilePattern === "assertive-risk") {
@@ -1335,23 +1379,16 @@ export class CareerIntelligenceReport extends BaseReport {
             this.drawBalanceScale(widest.l, widest.lv, widest.r, widest.rv);
         }
 
-        this.p(this.tv(`agile-${p.agilePattern}`), { gap: 6 });
-        this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
+        this.p(this.tv(`agile-${p.agilePattern}`), { align: "center" });
     }
 
     // ── S3: Skill Heatmap ─────────────────────────────────────────
 
     private generateSkillHeatmap(): void {
-        this.ensureSpace(0.18, true);
-
-        this.h2("PROFESSIONAL SKILL HEATMAP", {
-            color: CI_COLORS.SECTION_BLUE,
-            topGap: 6,
-        });
+        this.h2("Professiosnal Skill Heatmap");
 
         this.p(
             "Derived competency scores combining behavioural and agile assessment data. Darker blocks indicate stronger natural orientation.",
-            { color: CI_COLORS.MEDIUM_TEXT, gap: 6 },
         );
 
         const p = this.patterns;
@@ -1643,17 +1680,17 @@ export class CareerIntelligenceReport extends BaseReport {
             {
                 label: "Personality",
                 value: personalityAvg,
-                color: CI_COLORS.SECTION_BLUE,
+                color: CI_COLORS.INDIGO,
             },
             {
                 label: "Agility",
                 value: agilityAvg,
-                color: CI_COLORS.ACCENT_TEAL,
+                color: CI_COLORS.INDIGO_MID,
             },
             {
                 label: "Leadership",
                 value: leadershipScore,
-                color: CI_COLORS.ACCENT_GREEN,
+                color: CI_COLORS.GREEN,
             },
         ]);
 
@@ -1777,37 +1814,45 @@ export class CareerIntelligenceReport extends BaseReport {
         const barX = x + labelWidth + 6;
         const barWidth = totalWidth - labelWidth - 45;
         const barHeight = 14;
+        const radius = barHeight / 2; // fully rounded capsule
         const gapBetween = 6;
 
         data.forEach((item) => {
             this.ensureSpace(barHeight + gapBetween + 14);
             const y = this.doc.y;
             const fillRatio = Math.min(1, Math.max(0, item.value / 100));
-            const fillW = barWidth * fillRatio;
+            const fillW = Math.max(0, barWidth * fillRatio);
 
-            // Label
+            // Label — right-aligned so it ends flush with the bar start
             this.doc
                 .font(this.FONT_REGULAR)
                 .fontSize(9)
                 .fillColor(CI_COLORS.DARK_TEXT)
-                .text(item.label, x, y + 1, {
+                .text(item.label, x, y + 2, {
                     width: labelWidth,
-                    align: "left",
+                    align: "right",
+                    lineBreak: false,
                 });
 
-            // Background bar
+            // Background track — fully rounded
             this.doc
-                .roundedRect(barX, y, barWidth, barHeight, 3)
+                .roundedRect(barX, y, barWidth, barHeight, radius)
                 .fill(CI_COLORS.GAUGE_BG);
 
-            // Filled bar
+            // Filled portion — clip to the track shape so corners stay round
             if (fillW > 0) {
+                this.doc.save();
+                // clip path = the full bar track shape
                 this.doc
-                    .roundedRect(barX, y, fillW, barHeight, 3)
+                    .roundedRect(barX, y, barWidth, barHeight, radius)
+                    .clip();
+                this.doc
+                    .roundedRect(barX, y, fillW, barHeight, radius)
                     .fill(item.color);
+                this.doc.restore();
             }
 
-            // Percentage label
+            // Percentage label to the right of the bar
             this.doc
                 .font(this.FONT_SEMIBOLD)
                 .fontSize(8)
@@ -1815,7 +1860,7 @@ export class CareerIntelligenceReport extends BaseReport {
                 .text(
                     `${Math.round(item.value)}%`,
                     barX + barWidth + 4,
-                    y + 2,
+                    y + 3,
                     { width: 35, align: "left" },
                 );
 
@@ -1887,7 +1932,7 @@ export class CareerIntelligenceReport extends BaseReport {
             .roundedRect(barX, barY, barWidth, barHeight, 4)
             .fill(CI_COLORS.TEAL_LIGHT);
 
-        // Current level (gradient teal fill)
+        // Current level (gradient teal fill) — clipped to track so corners round
         if (filledWidth > 0) {
             const grad = this.doc.linearGradient(
                 barX,
@@ -1895,11 +1940,14 @@ export class CareerIntelligenceReport extends BaseReport {
                 barX + filledWidth,
                 barY,
             );
-            grad.stop(0, CI_COLORS.TEAL_MID);
-            grad.stop(1, CI_COLORS.ACCENT_TEAL);
+            grad.stop(0, CI_COLORS.GREEN);
+            grad.stop(1, CI_COLORS.INDIGO_MID);
+            this.doc.save();
+            this.doc.roundedRect(barX, barY, barWidth, barHeight, 4).clip();
             this.doc
                 .roundedRect(barX, barY, filledWidth, barHeight, 4)
                 .fill(grad);
+            this.doc.restore();
         }
 
         // Current % label on bar
@@ -1958,6 +2006,137 @@ export class CareerIntelligenceReport extends BaseReport {
      * Draws a mini progress bar capsule for work readiness indicators.
      * Shows label on left, capsule bar in the middle, and level badge on right.
      */
+    /**
+     * Renders a two-column panel split:
+     *  LEFT  — "Agile Strengths"        (indigo panel, scores ≥ threshold)
+     *  RIGHT — "Growth Opportunities"   (green panel,  scores < threshold)
+     * Each row: dimension label (left) + pill score badge (right).
+     */
+    private drawAgileSplitPanel(
+        strengths: { label: string; score: number }[],
+        growth: { label: string; score: number }[],
+    ): void {
+        const x = this.MARGIN_STD;
+        const totalW = this.PAGE_WIDTH - 2 * this.MARGIN_STD;
+        const gap = 10;
+        const panelW = (totalW - gap) / 2;
+        const headerH = 24;
+        const rowH = 22;
+        const rowGap = 4;
+        const radius = 5;
+        const maxRows = Math.max(strengths.length, growth.length, 1);
+        const bodyH = maxRows * (rowH + rowGap) + 4;
+        const totalH = headerH + bodyH + 8;
+
+        this.ensureSpace(totalH + 16);
+        const startY = this.doc.y;
+
+        const drawPanel = (
+            panelX: number,
+            title: string,
+            items: { label: string; score: number }[],
+            headerBg: string,
+            pillBg: string,
+            emptyText: string,
+        ) => {
+            // Panel background (very subtle)
+            this.doc
+                .roundedRect(panelX, startY, panelW, totalH, radius)
+                .fill("#F8F8FC");
+
+            // Header strip
+            this.doc
+                .roundedRect(panelX, startY, panelW, headerH, radius)
+                .fill(headerBg);
+            // Square-off the bottom corners of the header
+            this.doc
+                .rect(panelX, startY + headerH - radius, panelW, radius)
+                .fill(headerBg);
+
+            this.doc
+                .font(this.FONT_SORA_BOLD)
+                .fontSize(9)
+                .fillColor("#FFFFFF")
+                .text(title, panelX + 10, startY + 7, {
+                    width: panelW - 20,
+                    lineBreak: false,
+                });
+
+            if (items.length === 0) {
+                this.doc
+                    .font(this.FONT_ITALIC)
+                    .fontSize(8)
+                    .fillColor(CI_COLORS.MEDIUM_TEXT)
+                    .text(emptyText, panelX + 10, startY + headerH + 10, {
+                        width: panelW - 20,
+                    });
+                return;
+            }
+
+            items.forEach((item, i) => {
+                const ry = startY + headerH + 4 + i * (rowH + rowGap);
+                const pct = Math.round((item.score / 25) * 100);
+
+                // Alternating row tint
+                if (i % 2 === 0) {
+                    this.doc
+                        .roundedRect(panelX + 4, ry, panelW - 8, rowH, 3)
+                        .fill("#EFEFEF");
+                }
+
+                // Label
+                this.doc
+                    .font(this.FONT_SORA_SEMIBOLD)
+                    .fontSize(8)
+                    .fillColor(CI_COLORS.DARK_TEXT)
+                    .text(item.label, panelX + 10, ry + 6, {
+                        width: panelW - 70,
+                        lineBreak: false,
+                    });
+
+                // Pill badge  e.g. "84%"
+                const pillW = 38;
+                const pillH = 14;
+                const pillX = panelX + panelW - pillW - 8;
+                const pillY = ry + (rowH - pillH) / 2;
+                this.doc
+                    .roundedRect(pillX, pillY, pillW, pillH, pillH / 2)
+                    .fill(pillBg);
+                this.doc
+                    .font(this.FONT_SORA_BOLD)
+                    .fontSize(8)
+                    .fillColor("#FFFFFF")
+                    .text(`${pct}%`, pillX, pillY + 3, {
+                        width: pillW,
+                        align: "center",
+                        lineBreak: false,
+                    });
+            });
+        };
+
+        // Left — Strengths (indigo)
+        drawPanel(
+            x,
+            "✦  Agile Strengths",
+            strengths,
+            CI_COLORS.INDIGO,
+            CI_COLORS.INDIGO_MID,
+            "All areas have growth potential",
+        );
+
+        // Right — Growth (green)
+        drawPanel(
+            x + panelW + gap,
+            "↑  Growth Opportunities",
+            growth,
+            CI_COLORS.GREEN_DARK,
+            CI_COLORS.GREEN,
+            "All dimensions are strengths!",
+        );
+
+        this.doc.y = startY + totalH + 10;
+    }
+
     private drawIndicatorRow(
         label: string,
         level: string,
@@ -2283,31 +2462,40 @@ export class CareerIntelligenceReport extends BaseReport {
             let bgColor: string;
             let textColor: string;
             if (skill.value >= 75) {
-                bgColor = CI_COLORS.SECTION_BLUE;
+                bgColor = CI_COLORS.INDIGO;
                 textColor = "#FFFFFF";
             } else if (skill.value >= 50) {
-                bgColor = CI_COLORS.ACCENT_TEAL;
+                bgColor = CI_COLORS.INDIGO_MID;
                 textColor = "#FFFFFF";
             } else {
-                bgColor = CI_COLORS.LIGHT_GRAY;
+                bgColor = CI_COLORS.INDIGO_PALE;
                 textColor = CI_COLORS.DARK_TEXT;
             }
 
             this.doc.roundedRect(cx, cy, cellW, cellH, 6).fill(bgColor);
 
-            // Label
+            const innerY = cy + (cellH - 14) / 2; // vertically center the text row
+
+            // Label — left side
             this.doc
                 .font(this.FONT_SORA_SEMIBOLD)
-                .fontSize(9)
+                .fontSize(10)
                 .fillColor(textColor)
-                .text(skill.label, cx + 8, cy + 8, { width: cellW - 16 });
+                .text(skill.label, cx + 10, innerY, {
+                    width: cellW - 20,
+                    lineBreak: false,
+                });
 
-            // Score
+            // Score — right side
             this.doc
                 .font(this.FONT_SORA_BOLD)
-                .fontSize(14)
+                .fontSize(13)
                 .fillColor(textColor)
-                .text(`${skill.value}`, cx + 8, cy + 24, { width: cellW - 16 });
+                .text(`${skill.value}%`, cx + 10, innerY - 1, {
+                    width: cellW - 26,
+                    align: "right",
+                    lineBreak: false,
+                });
         });
 
         this.doc.y = startY + totalH + 8;

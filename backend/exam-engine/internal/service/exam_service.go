@@ -164,28 +164,57 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 					db.Exec("DELETE FROM assessment_answers WHERE assessment_attempt_id = ?", attempt.ID)
 
 					// 4. Generate questions based on constraints
-					query := `
-						INSERT INTO assessment_answers (
-							assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
-							main_question_id, question_source, status, question_sequence, created_at, updated_at
-						)
-						SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY (board = ?) DESC, RANDOM()), NOW(), NOW()
-						FROM assessment_questions 
-						WHERE assessment_level_id = ? 
-							AND personality_trait_id = ?
-							AND (board = ? OR board IS NULL)
-							AND set_number = ?
-						ORDER BY (board = ?) DESC, RANDOM()
-						LIMIT 25
-					`
-					args := []interface{}{
-						attempt.ID, attempt.AssessmentSessionID, attempt.UserID, attempt.RegistrationID, attempt.ProgramID, *attempt.AssessmentLevelID,
-						studentBoard, // for first ORDER BY clause in SELECT
-						*attempt.AssessmentLevelID, *traitID, studentBoard, setNumber,
-						studentBoard, // for ORDER BY clause
+					var program models.Program
+					db.First(&program, attempt.ProgramID)
+
+					var query string
+					var args []interface{}
+
+					if program.Code == "SCHOOL_STUDENT" {
+						query = `
+							INSERT INTO assessment_answers (
+								assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
+								main_question_id, question_source, status, question_sequence, created_at, updated_at
+							)
+							SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY (board = ?) DESC, (board IS NULL) DESC, RANDOM()), NOW(), NOW()
+							FROM assessment_questions 
+							WHERE assessment_level_id = ? 
+								AND personality_trait_id = ?
+								AND set_number = ?
+								AND is_active = true 
+								AND is_deleted = false
+							ORDER BY (board = ?) DESC, (board IS NULL) DESC, RANDOM()
+							LIMIT 25
+						`
+						args = []interface{}{
+							attempt.ID, attempt.AssessmentSessionID, attempt.UserID, attempt.RegistrationID, attempt.ProgramID, *attempt.AssessmentLevelID,
+							studentBoard,
+							*attempt.AssessmentLevelID, *traitID, setNumber,
+							studentBoard,
+						}
+					} else {
+						query = `
+							INSERT INTO assessment_answers (
+								assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
+								main_question_id, question_source, status, question_sequence, created_at, updated_at
+							)
+							SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
+							FROM assessment_questions 
+							WHERE assessment_level_id = ? 
+								AND personality_trait_id = ?
+								AND set_number = ?
+								AND is_active = true 
+								AND is_deleted = false
+							ORDER BY RANDOM()
+							LIMIT 25
+						`
+						args = []interface{}{
+							attempt.ID, attempt.AssessmentSessionID, attempt.UserID, attempt.RegistrationID, attempt.ProgramID, *attempt.AssessmentLevelID,
+							*attempt.AssessmentLevelID, *traitID, setNumber,
+						}
 					}
 
-					fmt.Printf("[GetExamQuestions - Fallback] Generating Level 2 Questions for Attempt %d. Trait=%d, Board=%s, Set=%d\n", attempt.ID, *traitID, studentBoard, setNumber)
+					fmt.Printf("[GetExamQuestions - Fallback] Generating Level 2 Questions for Attempt %d (Program: %s). Trait=%d, Board=%s, Set=%d\n", attempt.ID, program.Code, *traitID, studentBoard, setNumber)
 					db.Exec(query, args...)
 
 					// Re-fetch questions after generation
@@ -624,26 +653,54 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 						tx.Exec("DELETE FROM assessment_answers WHERE assessment_attempt_id = ?", nextAttempt.ID)
 
 						// 3. Insert new questions based on Trait + Constraints
-						// Limit 25 is standard logic here
-						query := `
-							INSERT INTO assessment_answers (
-								assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
-								main_question_id, question_source, status, question_sequence, created_at, updated_at
-							)
-							SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY (board = ?) DESC, RANDOM()), NOW(), NOW()
-							FROM assessment_questions 
-							WHERE assessment_level_id = ? 
-							  AND personality_trait_id = ?
-							  AND (board = ? OR board IS NULL)
-							  AND set_number = ?
-							ORDER BY (board = ?) DESC, RANDOM()
-							LIMIT 25
-						`
-						args := []interface{}{
-							nextAttempt.ID, nextAttempt.AssessmentSessionID, nextAttempt.UserID, nextAttempt.RegistrationID, nextAttempt.ProgramID, nextLevel.ID,
-							studentBoard, // for first ORDER BY clause in SELECT
-							nextLevel.ID, *traitID, studentBoard, setNumber,
-							studentBoard, // for ORDER BY clause
+						var program models.Program
+						tx.First(&program, nextAttempt.ProgramID)
+
+						var query string
+						var args []interface{}
+
+						if program.Code == "SCHOOL_STUDENT" {
+							query = `
+								INSERT INTO assessment_answers (
+									assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
+									main_question_id, question_source, status, question_sequence, created_at, updated_at
+								)
+								SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY (board = ?) DESC, (board IS NULL) DESC, RANDOM()), NOW(), NOW()
+								FROM assessment_questions 
+								WHERE assessment_level_id = ? 
+								  AND personality_trait_id = ?
+								  AND set_number = ?
+								  AND is_active = true 
+								  AND is_deleted = false
+								ORDER BY (board = ?) DESC, (board IS NULL) DESC, RANDOM()
+								LIMIT 25
+							`
+							args = []interface{}{
+								nextAttempt.ID, nextAttempt.AssessmentSessionID, nextAttempt.UserID, nextAttempt.RegistrationID, nextAttempt.ProgramID, nextLevel.ID,
+								studentBoard,
+								nextLevel.ID, *traitID, setNumber,
+								studentBoard,
+							}
+						} else {
+							query = `
+								INSERT INTO assessment_answers (
+									assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
+									main_question_id, question_source, status, question_sequence, created_at, updated_at
+								)
+								SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
+								FROM assessment_questions 
+								WHERE assessment_level_id = ? 
+								  AND personality_trait_id = ?
+								  AND set_number = ?
+								  AND is_active = true 
+								  AND is_deleted = false
+								ORDER BY RANDOM()
+								LIMIT 25
+							`
+							args = []interface{}{
+								nextAttempt.ID, nextAttempt.AssessmentSessionID, nextAttempt.UserID, nextAttempt.RegistrationID, nextAttempt.ProgramID, nextLevel.ID,
+								nextLevel.ID, *traitID, setNumber,
+							}
 						}
 
 						tx.Exec(query, args...)

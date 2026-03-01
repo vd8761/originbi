@@ -528,7 +528,7 @@ export default function AiCounsellorChat() {
                             </div>
 
                             <p className="text-xs text-gray-300 dark:text-gray-600 mt-6">
-                                Powered by <span className="font-semibold text-emerald-400">BI</span> · OriginBI AI Counsellor
+                                Powered by <span className="font-semibold text-emerald-400">Ask BI</span> · OriginBI AI Counsellor
                             </p>
                         </div>
                     </div>
@@ -626,7 +626,7 @@ export default function AiCounsellorChat() {
                             </button>
                         </div>
                         <p className="text-center text-[10px] text-gray-300 dark:text-gray-600 mt-2.5">
-                            Powered by <span className="font-semibold text-emerald-400">BI</span> · OriginBI AI Counsellor
+                            Powered by <span className="font-semibold text-emerald-400">Ask BI</span> · OriginBI AI Counsellor
                         </p>
                     </div>
                 </footer>

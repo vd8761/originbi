@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { reportController } from "../controllers/reportController";
 
 const router = Router();
@@ -25,7 +25,7 @@ router.get(
 router.get("/download/status/:job_id", reportController.getDownloadStatus);
 
 // 5. Health Check Route
-router.get("/report-status", (req, res) => {
+router.get("/report-status", (req: Request, res: Response) => {
     res.json({
         status: "alive",
         service: "report-service",
