@@ -705,7 +705,7 @@ export class SchoolReport extends BaseReport {
 
         // 7. Course Compatability Matrix
         try {
-            await this.generateCourseCompatability();
+            await this.generateCourseCompatibility();
             logger.info("[School REPORT] Course Compatability Generated.");
         } catch (err) {
             logger.warn(
