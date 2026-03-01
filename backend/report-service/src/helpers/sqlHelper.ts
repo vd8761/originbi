@@ -5,16 +5,19 @@ import { logger } from "./logger";
 
 const poolConfig = process.env.DATABASE_URL
     ? {
-        connectionString: process.env.DATABASE_URL,
-        ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
-    }
+          connectionString: process.env.DATABASE_URL,
+          ssl:
+              process.env.NODE_ENV === "production"
+                  ? { rejectUnauthorized: false }
+                  : undefined,
+      }
     : {
-        user: process.env.DB_USER,
-        host: process.env.DB_HOST,
-        database: process.env.DB_NAME,
-        password: process.env.DB_PASSWORD,
-        port: parseInt(process.env.DB_PORT || "5432"),
-    };
+          user: process.env.DB_USER,
+          host: process.env.DB_HOST,
+          database: process.env.DB_NAME,
+          password: process.env.DB_PASSWORD,
+          port: parseInt(process.env.DB_PORT || "5432"),
+      };
 
 const pool = new Pool(poolConfig);
 
@@ -164,7 +167,7 @@ export async function getCareerGuidanceByTrait(
     }
 }
 
-export async function getCompapabilityMatixDetails(
+export async function getCompatibilityMatrixDetails(
     traitCode: string,
     schoolStreamId: number | undefined,
 ): Promise<CourseCompatibility[]> {

@@ -15,7 +15,7 @@ import {
     MAPPING,
 } from "./schoolConstants";
 import {
-    getCompapabilityMatixDetails,
+    getCompatibilityMatrixDetails,
     CourseCompatibility,
 } from "../../helpers/sqlHelper";
 import { ACI, ACI_SCORE, DISCLAIMER } from "../BaseConstants";
@@ -94,9 +94,9 @@ export class SchoolReport extends BaseReport {
         this.generateAcademicCareerGoals();
         logger.info("[School REPORT] Academic Career Goals Generated.");
 
-        // 7. Course Compatability Matrix
-        await this.generateCourseCompatability();
-        logger.info("[School REPORT] Course Compatability Generated.");
+        // 7. Course Compatibility Matrix
+        await this.generateCourseCompatibility();
+        logger.info("[School REPORT] Course Compatibility Generated.");
 
         // 8. Disclaimer & Closing
         this.generateDisclaimerSection();
@@ -347,7 +347,10 @@ export class SchoolReport extends BaseReport {
      */
     private generatePersonalizedInsights(): void {
         // most_answered_answer_type is an array of objects {ANSWER_TYPE, COUNT}
-        const primaryType = this.getTopTwoTraits()[0] as "D" | "I" | "S" | "C";
+        const primaryType = this.getTopTwoTraits(
+            this.data.most_answered_answer_type,
+            this.data,
+        )[0] as "D" | "I" | "S" | "C";
         const content = SCHOOL_DYNAMIC_CONTENT[primaryType];
 
         if (!content) {
@@ -378,7 +381,10 @@ export class SchoolReport extends BaseReport {
             align: "center",
             color: this.COLOR_DEEP_BLUE,
         });
-        const topTrait = this.getTopTwoTraits()[0];
+        const topTrait = this.getTopTwoTraits(
+            this.data.most_answered_answer_type,
+            this.data,
+        )[0];
         let chartData: { label: string; value: number; color: number[] }[] = [];
 
         if (topTrait === "D") {
@@ -495,7 +501,12 @@ export class SchoolReport extends BaseReport {
 
     private generateACI(): void {
         const contentBlock =
-            ACI[this.getTopTwoTraits()[0] + this.getTopTwoTraits()[1]];
+            ACI[
+                this.getTopTwoTraits(
+                    this.data.most_answered_answer_type,
+                    this.data,
+                ).join("")
+            ];
         const agileSum =
             this.data.agile_scores[0].commitment +
             this.data.agile_scores[0].focus +
@@ -630,7 +641,10 @@ export class SchoolReport extends BaseReport {
     }
 
     private generateNatureGraphSection(): void {
-        const topTrait = this.getTopTwoTraits()[0];
+        const topTrait = this.getTopTwoTraits(
+            this.data.most_answered_answer_type,
+            this.data,
+        )[0];
         let chartData: { label: string; value: number; color: number[] }[] = [];
 
         if (topTrait === "D") {
@@ -747,7 +761,10 @@ export class SchoolReport extends BaseReport {
      * - Provides Suggestions, Key Behaviours, and Trait Mapping tables.
      */
     private generateAcademicCareerGoals(): void {
-        const [primaryType, secondaryType] = this.getTopTwoTraits();
+        const [primaryType, secondaryType] = this.getTopTwoTraits(
+            this.data.most_answered_answer_type,
+            this.data,
+        );
         const dominantTrait = primaryType + secondaryType;
 
         const contentBlock =
@@ -808,17 +825,19 @@ export class SchoolReport extends BaseReport {
      * - Renders a Bar Chart comparing compatibility percentages for various courses.
      * - Includes the "Nature Style - Word Sketch".
      */
-    private async generateCourseCompatability(): Promise<void> {
-        this.h1("Course Compatability Matrix");
-        const topTwoTraits = this.getTopTwoTraits();
+    private async generateCourseCompatibility(): Promise<void> {
+        this.h1("Course Compatibility Matrix");
+        const topTwoTraits = this.getTopTwoTraits(
+            this.data.most_answered_answer_type,
+            this.data,
+        );
 
-        const data = await getCompapabilityMatixDetails(
+        const data = await getCompatibilityMatrixDetails(
             topTwoTraits[0] + topTwoTraits[1],
             this.data.school_stream_id,
         );
-        console.log(data);
 
-        this.generateCourseCompatabilityTable(
+        this.generateCourseCompatibilityTable(
             data,
             topTwoTraits[0],
             topTwoTraits[1],
@@ -1281,7 +1300,10 @@ export class SchoolReport extends BaseReport {
         this.doc.restore();
 
         // --- Chart Section ---
-        const [t1, t2] = this.getTopTwoTraits();
+        const [t1, t2] = this.getTopTwoTraits(
+            this.data.most_answered_answer_type,
+            this.data,
+        );
         const skills = MAPPING[t1 + t2];
         const years = [25, 27, 29, 31, 33, 35];
         const boxWidth = 15.5 * this.MM;
@@ -1583,43 +1605,6 @@ export class SchoolReport extends BaseReport {
         this.doc.y = footerY + 20 * this.MM;
     }
 
-    private getTopTwoTraits(): [string, string] {
-        let scores: { type: string; val: number }[] = [];
-
-        if (
-            this.data.most_answered_answer_type &&
-            this.data.most_answered_answer_type.length >= 4
-        ) {
-            scores = this.data.most_answered_answer_type.map((item) => ({
-                type: item.ANSWER_TYPE,
-                val: item.COUNT,
-            }));
-        } else {
-            scores = [
-                { type: "D", val: this.data.score_D },
-                { type: "I", val: this.data.score_I },
-                { type: "S", val: this.data.score_S },
-                { type: "C", val: this.data.score_C },
-            ];
-        }
-
-        const PRIORITY = ["C", "D", "I", "S"];
-        scores.sort((a, b) => {
-            const diff = b.val - a.val; // Primary: Value Descending
-            if (diff !== 0) return diff;
-
-            // Secondary: Priority Index Ascending (Low index = High Priority)
-            const pA = PRIORITY.indexOf(a.type);
-            const pB = PRIORITY.indexOf(b.type);
-            return pA - pB;
-        });
-
-        // Debug Log to verify sorting
-        // console.log("Sorted Traits:", scores);
-
-        return [scores[0].type, scores[1].type];
-    }
-
     /**
      * Generates a Course Compatibility Bar Chart.
      * Visuals:
@@ -1630,7 +1615,7 @@ export class SchoolReport extends BaseReport {
      * @param traitHigh Trait char (D/I/S/C) for scores >= 70%
      * @param traitLow Trait char (D/I/S/C) for scores < 70%
      */
-    private generateCourseCompatabilityTable(
+    private generateCourseCompatibilityTable(
         data: any[],
         traitHigh: string,
         traitLow: string,

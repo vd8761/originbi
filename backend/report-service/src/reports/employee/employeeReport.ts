@@ -312,7 +312,10 @@ export class EmployeeReport extends BaseReport {
      */
     private generatePersonalizedInsights(): void {
         // most_answered_answer_type is an array of objects {ANSWER_TYPE, COUNT}
-        const primaryType = this.getTopTwoTraits()[0] as "D" | "I" | "S" | "C";
+        const primaryType = this.getTopTwoTraits(
+            this.data.most_answered_answer_type,
+            this.data,
+        )[0] as "D" | "I" | "S" | "C";
         const content = EMPLOYEE_DYNAMIC_CONTENT[primaryType];
 
         if (!content) {
@@ -343,7 +346,10 @@ export class EmployeeReport extends BaseReport {
             align: "center",
             color: this.COLOR_DEEP_BLUE,
         });
-        const topTrait = this.getTopTwoTraits()[0];
+        const topTrait = this.getTopTwoTraits(
+            this.data.most_answered_answer_type,
+            this.data,
+        )[0];
         let chartData: { label: string; value: number; color: number[] }[] = [];
 
         if (topTrait === "D") {
@@ -454,7 +460,12 @@ export class EmployeeReport extends BaseReport {
 
     private generateACI(): void {
         const contentBlock =
-            ACI[this.getTopTwoTraits()[0] + this.getTopTwoTraits()[1]];
+            ACI[
+                this.getTopTwoTraits(
+                    this.data.most_answered_answer_type,
+                    this.data,
+                ).join("")
+            ];
         const agileSum =
             this.data.agile_scores[0].commitment +
             this.data.agile_scores[0].focus +
@@ -637,7 +648,10 @@ export class EmployeeReport extends BaseReport {
             align: "center",
             color: this.COLOR_DEEP_BLUE,
         });
-        const topTrait = this.getTopTwoTraits()[0];
+        const topTrait = this.getTopTwoTraits(
+            this.data.most_answered_answer_type,
+            this.data,
+        )[0];
         let chartData: { label: string; value: number; color: number[] }[] = [];
 
         if (topTrait === "D") {
@@ -698,8 +712,12 @@ export class EmployeeReport extends BaseReport {
      * - Renders "Nature Style - Word Sketch".
      */
     private generateBusinessVisionSection(): void {
-        const primaryType = this.getTopTwoTraits()[0] as "D" | "I" | "S" | "C";
-        const dominantTrait = this.getTopTwoTraits().join("");
+        const [t1, t2] = this.getTopTwoTraits(
+            this.data.most_answered_answer_type,
+            this.data,
+        );
+        const primaryType = t1 as "D" | "I" | "S" | "C";
+        const dominantTrait = t1 + t2;
 
         const contentBlock =
             BLENDED_STYLE_MAPPING[
@@ -743,7 +761,7 @@ export class EmployeeReport extends BaseReport {
         });
         this.generateRespondParameterTable(primaryType);
         this.doc.moveDown();
-        this.h2("Naure Style - Word Sketch");
+        this.h2("Nature Style - Word Sketch");
         this.pHtml(EMPLOYEE_CONTENT.natural_style_work_sketch_desc);
         this.pHtml(EMPLOYEE_CONTENT.natural_style_work_sketch_desc_1);
         this.generateWordSketch();
@@ -1137,7 +1155,7 @@ export class EmployeeReport extends BaseReport {
         };
         const traitName = traitNames[dominantType];
         const rowData = [[traitName, ...contentBlock.respond_parameter_row]];
-        this.ensureSpace(100);
+        this.ensureSpace(0.55, true);
         this.table(headers, rowData, {
             fontSize: 8,
             headerFontSize: 8,
@@ -1147,42 +1165,5 @@ export class EmployeeReport extends BaseReport {
             cellPadding: 5,
             colWidths: colWidths,
         });
-    }
-
-    private getTopTwoTraits(): [string, string] {
-        let scores: { type: string; val: number }[] = [];
-
-        if (
-            this.data.most_answered_answer_type &&
-            this.data.most_answered_answer_type.length >= 4
-        ) {
-            scores = this.data.most_answered_answer_type.map((item) => ({
-                type: item.ANSWER_TYPE,
-                val: item.COUNT,
-            }));
-        } else {
-            scores = [
-                { type: "D", val: this.data.score_D },
-                { type: "I", val: this.data.score_I },
-                { type: "S", val: this.data.score_S },
-                { type: "C", val: this.data.score_C },
-            ];
-        }
-
-        const PRIORITY = ["C", "D", "I", "S"];
-        scores.sort((a, b) => {
-            const diff = b.val - a.val; // Primary: Value Descending
-            if (diff !== 0) return diff;
-
-            // Secondary: Priority Index Ascending (Low index = High Priority)
-            const pA = PRIORITY.indexOf(a.type);
-            const pB = PRIORITY.indexOf(b.type);
-            return pA - pB;
-        });
-
-        // Debug Log to verify sorting
-        // console.log("Sorted Traits:", scores);
-
-        return [scores[0].type, scores[1].type];
     }
 }
