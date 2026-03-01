@@ -347,7 +347,49 @@ export class BaseReport {
 
     // --- Helpers ---
 
-    // --- Helpers ---
+    /**
+     * Identifies the Top Two DISC Traits (Primary and Secondary).
+     * Sorts by answer count first; falls back to raw score if count data is unavailable.
+     * Tie-breaker priority: C > D > I > S.
+     *
+     * @param mostAnswered - The most_answered_answer_type array from report data.
+     * @param scores       - Fallback raw scores { D, I, S, C }.
+     */
+    protected getTopTwoTraits(
+        mostAnswered: { ANSWER_TYPE: string; COUNT: number }[],
+        scores: {
+            score_D: number;
+            score_I: number;
+            score_S: number;
+            score_C: number;
+        },
+    ): [string, string] {
+        let traitScores: { type: string; val: number }[];
+
+        if (mostAnswered && mostAnswered.length >= 4) {
+            traitScores = mostAnswered.map((item) => ({
+                type: item.ANSWER_TYPE,
+                val: item.COUNT,
+            }));
+        } else {
+            traitScores = [
+                { type: "D", val: scores.score_D },
+                { type: "I", val: scores.score_I },
+                { type: "S", val: scores.score_S },
+                { type: "C", val: scores.score_C },
+            ];
+        }
+
+        const PRIORITY = ["C", "D", "I", "S"];
+        traitScores.sort((a, b) => {
+            const diff = b.val - a.val; // Primary: Value Descending
+            if (diff !== 0) return diff;
+            // Tie-breaker: Priority Index Ascending (low index = high priority)
+            return PRIORITY.indexOf(a.type) - PRIORITY.indexOf(b.type);
+        });
+
+        return [traitScores[0].type, traitScores[1].type];
+    }
 
     /**
      * Checks if there is enough vertical space remaining on the current page.

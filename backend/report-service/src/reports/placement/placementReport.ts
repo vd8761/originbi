@@ -16,7 +16,6 @@ import {
     CareerRoleData,
 } from "../../helpers/sqlHelper";
 import { logger } from "../../helpers/logger";
-import { height } from "pdfkit/js/page";
 
 /**
  * PlacementReport Class

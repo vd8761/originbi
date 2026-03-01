@@ -74,7 +74,10 @@ export class CollegeReport extends BaseReport {
         this.generateContent2();
 
         // --- Fetch Dynamic Career Data ---
-        const [t1, t2] = this.getTopTwoTraits();
+        const [t1, t2] = this.getTopTwoTraits(
+            this.data.most_answered_answer_type,
+            this.data,
+        );
         const traitKey = t1 + t2;
 
         let careerDataList: CareerRoleData[] = [];
@@ -357,7 +360,10 @@ export class CollegeReport extends BaseReport {
     }
 
     private generateContent1(): void {
-        const dominantType = this.getTopTwoTraits()[0] as "D" | "I" | "S" | "C";
+        const dominantType = this.getTopTwoTraits(
+            this.data.most_answered_answer_type,
+            this.data,
+        )[0] as "D" | "I" | "S" | "C";
         const contentBlock = CONTENT[dominantType];
         this.doc.lineGap(2);
         this.h1(COLLEGE_TOC_CONTENT[1]);
@@ -391,7 +397,10 @@ export class CollegeReport extends BaseReport {
             align: "center",
             color: this.COLOR_DEEP_BLUE,
         });
-        const topTrait = this.getTopTwoTraits()[0];
+        const topTrait = this.getTopTwoTraits(
+            this.data.most_answered_answer_type,
+            this.data,
+        )[0];
         let chartData: { label: string; value: number; color: number[] }[] = [];
 
         if (topTrait === "D") {
@@ -596,8 +605,14 @@ export class CollegeReport extends BaseReport {
     }
 
     private generateContent2(): void {
-        const dominantType = this.getTopTwoTraits()[0] as "D" | "I" | "S" | "C";
-        const dominantTrait = this.getTopTwoTraits().join("");
+        const dominantType = this.getTopTwoTraits(
+            this.data.most_answered_answer_type,
+            this.data,
+        )[0] as "D" | "I" | "S" | "C";
+        const dominantTrait = this.getTopTwoTraits(
+            this.data.most_answered_answer_type,
+            this.data,
+        ).join("");
         const contentBlock = blendedTraits[dominantTrait];
 
         this.h1("Applying Self-Discovery to Your Academic and Career Choices");
@@ -640,9 +655,17 @@ export class CollegeReport extends BaseReport {
     }
 
     private generateACI(): void {
-        const dominantType = this.getTopTwoTraits()[0] as "D" | "I" | "S" | "C";
+        const dominantType = this.getTopTwoTraits(
+            this.data.most_answered_answer_type,
+            this.data,
+        )[0] as "D" | "I" | "S" | "C";
         const contentBlock =
-            ACI[this.getTopTwoTraits()[0] + this.getTopTwoTraits()[1]];
+            ACI[
+                this.getTopTwoTraits(
+                    this.data.most_answered_answer_type,
+                    this.data,
+                ).join("")
+            ];
         const agileSum =
             this.data.agile_scores[0].commitment +
             this.data.agile_scores[0].focus +
@@ -820,14 +843,13 @@ export class CollegeReport extends BaseReport {
         // We fetch the top two traits.
         // Index 0 = Primary (Highest)
         // Index 1 = Secondary (Second Highest)
-        const dominantTraits = this.getTopTwoTraits();
+        const dominantTraits = this.getTopTwoTraits(
+            this.data.most_answered_answer_type,
+            this.data,
+        );
 
         // Iterate through EACH Suggestion (Max 3)
         careerDataList.slice(0, 3).forEach((role, index) => {
-            console.log(
-                `[REPORT] Generating Roadmap & Details for Role ${index + 1}: "${role.roleName}"`,
-            );
-
             // Calculate Color Logic:
             // Role 1 (index 0) -> Uses Primary Trait Color
             // Role 2 (index 1) -> Uses Secondary Trait Color
@@ -936,9 +958,6 @@ export class CollegeReport extends BaseReport {
         this.p(CONTENT.damages_desc_2);
     }
 
-    /**
-     * Generates the "Natural Style - Word Sketch" table.
-     * Can be called independently to render the table at the current position.
     /**
      * Generates the "Natural Style - Word Sketch" table.
      * This table visualizes the intensity of each trait (D, I, S, C) based on scores.
@@ -1368,7 +1387,10 @@ export class CollegeReport extends BaseReport {
         this.doc.restore();
 
         // --- Chart Section ---
-        const [t1, t2] = this.getTopTwoTraits();
+        const [t1, t2] = this.getTopTwoTraits(
+            this.data.most_answered_answer_type,
+            this.data,
+        );
         const skills = MAPPING[t1 + t2];
         const years = [25, 27, 29, 31, 33, 35];
         const boxWidth = 15.5 * this.MM;
@@ -1666,48 +1688,5 @@ export class CollegeReport extends BaseReport {
 
         this.doc.restore();
         this.doc.y = footerY + 20 * this.MM;
-    }
-
-    /**
-     * Helper: Identifies the Top Two Traits (Primary and Secondary).
-     * Logic:
-     * 1. Sorts traits by Value (Descending).
-     * 2. Tie-breaker: Uses fixed Priority (C > D > I > S).
-     */
-    private getTopTwoTraits(): [string, string] {
-        let scores: { type: string; val: number }[] = [];
-
-        if (
-            this.data.most_answered_answer_type &&
-            this.data.most_answered_answer_type.length >= 4
-        ) {
-            scores = this.data.most_answered_answer_type.map((item) => ({
-                type: item.ANSWER_TYPE,
-                val: item.COUNT,
-            }));
-        } else {
-            scores = [
-                { type: "D", val: this.data.score_D },
-                { type: "I", val: this.data.score_I },
-                { type: "S", val: this.data.score_S },
-                { type: "C", val: this.data.score_C },
-            ];
-        }
-
-        const PRIORITY = ["C", "D", "I", "S"];
-        scores.sort((a, b) => {
-            const diff = b.val - a.val; // Primary: Value Descending
-            if (diff !== 0) return diff;
-
-            // Secondary: Priority Index Ascending (Low index = High Priority)
-            const pA = PRIORITY.indexOf(a.type);
-            const pB = PRIORITY.indexOf(b.type);
-            return pA - pB;
-        });
-
-        // Debug Log to verify sorting
-        // console.log("Sorted Traits:", scores);
-
-        return [scores[0].type, scores[1].type];
     }
 }
