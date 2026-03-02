@@ -203,7 +203,19 @@ export class CorporateDashboardService {
   // Dashboard Data Helpers
   // ========================================================================
 
-  private async getMiniStats(corpId: number, startDate?: string, endDate?: string) {
+  private async getMiniStats(
+    corpId: number,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<{
+    totalRegistrations: number;
+    newRegistrationsThisMonth: number;
+    assessmentsAssigned: number;
+    assessmentsCompleted: number;
+    registrationsTrend: number;
+    assessmentsAssignedTrend: number;
+    assessmentsCompletedTrend: number;
+  }> {
     const now = new Date();
 
     // Default ranges for trend calculation (current vs last month)
@@ -230,7 +242,10 @@ export class CorporateDashboardService {
     }
 
     const baseQuery = `corporate_account_id = $1 AND is_deleted = false`;
-    const dateQueryFromFilter = startDate && endDate ? ` AND created_at >= '${startDate} 00:00:00' AND created_at <= '${endDate} 23:59:59'` : '';
+    const dateQueryFromFilter =
+      startDate && endDate
+        ? ` AND created_at >= '${startDate} 00:00:00' AND created_at <= '${endDate} 23:59:59'`
+        : '';
 
     const result = await this.dataSource.query(
       `
@@ -244,10 +259,18 @@ export class CorporateDashboardService {
       FROM registrations r
       WHERE ${baseQuery} ${dateQueryFromFilter}
       `,
-      [corpId, currentStart.toISOString(), prevStart.toISOString(), prevEnd.toISOString()],
+      [
+        corpId,
+        currentStart.toISOString(),
+        prevStart.toISOString(),
+        prevEnd.toISOString(),
+      ],
     );
 
-    const sessionDateQuery = startDate && endDate ? ` AND s.created_at >= '${startDate} 00:00:00' AND s.created_at <= '${endDate} 23:59:59'` : '';
+    const sessionDateQuery =
+      startDate && endDate
+        ? ` AND s.created_at >= '${startDate} 00:00:00' AND s.created_at <= '${endDate} 23:59:59'`
+        : '';
 
     const sessionResult = await this.dataSource.query(
       `
@@ -264,7 +287,12 @@ export class CorporateDashboardService {
       JOIN registrations r ON s.registration_id = r.id
       WHERE r.corporate_account_id = $1 AND r.is_deleted = false ${sessionDateQuery}
       `,
-      [corpId, currentStart.toISOString(), prevStart.toISOString(), prevEnd.toISOString()],
+      [
+        corpId,
+        currentStart.toISOString(),
+        prevStart.toISOString(),
+        prevEnd.toISOString(),
+      ],
     );
 
     const reg = result[0] || {};
@@ -276,17 +304,39 @@ export class CorporateDashboardService {
     };
 
     return {
-      totalRegistrations: parseInt(reg.total_registrations || '0', 10),
-      newRegistrationsThisMonth: parseInt(reg.current_period_count || '0', 10),
-      assessmentsAssigned: parseInt(sess.total_assigned || '0', 10),
-      assessmentsCompleted: parseInt(sess.total_completed || '0', 10),
-      registrationsTrend: calcTrend(parseInt(reg.current_period_count || '0', 10), parseInt(reg.previous_period_count || '0', 10)),
-      assessmentsAssignedTrend: calcTrend(parseInt(sess.assigned_current || '0', 10), parseInt(sess.assigned_prev || '0', 10)),
-      assessmentsCompletedTrend: calcTrend(parseInt(sess.completed_current || '0', 10), parseInt(sess.completed_prev || '0', 10)),
+      totalRegistrations: parseInt(
+        (reg.total_registrations as string) || '0',
+        10,
+      ),
+      newRegistrationsThisMonth: parseInt(
+        (reg.current_period_count as string) || '0',
+        10,
+      ),
+      assessmentsAssigned: parseInt((sess.total_assigned as string) || '0', 10),
+      assessmentsCompleted: parseInt(
+        (sess.total_completed as string) || '0',
+        10,
+      ),
+      registrationsTrend: calcTrend(
+        parseInt((reg.current_period_count as string) || '0', 10),
+        parseInt((reg.previous_period_count as string) || '0', 10),
+      ),
+      assessmentsAssignedTrend: calcTrend(
+        parseInt((sess.assigned_current as string) || '0', 10),
+        parseInt((sess.assigned_prev as string) || '0', 10),
+      ),
+      assessmentsCompletedTrend: calcTrend(
+        parseInt((sess.completed_current as string) || '0', 10),
+        parseInt((sess.completed_prev as string) || '0', 10),
+      ),
     };
   }
 
-  private async getAssessmentInsights(corpId: number, startDate?: string, endDate?: string) {
+  private async getAssessmentInsights(
+    corpId: number,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<any[]> {
     let dateQuery = ` AND s.created_at >= NOW() - INTERVAL '5 months'`;
 
     // If a month is filtered, show 6 months ending in that month
@@ -315,16 +365,23 @@ export class CorporateDashboardService {
       [corpId],
     );
 
-    return (result || []).map((row: any) => ({
-      month: row.month,
-      year: row.year,
-      assigned: parseInt(row.assigned || '0', 10),
-      completed: parseInt(row.completed || '0', 10),
+    return ((result || []) as any[]).map((row: any) => ({
+      month: row.month as string,
+      year: row.year as number,
+      assigned: parseInt((row.assigned as string) || '0', 10),
+      completed: parseInt((row.completed as string) || '0', 10),
     }));
   }
 
-  private async getPipelineOverview(corpId: number, startDate?: string, endDate?: string) {
-    const dateQuery = startDate && endDate ? ` AND r.created_at >= '${startDate} 00:00:00' AND r.created_at <= '${endDate} 23:59:59'` : '';
+  private async getPipelineOverview(
+    corpId: number,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<any> {
+    const dateQuery =
+      startDate && endDate
+        ? ` AND r.created_at >= '${startDate} 00:00:00' AND r.created_at <= '${endDate} 23:59:59'`
+        : '';
 
     const result = await this.dataSource.query(
       `
@@ -342,15 +399,31 @@ export class CorporateDashboardService {
 
     const row = result[0] || {};
     return {
-      totalRegistered: parseInt(row.total_registered || '0', 10),
-      assessmentsAssigned: parseInt(row.assessments_assigned || '0', 10),
-      assessmentsInProgress: parseInt(row.assessments_in_progress || '0', 10),
-      assessmentsCompleted: parseInt(row.assessments_completed || '0', 10),
+      totalRegistered: parseInt((row.total_registered as string) || '0', 10),
+      assessmentsAssigned: parseInt(
+        (row.assessments_assigned as string) || '0',
+        10,
+      ),
+      assessmentsInProgress: parseInt(
+        (row.assessments_in_progress as string) || '0',
+        10,
+      ),
+      assessmentsCompleted: parseInt(
+        (row.assessments_completed as string) || '0',
+        10,
+      ),
     };
   }
 
-  private async getPersonalityDistribution(corpId: number, startDate?: string, endDate?: string) {
-    const dateQuery = startDate && endDate ? ` AND aa.created_at >= '${startDate} 00:00:00' AND aa.created_at <= '${endDate} 23:59:59'` : '';
+  private async getPersonalityDistribution(
+    corpId: number,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<any> {
+    const dateQuery =
+      startDate && endDate
+        ? ` AND aa.created_at >= '${startDate} 00:00:00' AND aa.created_at <= '${endDate} 23:59:59'`
+        : '';
 
     const result = await this.dataSource.query(
       `
@@ -387,16 +460,16 @@ export class CorporateDashboardService {
     );
 
     return {
-      totalWithTraits: parseInt(totalResult[0]?.total || '0', 10),
+      totalWithTraits: parseInt((totalResult[0]?.total as string) || '0', 10),
       topTraits: (result || []).map((row: any) => ({
-        traitName: row.trait_name,
-        count: parseInt(row.count || '0', 10),
-        colorRgb: row.color_rgb || '#1ED36A',
+        traitName: row.trait_name as string,
+        count: parseInt((row.count as string) || '0', 10),
+        colorRgb: (row.color_rgb as string) || '#1ED36A',
       })),
     };
   }
 
-  private async getRecentParticipants(corpId: number) {
+  private async getRecentParticipants(corpId: number): Promise<any[]> {
     const result = await this.dataSource.query(
       `
       SELECT
@@ -415,19 +488,19 @@ export class CorporateDashboardService {
       [corpId],
     );
 
-    return (result || []).map((row: any) => ({
+    return ((result || []) as any[]).map((row: any) => ({
       id: String(row.id),
-      name: row.name || 'Unknown',
-      programType: row.program_type || 'N/A',
+      name: (row.name as string) || 'Unknown',
+      programType: (row.program_type as string) || 'N/A',
       status: row.status === 'COMPLETED',
       registerDate: row.register_date
-        ? new Date(row.register_date).toLocaleDateString('en-IN', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        })
+        ? new Date(row.register_date as string).toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+          })
         : 'N/A',
-      mobile: row.mobile || 'N/A',
+      mobile: (row.mobile as string) || 'N/A',
     }));
   }
 

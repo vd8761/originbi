@@ -16,7 +16,7 @@ export class CorporateDashboardController {
   constructor(
     private readonly dashboardService: CorporateDashboardService,
     private readonly reportService: CounsellingReportService,
-  ) { }
+  ) {}
 
   @Get('stats')
   getDashboardStats(
@@ -91,7 +91,14 @@ export class CorporateDashboardController {
     if (!email) throw new BadRequestException('Email is required');
     if (!paymentDetails)
       throw new BadRequestException('Payment details are required');
-    return this.dashboardService.verifyPayment(email, paymentDetails);
+    return this.dashboardService.verifyPayment(
+      email,
+      paymentDetails as {
+        razorpay_order_id: string;
+        razorpay_payment_id: string;
+        razorpay_signature: string;
+      },
+    );
   }
 
   @Post('record-payment-failure')
