@@ -16,14 +16,18 @@ export class CorporateDashboardController {
   constructor(
     private readonly dashboardService: CorporateDashboardService,
     private readonly reportService: CounsellingReportService,
-  ) {}
+  ) { }
 
   @Get('stats')
-  getDashboardStats(@Query('email') email: string) {
+  getDashboardStats(
+    @Query('email') email: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
     if (!email) {
       throw new BadRequestException('Email is required');
     }
-    return this.dashboardService.getStats(email);
+    return this.dashboardService.getStats(email, startDate, endDate);
   }
 
   @Post('forgot-password/initiate')

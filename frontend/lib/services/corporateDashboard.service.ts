@@ -24,9 +24,14 @@ export const corporateDashboardService = {
         return res.json();
     },
 
-    async getStats(email: string): Promise<any> {
+    async getStats(email: string, startDate?: string, endDate?: string): Promise<any> {
         const token = AuthService.getToken();
-        const res = await fetch(`${API_URL}/dashboard/stats?email=${encodeURIComponent(email)}`, {
+        const query = new URLSearchParams({
+            email,
+            ...(startDate && { startDate }),
+            ...(endDate && { endDate }),
+        });
+        const res = await fetch(`${API_URL}/dashboard/stats?${query.toString()}`, {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",
