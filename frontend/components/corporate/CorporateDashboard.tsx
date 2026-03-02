@@ -634,7 +634,13 @@ const ProfileResult = ({ data }: { data: ReportData }) => {
                 {/* Center: Character Image */}
                 <div className="lg:w-1/3 flex justify-center relative py-6 lg:py-0">
                     {/* Background Glow */}
-                    <div className="w-[260px] h-[260px] sm:w-[320px] sm:h-[320px] bg-[#FDE047]/20 dark:bg-yellow-500/10 rounded-full absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 blur-3xl pointer-events-none"></div>
+                    <div
+                        className="w-[260px] h-[260px] sm:w-[320px] sm:h-[320px] rounded-full absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 blur-3xl pointer-events-none transition-colors duration-500"
+                        style={{
+                            backgroundColor: trait.colorRgb || '#FDE047',
+                            opacity: 0.2
+                        }}
+                    ></div>
                     <div className="relative w-[300px] h-[300px] sm:w-[350px] sm:h-[350px]">
                         <img
                             src={trait.characterImage}
