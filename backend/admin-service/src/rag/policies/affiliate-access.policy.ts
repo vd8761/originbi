@@ -39,6 +39,7 @@ export class AffiliateAccessPolicy implements IAccessPolicy {
             'affiliate_earnings',        // Commission/earnings details
             'affiliate_payments',        // Settlement/payment history
             'general_knowledge',         // General questions (routed to LLM)
+            'data_query',                // Dynamic SQL queries (scoped to their referrals)
         ];
     }
 

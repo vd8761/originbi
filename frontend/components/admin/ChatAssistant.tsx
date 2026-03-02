@@ -246,10 +246,10 @@ const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
 
                 // ── Tables ──
                 if (block.type === 'table') {
-                    const rows = block.content.split('\n').filter(r => !r.match(/^\|[\s\-:]+\|$/));
+                    const rows = block.content.split('\n').filter(r => !r.match(/^\|[\s\-:|]+\|$/) || r.replace(/[|\s\-:]/g, '').length > 0 && !r.match(/^[|\s\-:]+$/));
                     const parseRow = (r: string) => r.split('|').filter((_, ci, arr) => ci > 0 && ci < arr.length - 1).map(c => c.trim());
                     const header = rows[0] ? parseRow(rows[0]) : [];
-                    const body = rows.slice(1).map(parseRow);
+                    const body = rows.slice(1).map(parseRow).filter(row => row.some(cell => cell && cell.replace(/[-\s*]/g, '').length > 0));
                     return (
                         <div key={bi} className="overflow-x-auto my-3 rounded-xl border border-gray-200">
                             <table className="w-full text-sm">
@@ -673,23 +673,23 @@ export default function ChatAssistant({
                 suggestions: [
                     { icon: Target, text: 'Show my employees', desc: 'View your team members', gradient: 'from-blue-500 to-indigo-500' },
                     { icon: TrendingUp, text: 'Best performers in my company', desc: 'Top talent insights', gradient: 'from-violet-500 to-purple-500' },
-                    { icon: Brain, text: 'Career recommendations for my team', desc: 'AI-powered guidance', gradient: 'from-orange-500 to-rose-500' },
+                    { icon: Brain, text: 'Average score of my candidates', desc: 'Team analytics', gradient: 'from-orange-500 to-rose-500' },
                 ],
             };
             case 'STUDENT': return {
                 label: 'Student', color: 'bg-emerald-50 text-emerald-600 border-emerald-200', icon: GraduationCap,
                 suggestions: [
-                    { icon: User, text: 'Tell me about myself', desc: 'Your personal profile', gradient: 'from-cyan-500 to-blue-500' },
+                    { icon: User, text: 'Show my assessment results', desc: 'Your performance data', gradient: 'from-cyan-500 to-blue-500' },
                     { icon: Brain, text: 'What careers suit me?', desc: 'Personalized matching', gradient: 'from-violet-500 to-purple-500' },
-                    { icon: TrendingUp, text: 'Show my assessment results', desc: 'Performance insights', gradient: 'from-orange-500 to-rose-500' },
+                    { icon: TrendingUp, text: 'Generate my career report', desc: 'AI career analysis', gradient: 'from-orange-500 to-rose-500' },
                 ],
             };
             default: return {
                 label: 'Admin', color: 'bg-purple-50 text-purple-600 border-purple-200', icon: Star,
                 suggestions: [
-                    { icon: Target, text: 'List all candidates', desc: 'Browse the talent pool', gradient: 'from-blue-500 to-indigo-500' },
+                    { icon: Target, text: 'How many candidates completed this month?', desc: 'Analytics dashboard', gradient: 'from-blue-500 to-indigo-500' },
                     { icon: TrendingUp, text: 'Show top performers', desc: 'Best scoring talent', gradient: 'from-violet-500 to-purple-500' },
-                    { icon: Zap, text: 'Generate career report', desc: 'AI career analysis', gradient: 'from-orange-500 to-rose-500' },
+                    { icon: Zap, text: 'Find candidates suitable for project manager', desc: 'AI job matching', gradient: 'from-orange-500 to-rose-500' },
                 ],
             };
         }
@@ -699,7 +699,7 @@ export default function ChatAssistant({
 
     /* ───────────────────────── RENDER ───────────────────────── */
     return (
-        <div className="fixed left-0 right-0 bottom-0 top-[61px] sm:top-[69px] z-[40] bg-gray-50 flex overflow-hidden" style={{ height: 'calc(100vh - 61px)' }}>
+        <div className="fixed left-0 right-0 bottom-0 top-[61px] sm:top-[69px] z-[40] bg-gray-50 flex overflow-hidden" style={{ height: 'calc(100dvh - 61px)' }}>
 
             {/* ═══════════════ SIDEBAR ═══════════════ */}
             <aside className={`
@@ -901,10 +901,10 @@ export default function ChatAssistant({
                 </header>
 
                 {/* ═══════════════ MAIN CONTENT ═══════════════ */}
-                <main className="relative z-10 flex-1 overflow-y-auto">
+                <main className="relative z-10 flex-1 overflow-y-auto min-h-0">
                     {messages.length === 0 && !activeConvId ? (
                         /* ─────── WELCOME SCREEN ─────── */
-                        <div className="h-full flex flex-col items-center justify-center px-6 py-4 sm:py-6 animate-chatFadeIn">
+                        <div className="h-full flex flex-col items-center justify-center px-4 sm:px-6 py-4 sm:py-6 animate-chatFadeIn">
                             <div className="max-w-2xl w-full text-center">
                                 <div className="relative mb-4 sm:mb-6 inline-block">
                                     <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl sm:rounded-3xl blur-2xl opacity-20 animate-pulse" />
@@ -913,10 +913,10 @@ export default function ChatAssistant({
                                     </div>
                                 </div>
 
-                                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+                                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-2">
                                     Hello{userName ? `, ${userName}` : ''}!
                                 </h1>
-                                <p className="text-gray-500 text-lg mb-2">
+                                <p className="text-gray-500 text-base sm:text-lg mb-2">
                                     I&apos;m <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500 font-bold">Ask BI</span>, your intelligent career companion.
                                 </p>
                                 <p className="text-gray-400 text-sm mb-6 sm:mb-8">
@@ -924,7 +924,7 @@ export default function ChatAssistant({
                                 </p>
 
                                 {/* Quick Suggestions */}
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6 sm:mb-8">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mb-4 sm:mb-8">
                                     {roleConfig.suggestions.map((s, i) => (
                                         <button
                                             key={i}
@@ -932,11 +932,11 @@ export default function ChatAssistant({
                                             className="group relative p-5 rounded-2xl bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 transition-all text-left overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
                                         >
                                             <div className={`absolute inset-0 bg-gradient-to-br ${s.gradient} opacity-0 group-hover:opacity-[0.04] transition-opacity duration-300`} />
-                                            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${s.gradient} flex items-center justify-center mb-3 shadow-md group-hover:scale-110 transition-transform`}>
+                                            <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br ${s.gradient} flex items-center justify-center mb-2 sm:mb-3 shadow-md group-hover:scale-110 transition-transform`}>
                                                 <s.icon className="w-5 h-5 text-white" />
                                             </div>
-                                            <p className="text-sm text-gray-800 font-semibold mb-1">{s.text}</p>
-                                            <p className="text-xs text-gray-400">{s.desc}</p>
+                                            <p className="text-xs sm:text-sm text-gray-800 font-semibold mb-0.5 sm:mb-1">{s.text}</p>
+                                            <p className="text-[10px] sm:text-xs text-gray-400">{s.desc}</p>
                                             <ChevronRight className="absolute top-5 right-4 w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                                         </button>
                                     ))}
@@ -966,14 +966,14 @@ export default function ChatAssistant({
                                     </div>
                                 </div>
 
-                                <p className="text-xs text-gray-300 mt-6">
+                                <p className="text-xs text-gray-300 mt-3 sm:mt-6">
                                     Powered by <span className="font-semibold text-emerald-400">Ask BI</span> · OriginBI Intelligence Engine
                                 </p>
                             </div>
                         </div>
                     ) : (
                         /* ─────── MESSAGES VIEW ─────── */
-                        <div className="max-w-3xl mx-auto p-6 space-y-5">
+                        <div className="max-w-3xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-5 pb-4">
                             {messages.map((m, idx) => (
                                 <div key={m.id} className="animate-chatSlideIn" style={{ animationDelay: `${Math.min(idx * 50, 300)}ms` }}>
                                     <div className={`flex gap-3.5 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
@@ -987,7 +987,7 @@ export default function ChatAssistant({
                                             </div>
                                         )}
 
-                                        <div className={`group flex flex-col max-w-[85%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                        <div className={`group flex flex-col max-w-[90%] sm:max-w-[85%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
                                             <div className={`rounded-2xl px-4 py-3 ${m.role === 'user'
                                                 ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-200/40 rounded-tr-md'
                                                 : 'bg-white border border-gray-100 shadow-sm rounded-tl-md'
@@ -1045,7 +1045,7 @@ export default function ChatAssistant({
 
                 {/* ═══════════════ BOTTOM INPUT ═══════════════ */}
                 {(messages.length > 0 || activeConvId) && (
-                    <footer className="relative z-10 p-4 bg-gradient-to-t from-white via-white/95 to-white/0 border-t border-gray-100">
+                    <footer className="relative z-10 flex-shrink-0 px-3 sm:px-4 pt-2 pb-2 sm:pb-3 bg-gradient-to-t from-white via-white to-transparent border-t border-gray-100">
                         <div className="max-w-3xl mx-auto">
                             <div className="flex items-end gap-3 p-2 bg-white border border-gray-200 rounded-2xl focus-within:border-emerald-400 focus-within:shadow-lg focus-within:shadow-emerald-100/50 transition-all shadow-sm">
                                 <Sparkles className="w-5 h-5 text-emerald-400 ml-3 mb-3 flex-shrink-0" />
@@ -1066,7 +1066,7 @@ export default function ChatAssistant({
                                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                                 </button>
                             </div>
-                            <p className="text-center text-[10px] text-gray-300 mt-2.5">
+                            <p className="text-center text-[10px] text-gray-300 mt-1.5">
                                 Powered by <span className="font-semibold text-emerald-400">Ask BI</span> · OriginBI Intelligence Engine
                             </p>
                         </div>
@@ -1099,6 +1099,15 @@ export default function ChatAssistant({
                     .scrollbar-thin::-webkit-scrollbar { width: 4px; }
                     .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
                     .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+                    /* Mobile responsive fixes */
+                    @media (max-width: 640px) {
+                        .sm\\:top-\\[69px\\] { top: 61px; }
+                    }
+                    @supports (height: 100dvh) {
+                        @media (max-width: 640px) {
+                            .fixed.bottom-0 { height: calc(100dvh - 61px) !important; }
+                        }
+                    }
                 `}</style>
             </div>
         </div>
