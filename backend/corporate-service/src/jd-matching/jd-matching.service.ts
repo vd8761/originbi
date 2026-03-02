@@ -496,7 +496,6 @@ export class CorporateJDMatchingService {
 
   /** Resolve corporate account ID from user email (public for controller use) */
   async getCorporateAccountId(email: string): Promise<number> {
-    const { ILike } = require('typeorm');
     const user = await this.dataSource.query(
       `SELECT id, corporate_id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
       [email],

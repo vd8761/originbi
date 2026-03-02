@@ -130,7 +130,7 @@ export class CounsellingReportService {
     if (
       !forceRegenerate &&
       session.reportData &&
-      Object.keys(session.reportData).length > 0
+      Object.keys(session.reportData as object).length > 0
     ) {
       this.logger.log(
         `📋 Report already exists for session ${sessionId}, returning cached report`,
@@ -200,7 +200,10 @@ export class CounsellingReportService {
       );
     }
 
-    if (!session.reportData || Object.keys(session.reportData).length === 0) {
+    if (
+      !session.reportData ||
+      Object.keys(session.reportData as object).length === 0
+    ) {
       return null;
     }
 
@@ -332,9 +335,13 @@ export class CounsellingReportService {
       const advanceCourses: string[] = [];
       const internationalCourses: string[] = [];
 
-      for (const course of coursesResult) {
-        const name = course.course_name;
-        const level = (course.course_level || course.notes || '').toLowerCase();
+      for (const course of coursesResult as any[]) {
+        const name = course.course_name as string;
+        const level = (
+          (course.course_level as string) ||
+          (course.notes as string) ||
+          ''
+        ).toLowerCase();
 
         if (
           level.includes('international') ||
@@ -406,12 +413,18 @@ export class CounsellingReportService {
     studentName: string,
     qualificationDetails?: any,
   ): Promise<CounsellingReportData> {
-    const traitCode = trait?.code || session.results?.dominant_trait || 'SC';
+    const traitCode =
+      trait?.code || (session.results?.dominant_trait as string) || 'SC';
     const traitName = trait?.blendedStyleName || 'Balanced Professional';
     const traitDescription =
       trait?.blendedStyleDesc ||
       'A balanced approach to work with adaptable characteristics.';
-    const discScores = session.results?.disc_scores || {
+    const discScores = (session.results?.disc_scores as {
+      D: number;
+      I: number;
+      S: number;
+      C: number;
+    }) || {
       D: 5,
       I: 5,
       S: 5,
@@ -425,7 +438,7 @@ export class CounsellingReportService {
     const userPrompt = this.buildUserPrompt(
       traitCode,
       courseDataset,
-      qualificationDetails,
+      qualificationDetails as object,
     );
 
     try {
@@ -454,7 +467,7 @@ export class CounsellingReportService {
         traitName,
         traitDescription,
         studentName,
-        qualificationDetails,
+        qualificationDetails as object,
       );
       return parsedReport;
     } catch (error) {
@@ -467,7 +480,7 @@ export class CounsellingReportService {
         traitDescription,
         courseDataset,
         studentName,
-        qualificationDetails,
+        qualificationDetails as object,
       );
     }
   }
@@ -821,14 +834,17 @@ Now generate the JSON report following the exact format specified in the system 
             below: { max: 70, label: 'Below Threshold' },
           },
         },
-        perfect_courses: normalizeCourses(parsed.perfect_courses, true),
-        good_courses: normalizeCourses(parsed.good_courses, true),
+        perfect_courses: normalizeCourses(
+          parsed.perfect_courses as any[],
+          true,
+        ),
+        good_courses: normalizeCourses(parsed.good_courses as any[], true),
         entry_level_courses: normalizeCourses(
-          parsed.entry_level_courses,
+          parsed.entry_level_courses as any[],
           false,
         ),
         international_courses: normalizeCourses(
-          parsed.international_courses,
+          parsed.international_courses as any[],
           true,
         ),
         career_guidance: parsed.career_guidance || {
