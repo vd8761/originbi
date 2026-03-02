@@ -464,7 +464,13 @@ export class CorporateDashboardService {
       topTraits: (result || []).map((row: any) => ({
         traitName: row.trait_name as string,
         count: parseInt((row.count as string) || '0', 10),
-        colorRgb: (row.color_rgb as string) || '#1ED36A',
+        colorRgb:
+          row.color_rgb &&
+            !row.color_rgb.startsWith('#') &&
+            !row.color_rgb.startsWith('rgb') &&
+            row.color_rgb.includes(',')
+            ? `rgb(${row.color_rgb})`
+            : (row.color_rgb as string) || '#1ED36A',
       })),
     };
   }
@@ -475,12 +481,16 @@ export class CorporateDashboardService {
       SELECT
         r.id,
         r.full_name AS name,
-        p.name AS program_type,
+        COALESCE(
+          p_direct.name,
+          (SELECT p_sess.name FROM assessment_sessions s JOIN programs p_sess ON s.program_id = p_sess.id WHERE s.registration_id = r.id ORDER BY s.created_at DESC LIMIT 1),
+          r.metadata->>'programType'
+        ) AS program_type,
         r.status,
         r.created_at AS register_date,
         r.mobile_number AS mobile
       FROM registrations r
-      LEFT JOIN programs p ON r.program_id = p.id
+      LEFT JOIN programs p_direct ON r.program_id = p_direct.id
       WHERE r.corporate_account_id = $1 AND r.is_deleted = false
       ORDER BY r.created_at DESC
       LIMIT 5
@@ -495,10 +505,10 @@ export class CorporateDashboardService {
       status: row.status === 'COMPLETED',
       registerDate: row.register_date
         ? new Date(row.register_date as string).toLocaleDateString('en-IN', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-          })
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        })
         : 'N/A',
       mobile: (row.mobile as string) || 'N/A',
     }));
@@ -1729,7 +1739,13 @@ export class CorporateDashboardService {
         code: row.trait_code,
         name: traitName,
         description: row.blended_style_desc,
-        colorRgb: row.color_rgb,
+        colorRgb:
+          row.color_rgb &&
+            !row.color_rgb.startsWith('#') &&
+            !row.color_rgb.startsWith('rgb') &&
+            row.color_rgb.includes(',')
+            ? `rgb(${row.color_rgb})`
+            : (row.color_rgb as string) || '#1ED36A',
         imageKey: traitImageKey,
         characterImage: `/traits/Corporate_${traitImageKey}.png`,
         strengthChartImage: `/charts/${traitImageKey}_Strength_Chart.png`,
