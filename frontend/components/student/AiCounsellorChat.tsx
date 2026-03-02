@@ -418,7 +418,7 @@ export default function AiCounsellorChat() {
             </div>
 
             {/* ═══════════════ HEADER ═══════════════ */}
-            <header className="relative z-10 flex items-center justify-between px-4 py-3 bg-white/80 dark:bg-brand-dark-secondary/80 backdrop-blur-xl border-b border-gray-200/60 dark:border-white/5 shadow-sm">
+            <header className="relative z-10 flex items-center justify-between px-4 py-3 bg-[#FAFAFA] dark:bg-[#24272B] border-b border-gray-200/60 dark:border-white/5 shadow-sm">
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => router.push('/student/dashboard')}

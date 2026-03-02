@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
     BulkUploadIcon,
     PlusIcon,
@@ -35,7 +36,10 @@ const useDebounce = (value: string, delay: number) => {
     return debouncedValue;
 };
 
-const MyEmployees: React.FC = () => {
+const MyEmployeesContent: React.FC = () => {
+    const searchParams = useSearchParams();
+    const idParam = searchParams.get('id');
+
     const [view, setView] = useState<"list" | "add" | "bulk" | "preview" | "group-assessment-preview" | "group-candidate-assessment-preview">("list");
     const [selectedEmployee, setSelectedEmployee] = useState<Registration | null>(null);
     const [activeTab, setActiveTab] = useState<"registrations" | "individual" | "group">("registrations");
@@ -67,15 +71,9 @@ const MyEmployees: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState("");
 
     // Date Filter State
-    const [dateRangeLabel, setDateRangeLabel] = useState<string>("This Month");
-    const [startDate, setStartDate] = useState<Date | null>(() => {
-        const now = new Date();
-        return new Date(now.getFullYear(), now.getMonth(), 1);
-    });
-    const [endDate, setEndDate] = useState<Date | null>(() => {
-        const now = new Date();
-        return new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day
-    });
+    const [dateRangeLabel, setDateRangeLabel] = useState<string>("All");
+    const [startDate, setStartDate] = useState<Date | null>(null);
+    const [endDate, setEndDate] = useState<Date | null>(null);
     const [isDateModalOpen, setIsDateModalOpen] = useState(false);
 
     // Sorting
@@ -118,6 +116,47 @@ const MyEmployees: React.FC = () => {
 
         if (email && !corporateEmail) setCorporateEmail(email);
     }, []);
+
+    // Effect for handling deep link (id parameter)
+    useEffect(() => {
+        const checkDeepLink = async () => {
+            if (idParam && corporateEmail && (!selectedEmployee || selectedEmployee.id !== idParam)) {
+                try {
+                    // We can reuse getMyEmployees with a search term as the ID if supported,
+                    // but usually registrations are fetched by searching.
+                    // Let's search by ID if the service allows or just fetch the profile.
+                    // For now, let's try searching specifically for this ID in MyEmployees.
+                    const res = await corporateDashboardService.getMyEmployees(corporateEmail, 1, 1, idParam);
+                    if (res.data && res.data.length > 0) {
+                        const r = res.data[0];
+                        const mapped: Registration = {
+                            id: r.id,
+                            user_id: r.userId,
+                            registration_source: r.registrationSource,
+                            full_name: r.fullName || "Unknown",
+                            email: r.user?.email || "",
+                            mobile_number: r.mobileNumber,
+                            country_code: r.countryCode,
+                            payment_required: r.paymentRequired,
+                            payment_status: r.paymentStatus,
+                            status: r.status,
+                            is_deleted: r.isDeleted,
+                            created_at: r.createdAt,
+                            updated_at: r.updatedAt,
+                            corporate_account_id: r.corporateAccountId,
+                            gender: r.gender,
+                            groupName: r.group?.name || undefined,
+                        };
+                        setSelectedEmployee(mapped);
+                        setView("preview");
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch deep-linked employee", e);
+                }
+            }
+        };
+        checkDeepLink();
+    }, [idParam, corporateEmail]);
 
     // Initial Fetch for Tab Counts
     useEffect(() => {
@@ -856,6 +895,18 @@ const MyEmployees: React.FC = () => {
                 </div>
             </div>
         </div>
+    );
+};
+
+const MyEmployees: React.FC = () => {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="w-10 h-10 border-4 border-[#1ED36A] border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        }>
+            <MyEmployeesContent />
+        </Suspense>
     );
 };
 

@@ -312,7 +312,7 @@ export class EmployeeReport extends BaseReport {
      */
     private generatePersonalizedInsights(): void {
         // most_answered_answer_type is an array of objects {ANSWER_TYPE, COUNT}
-        const primaryType = this.data.most_answered_answer_type[0].ANSWER_TYPE;
+        const primaryType = this.getTopTwoTraits()[0] as "D" | "I" | "S" | "C";
         const content = EMPLOYEE_DYNAMIC_CONTENT[primaryType];
 
         if (!content) {
@@ -453,8 +453,6 @@ export class EmployeeReport extends BaseReport {
     }
 
     private generateACI(): void {
-        const dominantType = this.data.most_answered_answer_type[0]
-            .ANSWER_TYPE as "D" | "I" | "S" | "C";
         const contentBlock =
             ACI[this.getTopTwoTraits()[0] + this.getTopTwoTraits()[1]];
         const agileSum =
@@ -700,12 +698,8 @@ export class EmployeeReport extends BaseReport {
      * - Renders "Nature Style - Word Sketch".
      */
     private generateBusinessVisionSection(): void {
-        const primaryType = this.data.most_answered_answer_type[0].ANSWER_TYPE;
-        const dominantTrait = this.data.most_answered_answer_type
-            .sort((a, b) => b.COUNT - a.COUNT)
-            .slice(0, 2)
-            .map((trait) => trait.ANSWER_TYPE)
-            .join("");
+        const primaryType = this.getTopTwoTraits()[0] as "D" | "I" | "S" | "C";
+        const dominantTrait = this.getTopTwoTraits().join("");
 
         const contentBlock =
             BLENDED_STYLE_MAPPING[

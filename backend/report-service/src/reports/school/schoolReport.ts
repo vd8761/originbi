@@ -968,7 +968,7 @@ export class SchoolReport extends BaseReport {
      */
     private generatePersonalizedInsights(): void {
         // most_answered_answer_type is an array of objects {ANSWER_TYPE, COUNT}
-        const primaryType = this.data.most_answered_answer_type[0].ANSWER_TYPE;
+        const primaryType = this.getTopTwoTraits()[0] as "D" | "I" | "S" | "C";
         const content = SCHOOL_DYNAMIC_CONTENT[primaryType];
 
         if (!content) {
@@ -1117,8 +1117,6 @@ export class SchoolReport extends BaseReport {
     }
 
     private generateACI(): void {
-        const dominantType = this.data.most_answered_answer_type[0]
-            .ANSWER_TYPE as "D" | "I" | "S" | "C";
         const contentBlock =
             ACI[this.getTopTwoTraits()[0] + this.getTopTwoTraits()[1]];
         const agileSum =
@@ -1372,12 +1370,8 @@ export class SchoolReport extends BaseReport {
      * - Provides Suggestions, Key Behaviours, and Trait Mapping tables.
      */
     private generateAcademicCareerGoals(): void {
-        const primaryType = this.data.most_answered_answer_type[0].ANSWER_TYPE;
-        const dominantTrait = this.data.most_answered_answer_type
-            .sort((a, b) => b.COUNT - a.COUNT)
-            .slice(0, 2)
-            .map((trait) => trait.ANSWER_TYPE)
-            .join("");
+        const [primaryType, secondaryType] = this.getTopTwoTraits();
+        const dominantTrait = primaryType + secondaryType;
 
         const contentBlock =
             SCHOOL_BLENDED_STYLE_MAPPING[
@@ -1425,7 +1419,9 @@ export class SchoolReport extends BaseReport {
             headerFontSize: 8,
             colWidths: colWidths,
         });
-        this.generateRespondParameterTable(primaryType);
+        this.generateRespondParameterTable(
+            primaryType as "D" | "I" | "S" | "C",
+        );
     }
 
     /**

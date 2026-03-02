@@ -2,7 +2,6 @@ import {
   Controller,
   Post,
   Body,
-  Query,
   Get,
   BadRequestException,
 } from '@nestjs/common';

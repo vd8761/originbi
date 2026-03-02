@@ -101,7 +101,7 @@ export default function StudentCounsellorPage() {
                     /* Loading state */
                     <main className="flex-1 flex items-center justify-center pt-[65px] sm:pt-[68px] lg:pt-[50px]">
                         <div className="flex flex-col items-center gap-3">
-                            <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
+                            <Loader2 className="w-8 h-8 text-brand-green animate-spin" />
                             <p className="text-sm text-gray-500 dark:text-gray-400">Checking access...</p>
                         </div>
                     </main>
@@ -113,8 +113,8 @@ export default function StudentCounsellorPage() {
                     <main className="flex-1 flex items-center justify-center pt-[65px] sm:pt-[68px] lg:pt-[50px] px-4">
                         <div className="max-w-md w-full text-center">
                             <div className="relative mb-6 inline-block">
-                                <div className="absolute inset-0 bg-gradient-to-br from-violet-400 to-purple-500 rounded-3xl blur-2xl opacity-20" />
-                                <div className="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-violet-400 via-purple-500 to-fuchsia-500 flex items-center justify-center shadow-xl shadow-violet-200/50 dark:shadow-violet-900/30">
+                                <div className="absolute inset-0 bg-brand-green rounded-3xl blur-2xl opacity-20" />
+                                <div className="relative w-20 h-20 rounded-3xl bg-brand-green flex items-center justify-center shadow-xl shadow-brand-green/30 dark:shadow-brand-green/20">
                                     <Lock className="w-10 h-10 text-white" />
                                 </div>
                             </div>
@@ -132,7 +132,7 @@ export default function StudentCounsellorPage() {
                             <div className="space-y-3">
                                 <button
                                     onClick={() => router.push('/student/dashboard')}
-                                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white rounded-xl font-semibold transition-all shadow-lg shadow-violet-200/50 dark:shadow-violet-900/30 hover:scale-[1.02] active:scale-[0.98]"
+                                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-brand-green hover:bg-[#16b058] text-[#19211C] dark:text-white rounded-xl font-semibold transition-all shadow-lg shadow-brand-green/20 dark:shadow-brand-green/10 hover:scale-[1.02] active:scale-[0.98]"
                                 >
                                     <Sparkles className="w-5 h-5" />
                                     Request for Pro Version
@@ -154,7 +154,7 @@ export default function StudentCounsellorPage() {
                                     { icon: Lock, label: 'Private & Secure', desc: 'Your data stays yours' },
                                 ].map((f, i) => (
                                     <div key={i} className="p-4 rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10">
-                                        <f.icon className="w-5 h-5 text-violet-500 mb-2" />
+                                        <f.icon className="w-5 h-5 text-brand-green mb-2" />
                                         <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{f.label}</p>
                                         <p className="text-xs text-gray-400 dark:text-gray-500">{f.desc}</p>
                                     </div>
