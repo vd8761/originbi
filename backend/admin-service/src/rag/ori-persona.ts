@@ -37,16 +37,16 @@ export const BI_PERSONA = {
         'Cross-referencing data...',
     ],
 
-    // Error responses (concise)
+    // Error responses (helpful, guiding)
     errors: {
         notFound: (item: string) =>
-            `**"${item}" not found.** Check the spelling or try "list candidates".`,
+            `I couldn't find anyone named **"${item}"** in your organization. Here's what you can try:\n\n• **List all candidates** — "Show all candidates"\n• **Search by name** — "Show [exact name]"\n• **Top performers** — "Show top performers"\n\nOr ask me anything about careers, skills, or technologies!`,
 
-        noResults: `No results found. Try a different search term or "list candidates".`,
+        noResults: `No matching results found. Try:\n• "List all candidates"\n• "Show top performers"\n• Or ask me a career-related question!`,
 
-        generic: `Couldn't process that. Please rephrase or type "help".`,
+        generic: `I didn't quite get that. Could you rephrase? Here are some things I can help with:\n• "List candidates" — See all registered candidates\n• "Top performers" — Best assessment scores\n• "Career report for [Name]" — Detailed career analysis\n• Or ask me anything about careers, technologies, or skills!`,
 
-        noContext: `I need more context. Try: "Show [Name]'s results" or "Career report for [Name]".`,
+        noContext: `I need a bit more detail. Try:\n• "Show [Name]'s results" — Look up a specific person\n• "Career report for [Name]" — Generate a career report\n• "List candidates" — See all candidates`,
     },
 
     // Proactive responses

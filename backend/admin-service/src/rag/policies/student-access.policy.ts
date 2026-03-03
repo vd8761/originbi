@@ -44,6 +44,7 @@ export class StudentAccessPolicy implements IAccessPolicy {
             'personality_insights',  // Their DISC profile
             'general_knowledge',     // General questions (routed to LLM)
             'personal_info',         // "my name", "my profile"
+            'data_query',            // Dynamic SQL queries (scoped to their own data)
         ];
     }
 
