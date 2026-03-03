@@ -5,6 +5,7 @@ import { StudentModule } from './student/student.module';
 import { ForgotPasswordModule } from './forgotpassword/forgotpassword.module';
 import { CounsellingModule } from './modules/counselling/counselling.module';
 import { PgBossModule } from '@wavezync/nestjs-pgboss';
+import { ReportModule } from './report/report.module';
 
 @Module({
   imports: [
@@ -71,6 +72,7 @@ import { PgBossModule } from '@wavezync/nestjs-pgboss';
     StudentModule,
     ForgotPasswordModule,
     CounsellingModule,
+    ReportModule,
   ],
 })
 export class AppModule {}
