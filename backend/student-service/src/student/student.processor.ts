@@ -71,12 +71,12 @@ export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
     this.scheduleRecoveryCheck();
 
     // Start keep-alive pings to report-service
-    this.startKeepAlive();
+    // this.startKeepAlive(); // Removed as per user request
   }
 
   onModuleDestroy() {
     this.clearRecoveryCheck();
-    this.stopKeepAlive();
+    // this.stopKeepAlive(); // Removed as per user request
   }
 
   async handleJobs(jobs: PgBoss.Job<{ userId: number }>[]): Promise<void> {
@@ -252,12 +252,9 @@ export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
   // ── Report-service keep-alive ──────────────────────────────────────
 
   private startKeepAlive() {
-    const reportServiceUrl =
-      this.configService.get<string>('REPORT_SERVICE_URL');
-    if (!reportServiceUrl) {
-      this.logger.warn('REPORT_SERVICE_URL not set — keep-alive ping disabled');
-      return;
-    }
+    // Ping the local report module to keep it "warm" if needed
+    const port = this.configService.get<number>('PORT') || 4004;
+    const reportServiceUrl = `http://localhost:${port}/report`;
 
     const url = `${reportServiceUrl}/report-status`;
     this.logger.log(

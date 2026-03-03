@@ -29,7 +29,7 @@ import {
   AffiliateReferralTransaction,
 } from '@originbi/shared-entities';
 import * as nodemailer from 'nodemailer';
-import { SES } from 'aws-sdk';
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
 
 export interface AssessmentProgressItem {
@@ -1165,15 +1165,13 @@ export class StudentService {
       );
     }
 
-    const ses = new SES({
-      accessKeyId,
-      secretAccessKey,
+    const sesClient = new SESv2Client({
       region,
+      credentials: { accessKeyId, secretAccessKey },
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const transporter = nodemailer.createTransport({
-      SES: ses,
+      SES: { sesClient, SendEmailCommand },
     } as any);
 
     const ccEmail = this.configService.get<string>('EMAIL_CC') || '';
@@ -1259,7 +1257,8 @@ export class StudentService {
       }
 
       // 2. Trigger Report Generation
-      const reportServiceUrl = process.env.REPORT_SERVICE_URL;
+      const port = process.env.PORT || 4004;
+      const reportServiceUrl = `http://localhost:${port}/report`;
       const generateUrl = `${reportServiceUrl}/generate/student/${userId}`;
 
       this.logger.log(`Triggering report generation: ${generateUrl}`);
@@ -1400,15 +1399,13 @@ export class StudentService {
         throw new Error('AWS SES Config Missing');
       }
 
-      const ses = new SES({
-        accessKeyId,
-        secretAccessKey,
+      const sesClient = new SESv2Client({
         region,
+        credentials: { accessKeyId, secretAccessKey },
       });
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const transporter = nodemailer.createTransport({
-        SES: ses,
+        SES: { sesClient, SendEmailCommand },
       } as any);
       // -------------------------
 
@@ -1491,8 +1488,8 @@ export class StudentService {
       const password = reportEntity?.reportPassword || 'Please contact support';
 
       // 5. Generate + download PDF
-      const reportServiceUrl =
-        this.configService.get<string>('REPORT_SERVICE_URL');
+      const port = this.configService.get<number>('PORT') || 4004;
+      const reportServiceUrl = `http://localhost:${port}/report`;
       const generateUrl = `${reportServiceUrl}/generate/student/${userId}`;
       this.logger.log(`Triggering report generation: ${generateUrl}`);
 
@@ -1607,9 +1604,13 @@ export class StudentService {
         throw new Error('AWS SES Config Missing');
       }
 
-      const ses = new SES({ accessKeyId, secretAccessKey, region });
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      const transporter = nodemailer.createTransport({ SES: ses } as any);
+      const sesClient = new SESv2Client({
+        region,
+        credentials: { accessKeyId, secretAccessKey },
+      });
+      const transporter = nodemailer.createTransport({
+        SES: { sesClient, SendEmailCommand },
+      } as any);
 
       const mailOptions = {
         from: `"${this.configService.get('EMAIL_SEND_FROM_NAME') || 'Origin BI Mind Works'}" <${this.configService.get('EMAIL_FROM') || 'no-reply@originbi.com'}>`,
@@ -1683,9 +1684,13 @@ export class StudentService {
         throw new Error('AWS SES Config Missing');
       }
 
-      const ses = new SES({ accessKeyId, secretAccessKey, region });
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      const transporter = nodemailer.createTransport({ SES: ses } as any);
+      const sesClient = new SESv2Client({
+        region,
+        credentials: { accessKeyId, secretAccessKey },
+      });
+      const transporter = nodemailer.createTransport({
+        SES: { sesClient, SendEmailCommand },
+      } as any);
 
       // 3. Build email using template
       const fromName =

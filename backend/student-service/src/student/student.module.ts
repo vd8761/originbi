@@ -5,6 +5,7 @@ import { StudentController } from './student.controller';
 import { StudentService } from './student.service';
 import { SubscriptionController } from './subscription.controller';
 import { SubscriptionService } from './subscription.service';
+import { StudentProcessor } from './student.processor';
 import { User } from '../entities/student.entity';
 import { AssessmentSession } from '../entities/assessment_session.entity';
 import { AssessmentAttempt } from '../entities/assessment_attempt.entity';
@@ -43,7 +44,7 @@ import {
     HttpModule,
   ],
   controllers: [StudentController, SubscriptionController],
-  providers: [StudentService, SubscriptionService],
+  providers: [StudentService, SubscriptionService, StudentProcessor],
   exports: [StudentService, SubscriptionService],
 })
 export class StudentModule {}
