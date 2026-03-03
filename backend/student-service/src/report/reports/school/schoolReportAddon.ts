@@ -1,4 +1,5 @@
-﻿import * as fs from "fs";
+﻿/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unused-vars */
+import * as fs from 'fs';
 import { SchoolData, COLORS } from '../../types/types';
 import {
   BaseReport,
@@ -1110,11 +1111,7 @@ export class SchoolReport extends BaseReport {
   }
 
   private generateACI(): void {
-    const dominantType = this.data.most_answered_answer_type[0].ANSWER_TYPE as
-      | 'D'
-      | 'I'
-      | 'S'
-      | 'C';
+    const dominantType = this.data.most_answered_answer_type[0].ANSWER_TYPE;
     const contentBlock =
       ACI[
         this.getTopTwoTraits(this.data.most_answered_answer_type, {
@@ -1387,10 +1384,7 @@ export class SchoolReport extends BaseReport {
       .map((trait) => trait.ANSWER_TYPE)
       .join('');
 
-    const contentBlock =
-      SCHOOL_BLENDED_STYLE_MAPPING[
-        dominantTrait as keyof typeof SCHOOL_BLENDED_STYLE_MAPPING
-      ];
+    const contentBlock = SCHOOL_BLENDED_STYLE_MAPPING[dominantTrait];
     if (!contentBlock) return;
 
     this.h1('Mapping Your Strengths to Future Academic and Career Goals');
@@ -1652,7 +1646,7 @@ export class SchoolReport extends BaseReport {
     this.doc.font(this.FONT_SORA_BOLD).fontSize(HEADER_FONT_SIZE);
 
     headers.forEach((h, i) => {
-      let cx = startX + (i > 0 ? colWidths[0] + (i - 1) * dataColWidth : 0);
+      const cx = startX + (i > 0 ? colWidths[0] + (i - 1) * dataColWidth : 0);
       const w = colWidths[i];
 
       // Draw BG
@@ -1687,7 +1681,7 @@ export class SchoolReport extends BaseReport {
     this.doc.font(this.FONT_SORA_BOLD).fontSize(8).fillColor('black');
 
     subHeaders.forEach((h, i) => {
-      let cx = startX + (i > 0 ? colWidths[0] + (i - 1) * dataColWidth : 0);
+      const cx = startX + (i > 0 ? colWidths[0] + (i - 1) * dataColWidth : 0);
       const w = colWidths[i];
 
       this.doc
@@ -1723,7 +1717,7 @@ export class SchoolReport extends BaseReport {
 
       // Draw Cells
       cells.forEach((text, i) => {
-        let cx = startX + (i > 0 ? colWidths[0] + (i - 1) * dataColWidth : 0);
+        const cx = startX + (i > 0 ? colWidths[0] + (i - 1) * dataColWidth : 0);
         const w = colWidths[i];
 
         this.doc.rect(cx, currentY, w, maxH).strokeColor('black').stroke();
@@ -1769,7 +1763,7 @@ export class SchoolReport extends BaseReport {
       }
 
       cells.forEach((text, i) => {
-        let cx = startX + (i > 0 ? colWidths[0] + (i - 1) * dataColWidth : 0);
+        const cx = startX + (i > 0 ? colWidths[0] + (i - 1) * dataColWidth : 0);
         const w = colWidths[i];
 
         // Draw Background Highlight
@@ -2419,7 +2413,8 @@ export class SchoolReport extends BaseReport {
 
     // Safety check: if traits aren't valid D/I/S/C, exit or handle gracefully
     if (!elementMap[trait1] || !elementMap[trait2]) {
-      console.error(`[Report service]`, 
+      console.error(
+        `[Report service]`,
         `[School Report] Invalid traits passed to renderElementCombo: ${trait1}, ${trait2}`,
       );
       return;

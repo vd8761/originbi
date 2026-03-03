@@ -1,13 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
 import { Pool } from 'pg';
 import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './logger';
-import {
-  CollegeData,
-  SchoolData,
-  AnswerTypeCount,
-  AgileScore,
-} from '../types/types';
+import { CollegeData, AnswerTypeCount, AgileScore } from '../types/types';
 
 const getPoolConfig = () => {
   if (process.env.DATABASE_URL) {
@@ -47,19 +43,6 @@ function logSqlOutput(label: string, data: any) {
   } catch (err) {
     console.error(`[Report service]`, 'Failed to write to log file:', err);
   }
-}
-
-interface AssessmentAttemptRow {
-  assessment_session_id: string;
-  user_id: string;
-  program_id: number;
-  status: string;
-  metadata: any;
-}
-
-interface GroupAssessmentData {
-  groupId: string;
-  programId: number;
 }
 
 export interface MergedUserData extends CollegeData {

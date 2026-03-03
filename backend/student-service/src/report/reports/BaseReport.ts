@@ -1,4 +1,5 @@
-import PDFDocument = require('pdfkit');
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call */
+import PDFDocument from 'pdfkit';
 import * as fs from 'fs';
 
 // --- Shared Interfaces ---
@@ -430,7 +431,7 @@ export class BaseReport {
       i: 1,
     };
     let roman = '';
-    for (let i in lookup) {
+    for (const i in lookup) {
       while (num >= lookup[i]) {
         roman += i;
         num -= lookup[i];
@@ -534,7 +535,7 @@ export class BaseReport {
     const width = opts.width ?? this.PAGE_WIDTH - 2 * this.MARGIN_STD;
     const gap = opts.gap ?? this.DEFAULT_GAP;
 
-    let cleanText = text
+    const cleanText = text
       .replace(/<\/p>\s+/gi, '</p>')
       .replace(/<\/p>/gi, '\n\n')
       .replace(/<p[^>]*>/gi, '')
@@ -643,7 +644,7 @@ export class BaseReport {
           opts.itemEnsureSpacePercent ?? false,
         );
         const currentNum = start + index;
-        let label =
+        const label =
           type === 'number'
             ? `${currentNum}.`
             : type === 'letter'
@@ -707,7 +708,7 @@ export class BaseReport {
       const title = titleMatch ? titleMatch[1].trim() : '';
 
       // Remove the title matching part and any trailing </li>
-      let bodyHtml = itemHtml
+      const bodyHtml = itemHtml
         .replace(/<b[\s\S]*?<\/b>/i, '')
         .replace(/<p[^>]*>&nbsp;<\/p>/gi, '')
         .replace(/<\/(ol|ul)>\s*$/i, '') // Remove trailing </ol> or </ul>
@@ -921,7 +922,7 @@ export class BaseReport {
     data.forEach((item, index) => {
       const barHeight = (item.value / 100) * maxBarHeight;
       const [r, g, b] = item.color;
-      let currentX = startX + index * (barWidth + barGap);
+      const currentX = startX + index * (barWidth + barGap);
 
       // Draw
       this.doc
@@ -1141,7 +1142,7 @@ export class BaseReport {
     };
 
     // --- 1. Smart Column Width Calculation ---
-    let finalColWidths: number[] = [];
+    const finalColWidths: number[] = [];
     const definedWidths =
       options.colWidths || new Array(headers.length).fill('fill');
 
@@ -1186,11 +1187,10 @@ export class BaseReport {
             // Ideally, we sum widths if on same line, but for this use case (multiline), max is fine?
             // Actually, we should concatenate plain text to measure "approximate" or iterate.
             // Let's just map to string for width calc if 'fit' is used.
-            cellText = (cellVal as RichTableCell).content
-              .map((c) => c.text)
-              .join('');
+            cellText = cellVal.content.map((c) => c.text).join('');
           } else {
-            cellText = String(cellVal ?? '');
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string
+            cellText = cellVal != null ? String(cellVal) : '';
           }
 
           const cellW = this.doc.widthOfString(cellText);
@@ -1436,7 +1436,7 @@ export class BaseReport {
         typeof rowOrObj === 'object' &&
         rowOrObj !== null
       ) {
-        const typedRow = rowOrObj as StyledRow;
+        const typedRow = rowOrObj;
         rowStyle = typedRow;
         rowData = typedRow.data;
 
@@ -1540,10 +1540,10 @@ export class BaseReport {
             if (
               !Array.isArray(prevRowObj) &&
               typeof prevRowObj === 'object' &&
-              (prevRowObj as StyledRow).type === 'row' &&
-              (prevRowObj as StyledRow).mergeSupportedColumn
+              prevRowObj.type === 'row' &&
+              prevRowObj.mergeSupportedColumn
             ) {
-              const prevText = String((prevRowObj as StyledRow).data[i] ?? '');
+              const prevText = String(prevRowObj.data[i] ?? '');
               if (cellText === prevText) isMergedAbove = true;
             }
           }
@@ -1687,12 +1687,10 @@ export class BaseReport {
               const prevRowObj = allRows[rowIndex - 1];
               if (
                 !Array.isArray(prevRowObj) &&
-                (prevRowObj as StyledRow).type === 'row' &&
-                (prevRowObj as StyledRow).mergeSupportedColumn
+                prevRowObj.type === 'row' &&
+                prevRowObj.mergeSupportedColumn
               ) {
-                const prevText = String(
-                  (prevRowObj as StyledRow).data[i] ?? '',
-                );
+                const prevText = String(prevRowObj.data[i] ?? '');
                 if (cellText === prevText) isMergedAbove = true;
               }
             }
@@ -1701,12 +1699,10 @@ export class BaseReport {
               const nextRowObj = allRows[rowIndex + 1];
               if (
                 !Array.isArray(nextRowObj) &&
-                (nextRowObj as StyledRow).type === 'row' &&
-                (nextRowObj as StyledRow).mergeSupportedColumn
+                nextRowObj.type === 'row' &&
+                nextRowObj.mergeSupportedColumn
               ) {
-                const nextText = String(
-                  (nextRowObj as StyledRow).data[i] ?? '',
-                );
+                const nextText = String(nextRowObj.data[i] ?? '');
                 if (cellText === nextText) isMergedBelow = true;
               }
             }
@@ -1825,7 +1821,6 @@ export class BaseReport {
       nodeRadius = 6,
       nodeColor = this.COLOR_DEEP_BLUE,
       nodeStrokeColor = '#FFFFFF',
-      nodeStrokeWidth = 2,
       alternating = true,
       contentPadding = 20,
 
@@ -2482,13 +2477,9 @@ export class BaseReport {
       font = this.FONT_REGULAR,
       color = '#58595B', // [88, 89, 91]
       lineColor = '#B4B4B4', // [180, 180, 180]
-      lineWidth = 0.2, // PHP used 0.2, likely mm? In points ~0.5.
       extraTopSpace = 10 * this.MM, // 12mm
       extraBottomSpace = 15 * this.MM, // 12mm
     } = options;
-
-    // Estimate height needed for line+text+gap
-    const requiredHeight = extraTopSpace + fontSize + extraBottomSpace;
 
     // Page break check
     // this.ensureSpace(requiredHeight);
