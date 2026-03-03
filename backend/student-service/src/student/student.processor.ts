@@ -42,7 +42,7 @@ export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
     for (let i = 0; i < concurrency; i++) {
       await this.pgBossService.registerJob(
         'assessment-email-queue',
-        this.handleJobs.bind(this),
+        (jobs: PgBoss.Job<{ userId: number }>[]) => this.handleJobs(jobs),
         { batchSize: 1 },
       );
     }
@@ -52,7 +52,8 @@ export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
     // Register manual report email queue worker
     await this.pgBossService.registerJob(
       'manual-report-email-queue',
-      this.handleManualEmailJobs.bind(this),
+      (jobs: PgBoss.Job<{ userId: number; toEmail?: string }>[]) =>
+        this.handleManualEmailJobs(jobs),
       { batchSize: 1 },
     );
     this.logger.log('manual-report-email-queue worker registered successfully');
@@ -60,7 +61,17 @@ export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
     // Register placement report email queue worker
     await this.pgBossService.registerJob(
       'placement-report-email-queue',
-      this.handlePlacementEmailJobs.bind(this),
+      (
+        jobs: PgBoss.Job<{
+          groupId: number;
+          departmentId: number;
+          toEmail: string;
+          downloadUrl: string;
+          studentCount: number;
+          degreeType: string;
+          departmentName: string;
+        }>[],
+      ) => this.handlePlacementEmailJobs(jobs),
       { batchSize: 1 },
     );
     this.logger.log(
@@ -71,12 +82,12 @@ export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
     this.scheduleRecoveryCheck();
 
     // Start keep-alive pings to report-service
-    this.startKeepAlive();
+    // this.startKeepAlive(); // Removed as per user request
   }
 
   onModuleDestroy() {
     this.clearRecoveryCheck();
-    this.stopKeepAlive();
+    // this.stopKeepAlive(); // Removed as per user request
   }
 
   async handleJobs(jobs: PgBoss.Job<{ userId: number }>[]): Promise<void> {
@@ -252,12 +263,9 @@ export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
   // ── Report-service keep-alive ──────────────────────────────────────
 
   private startKeepAlive() {
-    const reportServiceUrl =
-      this.configService.get<string>('REPORT_SERVICE_URL');
-    if (!reportServiceUrl) {
-      this.logger.warn('REPORT_SERVICE_URL not set — keep-alive ping disabled');
-      return;
-    }
+    // Ping the local report module to keep it "warm" if needed
+    const port = this.configService.get<number>('PORT') || 4004;
+    const reportServiceUrl = `http://localhost:${port}/report`;
 
     const url = `${reportServiceUrl}/report-status`;
     this.logger.log(

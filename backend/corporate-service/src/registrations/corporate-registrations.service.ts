@@ -328,7 +328,7 @@ export class CorporateRegistrationsService {
       // Create transport securely
       const transporter = nodemailer.createTransport({
         SES: ses,
-      } as any);
+      } as nodemailer.TransportOptions);
 
       // Use full URLs for assets ("from application itself")
       const apiUrl = process.env.API_URL;
@@ -511,7 +511,7 @@ export class CorporateRegistrationsService {
           // Pass null password as we didn't create it
           await this.sendWelcomeEmail(
             user.email,
-            user.metadata?.fullName || dto.fullName,
+            (user.metadata?.fullName as string) || dto.fullName,
             '******', // Masked password for existing users
             validFrom,
             program.assessmentTitle || program.name,

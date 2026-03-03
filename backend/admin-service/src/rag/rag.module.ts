@@ -12,6 +12,9 @@ import { ConversationService } from './conversation.service';
 import { ChatMemoryService } from './chat-memory.service';
 import { OriIntelligenceService } from './ori-intelligence.service';
 import { JDMatchingService } from './jd-matching.service';
+import { SchemaIntrospectorService } from './schema-introspector.service';
+import { TextToSqlService } from './text-to-sql.service';
+import { SqlValidatorService } from './utils/sql-validator.service';
 
 // RBAC Services
 import { AccessPolicyFactory } from './policies';
@@ -58,6 +61,10 @@ import { PdfModule } from '../common/pdf/pdf.module';
     ChatMemoryService,
     OriIntelligenceService,
     JDMatchingService,
+    // Text-to-SQL (Jarvis Engine)
+    SchemaIntrospectorService,
+    TextToSqlService,
+    SqlValidatorService,
     // RBAC Providers
     AccessPolicyFactory,
     SecureQueryExecutor,
@@ -73,6 +80,10 @@ import { PdfModule } from '../common/pdf/pdf.module';
     ChatMemoryService,
     OriIntelligenceService,
     JDMatchingService,
+    // Text-to-SQL Exports
+    SchemaIntrospectorService,
+    TextToSqlService,
+    SqlValidatorService,
     // RBAC Exports
     AccessPolicyFactory,
     SecureQueryExecutor,

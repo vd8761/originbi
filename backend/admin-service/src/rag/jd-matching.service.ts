@@ -563,6 +563,19 @@ RULES:
       paramIdx++;
     }
 
+    // Check if sincerity columns exist (some DB instances may not have them)
+    let hasSincerityCols = true;
+    try {
+      const colCheck = await this.dataSource.query(
+        `SELECT column_name FROM information_schema.columns WHERE table_name = 'assessment_attempts' AND column_name = 'sincerity_class'`
+      );
+      hasSincerityCols = colCheck.length > 0;
+    } catch { hasSincerityCols = false; }
+
+    const sincerityFields = hasSincerityCols
+      ? 'aa.sincerity_index, aa.sincerity_class,'
+      : 'NULL::numeric as sincerity_index, NULL::varchar as sincerity_class,';
+
     const sql = `
       SELECT 
         r.id as registration_id,
@@ -576,8 +589,7 @@ RULES:
         pt.blended_style_desc as personality_description,
         pt.code as personality_code,
         aa.total_score,
-        aa.sincerity_index,
-        aa.sincerity_class,
+        ${sincerityFields}
         aa.status as assessment_status,
         (SELECT MAX(aa2.total_score::numeric) FROM assessment_attempts aa2 WHERE aa2.registration_id = r.id AND aa2.status = 'COMPLETED') as best_score,
         (SELECT COUNT(*) FROM assessment_attempts aa3 WHERE aa3.registration_id = r.id AND aa3.status = 'COMPLETED') as attempt_count
@@ -1438,10 +1450,19 @@ Output ONLY a JSON array:
     let response = `🎯 **Candidate Matching Report**\n`;
     response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-    // ── Role Overview ──
-    response += `🏢 **Role:** ${req.roleTitle} *(${req.seniorityLevel} level)*\n`;
-    response += `📍 **Industry:** ${req.industryContext}\n`;
-    response += `👥 **Team:** ${req.teamDynamic.replace(/_/g, ' ')}\n\n`;
+    // ── Role Overview (only show known fields) ──
+    const isUnknown = (val: string) => !val || /^unknown$/i.test(val.trim());
+    if (!isUnknown(req.roleTitle)) {
+      const levelStr = !isUnknown(req.seniorityLevel) ? ` *(${req.seniorityLevel} level)*` : '';
+      response += `🏢 **Role:** ${req.roleTitle}${levelStr}\n`;
+    }
+    if (!isUnknown(req.industryContext)) {
+      response += `📍 **Industry:** ${req.industryContext}\n`;
+    }
+    if (!isUnknown(req.teamDynamic)) {
+      response += `👥 **Team:** ${req.teamDynamic.replace(/_/g, ' ')}\n`;
+    }
+    response += `\n`;
 
     // ── Core Competencies ──
     const competencies: string[] = [];

@@ -36,7 +36,13 @@ export class AssessmentAnswer {
   @Column({ name: 'assessment_level_id', type: 'bigint', nullable: true })
   assessmentLevelId: number | null;
 
-  @Column({ name: 'question_source', type: 'varchar', length: 10, nullable: true, default: 'MAIN' })
+  @Column({
+    name: 'question_source',
+    type: 'varchar',
+    length: 10,
+    nullable: true,
+    default: 'MAIN',
+  })
   questionSource: 'MAIN' | 'OPEN' | null;
 
   @Column({ name: 'main_question_id', type: 'bigint', nullable: true })
