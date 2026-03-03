@@ -8,8 +8,10 @@ import {
     EyeOffIcon,
     XIcon,
     WarningIcon,
+    ArrowLeftIcon,
 } from '../icons';
 import MobileInput from '../ui/MobileInput';
+import { fetchAuthSession } from 'aws-amplify/auth';
 
 interface AddAffiliateFormProps {
     onCancel: () => void;
@@ -298,9 +300,20 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
                 ? `${API_BASE}/admin/affiliates/${initialData.id}`
                 : `${API_BASE}/admin/affiliates`;
 
+            // Extract auth token
+            const session = await fetchAuthSession();
+            const idToken = session.tokens?.idToken?.toString();
+
+            if (!idToken) {
+                throw new Error("No active session. Please log in again.");
+            }
+
             const res = await fetch(url, {
                 method: isEditMode ? "PATCH" : "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${idToken}`
+                },
                 body: JSON.stringify(payload),
             });
 
@@ -327,6 +340,9 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
                     `${API_BASE}/admin/affiliates/${affiliateId}/documents`,
                     {
                         method: "POST",
+                        headers: {
+                            "Authorization": `Bearer ${idToken}`
+                        },
                         body: formDataUpload,
                     }
                 );
