@@ -54,6 +54,12 @@ export interface SchoolData {
   agile_scores: AgileScore[];
 }
 
+/** Employee / Professional report data — same shape as CollegeData */
+export type EmployeeData = CollegeData;
+
+/** CXO / Senior Leadership report data — same shape as CollegeData */
+export type CxoData = CollegeData;
+
 // interface UniversityData extends BaseData {
 //     department_deg_id: number;
 //     school_stream_id?: never;

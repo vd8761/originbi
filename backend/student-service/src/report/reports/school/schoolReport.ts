@@ -1131,7 +1131,7 @@ export class SchoolReport extends BaseReport {
     this.pHtml(DISCLAIMER.aci_description);
     this.pHtml(contentBlock.agile_desc_1);
 
-    this.h2('Pesonalized Insight');
+    this.h2('Personalized Insight');
     this.pHtml(contentBlock.personalized_insight);
 
     this.h2('Agile Value-Wise Breakdown Table');
@@ -2610,138 +2610,6 @@ export class SchoolReport extends BaseReport {
     const variants = TEXT_VARIATIONS[key];
     if (!variants) return '';
     return variants[this.ci_patterns.textVariant % variants.length];
-  }
-
-  // ════════════════════════════════════════════════════════════════
-  // SECTION RENDERERS
-  // ════════════════════════════════════════════════════════════════
-
-  private ci_generateCoverPage_SKIP(): void {
-    const bgPath = 'public/assets/images/Cover_Background.jpg';
-    if (fs.existsSync(bgPath))
-      this.doc.image(bgPath, 0, 0, {
-        width: this.PAGE_WIDTH,
-        height: this.PAGE_HEIGHT,
-      });
-    else this.doc.rect(0, 0, this.PAGE_WIDTH, this.PAGE_HEIGHT).fill('#f0f0f0');
-
-    // --- Title Wrapping ---
-    const titleWidth = this.PAGE_WIDTH - 100;
-
-    this.doc
-      .font(this.FONT_SORA_BOLD)
-      .fontSize(38)
-      .fillColor(this.COLOR_DEEP_BLUE)
-      .text(this.data.report_title, 35, 30, {
-        width: titleWidth,
-        align: 'left',
-      });
-
-    // --- Vertical Reference Number ---
-    const refNoX = this.PAGE_WIDTH - 47;
-    const refNoY = 150;
-
-    this.doc.save(); // Save state before rotation
-
-    this.doc.translate(refNoX, refNoY);
-    this.doc.rotate(-90, { origin: [0, 0] });
-
-    this.doc
-      .font(this.FONT_REGULAR)
-      .fontSize(8)
-      .fillColor(this.COLOR_BLACK)
-      .opacity(0.4)
-      .text(this.data.exam_ref_no, 0, 0);
-
-    this.doc.restore(); // Restore state (undo rotation)
-
-    // --- Footer Elements ---
-    const footerY = this.PAGE_HEIGHT - 90;
-    this.doc.opacity(1);
-
-    // Draw "Self Guidance" Label
-    this.doc
-      .font(this.FONT_SEMIBOLD)
-      .fontSize(20)
-      .fillColor(this.COLOR_BLACK)
-      .text('Self Guidance', 35, footerY);
-
-    // Draw Date
-    const dateString = new Date(this.data.exam_start).toLocaleDateString(
-      'en-GB',
-      { day: 'numeric', month: 'long', year: 'numeric' },
-    );
-    this.doc
-      .font(this.FONT_REGULAR)
-      .fontSize(16)
-      .text(dateString, 35, footerY + 25);
-
-    // --- FIX 2: Name Alignment with Smart Wrapping ---
-
-    // 1. Set font first so width calculations are accurate
-    this.doc.font(this.FONT_SORA_BOLD).fontSize(22);
-
-    const nameWidthLimit = 300; // Half page limit
-    const rawName = this.data.full_name;
-
-    // 2. Calculate the smart string (returns "First Last" or "First\nLast")
-    const nameText = this.getSmartSplitName(rawName, nameWidthLimit);
-
-    // 3. Define Position
-    const rightMarginLimit = 35;
-    // X position: Page Width - Text Box Width - Margin - Gap
-    const nameX = this.PAGE_WIDTH - nameWidthLimit - rightMarginLimit - 20;
-    const nameBaseY = footerY + 20; // This is where the bottom line should sit
-
-    const nameOptions = {
-      width: nameWidthLimit + 20,
-      align: 'right' as const,
-    };
-
-    // 4. Calculate Height for "Bottom-Up" positioning
-    // heightOfString handles the \n correctly
-    const totalNameHeight = this.doc.heightOfString(nameText, nameOptions);
-    const singleLineHeight = this.doc.heightOfString('M', nameOptions);
-
-    // AdjustedY ensures the last line of text is always at nameBaseY
-    const adjustedNameY = nameBaseY - (totalNameHeight - singleLineHeight);
-
-    this.doc
-      .fillColor(this.COLOR_DEEP_BLUE)
-      .text(nameText, nameX, adjustedNameY, nameOptions);
-  }
-
-  private ci_generatePageHeader(): void {
-    const x = this.MARGIN_STD;
-
-    this.renderTextBase('ORIGIN BI – CAREER INTELLIGENCE SUMMARY', {
-      x,
-      font: this.FONT_SORA_BOLD,
-      fontSize: 16,
-      color: CI_COLORS.SECTION_BLUE,
-    });
-
-    this.renderTextBase(this.data.full_name, {
-      x,
-      font: this.FONT_SORA_SEMIBOLD,
-      fontSize: 11,
-      color: CI_COLORS.MEDIUM_TEXT,
-      gap: 2,
-    });
-
-    const dateString = new Date(this.data.exam_start).toLocaleDateString(
-      'en-GB',
-      { day: 'numeric', month: 'long', year: 'numeric' },
-    );
-    this.renderTextBase(dateString, {
-      x,
-      font: this.FONT_REGULAR,
-      fontSize: 9,
-      color: CI_COLORS.MEDIUM_TEXT,
-      gap: 4,
-    });
-
-    this.drawSectionDivider(CI_COLORS.SECTION_BLUE, 1.5);
   }
 
   // ── S1: Career Alignment Index with Gauge ─────────────────────

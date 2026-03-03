@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unused-vars */
 import * as fs from 'fs';
-import { CollegeData, COLORS } from '../../types/types';
+import { EmployeeData, COLORS } from '../../types/types';
 import { BaseReport } from '../BaseReport';
 import {
   EMPLOYEE_TOC_CONTENT,
@@ -24,9 +24,9 @@ import { logger } from '../../helpers/logger';
  * - Agile Compatibility Index (ACI).
  */
 export class EmployeeReport extends BaseReport {
-  private data: CollegeData;
+  private data: EmployeeData;
 
-  constructor(data: CollegeData, options?: PDFKit.PDFDocumentOptions) {
+  constructor(data: EmployeeData, options?: PDFKit.PDFDocumentOptions) {
     super(options);
     this.data = data;
   }
@@ -472,7 +472,7 @@ export class EmployeeReport extends BaseReport {
     this.pHtml(DISCLAIMER.aci_description);
     this.pHtml(contentBlock.agile_desc_1);
 
-    this.h2('Pesonalized Insight');
+    this.h2('Personalized Insight');
     this.pHtml(contentBlock.personalized_insight);
 
     this.h2('Agile Value-Wise Breakdown Table');

@@ -263,6 +263,8 @@ export class CollegeReport extends BaseReport {
   private generateTableOfContents(): void {
     const headerX = 15 * this.MM;
     const circleCenterX = 25 * this.MM;
+    const TOC_CIRCLE_RADIUS = 5 * this.MM;
+    const TOC_CIRCLE_STROKE = 0.4 * this.MM;
 
     // Define the bottom limit (Page Height - Footer Margin)
     const bottomLimit = this.PAGE_HEIGHT - 30 * this.MM;
@@ -298,13 +300,13 @@ export class CollegeReport extends BaseReport {
       }
 
       const contentText = item.replace('$full_name', this.data.full_name);
-      const circleY = currentY + 5 * this.MM;
+      const circleY = currentY + TOC_CIRCLE_RADIUS;
 
       // Draw the Circle
       this.doc
-        .lineWidth(0.4 * this.MM)
+        .lineWidth(TOC_CIRCLE_STROKE)
         .strokeColor(this.COLOR_BRIGHT_GREEN)
-        .circle(circleCenterX, circleY, 5 * this.MM)
+        .circle(circleCenterX, circleY, TOC_CIRCLE_RADIUS)
         .stroke();
 
       // Draw the Number inside the circle
@@ -385,10 +387,7 @@ export class CollegeReport extends BaseReport {
       align: 'center',
       color: this.COLOR_DEEP_BLUE,
     });
-    const topTrait = this.getTopTwoTraits(
-      this.data.most_answered_answer_type,
-      this.data,
-    )[0];
+    const topTrait = dominantType; // reuse already-computed top trait
     let chartData: { label: string; value: number; color: number[] }[] = [];
 
     if (topTrait === 'D') {
@@ -531,7 +530,7 @@ export class CollegeReport extends BaseReport {
     let shouldAddPage = false;
     let scalingAdjustment = 0;
     let scale = 1;
-    let x = 0;
+    let postGraphGap = 0; // extra moveDown after graph image, only when page break occurred
 
     if (availableSpace >= normalHeightNeeded) {
       // Fits perfectly
@@ -544,7 +543,7 @@ export class CollegeReport extends BaseReport {
       shouldAddPage = true;
       scalingAdjustment = 0;
       scale = 1;
-      x = 0.5;
+      postGraphGap = 0.5;
     }
 
     if (shouldAddPage) {
@@ -560,7 +559,7 @@ export class CollegeReport extends BaseReport {
       width: this.PAGE_WIDTH - 120,
       align: 'center',
     });
-    this.doc.moveDown(x);
+    this.doc.moveDown(postGraphGap);
     this.h2(`Nature and Adapted Style`, {
       align: 'center',
       color: this.COLOR_DEEP_BLUE,
@@ -589,14 +588,12 @@ export class CollegeReport extends BaseReport {
   }
 
   private generateContent2(): void {
-    const dominantType = this.getTopTwoTraits(
+    const [t1, t2] = this.getTopTwoTraits(
       this.data.most_answered_answer_type,
       this.data,
-    )[0] as 'D' | 'I' | 'S' | 'C';
-    const dominantTrait = this.getTopTwoTraits(
-      this.data.most_answered_answer_type,
-      this.data,
-    ).join('');
+    );
+    const dominantType = t1 as 'D' | 'I' | 'S' | 'C';
+    const dominantTrait = t1 + t2;
     const contentBlock = blendedTraits[dominantTrait];
 
     this.h1('Applying Self-Discovery to Your Academic and Career Choices');
@@ -659,7 +656,7 @@ export class CollegeReport extends BaseReport {
     this.pHtml(DISCLAIMER.aci_description);
     this.pHtml(contentBlock.agile_desc_1);
 
-    this.h2('Pesonalized Insight');
+    this.h2('Personalized Insight');
     this.pHtml(contentBlock.personalized_insight);
 
     this.h2('Agile Value-Wise Breakdown Table');
@@ -776,10 +773,6 @@ export class CollegeReport extends BaseReport {
     this.pHtml(contentBlock.reflection_summary);
   }
 
-  /**
-   * Generates Content 3: Alternating Roadmap and Detailed Guidance.
-   * Flow: Suggestion 1 Header -> Roadmap 1 -> Explanation 1 -> Suggestion 2...
-   */
   /**
    * Generates Content 3: Career Guidance & Roadmap.
    * Details:

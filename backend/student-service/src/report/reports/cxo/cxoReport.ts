@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unused-vars */
 import * as fs from 'fs';
-import { CollegeData, COLORS } from '../../types/types';
+import { CxoData, COLORS } from '../../types/types';
 import { BaseReport } from '../BaseReport';
 import {
   CXO_TOC_CONTENT,
@@ -24,9 +24,9 @@ import { logger } from '../../helpers/logger';
  * - Agile Compatibility Index (ACI) for Leadership.
  */
 export class CxoReport extends BaseReport {
-  private data: CollegeData;
+  private data: CxoData;
 
-  constructor(data: CollegeData, options?: PDFKit.PDFDocumentOptions) {
+  constructor(data: CxoData, options?: PDFKit.PDFDocumentOptions) {
     super(options);
     this.data = data;
   }
@@ -469,7 +469,7 @@ export class CxoReport extends BaseReport {
     this.pHtml(DISCLAIMER.aci_description);
     this.pHtml(contentBlock.agile_desc_1);
 
-    this.h2('Pesonalized Insight');
+    this.h2('Personalized Insight');
     this.pHtml(contentBlock.personalized_insight);
 
     this.h2('Agile Value-Wise Breakdown Table');
