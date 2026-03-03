@@ -97,6 +97,9 @@ export class StudentService {
       credentials: { accessKeyId, secretAccessKey },
     });
 
+    // nodemailer's SES v2 transport has no official @types declaration;
+    // the `as any` cast is unavoidable here.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     return nodemailer.createTransport({
       SES: { sesClient, SendEmailCommand },
     } as any);

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unused-vars, @typescript-eslint/no-unsafe-return */
 // reports/placement/placementReport.ts
 
 import * as fs from 'fs';
@@ -313,7 +313,9 @@ export class PlacementReport extends BaseReport {
       {} as Record<string, number>,
     );
 
-    console.log(`[Report service]`, 'Radar Chart Data:', chartData);
+    logger.info(
+      `[PLACEMENT REPORT] Radar Chart Data: ${JSON.stringify(chartData)}`,
+    );
 
     // 2. Pass the dynamic data to the chart
     this.drawRadarChart(chartData, {

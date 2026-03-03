@@ -42,7 +42,7 @@ export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
     for (let i = 0; i < concurrency; i++) {
       await this.pgBossService.registerJob(
         'assessment-email-queue',
-        this.handleJobs.bind(this),
+        (jobs: PgBoss.Job<{ userId: number }>[]) => this.handleJobs(jobs),
         { batchSize: 1 },
       );
     }
@@ -52,7 +52,8 @@ export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
     // Register manual report email queue worker
     await this.pgBossService.registerJob(
       'manual-report-email-queue',
-      this.handleManualEmailJobs.bind(this),
+      (jobs: PgBoss.Job<{ userId: number; toEmail?: string }>[]) =>
+        this.handleManualEmailJobs(jobs),
       { batchSize: 1 },
     );
     this.logger.log('manual-report-email-queue worker registered successfully');
@@ -60,7 +61,17 @@ export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
     // Register placement report email queue worker
     await this.pgBossService.registerJob(
       'placement-report-email-queue',
-      this.handlePlacementEmailJobs.bind(this),
+      (
+        jobs: PgBoss.Job<{
+          groupId: number;
+          departmentId: number;
+          toEmail: string;
+          downloadUrl: string;
+          studentCount: number;
+          degreeType: string;
+          departmentName: string;
+        }>[],
+      ) => this.handlePlacementEmailJobs(jobs),
       { batchSize: 1 },
     );
     this.logger.log(
