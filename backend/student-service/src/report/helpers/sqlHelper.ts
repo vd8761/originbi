@@ -1,36 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
-import { Pool } from 'pg';
 import { PlacementData } from '../types/placementTypes';
-
+import { getPool } from './dbPool';
 import { logger } from './logger';
-
-const getPoolConfig = () => {
-  if (process.env.DATABASE_URL) {
-    return {
-      connectionString: process.env.DATABASE_URL,
-      ssl:
-        process.env.NODE_ENV === 'production'
-          ? { rejectUnauthorized: false }
-          : undefined,
-    };
-  }
-  return {
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASS || '',
-    port: parseInt(process.env.DB_PORT || '5432', 10),
-  };
-};
-
-let poolInstance: Pool | null = null;
-
-const getPool = (): Pool => {
-  if (!poolInstance) {
-    poolInstance = new Pool(getPoolConfig());
-  }
-  return poolInstance;
-};
 
 export async function testDbConnection() {
   try {

@@ -9,9 +9,8 @@ import { AssessmentReport } from '../entities/assessment-report.entity';
 import { getAssessmentCompletionEmailTemplate } from '../mail/templates/assessment-completion.template';
 import { getReportDeliveryEmailTemplate } from '../mail/templates/report-delivery.template';
 import { getPlacementReportEmailTemplate } from '../mail/templates/placement-report.template';
-import { lastValueFrom } from 'rxjs';
+import { firstValueFrom, lastValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
 import { User } from '../entities/student.entity';
 
 import { AssessmentSession } from '../entities/assessment_session.entity';
@@ -71,14 +70,38 @@ export class StudentService {
     private readonly affiliateRepo: Repository<AffiliateAccount>,
     @InjectRepository(AffiliateReferralTransaction)
     private readonly affiliateTransactionRepo: Repository<AffiliateReferralTransaction>,
-    private readonly http: HttpService,
     private readonly configService: ConfigService,
   ) {}
 
-  async onModuleInit() {
-    // Check if imported functions are used to avoid TS error, or just use them
-    // They are used in handleAssessmentCompletion
+  /**
+   * Creates a configured nodemailer transporter backed by AWS SES v2.
+   * Throws if any required AWS credentials are missing from the environment.
+   */
+  private createEmailTransporter() {
+    const region =
+      this.configService.get<string>('AWS_REGION') ||
+      this.configService.get<string>('AWS_DEFAULT_REGION');
+    const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
+    const secretAccessKey = this.configService.get<string>(
+      'AWS_SECRET_ACCESS_KEY',
+    );
+
+    if (!region || !accessKeyId || !secretAccessKey) {
+      throw new Error(
+        'AWS SES configuration is missing. Ensure AWS_REGION, AWS_ACCESS_KEY_ID, and AWS_SECRET_ACCESS_KEY are set.',
+      );
+    }
+
+    const sesClient = new SESv2Client({
+      region,
+      credentials: { accessKeyId, secretAccessKey },
+    });
+
+    return nodemailer.createTransport({
+      SES: { sesClient, SendEmailCommand },
+    } as any);
   }
+
   private async createCognitoUser(email: string, password: string) {
     const authServiceUrl =
       process.env.AUTH_SERVICE_URL || 'http://localhost:4000'; // Default or Env
@@ -1144,35 +1167,9 @@ export class StudentService {
     startDateTime?: Date | string,
     assessmentTitle?: string,
   ) {
-    const region =
-      this.configService.get<string>('AWS_REGION') ||
-      this.configService.get<string>('AWS_DEFAULT_REGION');
-    const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-    const secretAccessKey = this.configService.get<string>(
-      'AWS_SECRET_ACCESS_KEY',
-    );
+    this.logger.log(`[Email Debug] AWS Config Check triggered for: ${to}`);
 
-    this.logger.log(
-      `[Email Debug] AWS Config Check: Region=${region}, KeyPresent=${!!accessKeyId}`,
-    );
-
-    if (!region) {
-      this.logger.error(
-        '[Email Critical] AWS_REGION is missing in environment variables.',
-      );
-      throw new Error(
-        'Configuration Error: AWS_REGION is not defined in the environment.',
-      );
-    }
-
-    const sesClient = new SESv2Client({
-      region,
-      credentials: { accessKeyId, secretAccessKey },
-    });
-
-    const transporter = nodemailer.createTransport({
-      SES: { sesClient, SendEmailCommand },
-    } as any);
+    const transporter = this.createEmailTransporter();
 
     const ccEmail = this.configService.get<string>('EMAIL_CC') || '';
     const fromName =
@@ -1387,26 +1384,7 @@ export class StudentService {
       );
 
       // --- Transporter Setup ---
-      const region =
-        this.configService.get<string>('AWS_REGION') ||
-        this.configService.get<string>('AWS_DEFAULT_REGION');
-      const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-      const secretAccessKey = this.configService.get<string>(
-        'AWS_SECRET_ACCESS_KEY',
-      );
-
-      if (!region || !accessKeyId || !secretAccessKey) {
-        throw new Error('AWS SES Config Missing');
-      }
-
-      const sesClient = new SESv2Client({
-        region,
-        credentials: { accessKeyId, secretAccessKey },
-      });
-
-      const transporter = nodemailer.createTransport({
-        SES: { sesClient, SendEmailCommand },
-      } as any);
+      const transporter = this.createEmailTransporter();
       // -------------------------
 
       const mailOptions = {
@@ -1592,25 +1570,7 @@ export class StudentService {
       );
 
       // 7. Send email
-      const region =
-        this.configService.get<string>('AWS_REGION') ||
-        this.configService.get<string>('AWS_DEFAULT_REGION');
-      const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-      const secretAccessKey = this.configService.get<string>(
-        'AWS_SECRET_ACCESS_KEY',
-      );
-
-      if (!region || !accessKeyId || !secretAccessKey) {
-        throw new Error('AWS SES Config Missing');
-      }
-
-      const sesClient = new SESv2Client({
-        region,
-        credentials: { accessKeyId, secretAccessKey },
-      });
-      const transporter = nodemailer.createTransport({
-        SES: { sesClient, SendEmailCommand },
-      } as any);
+      const transporter = this.createEmailTransporter();
 
       const mailOptions = {
         from: `"${this.configService.get('EMAIL_SEND_FROM_NAME') || 'Origin BI Mind Works'}" <${this.configService.get('EMAIL_FROM') || 'no-reply@originbi.com'}>`,
@@ -1672,25 +1632,7 @@ export class StudentService {
       );
 
       // 2. Create email transporter
-      const region =
-        this.configService.get<string>('AWS_REGION') ||
-        this.configService.get<string>('AWS_DEFAULT_REGION');
-      const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-      const secretAccessKey = this.configService.get<string>(
-        'AWS_SECRET_ACCESS_KEY',
-      );
-
-      if (!region || !accessKeyId || !secretAccessKey) {
-        throw new Error('AWS SES Config Missing');
-      }
-
-      const sesClient = new SESv2Client({
-        region,
-        credentials: { accessKeyId, secretAccessKey },
-      });
-      const transporter = nodemailer.createTransport({
-        SES: { sesClient, SendEmailCommand },
-      } as any);
+      const transporter = this.createEmailTransporter();
 
       // 3. Build email using template
       const fromName =

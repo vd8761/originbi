@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, no-empty, no-useless-escape */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unused-vars, no-empty, no-useless-escape */
 import * as fs from 'fs';
 import * as path from 'path';
 import archiver from 'archiver';
@@ -13,7 +13,6 @@ import { PlacementReport } from '../reports/placement/placementReport';
 import { logger } from '../helpers/logger';
 
 // --- Setup Temp Directory ---
-// Note: In a real app, you might want this config to be more centralized
 const TEMP_DIR = path.join(__dirname, '../../temp_reports');
 if (!fs.existsSync(TEMP_DIR)) {
   fs.mkdirSync(TEMP_DIR, { recursive: true });
@@ -29,7 +28,42 @@ export interface JobState {
   password?: string;
 }
 
-const jobStore = new Map<string, JobState>();
+/**
+ * File-based job store — persists job state as JSON files in TEMP_DIR so that
+ * state survives a process restart (e.g. during a deployment while a job is
+ * actively being polled by handleAssessmentCompletion).
+ */
+const getJobFilePath = (jobId: string) =>
+  path.join(TEMP_DIR, `${jobId}.job.json`);
+
+const jobStore = {
+  get(jobId: string): JobState | undefined {
+    const p = getJobFilePath(jobId);
+    if (!fs.existsSync(p)) return undefined;
+    try {
+      return JSON.parse(fs.readFileSync(p, 'utf-8')) as JobState;
+    } catch {
+      return undefined;
+    }
+  },
+
+  set(jobId: string, state: JobState): void {
+    try {
+      fs.writeFileSync(getJobFilePath(jobId), JSON.stringify(state));
+    } catch (e) {
+      logger.error(`[JobStore] Failed to persist state for job ${jobId}`, e);
+    }
+  },
+
+  delete(jobId: string): void {
+    const p = getJobFilePath(jobId);
+    try {
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    } catch {
+      // Ignore cleanup errors
+    }
+  },
+};
 
 const scheduleCleanup = (
   jobId: string,

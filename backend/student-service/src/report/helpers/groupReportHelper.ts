@@ -1,49 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
-import { Pool } from 'pg';
-import * as fs from 'fs';
-import * as path from 'path';
 import { logger } from './logger';
+import { getPool } from './dbPool';
 import { CollegeData, AnswerTypeCount, AgileScore } from '../types/types';
-
-const getPoolConfig = () => {
-  if (process.env.DATABASE_URL) {
-    return {
-      connectionString: process.env.DATABASE_URL,
-      ssl:
-        process.env.NODE_ENV === 'production'
-          ? { rejectUnauthorized: false }
-          : undefined,
-    };
-  }
-  return {
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASS || '',
-    port: parseInt(process.env.DB_PORT || '5432', 10),
-  };
-};
-
-let poolInstance: Pool | null = null;
-
-const getPool = (): Pool => {
-  if (!poolInstance) {
-    poolInstance = new Pool(getPoolConfig());
-  }
-  return poolInstance;
-};
-
-const LOG_FILE_PATH = path.join(__dirname, '../../sql_logs.txt');
-
-function logSqlOutput(label: string, data: any) {
-  const timestamp = new Date().toISOString();
-  const logEntry = `\n[${timestamp}] --- ${label} ---\n${JSON.stringify(data, null, 2)}\n------------------------------------------------\n`;
-  try {
-    fs.appendFileSync(LOG_FILE_PATH, logEntry);
-  } catch (err) {
-    console.error(`[Report service]`, 'Failed to write to log file:', err);
-  }
-}
 
 export interface MergedUserData extends CollegeData {
   // Using CollegeData as base, covers most fields
@@ -59,8 +17,7 @@ export async function fetchGroupAssessmentData(
   const client = await getPool().connect();
 
   try {
-    console.log(`[Report service]`, `fetching data for group: ${groupId}`);
-    logSqlOutput('Allowing data fetch for Group ID', groupId);
+    logger.info(`Fetching data for group: ${groupId}`);
 
     const sessionsQuery = `
             SELECT 
@@ -88,16 +45,13 @@ export async function fetchGroupAssessmentData(
             WHERE s.group_id = $1
         `;
     const sessionsResult = await client.query(sessionsQuery, [groupId]);
-    logSqlOutput('Sessions Query Result', sessionsResult.rows);
+    logger.info(
+      `Sessions fetched for group ${groupId}: ${sessionsResult.rows.length} rows`,
+    );
 
     return await processSessionRows(client, sessionsResult.rows);
   } catch (error) {
-    console.error(
-      `[Report service]`,
-      'Error fetching group assessment data:',
-      error,
-    );
-    logSqlOutput('Error', error);
+    logger.error('Error fetching group assessment data:', error);
     throw error;
   } finally {
     client.release();
@@ -110,11 +64,7 @@ export async function fetchUserAssessmentData(
   const client = await getPool().connect();
 
   try {
-    console.log(
-      `[Report service]`,
-      `fetching data for users: ${userIds.join(', ')}`,
-    );
-    logSqlOutput('Allowing data fetch for User IDs', userIds);
+    logger.info(`Fetching data for users: ${userIds.join(', ')}`);
 
     // 1. Check Program ID first
     const programQuery = `SELECT program_id FROM assessment_sessions WHERE user_id = $1 LIMIT 1`;
@@ -124,7 +74,7 @@ export async function fetchUserAssessmentData(
 
     if (programId === 1) {
       // --- SCHOOL QUERY (No Department Joins) ---
-      console.log(`[Report service]`, 'Program ID:', programId);
+      logger.info(`Program ID: ${programId} (School)`);
       sessionsQuery = `
             SELECT 
             s.id as session_id, 
@@ -189,17 +139,13 @@ export async function fetchUserAssessmentData(
     }
 
     const sessionsResult = await client.query(sessionsQuery, [userIds]);
-    console.log(`[Report service]`, sessionsResult.rows);
-    logSqlOutput('Sessions Query Result', sessionsResult.rows);
+    logger.info(
+      `Sessions fetched for users: ${sessionsResult.rows.length} rows`,
+    );
 
     return await processSessionRows(client, sessionsResult.rows);
   } catch (error) {
-    console.error(
-      `[Report service]`,
-      'Error fetching user assessment data:',
-      error,
-    );
-    logSqlOutput('Error', error);
+    logger.error('Error fetching user assessment data:', error);
     throw error;
   } finally {
     client.release();
@@ -229,8 +175,7 @@ async function processSessionRows(
     // logSqlOutput(`Attempts for Session ${session.session_id}`, attemptsResult.rows);
 
     if (attemptsResult.rows.length < 2) {
-      console.warn(
-        `[Report service]`,
+      logger.warn(
         `User ${session.user_id} (Session ${session.session_id}) has fewer than 2 completed attempts. Skipping.`,
       );
       continue; // We need both parts
@@ -250,8 +195,7 @@ async function processSessionRows(
     }
 
     if (!discData || !agileData) {
-      console.warn(
-        `[Report service]`,
+      logger.warn(
         `User ${session.user_id} missing either DISC or Agile data. Skipping.`,
       );
       continue;
@@ -293,7 +237,7 @@ async function processSessionRows(
       3: 'Employee Personalized Report',
       4: 'OriginBI PersonaEdge Report',
     };
-    console.log(`[Report service]`, 'Report Number', session.report_number);
+    logger.info(`Report Number: ${session.report_number}`);
 
     const formatReportRef = (ref: string | null) => {
       if (!ref) return 'Nil';
@@ -381,6 +325,6 @@ async function processSessionRows(
     validUsersData.push(userData);
   }
 
-  logSqlOutput('Final Processed Data Count', validUsersData.length);
+  logger.info(`Final processed data count: ${validUsersData.length}`);
   return validUsersData;
 }
