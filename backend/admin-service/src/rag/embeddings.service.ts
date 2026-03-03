@@ -36,6 +36,10 @@ export class EmbeddingsService implements OnModuleInit {
   private requestTimestamps: number[] = [];
   private readonly RATE_LIMIT_RPM = 14; // stay just under limit
 
+  // Quota exhaustion tracking — temporarily disable when quota is hit
+  private quotaExhaustedUntil: number = 0;
+  private readonly QUOTA_COOLDOWN = 5 * 60 * 1000; // 5 minutes cooldown
+
   constructor(private dataSource: DataSource) { }
 
   async onModuleInit() {
@@ -100,7 +104,7 @@ export class EmbeddingsService implements OnModuleInit {
         // 2. Drop old indexes first
         await this.dataSource.query('DROP INDEX IF EXISTS idx_rag_embeddings_vector');
         await this.dataSource.query('DROP INDEX IF EXISTS rag_embeddings_embedding_idx');
-        
+
         // 3. Alter column to new dimension
         await this.dataSource.query(
           `ALTER TABLE rag_embeddings ALTER COLUMN embedding TYPE vector(${this.EMBEDDING_DIM})`,
@@ -213,6 +217,12 @@ export class EmbeddingsService implements OnModuleInit {
   ): Promise<number[] | null> {
     if (!this.embeddingsAvailable || !this.googleApiKey) return null;
 
+    // Quota exhaustion: temporarily skip API calls after rate limit hits
+    if (Date.now() < this.quotaExhaustedUntil) {
+      this.logger.debug('⏸️ Embedding skipped — API quota cooling down');
+      return null;
+    }
+
     // Check cache
     const cacheKey = `${task}:${text.slice(0, 200)}`;
     const cached = this.embeddingCache.get(cacheKey);
@@ -251,6 +261,11 @@ export class EmbeddingsService implements OnModuleInit {
 
         if (response.status === 429) {
           this.logger.warn(`⏳ Rate limited (attempt ${attempt}), backing off...`);
+          if (attempt === this.MAX_RETRIES) {
+            this.quotaExhaustedUntil = Date.now() + this.QUOTA_COOLDOWN;
+            this.logger.warn(`🚫 API quota exhausted — disabling embeddings for ${this.QUOTA_COOLDOWN / 60000} min`);
+            return null;
+          }
           await this.sleep(2000 * attempt);
           continue;
         }
