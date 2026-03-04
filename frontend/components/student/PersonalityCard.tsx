@@ -28,7 +28,7 @@ const PersonalityCard: React.FC = () => {
     const remainingName = nameWords.slice(1).join(' ');
 
     return (
-        <div className="rounded-2xl relative w-full h-full min-h-[300px] overflow-hidden group bg-gradient-to-br from-[#150089] to-[#0D0055]">
+        <div className="rounded-2xl relative w-full h-full min-h-[220px] md:min-h-[300px] overflow-hidden group bg-gradient-to-br from-[#150089] to-[#0D0055]">
             {/* Base Background - Dark Red Gradient */}
             {/* Concentric Circles Effect - Centered relative to the character */}
             {/* Using vw units for the circles to scale with the screen as requested */}
@@ -45,7 +45,7 @@ const PersonalityCard: React.FC = () => {
                 <img
                     src={imageSrc}
                     alt={traitName}
-                    className="h-full w-full transition-transform duration-700 group-hover:scale-105"
+                    className="h-full w-full object-cover object-bottom transition-transform duration-700 group-hover:scale-105"
                     onError={(e) => {
                         e.currentTarget.src = "/student_traits/Analytical_Leader.png";
                     }}
@@ -53,7 +53,7 @@ const PersonalityCard: React.FC = () => {
             </div>
 
             {/* Content Overlay */}
-            <div className="absolute inset-0 p-6 lg:p-[1.25vw] flex flex-col justify-start z-20">
+            <div className="absolute inset-0 p-4 md:p-6 lg:p-[1.25vw] flex flex-col justify-start z-20">
                 {/* Your Personality */}
                 <h4 className="text-white/90 font-sans font-normal text-sm lg:text-[0.833vw] mb-[0.5em] lg:mb-[0.4vw] tracking-wide leading-none drop-shadow-sm">
                     Your Personality
