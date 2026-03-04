@@ -20,7 +20,7 @@ import {
 import { CreateCorporateRegistrationDto } from './dto/create-corporate-registration.dto';
 import { getCorporateWelcomeEmailTemplate } from '../mail/templates/corporate-welcome.template';
 import * as nodemailer from 'nodemailer';
-import { SES } from 'aws-sdk';
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as path from 'path'; // Actually removing this if truly unused?
 // I will just remove it.
@@ -795,17 +795,18 @@ export class CorporateService {
   ) {
     // Imports moved to top
 
-    // Use legacy SES (SDK v2) for Nodemailer v6
-    const ses = new SES({
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-      sessionToken: process.env.AWS_SESSION_TOKEN,
+    const sesClient = new SESv2Client({
       region: process.env.AWS_REGION,
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+        sessionToken: process.env.AWS_SESSION_TOKEN,
+      },
     });
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const transporter = nodemailer.createTransport({
-      SES: ses, // Uppercase SES for Nodemailer v6
+      SES: { sesClient, SendEmailCommand },
     } as any);
     const ccEmail = process.env.EMAIL_CC || '';
     const frontendUrl = process.env.FRONTEND_URL ?? '';

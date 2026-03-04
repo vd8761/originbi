@@ -332,6 +332,14 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
             if (hasNewFiles && affiliateId) {
                 setUploadProgress("Uploading documents to cloud...");
 
+                // Refresh token right before upload — the session may have changed
+                const uploadSession = await fetchAuthSession();
+                const uploadToken = uploadSession.tokens?.idToken?.toString();
+
+                if (!uploadToken) {
+                    throw new Error("Your session expired during upload. Please log in again and upload documents from the affiliate's edit page.");
+                }
+
                 const formDataUpload = new FormData();
                 aadharFiles.forEach((file) => formDataUpload.append("aadhar", file));
                 panFiles.forEach((file) => formDataUpload.append("pan", file));
@@ -341,7 +349,7 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
                     {
                         method: "POST",
                         headers: {
-                            "Authorization": `Bearer ${idToken}`
+                            "Authorization": `Bearer ${uploadToken}`
                         },
                         body: formDataUpload,
                     }
