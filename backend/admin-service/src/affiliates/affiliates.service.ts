@@ -54,7 +54,7 @@ export class AffiliatesService {
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
     private readonly r2Service: R2Service,
-  ) {}
+  ) { }
 
   async updateReadyToProcessStatus() {
     const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
@@ -482,23 +482,22 @@ export class AffiliatesService {
     });
     if (!affiliate) throw new BadRequestException('Affiliate not found');
 
-    let aadharResults: R2UploadResult[] = [];
-    if (aadharFiles.length > 0) {
-      aadharResults = await this.r2Service.uploadMultipleFiles(
-        aadharFiles,
-        affiliate.referralCode,
-        'aadhar',
-      );
-    }
-
-    let panResults: R2UploadResult[] = [];
-    if (panFiles.length > 0) {
-      panResults = await this.r2Service.uploadMultipleFiles(
-        panFiles,
-        affiliate.referralCode,
-        'pan',
-      );
-    }
+    const [aadharResults, panResults] = await Promise.all([
+      aadharFiles.length > 0
+        ? this.r2Service.uploadMultipleFiles(
+          aadharFiles,
+          affiliate.referralCode,
+          'aadhar',
+        )
+        : Promise.resolve([]),
+      panFiles.length > 0
+        ? this.r2Service.uploadMultipleFiles(
+          panFiles,
+          affiliate.referralCode,
+          'pan',
+        )
+        : Promise.resolve([]),
+    ]);
 
     affiliate.aadharDocuments = [
       ...(affiliate.aadharDocuments || []),
@@ -531,6 +530,11 @@ export class AffiliatesService {
     referralLink: string,
     loginUrl: string,
   ) {
+    if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_REGION) {
+      this.logger.warn('AWS SES credentials missing in environment. Skipping welcome email sending.');
+      return;
+    }
+
     const ses = new AWS.SES({
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
