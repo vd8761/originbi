@@ -113,20 +113,35 @@ export class AffiliatesService {
     password: string,
     groupName: string = 'AFFILIATE',
   ) {
+    const authUrl = this.authServiceBaseUrl;
+    this.logger.log(`[CREATE-DEBUG] createCognitoUser: AUTH_SERVICE_URL = "${authUrl}"`);
+
+    if (!authUrl) {
+      this.logger.error('[CREATE-DEBUG] AUTH_SERVICE_URL is MISSING! Cannot create Cognito user.');
+      throw new InternalServerErrorException(
+        'AUTH_SERVICE_URL is not configured. Cannot create Cognito user.',
+      );
+    }
+
+    const fullUrl = `${authUrl}/internal/cognito/users`;
+    this.logger.log(`[CREATE-DEBUG] Calling auth-service at: ${fullUrl} for email: ${email}`);
+
     try {
       const res = await this.withRetry(() =>
         firstValueFrom(
           this.http.post(
-            `${this.authServiceBaseUrl}/internal/cognito/users`,
+            fullUrl,
             { email, password, groupName },
-            { proxy: false },
+            { proxy: false, timeout: 30000 },
           ),
         ),
       );
+      this.logger.log(`[CREATE-DEBUG] Cognito user created successfully. Sub: ${res.data?.sub}`);
       return res.data;
     } catch (err: any) {
       const authErr = err.response?.data || err.message || err;
-      this.logger.error('Error creating Cognito user:', authErr);
+      this.logger.error(`[CREATE-DEBUG] Error creating Cognito user: ${JSON.stringify(authErr)}`);
+      this.logger.error(`[CREATE-DEBUG] Error status: ${err.response?.status}, code: ${err.code}`);
       throw new InternalServerErrorException(
         `Failed to create Cognito user: ${authErr.message || JSON.stringify(authErr)}`,
       );
@@ -161,17 +176,30 @@ export class AffiliatesService {
   }
 
   async create(dto: CreateAffiliateDto) {
+    this.logger.log(`[CREATE-DEBUG] ===== Starting affiliate creation for: ${dto.email} =====`);
+
     dto.email = dto.email.toLowerCase();
+    this.logger.log(`[CREATE-DEBUG] Step 1: Checking if email exists in DB...`);
     const existingUser = await this.userRepo.findOne({
       where: { email: dto.email },
     });
-    if (existingUser) throw new BadRequestException('Email already registered');
+    if (existingUser) {
+      this.logger.warn(`[CREATE-DEBUG] Email already registered: ${dto.email}`);
+      throw new BadRequestException('Email already registered');
+    }
+    this.logger.log(`[CREATE-DEBUG] Step 1 DONE: Email is available.`);
 
+    this.logger.log(`[CREATE-DEBUG] Step 2: Creating Cognito user...`);
     const cognitoRes = await this.createCognitoUser(dto.email, dto.password);
     const sub = cognitoRes.sub!;
+    this.logger.log(`[CREATE-DEBUG] Step 2 DONE: Cognito user created with sub: ${sub}`);
+
+    this.logger.log(`[CREATE-DEBUG] Step 3: Generating referral code...`);
     const referralCode = await this.generateUniqueReferralCode();
+    this.logger.log(`[CREATE-DEBUG] Step 3 DONE: Referral code: ${referralCode}`);
 
     try {
+      this.logger.log(`[CREATE-DEBUG] Step 4: Creating DB records in transaction...`);
       const affiliate = await this.dataSource.transaction(async (manager) => {
         const user = manager.create(AdminUser, {
           email: dto.email,
@@ -182,6 +210,7 @@ export class AffiliatesService {
           metadata: { fullName: dto.name, mobile: dto.mobileNumber },
         });
         await manager.save(user);
+        this.logger.log(`[CREATE-DEBUG] Step 4a: User saved with id: ${user.id}`);
 
         const affiliateAccount = manager.create(AffiliateAccount, {
           userId: user.id,
@@ -200,38 +229,40 @@ export class AffiliatesService {
           branchName: dto.branchName ?? null,
         });
         await manager.save(affiliateAccount);
+        this.logger.log(`[CREATE-DEBUG] Step 4b: AffiliateAccount saved with id: ${affiliateAccount.id}`);
         return affiliateAccount;
       });
+      this.logger.log(`[CREATE-DEBUG] Step 4 DONE: Transaction committed.`);
 
-      // Send Welcome Email after successful creation
-      try {
-        const referralBaseUrl = process.env.REFERAL_BASE_URL || '';
-        const fullReferralLink = `${referralBaseUrl}?ref=${referralCode}`;
+      // Send Welcome Email after successful creation (fire-and-forget, don't await)
+      this.logger.log(`[CREATE-DEBUG] Step 5: Sending welcome email (non-blocking)...`);
+      const referralBaseUrl = process.env.REFERAL_BASE_URL || '';
+      const fullReferralLink = `${referralBaseUrl}?ref=${referralCode}`;
+      const affiliateLoginUrl = 'https://mind.originbi.com/affiliate/login';
 
-        // Redirection URL for affiliate login
-        const affiliateLoginUrl = 'https://mind.originbi.com/affiliate/login';
-
-        await this.sendWelcomeEmail(
-          dto.email,
-          dto.name,
-          dto.password,
-          dto.mobileNumber,
-          dto.countryCode ?? '+91',
-          dto.commissionPercentage ?? 0,
-          fullReferralLink,
-          affiliateLoginUrl,
+      // Fire-and-forget: don't block the response on email sending
+      this.sendWelcomeEmail(
+        dto.email,
+        dto.name,
+        dto.password,
+        dto.mobileNumber,
+        dto.countryCode ?? '+91',
+        dto.commissionPercentage ?? 0,
+        fullReferralLink,
+        affiliateLoginUrl,
+      )
+        .then(() => this.logger.log(`[CREATE-DEBUG] Welcome email sent to: ${dto.email}`))
+        .catch((emailErr: any) =>
+          this.logger.error(
+            `[CREATE-DEBUG] Failed to send welcome email to ${dto.email}: ${emailErr.message}`,
+            emailErr.stack,
+          ),
         );
-        this.logger.log(`Welcome email sent to affiliate: ${dto.email}`);
-      } catch (emailErr: any) {
-        this.logger.error(
-          `Failed to send welcome email to affiliate ${dto.email}: ${emailErr.message}`,
-          emailErr.stack,
-        );
-        // Don't fail the creation if email fails
-      }
 
+      this.logger.log(`[CREATE-DEBUG] ===== Affiliate creation SUCCESS — returning response =====`);
       return affiliate;
     } catch (e: any) {
+      this.logger.error(`[CREATE-DEBUG] ===== Affiliate creation FAILED: ${e.message} =====`, e.stack);
       throw new BadRequestException(`Affiliate creation failed: ${e.message}`);
     }
   }
