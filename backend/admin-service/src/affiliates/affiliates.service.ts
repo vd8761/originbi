@@ -223,7 +223,6 @@ export class AffiliatesService {
         dto.password,
         dto.mobileNumber,
         dto.countryCode ?? '+91',
-        dto.commissionPercentage ?? 0,
         fullReferralLink,
         affiliateLoginUrl,
       )
@@ -532,7 +531,6 @@ export class AffiliatesService {
     pass: string,
     mobile: string,
     countryCode: string,
-    commissionPercentage: number,
     referralLink: string,
     loginUrl: string,
   ) {
@@ -577,7 +575,6 @@ export class AffiliatesService {
       pass,
       mobile,
       countryCode,
-      commissionPercentage,
       referralLink,
       loginUrl,
       assets,
