@@ -4,7 +4,6 @@ export const getAffiliateWelcomeEmailTemplate = (
   pass: string,
   mobile: string,
   countryCode: string,
-  commissionPercentage: number,
   referralLink: string,
   loginUrl: string,
   assets: { footer: string; popper: string; pattern: string; logo: string },
@@ -89,10 +88,6 @@ export const getAffiliateWelcomeEmailTemplate = (
                               <tr>
                                 <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Temporary Password</td>
                                 <td style="font-family: Tahoma; font-weight: 700; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${pass}</td>
-                              </tr>
-                              <tr>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Commission Rate</td>
-                                <td style="font-family: Tahoma; font-weight: 700; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #1ED36A;">${commissionPercentage}%</td>
                               </tr>
                             </table>
 

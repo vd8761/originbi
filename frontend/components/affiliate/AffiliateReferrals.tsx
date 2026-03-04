@@ -52,7 +52,8 @@ const AffiliateReferrals: React.FC = () => {
     const [stats, setStats] = useState<ReferralStats>({ totalReferrals: 0, completedCount: 0, pendingCount: 0 });
     const [totalItems, setTotalItems] = useState(0);
     const [affiliateId, setAffiliateId] = useState<string | null>(null);
-    const [referralLink, setReferralLink] = useState("https://discover.originbi.com/register?ref=affiliate");
+    const referralBaseUrl = process.env.NEXT_PUBLIC_REFERAL_BASE_URL || 'https://discover.originbi.com';
+    const [referralLink, setReferralLink] = useState(`${referralBaseUrl}?ref=affiliate`);
     const [referralCode, setReferralCode] = useState('AFFILIATE');
     const [qrDataUrl, setQrDataUrl] = useState<string>('');
     const [shareCardImageUrl, setShareCardImageUrl] = useState<string | null>(null);
@@ -71,7 +72,8 @@ const AffiliateReferrals: React.FC = () => {
                     setAffiliateId(affId);
                     if (user.referralCode) {
                         setReferralCode(user.referralCode);
-                        setReferralLink(`https://discover.originbi.com/register?ref=${user.referralCode}`);
+                        const baseUrl = process.env.NEXT_PUBLIC_REFERAL_BASE_URL || 'https://discover.originbi.com';
+                        setReferralLink(`${baseUrl}?ref=${user.referralCode}`);
                     }
                 }
             }
