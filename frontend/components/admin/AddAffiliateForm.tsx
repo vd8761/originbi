@@ -8,8 +8,10 @@ import {
     EyeOffIcon,
     XIcon,
     WarningIcon,
+    ArrowLeftIcon,
 } from '../icons';
 import MobileInput from '../ui/MobileInput';
+import { fetchAuthSession } from 'aws-amplify/auth';
 
 interface AddAffiliateFormProps {
     onCancel: () => void;
@@ -298,9 +300,20 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
                 ? `${API_BASE}/admin/affiliates/${initialData.id}`
                 : `${API_BASE}/admin/affiliates`;
 
+            // Extract auth token
+            const session = await fetchAuthSession();
+            const idToken = session.tokens?.idToken?.toString();
+
+            if (!idToken) {
+                throw new Error("No active session. Please log in again.");
+            }
+
             const res = await fetch(url, {
                 method: isEditMode ? "PATCH" : "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${idToken}`
+                },
                 body: JSON.stringify(payload),
             });
 
@@ -319,6 +332,14 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
             if (hasNewFiles && affiliateId) {
                 setUploadProgress("Uploading documents to cloud...");
 
+                // Refresh token right before upload — the session may have changed
+                const uploadSession = await fetchAuthSession();
+                const uploadToken = uploadSession.tokens?.idToken?.toString();
+
+                if (!uploadToken) {
+                    throw new Error("Your session expired during upload. Please log in again and upload documents from the affiliate's edit page.");
+                }
+
                 const formDataUpload = new FormData();
                 aadharFiles.forEach((file) => formDataUpload.append("aadhar", file));
                 panFiles.forEach((file) => formDataUpload.append("pan", file));
@@ -327,6 +348,9 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
                     `${API_BASE}/admin/affiliates/${affiliateId}/documents`,
                     {
                         method: "POST",
+                        headers: {
+                            "Authorization": `Bearer ${uploadToken}`
+                        },
                         body: formDataUpload,
                     }
                 );

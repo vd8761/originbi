@@ -83,7 +83,8 @@ const AffiliateProfile: React.FC = () => {
             : 'Silver Affiliate';
     const status = profile.is_active ? 'active' : 'inactive';
 
-    const referralLink = `https://discover.originbi.com/register?ref=${profile.referral_code}`;
+    const referralBaseUrl = process.env.NEXT_PUBLIC_REFERAL_BASE_URL || 'https://discover.originbi.com';
+    const referralLink = `${referralBaseUrl}?ref=${profile.referral_code}`;
 
     const handleCopy = () => {
         navigator.clipboard.writeText(referralLink);
@@ -111,9 +112,8 @@ const AffiliateProfile: React.FC = () => {
                                 alt="Profile"
                                 className="w-32 h-32 rounded-full mb-4 border-4 border-[#E0E0E0] dark:border-white/10"
                             />
-                            <h3 className="text-[clamp(18px,1.3vw,22px)] font-bold text-[#19211C] dark:text-white mb-1">{profile.name}</h3>
+                            <p className="text-[clamp(18px,1.3vw,22px)] font-bold text-[#19211C] dark:text-white mb-1">{profile.name}</p>
                             <p className="text-[clamp(14px,1vw,16px)] text-[#1ED36A] font-medium mb-1">{tier}</p>
-                            <p className="text-[clamp(12px,0.8vw,14px)] text-[#19211C] dark:text-white opacity-60 font-normal">{profile.commission_percentage}% Commission</p>
 
                             {/* Status Badge */}
                             <div className="mt-4">
@@ -161,7 +161,6 @@ const AffiliateProfile: React.FC = () => {
                             <DetailItem label="Address" value={profile.address} />
                             <DetailItem label="Affiliate Tier" value={tier} />
                             <DetailItem label="Joined Date" value={new Date(profile.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} />
-                            <DetailItem label="Commission Rate" value={`${profile.commission_percentage}%`} />
                             <DetailItem label="Total Earned" value={`₹${profile.total_earned_commission.toLocaleString('en-IN')}`} />
                             <DetailItem label="Total Settled" value={`₹${profile.total_settled_commission.toLocaleString('en-IN')}`} />
                         </div>
