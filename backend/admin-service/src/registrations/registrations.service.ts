@@ -23,7 +23,7 @@ import { AssessmentGenerationService } from '../assessment/assessment-generation
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
 
 import * as nodemailer from 'nodemailer';
-import { SES } from 'aws-sdk';
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 
 @Injectable()
 export class RegistrationsService {
@@ -45,7 +45,7 @@ export class RegistrationsService {
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
-  ) {}
+  ) { }
 
   async withRetry<T>(
     operation: () => Promise<T>,
@@ -731,14 +731,16 @@ export class RegistrationsService {
     startDateTime?: Date | string,
     assessmentTitle?: string,
   ) {
-    const ses = new SES({
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-      sessionToken: process.env.AWS_SESSION_TOKEN,
+    const sesClient = new SESv2Client({
       region: process.env.AWS_REGION,
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+        sessionToken: process.env.AWS_SESSION_TOKEN,
+      },
     });
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    const transporter = nodemailer.createTransport({ SES: ses } as any);
+    const transporter = nodemailer.createTransport({ SES: { sesClient, SendEmailCommand } } as any);
     const ccEmail = process.env.EMAIL_CC || '';
 
     const fromName = process.env.EMAIL_SEND_FROM_NAME || 'Origin BI Mind Works';
