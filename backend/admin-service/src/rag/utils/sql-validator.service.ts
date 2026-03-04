@@ -68,14 +68,14 @@ export class SqlValidatorService {
       'assessment_sessions', 'assessment_questions', 'assessment_question_options',
       'personality_traits', 'programs', 'career_roles', 'career_role_tools',
       'trait_based_course_details', 'departments', 'department_degrees', 'degree_types',
-      'corporate_accounts', 'groups', 'open_questions', 'open_question_options',
+      'corporate_accounts', 'groups', 'group_assessments', 'open_questions', 'open_question_options',
       'affiliate_accounts', 'affiliate_referral_transactions', 'affiliate_settlement_transactions',
     ]),
     CORPORATE: new Set([
       'registrations', 'assessment_attempts', 'assessment_answers',
       'personality_traits', 'programs', 'career_roles', 'career_role_tools',
       'trait_based_course_details', 'departments', 'department_degrees', 'degree_types',
-      'corporate_accounts', 'groups',
+      'corporate_accounts', 'groups', 'group_assessments',
     ]),
     STUDENT: new Set([
       'registrations', 'assessment_attempts', 'assessment_answers',
@@ -225,6 +225,9 @@ export class SqlValidatorService {
       }
       if (tables.includes('groups')) {
         sql = this.injectWhereClause(sql, 'groups', `corporate_account_id = ${user.corporateId}`);
+      }
+      if (tables.includes('group_assessments')) {
+        sql = this.injectWhereClause(sql, 'group_assessments', `corporate_account_id = ${user.corporateId}`);
       }
       // If querying assessment_attempts without registrations, add a subquery scope
       if (tables.includes('assessment_attempts') && !tables.includes('registrations')) {

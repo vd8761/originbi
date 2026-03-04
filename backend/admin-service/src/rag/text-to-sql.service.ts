@@ -285,6 +285,68 @@ WHERE r.corporate_account_id = (SELECT id FROM corporate_accounts WHERE company_
   AND r.is_deleted = false
 ORDER BY r.created_at DESC
 
+-- Group/Batch summary with assessment stats (IMPORTANT: groups table = batches):
+SELECT g.name AS group_name, g.code AS group_code,
+  COUNT(DISTINCT r.id) AS total_candidates,
+  COUNT(DISTINCT CASE WHEN aa.status = 'COMPLETED' THEN aa.id END) AS completed_assessments,
+  COUNT(DISTINCT CASE WHEN aa.status = 'NOT_STARTED' THEN aa.id END) AS not_started,
+  ROUND(AVG(CASE WHEN aa.status = 'COMPLETED' THEN aa.total_score END), 1) AS avg_score,
+  MAX(CASE WHEN aa.status = 'COMPLETED' THEN aa.total_score END) AS highest_score,
+  MIN(CASE WHEN aa.status = 'COMPLETED' THEN aa.total_score END) AS lowest_score
+FROM groups g
+LEFT JOIN registrations r ON r.group_id = g.id AND r.is_deleted = false
+LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id
+WHERE g.is_deleted = false AND g.name ILIKE '%BatchName%'
+GROUP BY g.id, g.name, g.code
+
+-- Group/Batch with personality distribution (strengths analysis):
+SELECT g.name AS group_name, pt.blended_style_name AS personality_type,
+  COUNT(*) AS candidate_count,
+  ROUND(AVG(aa.total_score), 1) AS avg_score
+FROM groups g
+JOIN registrations r ON r.group_id = g.id AND r.is_deleted = false
+JOIN assessment_attempts aa ON aa.registration_id = r.id AND aa.status = 'COMPLETED'
+LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+WHERE g.is_deleted = false AND g.name ILIKE '%BatchName%'
+GROUP BY g.id, g.name, pt.id, pt.blended_style_name
+ORDER BY candidate_count DESC
+
+-- Program summary with assessment stats:
+SELECT p.name AS program_name, p.code AS program_code,
+  COUNT(DISTINCT r.id) AS total_registrations,
+  COUNT(DISTINCT CASE WHEN aa.status = 'COMPLETED' THEN aa.id END) AS completed,
+  COUNT(DISTINCT CASE WHEN aa.status = 'NOT_STARTED' THEN aa.id END) AS not_started,
+  ROUND(AVG(CASE WHEN aa.status = 'COMPLETED' THEN aa.total_score END), 1) AS avg_score
+FROM programs p
+LEFT JOIN registrations r ON r.program_id = p.id AND r.is_deleted = false
+LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id
+WHERE p.is_active = true AND p.name ILIKE '%ProgramName%'
+GROUP BY p.id, p.name, p.code
+
+-- List all groups/batches:
+SELECT g.name AS group_name, g.code AS group_code,
+  COUNT(r.id) AS candidate_count, g.is_active, g.created_at
+FROM groups g
+LEFT JOIN registrations r ON r.group_id = g.id AND r.is_deleted = false
+WHERE g.is_deleted = false
+GROUP BY g.id, g.name, g.code, g.is_active, g.created_at
+ORDER BY g.created_at DESC LIMIT 20
+
+-- Group assessments (programs assigned to groups):
+SELECT g.name AS group_name, p.name AS program_name,
+  ga.total_candidates, ga.status, ga.valid_from, ga.valid_to
+FROM group_assessments ga
+JOIN groups g ON ga.group_id = g.id
+JOIN programs p ON ga.program_id = p.id
+WHERE g.name ILIKE '%GroupName%'
+ORDER BY ga.created_at DESC
+
+═══ DOMAIN SYNONYMS FOR GROUPS/BATCHES/PROGRAMS ═══
+- "batch" = "group" = "groups" table. The user may say "KIOTstudents batch" meaning the groups table with name ILIKE '%KIOTstudents%'
+- "program" = "assessment program" = "programs" table. E.g. "School Students Program" → programs WHERE name ILIKE '%School Students%'
+- "summarize batch" = query groups + registrations + assessment_attempts for aggregate stats
+- "strengths" = personality_traits distribution. "risks" = low scores / not started. "readiness" = completed vs not started ratio.
+
 ${conversationHistory ? `\n═══ CONVERSATION CONTEXT ═══\n${conversationHistory}\nUse this to resolve references like "those candidates", "that group", "them", etc.\n` : ''}
 
 Now generate the SQL for the following question:`;
@@ -466,13 +528,17 @@ Return ONLY the corrected SQL, nothing else:`;
 
     const formatPrompt = `You are Ask BI, OriginBI's intelligent data assistant. Format the following database results into a clear, direct response like ChatGPT would.
 
-RULES:
+CRITICAL RULES:
+- ONLY use data from the "Data" section below. NEVER add information from general knowledge, the web, or your training data.
+- If the data contains 10 companies, list exactly those 10 — do NOT add extra companies you know from the real world.
+- Every name, number, score, and fact in your response MUST come from the provided data. Zero tolerance for fabrication.
 - Be direct and concise. Start with the answer immediately. No filler words, no "Great question!", no "Here are the results".
+- Use numbered lists for lists of items (companies, candidates, etc.)
 - Use markdown tables for tabular data (3+ rows with multiple columns)
 - Use bullet points for small lists (1-2 rows)
 - Bold important values: names, scores, counts
 - If data has only 1 value (like a count), just state it plainly: "There are **415** candidates." or "**181** female candidates."
-- If results are truncated, mention how many total rows exist
+- If results are truncated, mention how many total rows exist: e.g. "Total Companies: 24" at the end
 - Add a 1-line analytical insight ONLY when data has 5+ rows
 - Do NOT make up data not present in the results
 - Do NOT add disclaimers, tips, suggestions, or next steps unless explicitly asked
@@ -703,7 +769,7 @@ The SQL validator will auto-inject affiliate_account_id filters.`;
     // Strong indicators of a data/DB question
     const dataPatterns = [
       /\b(how many|count|total|number of)\b/,
-      /\b(list|show|get|display|find|search|fetch|retrieve)\b.*\b(candidate|student|user|registration|employee|resource|staff|member|assessment|test|exam|career|role|group|department|course|program|account|corporate|affiliate|referral)\b/,
+      /\b(list|show|get|display|find|search|fetch|retrieve)\b.*\b(candidate|student|user|registration|employee|resource|staff|member|assessment|test|exam|career|role|group|department|course|program|account|corporate|affiliate|referral|company|companies|corporates?|organization)\b/,
       /\b(who|which)\b.*\b(candidate|student|person|user)\b/,
       /\b(top|best|highest|lowest|worst|average|mean)\b.*\b(score|performer|candidate|result)\b/,
       /\b(score|result|assessment|test)s?\b.*\b(above|below|greater|less|between|over|under)\b/,
@@ -713,6 +779,9 @@ The SQL validator will auto-inject affiliate_account_id filters.`;
       /\b(report|summary|overview|dashboard|analytics|statistics|stats)\b/,
       /\b(compare|comparison|versus|vs|difference)\b/,
       /\b(personality|trait|disc|behavioral)\b.*\b(distribution|breakdown|count)\b/,
+      // Company / corporate data patterns
+      /\b(companies|corporates?|company|organization|employer)s?\b/,
+      /\b(list|show|get|all|display)\s+(the\s+)?(companies|corporates?|organizations?)\b/,
       // Additional data question indicators
       /\b(suitable|fit|eligible|qualified)\s+(for|to)\b/,
       /\b(find|match|identify|suggest)\b.*\b(candidate|student|person)\b/,
@@ -725,6 +794,14 @@ The SQL validator will auto-inject affiliate_account_id filters.`;
       /\bregistered?\s+(today|yesterday|this|last|in|between|from|since)\b/,
       /\b(my\s+employee|my\s+team|my\s+candidate|my\s+staff|my\s+resource)/,
       /\b(score|marks|result)\s+(of|for)\s+\w+/,
+      // Credit / account queries
+      /\b(credits?|balance|available\s+credits?)\b/,
+      /\b(affiliate|referral|commission)\b/,
+      // Group/batch/program queries
+      /\b(batch|group|program)\b.*\b(summary|summarize|strengths?|risks?|readiness|stats?|statistics|performance|overview|report)\b/,
+      /\b(summarize|summary|overview|analyze|analyse)\b.*\b(batch|group|program)\b/,
+      /\b(list|show|get)\b.*\b(groups?|batches?|programs?)\b/,
+      /\b(group_assessments?|group\s+assessments?|batch\s+assessment)\b/,
     ];
 
     return dataPatterns.some(p => p.test(q));

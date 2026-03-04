@@ -55,7 +55,7 @@ export class SchemaIntrospectorService implements OnModuleInit {
     'assessment_sessions', 'assessment_questions', 'assessment_question_options',
     'personality_traits', 'programs', 'career_roles', 'career_role_tools',
     'trait_based_course_details', 'departments', 'department_degrees', 'degree_types',
-    'corporate_accounts', 'groups', 'open_questions', 'open_question_options',
+    'corporate_accounts', 'groups', 'group_assessments', 'open_questions', 'open_question_options',
     'affiliate_accounts', 'affiliate_referral_transactions', 'affiliate_settlement_transactions',
   ];
 
@@ -362,6 +362,7 @@ export class SchemaIntrospectorService implements OnModuleInit {
       'assessment_answers': { scopeColumn: 'assessment_attempt_id', description: 'Scoped via JOIN to assessment_attempts → registrations' },
       'assessment_sessions': { scopeColumn: 'program_id', description: 'Admin only' },
       'groups': { scopeColumn: 'corporate_account_id', description: 'Scoped by corporate_account_id' },
+      'group_assessments': { scopeColumn: 'corporate_account_id', description: 'Scoped by corporate_account_id' },
     };
   }
 }

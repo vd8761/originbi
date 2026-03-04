@@ -612,12 +612,17 @@ export default function ChatAssistant({
                 loadConversations();
             }
 
+            // Disable typewriter animation for long reports — show instantly
+            const longReportTypes = ['career_report', 'custom_report', 'overall_report', 'jd_candidate_match', 'career_guidance'];
+            const answerText = data.answer || 'Sorry, I could not process that request.';
+            const isLongContent = longReportTypes.includes(data.searchType) || answerText.length > 800;
+
             setMessages(prev => [...prev, {
                 id: botId,
                 role: 'assistant',
-                content: data.answer || 'Sorry, I could not process that request.',
+                content: answerText,
                 timestamp: new Date(),
-                isStreaming: true,
+                isStreaming: !isLongContent,
                 suggestions: data.suggestions || [],
                 searchType: data.searchType,
                 confidence: data.confidence,
@@ -816,18 +821,7 @@ export default function ChatAssistant({
                     ))}
                 </div>
 
-                {/* Sidebar Footer */}
-                <div className="p-3 border-t border-[#E0E0E0] dark:border-white/10">
-                    <div className="flex items-center gap-2 px-2">
-                        <div className="w-8 h-8 rounded-full bg-brand-green flex items-center justify-center text-xs font-bold text-white">
-                            {(userName || 'U')[0].toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-[#19211C] dark:text-white truncate">{userName || 'User'}</p>
-                            <p className="text-[10px] text-[#19211C]/40 dark:text-white/40">{roleConfig.label}</p>
-                        </div>
-                    </div>
-                </div>
+                {/* Sidebar Footer Removed */}
             </aside>
 
             {/* Sidebar overlay on mobile */}
@@ -939,8 +933,8 @@ export default function ChatAssistant({
 
                                 {/* Welcome Input */}
                                 <div className="relative">
-                                    <div className="flex items-end gap-3 p-2 bg-white/60 dark:bg-[#FFFFFF]/[0.08] backdrop-blur-xl border border-[#E0E0E0] dark:border-white/10 rounded-2xl focus-within:border-brand-green focus-within:shadow-lg focus-within:shadow-brand-green/10 transition-all shadow-sm">
-                                        <Sparkles className="w-5 h-5 text-brand-green ml-3 mb-3 flex-shrink-0" />
+                                    <div className="flex items-center gap-3 p-1.5 bg-white/60 dark:bg-[#FFFFFF]/[0.08] backdrop-blur-xl border border-[#E0E0E0] dark:border-white/10 rounded-2xl focus-within:border-brand-green focus-within:shadow-lg focus-within:shadow-brand-green/10 transition-all shadow-sm">
+                                        <Sparkles className="w-5 h-5 text-brand-green ml-3 flex-shrink-0" />
                                         <textarea
                                             ref={inputRef}
                                             value={input}
@@ -948,8 +942,7 @@ export default function ChatAssistant({
                                             onKeyDown={handleKeyDown}
                                             placeholder="Ask me anything..."
                                             rows={1}
-                                            className="flex-1 bg-transparent text-[#19211C] dark:text-white placeholder-[#19211C]/40 dark:placeholder-white/40 focus:outline-none resize-none py-3 text-[15px] max-h-32"
-                                            disabled={loading}
+                                            className="flex-1 bg-transparent text-[#19211C] dark:text-white placeholder-[#19211C]/40 dark:placeholder-white/40 focus:outline-none resize-none py-1.5 text-[15px] max-h-32"
                                         />
                                         <button
                                             onClick={handleSend}
@@ -1040,18 +1033,17 @@ export default function ChatAssistant({
 
                 {/* ═══════════════ BOTTOM INPUT ═══════════════ */}
                 {(messages.length > 0 || activeConvId) && (
-                    <footer className="relative z-10 p-4 bg-gradient-to-t from-white/80 dark:from-[#19211C]/80 via-white/60 dark:via-[#19211C]/40 to-transparent border-t border-[#E0E0E0] dark:border-white/10">
+                    <footer className="relative z-10 px-4 pb-2 pt-1">
                         <div className="max-w-3xl mx-auto">
-                            <div className="flex items-end gap-3 p-2 bg-white/60 dark:bg-[#FFFFFF]/[0.08] border border-[#E0E0E0] dark:border-white/10 rounded-2xl focus-within:border-brand-green focus-within:shadow-lg focus-within:shadow-brand-green/10 transition-all shadow-sm">
-                                <Sparkles className="w-5 h-5 text-brand-green ml-3 mb-3 flex-shrink-0" />
+                            <div className="flex items-center gap-3 p-1.5 bg-white/95 dark:bg-[#FFFFFF]/[0.1] backdrop-blur-xl border border-[#E0E0E0] dark:border-white/10 rounded-2xl focus-within:border-brand-green focus-within:shadow-xl focus-within:shadow-brand-green/20 transition-all shadow-md">
+                                <Sparkles className="w-5 h-5 text-brand-green ml-3 flex-shrink-0" />
                                 <textarea
                                     value={input}
                                     onChange={e => setInput(e.target.value)}
                                     onKeyDown={handleKeyDown}
                                     placeholder="Ask a follow-up..."
                                     rows={1}
-                                    className="flex-1 bg-transparent text-[#19211C] dark:text-white placeholder-[#19211C]/40 dark:placeholder-white/40 focus:outline-none resize-none py-3 text-[15px] max-h-32"
-                                    disabled={loading}
+                                    className="flex-1 bg-transparent text-[#19211C] dark:text-white placeholder-[#19211C]/40 dark:placeholder-white/40 focus:outline-none resize-none py-1.5 text-[15px] max-h-32"
                                 />
                                 <button
                                     onClick={handleSend}

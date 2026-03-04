@@ -221,7 +221,7 @@ export class RegistrationsService {
           fullName: dto.name,
           countryCode: dto.countryCode ?? '+91',
           mobileNumber: dto.mobile,
-          gender: gender,
+            gender: gender,
           schoolLevel,
           schoolStream,
           departmentDegreeId,
@@ -605,10 +605,10 @@ export class RegistrationsService {
             sortCol = 'r.status';
             break;
           case 'gender':
-            sortCol = "u.metadata->>'gender'";
+            sortCol = 'r.gender';
             break;
           case 'mobile_number':
-            sortCol = "u.metadata->>'mobile'";
+            sortCol = 'r.mobileNumber';
             break;
           default:
             sortCol = 'r.createdAt';

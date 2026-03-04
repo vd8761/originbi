@@ -805,17 +805,51 @@ export class RagService {
       }
 
       // ═══════════════════════════════════════════════════════════════
+      // SPECIAL HANDLER: BATCH / GROUP / PROGRAM QUERIES
+      // MUST come before career_report to intercept program queries
+      // ═══════════════════════════════════════════════════════════════
+      if (interpretation.intent === 'batch_group_query') {
+        this.logger.log(`📊 Intent: batch_group_query → handleBatchGroupQuery`);
+        return await this.handleBatchGroupQuery(resolvedQuestion, user);
+      }
+
+      // ═══════════════════════════════════════════════════════════════
       // SPECIAL HANDLER: CAREER REPORT GENERATION (RBAC scoped)
       // ═══════════════════════════════════════════════════════════════
       if (interpretation.intent === 'career_report') {
+        // SAFETY: if the query mentions batch/group/program, divert to batch handler
+        if (/\b(batch|group|program)\b/i.test(resolvedQuestion)) {
+          this.logger.log(`📊 career_report contains batch/group/program keywords → routing to handleBatchGroupQuery`);
+          return await this.handleBatchGroupQuery(resolvedQuestion, user);
+        }
         return await this.handleCareerReport(interpretation.searchTerm, user);
       }
 
       // ═══════════════════════════════════════════════════════════════
       // SPECIAL HANDLER: PERSON LOOKUP (name search + disambiguation)
+      // SAFETY: Skip person lookup if query mentions company/corporate keywords
       // ═══════════════════════════════════════════════════════════════
       if (interpretation.intent === 'person_lookup' && interpretation.searchTerm) {
-        return await this.handlePersonLookup(interpretation.searchTerm, user);
+        // Company/corporate queries should NEVER go through person lookup
+        const companyGuardPattern = /\b(companies?|corporates?|organization|employer|business)\b/i;
+        // Batch/group/program queries should NEVER go through person lookup
+        const batchProgramGuardPattern = /\b(batch|group|program|summarize|summary|readiness|strengths|risks|principal\s+version)\b/i;
+        if (companyGuardPattern.test(resolvedQuestion)) {
+          this.logger.log(`🏢 Company guard: "${interpretation.searchTerm}" query mentions company keywords — redirecting to corporate_details`);
+          interpretation.intent = 'corporate_details';
+          interpretation.table = 'corporate_accounts';
+          // Extract actual company name (remove articles)
+          const companyName = interpretation.searchTerm
+            .replace(/^(the|a|an)\s+/i, '')
+            .replace(/\s+(company|corporate|organization|business|employer)$/i, '')
+            .trim();
+          interpretation.searchTerm = companyName || null;
+        } else if (batchProgramGuardPattern.test(resolvedQuestion)) {
+          this.logger.log(`📊 Batch/program guard at person_lookup: redirecting to handleBatchGroupQuery`);
+          return await this.handleBatchGroupQuery(resolvedQuestion, user);
+        } else {
+          return await this.handlePersonLookup(interpretation.searchTerm, user);
+        }
       }
 
       // ═══════════════════════════════════════════════════════════════
@@ -893,6 +927,19 @@ export class RagService {
       // web for biographical info about people.
       // ═══════════════════════════════════════════════════════════════
       if (interpretation.intent === 'general_knowledge' || interpretation.intent === 'career_guidance') {
+        // COMPANY GUARD: Skip person guard entirely for company/corporate queries
+        const companyKeywordGuard = /\b(companies?|corporates?|organization|employer|business)\b/i;
+        if (companyKeywordGuard.test(resolvedQuestion)) {
+          this.logger.log(`🏢 Company guard: Skipping person guard for company-related query`);
+          interpretation.intent = 'corporate_details';
+          interpretation.table = 'corporate_accounts';
+          interpretation.searchTerm = null;
+        }
+        // BATCH/GROUP/PROGRAM GUARD: Skip person guard for batch/group/program queries
+        else if (/\b(batch|group|program|summarize\s+(?:this\s+)?(?:batch|group)|readiness\s+level|principal\s+version)\b/i.test(resolvedQuestion)) {
+          this.logger.log(`📊 Batch/program guard: Routing to handleBatchGroupQuery`);
+          return await this.handleBatchGroupQuery(resolvedQuestion, user);
+        } else {
         const personNameToCheck = interpretation.searchTerm
           || this.extractName(resolvedQuestion)
           || (nameFieldMatch && nameFieldMatch[1]?.trim());
@@ -945,24 +992,8 @@ export class RagService {
             const scopeMsg = guardRole === 'CORPORATE' ? ' within your organization' : '';
             this.logger.warn(`⚠️ Person guard: "${personNameToCheck}" not found${scopeMsg}`);
 
-            // Smart fallback: try LLM to answer the question intelligently
-            // instead of dead-ending with "not found"
-            try {
-              const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
-              const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, conversationHistory);
-              if (answer && answer.length > 20) {
-                this.logger.log(`✅ Person guard fallback: LLM gave a useful answer`);
-                return {
-                  answer,
-                  searchType: 'intelligent_response',
-                  confidence: 0.85,
-                };
-              }
-            } catch (fallbackErr) {
-              this.logger.warn(`Person guard LLM fallback failed: ${fallbackErr.message}`);
-            }
-
-            // If LLM fallback also fails, use the improved error message
+            // NO LLM FALLBACK — never use general/web knowledge for person queries.
+            // This prevents the LLM from fabricating data about people.
             return {
               answer: BI_PERSONA.errors.notFound(personNameToCheck),
               searchType: 'person_not_found',
@@ -993,6 +1024,7 @@ export class RagService {
             };
           }
         }
+        } // end else (non-company person guard)
       }
 
       // ═══════════════════════════════════════════════════════════════
@@ -1015,23 +1047,65 @@ export class RagService {
               sources: { rows: tsResult.rowCount, sql: tsResult.sql },
             };
           }
-          // Low confidence — try LLM as this might be a general question misclassified
-          this.logger.log('🔄 Text-to-SQL low confidence — falling through to LLM');
+          // Low confidence — return a clear DB-only response, NEVER fallback to LLM general knowledge
+          this.logger.log('🔄 Text-to-SQL low confidence — returning DB-only response');
+          return {
+            answer: `I couldn't find matching data in the platform database for that query. All my responses are based exclusively on OriginBI platform data.\n\nTry rephrasing your question, for example:\n- **"list companies"** — see all corporate accounts\n- **"list candidates"** — see all registered candidates\n- **"how many users"** — get user counts\n- **"show top performers"** — see highest scorers`,
+            searchType: 'data_query_no_results',
+            confidence: 0.6,
+          };
         } catch (tsError) {
-          this.logger.warn(`Text-to-SQL data_query failed: ${tsError.message} — trying LLM fallback`);
+          this.logger.warn(`Text-to-SQL data_query failed: ${tsError.message}`);
+          return {
+            answer: `I encountered an issue querying the database. Please try rephrasing your question or try a simpler query.`,
+            searchType: 'data_query_error',
+            confidence: 0.4,
+          };
         }
-        // Fallback: answer via LLM if Text-to-SQL can't handle it
-        const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
-        const llmAnswer = await this.oriIntelligence.answerAnyQuestion(resolvedQuestion, userProfile, conversationHistory);
-        return {
-          answer: llmAnswer,
-          searchType: 'intelligent_response',
-          confidence: 0.8,
-        };
       }
 
       if (interpretation.intent === 'general_knowledge') {
         this.logger.log('🧠 Intent: general_knowledge → checking if data question first');
+
+        // ═══════════════════════════════════════════════════════════════
+        // PLATFORM DATA GUARD — Prevent LLM from answering platform
+        // data questions (companies, candidates, scores, etc.) using
+        // general/web knowledge. Force these through the DB pipeline.
+        // ═══════════════════════════════════════════════════════════════
+        const platformDataPattern = /\b(companies|corporates?|company|organization|employer|accounts?|candidates?|students?|registrations?|users?|employees?|resources?|staff|members?|assessments?|scores?|results?|affiliates?|referrals?|groups?|batches?|credits?)\b/i;
+        const isPlatformDataQuery = platformDataPattern.test(resolvedQuestion);
+
+        if (isPlatformDataQuery) {
+          this.logger.log('🛡️ DATA GUARD: Platform entity detected in general_knowledge query — forcing DB route');
+          try {
+            const tsResult = await this.textToSqlService.answerQuestion(
+              resolvedQuestion, user as UserContext, conversationHistory,
+            );
+            if (tsResult.confidence > 0.3) {
+              return {
+                answer: tsResult.answer,
+                searchType: tsResult.searchType,
+                confidence: tsResult.confidence,
+                sources: { rows: tsResult.rowCount },
+              };
+            }
+            // If Text-to-SQL returned low confidence with 0 rows, give a clear DB-only answer
+            if (tsResult.rowCount === 0) {
+              return {
+                answer: `No matching data found in the platform database for your query. I can only provide information that exists in the OriginBI database — I don't use external or web-based data sources.\n\nTry rephrasing your question, or ask "what can you do" for help.`,
+                searchType: 'data_guard_no_results',
+                confidence: 0.8,
+              };
+            }
+          } catch (tsErr) {
+            this.logger.warn(`Text-to-SQL data guard failed: ${tsErr.message}`);
+            return {
+              answer: `I couldn't retrieve that data from the platform database right now. Please try rephrasing your question.\n\nFor example, try: **"list companies"**, **"list candidates"**, **"show top performers"**, or **"how many users"**.`,
+              searchType: 'data_guard_error',
+              confidence: 0.6,
+            };
+          }
+        }
 
         // SMART ROUTING: If the question looks like it wants DB data,
         // route through Text-to-SQL instead of generic LLM
@@ -1216,7 +1290,17 @@ export class RagService {
           };
         }
 
-        // Only use LLM fallback for non-DB intents (general_knowledge, career_guidance)
+        // Only use LLM fallback for genuinely non-DB intents (career_guidance, etc.)
+        // Even here, check that the question isn't about platform entities
+        const platformEntityCheck = /\b(companies|corporates?|company|candidates?|students?|users?|employees?|resources?|assessments?|scores?|results?|affiliates?|registrations?)\\b/i;
+        if (platformEntityCheck.test(question)) {
+          // Platform data question — return DB-only message, don't use LLM
+          return {
+            answer: `No matching data found in the platform database for your query. All responses are based exclusively on OriginBI platform data.\n\nTry rephrasing, or use commands like: **"list companies"**, **"list candidates"**, **"show top performers"**.`,
+            searchType: 'data_guard_no_results',
+            confidence: 0.7,
+          };
+        }
         const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
         const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, conversationHistory);
         return {
@@ -1262,24 +1346,31 @@ export class RagService {
       }
 
       // ═══════════════════════════════════════════════════════════
-      // GRACEFUL FALLBACK: Try LLM general knowledge as last attempt
-      // Even if the DB query fails, the LLM can still help with the question
+      // GRACEFUL FALLBACK: Only use LLM for genuinely non-data questions
+      // Platform data queries MUST NOT fall back to LLM general knowledge
       // ═══════════════════════════════════════════════════════════
-      try {
-        this.logger.log('🧠 All DB paths failed — trying LLM general knowledge fallback...');
-        const userId = user?.id || 0;
-        const userEmail = user?.email || '';
-        const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
-        const llmAnswer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, '');
-        if (llmAnswer && !llmAnswer.includes('experiencing high demand')) {
-          return {
-            answer: llmAnswer,
-            searchType: 'llm_fallback',
-            confidence: 0.7,
-          };
+      const platformEntityPattern = /\b(companies|corporates?|company|candidates?|students?|users?|employees?|resources?|assessments?|scores?|results?|affiliates?|registrations?)\b/i;
+      const isDataRelatedQuery = platformEntityPattern.test(question) || this.textToSqlService.isDataQuestion(question);
+
+      if (!isDataRelatedQuery) {
+        try {
+          this.logger.log('🧠 Non-data query — trying LLM general knowledge fallback...');
+          const userId = user?.id || 0;
+          const userEmail = user?.email || '';
+          const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
+          const llmAnswer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, '');
+          if (llmAnswer && !llmAnswer.includes('experiencing high demand')) {
+            return {
+              answer: llmAnswer,
+              searchType: 'llm_fallback',
+              confidence: 0.7,
+            };
+          }
+        } catch (llmError) {
+          this.logger.warn(`LLM fallback also failed: ${llmError.message}`);
         }
-      } catch (llmError) {
-        this.logger.warn(`LLM fallback also failed: ${llmError.message}`);
+      } else {
+        this.logger.log('🛡️ DATA GUARD: Skipping LLM fallback for data-related query to prevent web/general data leakage');
       }
 
       // ── Role-aware error message as absolute last resort ──
@@ -1296,6 +1387,399 @@ export class RagService {
         answer: `I couldn't process that request right now. ${suggestion}\n\nYou can also ask me general questions about careers, technologies, skills, or interview preparation — I'm happy to help!`,
         searchType: 'error',
         confidence: 0,
+      };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // BATCH / GROUP / PROGRAM HANDLER — dedicated handler for group analytics
+  // Generates targeted SQL directly without relying on generic text-to-sql
+  // ═══════════════════════════════════════════════════════════════════════════
+  private async handleBatchGroupQuery(
+    question: string,
+    user?: any,
+  ): Promise<QueryResult> {
+    const userRole = (user?.role || 'STUDENT').toUpperCase();
+    const corporateId = user?.corporateId;
+    const q = question.toLowerCase();
+
+    // ── Extract group/batch/program name ──
+    let searchName: string | null = null;
+    // 1) Parenthesized name: (KIOTstudents) or (KIOTstudents  — handle missing close paren
+    const parenMatch = question.match(/\(([^)]+)\)?/);
+    if (parenMatch) searchName = parenMatch[1].trim();
+    // 2) After "batch" / "group": summarize batch KIOTstudents
+    if (!searchName) {
+      const afterBatch = question.match(/\b(?:batch|group)\s+(?:named?\s+)?["']?([A-Za-z0-9_\-]+(?:\s+[A-Za-z0-9_\-]+)*)["']?/i);
+      if (afterBatch) {
+        let n = afterBatch[1].replace(/\b(summary|summarize|report|strengths|risks|readiness|overview|stats|statistics|performance|analysis|details?|info|candidates?)\b/gi, '').trim();
+        if (n.length >= 2) searchName = n;
+      }
+    }
+    // 3) "for [program/group name]": Generate report for School Students Program
+    if (!searchName) {
+      const forMatch = question.match(/\bfor\s+(.+?)(?:\s*$|\s*\?)/i);
+      if (forMatch) {
+        let pn = forMatch[1].replace(/\b(program|report|summary|version|principal|generate|no\s+disc\s+naming|batch|group)\b/gi, '').trim();
+        if (pn.length >= 2) searchName = pn;
+      }
+    }
+    // 4) "program [name]" or "[Name] Program" 
+    if (!searchName) {
+      const progMatch = question.match(/\bprogram\s+["']?(.+?)["']?\s*(?:$|\?|summary|report)/i);
+      if (progMatch) {
+        let pn = progMatch[1].replace(/\b(report|summary|version|principal|generate)\b/gi, '').trim();
+        if (pn.length >= 2) searchName = pn;
+      }
+    }
+    // 5) Full program name like "School Students Program"
+    if (!searchName) {
+      const fullProgMatch = question.match(/["']?([A-Z][A-Za-z\s]+Program)["']?/i);
+      if (fullProgMatch) searchName = fullProgMatch[1].trim();
+    }
+
+    this.logger.log(`📊 handleBatchGroupQuery: question="${question}", searchName="${searchName}", role=${userRole}`);
+
+    // ── Determine if this is about a program or a group/batch ──
+    const isProgramQuery = /\bprogram\b/i.test(q) || /\b(principal|version|disc\s+naming)\b/i.test(q);
+    const isListQuery = /\b(list|show|all|get|display)\b/i.test(q) && !searchName;
+
+    try {
+      // ═══ LIST ALL GROUPS ═══
+      if (isListQuery && !isProgramQuery) {
+        const params: any[] = [];
+        let listSql = `
+          SELECT g.name AS group_name, g.code AS group_code,
+            COUNT(DISTINCT r.id) AS total_candidates,
+            COUNT(DISTINCT CASE WHEN aa.status = 'COMPLETED' THEN aa.id END) AS completed,
+            g.is_active, g.created_at
+          FROM groups g
+          LEFT JOIN registrations r ON r.group_id = g.id AND r.is_deleted = false
+          LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id
+          WHERE g.is_deleted = false`;
+        if (userRole === 'CORPORATE' && corporateId) {
+          listSql += ` AND g.corporate_account_id = $1`;
+          params.push(corporateId);
+        }
+        listSql += ` GROUP BY g.id, g.name, g.code, g.is_active, g.created_at ORDER BY g.created_at DESC LIMIT 50`;
+
+        const rows = await this.dataSource.query(listSql, params);
+        if (!rows || rows.length === 0) {
+          return { answer: 'No groups/batches found in the system.', searchType: 'batch_group_query', confidence: 0.8 };
+        }
+        let table = '| Group Name | Code | Total Candidates | Completed | Active | Created |\n';
+        table += '| --- | --- | --- | --- | --- | --- |\n';
+        for (const r of rows) {
+          table += `| ${r.group_name} | ${r.group_code || '-'} | ${r.total_candidates} | ${r.completed} | ${r.is_active ? 'Yes' : 'No'} | ${new Date(r.created_at).toLocaleDateString()} |\n`;
+        }
+        return { answer: `**📋 All Groups/Batches (${rows.length})**\n\n${table}`, searchType: 'batch_group_query', confidence: 0.95 };
+      }
+
+      // ═══ LIST ALL PROGRAMS ═══
+      if (isListQuery && isProgramQuery) {
+        const rows = await this.dataSource.query(`
+          SELECT p.name AS program_name, p.code AS program_code, p.description,
+            COUNT(DISTINCT r.id) AS total_registrations,
+            COUNT(DISTINCT CASE WHEN aa.status = 'COMPLETED' THEN aa.id END) AS completed
+          FROM programs p
+          LEFT JOIN registrations r ON r.program_id = p.id AND r.is_deleted = false
+          LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id
+          WHERE p.is_active = true
+          GROUP BY p.id, p.name, p.code, p.description
+          ORDER BY total_registrations DESC LIMIT 50`);
+        if (!rows || rows.length === 0) {
+          return { answer: 'No active programs found in the system.', searchType: 'batch_group_query', confidence: 0.8 };
+        }
+        let table = '| Program Name | Code | Description | Registrations | Completed |\n';
+        table += '| --- | --- | --- | --- | --- |\n';
+        for (const r of rows) {
+          table += `| ${r.program_name} | ${r.program_code || '-'} | ${(r.description || '-').substring(0, 60)} | ${r.total_registrations} | ${r.completed} |\n`;
+        }
+        return { answer: `**📋 All Programs (${rows.length})**\n\n${table}`, searchType: 'batch_group_query', confidence: 0.95 };
+      }
+
+      // ═══ PROGRAM SUMMARY ═══
+      if (isProgramQuery && searchName) {
+        // Find matching program
+        const programs = await this.dataSource.query(
+          `SELECT id, name, code, description, assessment_title, report_title FROM programs WHERE name ILIKE $1 AND is_active = true LIMIT 5`,
+          [`%${searchName}%`]
+        );
+        if (!programs || programs.length === 0) {
+          // Try broader search
+          const words = searchName.split(/\s+/).filter(w => w.length >= 3);
+          let found: any[] = [];
+          for (const word of words) {
+            found = await this.dataSource.query(
+              `SELECT id, name, code, description FROM programs WHERE name ILIKE $1 AND is_active = true LIMIT 5`,
+              [`%${word}%`]
+            );
+            if (found.length > 0) break;
+          }
+          if (found.length === 0) {
+            return {
+              answer: `No program found matching **"${searchName}"**. Try **"list programs"** to see all available programs.`,
+              searchType: 'batch_group_query', confidence: 0.7,
+            };
+          }
+          // Found via broader search
+          programs.push(...found);
+        }
+        const prog = programs[0];
+
+        // Stats
+        const statsParams: any[] = [prog.id];
+        let regRbac = '';
+        if (userRole === 'CORPORATE' && corporateId) {
+          regRbac = ` AND r.corporate_account_id = $2`;
+          statsParams.push(corporateId);
+        }
+        const stats = await this.dataSource.query(`
+          SELECT
+            COUNT(DISTINCT r.id) AS total_registrations,
+            COUNT(DISTINCT CASE WHEN aa.status = 'COMPLETED' THEN aa.id END) AS completed_assessments,
+            COUNT(DISTINCT CASE WHEN aa.status = 'NOT_STARTED' OR aa.status IS NULL THEN r.id END) AS not_started,
+            ROUND(AVG(CASE WHEN aa.status = 'COMPLETED' THEN aa.total_score END), 1) AS avg_score,
+            MAX(CASE WHEN aa.status = 'COMPLETED' THEN aa.total_score END) AS highest_score,
+            MIN(CASE WHEN aa.status = 'COMPLETED' THEN aa.total_score END) AS lowest_score,
+            COUNT(DISTINCT CASE WHEN r.gender = 'MALE' THEN r.id END) AS male_count,
+            COUNT(DISTINCT CASE WHEN r.gender = 'FEMALE' THEN r.id END) AS female_count
+          FROM registrations r
+          LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id
+          WHERE r.program_id = $1 AND r.is_deleted = false${regRbac}`, statsParams);
+
+        // Personality distribution
+        const traitParams: any[] = [prog.id];
+        let traitRbac = '';
+        if (userRole === 'CORPORATE' && corporateId) {
+          traitRbac = ` AND r.corporate_account_id = $2`;
+          traitParams.push(corporateId);
+        }
+        const traits = await this.dataSource.query(`
+          SELECT pt.blended_style_name AS personality_type, COUNT(*) AS count,
+            ROUND(AVG(aa.total_score), 1) AS avg_score
+          FROM registrations r
+          JOIN assessment_attempts aa ON aa.registration_id = r.id AND aa.status = 'COMPLETED'
+          LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+          WHERE r.program_id = $1 AND r.is_deleted = false${traitRbac}
+          GROUP BY pt.id, pt.blended_style_name ORDER BY count DESC`, traitParams);
+
+        const s = stats[0] || {};
+        const totalReg = parseInt(s.total_registrations) || 0;
+        const completed = parseInt(s.completed_assessments) || 0;
+        const notStarted = parseInt(s.not_started) || 0;
+        const readinessRate = totalReg > 0 ? Math.round((completed / totalReg) * 100) : 0;
+
+        let response = `## 📊 Program Summary: ${prog.name}\n\n`;
+        if (prog.description) response += `> ${prog.description}\n\n`;
+        response += `### 📈 Key Metrics\n`;
+        response += `- **Total Registrations**: ${totalReg}\n`;
+        response += `- **Completed Assessments**: ${completed}\n`;
+        response += `- **Not Started / Pending**: ${notStarted}\n`;
+        response += `- **Readiness Rate**: ${readinessRate}%\n`;
+        if (s.avg_score) response += `- **Average Score**: ${s.avg_score}\n`;
+        if (s.highest_score) response += `- **Highest Score**: ${s.highest_score}\n`;
+        if (s.lowest_score) response += `- **Lowest Score**: ${s.lowest_score}\n`;
+        response += `- **Gender**: ${s.male_count || 0} Male, ${s.female_count || 0} Female\n\n`;
+
+        if (traits.length > 0) {
+          response += `### 🧠 Personality Distribution\n`;
+          response += `| Personality Type | Count | Avg Score |\n| --- | --- | --- |\n`;
+          for (const t of traits) {
+            response += `| ${t.personality_type || 'Unknown'} | ${t.count} | ${t.avg_score || '-'} |\n`;
+          }
+          response += '\n';
+        }
+
+        if (notStarted > 0 || readinessRate < 50) {
+          response += `### ⚠️ Risks\n`;
+          if (notStarted > 0) response += `- **${notStarted}** candidates have not started their assessment yet\n`;
+          if (readinessRate < 50) response += `- Readiness rate is below 50% — consider follow-up\n`;
+          response += '\n';
+        }
+
+        return { answer: response, searchType: 'batch_group_query', confidence: 0.95 };
+      }
+
+      // ═══ GROUP/BATCH SUMMARY ═══
+      if (!isProgramQuery || searchName) {
+        // Find the group
+        let groupRows: any[];
+        if (searchName) {
+          const groupParams: any[] = [`%${searchName}%`];
+          let groupRbac = '';
+          if (userRole === 'CORPORATE' && corporateId) {
+            groupRbac = ` AND corporate_account_id = $2`;
+            groupParams.push(corporateId);
+          }
+          groupRows = await this.dataSource.query(
+            `SELECT id, name, code, corporate_account_id FROM groups WHERE (name ILIKE $1 OR code ILIKE $1) AND is_deleted = false${groupRbac} LIMIT 5`,
+            groupParams,
+          );
+          // If no match, try broader word-by-word search
+          if ((!groupRows || groupRows.length === 0) && searchName.length >= 3) {
+            const words = searchName.split(/\s+/).filter(w => w.length >= 3);
+            for (const word of words) {
+              const wParams: any[] = [`%${word}%`];
+              let wRbac = '';
+              if (userRole === 'CORPORATE' && corporateId) {
+                wRbac = ` AND corporate_account_id = $2`;
+                wParams.push(corporateId);
+              }
+              groupRows = await this.dataSource.query(
+                `SELECT id, name, code, corporate_account_id FROM groups WHERE (name ILIKE $1 OR code ILIKE $1) AND is_deleted = false${wRbac} LIMIT 5`,
+                wParams,
+              );
+              if (groupRows && groupRows.length > 0) break;
+            }
+          }
+        } else {
+          // No name — summarize all groups
+          const allParams: any[] = [];
+          let allRbac = '';
+          if (userRole === 'CORPORATE' && corporateId) {
+            allRbac = ` AND corporate_account_id = $1`;
+            allParams.push(corporateId);
+          }
+          groupRows = await this.dataSource.query(
+            `SELECT id, name, code, corporate_account_id FROM groups WHERE is_deleted = false${allRbac} LIMIT 20`,
+            allParams,
+          );
+        }
+
+        if (!groupRows || groupRows.length === 0) {
+          return {
+            answer: searchName
+              ? `No group/batch found matching **"${searchName}"**. Try **"list groups"** to see all available groups/batches.`
+              : `No groups/batches found in the system.`,
+            searchType: 'batch_group_query', confidence: 0.7,
+          };
+        }
+
+        // Build summary for each matching group
+        const summaries: string[] = [];
+        for (const group of groupRows.slice(0, 5)) {
+          const gParams: any[] = [group.id];
+          let regRbac = '';
+          if (userRole === 'CORPORATE' && corporateId) {
+            regRbac = ` AND r.corporate_account_id = $2`;
+            gParams.push(corporateId);
+          }
+
+          // Stats
+          const stats = await this.dataSource.query(`
+            SELECT
+              COUNT(DISTINCT r.id) AS total_candidates,
+              COUNT(DISTINCT CASE WHEN aa.status = 'COMPLETED' THEN aa.id END) AS completed,
+              COUNT(DISTINCT CASE WHEN aa.status = 'NOT_STARTED' OR aa.status IS NULL THEN r.id END) AS not_started,
+              ROUND(AVG(CASE WHEN aa.status = 'COMPLETED' THEN aa.total_score END), 1) AS avg_score,
+              MAX(CASE WHEN aa.status = 'COMPLETED' THEN aa.total_score END) AS highest_score,
+              MIN(CASE WHEN aa.status = 'COMPLETED' THEN aa.total_score END) AS lowest_score,
+              COUNT(DISTINCT CASE WHEN r.gender = 'MALE' THEN r.id END) AS male_count,
+              COUNT(DISTINCT CASE WHEN r.gender = 'FEMALE' THEN r.id END) AS female_count
+            FROM registrations r
+            LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id
+            WHERE r.group_id = $1 AND r.is_deleted = false${regRbac}`, gParams);
+
+          // Personality distribution
+          const traits = await this.dataSource.query(`
+            SELECT pt.blended_style_name AS personality_type, COUNT(*) AS count,
+              ROUND(AVG(aa.total_score), 1) AS avg_score
+            FROM registrations r
+            JOIN assessment_attempts aa ON aa.registration_id = r.id AND aa.status = 'COMPLETED'
+            LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+            WHERE r.group_id = $1 AND r.is_deleted = false${regRbac}
+            GROUP BY pt.id, pt.blended_style_name ORDER BY count DESC`, gParams);
+
+          // Assigned programs via group_assessments
+          const programs = await this.dataSource.query(`
+            SELECT p.name AS program_name, ga.total_candidates, ga.status
+            FROM group_assessments ga
+            JOIN programs p ON ga.program_id = p.id
+            WHERE ga.group_id = $1
+            ORDER BY ga.created_at DESC LIMIT 10`, [group.id]);
+
+          const s = stats[0] || {};
+          const totalCand = parseInt(s.total_candidates) || 0;
+          const completed = parseInt(s.completed) || 0;
+          const notStarted = parseInt(s.not_started) || 0;
+          const readinessRate = totalCand > 0 ? Math.round((completed / totalCand) * 100) : 0;
+
+          let summary = `## 📊 Batch/Group: ${group.name}${group.code ? ` (${group.code})` : ''}\n\n`;
+          summary += `### 📈 Key Metrics\n`;
+          summary += `- **Total Candidates**: ${totalCand}\n`;
+          summary += `- **Completed Assessments**: ${completed}\n`;
+          summary += `- **Not Started / Pending**: ${notStarted}\n`;
+          summary += `- **Readiness Rate**: ${readinessRate}%\n`;
+          if (s.avg_score) summary += `- **Average Score**: ${s.avg_score}\n`;
+          if (s.highest_score) summary += `- **Highest Score**: ${s.highest_score}\n`;
+          if (s.lowest_score) summary += `- **Lowest Score**: ${s.lowest_score}\n`;
+          summary += `- **Gender**: ${s.male_count || 0} Male, ${s.female_count || 0} Female\n\n`;
+
+          // Strengths (personality distribution)
+          if (traits.length > 0) {
+            summary += `### 🧠 Strengths (Personality Distribution)\n`;
+            summary += `| Personality Type | Count | Avg Score |\n| --- | --- | --- |\n`;
+            for (const t of traits) {
+              summary += `| ${t.personality_type || 'Unknown'} | ${t.count} | ${t.avg_score || '-'} |\n`;
+            }
+            summary += '\n';
+          }
+
+          // Readiness levels
+          summary += `### 🎯 Readiness Levels\n`;
+          if (readinessRate >= 80) summary += `- 🟢 **High Readiness** (${readinessRate}% completion rate)\n`;
+          else if (readinessRate >= 50) summary += `- 🟡 **Moderate Readiness** (${readinessRate}% completion rate)\n`;
+          else summary += `- 🔴 **Low Readiness** (${readinessRate}% completion rate) — immediate attention needed\n`;
+          summary += '\n';
+
+          // Risks
+          const risks: string[] = [];
+          if (notStarted > 0) risks.push(`**${notStarted}** candidates have not started their assessment`);
+          if (readinessRate < 50) risks.push(`Readiness rate is critically low at ${readinessRate}%`);
+          if (totalCand === 0) risks.push('No candidates registered in this batch');
+          if (s.lowest_score && parseFloat(s.lowest_score) < 30) risks.push(`Lowest score is ${s.lowest_score} — some candidates may need support`);
+          if (risks.length > 0) {
+            summary += `### ⚠️ Risks\n`;
+            for (const risk of risks) summary += `- ${risk}\n`;
+            summary += '\n';
+          }
+
+          // Assigned programs
+          if (programs.length > 0) {
+            summary += `### 📚 Assigned Programs\n`;
+            for (const p of programs) {
+              summary += `- **${p.program_name}** — ${p.total_candidates || 0} candidates, status: ${p.status || 'N/A'}\n`;
+            }
+            summary += '\n';
+          }
+
+          summaries.push(summary);
+        }
+
+        return {
+          answer: summaries.join('\n---\n\n'),
+          searchType: 'batch_group_query',
+          confidence: 0.95,
+        };
+      }
+
+      // ═══ FALLBACK: Route to text-to-sql for anything else ═══
+      this.logger.log('📊 Batch/group query — falling back to Text-to-SQL');
+      const tsResult = await this.textToSqlService.answerQuestion(
+        question, user as any, '',
+      );
+      return {
+        answer: tsResult.answer,
+        searchType: tsResult.searchType,
+        confidence: tsResult.confidence,
+      };
+    } catch (error) {
+      this.logger.error(`❌ handleBatchGroupQuery failed: ${error.message}`, error.stack);
+      return {
+        answer: `I encountered an issue querying batch/group data. Please try rephrasing your question.\n\nExamples:\n- **"list groups"** — see all batches\n- **"summarize batch KIOTstudents"** — get batch summary\n- **"list programs"** — see all programs`,
+        searchType: 'batch_group_query',
+        confidence: 0.4,
       };
     }
   }
@@ -2473,9 +2957,14 @@ export class RagService {
     // This avoids an LLM call for ~70% of queries
     const localResult = this.fastLocalMatch(question);
     if (localResult) {
-      this.logger.log(`⚡ Fast-matched intent: ${localResult.intent} (no LLM call)`);
-      this.queryCache.set(cacheKey, { result: localResult, timestamp: Date.now() });
-      return localResult;
+      // CRITICAL: Run domain overrides even on fastLocalMatch results
+      // This catches cases like "tell about the touchmark company" where
+      // extractName returns "the touchmark" as person_lookup, but the query
+      // actually mentions "company" and should route to corporate_details.
+      const overridden = this.applyDomainOverrides(question, localResult);
+      this.logger.log(`⚡ Fast-matched intent: ${overridden.intent} (no LLM call${overridden.intent !== localResult.intent ? `, overridden from ${localResult.intent}` : ''})`);
+      this.queryCache.set(cacheKey, { result: overridden, timestamp: Date.now() });
+      return overridden;
     }
 
     // ── LLM call with compact prompt (~400 tokens instead of ~1200) ──
@@ -2530,7 +3019,14 @@ INTENTS (choose the MOST SPECIFIC one):
 - affiliate_lookup: Look up a specific affiliate by name
 - affiliate_students: Students referred by affiliate(s)
 
-Tables: users|registrations|assessment_attempts|career_roles|corporate_accounts|affiliate_accounts|affiliate_referral_transactions|affiliate_settlement_transactions|none
+Tables: users|registrations|assessment_attempts|career_roles|corporate_accounts|affiliate_accounts|affiliate_referral_transactions|affiliate_settlement_transactions|groups|group_assessments|programs|none
+
+DOMAIN SYNONYMS:
+- "batch" = group (groups table). A batch/group contains candidates.
+- "program" = assessment program (programs table). Groups are assigned to programs via group_assessments.
+- "summarize batch X" / "batch summary" / "group report" → data_query with table=groups
+- "list programs" / "program overview" → data_query with table=programs
+- "School Students Program" is a PROGRAM NAME, not a person name
 
 CRITICAL RULES:
 1. If someone asks "what are the skills to become X" or "how to become X" or "best courses for X" or "explain X" → general_knowledge (NOT list_users, NOT career_roles)
@@ -2548,6 +3044,7 @@ CRITICAL RULES:
 13. **"candidates for [role]" or "candidate's for [role]" = the user wants to find/match candidates for that role → jd_candidate_match or list_candidates, NEVER person_lookup**
 14. **CORPORATE DATA**: "list corporates", "corporate details", "company accounts", "show companies" → corporate_details. If conversation previously mentioned corporates/companies and user says "list those details" or "show details" → corporate_details
 15. **FOLLOW-UP CONTEXT**: When conversation history mentions a topic (e.g., corporate accounts, candidates), follow-up like "list those", "show details", "tell me more" should route to the same topic's intent
+16. **BATCH/GROUP/PROGRAM queries**: "summarize batch X", "group summary", "strengths of batch X", "readiness levels for group", "list groups/batches", "program summary", "principal version report for program X", "School Students Program" → data_query. NEVER treat program/batch/group names like "School Students Program" or "KIOTstudents" as person names.
 
 Query: "${question}"
 JSON:`;
@@ -2664,7 +3161,39 @@ JSON:`;
     }
 
     // If query asks about "corporate" data but got list_users → correct to list_candidates or keep
-    // (Add more domain overrides here as needed in the future)
+    // ═══════════════════════════════════════════════════════════════
+    // CORPORATE/COMPANY DOMAIN OVERRIDE
+    // If query mentions companies/corporates and LLM returned a misrouted intent,
+    // reroute to corporate_details or data_query to prevent web data leakage
+    // Also catches career_guidance that should be corporate queries
+    // ═══════════════════════════════════════════════════════════════
+    const companyKeywords = /\b(companies|corporates?|company|organization|employer|business)\b/i;
+    const misroutedIntents = ['general_knowledge', 'list_users', 'person_lookup', 'career_guidance'];
+
+    if (companyKeywords.test(q) && misroutedIntents.includes(result.intent)) {
+      this.logger.warn(
+        `🔄 Domain override: LLM returned "${result.intent}" for company/corporate query, correcting...`,
+      );
+
+      // Try to extract a specific company name from the query
+      const companyNameMatch = q.match(/\b(?:tell|know|learn|about|bout)\s+(?:me\s+)?(?:about|bout)?\s*(?:the\s+)?(.+?)\s+(?:company|corporate|organization|business)\b/i)
+        || q.match(/\babout\s+(?:the\s+)?(.+?)\s+(?:company|corporate|organization|business)\b/i);
+      let extractedCompanyName: string | null = null;
+      if (companyNameMatch && companyNameMatch[1]) {
+        const rawName = companyNameMatch[1].replace(/^(the|a|an)\s+/i, '').trim();
+        // Avoid domain terms as company names
+        const domainWords = new Set(['all', 'the', 'my', 'our', 'your', 'their', 'this', 'that', 'any', 'some', 'list', 'show', 'get', 'display']);
+        if (rawName && rawName.length >= 2 && !domainWords.has(rawName.toLowerCase())) {
+          extractedCompanyName = rawName;
+        }
+      }
+
+      if (/\b(how many|count|total|number)\b/i.test(q)) {
+        return { ...result, intent: 'data_query', table: 'corporate_accounts', searchTerm: null };
+      }
+      // Route to corporate_details, preserving company name if found
+      return { ...result, intent: 'corporate_details', table: 'corporate_accounts', searchTerm: extractedCompanyName };
+    }
 
     // ═══════════════════════════════════════════════════════════════
     // CRITICAL SAFETY NET: Strip domain words from searchTerm
@@ -2982,17 +3511,178 @@ JSON:`;
       return { intent: 'custom_report', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // BATCH / GROUP / PROGRAM QUERIES — MUST come BEFORE career_report
+    // because "generate report for School Students Program" contains "generate.*report"
+    // which would otherwise be intercepted by the career_report pattern
+    // ═══════════════════════════════════════════════════════════════
+    const batchGroupProgramGuard = /\b(batch|group|program)\b/i;
+    if (batchGroupProgramGuard.test(q)) {
+      // Summarize / overview / analyze a batch/group
+      if (/\b(summarize|summary|overview|analyze|analyse|report|stats?|statistics|performance|strengths?|risks?|readiness)\b/i.test(q) &&
+          /\b(batch|group)\b/i.test(q)) {
+        let groupName: string | null = null;
+        const pm = question.match(/\(([^)]+)\)?/);  // handle both (X) and (X without closing
+        if (pm) groupName = pm[1].trim();
+        if (!groupName) {
+          const nm = question.match(/\b(?:batch|group)\s+(?:named?\s+)?["']?([A-Za-z0-9_\-]+(?:\s+[A-Za-z0-9_\-]+)*)["']?/i);
+          if (nm) {
+            let n = nm[1].replace(/\b(summary|summarize|report|strengths|risks|readiness|overview|stats|statistics|performance|analysis)\b/gi, '').trim();
+            if (n.length >= 2) groupName = n;
+          }
+        }
+        return { intent: 'batch_group_query', searchTerm: groupName, table: 'groups', includePersonality: true };
+      }
+      // List groups/batches
+      if (/\b(list|show|get|display|all)\s+(the\s+)?(groups?|batches?)\b/i.test(q) || /^(groups?|batches?)\s*\??$/i.test(q)) {
+        return { intent: 'batch_group_query', searchTerm: null, table: 'groups', includePersonality: false };
+      }
+      // Program summary / report / overview
+      if (/\bprogram\b/i.test(q) && /\b(summarize|summary|overview|report|generate|principal|version|school|stats?|strengths?|risks?|readiness)\b/i.test(q)) {
+        let programName: string | null = null;
+        const forM = question.match(/\bfor\s+(.+?)(?:\s*$|\s*\?)/i);
+        if (forM) {
+          let pn = forM[1].replace(/\b(program|report|summary|version|principal|generate|no\s+disc\s+naming)\b/gi, '').trim();
+          if (pn.length >= 2) programName = pn;
+        }
+        if (!programName) {
+          const pnM = question.match(/\bprogram\s+["']?(.+?)["']?\s*(?:$|\?|summary|report)/i);
+          if (pnM) {
+            let pn = pnM[1].replace(/\b(report|summary|version|principal|generate)\b/gi, '').trim();
+            if (pn.length >= 2) programName = pn;
+          }
+        }
+        // Also try extracting from "School Students Program" as-is
+        if (!programName) {
+          const fullProgMatch = question.match(/["']?([A-Z][A-Za-z\s]+Program)["']?/i);
+          if (fullProgMatch) programName = fullProgMatch[1].trim();
+        }
+        return { intent: 'batch_group_query', searchTerm: programName, table: 'programs', includePersonality: true };
+      }
+      // List programs
+      if (/\b(list|show|get|display|all)\s+(the\s+)?(programs?)\b/i.test(q) || /^programs?\s*\??$/i.test(q)) {
+        return { intent: 'batch_group_query', searchTerm: null, table: 'programs', includePersonality: false };
+      }
+      // Any remaining query mentioning "batch/group/program" with analytical intent
+      if (/\b(batch|group)\b/i.test(q) && /\b(candidate|student|member|score|assessment|completed?|total|count|detail|info|who|how|many|result|age|gender|male|female)\b/i.test(q)) {
+        let groupName: string | null = null;
+        const pm = question.match(/\(([^)]+)\)?/);
+        if (pm) groupName = pm[1].trim();
+        if (!groupName) {
+          const nm = question.match(/\b(?:batch|group)\s+(?:named?\s+)?["']?([A-Za-z0-9_\-]+)["']?/i);
+          if (nm) groupName = nm[1].trim();
+        }
+        return { intent: 'batch_group_query', searchTerm: groupName, table: 'groups', includePersonality: true };
+      }
+      // "how many candidates in batch X", "total students in group Y", "candidates in program Z"
+      if (/\b(how\s+many|total|count)\b/i.test(q) && /\b(batch|group|program)\b/i.test(q)) {
+        let name: string | null = null;
+        const pm = question.match(/\(([^)]+)\)?/);
+        if (pm) name = pm[1].trim();
+        if (!name) {
+          const nm = question.match(/\b(?:batch|group|program)\s+(?:named?\s+)?["']?([A-Za-z0-9_\-]+)["']?/i);
+          if (nm) name = nm[1].trim();
+        }
+        const tbl = /\bprogram\b/i.test(q) ? 'programs' : 'groups';
+        return { intent: 'batch_group_query', searchTerm: name, table: tbl, includePersonality: false };
+      }
+      // "who scored highest in batch X", "top performers in group Y"
+      if (/\b(top|best|highest|lowest|worst)\b/i.test(q) && /\b(batch|group|program)\b/i.test(q)) {
+        let name: string | null = null;
+        const pm = question.match(/\(([^)]+)\)?/);
+        if (pm) name = pm[1].trim();
+        if (!name) {
+          const nm = question.match(/\b(?:batch|group|program)\s+(?:named?\s+)?["']?([A-Za-z0-9_\-]+)["']?/i);
+          if (nm) name = nm[1].trim();
+        }
+        return { intent: 'batch_group_query', searchTerm: name, table: 'groups', includePersonality: true };
+      }
+      // "compare batches", "batch comparison", "group vs group"
+      if (/\b(compare|comparison|vs|versus|between)\b/i.test(q) && /\b(batch|group|program)\b/i.test(q)) {
+        return { intent: 'batch_group_query', searchTerm: null, table: 'groups', includePersonality: true };
+      }
+      // Catch-all: any remaining query with batch/group/program that wasn't handled above
+      // Route to batch handler which has a text-to-sql fallback
+      {
+        let name: string | null = null;
+        const pm = question.match(/\(([^)]+)\)?/);
+        if (pm) name = pm[1].trim();
+        if (!name) {
+          const nm = question.match(/\b(?:batch|group|program)\s+(?:named?\s+)?["']?([A-Za-z0-9_\-]+)["']?/i);
+          if (nm) name = nm[1].trim();
+        }
+        const tbl = /\bprogram\b/i.test(q) ? 'programs' : 'groups';
+        return { intent: 'batch_group_query', searchTerm: name, table: tbl, includePersonality: true };
+      }
+    }
+
     // Career report for someone
-    if (/\b(career\s*report|future\s*role|role\s*readiness|generate.*report)\b/.test(q)) {
+    // SAFETY: Exclude program/batch/group queries (already handled above)
+    if (/\b(career\s*report|future\s*role|role\s*readiness)\b/.test(q) ||
+        (/\bgenerate.*report\b/.test(q) && !batchGroupProgramGuard.test(q))) {
       const name = this.extractName(question);
       return { intent: 'career_report', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
     }
 
+    // "report for [name]" / "test report for [name]" / "assessment report for [name]"
+    // Priority: extract the person's name AFTER "for" keyword
+    if (/\breport\b/i.test(q) && /\b(for|of|about)\s+/i.test(q)) {
+      const name = this.extractName(question);
+      if (name) {
+        // Determine intent: if query mentions "test", "assessment", "score", "exam" → person_lookup
+        const isTestReport = /\b(test|assessment|exam|score|result)\b/i.test(q);
+        return {
+          intent: isTestReport ? 'person_lookup' : 'career_report',
+          searchTerm: name,
+          table: 'assessment_attempts',
+          includePersonality: true,
+        };
+      }
+    }
+
     // "[Name(s)] report" — e.g. "DINESH S J and PRAKASH B report", "dinesh report"
     if (/\breport\b/i.test(q)) {
+      // First try extractName which is smarter about finding actual person names
+      const nameFromExtract = this.extractName(question);
+      if (nameFromExtract) {
+        const isTestReport = /\b(test|assessment|exam|score|result)\b/i.test(q);
+        return {
+          intent: isTestReport ? 'person_lookup' : 'career_report',
+          searchTerm: nameFromExtract,
+          table: 'assessment_attempts',
+          includePersonality: true,
+        };
+      }
+
+      // Fallback: extract text before "report" as the name
       const beforeReport = question.replace(/\s*report\b.*/i, '').trim();
-      if (beforeReport.length >= 2 && !/^(show|get|list|create|generate|overall|custom|my)$/i.test(beforeReport)) {
-        return { intent: 'career_report', searchTerm: beforeReport, table: 'assessment_attempts', includePersonality: true };
+      // Filter out question phrases like "what is the", "what are the", "show me the", etc.
+      let cleanedBeforeReport = beforeReport
+        .replace(/^(what\s+(is|are)\s+(the|a|an)?\s*)/i, '')
+        .replace(/^(show\s+me\s+(the)?\s*)/i, '')
+        .replace(/^(give\s+me\s+(the)?\s*)/i, '')
+        .replace(/^(tell\s+me\s+(the)?\s*)/i, '')
+        .replace(/^(i\s+(want|need)\s+(the|a)?\s*)/i, '')
+        .replace(/^(can\s+(you|i)\s+(get|show|see)\s+(the)?\s*)/i, '')
+        .trim();
+      // Strip trailing domain/stop words that aren't names (e.g. "sriharan test" → "sriharan")
+      const trailingStopWords = /\s+(test|exam|assessment|career|score|result|results|detail|details|data|profile|information|info|the|a|an|for|of|about)$/i;
+      while (trailingStopWords.test(cleanedBeforeReport)) {
+        cleanedBeforeReport = cleanedBeforeReport.replace(trailingStopWords, '').trim();
+      }
+      // Also strip leading stop words
+      const leadingStopWords = /^(test|exam|assessment|career|score|result|results|detail|details|the|a|an)\s+/i;
+      while (leadingStopWords.test(cleanedBeforeReport)) {
+        cleanedBeforeReport = cleanedBeforeReport.replace(leadingStopWords, '').trim();
+      }
+      if (cleanedBeforeReport.length >= 2 && !/^(show|get|list|create|generate|overall|custom|my|test|exam|assessment)$/i.test(cleanedBeforeReport)) {
+        const isTestReport = /\b(test|assessment|exam|score|result)\b/i.test(q);
+        return {
+          intent: isTestReport ? 'person_lookup' : 'career_report',
+          searchTerm: cleanedBeforeReport,
+          table: 'assessment_attempts',
+          includePersonality: true,
+        };
       }
     }
 
@@ -3093,8 +3783,42 @@ JSON:`;
     // CORPORATE DETAILS — List/show corporate accounts/companies
     // ═══════════════════════════════════════════════════════════════
     // "list corporates", "corporate accounts", "show companies", "corporate details"
-    if (/\b(list|show|get|display)\s+(all\s+)?(corporate|company|companies|corporate\s+account)/i.test(q)) {
+    if (/\b(list|show|get|display)\s+(all\s+)?(the\s+)?(corporate|company|companies|corporates|corporate\s+account)/i.test(q)) {
       return { intent: 'corporate_details', searchTerm: null, table: 'corporate_accounts', includePersonality: false };
+    }
+    // Bare "companies" or "the companies" or "all companies"
+    if (/^(the\s+)?companies\s*\??$/i.test(q) || /^(all\s+)?companies\s*$/i.test(q) || /^corporates\s*\??$/i.test(q)) {
+      return { intent: 'corporate_details', searchTerm: null, table: 'corporate_accounts', includePersonality: false };
+    }
+    // "what are the companies", "what companies are there", "which companies", "what are the companies are there"
+    if (/\b(what|which)\b.*\b(companies|corporates?|organizations?)\b/i.test(q)) {
+      return { intent: 'corporate_details', searchTerm: null, table: 'corporate_accounts', includePersonality: false };
+    }
+    // "tell about [name] company", "about [name] company/corporate/organization"
+    // Extract company name and route to corporate_details with searchTerm
+    {
+      const companyNameMatch = q.match(/\b(?:tell|know|learn|inform)\s+(?:me\s+)?(?:about|bout)\s+(?:the\s+)?(.+?)\s+(?:company|corporate|organization|business)\b/i)
+        || q.match(/\babout\s+(?:the\s+)?(.+?)\s+(?:company|corporate|organization|business)\b/i);
+      if (companyNameMatch && companyNameMatch[1]) {
+        const companyName = companyNameMatch[1].replace(/^(the|a|an)\s+/i, '').trim();
+        if (companyName && companyName.length >= 2) {
+          return { intent: 'corporate_details', searchTerm: companyName, table: 'corporate_accounts', includePersonality: false };
+        }
+      }
+    }
+    // "[name] company details", "[name] company info"
+    {
+      const companyInfoMatch = q.match(/^(.+?)\s+(?:company|corporate)\s+(?:detail|info|data|profile)s?\b/i);
+      if (companyInfoMatch && companyInfoMatch[1]) {
+        const companyName = companyInfoMatch[1].replace(/^(the|a|an|about|tell|show|get)\s+/gi, '').trim();
+        if (companyName && companyName.length >= 2) {
+          return { intent: 'corporate_details', searchTerm: companyName, table: 'corporate_accounts', includePersonality: false };
+        }
+      }
+    }
+    // "how many companies", "total companies", "number of companies"
+    if (/\b(how\s+many|count|total|number\s+of)\s+(companies|corporates|corporate\s+accounts?)\b/i.test(q)) {
+      return { intent: 'data_query', searchTerm: null, table: 'corporate_accounts', includePersonality: false };
     }
     // "corporate details", "company details", "corporate info"
     if (/\b(corporate|company|companies)\s+(detail|info|account|data|profile)s?\b/i.test(q)) {
@@ -3132,15 +3856,15 @@ JSON:`;
       return { intent: 'self_results', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
     }
 
-    // Test results (general)
-    if (/\b(test|exam|assessment)\s*(result|score)s?\b/.test(q) || /\bresults?\b/.test(q)) {
+    // Test results / test report for a specific person
+    if (/\b(test|exam|assessment)\s*(result|score|report)s?\b/.test(q) || /\bresults?\b/.test(q)) {
       const name = this.extractName(question);
       return { intent: name ? 'person_lookup' : 'test_results', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
     }
 
-    // Person lookup: "[name]'s score" or "show [name]"
+    // Person lookup: "[name]'s score" or "show [name]" or "[name] report"
     const possibleName = this.extractName(question);
-    if (possibleName && /\b(score|result|detail|profile|data)\b/.test(q)) {
+    if (possibleName && /\b(score|result|detail|profile|data|report)\b/.test(q)) {
       return { intent: 'person_lookup', searchTerm: possibleName, table: 'assessment_attempts', includePersonality: true };
     }
 
@@ -3263,7 +3987,7 @@ JSON:`;
 
     // "what is X", "what are X", "what does X mean"
     if (/^(what|who|why|when|where)\s+(is|are|does|do|was|were|would|could|should|can|will)\b/.test(q) &&
-      !/\b(my |user|candidate|registration|result|score|attempt|corporate|list|show|get|count|how many)\b/.test(q)) {
+      !/\b(my |user|candidate|registration|result|score|attempt|corporate|corporates|company|companies|organization|list|show|get|count|how many)\b/.test(q)) {
       return { intent: 'general_knowledge', searchTerm: null, table: 'none', includePersonality: false };
     }
 
@@ -3285,7 +4009,7 @@ JSON:`;
 
     // "explain X", "tell me about X" (general topics, not person/data)
     if (/^(explain|describe|define)\s+/.test(q) ||
-      (/\btell\s+me\s+about\b/.test(q) && !/\b(my|his|her|their|candidate|user|\w+'s)\b/.test(q))) {
+      (/\btell\s+me\s+about\b/.test(q) && !/\b(my|his|her|their|candidate|user|company|companies|corporate|corporates|organization|\w+'s)\b/.test(q))) {
       return { intent: 'general_knowledge', searchTerm: null, table: 'none', includePersonality: false };
     }
 
@@ -3506,6 +4230,7 @@ JSON:`;
       'member', 'members', 'staff', 'worker', 'workers',
       'people', 'person', 'team', 'everyone', 'everybody',
       'company', 'organization', 'organisation', 'department',
+      'corporate', 'business', 'employer', 'companies', 'corporates',
       'development', 'developer', 'engineering', 'full', 'stack',
       'frontend', 'backend', 'manager', 'lead', 'senior', 'junior',
       'role', 'position', 'job', 'work', 'tasks', 'skill', 'skills',
@@ -3513,6 +4238,10 @@ JSON:`;
       // Gender terms — NOT person names
       'male', 'female', 'males', 'females', 'boys', 'girls', 'men', 'women',
       'boy', 'girl', 'man', 'woman',
+      // Program / batch / group / report terms — NOT person names
+      'program', 'programs', 'batch', 'batches', 'group', 'groups',
+      'summary', 'summarize', 'report', 'version', 'principal', 'generate',
+      'readiness', 'strengths', 'risks', 'overview', 'students', 'school',
     ]);
 
     for (const pattern of patterns) {
@@ -3525,7 +4254,23 @@ JSON:`;
         while (words.length > 0 && stopWords.has(words[words.length - 1].toLowerCase())) {
           words.pop();
         }
+        // Remove leading articles/stop words (e.g. "the touchmark" → "touchmark")
+        while (words.length > 0 && stopWords.has(words[0].toLowerCase())) {
+          words.shift();
+        }
         name = words.join(' ').trim();
+
+        // SAFETY: If the original query contains company/corporate/organization after the extracted name,
+        // this is a company query, NOT a person query — return null
+        if (/\b(company|corporate|organization|business|employer)\b/i.test(question)) {
+          return null;
+        }
+
+        // SAFETY: If the query contains program/batch/group keywords, it's about a program/group, NOT a person
+        if (/\b(program|batch|group|summarize|summary|readiness|strengths|risks|principal\s+version)\b/i.test(question)) {
+          return null;
+        }
+
         if (name && !stopWords.has(name.toLowerCase()) && name.length >= 2) {
           return name;
         }
@@ -3581,6 +4326,11 @@ JSON:`;
       'resource', 'resources', 'member', 'members', 'staff', 'worker', 'workers',
       'people', 'person', 'team', 'everyone', 'everybody',
       'company', 'organization', 'organisation', 'department',
+      'corporate', 'business', 'employer', 'companies', 'corporates',
+      // Batch / group / program terms
+      'batch', 'batches', 'group', 'groups', 'program', 'programs',
+      'summary', 'summarize', 'overview', 'readiness', 'strengths', 'risks',
+      'principal', 'version', 'generate', 'school',
       'development', 'developer', 'engineering', 'full stack', 'frontend', 'backend',
       'manager', 'lead', 'senior', 'junior', 'role', 'position', 'job',
       'skill', 'skills', 'information', 'info', 'help', 'status', 'assessment',
@@ -4035,26 +4785,66 @@ JSON:`;
 
       // ═══════════════════════════════════════════════════════════════
       // CORPORATE DETAILS — List corporate/company accounts
+      // Supports: name search, RBAC scoping, corporateId fallback
       // ═══════════════════════════════════════════════════════════════
       case 'corporate_details': {
+        const companySearchTerm = interpretation.searchTerm;
+
         if (userRole === 'ADMIN') {
-          sql = `SELECT ca.id, ca.company_name, ca.full_name AS contact_person, ca.mobile_number,
-                   ca.sector_code AS industry, ca.job_title, ca.gender, ca.business_locations,
-                   ca.total_credits, ca.available_credits, ca.is_active, u.email, ca.created_at
-                 FROM corporate_accounts ca
-                 LEFT JOIN users u ON ca.user_id = u.id
-                 WHERE ca.is_active = true
-                 ORDER BY ca.company_name ASC
-                 LIMIT ${limit} OFFSET ${offset}`;
-        } else if (userRole === 'CORPORATE' && corporateId) {
-          params.push(corporateId);
-          sql = `SELECT ca.id, ca.company_name, ca.full_name AS contact_person, ca.mobile_number,
-                   ca.sector_code AS industry, ca.job_title, ca.gender, ca.business_locations,
-                   ca.total_credits, ca.available_credits, ca.is_active, u.email, ca.created_at
-                 FROM corporate_accounts ca
-                 LEFT JOIN users u ON ca.user_id = u.id
-                 WHERE ca.id = $1
-                 LIMIT 1`;
+          if (companySearchTerm) {
+            // Admin searching for a specific company by name
+            params.push(`%${companySearchTerm.toLowerCase()}%`);
+            sql = `SELECT ca.id, ca.company_name, ca.full_name AS contact_person, ca.mobile_number,
+                     ca.sector_code AS industry, ca.job_title, ca.gender, ca.business_locations,
+                     ca.total_credits, ca.available_credits, ca.is_active, u.email, ca.created_at
+                   FROM corporate_accounts ca
+                   LEFT JOIN users u ON ca.user_id = u.id
+                   WHERE ca.is_active = true AND LOWER(ca.company_name) LIKE $1
+                   ORDER BY ca.company_name ASC
+                   LIMIT ${limit}`;
+          } else {
+            sql = `SELECT ca.id, ca.company_name, ca.full_name AS contact_person, ca.mobile_number,
+                     ca.sector_code AS industry, ca.job_title, ca.gender, ca.business_locations,
+                     ca.total_credits, ca.available_credits, ca.is_active, u.email, ca.created_at
+                   FROM corporate_accounts ca
+                   LEFT JOIN users u ON ca.user_id = u.id
+                   WHERE ca.is_active = true
+                   ORDER BY ca.company_name ASC
+                   LIMIT ${limit} OFFSET ${offset}`;
+          }
+        } else if (userRole === 'CORPORATE') {
+          // CORPORATE RBAC: Always show only their own company
+          let resolvedCorporateId = corporateId;
+
+          // Fallback: If corporateId is not set, try to resolve from database
+          if (!resolvedCorporateId && userId) {
+            try {
+              const corpLookup = await this.dataSource.query(
+                `SELECT ca.id FROM corporate_accounts ca JOIN users u ON ca.user_id = u.id WHERE u.id = $1 LIMIT 1`,
+                [userId]
+              );
+              if (corpLookup?.length > 0) {
+                resolvedCorporateId = corpLookup[0].id;
+                this.logger.log(`🏢 RBAC fallback: resolved corporateId=${resolvedCorporateId} from userId=${userId}`);
+              }
+            } catch (e) {
+              this.logger.warn(`Failed to resolve corporateId for userId=${userId}: ${e.message}`);
+            }
+          }
+
+          if (resolvedCorporateId) {
+            params.push(resolvedCorporateId);
+            sql = `SELECT ca.id, ca.company_name, ca.full_name AS contact_person, ca.mobile_number,
+                     ca.sector_code AS industry, ca.job_title, ca.gender, ca.business_locations,
+                     ca.total_credits, ca.available_credits, ca.is_active, u.email, ca.created_at
+                   FROM corporate_accounts ca
+                   LEFT JOIN users u ON ca.user_id = u.id
+                   WHERE ca.id = $1
+                   LIMIT 1`;
+          } else {
+            this.logger.warn(`⚠️ RBAC: CORPORATE user has no corporateId and fallback failed — showing error`);
+            return [{ message: 'Unable to determine your corporate account. Please contact support.' }];
+          }
         } else {
           return [{ message: 'Corporate account details are only available to admin and corporate users.' }];
         }

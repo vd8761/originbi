@@ -505,8 +505,8 @@ export default function AiCounsellorChat() {
 
                             {/* Welcome Input */}
                             <div className="relative w-full">
-                                <div className="flex items-end gap-3 p-2 bg-white dark:bg-white/5 backdrop-blur-xl border border-gray-200 dark:border-white/10 rounded-2xl focus-within:border-emerald-400 dark:focus-within:border-emerald-500 focus-within:shadow-lg focus-within:shadow-emerald-100/50 dark:focus-within:shadow-emerald-900/20 transition-all shadow-sm">
-                                    <Sparkles className="w-5 h-5 text-emerald-400 ml-3 mb-3 flex-shrink-0" />
+                                <div className="flex items-center gap-3 p-1.5 bg-white dark:bg-white/5 backdrop-blur-xl border border-gray-200 dark:border-white/10 rounded-2xl focus-within:border-emerald-400 dark:focus-within:border-emerald-500 focus-within:shadow-lg focus-within:shadow-emerald-100/50 dark:focus-within:shadow-emerald-900/20 transition-all shadow-sm">
+                                    <Sparkles className="w-5 h-5 text-emerald-400 ml-3 flex-shrink-0" />
                                     <textarea
                                         ref={inputRef}
                                         value={input}
@@ -514,8 +514,7 @@ export default function AiCounsellorChat() {
                                         onKeyDown={handleKeyDown}
                                         placeholder="Ask me about your career, skills, goals..."
                                         rows={1}
-                                        className="flex-1 bg-transparent text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none resize-none py-3 text-[15px] max-h-32"
-                                        disabled={loading}
+                                        className="flex-1 bg-transparent text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none resize-none py-1.5 text-[15px] max-h-32"
                                     />
                                     <button
                                         onClick={handleSend}
@@ -606,16 +605,15 @@ export default function AiCounsellorChat() {
             {messages.length > 0 && (
                 <footer className="relative z-10 p-4 bg-gradient-to-t from-white dark:from-brand-dark-primary via-white/95 dark:via-brand-dark-primary/95 to-white/0 dark:to-transparent border-t border-gray-100 dark:border-white/5">
                     <div className="max-w-3xl mx-auto">
-                        <div className="flex items-end gap-3 p-2 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl focus-within:border-emerald-400 dark:focus-within:border-emerald-500 focus-within:shadow-lg focus-within:shadow-emerald-100/50 dark:focus-within:shadow-emerald-900/20 transition-all shadow-sm">
-                            <Sparkles className="w-5 h-5 text-emerald-400 ml-3 mb-3 flex-shrink-0" />
+                        <div className="flex items-center gap-3 p-1.5 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl focus-within:border-emerald-400 dark:focus-within:border-emerald-500 focus-within:shadow-lg focus-within:shadow-emerald-100/50 dark:focus-within:shadow-emerald-900/20 transition-all shadow-sm">
+                            <Sparkles className="w-5 h-5 text-emerald-400 ml-3 flex-shrink-0" />
                             <textarea
                                 value={input}
                                 onChange={e => setInput(e.target.value)}
                                 onKeyDown={handleKeyDown}
                                 placeholder="Ask a follow-up..."
                                 rows={1}
-                                className="flex-1 bg-transparent text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none resize-none py-3 text-[15px] max-h-32"
-                                disabled={loading}
+                                className="flex-1 bg-transparent text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none resize-none py-1.5 text-[15px] max-h-32"
                             />
                             <button
                                 onClick={handleSend}
