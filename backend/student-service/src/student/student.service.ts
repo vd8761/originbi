@@ -322,9 +322,84 @@ export class StudentService {
     const traitResult = await this.userRepo.query(traitQuery, [user.id]);
     const trait = traitResult && traitResult.length > 0 ? traitResult[0] : null;
 
+    // Fetch program type from registration
+    const programQuery = `
+      SELECT p.code as program_code, p.id as program_id
+      FROM registrations r
+      JOIN programs p ON r.program_id = p.id
+      WHERE r.user_id = $1 AND r.is_deleted = false
+      ORDER BY r.created_at DESC
+      LIMIT 1
+    `;
+    const programResult = await this.userRepo.query(programQuery, [user.id]);
+    const programCode = programResult?.[0]?.program_code || null;
+
+    // Fetch DISC scores and agile scores for impact assessment
+    let impactData = null;
+    if (programCode) {
+      const scoresQuery = `
+        SELECT 
+          aa_disc.metadata->'disc_scores'->>'D' as score_d,
+          aa_disc.metadata->'disc_scores'->>'I' as score_i,
+          aa_disc.metadata->'disc_scores'->>'S' as score_s,
+          aa_disc.metadata->'disc_scores'->>'C' as score_c,
+          aa_agile.metadata->'agile_scores'->>'Courage' as courage,
+          aa_agile.metadata->'agile_scores'->>'Respect' as respect,
+          aa_agile.metadata->'agile_scores'->>'Focus' as focus,
+          aa_agile.metadata->'agile_scores'->>'Commitment' as commitment,
+          aa_agile.metadata->'agile_scores'->>'Openness' as openness
+        FROM assessment_sessions asess
+        JOIN assessment_attempts aa_disc ON aa_disc.assessment_session_id = asess.id AND aa_disc.assessment_level_id = 1
+        LEFT JOIN assessment_attempts aa_agile ON aa_agile.assessment_session_id = asess.id AND aa_agile.assessment_level_id = 2
+        WHERE asess.user_id = $1 AND asess.status = 'COMPLETED'
+          AND aa_disc.status = 'COMPLETED' 
+          AND aa_disc.metadata->'disc_scores' IS NOT NULL
+        ORDER BY asess.created_at DESC
+        LIMIT 1
+      `;
+      const scoresResult = await this.userRepo.query(scoresQuery, [user.id]);
+
+      if (scoresResult?.[0]) {
+        const s = scoresResult[0];
+        const D = Number(s.score_d) || 0;
+        const I = Number(s.score_i) || 0;
+        const S = Number(s.score_s) || 0;
+        const C = Number(s.score_c) || 0;
+
+        const norm = (v: number) => Math.min(100, Math.round((v / 25) * 100));
+        const courage = norm(Number(s.courage) || 0);
+        const respect = norm(Number(s.respect) || 0);
+        const focus = norm(Number(s.focus) || 0);
+        const commitment = norm(Number(s.commitment) || 0);
+        const openness = norm(Number(s.openness) || 0);
+
+        const personalityAvg = Math.round((D + I + S + C) / 4);
+        const agilityAvg = Math.round(
+          (courage + respect + focus + commitment + openness) / 5,
+        );
+        // Leadership score: same formula as CI patterns in the report
+        const leadershipScore = Math.min(
+          100,
+          Math.round((D * 0.4 + I * 0.3 + norm(Number(s.courage) || 0) * 0.3)),
+        );
+
+        impactData = {
+          discScores: { D, I, S, C },
+          agileScores: { courage, respect, focus, commitment, openness },
+          impactStats: {
+            personalityAvg,
+            agilityAvg,
+            leadershipScore,
+          },
+        };
+      }
+    }
+
     return {
       ...user,
       personalityTrait: trait,
+      programCode,
+      ...(impactData || {}),
     };
   }
 
