@@ -1437,12 +1437,24 @@ export class RagService {
       const fullProgMatch = question.match(/["']?([A-Z][A-Za-z\s]+Program)["']?/i);
       if (fullProgMatch) searchName = fullProgMatch[1].trim();
     }
+    // 6) "[name] count" or "[name] total" — e.g. "kiot aids count", "kiot it total"
+    if (!searchName) {
+      const countMatch = question.match(/^(.+?)\s+(?:count|total)\s*$/i);
+      if (countMatch) {
+        let n = countMatch[1]
+          .replace(/\b(how|many|total|number|of|the|a|an|candidates?|students?|users?)\b/gi, '')
+          .trim();
+        if (n.length >= 2) searchName = n;
+      }
+    }
 
     this.logger.log(`📊 handleBatchGroupQuery: question="${question}", searchName="${searchName}", role=${userRole}`);
 
     // ── Determine if this is about a program or a group/batch ──
     const isProgramQuery = /\bprogram\b/i.test(q) || /\b(principal|version|disc\s+naming)\b/i.test(q);
     const isListQuery = /\b(list|show|all|get|display)\b/i.test(q) && !searchName;
+    // Count-only query (no full summary needed) — e.g. "kiot aids count"
+    const isCountOnlyQuery = /\b(count|total)\s*$/i.test(q) && !/\b(summarize|summary|overview|analyze|report|stats|performance|strengths|risks|readiness)\b/i.test(q);
 
     try {
       // ═══ LIST ALL GROUPS ═══
@@ -1653,6 +1665,27 @@ export class RagService {
               ? `No group/batch found matching **"${searchName}"**. Try **"list groups"** to see all available groups/batches.`
               : `No groups/batches found in the system.`,
             searchType: 'batch_group_query', confidence: 0.7,
+          };
+        }
+
+        // ── COUNT-ONLY shortcut: just return the candidate count for the matched group ──
+        if (isCountOnlyQuery && searchName && groupRows.length > 0) {
+          const group = groupRows[0];
+          const cParams: any[] = [group.id];
+          let cRbac = '';
+          if (userRole === 'CORPORATE' && corporateId) {
+            cRbac = ` AND r.corporate_account_id = $2`;
+            cParams.push(corporateId);
+          }
+          const cRows = await this.dataSource.query(
+            `SELECT COUNT(DISTINCT r.id) AS total_candidates FROM registrations r WHERE r.group_id = $1 AND r.is_deleted = false${cRbac}`,
+            cParams,
+          );
+          const total = parseInt(cRows[0]?.total_candidates) || 0;
+          return {
+            answer: `**${group.name}** has **${total} candidates** registered.`,
+            searchType: 'batch_group_query',
+            confidence: 0.95,
           };
         }
 
@@ -3509,6 +3542,21 @@ JSON:`;
     // Custom / career fitment report
     if (/\b(career\s*fitment|custom\s*report|my\s*fitment|personalized\s*report)\b/.test(q)) {
       return { intent: 'custom_report', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // "[Group name] count" — e.g. "kiot aids count", "kiot it count"
+    // These lack the word batch/group/program but user wants the count for a specific group.
+    // Must come BEFORE the batchGroupProgramGuard block.
+    // ═══════════════════════════════════════════════════════════════
+    if (/\b(count|total)\s*$/i.test(q) && !/(how\s+many|list|show|all|batch|group|program)/i.test(q)) {
+      const nameBeforeCount = question
+        .replace(/\b(count|total)\s*$/i, '')
+        .replace(/\b(candidates?|students?|users?|members?|of\s+the|in)\b/gi, '')
+        .trim();
+      if (nameBeforeCount.length >= 2) {
+        return { intent: 'batch_group_query', searchTerm: nameBeforeCount, table: 'groups', includePersonality: false };
+      }
     }
 
     // ═══════════════════════════════════════════════════════════════

@@ -5,12 +5,12 @@ import { DataSource } from 'typeorm';
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
  * ║              SCHEMA INTROSPECTOR SERVICE                                  ║
- * ║     Auto-discovers database schema from the live database                ║
+ * ║     Auto-discovers database schema from the live database                 ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
- * ║  - No hardcoded schema — always in sync with the real DB                ║
- * ║  - Caches at startup, refreshes periodically                            ║
- * ║  - Includes table relationships (foreign keys)                          ║
- * ║  - Provides sample data hints for LLM context                          ║
+ * ║  - No hardcoded schema — always in sync with the real DB                  ║
+ * ║  - Caches at startup, refreshes periodically                              ║
+ * ║  - Includes table relationships (foreign keys)                            ║
+ * ║  - Provides sample data hints for LLM context                             ║
  * ╚═══════════════════════════════════════════════════════════════════════════╝
  */
 
