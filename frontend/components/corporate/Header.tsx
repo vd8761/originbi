@@ -20,6 +20,8 @@ import {
 } from '../icons';
 import { corporateDashboardService } from '../../lib/services';
 import { CorporateAccount } from '../../lib/types';
+import { capitalizeWords, formatRelativeTime } from "../../lib/utils";
+import { useNotifications } from "../../lib/hooks/useNotifications";
 import Script from "next/script";
 import BuyCreditsModal from "./BuyCreditsModal";
 
@@ -129,7 +131,7 @@ const Header: React.FC<HeaderProps> = ({
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isNotificationsOpen, setNotificationsOpen] = useState(false);
   const [language, setLanguage] = useState("ENG");
-  const [hasNotification, setHasNotification] = useState(true);
+  const { unreadCount, notifications: realNotifications, fetchNotifications, markAllAsRead } = useNotifications();
 
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const langMenuRef = useRef<HTMLDivElement>(null);
@@ -267,16 +269,19 @@ const Header: React.FC<HeaderProps> = ({
   })();
 
   const handleLangChange = (lang: string) => { setLanguage(lang); setLangOpen(false); };
-  const handleNotificationClick = () => { setNotificationsOpen((p) => !p); if (hasNotification) setHasNotification(false); };
+  const handleNotificationClick = () => { setNotificationsOpen((p) => !p); if (!isNotificationsOpen) fetchNotifications(); };
   const handleNavClick = (view: any) => {
     onNavigate?.(view);
     setMobileMenuOpen(false);
   };
 
-  const notifications = [
-    { icon: <RoadmapIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />, title: "New Roadmap Unlocked!", time: "2 hours ago", isNew: true },
-    { icon: <JobsIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />, title: "3 new job matches for you", time: "Yesterday", isNew: true },
-    { icon: <ProfileIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />, title: "Your profile is 85% complete", time: "3 days ago", isNew: false },
+  const displayNotifications = realNotifications.length > 0 ? realNotifications.map(n => ({
+    icon: <RoadmapIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />,
+    title: n.title,
+    time: formatRelativeTime(n.createdAt),
+    isNew: !n.isRead
+  })) : [
+    { icon: <RoadmapIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />, title: "No new notifications", time: "", isNew: false },
   ];
 
   const renderNavItems = (isMobile: boolean) => (
@@ -383,18 +388,20 @@ const Header: React.FC<HeaderProps> = ({
                   className="bg-white border border-gray-200 text-[#150089] hover:bg-gray-50 hover:border-gray-300 dark:bg-brand-dark-tertiary dark:border-transparent dark:text-white dark:hover:bg-gray-800 w-8 h-8 2xl:w-8 2xl:h-8 rounded-full flex items-center justify-center transition-all relative cursor-pointer"
                 >
                   <NotificationIcon className="w-4 h-4 2xl:w-5 2xl:h-5 fill-current" />
-                  {hasNotification && (
-                    <span className="absolute top-[7px] right-[7px] w-2 h-2 bg-brand-green rounded-full border border-white dark:border-brand-dark-secondary"></span>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center bg-brand-green text-white text-[10px] font-bold rounded-full border-2 border-white dark:border-brand-dark-secondary px-1">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
                   )}
                 </button>
                 {isNotificationsOpen && (
                   <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-brand-dark-secondary rounded-lg shadow-xl py-2 ring-1 ring-black ring-opacity-5 z-50 border border-gray-100 dark:border-brand-dark-tertiary max-h-96 overflow-y-auto">
                     <div className="px-4 py-2 border-b border-gray-100 dark:border-brand-dark-tertiary flex justify-between items-center">
                       <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Notifications</h3>
-                      <button className="text-xs text-brand-green hover:underline">Mark all read</button>
+                      <button onClick={markAllAsRead} className="text-xs text-brand-green hover:underline">Mark all read</button>
                     </div>
                     <div className="divide-y divide-gray-100 dark:divide-brand-dark-tertiary">
-                      {notifications.map((n, i) => (
+                      {displayNotifications.map((n, i) => (
                         <NotificationItem key={i} {...n} />
                       ))}
                     </div>

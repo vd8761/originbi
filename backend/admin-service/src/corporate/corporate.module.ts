@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { NotificationModule } from '../notification/notification.module';
 import { HttpModule } from '@nestjs/axios';
 
 import { CorporateController } from './corporate.controller';
@@ -20,9 +21,10 @@ import {
       CorporateCounsellingAccess,
     ]),
     HttpModule,
+    NotificationModule,
   ],
   controllers: [CorporateController],
   providers: [CorporateService],
   exports: [CorporateService],
 })
-export class CorporateModule {}
+export class CorporateModule { }

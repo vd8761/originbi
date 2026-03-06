@@ -20,6 +20,7 @@ import {
 import { CreateCorporateRegistrationDto } from './dto/create-corporate-registration.dto';
 import { getCorporateWelcomeEmailTemplate } from '../mail/templates/corporate-welcome.template';
 import * as nodemailer from 'nodemailer';
+import { NotificationService } from '../notification/notification.service';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as path from 'path'; // Actually removing this if truly unused?
@@ -44,6 +45,7 @@ export class CorporateService {
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
+    private readonly notificationService: NotificationService,
   ) {
     this.authServiceBaseUrl =
       this.configService.get<string>('AUTH_SERVICE_URL') ?? '';
@@ -735,6 +737,18 @@ export class CorporateService {
           await manager.save(ledger);
         }
 
+        // D. Counselling Access
+        if (dto.counsellingAccess && Array.isArray(dto.counsellingAccess)) {
+          const accessEntities = dto.counsellingAccess.map((typeId) =>
+            manager.create(CorporateCounsellingAccess, {
+              corporateAccountId: corporateAccount.id,
+              counsellingTypeId: typeId,
+              isEnabled: true,
+            }),
+          );
+          await manager.save(accessEntities);
+        }
+
         // Send Email
         if (dto.sendEmail) {
           try {
@@ -751,16 +765,21 @@ export class CorporateService {
           }
         }
 
-        // D. Counselling Access
-        if (dto.counsellingAccess && Array.isArray(dto.counsellingAccess)) {
-          const accessEntities = dto.counsellingAccess.map((typeId) =>
-            manager.create(CorporateCounsellingAccess, {
+        // Add Notification for Admin
+        try {
+          await this.notificationService.createNotification({
+            userId: 1, // Assuming user ID 1 is the main admin
+            role: 'ADMIN',
+            type: 'NEW_CORPORATE_SIGNUP',
+            title: 'New Corporate Signup',
+            message: `A new corporate account for "${dto.companyName}" has been created.`,
+            metadata: {
               corporateAccountId: corporateAccount.id,
-              counsellingTypeId: typeId,
-              isEnabled: true,
-            }),
-          );
-          await manager.save(accessEntities);
+              email: email,
+            },
+          });
+        } catch (err) {
+          this.logger.error('Failed to create notification', err.stack);
         }
 
         return {

@@ -31,6 +31,7 @@ import {
 } from './dto/create-affiliate.dto';
 import { CreateSettlementDto } from './dto/create-settlement.dto';
 import { R2Service, R2UploadResult } from '../r2/r2.service';
+import { NotificationService } from '../notification/notification.service';
 import { getAffiliateWelcomeEmailTemplate } from '../mail/templates/affiliate-welcome.template';
 
 @Injectable()
@@ -54,6 +55,7 @@ export class AffiliatesService {
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
     private readonly r2Service: R2Service,
+    private readonly notificationService: NotificationService,
   ) { }
 
   async updateReadyToProcessStatus() {
@@ -233,6 +235,23 @@ export class AffiliatesService {
             emailErr.stack,
           ),
         );
+
+      // Add Notification for Admin
+      try {
+        await this.notificationService.createNotification({
+          userId: 1, // System Admin
+          role: 'ADMIN',
+          type: 'NEW_AFFILIATE_SIGNUP',
+          title: 'New Affiliate Partner',
+          message: `A new affiliate account for "${dto.name}" has been created.`,
+          metadata: {
+            affiliateId: affiliate.id,
+            email: dto.email,
+          },
+        });
+      } catch (err) {
+        this.logger.error('Failed to create notification', err.stack);
+      }
 
       return affiliate;
     } catch (e: any) {

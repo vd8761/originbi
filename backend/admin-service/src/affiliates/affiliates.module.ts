@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { NotificationModule } from '../notification/notification.module';
 import { HttpModule } from '@nestjs/axios';
 
 import {
@@ -26,9 +27,10 @@ import { R2Module } from '../r2/r2.module';
     ]),
     HttpModule,
     R2Module,
+    NotificationModule,
   ],
   providers: [AffiliatesService],
   controllers: [AffiliatesController, AffiliatePortalController],
   exports: [AffiliatesService],
 })
-export class AffiliatesModule {}
+export class AffiliatesModule { }

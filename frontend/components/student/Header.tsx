@@ -19,6 +19,8 @@ import {
 
 import { useTheme } from '../../contexts/ThemeContext';
 import { Brain } from 'lucide-react';
+import { capitalizeWords, formatRelativeTime } from "../../lib/utils";
+import { useNotifications } from "../../lib/hooks/useNotifications";
 
 interface HeaderProps {
     onLogout: () => void;
@@ -140,7 +142,7 @@ const Header: React.FC<HeaderProps> = ({
     const [isLangOpen, setLangOpen] = useState(false);
     const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [isNotificationsOpen, setNotificationsOpen] = useState(false);
-    const [hasNotification, setHasNotification] = useState(true);
+    const { unreadCount, notifications: realNotifications, fetchNotifications, markAllAsRead } = useNotifications();
 
     const profileMenuRef = useRef<HTMLDivElement>(null);
     const langMenuRef = useRef<HTMLDivElement>(null);
@@ -254,7 +256,7 @@ const Header: React.FC<HeaderProps> = ({
     }, [isMobileMenuOpen]);
 
     const handleLangChange = (lang: "ENG" | "TAM") => { setLanguage(lang); setLangOpen(false); };
-    const handleNotificationClick = () => { setNotificationsOpen((p) => !p); if (hasNotification) setHasNotification(false); };
+    const handleNotificationClick = () => { setNotificationsOpen((p) => !p); if (!isNotificationsOpen) fetchNotifications(); };
 
     const router = useRouter();
     const pathname = usePathname();
@@ -278,10 +280,13 @@ const Header: React.FC<HeaderProps> = ({
     const isRoadmapsActive = pathname?.includes('/student/roadmaps') || currentView === 'roadmaps';
     const isCounsellorActive = pathname?.includes('/student/counsellor');
 
-    const notifications = [
-        { icon: <RoadmapIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />, title: "New Roadmap Unlocked!", time: "2 hours ago", isNew: true },
-        { icon: <JobsIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />, title: "3 new job matches for you", time: "Yesterday", isNew: true },
-        { icon: <ProfileIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />, title: "Your profile is 85% complete", time: "3 days ago", isNew: false },
+    const displayNotifications = realNotifications.length > 0 ? realNotifications.map(n => ({
+        icon: <RoadmapIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />,
+        title: n.title,
+        time: formatRelativeTime(n.createdAt),
+        isNew: !n.isRead
+    })) : [
+        { icon: <RoadmapIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />, title: "No new notifications", time: "", isNew: false },
     ];
 
     const renderNavItems = (isMobile: boolean) => {
@@ -380,18 +385,20 @@ const Header: React.FC<HeaderProps> = ({
                             className="bg-white border border-gray-200 shadow-sm text-[#150089] hover:bg-gray-50 hover:border-gray-300 dark:bg-black/20 dark:border-white/5 dark:shadow-none dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white w-7 h-7 2xl:w-7 2xl:h-7 rounded-full flex items-center justify-center transition-all relative cursor-pointer"
                         >
                             <NotificationIcon className="w-3.5 h-3.5 2xl:w-3.5 2xl:h-3.5 fill-current" />
-                            {hasNotification && (
-                                <span className="absolute top-[6px] right-[6px] w-1.5 h-1.5 bg-[#1ED36A] rounded-full border border-white dark:border-[#19211C]"></span>
+                            {unreadCount > 0 && (
+                                <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] flex items-center justify-center bg-[#1ED36A] text-white text-[9px] font-bold rounded-full border-2 border-white dark:border-[#19211C] px-0.5">
+                                    {unreadCount > 9 ? '9+' : unreadCount}
+                                </span>
                             )}
                         </button>
                         {isNotificationsOpen && (
                             <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-brand-dark-secondary rounded-lg shadow-xl py-2 ring-1 ring-black ring-opacity-5 z-50 border border-gray-100 dark:border-brand-dark-tertiary max-h-96 overflow-y-auto">
                                 <div className="px-4 py-2 border-b border-gray-100 dark:border-brand-dark-tertiary flex justify-between items-center">
                                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Notifications</h3>
-                                    <button className="text-xs text-brand-green hover:underline">Mark all read</button>
+                                    <button onClick={markAllAsRead} className="text-xs text-brand-green hover:underline">Mark all read</button>
                                 </div>
                                 <div className="divide-y divide-gray-100 dark:divide-brand-dark-tertiary">
-                                    {notifications.map((n, i) => (
+                                    {displayNotifications.map((n, i) => (
                                         <NotificationItem key={i} {...n} />
                                     ))}
                                 </div>
