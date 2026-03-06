@@ -137,6 +137,50 @@ const RenderContent = memo(({ content, streaming, onDone }: {
         }
     };
 
+    // ── Pre-process: Convert ASCII box-drawing tables to Markdown tables ──
+    const preprocessContent = (raw: string): string => {
+        const lines = raw.split('\n');
+        const result: string[] = [];
+        let inBoxTable = false;
+        const boxRows: string[] = [];
+
+        const isBoxBorder = (l: string) => /^[┌┬┐└┴┘├┼┤─│╔╦╗╚╩╝╠╬╣═║\s]+$/.test(l.trim());
+        const isBoxDataRow = (l: string) => /^[│║]/.test(l.trim()) && /[│║]$/.test(l.trim());
+
+        const flushBoxTable = () => {
+            if (boxRows.length === 0) return;
+            const dataRows = boxRows.filter(r => isBoxDataRow(r));
+            if (dataRows.length === 0) { boxRows.length = 0; return; }
+            const mdRows = dataRows.map(r =>
+                '| ' + r.replace(/^[│║]\s*/, '').replace(/\s*[│║]$/, '').split(/\s*[│║]\s*/).join(' | ') + ' |'
+            );
+            if (mdRows.length > 1) {
+                const colCount = mdRows[0].split('|').filter(c => c.trim() !== '').length;
+                const sep = '| ' + Array(colCount).fill('---').join(' | ') + ' |';
+                mdRows.splice(1, 0, sep);
+            }
+            result.push(...mdRows);
+            boxRows.length = 0;
+        };
+
+        for (const line of lines) {
+            if (isBoxBorder(line) || isBoxDataRow(line)) {
+                inBoxTable = true;
+                boxRows.push(line);
+            } else {
+                if (inBoxTable) {
+                    flushBoxTable();
+                    inBoxTable = false;
+                }
+                result.push(line);
+            }
+        }
+        if (inBoxTable) flushBoxTable();
+        return result.join('\n');
+    };
+
+    content = preprocessContent(content);
+
     const blocks: { type: 'code' | 'table' | 'lines'; content: string; lang?: string }[] = [];
     const rawLines = content.split('\n');
     let i = 0;

@@ -47,6 +47,7 @@ export class TextToSqlService {
   private readonly logger = new Logger('TextToSQL');
   private llm: ChatGroq | null = null;
   private formatterLlm: ChatGroq | null = null;
+  private synthesizerLlm: ChatGroq | null = null;
 
   // Retry state: when SQL fails, we feed the error back and retry
   private readonly MAX_SQL_RETRIES = 2;
@@ -88,6 +89,20 @@ export class TextToSqlService {
     return this.formatterLlm;
   }
 
+  private getSynthesizerLlm(): ChatGroq {
+    if (!this.synthesizerLlm) {
+      const apiKey = process.env.GROQ_API_KEY;
+      if (!apiKey) throw new Error('GROQ_API_KEY not set');
+      this.synthesizerLlm = new ChatGroq({
+        apiKey,
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.3,
+        maxTokens: 3000,
+      });
+    }
+    return this.synthesizerLlm;
+  }
+
   /**
    * ═══════════════════════════════════════════════════════════════
    * MAIN ENTRY POINT: Answer any data question using Text-to-SQL
@@ -102,6 +117,14 @@ export class TextToSqlService {
     this.logger.log(`🚀 Text-to-SQL: "${question}" [${user.role}]`);
 
     try {
+      // ── STEP 0: Detect complex multi-part questions → decompose ──
+      if (this.isComplexQuestion(question)) {
+        this.logger.log('🧩 Complex question detected → decomposing into sub-queries');
+        const result = await this.answerComplexQuestion(question, user, conversationHistory, startTime);
+        if (result) return result;
+        // If decomposition failed, fall through to single-query mode
+      }
+
       // ── STEP 1: Generate SQL from natural language ──
       const generatedSql = await this.generateSql(question, user, conversationHistory);
       this.logger.log(`📝 Generated SQL: ${generatedSql}`);
@@ -526,34 +549,50 @@ Return ONLY the corrected SQL, nothing else:`;
     const dataStr = JSON.stringify(truncatedData, null, 2);
     const totalRows = data.length;
 
-    const formatPrompt = `You are Ask BI, OriginBI's intelligent data assistant. Format the following database results into a clear, direct response like ChatGPT would.
+    const formatPrompt = `You are Ask BI — OriginBI's intelligent data analyst. Transform raw database results into a professional, insightful response that reads like a top-tier analytics dashboard.
 
-CRITICAL RULES:
-- ONLY use data from the "Data" section below. NEVER add information from general knowledge, the web, or your training data.
-- If the data contains 10 companies, list exactly those 10 — do NOT add extra companies you know from the real world.
-- Every name, number, score, and fact in your response MUST come from the provided data. Zero tolerance for fabrication.
-- Be direct and concise. Start with the answer immediately. No filler words, no "Great question!", no "Here are the results".
-- Use numbered lists for lists of items (companies, candidates, etc.)
-- Use markdown tables for tabular data (3+ rows with multiple columns)
-- Use bullet points for small lists (1-2 rows)
-- Bold important values: names, scores, counts
-- If data has only 1 value (like a count), just state it plainly: "There are **415** candidates." or "**181** female candidates."
-- If results are truncated, mention how many total rows exist: e.g. "Total Companies: 24" at the end
-- Add a 1-line analytical insight ONLY when data has 5+ rows
-- Do NOT make up data not present in the results
-- Do NOT add disclaimers, tips, suggestions, or next steps unless explicitly asked
-- Do NOT add "Try asking:" or follow-up suggestions
-- Keep it as short as possible while being complete
+═══ ABSOLUTE RULES ═══
+1. ONLY use data from the "Data" section. ZERO tolerance for fabrication — every name, number, and fact must come from the provided data.
+2. Never add companies, candidates, or statistics from general knowledge or the web.
+
+═══ FORMATTING STYLE ═══
+- Start with the answer immediately. No "Here are the results", no "Based on the data".
+- Use **bold** for key values: counts, names, scores, percentages.
+- Use markdown tables for tabular data (3+ rows with multiple columns).
+- Use numbered lists for rankings or ordered items.
+- Use bullet points for summaries (1-2 items).
+- For single values: "There are **415** candidates registered." — clean and direct.
+
+═══ ANALYTICAL QUALITY ═══
+- Don't just list data — INTERPRET it. Add a 1-2 line insight when the data tells a story:
+  - "**Expressive Communicators** dominate at 34%, suggesting the cohort is strong in interpersonal skills."
+  - "Completion rate is **67%** — above average, but **22 candidates** still haven't started."
+  - "**3 of the top 5 scorers** are female, indicating strong performance from female candidates."
+- Compare values when relevant: "**KIOT IT** (avg 78.3) outperforms **KIOT CSE** (avg 63.1) by **24%**."
+- Flag risks or notable patterns: "⚠️ **12 candidates** scored below 30 — they may need additional support."
+
+═══ STRUCTURE ═══
+- For 1 result: single sentence or bullet list
+- For 2-5 results: compact bullet list or small table
+- For 6+ results: markdown table + 1-line summary insight
+- For aggregations: bold the key metric, add context
+- If results truncated, note: "Showing **30 of ${totalRows}** total results."
+
+═══ NEVER DO THIS ═══
+- No disclaimers, tips, or "Try asking:" suggestions
+- No "I hope this helps" or similar filler
+- No making up data not in the results
+- No explaining the SQL or methodology
 
 User's question: "${question}"
 User's role: ${user.role}
-Total matching rows: ${totalRows}
+Total rows: ${totalRows}
 ${totalRows > 30 ? `(Showing first 30 of ${totalRows})` : ''}
 
 Data:
 ${dataStr}
 
-Format this into a natural response:`;
+Response:`;
 
     try {
       const response = await this.getFormatterLlm().invoke([
@@ -637,10 +676,21 @@ Format this into a natural response:`;
     const q = question.toLowerCase();
 
     if (/\b(who|find|search|show|list)\b/i.test(q) && /\b(name|person|candidate)\b/i.test(q)) {
-      return `No matching candidates found for your query. Try:\n- Using a broader search term\n- Checking the spelling\n- Asking "list all candidates" to see who's available`;
+      return `No matching candidates found. You can try asking **"list all candidates"** to see who's available.`;
     }
 
-    return `No results found for "${question}". The data may not exist yet, or you may need to adjust your query.\n\n*Try rephrasing or ask "what can you do" for help.*`;
+    // Contextual messages based on what the user asked about
+    if (/\b(education|qualification|degree|department|school|board|stream)\b/i.test(q)) {
+      return `The requested education/qualification details are not available for these candidates at this time.`;
+    }
+    if (/\b(score|marks|assessment|test|exam|result)\b/i.test(q)) {
+      return `No assessment data is currently available for this query. The candidates may not have completed their assessments yet.`;
+    }
+    if (/\b(email|phone|mobile|contact)\b/i.test(q)) {
+      return `The requested contact details are not available for these candidates.`;
+    }
+
+    return `No matching data found for your request. Please try a different question or ask **"what can you do"** for help.`;
   }
 
   /**
@@ -737,7 +787,7 @@ The SQL validator will auto-inject affiliate_account_id filters.`;
   private buildErrorResult(question: string, error: string, startTime: number): TextToSqlResult {
     this.logger.error(`Text-to-SQL error for "${question}": ${error}`);
     return {
-      answer: `I wasn't able to query the database for that. ${this.getHelpfulErrorMessage(error)}\n\nTry rephrasing your question, or ask something like "list candidates" or "how many assessments completed".`,
+      answer: `I wasn't able to process that request. ${this.getHelpfulErrorMessage(error)}\n\nTry asking something like **"list candidates"** or **"how many assessments completed"**.`,
       sql: '',
       rawData: [],
       rowCount: 0,
@@ -754,8 +804,8 @@ The SQL validator will auto-inject affiliate_account_id filters.`;
   private getHelpfulErrorMessage(error: string): string {
     if (error.includes('not allowed')) return 'That type of operation is restricted for security reasons.';
     if (error.includes('permission')) return 'You don\'t have access to that data with your current role.';
-    if (error.includes('not exist') || error.includes('does not exist')) return 'The requested data table or column doesn\'t exist.';
-    if (error.includes('syntax')) return 'There was a query construction issue.';
+    if (error.includes('not exist') || error.includes('does not exist')) return 'Some requested data fields are not available.';
+    if (error.includes('syntax')) return 'There was an issue understanding that question.';
     return '';
   }
 
@@ -805,5 +855,172 @@ The SQL validator will auto-inject affiliate_account_id filters.`;
     ];
 
     return dataPatterns.some(p => p.test(q));
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // QUERY DECOMPOSER — Breaks complex multi-part questions into sub-queries
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Detect whether a question is complex enough to need decomposition.
+   */
+  private isComplexQuestion(question: string): boolean {
+    const q = question.toLowerCase();
+    const complexPatterns = [
+      /\b(compare|versus|vs)\b.*\b(and|with|to)\b/,                    // "compare X and Y"
+      /\b(also|additionally|and also|plus|as well as)\b/,              // multi-part requests
+      /\b(which|who).*(better|worse|higher|lower|more|less).*\b(than|compared)\b/, // comparisons
+      /\b(difference|gap)\s+(between|among)\b/,                        // "difference between"
+      /\b(both|each|every)\s+(group|batch|program|team)\b/,           // multi-entity
+      /\band\b.*\band\b/,                                              // "X and Y and Z"
+      /\b(breakdown|distribution)\b.*\b(by|across|per|for each)\b.*\b(and|,)\b/, // multi-dimension
+      /\btop\b.*\bcomplete.*\band\b/,                                  // "top scorers and completion"
+      /\b(then|after that|next|followed by)\b/,                       // sequential requests
+    ];
+    // Only flag as complex if 2+ patterns match, or question is very long with conjunctions
+    const matchCount = complexPatterns.filter(p => p.test(q)).length;
+    if (matchCount >= 1) return true;
+    // Very long questions with "and" likely need decomposition
+    if (q.length > 120 && /\band\b/.test(q)) return true;
+    return false;
+  }
+
+  /**
+   * Decompose a complex question into sub-queries, execute each, and synthesize
+   * a unified natural language response.
+   */
+  private async answerComplexQuestion(
+    question: string,
+    user: UserContext,
+    conversationHistory: string,
+    startTime: number,
+  ): Promise<TextToSqlResult | null> {
+    try {
+      const schema = this.schemaIntrospector.getCompactSchemaText();
+      const roleContext = this.buildRoleContext(user);
+
+      // ── Step 1: Ask LLM to decompose into sub-questions ──
+      const decomposePrompt = `You are a query decomposition engine. Break this complex question into 2-5 simpler sub-questions that can each be answered with a single SQL query against this database.
+
+Schema (abbreviated):
+${schema}
+
+User role: ${user.role}
+
+Complex question: "${question}"
+
+Rules:
+- Each sub-question must be independently answerable with a single SQL SELECT
+- Preserve the user's original intent — don't change the meaning
+- Keep sub-questions short and focused
+- If the question is actually simple (can be done in 1 query), return just ["${question}"]
+- Return ONLY a JSON array of strings, no explanation
+
+Example:
+Input: "Compare KIOT IT and KIOT CSE batches — which has higher scores and better completion rate"
+Output: ["What is the average score and completion rate for batch KIOT IT?", "What is the average score and completion rate for batch KIOT CSE?"]
+
+JSON array:`;
+
+      const decomposeResp = await this.getSqlLlm().invoke([
+        new SystemMessage('Return ONLY a JSON array of sub-questions. No explanation.'),
+        new HumanMessage(decomposePrompt),
+      ]);
+
+      let subQuestionsText = decomposeResp.content.toString().trim();
+      subQuestionsText = subQuestionsText.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
+      const subQuestions: string[] = JSON.parse(subQuestionsText);
+
+      if (!Array.isArray(subQuestions) || subQuestions.length === 0) return null;
+      if (subQuestions.length === 1) return null; // Not actually complex
+
+      this.logger.log(`🧩 Decomposed into ${subQuestions.length} sub-queries: ${JSON.stringify(subQuestions)}`);
+
+      // ── Step 2: Execute each sub-question independently (up to 5) ──
+      const subResults: { question: string; data: any[]; sql: string; error?: string }[] = [];
+
+      for (const subQ of subQuestions.slice(0, 5)) {
+        try {
+          const sql = await this.generateSql(subQ, user, conversationHistory);
+          const validation = this.sqlValidator.validate(sql, user);
+          if (!validation.isValid) {
+            subResults.push({ question: subQ, data: [], sql, error: validation.error || 'Validation failed' });
+            continue;
+          }
+          const rows = await this.dataSource.query(validation.sanitizedSql);
+          subResults.push({ question: subQ, data: rows.slice(0, 30), sql: validation.sanitizedSql });
+        } catch (subErr) {
+          subResults.push({ question: subQ, data: [], sql: '', error: subErr.message });
+        }
+      }
+
+      // Check if we got any useful data
+      const successfulResults = subResults.filter(r => r.data.length > 0);
+      if (successfulResults.length === 0) return null;
+
+      // Log audit for the primary query
+      this.auditLogger.logQuery({
+        timestamp: new Date(),
+        userId: user.id,
+        userRole: user.role,
+        userEmail: user.email,
+        corporateId: user.corporateId,
+        action: 'TEXT_TO_SQL_COMPLEX',
+        intent: 'complex_query',
+        query: question,
+        tablesAccessed: [...new Set(subResults.flatMap(r => this.extractTablesFromSql(r.sql)))],
+        recordsReturned: subResults.reduce((sum, r) => sum + r.data.length, 0),
+        accessGranted: true,
+        responseTime: Date.now() - startTime,
+      });
+
+      // ── Step 3: Synthesize all sub-results into one cohesive response ──
+      const synthesisInput = subResults.map((r, i) => {
+        if (r.error) return `Sub-question ${i + 1}: "${r.question}"\nResult: Error — ${r.error}`;
+        if (r.data.length === 0) return `Sub-question ${i + 1}: "${r.question}"\nResult: No data found`;
+        return `Sub-question ${i + 1}: "${r.question}"\nData (${r.data.length} rows):\n${JSON.stringify(r.data.slice(0, 15), null, 2)}`;
+      }).join('\n\n');
+
+      const synthesisPrompt = `You are Ask BI, an advanced data intelligence assistant. The user asked a complex question that was broken into sub-queries. Now synthesize ALL the sub-results into a single, coherent, insightful response.
+
+ORIGINAL QUESTION: "${question}"
+
+SUB-QUERY RESULTS:
+${synthesisInput}
+
+SYNTHESIS RULES:
+1. Combine all data into ONE unified response that directly answers the original question
+2. If this is a comparison, use a comparison table or side-by-side format
+3. Highlight the KEY INSIGHT — what's the main takeaway? (bold it)
+4. Use markdown: tables for multi-row data, bullet points for summaries, bold for important values
+5. Be analytical — don't just list data, draw conclusions:
+   - "**KIOT IT** outperforms KIOT CSE by 15 points on average (78.3 vs 63.1)"
+   - "**Completion rate is critically low** at 23% — only 15 of 67 candidates finished"
+6. Add a brief analytical summary at the end if there are 2+ dimensions of data
+7. NEVER fabricate data not in the results above
+8. Start with the answer immediately — no filler, no "Based on the data..."
+9. Keep it concise but complete
+
+Synthesized response:`;
+
+      const synthResp = await this.getSynthesizerLlm().invoke([
+        new SystemMessage(synthesisPrompt),
+      ]);
+      const answer = synthResp.content.toString().trim();
+
+      return {
+        answer,
+        sql: subResults.map(r => r.sql).filter(Boolean).join(';\n'),
+        rawData: subResults.flatMap(r => r.data),
+        rowCount: subResults.reduce((sum, r) => sum + r.data.length, 0),
+        executionTimeMs: Date.now() - startTime,
+        confidence: 0.93,
+        searchType: 'text_to_sql_complex',
+        warnings: subResults.filter(r => r.error).map(r => `Sub-query failed: ${r.error}`),
+      };
+    } catch (err) {
+      this.logger.warn(`Complex query decomposition failed: ${err.message} — falling back to single query`);
+      return null;
+    }
   }
 }

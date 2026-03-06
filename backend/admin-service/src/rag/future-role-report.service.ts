@@ -20,9 +20,15 @@ export interface ProfileInput {
   relevantExperience: string;
   currentIndustry: string;
   expectedFutureRole: string;
-  behavioralStyle?: string; // From DISC assessment
-  behavioralDescription?: string; // From personality_traits
-  agileScore?: number; // From assessment_attempts.total_score
+  behavioralStyle?: string;
+  behavioralDescription?: string;
+  agileScore?: number;
+  totalScore?: number;
+  sincerityIndex?: number;
+  programName?: string;
+  groupName?: string;
+  gender?: string;
+  attemptCount?: number;
 }
 
 export interface FutureRoleReport {
@@ -113,10 +119,10 @@ export class FutureRoleReportService {
       profileSnapshot: {
         name: profile.name,
         currentRole: profile.currentRole,
-        totalExperience: `${profile.yearsOfExperience} Years`,
-        relevantExperience: profile.relevantExperience,
+        totalExperience: profile.yearsOfExperience > 0 ? `${profile.yearsOfExperience} Years` : 'N/A',
+        relevantExperience: profile.relevantExperience || 'N/A',
         currentIndustry: profile.currentIndustry,
-        expectedFutureRole: profile.expectedFutureRole,
+        expectedFutureRole: profile.expectedFutureRole || 'Based on assessment analysis',
       },
       behavioralAlignment: '',
       skillAssessment: [],
@@ -131,15 +137,12 @@ export class FutureRoleReportService {
   }
 
   private generateReportId(name: string): string {
-    const date = new Date();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = String(date.getFullYear()).slice(-2);
     const initials = name
       .split(' ')
       .map((n) => n[0]?.toUpperCase() || '')
       .join('');
-    const seq = String(Math.floor(Math.random() * 99) + 1).padStart(2, '0');
-    return `OBI-G1-${month}/${year}-${initials}-${seq}`;
+    const seq = String(Math.floor(Math.random() * 999) + 1).padStart(3, '0');
+    return `CFRR-${initials}-${seq}`;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -148,149 +151,224 @@ export class FutureRoleReportService {
   private async generateFullReportWithAI(
     profile: ProfileInput,
   ): Promise<string> {
-    const systemPrompt = `You are an expert HR consultant and career strategist at Origin BI. 
-Generate a comprehensive "Career Fitment & Future Role Readiness Report" based on the candidate profile.
+    const isStudent = profile.currentRole.toLowerCase().includes('student');
+    const hasScore = profile.totalScore != null && profile.totalScore > 0;
 
-OUTPUT FORMAT (Use EXACTLY this structure):
+    const systemPrompt = `You are an expert career strategist and behavioral analyst at Origin BI.
+Generate a professional "Career Fitment & Future Role Readiness Report".
 
-═══════════════════════════════════════════════════════════════════════════════
-                    CAREER FITMENT & FUTURE ROLE READINESS REPORT
-                                   Report ID: [GENERATE]
-                                     [CANDIDATE NAME]
-                                  Future Role Readiness
-═══════════════════════════════════════════════════════════════════════════════
+CRITICAL FORMATTING RULES:
+1. Use **Markdown tables** (pipe | format) for ALL tabular data. NEVER use ASCII box-drawing characters (┌─┬─┐ │ └─┴─┘ ├ ┼ ┤).
+2. Tables MUST have a header row, a separator row (| --- | --- |), and data rows.
+3. Use ## for major section headings and ### for sub-sections.
+4. Use **bold** for emphasis and key terms.
+5. Keep the report clean, professional, and well-structured.
 
-📋 PROFILE SNAPSHOT
-─────────────────────────────────────────────────────────────────────────────
-Current Role: [ROLE]
-Total Experience: [X] Years
-Relevant Experience: [DETAILS]
-Current Industry: [INDUSTRY]
-Expected Future Role: [TARGET ROLE]
+${isStudent ? `STUDENT CONTEXT:
+This candidate is a STUDENT. Do NOT include:
+- "Total Experience" or "Years of Experience" (they are a student with 0 experience)
+- "Relevant Experience" field
+- "Current Industry" as a corporate field
+- Any corporate/professional jargon that doesn't apply to students
 
-═══════════════════════════════════════════════════════════════════════════════
-1. BEHAVIORAL ALIGNMENT SUMMARY
-═══════════════════════════════════════════════════════════════════════════════
-[3-4 paragraph analysis of behavioral profile and how it aligns with the target role]
+Instead, in the PROFILE SNAPSHOT, show ONLY:
+- Name
+- Status: Student
+- Field of Study / Academic Background (from their role description)
+- Program: (assessment program they took)
+- Behavioral Profile: (their behavioral style)
+- Assessment Score: (their score if available)
+` : ''}
 
-═══════════════════════════════════════════════════════════════════════════════
-2. SKILL-WISE CAPABILITY ASSESSMENT (Score out of 5)
-═══════════════════════════════════════════════════════════════════════════════
+OUTPUT FORMAT (Use EXACTLY this structure with Markdown formatting):
 
-📌 COMMUNICATION SKILLS
-┌─────────────────────────────┬───────┬──────────────────────────────────────┐
-│ Skill                       │ Score │ Insight                              │
-├─────────────────────────────┼───────┼──────────────────────────────────────┤
-│ Management Communication    │ X.X   │ [insight]                            │
-│ Employee Communication      │ X.X   │ [insight]                            │
-│ Stakeholder Negotiation     │ X.X   │ [insight]                            │
-│ Policy & Change Comm.       │ X.X   │ [insight]                            │
-└─────────────────────────────┴───────┴──────────────────────────────────────┘
+# CAREER FITMENT & FUTURE ROLE READINESS REPORT
 
-📌 [RELEVANT DOMAIN SKILLS - based on target role]
-[Generate 4-5 relevant skill categories with 3-5 skills each]
+**Report ID:** CFRR-XXX
+**Candidate:** [NAME]
+**Status:** ${isStudent ? 'Student' : '[ROLE]'}
 
-📌 LEADERSHIP & STRATEGY
-[Skills relevant to target role]
+---
 
-═══════════════════════════════════════════════════════════════════════════════
-3. OVERALL SKILL COVERAGE INSIGHT
-═══════════════════════════════════════════════════════════════════════════════
-✅ High Strength Areas: [list]
-⚡ Moderate / Developable Areas: [list]
-[1 sentence summary]
+## 📋 Profile Snapshot
 
-═══════════════════════════════════════════════════════════════════════════════
-4. FUTURE ROLE READINESS MAPPING ([CURRENT] → [TARGET])
-═══════════════════════════════════════════════════════════════════════════════
-┌─────────────────────────────┬────────────────────────────────────────────────┐
-│ Dimension                   │ Alignment                                      │
-├─────────────────────────────┼────────────────────────────────────────────────┤
-│ Responsibility Overlap      │ [High/Medium/Low]                              │
-│ Skill Transferability       │ [High/Medium/Low]                              │
-│ Behavioral Fit              │ [High/Medium/Low]                              │
-│ Industry Continuity         │ [High/Medium/Low] ([reason])                   │
-└─────────────────────────────┴────────────────────────────────────────────────┘
+${isStudent ? `| Field | Details |
+| --- | --- |
+| **Name** | [Full Name] |
+| **Status** | Student |
+| **Academic Background** | [Field of study / department / stream] |
+| **Program** | [Assessment program name] |
+| **Behavioral Profile** | [Behavioral style] |
+${hasScore ? '| **Assessment Score** | [Score] |' : ''}
+` : `| Field | Details |
+| --- | --- |
+| **Name** | [Full Name] |
+| **Current Role** | [Role] |
+| **Industry** | [Industry] |
+| **Behavioral Profile** | [Style] |
+`}
+---
 
-🎯 Future Role Readiness Score: [XX]%
-📊 Adjacency Type: [Near/Moderate/Distant] Adjacency - [explanation]
+## 1. Behavioral Alignment Summary
 
-Score Interpretation:
-• 80-100%: High Readiness (Green) - Ready for immediate transition
-• 60-79%: Moderate Readiness (Amber) - Transitionable with support
-• 0-59%: Low Readiness (Red) - Significant gaps exist
+[3-4 paragraph detailed analysis of the candidate's behavioral profile. Explain their dominant traits, strengths, interpersonal style, work approach, and how these traits align with potential career paths. Be specific and insightful — reference their behavioral style characteristics directly.]
 
-═══════════════════════════════════════════════════════════════════════════════
-5. ROLE FITMENT SCORE - [TARGET ROLE] (Out of 100)
-═══════════════════════════════════════════════════════════════════════════════
-┌─────────────────────────────┬────────┬───────┐
-│ Component                   │ Weight │ Score │
-├─────────────────────────────┼────────┼───────┤
-│ Behavioral Alignment        │ 40%    │ [XX]  │
-│ Experience Readiness        │ 30%    │ [XX]  │
-│ Skill Coverage              │ 20%    │ [XX]  │
-│ Growth Feasibility          │ 10%    │ [XX]  │
-└─────────────────────────────┴────────┴───────┘
+---
 
-🏆 Final Role Fitment Score: [XX]%
+## 2. Skill-Wise Capability Assessment (Score out of 5)
 
-VERDICT: [STRONG FIT / CONDITIONAL STRONG FIT / MODERATE FIT / DEVELOPMENT NEEDED]
-[1-2 sentence explanation of verdict]
+### 📌 Communication Skills
 
-═══════════════════════════════════════════════════════════════════════════════
-6. INDUSTRY-SPECIFIC SUITABILITY
-═══════════════════════════════════════════════════════════════════════════════
-🏢 [Target Industry 1]
-   Suitability: [High/Medium/Low]
-   Ideal for: [specific areas]
+| Skill | Score | Insight |
+| --- | --- | --- |
+| Verbal Communication | X.X | [specific insight based on behavioral profile] |
+| Interpersonal Skills | X.X | [insight] |
+| Presentation & Articulation | X.X | [insight] |
+| Written Communication | X.X | [insight] |
 
-🏢 [Target Industry 2]
-   Suitability: [High/Medium/Low]
-   Requires: [development areas]
+### 📌 Analytical & Problem-Solving
 
-═══════════════════════════════════════════════════════════════════════════════
-7. KEY TRANSITION REQUIREMENTS (Critical for [TARGET ROLE] Readiness)
-═══════════════════════════════════════════════════════════════════════════════
-To move from [CURRENT ROLE] → [TARGET ROLE], the following shifts are required:
+| Skill | Score | Insight |
+| --- | --- | --- |
+| Critical Thinking | X.X | [insight] |
+| Data-Driven Decision Making | X.X | [insight] |
+| Strategic Planning | X.X | [insight] |
+| Creative Problem Solving | X.X | [insight] |
 
-➡️ From [current capability] → [required capability]
-➡️ From [current capability] → [required capability]
-➡️ From [current capability] → [required capability]
-➡️ From [current capability] → [required capability]
-➡️ From [current capability] → [required capability]
+### 📌 Leadership & Teamwork
 
-═══════════════════════════════════════════════════════════════════════════════
-8. ORIGIN BI EXECUTIVE INSIGHT
-═══════════════════════════════════════════════════════════════════════════════
-[2-3 paragraph personalized executive summary with actionable recommendations]
+| Skill | Score | Insight |
+| --- | --- | --- |
+| Team Collaboration | X.X | [insight] |
+| Initiative & Ownership | X.X | [insight] |
+| Conflict Resolution | X.X | [insight] |
+| Adaptability | X.X | [insight] |
 
-═══════════════════════════════════════════════════════════════════════════════
+### 📌 ${isStudent ? 'Learning & Growth Potential' : 'Domain Expertise'}
+
+| Skill | Score | Insight |
+| --- | --- | --- |
+| [Relevant skill 1] | X.X | [insight] |
+| [Relevant skill 2] | X.X | [insight] |
+| [Relevant skill 3] | X.X | [insight] |
+| [Relevant skill 4] | X.X | [insight] |
+
+---
+
+## 3. Overall Skill Coverage Insight
+
+- ✅ **High Strength Areas:** [list top 3-4 strengths]
+- ⚡ **Moderate / Developable Areas:** [list 2-3 areas for growth]
+- ⚠️ **Needs Attention:** [list 1-2 areas needing development]
+
+[1-2 sentence summary of overall capability profile]
+
+---
+
+## 4. ${isStudent ? 'Career Readiness Assessment' : 'Future Role Readiness Mapping'}
+
+| Dimension | Rating | Details |
+| --- | --- | --- |
+| ${isStudent ? 'Academic Readiness' : 'Responsibility Overlap'} | [High/Medium/Low] | [explanation] |
+| Skill Transferability | [High/Medium/Low] | [explanation] |
+| Behavioral Fit | [High/Medium/Low] | [explanation] |
+| ${isStudent ? 'Growth Trajectory' : 'Industry Continuity'} | [High/Medium/Low] | [explanation] |
+
+**🎯 ${isStudent ? 'Career' : 'Future Role'} Readiness Score:** [XX]%
+**📊 Assessment:** [explanation of the score]
+
+- 80-100%: **High Readiness** — Ready for career entry / role transition
+- 60-79%: **Moderate Readiness** — Needs targeted development
+- 0-59%: **Building Phase** — Significant development needed
+
+---
+
+## 5. Role Fitment Analysis (Out of 100)
+
+| Component | Weight | Score |
+| --- | --- | --- |
+| Behavioral Alignment | 40% | [XX] |
+| ${isStudent ? 'Academic Foundation' : 'Experience Readiness'} | 30% | [XX] |
+| Skill Coverage | 20% | [XX] |
+| Growth Potential | 10% | [XX] |
+
+**🏆 Final Role Fitment Score:** [XX]%
+
+**Verdict:** [STRONG FIT / CONDITIONAL STRONG FIT / MODERATE FIT / DEVELOPMENT NEEDED]
+[1-2 sentence explanation]
+
+---
+
+## 6. ${isStudent ? 'Recommended Career Paths' : 'Industry-Specific Suitability'}
+
+${isStudent ? `Based on the behavioral profile and assessment data, the following career paths are recommended:
+
+### 🎯 Top Recommended Careers
+
+| Career Path | Suitability | Why This Fits |
+| --- | --- | --- |
+| [Career 1] | High | [reason based on behavioral traits] |
+| [Career 2] | High | [reason] |
+| [Career 3] | Medium-High | [reason] |
+| [Career 4] | Medium | [reason] |
+| [Career 5] | Medium | [reason] |
+` : `| Industry | Suitability | Best For |
+| --- | --- | --- |
+| [Industry 1] | High | [specifics] |
+| [Industry 2] | Medium | [specifics] |
+`}
+---
+
+## 7. ${isStudent ? 'Development Roadmap' : 'Key Transition Requirements'}
+
+${isStudent ? `To maximize career readiness, the following development areas are recommended:` : `To transition effectively, the following shifts are required:`}
+
+- ➡️ [Development area 1 with specific actionable advice]
+- ➡️ [Development area 2 with specific actionable advice]
+- ➡️ [Development area 3 with specific actionable advice]
+- ➡️ [Development area 4 with specific actionable advice]
+- ➡️ [Development area 5 with specific actionable advice]
+
+---
+
+## 8. Origin BI Executive Insight
+
+[2-3 paragraph personalized executive summary. Highlight the candidate's unique strengths, potential career trajectory, and specific actionable recommendations. ${isStudent ? 'Focus on academic development, skill-building resources, and career preparation steps suitable for a student.' : 'Focus on professional development and role transition strategy.'}]
+
+---
 
 IMPORTANT RULES:
-1. Be specific and analytical - use real insights based on the role transition
-2. Generate realistic skill scores (3.0 - 5.0 range typically)
-3. Provide actionable, practical insights
-4. The readiness score should realistically reflect the gap between current and target role
-5. Customize skill categories based on the TARGET role requirements
-6. Do NOT mention assessment methodologies like DISC or Agile ACI
-7. NEVER include any dates in the report - no month, year, or day references`;
+1. Be specific and analytical — use real insights derived from the behavioral profile data provided
+2. Skill scores should range from 2.5 to 5.0, be realistic and VARIED (not all similar)
+3. Provide actionable, practical insights — not generic advice
+4. ALL tables MUST use Markdown pipe format (| col1 | col2 |) — NEVER ASCII box characters
+5. Do NOT mention assessment methodology names like "DISC" or "Agile ACI" directly
+6. NEVER include dates in the report
+7. ${isStudent ? 'Do NOT include experience-related fields. This is a STUDENT. Focus on potential, growth, and career direction.' : 'Customize for the professional context.'}
+8. Make skill category names relevant to the candidate's background and career potential`;
+
+    // Build assessment data section for the prompt
+    const assessmentLines: string[] = [];
+    if (hasScore) assessmentLines.push(`Assessment Score: ${profile.totalScore}`);
+    if (profile.agileScore) assessmentLines.push(`Agile Score: ${profile.agileScore}`);
+    if (profile.sincerityIndex) assessmentLines.push(`Sincerity Index: ${profile.sincerityIndex}`);
+    if (profile.attemptCount) assessmentLines.push(`Assessment Attempts: ${profile.attemptCount}`);
 
     const userPrompt = `Generate a complete Career Fitment & Future Role Readiness Report for:
 
-CANDIDATE PROFILE:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Name: ${profile.name}
-Current Role: ${profile.currentRole}
-Current Job Description: ${profile.currentJobDescription}
-Years of Experience: ${profile.yearsOfExperience}
-Relevant Experience: ${profile.relevantExperience}
-Current Industry: ${profile.currentIndustry}
-Expected Future Role: ${profile.expectedFutureRole}
-${profile.behavioralStyle ? `Behavioral Style: ${profile.behavioralStyle}` : ''}
-${profile.behavioralDescription ? `Behavioral Description: ${profile.behavioralDescription}` : ''}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**CANDIDATE PROFILE:**
+- Name: ${profile.name}
+- Current Role: ${profile.currentRole}
+- Background: ${profile.currentJobDescription}
+${profile.currentIndustry ? `- Field: ${profile.currentIndustry}` : ''}
+${profile.programName ? `- Assessment Program: ${profile.programName}` : ''}
+${profile.groupName ? `- Group/Batch: ${profile.groupName}` : ''}
+${profile.gender ? `- Gender: ${profile.gender}` : ''}
+${profile.behavioralStyle ? `- Behavioral Style: ${profile.behavioralStyle}` : ''}
+${profile.behavioralDescription ? `- Behavioral Description: ${profile.behavioralDescription}` : ''}
+${assessmentLines.length > 0 ? `\n**ASSESSMENT DATA:**\n${assessmentLines.map(l => `- ${l}`).join('\n')}` : ''}
 
-Generate the COMPLETE report now:`;
+Generate the COMPLETE report now using Markdown tables (pipe format). Do NOT use ASCII box-drawing characters.`;
 
     try {
       const response = await this.getLlm().invoke([
@@ -309,6 +387,6 @@ Generate the COMPLETE report now:`;
   // FORMAT FOR CHAT DISPLAY
   // ═══════════════════════════════════════════════════════════════════════════
   formatForChat(report: FutureRoleReport): string {
-    return `**📊 Career Fitment Report Generated**\n\n**Report ID:** ${report.reportId}\n**Candidate:** ${report.profileSnapshot.name}\n**Generated:** ${report.generatedAt.toLocaleDateString()}\n\n---\n\n${report.fullReportText}`;
+    return `**📊 Career Fitment Report Generated**\n\n**Report ID:** ${report.reportId}\n**Candidate:** ${report.profileSnapshot.name}\n\n---\n\n${report.fullReportText}`;
   }
 }

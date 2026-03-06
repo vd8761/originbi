@@ -196,6 +196,53 @@ const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
         }
     };
 
+    // ── Pre-process: Convert ASCII box-drawing tables to Markdown tables ──
+    // Handles tables using ┌─┬─┐ │ │ │ └─┴─┘ ├─┼─┤ characters
+    const preprocessContent = (raw: string): string => {
+        const lines = raw.split('\n');
+        const result: string[] = [];
+        let inBoxTable = false;
+        const boxRows: string[] = [];
+
+        const isBoxBorder = (l: string) => /^[┌┬┐└┴┘├┼┤─│╔╦╗╚╩╝╠╬╣═║\s]+$/.test(l.trim());
+        const isBoxDataRow = (l: string) => /^[│║]/.test(l.trim()) && /[│║]$/.test(l.trim());
+
+        const flushBoxTable = () => {
+            if (boxRows.length === 0) return;
+            // Parse data rows (│ col1 │ col2 │) into markdown
+            const dataRows = boxRows.filter(r => isBoxDataRow(r));
+            if (dataRows.length === 0) { boxRows.length = 0; return; }
+            const mdRows = dataRows.map(r =>
+                '| ' + r.replace(/^[│║]\s*/, '').replace(/\s*[│║]$/, '').split(/\s*[│║]\s*/).join(' | ') + ' |'
+            );
+            // Insert separator after first row (header)
+            if (mdRows.length > 1) {
+                const colCount = mdRows[0].split('|').filter(c => c.trim() !== '').length;
+                const sep = '| ' + Array(colCount).fill('---').join(' | ') + ' |';
+                mdRows.splice(1, 0, sep);
+            }
+            result.push(...mdRows);
+            boxRows.length = 0;
+        };
+
+        for (const line of lines) {
+            if (isBoxBorder(line) || isBoxDataRow(line)) {
+                inBoxTable = true;
+                boxRows.push(line);
+            } else {
+                if (inBoxTable) {
+                    flushBoxTable();
+                    inBoxTable = false;
+                }
+                result.push(line);
+            }
+        }
+        if (inBoxTable) flushBoxTable();
+        return result.join('\n');
+    };
+
+    content = preprocessContent(content);
+
     // ── Parse into blocks: code blocks, tables, regular lines ──
     const blocks: { type: 'code' | 'table' | 'lines'; content: string; lang?: string }[] = [];
     const rawLines = content.split('\n');

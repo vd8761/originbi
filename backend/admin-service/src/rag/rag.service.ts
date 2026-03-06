@@ -11,6 +11,7 @@ import { ChatMemoryService } from './chat-memory.service';
 import { OriIntelligenceService } from './ori-intelligence.service';
 import { JDMatchingService } from './jd-matching.service';
 import { TextToSqlService } from './text-to-sql.service';
+import { RagCacheService } from './rag-cache.service';
 
 // RBAC Imports
 import { AccessPolicyFactory } from './policies';
@@ -63,8 +64,8 @@ Notes: Candidates/students. ALWAYS use full_name for person searches. Email is N
 Relationships: registrations.user_id → users.id, registrations.corporate_account_id → corporate_accounts.id, registrations.group_id → groups.id, registrations.program_id → programs.id
 
 TABLE: assessment_attempts
-Columns: id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, unlock_at, expires_at, started_at, must_finish_by, completed_at, status(NOT_STARTED/IN_PROGRESS/COMPLETED), total_score(numeric), max_score_snapshot, sincerity_index(numeric), sincerity_class, dominant_trait_id, agile_score(numeric), is_deleted, created_at, updated_at
-Notes: Exam/assessment results. JOIN with registrations ON registration_id for candidate name. total_score & agile_score are numeric (cast as needed).
+Columns: id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, unlock_at, expires_at, started_at, must_finish_by, completed_at, status(NOT_STARTED/IN_PROGRESS/COMPLETED), total_score(numeric), max_score_snapshot, sincerity_index(numeric), sincerity_class, dominant_trait_id, is_deleted, created_at, updated_at
+Notes: Exam/assessment results. JOIN with registrations ON registration_id for candidate name. total_score is the main score (also known as agile_score in reports). sincerity_index is numeric.
 Relationships: assessment_attempts.registration_id → registrations.id, assessment_attempts.dominant_trait_id → personality_traits.id, assessment_attempts.program_id → programs.id
 
 TABLE: assessment_answers
@@ -218,6 +219,7 @@ export class RagService {
     private textToSqlService: TextToSqlService,
     private policyFactory: AccessPolicyFactory,
     private auditLogger: AuditLoggerService,
+    private ragCache: RagCacheService,
   ) {
     this.reportsDir = path.join(process.cwd(), 'reports');
     if (!fs.existsSync(this.reportsDir)) {
@@ -255,6 +257,24 @@ export class RagService {
       return `${alias}.sincerity_index, ${alias}.sincerity_class`;
     }
     return `NULL::numeric as sincerity_index, NULL::varchar as sincerity_class`;
+  }
+
+  /** Generate a contextual "no data" message based on what the user asked about */
+  private getContextualNoDataMessage(question: string, scopeMsg: string): string {
+    const q = question.toLowerCase();
+    if (/\b(education|qualification|degree|department|school|board|stream)\b/i.test(q)) {
+      return `Education/qualification details are not available for the candidates${scopeMsg} at this time.`;
+    }
+    if (/\b(score|marks|assessment|test|exam|result)\b/i.test(q)) {
+      return `No assessment results are currently available${scopeMsg}. The candidates may not have completed their assessments yet.`;
+    }
+    if (/\b(email|phone|mobile|contact)\b/i.test(q)) {
+      return `Contact details are not available for these candidates${scopeMsg}.`;
+    }
+    if (/\b(their|them|those)\b/i.test(q)) {
+      return `No data available for the requested details${scopeMsg}. Try asking **"list candidates"** to see available data.`;
+    }
+    return `No matching data found${scopeMsg}. Try asking a more specific question or use **"list candidates"** to see available data.`;
   }
 
   /** Sanitize error messages — never expose raw SQL/DB internals to users */
@@ -646,9 +666,26 @@ export class RagService {
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // STEP 1: CONVERSATION CONTEXT + QUERY UNDERSTANDING
+      // SEMANTIC CACHE — Check if a similar question was answered recently
       // ═══════════════════════════════════════════════════════════════
       const userRole = (user?.role || 'STUDENT').toUpperCase();
+      try {
+        const cached = await this.ragCache.lookup(question, userRole);
+        if (cached) {
+          this.logger.log(`⚡ Cache HIT — returning cached response (similarity ≥ 0.92)`);
+          return {
+            answer: cached.answer,
+            searchType: cached.searchType || 'cached',
+            confidence: cached.confidence || 0.95,
+          };
+        }
+      } catch (cacheErr) {
+        this.logger.warn(`Cache lookup failed (non-blocking): ${cacheErr}`);
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // STEP 1: CONVERSATION CONTEXT + QUERY UNDERSTANDING
+      // ═══════════════════════════════════════════════════════════════
       const sessionId = conversationId > 0 ? `conv_${conversationId}` : `user_${user?.id || 0}`;
 
       // Build conversation history for context-aware intent classification
@@ -717,7 +754,7 @@ export class RagService {
 
         if (!followUpData || (Array.isArray(followUpData) && followUpData.length === 0)) {
           return {
-            answer: `No data found for this follow-up query.`,
+            answer: this.getContextualNoDataMessage(resolvedQuestion, userRole === 'CORPORATE' ? ' in your organization' : ''),
             searchType: followUpResolved.intent,
             confidence: 0.8,
           };
@@ -1040,6 +1077,8 @@ export class RagService {
             resolvedQuestion, user as UserContext, conversationHistory,
           );
           if (tsResult.confidence > 0.3) {
+            // Store in semantic cache (fire-and-forget)
+            this.ragCache.store(resolvedQuestion, tsResult.answer, tsResult.searchType, tsResult.confidence, userRole).catch(() => {});
             return {
               answer: tsResult.answer,
               searchType: tsResult.searchType,
@@ -1092,7 +1131,7 @@ export class RagService {
             // If Text-to-SQL returned low confidence with 0 rows, give a clear DB-only answer
             if (tsResult.rowCount === 0) {
               return {
-                answer: `No matching data found in the platform database for your query. I can only provide information that exists in the OriginBI database — I don't use external or web-based data sources.\n\nTry rephrasing your question, or ask "what can you do" for help.`,
+                answer: `No matching data found for your request. I can help with questions about candidates, assessments, companies, and more.\n\nTry asking:\n- **"list candidates"** — see registered candidates\n- **"how many users"** — get user counts\n- **"show top performers"** — see highest scorers`,
                 searchType: 'data_guard_no_results',
                 confidence: 0.8,
               };
@@ -1259,7 +1298,7 @@ export class RagService {
         const dbBoundIntents = [
           'list_users', 'list_candidates', 'test_results', 'best_performer',
           'person_lookup', 'self_results', 'career_roles', 'count', 'count_by_role',
-          'corporate_details',
+          'corporate_details', 'data_query',
           'affiliate_dashboard', 'affiliate_referrals', 'affiliate_earnings',
           'affiliate_payments', 'affiliate_list', 'affiliate_lookup',
           'affiliate_students',
@@ -1278,6 +1317,7 @@ export class RagService {
             count: `**Total: 0**`,
             count_by_role: `No accounts found.`,
             corporate_details: `No corporate accounts found${scopeMsg}.`,
+            data_query: this.getContextualNoDataMessage(question, scopeMsg),
           };
 
           const answer = noDataMessages[interpretation.intent]
@@ -1296,7 +1336,7 @@ export class RagService {
         if (platformEntityCheck.test(question)) {
           // Platform data question — return DB-only message, don't use LLM
           return {
-            answer: `No matching data found in the platform database for your query. All responses are based exclusively on OriginBI platform data.\n\nTry rephrasing, or use commands like: **"list companies"**, **"list candidates"**, **"show top performers"**.`,
+            answer: `No matching data found for your request. Try asking a more specific question or use commands like:\n- **"list candidates"** — see all registered candidates\n- **"list companies"** — see corporate accounts\n- **"show top performers"** — see highest scorers`,
             searchType: 'data_guard_no_results',
             confidence: 0.7,
           };
@@ -1412,7 +1452,7 @@ export class RagService {
     if (!searchName) {
       const afterBatch = question.match(/\b(?:batch|group)\s+(?:named?\s+)?["']?([A-Za-z0-9_\-]+(?:\s+[A-Za-z0-9_\-]+)*)["']?/i);
       if (afterBatch) {
-        let n = afterBatch[1].replace(/\b(summary|summarize|report|strengths|risks|readiness|overview|stats|statistics|performance|analysis|details?|info|candidates?)\b/gi, '').trim();
+        let n = afterBatch[1].replace(/\b(summary|summarize|report|strengths|risks|readiness|overview|stats|statistics|performance|analysis|details?|info|candidates?|list|show|all|get|display)\b/gi, '').trim();
         if (n.length >= 2) searchName = n;
       }
     }
@@ -1937,10 +1977,20 @@ export class RagService {
                     r.full_name,
                     r.gender,
                     r.mobile_number,
+                    r.school_level,
+                    r.school_stream,
+                    r.student_board,
+                    r.registration_source,
                     u.email,
                     aa.total_score,
+                    aa.sincerity_index,
                     pt.blended_style_name as behavioral_style,
                     pt.blended_style_desc as behavior_description,
+                    p.name as program_name,
+                    g.name as group_name,
+                    dep.name as department_name,
+                    dt.name as degree_name,
+                    ca.company_name,
                     (SELECT MAX(aa2.total_score) FROM assessment_attempts aa2 WHERE aa2.registration_id = r.id) as best_score,
                     (SELECT COUNT(*) FROM assessment_attempts aa3 WHERE aa3.registration_id = r.id AND aa3.status = 'COMPLETED') as attempt_count
                 FROM registrations r
@@ -1948,6 +1998,12 @@ export class RagService {
                 LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id 
                     AND aa.id = (SELECT id FROM assessment_attempts WHERE registration_id = r.id ORDER BY completed_at DESC LIMIT 1)
                 LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+                LEFT JOIN programs p ON COALESCE(aa.program_id, r.program_id) = p.id
+                LEFT JOIN groups g ON r.group_id = g.id
+                LEFT JOIN department_degrees dd ON r.department_degree_id = dd.id
+                LEFT JOIN departments dep ON dd.department_id = dep.id
+                LEFT JOIN degree_types dt ON dd.degree_type_id = dt.id
+                LEFT JOIN corporate_accounts ca ON r.corporate_account_id = ca.id
                 WHERE (${whereClause})
                 AND r.is_deleted = false${rbacFilter}
                 ORDER BY r.id, aa.total_score DESC NULLS LAST
@@ -1971,10 +2027,17 @@ export class RagService {
         }
         personData = await this.dataSource.query(`
                 SELECT 
-                    r.id, r.full_name, r.gender, r.mobile_number, u.email,
-                    aa.total_score,
+                    r.id, r.full_name, r.gender, r.mobile_number,
+                    r.school_level, r.school_stream, r.student_board, r.registration_source,
+                    u.email,
+                    aa.total_score, aa.sincerity_index,
                     pt.blended_style_name as behavioral_style,
                     pt.blended_style_desc as behavior_description,
+                    p.name as program_name,
+                    g.name as group_name,
+                    dep.name as department_name,
+                    dt.name as degree_name,
+                    ca.company_name,
                     (SELECT MAX(aa2.total_score) FROM assessment_attempts aa2 WHERE aa2.registration_id = r.id) as best_score,
                     (SELECT COUNT(*) FROM assessment_attempts aa3 WHERE aa3.registration_id = r.id AND aa3.status = 'COMPLETED') as attempt_count
                 FROM registrations r
@@ -1982,6 +2045,12 @@ export class RagService {
                 LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id 
                     AND aa.id = (SELECT id FROM assessment_attempts WHERE registration_id = r.id ORDER BY completed_at DESC LIMIT 1)
                 LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+                LEFT JOIN programs p ON COALESCE(aa.program_id, r.program_id) = p.id
+                LEFT JOIN groups g ON r.group_id = g.id
+                LEFT JOIN department_degrees dd ON r.department_degree_id = dd.id
+                LEFT JOIN departments dep ON dd.department_id = dep.id
+                LEFT JOIN degree_types dt ON dd.degree_type_id = dt.id
+                LEFT JOIN corporate_accounts ca ON r.corporate_account_id = ca.id
                 WHERE r.full_name ILIKE $1 AND r.is_deleted = false${fallbackRbac}
                 ORDER BY r.id, aa.total_score DESC NULLS LAST
                 LIMIT 10`, fallbackParams);
@@ -2051,22 +2120,38 @@ export class RagService {
       // Use best_score for report generation if available
       const scoreToUse = person.best_score || person.total_score;
 
+      // ── Build smart ProfileInput based on actual student data ──
+      const isStudent = !person.company_name; // No corporate = student
+      const schoolInfo = [person.school_level, person.school_stream, person.student_board].filter(Boolean).join(' / ');
+      const deptInfo = [person.degree_name, person.department_name].filter(Boolean).join(' — ');
+      const currentRole = isStudent
+        ? (deptInfo ? `Student (${deptInfo})` : (schoolInfo ? `Student (${schoolInfo})` : 'Student'))
+        : (person.company_name ? `Employee at ${person.company_name}` : 'Assessment Candidate');
+      const currentIndustry = isStudent
+        ? (person.department_name || 'Education / Academics')
+        : (person.company_name || 'Professional');
+
       // Generate the full Career Fitment Report
       const report = await this.futureRoleReportService.generateReport({
         name: person.full_name || searchTerm,
-        currentRole: 'Assessment Candidate',
-        currentJobDescription:
-          'Completed behavioral and skill assessments through the OriginBI platform.',
-        yearsOfExperience: 0,
-        relevantExperience: 'Based on assessment data',
-        currentIndustry: 'Assessment',
-        expectedFutureRole: 'To be determined based on assessment results',
+        currentRole,
+        currentJobDescription: isStudent
+          ? `Pursuing ${deptInfo || schoolInfo || 'academics'}. Completed behavioral and skill assessments through the OriginBI platform.`
+          : `Working at ${person.company_name || 'organization'}. Completed behavioral and skill assessments through the OriginBI platform.`,
+        yearsOfExperience: isStudent ? 0 : 0,
+        relevantExperience: isStudent ? '' : '',
+        currentIndustry,
+        expectedFutureRole: '',
         behavioralStyle: person.behavioral_style || undefined,
         behavioralDescription: person.behavior_description || undefined,
-        agileScore: scoreToUse
-          ? parseFloat(scoreToUse)
-          : undefined,
-      });
+        agileScore: scoreToUse ? parseFloat(scoreToUse) : undefined,
+        totalScore: scoreToUse ? parseFloat(scoreToUse) : undefined,
+        sincerityIndex: person.sincerity_index ? parseFloat(person.sincerity_index) : undefined,
+        programName: person.program_name || undefined,
+        groupName: person.group_name || undefined,
+        gender: person.gender || undefined,
+        attemptCount: person.attempt_count ? parseInt(person.attempt_count) : undefined,
+      } as any);
 
       return {
         answer: report.fullReportText,
@@ -3318,7 +3403,10 @@ JSON:`;
       || /^(what|who)\s+are\s+(they|those|them)\s*\??$/i.test(q)
       || /^(detail|details|more\s+details?|full\s+details?)\s*\??$/i.test(q)
       || /^(list|show)\s+(all\s+)?(the|their|those)?\s*(details|info|names?)?\s*\??$/i.test(q)
-      || /^(give|tell)\s+(me\s+)?(all\s+)?(the\s+|those\s+)?(detail|info|data|name)s?\s*\??$/i.test(q);
+      || /^(give|tell)\s+(me\s+)?(all\s+)?(the\s+|those\s+)?(detail|info|data|name)s?\s*\??$/i.test(q)
+      // Extended follow-ups: "show their list along with X", "list them with education", "show their details with scores"
+      || /^(show|list|get|display)\s+(their|them|those|the)\s+(list|details?|info|data|names?)\b/i.test(q)
+      || /^(list|show)\s+(them|those)\b/i.test(q);
 
     if (!isGenericFollowUp) return null;
 
@@ -3329,6 +3417,13 @@ JSON:`;
     if (!lastIntent) return null;
 
     this.logger.log(`🔁 Generic follow-up detected: "${question}" | lastIntent: ${lastIntent}`);
+
+    // If the follow-up mentions specific data qualifiers (education, scores, etc.),
+    // route to data_query which can use text-to-SQL for flexible column selection
+    const hasDataQualifier = /\b(education|qualification|score|marks|assessment|personality|department|degree|experience|gender|age|email|mobile|phone|board|stream|level)\b/i.test(q);
+    if (hasDataQualifier) {
+      return { intent: 'data_query', searchTerm: null, table: 'registrations', includePersonality: true };
+    }
 
     // Map lastIntent → detail intent
     const intentMapping: Record<string, { intent: string; table: string; includePersonality: boolean }> = {
@@ -3415,6 +3510,23 @@ JSON:`;
     // "all person report" / "all candidate report" / "all report" → overall_report
     if (/\b(all|every|overall|complete|full)\s+(candidate|person|student|user)?\s*(report|summary|overview|dashboard)\b/.test(q)) {
       return { intent: 'overall_report', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PRONOUN-BASED FOLLOW-UPS — "show their list", "list them",
+    // "show them with education", "their list along with qualification"
+    // These refer to previously mentioned candidates — route to data_query
+    // so the text-to-SQL engine can include requested columns.
+    // ═══════════════════════════════════════════════════════════════
+    if (/\b(show|list|get|display)\s+(their|them|those)\s+(list|details?|info|data|names?)\b/i.test(q) ||
+        /\b(show|list|get|display)\s+(them|those)\b/i.test(q) ||
+        /\btheir\s+(list|details?|info|names?)\b/i.test(q)) {
+      // If extra qualifiers like "education", "score", etc. → data_query for flexible columns
+      const hasQualifier = /\b(education|qualification|score|marks|assessment|personality|department|degree|experience|gender|age|email|mobile|phone)\b/i.test(q);
+      if (hasQualifier) {
+        return { intent: 'data_query', searchTerm: null, table: 'registrations', includePersonality: true };
+      }
+      return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
     }
 
     // "best candidate for [role]" → jd_candidate_match (role-specific matching, NOT generic best_performer)
@@ -3677,10 +3789,10 @@ JSON:`;
     if (/\breport\b/i.test(q) && /\b(for|of|about)\s+/i.test(q)) {
       const name = this.extractName(question);
       if (name) {
-        // Determine intent: if query mentions "test", "assessment", "score", "exam" → person_lookup
-        const isTestReport = /\b(test|assessment|exam|score|result)\b/i.test(q);
+        // Only route to person_lookup if explicitly asking for test RESULTS/SCORES (not just "test report")
+        const isTestResults = /\b(test\s+results?|test\s+scores?|assessment\s+results?|exam\s+results?|exam\s+scores?|score\s+details?)\b/i.test(q);
         return {
-          intent: isTestReport ? 'person_lookup' : 'career_report',
+          intent: isTestResults ? 'person_lookup' : 'career_report',
           searchTerm: name,
           table: 'assessment_attempts',
           includePersonality: true,
@@ -3693,9 +3805,9 @@ JSON:`;
       // First try extractName which is smarter about finding actual person names
       const nameFromExtract = this.extractName(question);
       if (nameFromExtract) {
-        const isTestReport = /\b(test|assessment|exam|score|result)\b/i.test(q);
+        const isTestResults = /\b(test\s+results?|test\s+scores?|assessment\s+results?|exam\s+results?|exam\s+scores?|score\s+details?)\b/i.test(q);
         return {
-          intent: isTestReport ? 'person_lookup' : 'career_report',
+          intent: isTestResults ? 'person_lookup' : 'career_report',
           searchTerm: nameFromExtract,
           table: 'assessment_attempts',
           includePersonality: true,
@@ -3724,9 +3836,9 @@ JSON:`;
         cleanedBeforeReport = cleanedBeforeReport.replace(leadingStopWords, '').trim();
       }
       if (cleanedBeforeReport.length >= 2 && !/^(show|get|list|create|generate|overall|custom|my|test|exam|assessment)$/i.test(cleanedBeforeReport)) {
-        const isTestReport = /\b(test|assessment|exam|score|result)\b/i.test(q);
+        const isTestResults = /\b(test\s+results?|test\s+scores?|assessment\s+results?|exam\s+results?|exam\s+scores?|score\s+details?)\b/i.test(q);
         return {
-          intent: isTestReport ? 'person_lookup' : 'career_report',
+          intent: isTestResults ? 'person_lookup' : 'career_report',
           searchTerm: cleanedBeforeReport,
           table: 'assessment_attempts',
           includePersonality: true,
@@ -3748,6 +3860,10 @@ JSON:`;
     }
 
     // Count — "how many users/candidates/students/male/female/corporate/admin" / "total candidates" / "total male and female"
+    // GUARD: If asking "how many [people] suit/fit for [role]" → jd_candidate_match, not count
+    if (/\b(how\s*many|count|total)\b/i.test(q) && /\b(suits?|fit|suitable|suited|eligible|qualified|ready|right|ideal|match)\b/i.test(q) && /\b(for|to)\s+\w/i.test(q)) {
+      return { intent: 'jd_candidate_match', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
     if (/\b(how\s*many|count|total\s*number)\b/.test(q) || /\btotal\s+(candidate|candidates|student|students|user|users|male|female|people|resource|employee|member|registration|count|number)s?\b/i.test(q)) {
       // Detect role-based count (corporate, admin, student breakdown)
       const rolesRequested: string[] = [];
@@ -4084,8 +4200,14 @@ JSON:`;
       return { intent: 'general_knowledge', searchTerm: null, table: 'none', includePersonality: false };
     }
 
-    // "salary of", "job market", "industry trends", "career path"
-    if (/\b(salary|compensation|pay|job\s*market|industry\s*trends?|career\s*path|career\s*options?|job\s*prospects?|job\s*opportunities|future\s+of|scope\s+of|demand\s+for|interview\s+questions?|resume\s+tips?)\b/.test(q)) {
+    // "ask me about X" — informational request, not a person lookup
+    if (/\b(ask|tell)\s+me\s+about\b/.test(q) &&
+      !/\b(my|his|her|their|candidate|user|company|companies|corporate|corporates|organization|\w+'s)\b/.test(q)) {
+      return { intent: 'general_knowledge', searchTerm: null, table: 'none', includePersonality: false };
+    }
+
+    // "salary of", "job market", "industry trends", "career path(s)"
+    if (/\b(salary|compensation|pay|job\s*market|industry\s*trends?|career\s*paths?|career\s*options?|job\s*prospects?|job\s*opportunities|future\s+of|scope\s+of|demand\s+for|interview\s+questions?|resume\s+tips?)\b/.test(q)) {
       return { intent: 'general_knowledge', searchTerm: null, table: 'none', includePersonality: false };
     }
 
@@ -4290,6 +4412,9 @@ JSON:`;
       'program', 'programs', 'batch', 'batches', 'group', 'groups',
       'summary', 'summarize', 'report', 'version', 'principal', 'generate',
       'readiness', 'strengths', 'risks', 'overview', 'students', 'school',
+      // Follow-up / structural words — NOT person names
+      'along', 'with', 'without', 'including', 'education', 'qualification',
+      'qualifications', 'experience', 'details', 'detail', 'score', 'scores',
     ]);
 
     for (const pattern of patterns) {
