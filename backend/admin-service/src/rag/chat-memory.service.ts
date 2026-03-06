@@ -222,7 +222,9 @@ export class ChatMemoryService {
 
   /**
    * Build a prompt-ready conversation history string.
-   * Returns the last N messages formatted for injection into the LLM prompt.
+   * Uses a smart windowing strategy:
+   * - Last 6 messages: included verbatim (recent context)
+   * - Older messages: compressed into a brief summary (saves tokens, prevents hallucination)
    */
   async buildLlmHistory(conversationId: number): Promise<string> {
     if (!this.tablesExist) return '';
@@ -239,8 +241,23 @@ export class ChatMemoryService {
     // Reverse to chronological order
     rows.reverse();
 
+    const RECENT_WINDOW = 6; // Keep last 6 messages verbatim
+
     let history = '--- CONVERSATION HISTORY ---\n';
-    for (const row of rows) {
+
+    // If we have more messages than the recent window, summarize the older ones
+    if (rows.length > RECENT_WINDOW) {
+      const olderMessages = rows.slice(0, rows.length - RECENT_WINDOW);
+      const summary = this.summarizeMessages(olderMessages);
+      history += `[Earlier context: ${summary}]\n\n`;
+    }
+
+    // Add recent messages verbatim
+    const recentMessages = rows.length > RECENT_WINDOW
+      ? rows.slice(rows.length - RECENT_WINDOW)
+      : rows;
+
+    for (const row of recentMessages) {
       const label = row.role === 'user' ? 'User' : 'BI';
       let content: string = row.content || '';
       if (content.length > this.MSG_TRUNCATE_LEN) {
@@ -250,6 +267,51 @@ export class ChatMemoryService {
     }
     history += '--- CURRENT INTERACTION ---\n';
     return history;
+  }
+
+  /**
+   * Compress older messages into a concise summary string.
+   * This is a fast, deterministic summarizer — no LLM call needed.
+   * Extracts key entities, topics, and data points mentioned.
+   */
+  private summarizeMessages(messages: { role: string; content: string }[]): string {
+    const topics = new Set<string>();
+    const entities = new Set<string>();
+    const dataPoints: string[] = [];
+
+    for (const msg of messages) {
+      const content = (msg.content || '').toLowerCase();
+
+      // Extract topics
+      if (/\b(candidate|student|registration)\b/.test(content)) topics.add('candidates');
+      if (/\b(company|corporate|account)\b/.test(content)) topics.add('companies');
+      if (/\b(assessment|test|exam|score)\b/.test(content)) topics.add('assessments');
+      if (/\b(group|batch)\b/.test(content)) topics.add('groups/batches');
+      if (/\b(program)\b/.test(content)) topics.add('programs');
+      if (/\b(affiliate|referral)\b/.test(content)) topics.add('affiliates');
+      if (/\b(career|role|job)\b/.test(content)) topics.add('career roles');
+      if (/\b(report|summary)\b/.test(content)) topics.add('reports');
+      if (/\b(personality|trait|disc)\b/.test(content)) topics.add('personality traits');
+
+      // Extract mentioned names (capitalized words that look like proper nouns)
+      const nameMatches = msg.content.match(/\b[A-Z][a-z]+ [A-Z][a-z]+\b/g);
+      if (nameMatches) nameMatches.forEach(n => entities.add(n));
+
+      // Extract key numbers/data from assistant messages
+      if (msg.role === 'assistant') {
+        const numMatch = msg.content.match(/\*\*(\d[\d,]*)\*\*/g);
+        if (numMatch) numMatch.slice(0, 3).forEach(n => dataPoints.push(n.replace(/\*\*/g, '')));
+      }
+    }
+
+    const parts: string[] = [];
+    if (topics.size > 0) parts.push(`discussed ${[...topics].join(', ')}`);
+    if (entities.size > 0) parts.push(`mentioned ${[...entities].slice(0, 5).join(', ')}`);
+    if (dataPoints.length > 0) parts.push(`key figures: ${dataPoints.slice(0, 3).join(', ')}`);
+
+    return parts.length > 0
+      ? parts.join('; ')
+      : `${messages.length} earlier messages exchanged`;
   }
 
   /* ═══════════════════════════════════════════════════════════
