@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';
-import { Notification } from '@originbi/shared-entities';
+import { Notification, User as AdminUser } from '@originbi/shared-entities';
 
 @Injectable()
 export class NotificationService {
@@ -10,10 +10,13 @@ export class NotificationService {
     constructor(
         @InjectRepository(Notification)
         private readonly notificationRepo: Repository<Notification>,
+
+        @InjectRepository(AdminUser)
+        private readonly userRepo: Repository<AdminUser>,
     ) { }
 
     async createNotification(data: {
-        userId: number;
+        userId?: number;
         role: string;
         type: string;
         title: string;
@@ -21,8 +24,31 @@ export class NotificationService {
         metadata?: any;
     }) {
         try {
+            if (!data.userId) {
+                // Find all users with this role to broadcast
+                const users = await this.userRepo.find({
+                    where: { role: data.role, isActive: true },
+                    select: ['id'],
+                });
+
+                if (users.length === 0) {
+                    this.logger.warn(`No active users found with role ${data.role} to notify.`);
+                    return null;
+                }
+
+                const notifications = users.map(user =>
+                    this.notificationRepo.create({
+                        ...data,
+                        userId: Number(user.id),
+                    })
+                );
+
+                return await this.notificationRepo.save(notifications);
+            }
+
             const notification = this.notificationRepo.create({
                 ...data,
+                userId: data.userId,
             });
             return await this.notificationRepo.save(notification);
         } catch (error) {

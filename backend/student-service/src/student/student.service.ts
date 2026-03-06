@@ -846,11 +846,10 @@ export class StudentService {
       // Send Admin Notification
       try {
         const message = registeredWithAffiliate
-          ? `${dto.full_name} signed up using ${affiliateName}'s referral code.`
-          : `${dto.full_name} signed up without a referral code.`;
+          ? `${dto.full_name} signed up using ${affiliateName}'s referral link.`
+          : `${dto.full_name} signed up without a referral link.`;
 
         await this.sendAdminNotification({
-          userId: 1, // System Admin
           role: 'ADMIN',
           type: registeredWithAffiliate ? 'STUDENT_REFERRAL_REGISTRATION' : 'STUDENT_DIRECT_REGISTRATION',
           title: 'New Student registration',

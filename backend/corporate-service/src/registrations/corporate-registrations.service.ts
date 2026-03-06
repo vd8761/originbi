@@ -65,7 +65,7 @@ export class CorporateRegistrationsService {
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
     private readonly assessmentGenService: AssessmentGenerationService,
-  ) {}
+  ) { }
 
   async registerCandidate(dto: CreateCandidateDto, corporateUserId: number) {
     // 0. (Optional) Verify User exists if needed, but we can trust the ID for now or just let the Corp lookup fail
@@ -108,8 +108,8 @@ export class CorporateRegistrationsService {
     const password =
       dto.password ||
       Math.random().toString(36).slice(-8) +
-        Math.random().toString(36).slice(-4).toUpperCase() +
-        '1!';
+      Math.random().toString(36).slice(-4).toUpperCase() +
+      '1!';
 
     // 3. Create Cognito User
     let sub: string;

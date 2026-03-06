@@ -765,23 +765,6 @@ export class CorporateService {
           }
         }
 
-        // Add Notification for Admin
-        try {
-          await this.notificationService.createNotification({
-            userId: 1, // Assuming user ID 1 is the main admin
-            role: 'ADMIN',
-            type: 'NEW_CORPORATE_SIGNUP',
-            title: 'New Corporate Signup',
-            message: `A new corporate account for "${dto.companyName}" has been created.`,
-            metadata: {
-              corporateAccountId: corporateAccount.id,
-              email: email,
-            },
-          });
-        } catch (err) {
-          this.logger.error('Failed to create notification', err.stack);
-        }
-
         return {
           corporateAccountId: corporateAccount.id,
           userId: user.id,
