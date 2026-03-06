@@ -23,7 +23,7 @@ export function useNotifications() {
         if (!user.id || user.id === 0) return;
 
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_ADMIN_SERVICE_URL || 'http://localhost:3005';
+            const baseUrl = process.env.NEXT_PUBLIC_ADMIN_SERVICE_URL || 'http://localhost:4001';
             const response = await fetch(`${baseUrl}/notifications/unread-count?userId=${user.id}&role=${user.role}`, {
                 headers: getAuthHeaders(),
             });
@@ -41,7 +41,7 @@ export function useNotifications() {
 
         setLoading(true);
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_ADMIN_SERVICE_URL || 'http://localhost:3005';
+            const baseUrl = process.env.NEXT_PUBLIC_ADMIN_SERVICE_URL || 'http://localhost:4001';
             const response = await fetch(`${baseUrl}/notifications?userId=${user.id}&role=${user.role}&limit=20`, {
                 headers: getAuthHeaders(),
             });
@@ -58,7 +58,7 @@ export function useNotifications() {
 
     const markAsRead = async (id: string) => {
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_ADMIN_SERVICE_URL || 'http://localhost:3005';
+            const baseUrl = process.env.NEXT_PUBLIC_ADMIN_SERVICE_URL || 'http://localhost:4001';
             const response = await fetch(`${baseUrl}/notifications/${id}/read`, {
                 method: 'PATCH',
                 headers: getAuthHeaders(),
@@ -77,7 +77,7 @@ export function useNotifications() {
 
     const markAllAsRead = async () => {
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_ADMIN_SERVICE_URL || 'http://localhost:3005';
+            const baseUrl = process.env.NEXT_PUBLIC_ADMIN_SERVICE_URL || 'http://localhost:4001';
             const response = await fetch(`${baseUrl}/notifications/read-all`, {
                 method: 'PATCH',
                 headers: getAuthHeaders(),

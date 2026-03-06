@@ -781,12 +781,17 @@ export class StudentService {
       );
 
       // Handle Affiliate Referral if code is provided
+      let registeredWithAffiliate = false;
+      let affiliateName = '';
+
       if (dto.referral_code) {
         const affiliate = await this.affiliateRepo.findOne({
           where: { referralCode: dto.referral_code, isActive: true },
         });
 
         if (affiliate) {
+          registeredWithAffiliate = true;
+          affiliateName = affiliate.name;
           this.logger.log(
             `Referral code ${dto.referral_code} found for affiliate ${affiliate.id}`,
           );
@@ -836,6 +841,29 @@ export class StudentService {
             `Invalid or inactive referral code provided: ${dto.referral_code}`,
           );
         }
+      }
+
+      // Send Admin Notification
+      try {
+        const message = registeredWithAffiliate
+          ? `${dto.full_name} signed up using ${affiliateName}'s referral code.`
+          : `${dto.full_name} signed up without a referral code.`;
+
+        await this.sendAdminNotification({
+          userId: 1, // System Admin
+          role: 'ADMIN',
+          type: registeredWithAffiliate ? 'STUDENT_REFERRAL_REGISTRATION' : 'STUDENT_DIRECT_REGISTRATION',
+          title: 'New Student registration',
+          message: message,
+          metadata: {
+            studentEmail: dto.email,
+            studentName: dto.full_name,
+            referralCode: dto.referral_code,
+            affiliateName: registeredWithAffiliate ? affiliateName : undefined
+          },
+        });
+      } catch (err) {
+        this.logger.error('Failed to send admin notification for registration', err.stack);
       }
 
       // 6. Create Assessment Session with Schedule
@@ -1748,6 +1776,18 @@ export class StudentService {
     } catch (error) {
       this.logger.error('Failed to send placement report email', error);
       throw error;
+    }
+  }
+
+  private async sendAdminNotification(data: any) {
+    const adminServiceUrl = this.configService.get('ADMIN_SERVICE_URL') || 'http://localhost:4001';
+    try {
+      await lastValueFrom(
+        this.httpService.post(`${adminServiceUrl}/notifications/internal`, data)
+      );
+      this.logger.log('Admin notification sent successfully');
+    } catch (err) {
+      this.logger.error('Failed to send admin notification via internal API', err.message);
     }
   }
 }

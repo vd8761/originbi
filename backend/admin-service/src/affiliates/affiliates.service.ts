@@ -236,23 +236,6 @@ export class AffiliatesService {
           ),
         );
 
-      // Add Notification for Admin
-      try {
-        await this.notificationService.createNotification({
-          userId: 1, // System Admin
-          role: 'ADMIN',
-          type: 'NEW_AFFILIATE_SIGNUP',
-          title: 'New Affiliate Partner',
-          message: `A new affiliate account for "${dto.name}" has been created.`,
-          metadata: {
-            affiliateId: affiliate.id,
-            email: dto.email,
-          },
-        });
-      } catch (err) {
-        this.logger.error('Failed to create notification', err.stack);
-      }
-
       return affiliate;
     } catch (e: any) {
       this.logger.error(`Affiliate creation failed: ${e.message}`, e.stack);

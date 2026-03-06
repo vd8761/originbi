@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, MoreThan } from 'typeorm';
 import { Notification } from '@originbi/shared-entities';
 
 @Injectable()
@@ -32,20 +32,28 @@ export class NotificationService {
     }
 
     async getUnreadCount(userId: number, role: string): Promise<number> {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
         return this.notificationRepo.count({
             where: {
                 userId,
                 role,
                 isRead: false,
+                createdAt: MoreThan(thirtyDaysAgo),
             },
         });
     }
 
     async getNotifications(userId: number, role: string, page = 1, limit = 20) {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
         const [items, total] = await this.notificationRepo.findAndCount({
             where: {
                 userId,
                 role,
+                createdAt: MoreThan(thirtyDaysAgo),
             },
             order: {
                 createdAt: 'DESC',
