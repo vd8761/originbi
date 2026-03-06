@@ -10,6 +10,7 @@ import {
     SettingsIcon,
     LogoutIcon,
     MenuIcon,
+    HistoryIcon,
 } from '../icons';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -76,6 +77,7 @@ const AffiliateHeader: React.FC<AffiliateHeaderProps> = ({ onLogout, onNavigate 
     const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [isNotificationsOpen, setNotificationsOpen] = useState(false);
     const [hasNotification, setHasNotification] = useState(true);
+    const [showHistory, setShowHistory] = useState(false);
     const [affiliateData, setAffiliateData] = useState<any>(null);
 
     const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -127,6 +129,7 @@ const AffiliateHeader: React.FC<AffiliateHeaderProps> = ({ onLogout, onNavigate 
     const handleNotificationClick = () => {
         setNotificationsOpen((p) => !p);
         if (hasNotification) setHasNotification(false);
+        if (isNotificationsOpen) setShowHistory(false); // Reset when closing
     };
 
     const renderNavItems = (isMobile: boolean) => (
@@ -182,32 +185,49 @@ const AffiliateHeader: React.FC<AffiliateHeaderProps> = ({ onLogout, onNavigate 
                             )}
                         </button>
                         {isNotificationsOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-brand-dark-secondary rounded-lg shadow-xl py-2 ring-1 ring-black ring-opacity-5 z-50 border border-gray-100 dark:border-brand-dark-tertiary max-h-96 overflow-y-auto">
-                                <div className="px-4 py-2 border-b border-gray-100 dark:border-brand-dark-tertiary flex justify-between items-center">
-                                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Notifications</h3>
-                                    <button className="text-xs text-brand-green hover:underline">Mark all read</button>
+                            <div className="absolute right-0 top-full mt-2 w-80 sm:w-[380px] md:w-[420px] 2xl:w-[460px] bg-white dark:bg-brand-dark-secondary rounded-lg shadow-xl p-0 ring-1 ring-black ring-opacity-5 z-50 border border-gray-100 dark:border-brand-dark-tertiary animate-slide-down overflow-hidden">
+                                <div className="sticky top-0 bg-white dark:bg-brand-dark-secondary z-10 px-4 py-3 border-b border-gray-100 dark:border-brand-dark-tertiary flex justify-between items-center shadow-sm">
+                                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                        {showHistory ? 'History' : 'Notifications'}
+                                        <button
+                                            onClick={() => setShowHistory(!showHistory)}
+                                            className={`transition-colors p-1 rounded-md ${showHistory ? 'bg-brand-green/10 text-brand-green' : 'hover:text-brand-green'}`}
+                                        >
+                                            <HistoryIcon className="w-3.5 h-3.5" />
+                                        </button>
+                                    </h3>
+                                    {!showHistory && <button className="text-xs text-brand-green hover:underline">Mark all read</button>}
                                 </div>
-                                <div className="divide-y divide-gray-100 dark:divide-brand-dark-tertiary">
-                                    <div className="flex items-start space-x-3 p-3 hover:bg-brand-light-tertiary dark:hover:bg-brand-dark-tertiary/60 transition-colors">
-                                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand-light-tertiary dark:bg-brand-dark-tertiary flex items-center justify-center">
-                                            <EarningsIcon className="w-4 h-4 text-brand-green" />
-                                        </div>
-                                        <div className="flex-grow">
-                                            <p className="text-sm font-medium text-brand-text-light-primary dark:text-brand-text-primary">New commission earned!</p>
-                                            <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary">2 hours ago</p>
-                                        </div>
-                                        <div className="w-2 h-2 bg-brand-green rounded-full mt-1 flex-shrink-0"></div>
-                                    </div>
-                                    <div className="flex items-start space-x-3 p-3 hover:bg-brand-light-tertiary dark:hover:bg-brand-dark-tertiary/60 transition-colors">
-                                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand-light-tertiary dark:bg-brand-dark-tertiary flex items-center justify-center">
-                                            <ReferralsIcon className="w-4 h-4 text-brand-green" />
-                                        </div>
-                                        <div className="flex-grow">
-                                            <p className="text-sm font-medium text-brand-text-light-primary dark:text-brand-text-primary">3 new referral sign-ups</p>
-                                            <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary">Yesterday</p>
-                                        </div>
-                                        <div className="w-2 h-2 bg-brand-green rounded-full mt-1 flex-shrink-0"></div>
-                                    </div>
+                                <div
+                                    key={showHistory ? 'history' : 'new'}
+                                    className="divide-y divide-gray-100 dark:divide-brand-dark-tertiary max-h-[320px] overflow-y-auto custom-scrollbar animate-slide-in-left"
+                                >
+                                    {showHistory ? (
+                                        <div className="p-8 text-center text-gray-400 text-sm">No notification history (30 days)</div>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-start space-x-3 p-3 hover:bg-brand-light-tertiary dark:hover:bg-brand-dark-tertiary/60 transition-colors">
+                                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand-light-tertiary dark:bg-brand-dark-tertiary flex items-center justify-center">
+                                                    <EarningsIcon className="w-4 h-4 text-brand-green" />
+                                                </div>
+                                                <div className="flex-grow">
+                                                    <p className="text-sm font-medium text-brand-text-light-primary dark:text-brand-text-primary">New commission earned!</p>
+                                                    <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary">2 hours ago</p>
+                                                </div>
+                                                <div className="w-2 h-2 bg-brand-green rounded-full mt-1 flex-shrink-0"></div>
+                                            </div>
+                                            <div className="flex items-start space-x-3 p-3 hover:bg-brand-light-tertiary dark:hover:bg-brand-dark-tertiary/60 transition-colors">
+                                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand-light-tertiary dark:bg-brand-dark-tertiary flex items-center justify-center">
+                                                    <ReferralsIcon className="w-4 h-4 text-brand-green" />
+                                                </div>
+                                                <div className="flex-grow">
+                                                    <p className="text-sm font-medium text-brand-text-light-primary dark:text-brand-text-primary">3 new referral sign-ups</p>
+                                                    <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary">Yesterday</p>
+                                                </div>
+                                                <div className="w-2 h-2 bg-brand-green rounded-full mt-1 flex-shrink-0"></div>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         )}

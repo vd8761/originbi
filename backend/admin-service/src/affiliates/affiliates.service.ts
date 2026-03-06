@@ -61,6 +61,17 @@ export class AffiliatesService {
   async updateReadyToProcessStatus() {
     const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
     try {
+      // 1. Get affiliates who have transactions about to be moved to "Ready to Process"
+      const txnsToUpdate = await this.referralTransactionRepo
+        .createQueryBuilder('t')
+        .select('DISTINCT(t.affiliate_account_id)', 'affiliateId')
+        .where('t.settlement_status = 0')
+        .andWhere('t.created_at <= :fortyEightHoursAgo', { fortyEightHoursAgo })
+        .getRawMany();
+
+      const affiliateIds = txnsToUpdate.map((t) => Number(t.affiliateId));
+
+      // 2. Perform the update
       const result = await this.referralTransactionRepo
         .createQueryBuilder()
         .update(AffiliateReferralTransaction)
@@ -68,12 +79,41 @@ export class AffiliatesService {
         .where('settlement_status = 0')
         .andWhere('created_at <= :fortyEightHoursAgo', { fortyEightHoursAgo })
         .execute();
+
       const affected = result.affected || 0;
       if (affected > 0) {
         this.logger.log(
           `Updated ${affected} referral transactions to status 1 (Processing)`,
         );
+
+        // 3. Notify admin for each affiliate that has newly ready funds
+        for (const affiliateId of affiliateIds) {
+          const affiliate = await this.affiliateRepo.findOne({
+            where: { id: affiliateId },
+          });
+
+          if (affiliate && !affiliate.settlementNotificationSent) {
+            const readyAmount = await this.calculateReadyToProcessAmount(
+              affiliate.id,
+              Number(affiliate.totalSettledCommission) || 0,
+            );
+
+            if (readyAmount > 0) {
+              await this.notificationService.createNotification({
+                role: 'ADMIN',
+                type: 'AFFILIATE_SETTLEMENT_READY',
+                title: 'Affiliate Settlement Ready',
+                message: `${affiliate.name} has ₹${readyAmount.toFixed(2)} ready for settlement.`,
+                metadata: { affiliateId: affiliate.id, amount: readyAmount },
+              });
+
+              affiliate.settlementNotificationSent = true;
+              await this.affiliateRepo.save(affiliate);
+            }
+          }
+        }
       }
+
       return {
         message: 'Ready to payment status refreshed',
         updated: affected,
@@ -1249,6 +1289,16 @@ export class AffiliatesService {
           Number(affiliate.totalSettledCommission || 0) + dto.settleAmount;
         affiliate.totalPendingCommission =
           Number(affiliate.totalPendingCommission || 0) - dto.settleAmount;
+
+        // Reset notification flag if no more funds are ready to process
+        const remainingReadyAmount = await this.calculateReadyToProcessAmount(
+          affiliate.id,
+          Number(affiliate.totalSettledCommission) || 0,
+        );
+        if (remainingReadyAmount <= 0.01) {
+          affiliate.settlementNotificationSent = false;
+        }
+
         await manager.save(affiliate);
 
         return {

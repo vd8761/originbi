@@ -321,6 +321,9 @@ const Header: React.FC<HeaderProps> = ({
             case 'NEW_CORPORATE_SIGNUP':
                 heading = "New Corporate Signup: ";
                 break;
+            case 'AFFILIATE_SETTLEMENT_READY':
+                heading = "Affiliate Settlement Ready: ";
+                break;
             default:
                 heading = "";
         }
@@ -448,8 +451,8 @@ const Header: React.FC<HeaderProps> = ({
                             )}
                         </button>
                         {isNotificationsOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-brand-dark-secondary rounded-lg shadow-xl py-2 ring-1 ring-black ring-opacity-5 z-50 border border-gray-100 dark:border-brand-dark-tertiary">
-                                <div className="px-4 py-2 border-b border-gray-100 dark:border-brand-dark-tertiary flex justify-between items-center">
+                            <div className="absolute right-0 top-full mt-2 w-80 sm:w-[380px] md:w-[420px] 2xl:w-[460px] bg-white dark:bg-brand-dark-secondary rounded-lg shadow-xl p-0 ring-1 ring-black ring-opacity-5 z-50 border border-gray-100 dark:border-brand-dark-tertiary animate-slide-down overflow-hidden">
+                                <div className="sticky top-0 bg-white dark:bg-brand-dark-secondary z-10 px-4 py-3 border-b border-gray-100 dark:border-brand-dark-tertiary flex justify-between items-center shadow-sm">
                                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                                         {showHistory ? 'Notification History' : 'Notifications'}
                                         <button
@@ -462,7 +465,10 @@ const Header: React.FC<HeaderProps> = ({
                                     </h3>
                                     {!showHistory && <button onClick={markAllAsRead} className="text-xs text-brand-green hover:underline">Mark all read</button>}
                                 </div>
-                                <div className="divide-y divide-gray-100 dark:divide-brand-dark-tertiary max-h-[350px] overflow-y-auto">
+                                <div
+                                    key={showHistory ? 'history' : 'new'}
+                                    className="divide-y divide-gray-100 dark:divide-brand-dark-tertiary max-h-[320px] overflow-y-auto custom-scrollbar animate-slide-in-left"
+                                >
                                     {displayNotifications.length > 0 ? (
                                         displayNotifications.map((n, i) => (
                                             <NotificationItem key={i} {...n} />
