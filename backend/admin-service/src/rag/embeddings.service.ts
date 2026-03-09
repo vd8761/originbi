@@ -44,7 +44,7 @@ export class EmbeddingsService implements OnModuleInit {
 
   // Quota exhaustion tracking — temporarily disable when quota is hit
   private quotaExhaustedUntil: number = 0;
-  private readonly QUOTA_COOLDOWN = 5 * 60 * 1000; // 5 minutes cooldown
+  private readonly QUOTA_COOLDOWN = 30 * 1000; // 30 seconds cooldown (was 5 min — too long)
 
   constructor(private dataSource: DataSource) { }
 
