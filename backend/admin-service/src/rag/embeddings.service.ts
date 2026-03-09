@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unused-vars */
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { CohereClient } from 'cohere-ai';
 
 /**
  * Production-Grade Embeddings Service — Google Gemini
@@ -22,6 +23,11 @@ export class EmbeddingsService implements OnModuleInit {
   private readonly MODEL = 'models/gemini-embedding-001';
   private readonly EMBEDDING_DIM = 1536;  // Safe dimension that works with both IVFFlat and HNSW
   private readonly GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
+
+  // Cohere Reranker — re-scores vector search results for higher precision
+  private cohereClient: CohereClient | null = null;
+  private cohereAvailable = false;
+  private readonly COHERE_RERANK_MODEL = 'rerank-v3.5'; // multilingual, best precision
 
   // Cache for embeddings to reduce API calls
   private embeddingCache = new Map<
@@ -53,6 +59,17 @@ export class EmbeddingsService implements OnModuleInit {
       );
       this.embeddingsAvailable = false;
     }
+
+    // Init Cohere Reranker
+    const cohereKey = process.env.COHERE_API_KEY || null;
+    if (cohereKey) {
+      this.cohereClient = new CohereClient({ token: cohereKey });
+      this.cohereAvailable = true;
+      this.logger.log('✅ Cohere Reranker initialized — search precision upgraded!');
+    } else {
+      this.logger.warn('⚠️ No COHERE_API_KEY — reranking disabled, using plain vector similarity');
+    }
+
     await this.checkPgvector();
     if (this.pgvectorAvailable) {
       await this.checkAndMigrateSchema();
@@ -520,10 +537,58 @@ export class EmbeddingsService implements OnModuleInit {
     return { success, failed };
   }
 
+  // ─────────────── Cohere Reranker ───────────────
+
+  /**
+   * Re-rank a list of documents against the query using Cohere's
+   * cross-encoder model. Returns the same doc objects, re-ordered
+   * from most to least relevant, trimmed to `topN`.
+   *
+   * WHY: Vector similarity is computed without knowing the query.
+   * The reranker compares query vs. every document TOGETHER, giving
+   * a much more accurate relevance score — like a second opinion
+   * from a smarter judge after the fast first-pass.
+   */
+  private async rerankWithCohere<T extends { content: string }>({
+    query,
+    documents,
+    topN,
+  }: { query: string; documents: T[]; topN: number }): Promise<T[]> {
+    if (!this.cohereAvailable || !this.cohereClient || documents.length === 0) {
+      return documents.slice(0, topN);
+    }
+
+    try {
+      const response = await this.cohereClient.rerank({
+        model: this.COHERE_RERANK_MODEL,
+        query,
+        documents: documents.map((d) => d.content),
+        topN,
+        returnDocuments: false, // we already have them
+      });
+
+      // Re-order original docs according to Cohere's ranking
+      const reranked = response.results
+        .sort((a, b) => a.index - b.index) // preserve Cohere's rank order
+        .map((r) => documents[r.index]);
+
+      this.logger.debug(
+        `🔀 Cohere reranked ${documents.length} → ${reranked.length} docs for: "${query.slice(0, 60)}"`,
+      );
+      return reranked;
+    } catch (err) {
+      // Never crash the main pipeline — fallback to plain vector order
+      this.logger.warn(`⚠️ Cohere rerank failed (using vector order): ${err?.message || err}`);
+      return documents.slice(0, topN);
+    }
+  }
+
   // ─────────────── Semantic Search ───────────────
 
   /**
-   * Semantic search with minimum similarity threshold
+   * Semantic search with Cohere Reranking.
+   * Retrieves top (limit * 4) vector candidates, then reranks to top `limit`.
+   * Falls back to plain cosine order if Cohere is unavailable.
    */
   async semanticSearch(
     query: string,
@@ -538,6 +603,9 @@ export class EmbeddingsService implements OnModuleInit {
       if (!queryEmbedding) return [];
 
       const embeddingStr = `[${queryEmbedding.join(',')}]`;
+
+      // Fetch MORE candidates when reranking is available (wider net → better rerank)
+      const fetchLimit = this.cohereAvailable ? limit * 4 : limit;
 
       let sql = `
                 SELECT 
@@ -561,9 +629,16 @@ export class EmbeddingsService implements OnModuleInit {
       }
 
       sql += ` ORDER BY e.embedding <=> $1::vector LIMIT $${params.length + 1}`;
-      params.push(limit);
+      params.push(fetchLimit);
 
-      return await this.dataSource.query(sql, params);
+      const candidates = await this.dataSource.query(sql, params);
+
+      // Rerank candidates with Cohere for higher precision
+      if (this.cohereAvailable && candidates.length > limit) {
+        return await this.rerankWithCohere({ query, documents: candidates, topN: limit });
+      }
+
+      return candidates.slice(0, limit);
     } catch (error) {
       this.logger.error('Semantic search failed:', error);
       return [];
