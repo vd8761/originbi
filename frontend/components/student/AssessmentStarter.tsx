@@ -685,9 +685,9 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
                         w-full p-[clamp(10px,1.2vw,18px)] rounded-xl lg:rounded-2xl text-left flex items-center gap-[clamp(10px,1.5vw,24px)] transition-all duration-200 border group relative overflow-hidden
                         ${isSelected
                             ? "bg-[#1ED36A] border-[#1ED36A] shadow-[0_4px_16px_rgba(30,211,106,0.2)]"
-                            : "bg-white dark:bg-[#24272B] border-brand-light-tertiary dark:border-white/5"
+                            : "bg-white dark:bg-[#24272B] border-brand-light-tertiary dark:border-white/5 " + (!submitting ? "hover:bg-gray-50 dark:hover:bg-[#2D3136]" : "")
                           }
-                        ${submitting ? "opacity-60 cursor-not-allowed" : "cursor-pointer hover:bg-gray-50 dark:hover:bg-[#2D3136]"}
+                        ${submitting ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
                       `}
                       >
                         <div className="flex-shrink-0 z-10">
