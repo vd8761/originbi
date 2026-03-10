@@ -1372,6 +1372,44 @@ export class StudentService {
         return;
       }
 
+      // --- 8. Notify Corporate User (MOVED UP) ---
+      if (registration.registrationSource === 'CORPORATE') {
+        const corporateUserId = user.corporateId || registration.createdByUserId;
+        if (corporateUserId) {
+          try {
+            // Check if already notified for this registration using JSONB path query
+            const existingNotif = await this.notificationRepo.createQueryBuilder('n')
+              .where('n.user_id = :userId', { userId: Number(corporateUserId) })
+              .andWhere('n.type = :type', { type: 'EMPLOYEE_TEST_COMPLETED' })
+              .andWhere("n.metadata ->> 'registrationId' = :regId", { regId: registration.id.toString() })
+              .getOne();
+
+            if (!existingNotif) {
+              await this.notificationRepo.save({
+                userId: Number(corporateUserId),
+                role: 'CORPORATE',
+                type: 'EMPLOYEE_TEST_COMPLETED',
+                title: 'Assessment Completed',
+                message: `${registration.fullName || 'An employee'} has successfully completed the ${registration.program?.name ? registration.program.name + ' assessment' : 'assessment'}.`,
+                metadata: {
+                  studentId: userId,
+                  studentName: registration.fullName,
+                  registrationId: registration.id,
+                },
+              });
+              this.logger.log(`Corporate notification saved for corporate user ${corporateUserId} (Student: ${userId})`);
+            } else {
+              this.logger.log(`Corporate notification already exists for student ${userId}, skipping duplicate.`);
+            }
+          } catch (err) {
+            this.logger.error(
+              `Failed to handle corporate notification: ${err.message}`,
+            );
+          }
+        }
+      }
+      // --------------------------------------------
+
       // 2. Trigger Report Generation
       const port = process.env.PORT || 4004;
       const reportServiceUrl = `http://localhost:${port}/report`;
@@ -1480,7 +1518,7 @@ export class StudentService {
         }
       }
 
-      // 7. Send Email
+      // 9. Send Email
       const dateStr = new Date().toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
@@ -1540,28 +1578,6 @@ export class StudentService {
         }
       }
 
-      // 8. Notify Corporate User if applicable
-      if (registration.registrationSource === 'CORPORATE' && user.corporateId) {
-        try {
-          await this.notificationRepo.save({
-            userId: Number(user.corporateId),
-            role: 'CORPORATE',
-            type: 'EMPLOYEE_TEST_COMPLETED',
-            title: 'Assessment Completed',
-            message: `${registration.fullName || 'An employee'} has successfully completed the ${registration.program?.name ? registration.program.name + ' assessment' : 'assessment'}.`,
-            metadata: {
-              studentId: userId,
-              studentName: registration.fullName,
-              registrationId: registration.id,
-            },
-          });
-          this.logger.log(`Corporate notification saved for user ${userId}`);
-        } catch (err) {
-          this.logger.error(
-            `Failed to save corporate notification: ${err.message}`,
-          );
-        }
-      }
     } catch (error) {
       this.logger.error('Failed to send assessment completion email', error);
       throw error; // Re-throw so pg-boss marks the job as failed and retries
