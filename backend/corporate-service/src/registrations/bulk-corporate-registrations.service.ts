@@ -748,7 +748,7 @@ export class BulkCorporateRegistrationsService {
 
         if (!corpAccount || !corpAccount.userId) continue;
 
-        const message = `${data.count} assigned assessment(s) are expiring in 1 day. Candidates: ${data.studentNames.join(', ')}`;
+        const message = `Candidate ${data.studentNames.join(', ')}'s assessment will be expired in 1 day.`;
 
         try {
           await this.notificationRepo.save({

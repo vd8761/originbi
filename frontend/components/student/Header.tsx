@@ -17,6 +17,8 @@ import {
     MenuIcon,
     UsersIcon,
     HistoryIcon,
+    CheckCircleIcon,
+    CompletedStepIcon,
 } from '../icons';
 
 import { useTheme } from '../../contexts/ThemeContext';
@@ -96,8 +98,12 @@ const NotificationItem: React.FC<{
     title: React.ReactNode;
     time?: string;
     isNew?: boolean;
-}> = ({ icon, title, time, isNew }) => (
-    <div className="flex items-start space-x-3 p-3 hover:bg-brand-light-tertiary dark:hover:bg-brand-dark-tertiary/60 transition-colors duration-200">
+    onClick?: () => void;
+}> = ({ icon, title, time, isNew, onClick }) => (
+    <div
+        onClick={onClick}
+        className="flex items-start space-x-3 p-3 hover:bg-brand-light-tertiary dark:hover:bg-brand-dark-tertiary/60 transition-colors duration-200 cursor-pointer"
+    >
         {icon && (
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand-light-tertiary dark:bg-brand-dark-tertiary flex items-center justify-center">
                 {icon}
@@ -149,7 +155,7 @@ const Header: React.FC<HeaderProps> = ({
     const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [isNotificationsOpen, setNotificationsOpen] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
-    const { unreadCount, notifications: realNotifications, fetchNotifications, markAllAsRead } = useNotifications();
+    const { unreadCount, notifications: realNotifications, fetchNotifications, markAllAsRead, markAsRead } = useNotifications();
 
     const profileMenuRef = useRef<HTMLDivElement>(null);
     const langMenuRef = useRef<HTMLDivElement>(null);
@@ -252,7 +258,13 @@ const Header: React.FC<HeaderProps> = ({
         const handleClickOutside = (event: MouseEvent) => {
             if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) { setProfileOpen(false); }
             if (langMenuRef.current && !langMenuRef.current.contains(event.target as Node)) { setLangOpen(false); }
-            if (notificationsMenuRef.current && !notificationsMenuRef.current.contains(event.target as Node)) { setNotificationsOpen(false); }
+            if (notificationsMenuRef.current && !notificationsMenuRef.current.contains(event.target as Node)) {
+                if (isNotificationsOpen) {
+                    if (unreadCount > 0) markAllAsRead();
+                    setNotificationsOpen(false);
+                    setShowHistory(false);
+                }
+            }
             if (isMobileMenuOpen && mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
                 const target = event.target as Element;
                 if (!target.closest("#mobile-menu-btn")) { setMobileMenuOpen(false); }
@@ -260,16 +272,19 @@ const Header: React.FC<HeaderProps> = ({
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => { document.removeEventListener("mousedown", handleClickOutside); };
-    }, [isMobileMenuOpen]);
+    }, [isMobileMenuOpen, isNotificationsOpen, unreadCount, markAllAsRead]);
 
     const handleLangChange = (lang: "ENG" | "TAM") => { setLanguage(lang); setLangOpen(false); };
     const handleNotificationClick = () => {
         const nextState = !isNotificationsOpen;
-        setNotificationsOpen(nextState);
         if (nextState) {
             fetchNotifications();
-            // Stopped auto-marking on open so "New" vs "History" distinction works.
+            setNotificationsOpen(true);
         } else {
+            if (unreadCount > 0) {
+                markAllAsRead();
+            }
+            setNotificationsOpen(false);
             setShowHistory(false);
         }
     };
@@ -304,6 +319,10 @@ const Header: React.FC<HeaderProps> = ({
                 return <ProfileIcon className={iconClass} />;
             case 'NEW_CORPORATE_SIGNUP':
                 return <UsersIcon className={iconClass} />;
+            case 'EMPLOYEE_TEST_COMPLETED':
+                return <CompletedStepIcon className={iconClass} />;
+            case 'EXAM_EXPIRATION':
+                return <NotificationIcon className={`${iconClass} text-red-500 font-bold`} />;
             default:
                 return <RoadmapIcon className={iconClass} />;
         }
@@ -324,14 +343,21 @@ const Header: React.FC<HeaderProps> = ({
             case 'AFFILIATE_SETTLEMENT_READY':
                 heading = "Affiliate Settlement Ready: ";
                 break;
+            case 'EMPLOYEE_TEST_COMPLETED':
+                heading = "Test Completed: ";
+                break;
+            case 'EXAM_EXPIRATION':
+                heading = "Exam Expiry Warning: ";
+                break;
             default:
                 heading = "";
         }
 
         if (heading) {
+            const colorClass = n.type === 'EXAM_EXPIRATION' ? "text-red-500" : "text-brand-green";
             return (
                 <>
-                    <span className="text-brand-green font-bold">{heading}</span>
+                    <span className={`${colorClass} font-bold`}>{heading}</span>
                     {message}
                 </>
             );
@@ -342,6 +368,7 @@ const Header: React.FC<HeaderProps> = ({
     const displayNotifications = realNotifications.length > 0 ? realNotifications
         .filter(n => showHistory || !n.isRead)
         .map(n => ({
+            id: n.id,
             icon: getNotificationIcon(n.type),
             title: formatNotificationTitle(n),
             time: formatRelativeTime(n.createdAt),
@@ -471,7 +498,11 @@ const Header: React.FC<HeaderProps> = ({
                                 >
                                     {displayNotifications.length > 0 ? (
                                         displayNotifications.map((n, i) => (
-                                            <NotificationItem key={i} {...n} />
+                                            <NotificationItem
+                                                key={i}
+                                                {...n}
+                                                onClick={() => n.isNew && markAsRead(n.id)}
+                                            />
                                         ))
                                     ) : (
                                         <div className="p-8 text-center text-gray-400 text-sm">

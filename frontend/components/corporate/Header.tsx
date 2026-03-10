@@ -20,6 +20,7 @@ import {
   UsersIcon,
   HistoryIcon,
   CheckCircleIcon,
+  CompletedStepIcon,
 } from '../icons';
 import { corporateDashboardService } from '../../lib/services';
 import { CorporateAccount } from '../../lib/types';
@@ -258,7 +259,13 @@ const Header: React.FC<HeaderProps> = ({
     const handleClickOutside = (event: MouseEvent) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) { setProfileOpen(false); }
       if (langMenuRef.current && !langMenuRef.current.contains(event.target as Node)) { setLangOpen(false); }
-      if (notificationsMenuRef.current && !notificationsMenuRef.current.contains(event.target as Node)) { setNotificationsOpen(false); }
+      if (notificationsMenuRef.current && !notificationsMenuRef.current.contains(event.target as Node)) {
+        if (isNotificationsOpen) {
+          if (unreadCount > 0) markAllAsRead();
+          setNotificationsOpen(false);
+          setShowHistory(false);
+        }
+      }
       if (isMobileMenuOpen && mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
         const target = event.target as Element;
         if (!target.closest("#mobile-menu-btn")) { setMobileMenuOpen(false); }
@@ -266,7 +273,7 @@ const Header: React.FC<HeaderProps> = ({
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => { document.removeEventListener("mousedown", handleClickOutside); };
-  }, [isMobileMenuOpen]);
+  }, [isMobileMenuOpen, isNotificationsOpen, unreadCount, markAllAsRead]);
 
   const pathname = usePathname();
   const activeView = (() => {
@@ -283,15 +290,14 @@ const Header: React.FC<HeaderProps> = ({
   const handleLangChange = (lang: string) => { setLanguage(lang); setLangOpen(false); };
   const handleNotificationClick = () => {
     const nextState = !isNotificationsOpen;
-    setNotificationsOpen(nextState);
     if (nextState) {
       fetchNotifications();
+      setNotificationsOpen(true);
     } else {
-      // Auto-read logic: Mark all as read when closing the tray
-      // This ensures the user sees them before they move to history
       if (unreadCount > 0) {
         markAllAsRead();
       }
+      setNotificationsOpen(false);
       setShowHistory(false);
     }
   };
@@ -314,7 +320,7 @@ const Header: React.FC<HeaderProps> = ({
       case 'EXAM_EXPIRATION':
         return <NotificationIcon className={`${iconClass} text-red-500 font-bold`} />;
       case 'EMPLOYEE_TEST_COMPLETED':
-        return <CheckCircleIcon className={iconClass} />;
+        return <CompletedStepIcon className={iconClass} />;
       default:
         return <RoadmapIcon className={iconClass} />;
     }
@@ -352,7 +358,7 @@ const Header: React.FC<HeaderProps> = ({
     }
 
     if (heading) {
-      const colorClass = n.type === 'LOW_CREDITS' ? "text-red-500" : "text-brand-green";
+      const colorClass = (n.type === 'LOW_CREDITS' || n.type === 'EXAM_EXPIRATION') ? "text-red-500" : "text-brand-green";
       return (
         <>
           <span className={`${colorClass} font-bold`}>{heading}</span>
