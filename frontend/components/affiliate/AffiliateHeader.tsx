@@ -19,7 +19,7 @@ import {
 } from '../icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useNotifications } from "../../lib/hooks/useNotifications";
-import { formatRelativeTime } from "../../lib/utils";
+import { formatRelativeTime, capitalizeWords } from "../../lib/utils";
 
 // --- Affiliate-specific Icons ---
 const ReferralsIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
@@ -80,11 +80,12 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, active, isMobile, onClic
 
 const NotificationItem: React.FC<{
     icon?: React.ReactNode;
-    title: React.ReactNode;
+    title: string;
+    message: string;
     time?: string;
     isNew?: boolean;
     onClick?: () => void;
-}> = ({ icon, title, time, isNew, onClick }) => (
+}> = ({ icon, title, message, time, isNew, onClick }) => (
     <div
         onClick={onClick}
         className="flex items-start space-x-3 p-3 hover:bg-brand-light-tertiary dark:hover:bg-brand-dark-tertiary/60 transition-colors duration-200 cursor-pointer"
@@ -94,12 +95,15 @@ const NotificationItem: React.FC<{
                 {icon}
             </div>
         )}
-        <div className="flex-grow">
-            <div className="text-sm font-medium text-brand-text-light-primary dark:text-brand-text-primary">
+        <div className="flex-grow min-w-0">
+            <div className="text-sm font-bold text-brand-green truncate">
                 {title}
             </div>
+            <div className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary mt-0.5 line-clamp-2">
+                {message}
+            </div>
             {time && (
-                <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary">
+                <p className="text-[10px] text-brand-text-light-secondary/60 dark:text-brand-text-secondary/60 mt-1">
                     {time}
                 </p>
             )}
@@ -208,56 +212,14 @@ const AffiliateHeader: React.FC<AffiliateHeaderProps> = ({ onLogout, onNavigate 
         }
     };
 
-    const formatNotificationTitle = (n: any) => {
-        const message = n.message || n.title;
-        let heading = "";
-
-        switch (n.type) {
-            case 'STUDENT_REFERRAL_REGISTRATION':
-            case 'STUDENT_DIRECT_REGISTRATION':
-            case 'AFFILIATE_NEW_REFERRAL':
-                heading = "";
-                break;
-            case 'NEW_CORPORATE_SIGNUP':
-                heading = "New Corporate Signup: ";
-                break;
-            case 'AFFILIATE_SETTLEMENT_READY':
-                heading = "Settlement Ready: ";
-                break;
-            case 'AFFILIATE_SETTLEMENT_PROCESSED':
-                heading = "Settlement Processed: ";
-                break;
-            case 'AFFILIATE_MILESTONE_REACHED':
-                heading = "Milestone Reached: ";
-                break;
-            case 'EMPLOYEE_TEST_COMPLETED':
-                heading = "Test Completed: ";
-                break;
-            case 'EXAM_EXPIRATION':
-                heading = "Exam Expiry Warning: ";
-                break;
-            default:
-                heading = "";
-        }
-
-        if (heading) {
-            const colorClass = n.type === 'EXAM_EXPIRATION' ? "text-red-500" : "text-brand-green";
-            return (
-                <>
-                    <span className={`${colorClass} font-bold`}>{heading}</span>
-                    {message}
-                </>
-            );
-        }
-        return message;
-    };
 
     const displayNotifications = realNotifications.length > 0 ? realNotifications
         .filter(n => showHistory || !n.isRead)
         .map(n => ({
             id: n.id,
             icon: getNotificationIcon(n.type),
-            title: formatNotificationTitle(n),
+            title: n.title || capitalizeWords(n.type.toLowerCase().replace(/_/g, ' ')),
+            message: n.message,
             time: formatRelativeTime(n.createdAt),
             isNew: !n.isRead
         })) : [];

@@ -99,35 +99,45 @@ const NavItem: React.FC<NavItemProps> = ({
 
 const NotificationItem: React.FC<{
   icon?: React.ReactNode;
-  title: React.ReactNode;
+  title: string;
+  message: string;
+  type: string;
   time?: string;
   isNew?: boolean;
   onClick?: () => void;
-}> = ({ icon, title, time, isNew, onClick }) => (
-  <div
-    onClick={onClick}
-    className="flex items-start space-x-3 p-3 hover:bg-brand-light-tertiary dark:hover:bg-brand-dark-tertiary/60 transition-colors duration-200 cursor-pointer"
-  >
-    {icon && (
-      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand-light-tertiary dark:bg-brand-dark-tertiary flex items-center justify-center">
-        {icon}
+}> = ({ icon, title, message, type, time, isNew, onClick }) => {
+  const isWarning = type === 'EXAM_EXPIRATION' || type === 'LOW_CREDITS';
+  const colorClass = isWarning ? "text-red-500" : "text-brand-green";
+
+  return (
+    <div
+      onClick={onClick}
+      className="flex items-start space-x-3 p-3 hover:bg-brand-light-tertiary dark:hover:bg-brand-dark-tertiary/60 transition-colors duration-200 cursor-pointer"
+    >
+      {icon && (
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand-light-tertiary dark:bg-brand-dark-tertiary flex items-center justify-center">
+          {icon}
+        </div>
+      )}
+      <div className="flex-grow min-w-0">
+        <div className={`text-sm font-bold ${colorClass} truncate`}>
+          {title}
+        </div>
+        <div className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary mt-0.5 line-clamp-2">
+          {message}
+        </div>
+        {time && (
+          <p className="text-[10px] text-brand-text-light-secondary/60 dark:text-brand-text-secondary/60 mt-1">
+            {time}
+          </p>
+        )}
       </div>
-    )}
-    <div className="flex-grow">
-      <p className="text-sm font-medium text-brand-text-light-primary dark:text-brand-text-primary">
-        {title}
-      </p>
-      {time && (
-        <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary">
-          {time}
-        </p>
+      {isNew && (
+        <div className="w-2 h-2 bg-brand-green rounded-full mt-1 flex-shrink-0"></div>
       )}
     </div>
-    {isNew && (
-      <div className="w-2 h-2 bg-brand-green rounded-full mt-1 flex-shrink-0"></div>
-    )}
-  </div>
-);
+  );
+};
 
 const Header: React.FC<HeaderProps> = ({
   onLogout,
@@ -326,55 +336,15 @@ const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  const formatNotificationTitle = (n: any) => {
-    const message = n.message || n.title;
-    let heading = "";
-
-    switch (n.type) {
-      case 'STUDENT_REFERRAL_REGISTRATION':
-      case 'STUDENT_DIRECT_REGISTRATION':
-        heading = "New Student registration: ";
-        break;
-      case 'NEW_CORPORATE_SIGNUP':
-        heading = "New Corporate Signup: ";
-        break;
-      case 'AFFILIATE_SETTLEMENT_READY':
-        heading = "Affiliate Settlement Ready: ";
-        break;
-      case 'LOW_CREDITS':
-        heading = "Low Credits Alert: ";
-        break;
-      case 'CREDITS_ADDED':
-        heading = "Credits Added: ";
-        break;
-      case 'EMPLOYEE_TEST_COMPLETED':
-        heading = "Test Completed: ";
-        break;
-      case 'EXAM_EXPIRATION':
-        heading = "Exam Expiry Warning: ";
-        break;
-      default:
-        heading = "";
-    }
-
-    if (heading) {
-      const colorClass = (n.type === 'LOW_CREDITS' || n.type === 'EXAM_EXPIRATION') ? "text-red-500" : "text-brand-green";
-      return (
-        <>
-          <span className={`${colorClass} font-bold`}>{heading}</span>
-          {message}
-        </>
-      );
-    }
-    return message;
-  };
 
   const displayNotifications = realNotifications.length > 0 ? realNotifications
     .filter(n => showHistory || !n.isRead)
     .map(n => ({
       id: n.id,
       icon: getNotificationIcon(n.type),
-      title: formatNotificationTitle(n),
+      title: n.title || capitalizeWords(n.type.toLowerCase().replace(/_/g, ' ')),
+      message: n.message,
+      type: n.type,
       time: formatRelativeTime(n.createdAt),
       isNew: !n.isRead
     })) : [];

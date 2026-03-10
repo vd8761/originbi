@@ -847,7 +847,7 @@ export class StudentService {
               role: 'AFFILIATE',
               type: 'AFFILIATE_NEW_REFERRAL',
               title: 'New Registration',
-              message: `User ${dto.full_name} signed up using this site.`,
+              message: `${dto.full_name} is registered using your referral link.`,
               metadata: {
                 studentName: dto.full_name,
                 referralCode: dto.referral_code,
@@ -1603,11 +1603,11 @@ export class StudentService {
       await transporter.sendMail(mailOptions);
       this.logger.log(`Assessment completion email sent to ${user.email}`);
 
-      // Notify Student in-app
+      // Notify user in-app
       try {
         await this.notificationRepo.save({
           userId: Number(userId),
-          role: 'STUDENT',
+          role: user.role || 'STUDENT',
           type: 'ASSESSMENT_REPORT_READY',
           title: 'Assessment Report Ready',
           message: 'Your assessment report has been sent to your mail id.',
@@ -1892,9 +1892,12 @@ export class StudentService {
   async handleLevelUnlocked(userId: number, levelNumber: number): Promise<void> {
     this.logger.log(`Handling level unlocked notification for user ${userId}, level ${levelNumber}`);
     try {
+      const user = await this.userRepo.findOne({ where: { id: userId } });
+      const userRole = user?.role || 'STUDENT';
+
       await this.notificationRepo.save({
         userId: Number(userId),
-        role: 'STUDENT',
+        role: userRole,
         type: 'LEVEL_UNLOCKED',
         title: `Level ${levelNumber} Unlocked`,
         message: `Level ${levelNumber} is now available. You can continue your assessment now.`,
