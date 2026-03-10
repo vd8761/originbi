@@ -190,11 +190,15 @@ const AffiliateHeader: React.FC<AffiliateHeaderProps> = ({ onLogout, onNavigate 
         switch (type) {
             case 'STUDENT_REFERRAL_REGISTRATION':
             case 'STUDENT_DIRECT_REGISTRATION':
+            case 'AFFILIATE_NEW_REFERRAL':
                 return <ProfileIcon className={iconClass} />;
             case 'NEW_CORPORATE_SIGNUP':
                 return <UsersIcon className={iconClass} />;
             case 'AFFILIATE_SETTLEMENT_READY':
+            case 'AFFILIATE_SETTLEMENT_PROCESSED':
                 return <EarningsIcon className={iconClass} />;
+            case 'AFFILIATE_MILESTONE_REACHED':
+                return <CompletedStepIcon className={iconClass} />;
             case 'EMPLOYEE_TEST_COMPLETED':
                 return <CompletedStepIcon className={iconClass} />;
             case 'EXAM_EXPIRATION':
@@ -211,13 +215,20 @@ const AffiliateHeader: React.FC<AffiliateHeaderProps> = ({ onLogout, onNavigate 
         switch (n.type) {
             case 'STUDENT_REFERRAL_REGISTRATION':
             case 'STUDENT_DIRECT_REGISTRATION':
-                heading = "New Student registration: ";
+            case 'AFFILIATE_NEW_REFERRAL':
+                heading = "";
                 break;
             case 'NEW_CORPORATE_SIGNUP':
                 heading = "New Corporate Signup: ";
                 break;
             case 'AFFILIATE_SETTLEMENT_READY':
-                heading = "Affiliate Settlement Ready: ";
+                heading = "Settlement Ready: ";
+                break;
+            case 'AFFILIATE_SETTLEMENT_PROCESSED':
+                heading = "Settlement Processed: ";
+                break;
+            case 'AFFILIATE_MILESTONE_REACHED':
+                heading = "Milestone Reached: ";
                 break;
             case 'EMPLOYEE_TEST_COMPLETED':
                 heading = "Test Completed: ";

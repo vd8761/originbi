@@ -38,7 +38,14 @@ export function snapshotUserToSession(): void {
  */
 export function getStoredUser(): StoredUser {
     try {
-        const raw = sessionStorage.getItem('user') || localStorage.getItem('user') || localStorage.getItem('affiliate_user');
+        let raw: string | null = null;
+
+        if (typeof window !== 'undefined' && window.location.pathname.startsWith('/affiliate')) {
+            raw = localStorage.getItem('affiliate_user') || sessionStorage.getItem('affiliate_user');
+        } else {
+            raw = sessionStorage.getItem('user') || localStorage.getItem('user');
+        }
+
         if (raw) {
             const parsed = JSON.parse(raw);
             return {

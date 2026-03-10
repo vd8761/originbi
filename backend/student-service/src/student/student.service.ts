@@ -829,8 +829,8 @@ export class StudentService {
             `Affiliate referral transaction recorded for registration ${savedReg.id}`,
           );
 
-          // Update aggregate fields on AffiliateAccount
-          affiliate.referralCount = (Number(affiliate.referralCount) || 0) + 1;
+          const currentReferralCount = (Number(affiliate.referralCount) || 0) + 1;
+          affiliate.referralCount = currentReferralCount;
           affiliate.totalEarnedCommission =
             (Number(affiliate.totalEarnedCommission) || 0) + earnedCommission;
           affiliate.totalPendingCommission =
@@ -839,6 +839,47 @@ export class StudentService {
           this.logger.log(
             `Affiliate ${affiliate.id} aggregates updated: referralCount=${affiliate.referralCount}, totalEarned=${affiliate.totalEarnedCommission}, totalPending=${affiliate.totalPendingCommission}`,
           );
+
+          // 1. Notify Affiliate of Successful Referral
+          try {
+            await this.notificationRepo.save({
+              userId: Number(affiliate.userId),
+              role: 'AFFILIATE',
+              type: 'AFFILIATE_NEW_REFERRAL',
+              title: 'New Registration',
+              message: `User ${dto.full_name} signed up using this site.`,
+              metadata: {
+                studentName: dto.full_name,
+                referralCode: dto.referral_code,
+              },
+            });
+          } catch (err) {
+            this.logger.error(`Failed to notify affiliate of new referral: ${err.message}`);
+          }
+
+          // 2. Milestone Notification Check
+          const milestones = [10, 50, 100];
+          let isMilestone = milestones.includes(currentReferralCount);
+          if (!isMilestone && currentReferralCount > 100 && currentReferralCount % 100 === 0) {
+            isMilestone = true;
+          }
+
+          if (isMilestone) {
+            try {
+              await this.notificationRepo.save({
+                userId: Number(affiliate.userId),
+                role: 'AFFILIATE',
+                type: 'AFFILIATE_MILESTONE_REACHED',
+                title: 'Referral Milestone Reached!',
+                message: `Congratulations! You've reached ${currentReferralCount} referrals.`,
+                metadata: {
+                  count: currentReferralCount,
+                },
+              });
+            } catch (err) {
+              this.logger.error(`Failed to notify affiliate of milestone: ${err.message}`);
+            }
+          }
         } else {
           this.logger.warn(
             `Invalid or inactive referral code provided: ${dto.referral_code}`,
@@ -1562,6 +1603,23 @@ export class StudentService {
       await transporter.sendMail(mailOptions);
       this.logger.log(`Assessment completion email sent to ${user.email}`);
 
+      // Notify Student in-app
+      try {
+        await this.notificationRepo.save({
+          userId: Number(userId),
+          role: 'STUDENT',
+          type: 'ASSESSMENT_REPORT_READY',
+          title: 'Assessment Report Ready',
+          message: 'Your assessment report has been sent to your mail id.',
+          metadata: {
+            registrationId: registration.id,
+          },
+        });
+        this.logger.log(`Student notification saved for user ${userId} (Assessment Report Ready)`);
+      } catch (err) {
+        this.logger.error(`Failed to save student notification: ${err.message}`);
+      }
+
       // Update assessment_reports to track the sent email
       if (session) {
         const reportEntity = await this.assessmentReportRepository.findOne({
@@ -1828,6 +1886,25 @@ export class StudentService {
     } catch (error) {
       this.logger.error('Failed to send placement report email', error);
       throw error;
+    }
+  }
+
+  async handleLevelUnlocked(userId: number, levelNumber: number): Promise<void> {
+    this.logger.log(`Handling level unlocked notification for user ${userId}, level ${levelNumber}`);
+    try {
+      await this.notificationRepo.save({
+        userId: Number(userId),
+        role: 'STUDENT',
+        type: 'LEVEL_UNLOCKED',
+        title: `Level ${levelNumber} Unlocked`,
+        message: `Level ${levelNumber} is now available. You can continue your assessment now.`,
+        metadata: {
+          levelNumber,
+        },
+      });
+      this.logger.log(`Level unlocked notification saved for user ${userId}, level ${levelNumber}`);
+    } catch (err) {
+      this.logger.error(`Failed to save level unlocked notification: ${err.message}`);
     }
   }
 

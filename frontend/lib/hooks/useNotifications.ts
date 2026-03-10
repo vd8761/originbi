@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getStoredUser, getAuthHeaders } from '../auth-helpers';
+import { usePathname } from 'next/navigation';
 
 export interface Notification {
     id: string;
@@ -15,6 +16,7 @@ export interface Notification {
 
 export function useNotifications() {
     const [unreadCount, setUnreadCount] = useState(0);
+    const pathname = usePathname();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(false);
     const user = getStoredUser();
@@ -98,14 +100,14 @@ export function useNotifications() {
             return;
         }
 
-        // Initial fetch
+        // Initial fetch and on route change
         fetchUnreadCount();
 
         // Start polling every 120 seconds
         const intervalId = setInterval(fetchUnreadCount, 120000);
 
         return () => clearInterval(intervalId);
-    }, [user.id, fetchUnreadCount]);
+    }, [user.id, fetchUnreadCount, pathname]);
 
     return {
         unreadCount,

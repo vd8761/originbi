@@ -1301,6 +1301,23 @@ export class AffiliatesService {
 
         await manager.save(affiliate);
 
+        // Notify Affiliate of Settlement Processed
+        try {
+          await this.notificationService.createNotification({
+            userId: Number(affiliate.userId),
+            role: 'AFFILIATE',
+            type: 'AFFILIATE_SETTLEMENT_PROCESSED',
+            title: 'Settlement Processed',
+            message: `Settlement Processed: ₹${dto.settleAmount.toFixed(2)} has been processed to your account.`,
+            metadata: {
+              settlementId: settlement.id,
+              amount: dto.settleAmount,
+            },
+          });
+        } catch (err) {
+          this.logger.error(`Failed to notify affiliate of settlement processed: ${err.message}`);
+        }
+
         return {
           message: 'Settlement completed successfully',
           settlement: {

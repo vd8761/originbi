@@ -321,6 +321,10 @@ const Header: React.FC<HeaderProps> = ({
                 return <UsersIcon className={iconClass} />;
             case 'EMPLOYEE_TEST_COMPLETED':
                 return <CompletedStepIcon className={iconClass} />;
+            case 'LEVEL_UNLOCKED':
+                return <RoadmapIcon className={iconClass} />;
+            case 'ASSESSMENT_REPORT_READY':
+                return <CheckCircleIcon className={iconClass} />;
             case 'EXAM_EXPIRATION':
                 return <NotificationIcon className={`${iconClass} text-red-500 font-bold`} />;
             default:
@@ -345,6 +349,12 @@ const Header: React.FC<HeaderProps> = ({
                 break;
             case 'EMPLOYEE_TEST_COMPLETED':
                 heading = "Test Completed: ";
+                break;
+            case 'LEVEL_UNLOCKED':
+                heading = "Level Unlocked: ";
+                break;
+            case 'ASSESSMENT_REPORT_READY':
+                heading = "Assessment Ready: ";
                 break;
             case 'EXAM_EXPIRATION':
                 heading = "Exam Expiry Warning: ";

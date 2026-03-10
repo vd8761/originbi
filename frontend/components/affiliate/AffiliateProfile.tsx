@@ -57,8 +57,10 @@ const AffiliateProfile: React.FC = () => {
             const storedUser = localStorage.getItem('affiliate_user');
             if (storedUser) {
                 const user = JSON.parse(storedUser);
-                if (user.id) {
-                    fetchData(user.id);
+                // Use affiliateId (AffiliateAccount table ID) for portal-specific stats
+                const affId = user.affiliateId || user.id;
+                if (affId) {
+                    fetchData(String(affId));
                 }
             }
         } catch { /* empty */ }
