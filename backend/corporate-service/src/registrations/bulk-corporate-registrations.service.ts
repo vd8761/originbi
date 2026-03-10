@@ -4,7 +4,11 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  Inject,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom, lastValueFrom } from 'rxjs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In, LessThan } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -52,7 +56,9 @@ export class BulkCorporateRegistrationsService {
     private groupAssessmentRepo: Repository<GroupAssessment>,
     private dataSource: DataSource,
     private readonly corporateRegistrationsService: CorporateRegistrationsService,
-  ) {}
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
+  ) { }
 
   /**
    * Phase 1: Preview & Validate
@@ -675,6 +681,96 @@ export class BulkCorporateRegistrationsService {
       // Delete jobs
       const res = await this.bulkImportRepo.delete({ id: In(ids) });
       this.logger.log(`Deleted ${res.affected} old DRAFT bulk imports.`);
+    }
+  }
+
+  /**
+   * Exam Expiration Notification (1 day before)
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_9AM)
+  async notifyExpiringExams() {
+    this.logger.log('Running notifyExpiringExams cron...');
+
+    try {
+      // 1. Calculate boundaries for "Tomorrow" in IST (Assuming DB is UTC)
+      // We want session.valid_to to be within [Now + 24h - buffer, Now + 24h + buffer]
+      // Or just sessions whose validTo is tomorrow in IST calendar.
+      const tomorrow = dayjs().add(1, 'day');
+      const startOfTomorrow = tomorrow.startOf('day').toISOString();
+      const endOfTomorrow = tomorrow.endOf('day').toISOString();
+
+      // 2. Find sessions expiring tomorrow
+      const expiringSessions = await this.dataSource.query(
+        `
+        SELECT s.id, u.corporate_id, r.full_name as student_name
+        FROM assessment_sessions s
+        JOIN users u ON s.user_id = u.id
+        JOIN registrations r ON s.registration_id = r.id
+        WHERE s.status IN ('NOT_STARTED', 'IN_PROGRESS')
+          AND s.valid_to >= $1 AND s.valid_to <= $2
+          AND u.role = 'STUDENT'
+          AND u.corporate_id IS NOT NULL
+        `,
+        [startOfTomorrow, endOfTomorrow],
+      );
+
+      if (!expiringSessions || expiringSessions.length === 0) {
+        this.logger.log('No expiring exams found for tomorrow.');
+        return;
+      }
+
+      // 3. Group by Corporate ID
+      const corpMap = new Map<number, { count: number; studentNames: string[] }>();
+      for (const s of expiringSessions) {
+        const corpId = Number(s.corporate_id);
+        if (!corpId) continue;
+
+        if (!corpMap.has(corpId)) {
+          corpMap.set(corpId, { count: 0, studentNames: [] });
+        }
+        const entry = corpMap.get(corpId)!;
+        entry.count++;
+        if (s.student_name) entry.studentNames.push(s.student_name);
+      }
+
+      // 4. Send notifications
+      const adminServiceUrl =
+        this.configService.get<string>('ADMIN_SERVICE_URL') ||
+        'http://localhost:4002';
+
+      for (const [corpId, data] of corpMap.entries()) {
+        const corpAccount = await this.corporateAccountRepo.findOne({
+          where: { id: corpId },
+        });
+
+        if (!corpAccount || !corpAccount.userId) continue;
+
+        const message = `${data.count} assigned assessment(s) are expiring in 1 day. Candidates: ${data.studentNames.join(', ')}`;
+
+        try {
+          await lastValueFrom(
+            this.httpService.post(`${adminServiceUrl}/notifications/internal`, {
+              userId: Number(corpAccount.userId),
+              role: 'CORPORATE',
+              type: 'EXAM_EXPIRATION',
+              title: 'Exam Expiry Warning',
+              message,
+              metadata: {
+                corporateAccountId: corpId,
+                count: data.count,
+                expiryDate: startOfTomorrow,
+              },
+            }),
+          );
+          this.logger.log(`Expiry notification sent to Corp ID: ${corpId}`);
+        } catch (err) {
+          this.logger.error(
+            `Failed to notify corporate account ${corpId}: ${err.message}`,
+          );
+        }
+      }
+    } catch (error) {
+      this.logger.error('Error in notifyExpiringExams cron', error.stack);
     }
   }
 

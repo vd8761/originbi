@@ -19,6 +19,7 @@ import {
   MyEmployeesIcon,
   UsersIcon,
   HistoryIcon,
+  CheckCircleIcon,
 } from '../icons';
 import { corporateDashboardService } from '../../lib/services';
 import { CorporateAccount } from '../../lib/types';
@@ -281,10 +282,12 @@ const Header: React.FC<HeaderProps> = ({
     setNotificationsOpen(nextState);
     if (nextState) {
       fetchNotifications();
-      // Only mark read if user specifically wants it or keep current behavior?
-      // Given user wants "History" to be distinct, I'll stop auto-marking on open
-      // so "New Notifications" actually works.
     } else {
+      // Auto-read logic: Mark all as read when closing the tray
+      // This ensures the user sees them before they move to history
+      if (unreadCount > 0) {
+        markAllAsRead();
+      }
       setShowHistory(false);
     }
   };
@@ -301,6 +304,13 @@ const Header: React.FC<HeaderProps> = ({
         return <ProfileIcon className={iconClass} />;
       case 'NEW_CORPORATE_SIGNUP':
         return <UsersIcon className={iconClass} />;
+      case 'LOW_CREDITS':
+      case 'CREDITS_ADDED':
+        return <CoinIcon className={iconClass} />;
+      case 'EXAM_EXPIRATION':
+        return <NotificationIcon className={`${iconClass} text-red-500 font-bold`} />;
+      case 'EMPLOYEE_TEST_COMPLETED':
+        return <CheckCircleIcon className={iconClass} />;
       default:
         return <RoadmapIcon className={iconClass} />;
     }
@@ -321,14 +331,27 @@ const Header: React.FC<HeaderProps> = ({
       case 'AFFILIATE_SETTLEMENT_READY':
         heading = "Affiliate Settlement Ready: ";
         break;
+      case 'LOW_CREDITS':
+        heading = "Low Credits Alert: ";
+        break;
+      case 'CREDITS_ADDED':
+        heading = "Credits Added: ";
+        break;
+      case 'EMPLOYEE_TEST_COMPLETED':
+        heading = "Test Completed: ";
+        break;
+      case 'EXAM_EXPIRATION':
+        heading = "Exam Expiry Warning: ";
+        break;
       default:
         heading = "";
     }
 
     if (heading) {
+      const colorClass = n.type === 'LOW_CREDITS' ? "text-red-500" : "text-brand-green";
       return (
         <>
-          <span className="text-brand-green font-bold">{heading}</span>
+          <span className={`${colorClass} font-bold`}>{heading}</span>
           {message}
         </>
       );

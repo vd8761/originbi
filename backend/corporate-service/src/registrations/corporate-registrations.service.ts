@@ -31,6 +31,7 @@ import { CreateCandidateDto } from './dto/create-candidate.dto';
 export class CorporateRegistrationsService {
   private readonly logger = new Logger(CorporateRegistrationsService.name);
   private authServiceBaseUrl = process.env.AUTH_SERVICE_URL;
+  private adminServiceBaseUrl = process.env.ADMIN_SERVICE_URL || 'http://localhost:4001';
 
   async withRetry<T>(
     operation: () => Promise<T>,
@@ -137,8 +138,35 @@ export class CorporateRegistrationsService {
     // 4. Transaction
     return this.dataSource.transaction(async (manager: EntityManager) => {
       // A. Debit Credit & Ledger
+      const oldCredits = Number(corporateAccount.availableCredits);
       corporateAccount.availableCredits -= 1;
       await manager.save(corporateAccount);
+
+      this.logger.log(`Credit Update: Old=${oldCredits}, New=${corporateAccount.availableCredits}, CorporateUserId=${corporateUserId}`);
+
+      // Notify if credits just dropped below 10
+      if (oldCredits >= 10 && Number(corporateAccount.availableCredits) < 10) {
+        this.logger.log(`Triggering LOW_CREDITS notification for user ${corporateUserId}`);
+        try {
+          const url = `${this.adminServiceBaseUrl}/notifications/internal`;
+          this.logger.log(`POST to ${url}`);
+          await firstValueFrom(
+            this.http.post(url, {
+              userId: corporateUserId,
+              role: 'CORPORATE',
+              type: 'LOW_CREDITS',
+              title: 'Low Credits Alert',
+              message: `Your account balance is low (${corporateAccount.availableCredits} credits remaining). Please top up now to ensure uninterrupted service.`,
+            }),
+          );
+        } catch (err) {
+          this.logger.error(
+            `Failed to send low credits notification: ${err.message}`,
+          );
+        }
+      } else {
+        this.logger.log(`Notification NOT triggered. Condition (oldCredits >= 10 && newCredits < 10) not met.`);
+      }
 
       const ledger = manager.create(CorporateCreditLedger, {
         corporateAccountId: corporateAccount.id,

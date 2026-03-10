@@ -1341,13 +1341,24 @@ export class StudentService {
     try {
       // 1. Verify User and Registration
       const registration = await this.registrationRepo.findOne({
-        where: { userId: userId, registrationSource: 'SELF' },
+        where: { userId: userId },
         relations: ['program'],
       });
 
       if (!registration) {
         this.logger.warn(
-          `Skipping email: No SELF registration found for user ${userId}`,
+          `Skipping email: No registration found for user ${userId}`,
+        );
+        return;
+      }
+
+      // Check for allowed registration sources
+      if (
+        registration.registrationSource !== 'SELF' &&
+        registration.registrationSource !== 'CORPORATE'
+      ) {
+        this.logger.warn(
+          `Skipping email: registration source ${registration.registrationSource} is not SELF or CORPORATE`,
         );
         return;
       }
@@ -1522,6 +1533,34 @@ export class StudentService {
           await this.assessmentReportRepository.save(reportEntity);
           this.logger.log(
             `assessment_reports updated: email_sent=true for session ${session.id}`,
+          );
+        }
+      }
+
+      // 8. Notify Corporate User if applicable
+      if (registration.registrationSource === 'CORPORATE' && user.corporateId) {
+        try {
+          const adminServiceUrl =
+            this.configService.get<string>('ADMIN_SERVICE_URL') ||
+            'http://localhost:4002';
+          await lastValueFrom(
+            this.httpService.post(`${adminServiceUrl}/notifications/internal`, {
+              userId: Number(user.corporateId),
+              role: 'CORPORATE',
+              type: 'EMPLOYEE_TEST_COMPLETED',
+              title: 'Assessment Completed',
+              message: `${registration.fullName || 'An employee'} has successfully completed their assessment.`,
+              metadata: {
+                studentId: userId,
+                studentName: registration.fullName,
+                registrationId: registration.id,
+              },
+            }),
+          );
+          this.logger.log(`Corporate notification sent for user ${userId}`);
+        } catch (err) {
+          this.logger.error(
+            `Failed to send corporate notification: ${err.message}`,
           );
         }
       }

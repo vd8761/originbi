@@ -419,6 +419,24 @@ export class CorporateService {
             reason: 'Manual update by admin during account edit',
           });
           await manager.save(ledger);
+
+          // Notify if credits were added
+          if (diff > 0) {
+            try {
+              await this.notificationService.createNotification({
+                userId: Number(account.userId),
+                role: 'CORPORATE',
+                type: 'CREDITS_ADDED',
+                title: 'Credits Added',
+                message: `${diff} credits have been added to your account.`,
+                metadata: { amount: diff, reason: 'Manual update by admin' },
+              });
+            } catch (err) {
+              this.logger.error(
+                `Failed to send credits added notification: ${err.message}`,
+              );
+            }
+          }
         }
       }
 
@@ -555,6 +573,22 @@ export class CorporateService {
         createdByUserId: undefined, // this.ADMIN_USER_ID,
       });
       await manager.save(ledger);
+
+      // Notify Corporate User
+      try {
+        await this.notificationService.createNotification({
+          userId: Number(account.userId),
+          role: 'CORPORATE',
+          type: 'CREDITS_ADDED',
+          title: 'Credits Added',
+          message: `${delta} credits have been added to your account.`,
+          metadata: { amount: delta, reason: reason || 'Top-up by Admin' },
+        });
+      } catch (err) {
+        this.logger.error(
+          `Failed to send credits added notification: ${err.message}`,
+        );
+      }
 
       return {
         success: true,
