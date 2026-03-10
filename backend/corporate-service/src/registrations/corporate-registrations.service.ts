@@ -21,6 +21,7 @@ import {
   AssessmentSession,
   AssessmentAttempt,
   AssessmentLevel,
+  Notification,
 } from '@originbi/shared-entities';
 
 import { AssessmentGenerationService } from '../assessment/assessment-generation.service';
@@ -62,6 +63,8 @@ export class CorporateRegistrationsService {
     private readonly corpRepo: Repository<CorporateAccount>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(Notification)
+    private readonly notificationRepo: Repository<Notification>,
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
@@ -148,20 +151,16 @@ export class CorporateRegistrationsService {
       if (oldCredits >= 10 && Number(corporateAccount.availableCredits) < 10) {
         this.logger.log(`Triggering LOW_CREDITS notification for user ${corporateUserId}`);
         try {
-          const url = `${this.adminServiceBaseUrl}/notifications/internal`;
-          this.logger.log(`POST to ${url}`);
-          await firstValueFrom(
-            this.http.post(url, {
-              userId: corporateUserId,
-              role: 'CORPORATE',
-              type: 'LOW_CREDITS',
-              title: 'Low Credits Alert',
-              message: `Your account balance is low (${corporateAccount.availableCredits} credits remaining). Please top up now to ensure uninterrupted service.`,
-            }),
-          );
+          await manager.save(Notification, {
+            userId: corporateUserId,
+            role: 'CORPORATE',
+            type: 'LOW_CREDITS',
+            title: 'Low Credits Alert',
+            message: `Your account balance is low (${corporateAccount.availableCredits} credits remaining). Please top up now to ensure uninterrupted service.`,
+          });
         } catch (err) {
           this.logger.error(
-            `Failed to send low credits notification: ${err.message}`,
+            `Failed to save low credits notification: ${err.message}`,
           );
         }
       } else {
@@ -186,6 +185,7 @@ export class CorporateRegistrationsService {
         isActive: true,
         isBlocked: false,
         createdByUserId: corporateAccount.id,
+        corporateId: corporateUserId.toString(),
         metadata: {
           fullName: dto.fullName,
           mobile: dto.mobile,
@@ -431,6 +431,10 @@ export class CorporateRegistrationsService {
     return this.dataSource.transaction(async (manager: EntityManager) => {
       const user = await manager.findOne(User, { where: { id: userId } });
       if (!user) throw new BadRequestException('User not found');
+
+      // Link user to this corporate for notifications
+      user.corporateId = corporateUserId.toString();
+      await manager.save(user);
 
       // 2. Ensure Registration Exists for this Corporate
       let registration = await manager.findOne(Registration, {

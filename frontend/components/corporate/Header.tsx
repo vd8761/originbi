@@ -101,8 +101,12 @@ const NotificationItem: React.FC<{
   title: React.ReactNode;
   time?: string;
   isNew?: boolean;
-}> = ({ icon, title, time, isNew }) => (
-  <div className="flex items-start space-x-3 p-3 hover:bg-brand-light-tertiary dark:hover:bg-brand-dark-tertiary/60 transition-colors duration-200">
+  onClick?: () => void;
+}> = ({ icon, title, time, isNew, onClick }) => (
+  <div
+    onClick={onClick}
+    className="flex items-start space-x-3 p-3 hover:bg-brand-light-tertiary dark:hover:bg-brand-dark-tertiary/60 transition-colors duration-200 cursor-pointer"
+  >
     {icon && (
       <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand-light-tertiary dark:bg-brand-dark-tertiary flex items-center justify-center">
         {icon}
@@ -139,7 +143,7 @@ const Header: React.FC<HeaderProps> = ({
   const [isNotificationsOpen, setNotificationsOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [language, setLanguage] = useState("ENG");
-  const { unreadCount, notifications: realNotifications, fetchNotifications, markAllAsRead } = useNotifications();
+  const { unreadCount, notifications: realNotifications, fetchNotifications, markAllAsRead, markAsRead } = useNotifications();
 
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const langMenuRef = useRef<HTMLDivElement>(null);
@@ -362,6 +366,7 @@ const Header: React.FC<HeaderProps> = ({
   const displayNotifications = realNotifications.length > 0 ? realNotifications
     .filter(n => showHistory || !n.isRead)
     .map(n => ({
+      id: n.id,
       icon: getNotificationIcon(n.type),
       title: formatNotificationTitle(n),
       time: formatRelativeTime(n.createdAt),
@@ -499,7 +504,11 @@ const Header: React.FC<HeaderProps> = ({
                     >
                       {displayNotifications.length > 0 ? (
                         displayNotifications.map((n, i) => (
-                          <NotificationItem key={i} {...n} />
+                          <NotificationItem
+                            key={i}
+                            {...n}
+                            onClick={() => n.isNew && markAsRead(n.id)}
+                          />
                         ))
                       ) : (
                         <div className="p-8 text-center text-gray-400 text-sm">

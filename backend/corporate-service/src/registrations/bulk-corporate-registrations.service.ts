@@ -32,6 +32,7 @@ import {
   Program,
   CorporateAccount,
   GroupAssessment,
+  Notification,
 } from '@originbi/shared-entities';
 import { CorporateRegistrationsService } from './corporate-registrations.service';
 
@@ -54,6 +55,8 @@ export class BulkCorporateRegistrationsService {
     private corporateAccountRepo: Repository<CorporateAccount>,
     @InjectRepository(GroupAssessment)
     private groupAssessmentRepo: Repository<GroupAssessment>,
+    @InjectRepository(Notification)
+    private notificationRepo: Repository<Notification>,
     private dataSource: DataSource,
     private readonly corporateRegistrationsService: CorporateRegistrationsService,
     private readonly httpService: HttpService,
@@ -748,24 +751,22 @@ export class BulkCorporateRegistrationsService {
         const message = `${data.count} assigned assessment(s) are expiring in 1 day. Candidates: ${data.studentNames.join(', ')}`;
 
         try {
-          await lastValueFrom(
-            this.httpService.post(`${adminServiceUrl}/notifications/internal`, {
-              userId: Number(corpAccount.userId),
-              role: 'CORPORATE',
-              type: 'EXAM_EXPIRATION',
-              title: 'Exam Expiry Warning',
-              message,
-              metadata: {
-                corporateAccountId: corpId,
-                count: data.count,
-                expiryDate: startOfTomorrow,
-              },
-            }),
-          );
-          this.logger.log(`Expiry notification sent to Corp ID: ${corpId}`);
+          await this.notificationRepo.save({
+            userId: Number(corpAccount.userId),
+            role: 'CORPORATE',
+            type: 'EXAM_EXPIRATION',
+            title: 'Exam Expiry Warning',
+            message,
+            metadata: {
+              corporateAccountId: corpId,
+              count: data.count,
+              expiryDate: startOfTomorrow,
+            },
+          });
+          this.logger.log(`Expiry notification saved for Corp ID: ${corpId}`);
         } catch (err) {
           this.logger.error(
-            `Failed to notify corporate account ${corpId}: ${err.message}`,
+            `Failed to save notification for corporate account ${corpId}: ${err.message}`,
           );
         }
       }

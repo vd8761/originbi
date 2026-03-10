@@ -26,6 +26,7 @@ import {
   PaymentStatus,
   AffiliateAccount,
   AffiliateReferralTransaction,
+  Notification,
 } from '@originbi/shared-entities';
 import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
@@ -70,6 +71,8 @@ export class StudentService {
     private readonly affiliateRepo: Repository<AffiliateAccount>,
     @InjectRepository(AffiliateReferralTransaction)
     private readonly affiliateTransactionRepo: Repository<AffiliateReferralTransaction>,
+    @InjectRepository(Notification)
+    private readonly notificationRepo: Repository<Notification>,
     private readonly configService: ConfigService,
   ) { }
 
@@ -1540,27 +1543,22 @@ export class StudentService {
       // 8. Notify Corporate User if applicable
       if (registration.registrationSource === 'CORPORATE' && user.corporateId) {
         try {
-          const adminServiceUrl =
-            this.configService.get<string>('ADMIN_SERVICE_URL') ||
-            'http://localhost:4002';
-          await lastValueFrom(
-            this.httpService.post(`${adminServiceUrl}/notifications/internal`, {
-              userId: Number(user.corporateId),
-              role: 'CORPORATE',
-              type: 'EMPLOYEE_TEST_COMPLETED',
-              title: 'Assessment Completed',
-              message: `${registration.fullName || 'An employee'} has successfully completed their assessment.`,
-              metadata: {
-                studentId: userId,
-                studentName: registration.fullName,
-                registrationId: registration.id,
-              },
-            }),
-          );
-          this.logger.log(`Corporate notification sent for user ${userId}`);
+          await this.notificationRepo.save({
+            userId: Number(user.corporateId),
+            role: 'CORPORATE',
+            type: 'EMPLOYEE_TEST_COMPLETED',
+            title: 'Assessment Completed',
+            message: `${registration.fullName || 'An employee'} has successfully completed the ${registration.program?.name ? registration.program.name + ' assessment' : 'assessment'}.`,
+            metadata: {
+              studentId: userId,
+              studentName: registration.fullName,
+              registrationId: registration.id,
+            },
+          });
+          this.logger.log(`Corporate notification saved for user ${userId}`);
         } catch (err) {
           this.logger.error(
-            `Failed to send corporate notification: ${err.message}`,
+            `Failed to save corporate notification: ${err.message}`,
           );
         }
       }

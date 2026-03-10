@@ -15,11 +15,15 @@ import { AssessmentAnswer } from '../entities/assessment_answer.entity';
 import { Program } from '../entities/program.entity';
 import { AssessmentReport } from '../entities/assessment-report.entity';
 import {
-  AffiliateReferralTransaction,
-  AffiliateAccount,
-  Groups,
-  AffiliateSettlementTransaction,
   Registration,
+  Gender,
+  RegistrationStatus,
+  PaymentStatus,
+  AffiliateAccount,
+  AffiliateReferralTransaction,
+  Notification,
+  AffiliateSettlementTransaction,
+  Groups,
   StudentSubscription,
 } from '@originbi/shared-entities';
 
@@ -30,7 +34,6 @@ import {
       AssessmentSession,
       AssessmentAttempt,
       AssessmentLevel,
-
       AssessmentAnswer,
       Registration,
       Program,
@@ -40,6 +43,7 @@ import {
       AffiliateSettlementTransaction,
       Groups,
       StudentSubscription,
+      Notification,
     ]),
     HttpModule,
   ],
@@ -47,4 +51,4 @@ import {
   providers: [StudentService, SubscriptionService, StudentProcessor],
   exports: [StudentService, SubscriptionService],
 })
-export class StudentModule {}
+export class StudentModule { }
