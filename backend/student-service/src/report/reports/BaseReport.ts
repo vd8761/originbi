@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call */
-import PDFDocument from 'pdfkit';
+import PDFDocument = require('pdfkit');
 import * as fs from 'fs';
 
 // --- Shared Interfaces ---

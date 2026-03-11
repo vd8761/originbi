@@ -1559,7 +1559,41 @@ export class StudentService {
         }
       }
 
-      // 9. Send Email
+      // 9. Save in-app notification first (do not block on email delivery)
+      try {
+        const existingNotif = await this.notificationRepo
+          .createQueryBuilder('n')
+          .where('n.user_id = :userId', { userId: Number(userId) })
+          .andWhere('n.type = :type', { type: 'ASSESSMENT_REPORT_READY' })
+          .andWhere("n.metadata ->> 'registrationId' = :regId", {
+            regId: registration.id.toString(),
+          })
+          .getOne();
+
+        if (!existingNotif) {
+          await this.notificationRepo.save({
+            userId: Number(userId),
+            role: user.role || 'STUDENT',
+            type: 'ASSESSMENT_REPORT_READY',
+            title: 'Assessment Report Ready',
+            message: 'Your assessment report is ready. Please check it in your email.',
+            metadata: {
+              registrationId: registration.id,
+            },
+          });
+          this.logger.log(
+            `Student notification saved for user ${userId} (Assessment Report Ready)`,
+          );
+        } else {
+          this.logger.log(
+            `Assessment report-ready notification already exists for user ${userId}, skipping duplicate.`,
+          );
+        }
+      } catch (err) {
+        this.logger.error(`Failed to save student notification: ${err.message}`);
+      }
+
+      // 10. Send Email
       const dateStr = new Date().toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
@@ -1581,43 +1615,29 @@ export class StudentService {
         'Self Discovery Report',
       );
 
-      // --- Transporter Setup ---
-      const transporter = this.createEmailTransporter();
-      // -------------------------
-
-      const mailOptions = {
-        from: `"${process.env.EMAIL_SEND_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
-        to: user.email,
-        cc: [process.env.EMAIL_CC],
-        subject: `Your Assessment Report is Ready - ${((registration as any).program?.reportTitle as string) || 'Origin BI'}`,
-        html: emailHtml,
-        attachments: [
-          {
-            filename: attachmentFileName,
-            content: pdfBuffer,
-            contentType: 'application/pdf',
-          },
-        ],
-      };
-
-      await transporter.sendMail(mailOptions);
-      this.logger.log(`Assessment completion email sent to ${user.email}`);
-
-      // Notify user in-app
       try {
-        await this.notificationRepo.save({
-          userId: Number(userId),
-          role: user.role || 'STUDENT',
-          type: 'ASSESSMENT_REPORT_READY',
-          title: 'Assessment Report Ready',
-          message: 'Your assessment report has been sent to your mail id.',
-          metadata: {
-            registrationId: registration.id,
-          },
-        });
-        this.logger.log(`Student notification saved for user ${userId} (Assessment Report Ready)`);
+        const transporter = this.createEmailTransporter();
+        const mailOptions = {
+          from: `"${process.env.EMAIL_SEND_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
+          to: user.email,
+          cc: [process.env.EMAIL_CC],
+          subject: `Your Assessment Report is Ready - ${((registration as any).program?.reportTitle as string) || 'Origin BI'}`,
+          html: emailHtml,
+          attachments: [
+            {
+              filename: attachmentFileName,
+              content: pdfBuffer,
+              contentType: 'application/pdf',
+            },
+          ],
+        };
+
+        await transporter.sendMail(mailOptions);
+        this.logger.log(`Assessment completion email sent to ${user.email}`);
       } catch (err) {
-        this.logger.error(`Failed to save student notification: ${err.message}`);
+        this.logger.error(
+          `Failed to send assessment completion email to ${user.email}: ${err.message}`,
+        );
       }
 
       // Update assessment_reports to track the sent email
