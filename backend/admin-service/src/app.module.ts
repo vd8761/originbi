@@ -64,7 +64,9 @@ import { R2Module } from './r2/r2.module';
             type: 'postgres',
             url,
             autoLoadEntities: true,
-            synchronize: config.get<string>('DB_SYNC') === 'true',
+            // Never use schema sync in runtime; use migrations instead.
+            // Sync can generate destructive/invalid ALTER statements on large schemas.
+            synchronize: false,
             ssl: isLocal ? false : { rejectUnauthorized: false },
             schema: 'public',
             // Connection pooling for better performance
@@ -87,7 +89,8 @@ import { R2Module } from './r2/r2.module';
           password: config.get<string>('DB_PASS') || '',
           database: config.get<string>('DB_NAME') || 'originbi',
           autoLoadEntities: true,
-          synchronize: config.get<string>('DB_SYNC') === 'true',
+          // Never use schema sync in runtime; use migrations instead.
+          synchronize: false,
           ssl: false,
           schema: 'public',
           // Connection pooling for better performance

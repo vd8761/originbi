@@ -567,10 +567,11 @@ export class EmbeddingsService implements OnModuleInit {
         returnDocuments: false, // we already have them
       });
 
-      // Re-order original docs according to Cohere's ranking
+      // Cohere returns results ordered by relevance already.
+      // Sorting by original index would destroy rerank quality.
       const reranked = response.results
-        .sort((a, b) => a.index - b.index) // preserve Cohere's rank order
-        .map((r) => documents[r.index]);
+        .map((r) => documents[r.index])
+        .filter(Boolean);
 
       this.logger.debug(
         `🔀 Cohere reranked ${documents.length} → ${reranked.length} docs for: "${query.slice(0, 60)}"`,
@@ -604,10 +605,10 @@ export class EmbeddingsService implements OnModuleInit {
 
       const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
-      // Fetch MORE candidates when reranking is available (wider net → better rerank)
-      const fetchLimit = this.cohereAvailable ? limit * 4 : limit;
+      // Fetch more candidates for better reranking/hybrid fusion.
+      const fetchLimit = this.cohereAvailable ? limit * 4 : limit * 3;
 
-      let sql = `
+      let vectorSql = `
                 SELECT 
                     d.id,
                     d.content,
@@ -621,17 +622,63 @@ export class EmbeddingsService implements OnModuleInit {
                 WHERE 1 - (e.embedding <=> $1::vector) >= $2
             `;
 
-      const params: any[] = [embeddingStr, minSimilarity];
+      const vectorParams: any[] = [embeddingStr, minSimilarity];
 
       if (category) {
-        sql += ` AND d.category = $3`;
-        params.push(category);
+        vectorSql += ` AND d.category = $3`;
+        vectorParams.push(category);
       }
 
-      sql += ` ORDER BY e.embedding <=> $1::vector LIMIT $${params.length + 1}`;
-      params.push(fetchLimit);
+      vectorSql += ` ORDER BY e.embedding <=> $1::vector LIMIT $${vectorParams.length + 1}`;
+      vectorParams.push(fetchLimit);
 
-      const candidates = await this.dataSource.query(sql, params);
+      const vectorCandidates = await this.dataSource.query(vectorSql, vectorParams);
+
+      // Hybrid lexical candidates: helps for exact names/codes/rare tokens.
+      let lexicalCandidates: any[] = [];
+      try {
+        let lexicalSql = `
+          SELECT
+              d.id,
+              d.content,
+              d.metadata,
+              d.category,
+              d.source_table,
+              d.source_id,
+              ts_rank_cd(to_tsvector('english', d.content), plainto_tsquery('english', $1)) AS lexical_score
+          FROM rag_documents d
+          WHERE to_tsvector('english', d.content) @@ plainto_tsquery('english', $1)
+        `;
+        const lexicalParams: any[] = [query];
+        if (category) {
+          lexicalSql += ` AND d.category = $2`;
+          lexicalParams.push(category);
+        }
+        lexicalSql += ` ORDER BY lexical_score DESC LIMIT $${lexicalParams.length + 1}`;
+        lexicalParams.push(fetchLimit);
+        lexicalCandidates = await this.dataSource.query(lexicalSql, lexicalParams);
+      } catch (lexErr) {
+        // Keep vector-only search if tsvector functions are unavailable.
+        this.logger.debug(`Lexical fallback skipped: ${lexErr?.message || lexErr}`);
+      }
+
+      // Reciprocal Rank Fusion (RRF) on ids from vector + lexical rankings.
+      const fusedById = new Map<number, { row: any; score: number }>();
+      const k = 60;
+      vectorCandidates.forEach((row, idx) => {
+        const curr = fusedById.get(row.id) || { row, score: 0 };
+        curr.score += 1 / (k + idx + 1);
+        fusedById.set(row.id, curr);
+      });
+      lexicalCandidates.forEach((row, idx) => {
+        const curr = fusedById.get(row.id) || { row, score: 0 };
+        curr.score += 1 / (k + idx + 1);
+        fusedById.set(row.id, curr);
+      });
+
+      const candidates = Array.from(fusedById.values())
+        .sort((a, b) => b.score - a.score)
+        .map((x) => x.row);
 
       // Rerank candidates with Cohere for higher precision
       if (this.cohereAvailable && candidates.length > limit) {
