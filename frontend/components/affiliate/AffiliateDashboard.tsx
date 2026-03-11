@@ -206,7 +206,8 @@ const ReferralLinkCard = () => {
     const [showQRModal, setShowQRModal] = useState(false);
     const [showShareCardModal, setShowShareCardModal] = useState(false);
     const [mounted, setMounted] = useState(false);
-    const [referralLink, setReferralLink] = useState("https://discover.originbi.com/register?ref=affiliate");
+    const referralBaseUrl = process.env.NEXT_PUBLIC_REFERAL_BASE_URL || 'https://discover.originbi.com';
+    const [referralLink, setReferralLink] = useState(`${referralBaseUrl}?ref=affiliate`);
     const [referralCode, setReferralCode] = useState('AFFILIATE');
     const [qrDataUrl, setQrDataUrl] = useState<string>('');
     const [shareCardImageUrl, setShareCardImageUrl] = useState<string | null>(null);
@@ -221,7 +222,8 @@ const ReferralLinkCard = () => {
                 const user = JSON.parse(storedUser);
                 if (user.referralCode) {
                     setReferralCode(user.referralCode);
-                    setReferralLink(`https://discover.originbi.com/register?ref=${user.referralCode}`);
+                    const baseUrl = process.env.NEXT_PUBLIC_REFERAL_BASE_URL || 'https://discover.originbi.com';
+                    setReferralLink(`${baseUrl}?ref=${user.referralCode}`);
                 }
             }
         } catch { /* empty */ }
@@ -711,8 +713,8 @@ const ReferralsTable = ({ data }: { data: Referral[] }) => {
                                 <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] leading-none">
                                     <span className={
                                         row.settledDown === 'Settled' ? 'text-[#1ED36A]'
-                                        : row.settledDown === 'Processing' ? 'text-[#F59E0B]'
-                                        : 'text-[#FF5457]'
+                                            : row.settledDown === 'Processing' ? 'text-[#F59E0B]'
+                                                : 'text-[#FF5457]'
                                     }>
                                         {row.settledDown}
                                     </span>

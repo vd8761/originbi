@@ -15,6 +15,7 @@ import { JDMatchingService } from './jd-matching.service';
 import { SchemaIntrospectorService } from './schema-introspector.service';
 import { TextToSqlService } from './text-to-sql.service';
 import { SqlValidatorService } from './utils/sql-validator.service';
+import { RagCacheService } from './rag-cache.service';
 
 // RBAC Services
 import { AccessPolicyFactory } from './policies';
@@ -65,6 +66,7 @@ import { PdfModule } from '../common/pdf/pdf.module';
     SchemaIntrospectorService,
     TextToSqlService,
     SqlValidatorService,
+    RagCacheService,
     // RBAC Providers
     AccessPolicyFactory,
     SecureQueryExecutor,
@@ -84,6 +86,7 @@ import { PdfModule } from '../common/pdf/pdf.module';
     SchemaIntrospectorService,
     TextToSqlService,
     SqlValidatorService,
+    RagCacheService,
     // RBAC Exports
     AccessPolicyFactory,
     SecureQueryExecutor,

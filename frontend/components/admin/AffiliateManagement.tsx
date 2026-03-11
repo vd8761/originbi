@@ -11,6 +11,7 @@ import {
 import AffiliateTable from "./AffiliateTable";
 import AddAffiliateForm from "./AddAffiliateForm";
 import AffiliateDetailsView from "./AffiliateDetailsView";
+import { fetchAuthSession } from 'aws-amplify/auth';
 
 const API_BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "";
 
@@ -43,7 +44,14 @@ const AffiliateManagement: React.FC = () => {
             if (searchTerm.trim()) {
                 params.set("search", searchTerm.trim());
             }
-            const res = await fetch(`${API_BASE}/admin/affiliates?${params.toString()}`);
+            const session = await fetchAuthSession();
+            const idToken = session.tokens?.idToken?.toString();
+
+            const res = await fetch(`${API_BASE}/admin/affiliates?${params.toString()}`, {
+                headers: {
+                    "Authorization": `Bearer ${idToken}`
+                }
+            });
             if (!res.ok) throw new Error(`Failed to load affiliates (${res.status})`);
             const json = await res.json();
             setAffiliates(json.data || []);
@@ -191,7 +199,15 @@ const AffiliateManagement: React.FC = () => {
                         onClick={async () => {
                             setRefreshing(true);
                             try {
-                                await fetch(`${API_BASE}/admin/affiliates/refresh-ready-status`, { method: 'POST' });
+                                const session = await fetchAuthSession();
+                                const idToken = session.tokens?.idToken?.toString();
+
+                                await fetch(`${API_BASE}/admin/affiliates/refresh-ready-status`, {
+                                    method: 'POST',
+                                    headers: {
+                                        "Authorization": `Bearer ${idToken}`
+                                    }
+                                });
                                 await fetchAffiliates();
                             } catch (err) {
                                 console.error('Failed to refresh ready status', err);

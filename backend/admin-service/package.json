@@ -22,6 +22,9 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.992.0",
+    "@aws-sdk/client-ses": "^3.1001.0",
+    "@aws-sdk/client-sesv2": "^3.1001.0",
+    "@aws-sdk/credential-providers": "^3.1001.0",
     "@aws-sdk/lib-storage": "^3.992.0",
     "@aws-sdk/s3-request-presigner": "^3.992.0",
     "@isaacs/brace-expansion": "^5.0.1",
@@ -42,7 +45,6 @@
     "@types/pdfkit": "^0.17.4",
     "@wavezync/nestjs-pgboss": "^5.1.1",
     "aws-jwt-verify": "^4.0.1",
-    "aws-sdk": "^2.1693.0",
     "axios": "^1.13.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
@@ -61,6 +63,7 @@
     "typeorm": "^0.3.28"
   },
   "devDependencies": {
+    "@angular-devkit/schematics": "^19.2.19",
     "@eslint/eslintrc": "^3.2.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.1.9",

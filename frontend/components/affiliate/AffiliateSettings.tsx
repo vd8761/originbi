@@ -247,7 +247,7 @@ const AffiliateSettings: React.FC = () => {
                             <div>
                                 <h3 className="font-bold text-[clamp(20px,1.5vw,24px)] text-[#19211C] dark:text-white">{fullName || 'Affiliate'}</h3>
                                 <p className="text-[clamp(14px,1vw,16px)] text-[#19211C] dark:text-white opacity-60 font-normal">
-                                    Affiliate Code: {referralCode || 'N/A'} • Commission: {commissionPercentage}%
+                                    Affiliate Code: {referralCode || 'N/A'}
                                 </p>
                             </div>
                         </div>
