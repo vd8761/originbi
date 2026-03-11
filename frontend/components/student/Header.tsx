@@ -326,7 +326,7 @@ const Header: React.FC<HeaderProps> = ({
             case 'EMPLOYEE_TEST_COMPLETED':
                 return <CompletedStepIcon className={iconClass} />;
             case 'LEVEL_UNLOCKED':
-                return <RoadmapIcon className={iconClass} />;
+                return <JobsIcon className={iconClass} />;
             case 'ASSESSMENT_REPORT_READY':
                 return <CheckCircleIcon className={iconClass} />;
             case 'EXAM_EXPIRATION':

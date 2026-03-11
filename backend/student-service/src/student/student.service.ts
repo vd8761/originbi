@@ -1895,12 +1895,19 @@ export class StudentService {
       const user = await this.userRepo.findOne({ where: { id: userId } });
       const userRole = user?.role || 'STUDENT';
 
+      const levelNames: Record<number, string> = {
+        1: 'DISC Behavioral Insight',
+        2: 'ACI Agile Compatibility Index',
+      };
+
+      const assessmentName = levelNames[levelNumber] || `Level ${levelNumber}`;
+
       await this.notificationRepo.save({
         userId: Number(userId),
         role: userRole,
         type: 'LEVEL_UNLOCKED',
         title: `Level ${levelNumber} Unlocked`,
-        message: `Level ${levelNumber} is now available. You can continue your assessment now.`,
+        message: `Level ${levelNumber} : ${assessmentName} Assessment is now Unlocked`,
         metadata: {
           levelNumber,
         },

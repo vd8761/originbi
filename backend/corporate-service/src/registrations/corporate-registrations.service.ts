@@ -8,8 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, EntityManager, In, Not } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import * as nodemailer from 'nodemailer';
-import { SES } from 'aws-sdk';
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 
 import {
   CorporateAccount,
@@ -184,8 +183,7 @@ export class CorporateRegistrationsService {
         cognitoSub: sub,
         isActive: true,
         isBlocked: false,
-        createdByUserId: corporateAccount.id,
-        corporateId: corporateUserId.toString(),
+        corporateId: corporateAccount.id.toString(),
         metadata: {
           fullName: dto.fullName,
           mobile: dto.mobile,
@@ -345,18 +343,14 @@ export class CorporateRegistrationsService {
     );
 
     try {
-      // Use aws-sdk v2 (Standard, matches Admin Service)
-      const ses = new SES({
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-        sessionToken: process.env.AWS_SESSION_TOKEN, // Optional
+      const sesClient = new SESClient({
         region: process.env.AWS_REGION,
+        credentials: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+          sessionToken: process.env.AWS_SESSION_TOKEN,
+        },
       });
-
-      // Create transport securely
-      const transporter = nodemailer.createTransport({
-        SES: ses,
-      } as nodemailer.TransportOptions);
 
       // Use full URLs for assets ("from application itself")
       const apiUrl = process.env.API_URL;
@@ -378,15 +372,31 @@ export class CorporateRegistrationsService {
         assessmentTitle,
       );
 
-      const info = await transporter.sendMail({
-        from: `"${process.env.EMAIL_SEND_FROM_NAME || 'Origin BI'}" <${process.env.EMAIL_FROM || 'no-reply@originbi.com'}>`,
-        to,
-        subject: 'Welcome to OriginBI - Assessment Invitation',
-        html,
+      const fromName = process.env.EMAIL_SEND_FROM_NAME || 'Origin BI';
+      const fromEmail = process.env.EMAIL_FROM || 'no-reply@originbi.com';
+
+      const command = new SendEmailCommand({
+        Source: `"${fromName}" <${fromEmail}>`,
+        Destination: {
+          ToAddresses: [to],
+        },
+        Message: {
+          Subject: {
+            Data: 'Welcome to OriginBI - Assessment Invitation',
+            Charset: 'UTF-8',
+          },
+          Body: {
+            Html: {
+              Data: html,
+              Charset: 'UTF-8',
+            },
+          },
+        },
       });
+      const result = await sesClient.send(command);
 
       this.logger.log(
-        `Email sent successfully to ${to}. MessageId: ${info.messageId}`,
+        `Email sent successfully to ${to}. MessageId: ${result.MessageId}`,
       );
     } catch (error) {
       this.logger.error(`Failed to send email to ${to}`, error);
@@ -433,7 +443,7 @@ export class CorporateRegistrationsService {
       if (!user) throw new BadRequestException('User not found');
 
       // Link user to this corporate for notifications
-      user.corporateId = corporateUserId.toString();
+      user.corporateId = corporateAccount.id.toString();
       await manager.save(user);
 
       // 2. Ensure Registration Exists for this Corporate
