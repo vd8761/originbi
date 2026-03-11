@@ -5,8 +5,8 @@ import archiver from 'archiver';
 import {
   fetchGroupAssessmentData,
   fetchUserAssessmentData,
-  MergedUserData,
 } from '../helpers/groupReportHelper';
+import { MergedReportData } from '../types/types';
 import { getPlacementDetails } from '../helpers/sqlHelper';
 import { generateReportForUser } from '../helpers/reportFactory';
 import { PlacementReport } from '../reports/placement/placementReport';
@@ -179,12 +179,12 @@ export const reportQueueService = {
       if (fs.existsSync(jobDir)) {
         try {
           fs.rmSync(jobDir, { recursive: true, force: true });
-        } catch (e) {}
+        } catch (e) { }
       }
       fs.mkdirSync(jobDir, { recursive: true });
 
       logger.info(`[JOB:${jobId}] Fetching data...`);
-      const groupData: MergedUserData[] =
+      const groupData: MergedReportData[] =
         await fetchGroupAssessmentData(groupId);
       const totalUsers = groupData.length;
 
@@ -209,8 +209,10 @@ export const reportQueueService = {
         });
 
         const safeName = user.full_name.replace(/[^a-zA-Z0-9 ]/g, '_').trim();
-        const fileName = `${safeName}.${user.dept_code}.${user.exam_ref_no.replace(/[\/\\]/g, '-')}.pdf`;
-        groupName = user.group_name?.replace(' ', '_');
+        const deptStr = 'dept_code' in user ? user.dept_code : 'GENERAL';
+        const fileName = `${safeName}.${deptStr}.${user.exam_ref_no.replace(/[\/\\]/g, '-')}.pdf`;
+        const groupStr = 'group_name' in user ? user.group_name : 'NoGroup';
+        groupName = groupStr?.replace(' ', '_');
         const filePath = path.join(jobDir, fileName);
 
         console.log(
@@ -259,7 +261,7 @@ export const reportQueueService = {
         // Optional: Cleanup the raw PDF folder
         try {
           fs.rmSync(jobDir, { recursive: true, force: true });
-        } catch (e) {}
+        } catch (e) { }
         scheduleCleanup(jobId, [zipFilePath]);
       });
 
@@ -295,12 +297,12 @@ export const reportQueueService = {
       if (fs.existsSync(jobDir)) {
         try {
           fs.rmSync(jobDir, { recursive: true, force: true });
-        } catch (e) {}
+        } catch (e) { }
       }
       fs.mkdirSync(jobDir, { recursive: true });
 
       logger.info(`[JOB:${jobId}] Fetching data...`);
-      const groupData: MergedUserData[] =
+      const groupData: MergedReportData[] =
         await fetchUserAssessmentData(userIds);
       const totalUsers = groupData.length;
 
@@ -324,7 +326,8 @@ export const reportQueueService = {
         });
 
         const safeName = user.full_name.replace(/[^a-zA-Z0-9 ]/g, '_').trim();
-        const fileName = `${safeName}.${user.dept_code}.${user.exam_ref_no.replace(/[\/\\]/g, '-')}.pdf`;
+        const deptStr = 'dept_code' in user ? user.dept_code : 'GENERAL';
+        const fileName = `${safeName}.${deptStr}.${user.exam_ref_no.replace(/[\/\\]/g, '-')}.pdf`;
         const filePath = path.join(jobDir, fileName);
 
         console.log(
@@ -368,7 +371,7 @@ export const reportQueueService = {
         });
         try {
           fs.rmSync(jobDir, { recursive: true, force: true });
-        } catch (e) {}
+        } catch (e) { }
         scheduleCleanup(jobId, [zipFilePath]);
       });
 
@@ -409,7 +412,7 @@ export const reportQueueService = {
       logger.info(`[JOB:${jobId}] Fetching data for user ${userId}...`);
 
       // Reuse existing fetchUserAssessmentData which takes array
-      const groupData: MergedUserData[] = await fetchUserAssessmentData([
+      const groupData: MergedReportData[] = await fetchUserAssessmentData([
         userId,
       ]);
 

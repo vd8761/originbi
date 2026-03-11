@@ -1,10 +1,12 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unused-vars */
+﻿/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unused-vars */
 import * as fs from 'fs';
-import { SchoolData, COLORS } from '../../types/types';
+import { SchoolData, AgileScore, COLORS } from '../../types/types';
 import {
   BaseReport,
   FutureOutlookData,
   FutureOutlookOptions,
+  StyledRow,
+  TextAlignment,
 } from '../BaseReport';
 import {
   SCHOOL_TOC_CONTENT,
@@ -14,608 +16,33 @@ import {
   WORD_SKETCH_DATA,
   DISCLAIMER_CONTENT,
   MAPPING,
+  DISC_AGILE_CAREER_PACE,
+  DiscAgileEntry,
+  CAREER_ODYSSEY_ROADMAP,
+  OdysseyNode,
+  CI_COLORS,
+  BEHAVIOR_LABELS,
+  IDENTITY_MAP,
+  STRENGTH_MAP,
+  DEVELOPMENT_MAP,
+  CAREER_DOMAIN_MAP,
+  ProfilePatterns,
+  ARCHETYPE_DATA,
+  DUAL_ARCHETYPE,
+  TEXT_VARIATIONS,
+  STREAM_SELECTION_CONTENT,
+  STREAM_ODYSSEY_ROADMAP,
 } from './schoolConstants';
 import {
   getCompatibilityMatrixDetails,
   CourseCompatibility,
 } from '../../helpers/sqlHelper';
+import {
+  getTopCollegesForStudent,
+  UniversityData,
+} from '../../helpers/SchoolHelper';
 import { ACI, ACI_SCORE, DISCLAIMER } from '../BaseConstants';
 import { logger } from '../../helpers/logger';
-
-export const CI_COLORS = {
-  // Brand primaries
-  INDIGO: '#2c2a7d', // base indigo — high values
-  INDIGO_MID: '#4e4ba6', // medium shade
-  INDIGO_LIGHT: '#9896cc', // light shade — low values / tracks
-  INDIGO_PALE: '#e8e7f5', // very light — backgrounds / row stripes
-  GREEN: '#4cb966', // base green — secondary / accent
-  GREEN_DARK: '#2d8a45', // darker green
-  GREEN_LIGHT: '#a8e0b3', // light green tint
-  // Neutrals
-  LIGHT_GRAY: '#F5F5F5',
-  DARK_TEXT: '#1A1A1A',
-  MEDIUM_TEXT: '#444444',
-  // Semantic
-  STRONG_GREEN: '#2d8a45',
-  MODERATE_AMBER: '#C68A00',
-  DEVELOPING_RED: '#D04A4A',
-  // Kept for non-bar usage only
-  SECTION_BLUE: '#2c2a7d', // alias for INDIGO
-  ACCENT_GREEN: '#4cb966', // alias for GREEN
-  ACCENT_TEAL: '#4e4ba6', // remapped to indigo-mid
-  TEAL_LIGHT: '#e8e7f5', // remapped to indigo-pale
-  TEAL_MID: '#9896cc', // remapped to indigo-light
-  TILE_BLUE: '#e8e7f5',
-  TILE_TEAL: '#e8e7f5',
-  GAUGE_START: '#4cb966', // green start
-  GAUGE_END: '#2c2a7d', // indigo end
-  GAUGE_BG: '#e8e7f5',
-  RADAR_FILL: '#9896cc',
-  RADAR_STROKE: '#2c2a7d',
-  RADAR_GRID: '#BCBEC0',
-  BAR_BLUE: '#2c2a7d',
-  BAR_GREEN: '#4cb966',
-  BAR_TEAL: '#4e4ba6',
-  BAR_PURPLE: '#2c2a7d',
-  BAR_INDIGO: '#4e4ba6',
-};
-
-// Non-DISC axis labels for the behavioral radar
-const BEHAVIOR_LABELS: Record<string, string> = {
-  D: 'Drive',
-  I: 'Expression',
-  S: 'Stability',
-  C: 'Precision',
-};
-
-/**
- * SchoolReport Class
- * ------------------
- * Generates the School Student Report PDF.
- * Focuses on:
- * - Personalized Insights based on DISC scores.
- * - Study Habits and Learning Styles.
- * - Academic and Career stream recommendations.
- * - Course Compatibility Matrix.
- */
-
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// CAREER INTELLIGENCE â€” Static Data Maps (migrated from schoolReport2.ts)
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-
-// ─── STATIC DATA (Non-DISC Career Language) ────────────────────────────────
-
-/** Maps two-letter trait combos to professional identity titles and descriptions */
-const IDENTITY_MAP: Record<string, { title: string; description: string }> = {
-  DC: {
-    title: 'Structured Strategic Performer',
-    description:
-      'This student naturally prefers clarity, defined systems, and logical decision-making environments. They perform best where expectations are clear, processes are structured, and outcomes are measurable. They evaluate, plan, and then execute with discipline.',
-  },
-  CD: {
-    title: 'Precision-Driven Strategist',
-    description:
-      'This student thrives in environments where quality standards are high and decisions are supported by evidence. They bring thoroughness and strategic thinking together, preferring to analyse before acting and holding themselves to exacting standards.',
-  },
-  DI: {
-    title: 'Adaptive Collaborative Driver',
-    description:
-      'This student combines a goal-oriented mindset with strong interpersonal energy. They take charge confidently while engaging others, and perform best in dynamic settings that reward initiative, persuasion, and visible results.',
-  },
-  ID: {
-    title: 'Expressive Initiative Leader',
-    description:
-      'This student leads through enthusiasm and social connection. They naturally rally people around ideas, communicate with energy, and thrive where creativity, collaboration, and rapid action intersect.',
-  },
-  DS: {
-    title: 'Resilient Operational Executor',
-    description:
-      'This student blends a drive for results with steady follow-through. They set clear targets and build practical processes to reach them, bringing determination and patience together in equal measure.',
-  },
-  SD: {
-    title: 'Dependable Performance Anchor',
-    description:
-      'This student brings reliability and quiet resolve to every environment. They follow systems faithfully, execute with discipline, and provide a stabilising force that others depend on during change.',
-  },
-  IS: {
-    title: 'Empathic Engagement Specialist',
-    description:
-      'This student creates trust and collaboration effortlessly. They sense team dynamics, build inclusive environments, and perform best where cooperation, empathy, and steady contribution are valued.',
-  },
-  SI: {
-    title: 'Supportive Team Catalyst',
-    description:
-      'This student combines warmth with cooperative energy, naturally encouraging others while maintaining steady output. They thrive in team-first environments that value harmony and shared achievement.',
-  },
-  IC: {
-    title: 'Creative Analytical Innovator',
-    description:
-      'This student brings a rare blend of imagination and logical rigour. They design thoughtful solutions, balance creativity with evidence, and perform best in environments that value both innovation and accuracy.',
-  },
-  CI: {
-    title: 'Methodical Creative Planner',
-    description:
-      'This student approaches creativity with discipline. They merge analytical depth with expressive communication, thriving where structured innovation and evidence-based storytelling are required.',
-  },
-  SC: {
-    title: 'Steady Quality Guardian',
-    description:
-      'This student values consistency, precision, and calm performance. They maintain high standards through patience and systematic work, excelling in environments that reward reliability and thoroughness.',
-  },
-  CS: {
-    title: 'Careful Stability Architect',
-    description:
-      'This student brings order and meticulous care to every project. They prefer predictable environments with clear processes, and their attention to detail ensures that standards are never compromised.',
-  },
-};
-
-/** Maps each trait letter to career-relevant strength labels + short descriptions */
-const STRENGTH_MAP: Record<string, { label: string; desc: string }[]> = {
-  D: [
-    {
-      label: 'Goal-Driven Decision Making',
-      desc: 'Maintains focus on measurable results and defined objectives.',
-    },
-    {
-      label: 'Strategic Execution Authority',
-      desc: 'Comfortable taking ownership and driving outcomes independently.',
-    },
-    {
-      label: 'Rapid Problem Resolution',
-      desc: 'Cuts through ambiguity and delivers solutions under pressure.',
-    },
-  ],
-  I: [
-    {
-      label: 'Collaborative Influence',
-      desc: 'Strong ability to rally teams and build consensus around ideas.',
-    },
-    {
-      label: 'Adaptive Communication',
-      desc: 'Adjusts messaging instinctively to engage diverse audiences.',
-    },
-    {
-      label: 'Creative Solution Design',
-      desc: 'Generates fresh approaches and inspires innovative thinking.',
-    },
-  ],
-  S: [
-    {
-      label: 'Consistency & Reliability',
-      desc: 'Demonstrates dependable performance under structured expectations.',
-    },
-    {
-      label: 'Team Cohesion Building',
-      desc: 'Fosters trust and psychological safety within groups.',
-    },
-    {
-      label: 'Sustained Task Commitment',
-      desc: 'Maintains steady effort over extended timelines without burnout.',
-    },
-  ],
-  C: [
-    {
-      label: 'Analytical Accuracy',
-      desc: 'Strong ability to evaluate information carefully and make data-driven decisions.',
-    },
-    {
-      label: 'Structured Execution Discipline',
-      desc: 'Performs consistently in environments that require procedure adherence.',
-    },
-    {
-      label: 'Strategic Planning Orientation',
-      desc: 'Comfortable setting goals and aligning resources for long-term outcomes.',
-    },
-  ],
-};
-
-/** Maps each trait letter to positive development opportunity descriptions */
-const DEVELOPMENT_MAP: Record<string, { label: string; desc: string }[]> = {
-  D: [
-    {
-      label: 'Emotional Flexibility',
-      desc: 'May benefit from adapting communication tone based on audience sensitivity.',
-    },
-    {
-      label: 'Delegation Comfort',
-      desc: 'Should gradually build confidence in sharing control and trusting team execution.',
-    },
-  ],
-  I: [
-    {
-      label: 'Sustained Focus Depth',
-      desc: 'Can strengthen performance by completing deep-work cycles without distraction.',
-    },
-    {
-      label: 'Detail Verification',
-      desc: 'May benefit from building routine checks before finalising deliverables.',
-    },
-  ],
-  S: [
-    {
-      label: 'Spontaneous Adaptability',
-      desc: 'Can strengthen performance in rapidly changing or ambiguous environments.',
-    },
-    {
-      label: 'Social Influence Confidence',
-      desc: 'May need to express ideas more assertively in collaborative discussions.',
-    },
-  ],
-  C: [
-    {
-      label: 'Pace Flexibility',
-      desc: 'May benefit from releasing work incrementally rather than waiting for perfection.',
-    },
-    {
-      label: 'Interpersonal Warmth',
-      desc: 'Can strengthen impact by adding informal, empathetic elements to communication.',
-    },
-  ],
-};
-
-/** Maps trait combos to career domains and automation risk */
-const CAREER_DOMAIN_MAP: Record<
-  string,
-  { domains: { name: string; score: number }[]; automationRisk: string }
-> = {
-  DC: {
-    domains: [
-      { name: 'Engineering & Robotics', score: 95 },
-      { name: 'Data & Systems Management', score: 90 },
-      { name: 'Governance & Compliance', score: 85 },
-      { name: 'Research & Structured Technology', score: 80 },
-      { name: 'Risk & Strategic Planning', score: 75 },
-    ],
-    automationRisk:
-      'Low risk in analytical and strategic domains. Higher risk only in repetitive, low-decision roles.',
-  },
-  CD: {
-    domains: [
-      { name: 'Quality Assurance & Standards', score: 95 },
-      { name: 'Financial Analysis & Auditing', score: 90 },
-      { name: 'Research & Development', score: 85 },
-      { name: 'Policy Design & Regulation', score: 80 },
-      { name: 'Data Science & Machine Learning', score: 78 },
-    ],
-    automationRisk:
-      'Low risk due to analytical depth. Roles requiring human oversight remain resilient.',
-  },
-  DI: {
-    domains: [
-      { name: 'Business Development & Sales', score: 92 },
-      { name: 'Product Management', score: 88 },
-      { name: 'Startup & Entrepreneurship', score: 85 },
-      { name: 'Marketing Strategy', score: 82 },
-      { name: 'Consulting & Advisory', score: 78 },
-    ],
-    automationRisk:
-      'Low risk in leadership and relationship-driven roles. Higher risk only in transactional functions.',
-  },
-  ID: {
-    domains: [
-      { name: 'Creative Direction & Content', score: 90 },
-      { name: 'Public Relations & Comms', score: 88 },
-      { name: 'Brand Management', score: 85 },
-      { name: 'Event & Experience Design', score: 80 },
-      { name: 'Media Production', score: 76 },
-    ],
-    automationRisk:
-      'Low risk in creative and people-facing domains. AI augments but does not replace persuasive leadership.',
-  },
-  DS: {
-    domains: [
-      { name: 'Operations Management', score: 94 },
-      { name: 'Project & Program Management', score: 90 },
-      { name: 'Supply Chain & Logistics', score: 86 },
-      { name: 'Construction & Infrastructure', score: 82 },
-      { name: 'Defence Strategy', score: 78 },
-    ],
-    automationRisk:
-      'Low risk in operational leadership. Steady execution roles remain critical.',
-  },
-  SD: {
-    domains: [
-      { name: 'Healthcare Administration', score: 92 },
-      { name: 'Education & Training', score: 88 },
-      { name: 'Facilities & Operations', score: 84 },
-      { name: 'Government & Public Service', score: 80 },
-      { name: 'Agricultural Management', score: 76 },
-    ],
-    automationRisk:
-      'Low risk in service-oriented leadership. Human judgment remains indispensable.',
-  },
-  IS: {
-    domains: [
-      { name: 'Human Resources & People Ops', score: 94 },
-      { name: 'Counselling & Social Work', score: 90 },
-      { name: 'Customer Success', score: 86 },
-      { name: 'Community Development', score: 82 },
-      { name: 'Teaching & Academic Mentoring', score: 78 },
-    ],
-    automationRisk:
-      'Low risk in empathy-driven roles. Human connection is irreplaceable.',
-  },
-  SI: {
-    domains: [
-      { name: 'Team Coordination', score: 90 },
-      { name: 'Patient Care & Allied Health', score: 88 },
-      { name: 'Hospitality & Guest Experience', score: 84 },
-      { name: 'Retail Management', score: 80 },
-      { name: 'Nonprofit Program Management', score: 76 },
-    ],
-    automationRisk:
-      'Low risk in people-first service environments. Supportive roles require human presence.',
-  },
-  IC: {
-    domains: [
-      { name: 'UX/UI Design & Research', score: 92 },
-      { name: 'Advertising & Creative Strategy', score: 88 },
-      { name: 'Architecture & Interior Design', score: 84 },
-      { name: 'Content Creation & Storytelling', score: 80 },
-      { name: 'Innovation Labs & R&D', score: 76 },
-    ],
-    automationRisk:
-      'Low risk where human creativity meets analytical rigour. AI assists but does not replace design judgment.',
-  },
-  CI: {
-    domains: [
-      { name: 'Technical Writing', score: 90 },
-      { name: 'Information Architecture', score: 86 },
-      { name: 'Product Design & Prototyping', score: 84 },
-      { name: 'Data Visualisation & Analytics', score: 80 },
-      { name: 'EdTech & Instructional Design', score: 76 },
-    ],
-    automationRisk:
-      'Low risk in structured creative domains. Methodical innovation requires human oversight.',
-  },
-  SC: {
-    domains: [
-      { name: 'Compliance & Regulatory Affairs', score: 92 },
-      { name: 'Laboratory Science', score: 88 },
-      { name: 'Archival & Library Science', score: 84 },
-      { name: 'Accounting & Financial Planning', score: 80 },
-      { name: 'Environmental Safety', score: 76 },
-    ],
-    automationRisk:
-      'Low risk in precision-driven stability roles. Quality-focused work resists full automation.',
-  },
-  CS: {
-    domains: [
-      { name: 'Software Quality Assurance', score: 92 },
-      { name: 'Pharmaceutical R&D', score: 88 },
-      { name: 'Legal Research', score: 84 },
-      { name: 'Actuarial Science', score: 80 },
-      { name: 'Clinical Data Management', score: 76 },
-    ],
-    automationRisk:
-      'Low risk in detail-critical domains. Precision roles demand human verification.',
-  },
-};
-
-interface ProfilePatterns {
-  discType: 'dominant' | 'dual' | 'balanced';
-  dominantTrait?: string;
-  dualTraits?: [string, string];
-  agilePattern: string;
-  leadership: number;
-  collaboration: number;
-  innovation: number;
-  analytical: number;
-  resilience: number;
-  adaptability: number;
-  stressType: string;
-  academicStyle: string;
-  textVariant: number;
-}
-
-// ─── ARCHETYPE DATA ────────────────────────────────────────────────────────
-
-const ARCHETYPE_DATA: Record<
-  string,
-  {
-    dominant: {
-      title: string;
-      superpower: string;
-      risk: string;
-      environment: string;
-    };
-    secondary: {
-      title: string;
-      superpower: string;
-      risk: string;
-      environment: string;
-    };
-  }
-> = {
-  D: {
-    dominant: {
-      title: 'Strategic Driver',
-      superpower: 'Decisive action under pressure',
-      risk: 'May overlook team sentiment in pursuit of results',
-      environment: 'Competitive, fast-paced, outcome-driven',
-    },
-    secondary: {
-      title: 'Assertive Contributor',
-      superpower: 'Confident initiative in group settings',
-      risk: 'Can become impatient with slower processes',
-      environment: 'Project-based, target-oriented',
-    },
-  },
-  I: {
-    dominant: {
-      title: 'Dynamic Communicator',
-      superpower: 'Energising teams and building enthusiasm',
-      risk: 'May prioritise engagement over follow-through',
-      environment: 'Collaborative, creative, socially active',
-    },
-    secondary: {
-      title: 'Expressive Collaborator',
-      superpower: 'Building rapport and inspiring action',
-      risk: 'May struggle with sustained solo tasks',
-      environment: 'Team-based, interactive learning',
-    },
-  },
-  S: {
-    dominant: {
-      title: 'Steady Anchor',
-      superpower: 'Reliable consistency and calm under pressure',
-      risk: 'May resist necessary changes or new methods',
-      environment: 'Structured, predictable, supportive',
-    },
-    secondary: {
-      title: 'Supportive Stabiliser',
-      superpower: 'Creating trust and psychological safety',
-      risk: 'May avoid confrontation when needed',
-      environment: 'Team-oriented, routine-based',
-    },
-  },
-  C: {
-    dominant: {
-      title: 'Precision Architect',
-      superpower: 'Analytical depth and quality control',
-      risk: 'May delay action while seeking perfect data',
-      environment: 'Research-oriented, standard-driven, detail-rich',
-    },
-    secondary: {
-      title: 'Quality Analyst',
-      superpower: 'Systematic evaluation and process design',
-      risk: 'May over-analyse in time-sensitive situations',
-      environment: 'Data-centric, structured planning',
-    },
-  },
-};
-
-const DUAL_ARCHETYPE: Record<string, { title: string; description: string }> = {
-  DC: {
-    title: 'Strategic Executor',
-    description:
-      'You combine decisiveness with structured thinking — a rare blend of action and precision.',
-  },
-  CD: {
-    title: 'Analytical Commander',
-    description: 'Your leadership style is analytical rather than impulsive.',
-  },
-  DI: {
-    title: 'Charismatic Driver',
-    description: 'You prefer taking charge while energising those around you.',
-  },
-  ID: {
-    title: 'Influential Initiator',
-    description: 'You lead through inspiration and bold action.',
-  },
-  DS: {
-    title: 'Resilient Operator',
-    description: 'You drive results with patient determination.',
-  },
-  SD: {
-    title: 'Steadfast Director',
-    description: 'You build systems while maintaining calm authority.',
-  },
-  IS: {
-    title: 'Empathetic Motivator',
-    description: 'You combine warmth with persuasive energy.',
-  },
-  SI: {
-    title: 'Harmonious Facilitator',
-    description: 'You build consensus through genuine care.',
-  },
-  IC: {
-    title: 'Creative Analyst',
-    description: 'You balance imagination with methodical evaluation.',
-  },
-  CI: {
-    title: 'Methodical Innovator',
-    description: 'You bring structure to creative problem-solving.',
-  },
-  SC: {
-    title: 'Reliable Perfectionist',
-    description: 'You combine steady commitment with quality focus.',
-  },
-  CS: {
-    title: 'Careful Maintainer',
-    description: 'You sustain high standards through disciplined patience.',
-  },
-};
-
-// ─── TEXT VARIATIONS ───────────────────────────────────────────────────────
-
-const TEXT_VARIATIONS: Record<string, string[]> = {
-  'disc-dominant': [
-    'You naturally take control in complex situations and prefer driving results rather than waiting for direction.',
-    'You show a strong preference for leading decisions and influencing outcomes, often stepping forward in high-pressure moments.',
-    'Your strong drive gives you an edge in competitive environments. Developing patience will multiply your leadership impact.',
-  ],
-  'disc-dual': [
-    'You combine two strong capabilities that create a distinctive professional identity.',
-    'Your profile blends complementary strengths that few others possess naturally.',
-    'Your dual strengths position you uniquely — leveraging both will accelerate career growth.',
-  ],
-  'disc-balanced': [
-    'You demonstrate adaptability across different environments without extreme behavioural shifts.',
-    'You can comfortably adjust between leadership, collaboration, and analysis.',
-    'Your flexibility makes you versatile. Developing deeper expertise in one area will amplify your impact.',
-  ],
-  'agile-assertive-risk': [
-    'You are bold in expressing ideas, but strengthening listening skills will elevate your influence.',
-    'You challenge situations confidently. Building empathy will increase long-term trust.',
-    'Your confidence is powerful. Balancing it with patience will amplify impact.',
-  ],
-  'agile-execution-engine': [
-    'You show consistency in completing tasks even under pressure.',
-    "You don't just start strong — you sustain performance across the finish line.",
-    'You convert ideas into measurable outcomes with reliable follow-through.',
-  ],
-  'agile-creative-instability': [
-    'You generate ideas easily but may lose momentum in execution.',
-    'Your creativity thrives in flexible environments. Structure will increase success rate.',
-    'You adapt quickly, but consistency will turn potential into achievement.',
-  ],
-  'agile-balanced': [
-    'Your agile competencies are balanced, showing well-rounded readiness for professional environments.',
-    'You maintain consistent performance across all behavioural agility dimensions.',
-    'Your even distribution of agile capabilities supports adaptable career growth.',
-  ],
-  'stress-assertive': [
-    'Under pressure, your communication may become more direct and results-focused.',
-    'In high-stakes moments, you may prioritise outcomes over relationship management.',
-    'Stress can sharpen your decisiveness but may reduce diplomacy. Awareness is key.',
-  ],
-  'stress-overthink': [
-    'You may delay decisions seeking more data when under pressure.',
-    'Perfectionism can increase under uncertainty, slowing your response time.',
-    'Stress may push you toward over-analysis. Setting decision deadlines helps.',
-  ],
-  'stress-withdrawal': [
-    'Under pressure, you may become quieter and avoid confrontation.',
-    'Stress may lead you to internalise concerns rather than voicing them.',
-    'In difficult moments, building confidence to speak up will strengthen your resilience.',
-  ],
-  'stress-balanced': [
-    'You manage pressure with a reasonably steady approach, without strong behavioural shifts.',
-    'Under moderate stress, you maintain your typical work patterns and communication style.',
-    'Your stress responses are relatively balanced, allowing consistent performance in most environments.',
-  ],
-  'academic-structured': [
-    'You perform best with planned schedules and defined milestones.',
-    'Structured revision timetables and detailed notes align with your natural approach.',
-    'Clear deadlines and systematic preparation maximise your academic output.',
-  ],
-  'academic-collaborative': [
-    'Interactive environments and discussion-based learning increase retention.',
-    'Group projects, study circles, and presentation-based learning suit your style.',
-    'You learn best when you can engage with peers and exchange perspectives.',
-  ],
-  'academic-self-paced': [
-    'You prefer steady, self-paced study with consistent daily routines.',
-    'Regular practice with familiar materials builds your confidence and mastery.',
-    'You excel when given time to absorb content at your own speed.',
-  ],
-  'academic-competitive': [
-    'You thrive in competitive academic settings with visible rankings and challenges.',
-    'Mock tests, timed exercises, and performance benchmarks fuel your motivation.',
-    'Goal-setting and progress tracking align naturally with your approach to learning.',
-  ],
-};
 
 export class SchoolReport extends BaseReport {
   private data: SchoolData;
@@ -675,7 +102,7 @@ export class SchoolReport extends BaseReport {
     logger.info('[School REPORT] Personalized Insights Generated.');
 
     // --- CI CORE: Strengths Bars ---
-    this.ci_generateCoreIdentityAndStrengths();
+    // this.ci_generateCoreIdentityAndStrengths();
 
     // 5. Nature Style Graph (Charts)
     this.generateNatureGraphSection();
@@ -690,35 +117,31 @@ export class SchoolReport extends BaseReport {
     // --- CI PROFESSIONAL READINESS: Agile, Readiness, Skills ---
 
     this.ci_generateAgileMaturity();
-    this.ci_generateWorkReadinessRadar();
+    // this.ci_generateWorkReadinessRadar();
     this.ci_generateSkillHeatmap();
 
     // --- CI ACADEMICS: Setup for existing goals ---
 
-    this.ci_generateAcademicStrategy();
+    // this.ci_generateAcademicStrategy();
 
     // 6. Leadership Strengths - Business Vision
 
     this.generateAcademicCareerGoals();
     logger.info('[School REPORT] Academic Career Goals Generated.');
 
-    // 7. Course Compatability Matrix
-    try {
-      await this.generateCourseCompatibility();
-      logger.info('[School REPORT] Course Compatability Generated.');
-    } catch (err) {
-      logger.warn(
-        '[School REPORT] Course Compatability skipped (DB unavailable).',
-      );
+    // ── Branch: level-specific sections ──────────────────────────────────────
+    if (this.data.school_level_id === 1) {
+      // SSLC (Class 10)
+      await this.generateSSLCSections();
+    } else {
+      // HSC (Class 11 / 12)
+      await this.generateHSCSections();
     }
+    // ─────────────────────────────────────────────────────────────────────────
 
-    // --- CI FUTURE: Alignment, Fit, Domains, Dev Zones ---
-    this.ci_generateCareerAlignmentIndex();
-    this.ci_generateCareerFit();
-    this.ci_generateCareerDomainTable();
-    this.ci_generateDevelopmentZones();
+    this.generateWordSketchSection();
 
-    // 8. Disclaimer & Closing
+    // Disclaimer & Closing
     this.generateDisclaimerSection();
     logger.info('[School REPORT] Disclaimer Generated.');
 
@@ -729,7 +152,468 @@ export class SchoolReport extends BaseReport {
     logger.info(`[School REPORT] PDF generated successfully at: ${outputPath}`);
   }
 
+  // ── SSLC-specific sections (school_level_id === 1) ────────────────────────
+  private async generateSSLCSections(): Promise<void> {
+    // 1. Career Alignment Index
+    this.ci_generateCareerAlignmentIndex();
+
+    // 2. Career Fit
+    this.ci_generateCareerFit();
+
+    // 3. Career Domain Table
+    this.ci_generateCareerDomainTable();
+
+    // 4. Career Flight Path
+    try {
+      this.generateCareerFlightPath();
+      logger.info('[School REPORT][SSLC] Career Flight Path Generated.');
+    } catch (err) {
+      logger.warn('[School REPORT][SSLC] Career Flight Path skipped.', err);
+    }
+
+    // 5. Development Zones
+    this.ci_generateDevelopmentZones();
+
+    // 6. Future Pathways & Stream Odyssey
+    try {
+      this.generateStreamSelectionIntro();
+      ['PCMB', 'PCB', 'PCM', 'PCBZ', 'Commerce', 'Humanities'].forEach((streamKey) => {
+        this.generateStreamSelectionContent(streamKey);
+        this.generateStreamOdysseyRoadmap(streamKey);
+      });
+      logger.info('[School REPORT][SSLC] Stream Selection & Odyssey Generated.');
+    } catch (err) {
+      logger.warn('[School REPORT][SSLC] Stream Odyssey skipped.', err);
+    }
+  }
+
+  // ── HSC-specific sections (school_level_id === 2) ─────────────────────────
+  private async generateHSCSections(): Promise<void> {
+    // 1. Career Alignment Index
+    this.ci_generateCareerAlignmentIndex();
+
+    // 2. Career Fit
+    this.ci_generateCareerFit();
+
+    // 3. Career Domain Table
+    this.ci_generateCareerDomainTable();
+
+    // 4. Course Compatibility Matrix
+    try {
+      await this.generateCourseCompatibility();
+      logger.info('[School REPORT][HSC] Course Compatibility Generated.');
+    } catch {
+      logger.warn('[School REPORT][HSC] Course Compatibility skipped (DB unavailable).');
+    }
+
+    // 5. Your Reach Institutions
+    try {
+      await this.generateReachInstitutions();
+      logger.info('[School REPORT][HSC] Reach Institutions Generated.');
+    } catch (err) {
+      logger.warn('[School REPORT][HSC] Reach Institutions skipped (DB unavailable).', err);
+    }
+
+    // 6. Career Flight Path
+    try {
+      this.generateCareerFlightPath();
+      logger.info('[School REPORT][HSC] Career Flight Path Generated.');
+    } catch (err) {
+      logger.warn('[School REPORT][HSC] Career Flight Path skipped.', err);
+    }
+
+    // 7. Career Odyssey Roadmap
+    try {
+      this.generateCareerOdysseyRoadmap();
+      logger.info('[School REPORT][HSC] Career Odyssey Roadmap Generated.');
+    } catch (err) {
+      logger.warn('[School REPORT][HSC] Career Odyssey Roadmap skipped.', err);
+    }
+
+    // 8. Development Zones (Moved to the end for HSC)
+    this.ci_generateDevelopmentZones();
+  }
+
   // --- Section Methods (Placeholders) ---
+
+  private generateStreamSelectionIntro(): void {
+    this.doc.addPage();
+    this._useStdMargins = true;
+
+    this.h1('Future Pathways: Stream Selection');
+
+    this.h2('Choosing Your Stream: The Blueprint to Your Future');
+    this.pHtml(
+      'Transitioning to higher secondary education marks a crucial crossroads in your academic journey. The stream you select now is a foundational step that will help shape your college education, your career trajectory, and your future lifestyle.',
+    );
+
+    this.h2('It is Not Just About Subjects—It is About Your Identity');
+    this.pHtml(
+      'When choosing a stream for the 11th and 12th grades, it is helpful to look beyond the immediate syllabus and ask yourself: What kind of impact do I want to make? <br/>• Do you want to build the technology of tomorrow?<br/>• Are you driven to heal people and advance medical science?<br/>• Do you enjoy the dynamics of business, finance, and leadership?<br/>• Or are you passionate about understanding human behavior, law, and creative expression?'
+    );
+    this.pHtml(
+      'Your natural interests and strengths are the best compass you have. When you align your studies with what you genuinely enjoy, building a highly successful career becomes a pursuit of purpose rather than just work.'
+    );
+
+    this.h2('Understanding Your Stream Options');
+    this.pHtml(
+      'To help you navigate this decision, the following section breaks down the complex landscape of college degrees into clear, easy-to-understand career pathways.'
+    );
+    this.pHtml(
+      'On the upcoming pages, you will find a dedicated breakdown for each major academic stream. Every page will show you the core focus of that stream and the broad professional fields it unlocks for your future. You do not need to select an exact college degree today; the goal of this section is to help you confidently choose the broad direction you want to walk in.'
+    );
+    this.pHtml(
+      'Keep an open mind and use the following breakdowns to explore what your future could look like based on the stream you select.'
+    );
+  }
+
+  private generateStreamSelectionContent(streamKey: string): void {
+    const streamData = STREAM_SELECTION_CONTENT[streamKey];
+    if (!streamData) {
+      logger.warn(`[School REPORT] No stream data found for key: ${streamKey}`);
+      return;
+    }
+
+    this.doc.addPage();
+    this._useStdMargins = true;
+    const margin = this.MARGIN_STD;
+
+    // --- Top Banner ---
+    // Title
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(22)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text(`${streamData.shortName}\n(${streamData.title})`, margin, margin, {
+        width: this.PAGE_WIDTH - 2 * margin - 80, // Leave space for icon
+      });
+
+    // Icon Rendering
+    const iconBaseY = margin;
+    const iconBaseX = this.PAGE_WIDTH - margin - 60;
+    const iconName = streamKey === 'Humanities' ? 'humanity.png' : `${streamKey.toLowerCase()}.png`;
+    const iconPath = `public/assets/images/school/${iconName}`;
+
+    if (fs.existsSync(iconPath)) {
+      this.doc.image(iconPath, iconBaseX, iconBaseY, { width: 60, height: 60 });
+      this.doc.moveDown(0.5);
+    } else {
+      // Fallback Placeholder
+      this.doc
+        .rect(iconBaseX, iconBaseY, 60, 60)
+        .lineWidth(1)
+        .strokeColor('#D3D3D3')
+        .stroke();
+      this.doc
+        .font(this.FONT_SORA_REGULAR)
+        .fontSize(8)
+        .fillColor('#A0A0A0')
+        .text('Icon Place-', iconBaseX, iconBaseY + 20, { width: 60, align: 'center' });
+      this.doc.text('holder', iconBaseX, iconBaseY + 30, { width: 60, align: 'center' });
+      this.doc.moveDown(2.5);
+    }
+
+
+    // // --- Vibe Box ---
+    // const vibeBoxY = this.doc.y;
+
+    // // We measure the text to adapt the box height
+    // this.doc.font(this.FONT_SORA_REGULAR).fontSize(10);
+    // const vibeTextHeight = this.doc.heightOfString(streamData.vibe, { width: this.PAGE_WIDTH - 2 * margin - 20 }) + 20;
+
+    // this.doc
+    //   .rect(margin, vibeBoxY, this.PAGE_WIDTH - 2 * margin, vibeTextHeight)
+    //   .fillColor('#F4F7FB')
+    //   .fill();
+
+    // this.doc
+    //   .fillColor(this.COLOR_BLACK)
+    //   .text(streamData.vibe, margin + 10, vibeBoxY + 10, {
+    //     width: this.PAGE_WIDTH - 2 * margin - 20,
+    //     align: 'left',
+    //   });
+    this.p(streamData.vibe);
+
+    // --- The 2x2 Card Grid ---
+    this.doc.moveDown(0.5);
+    const gridY = this.doc.y;
+    const cardWidth = (this.PAGE_WIDTH - 2 * margin - 15) / 2; // 15 gap between cols
+
+    // Pre-calculate needed heights for each card to normalize row heights
+    const cardHeights = streamData.fields.map(field => {
+      let h = 15; // top padding
+
+      this.doc.font(this.FONT_SORA_BOLD).fontSize(11);
+      h += this.doc.heightOfString(field.name, { width: cardWidth - 50 });
+      h += 5; // spacing below title
+
+      this.doc.font(this.FONT_SORA_REGULAR).fontSize(9);
+      h += this.doc.heightOfString(field.vibe, { width: cardWidth - 30 });
+      h += 10; // spacing below vibe
+
+      const degreesList = field.mappedDegrees.split(',').map(d => d.trim().replace(/\.$/, ''));
+      degreesList.forEach(degree => {
+        // Bullet point text height, minimum roughly the icon height (6)
+        h += Math.max(12, this.doc.heightOfString(degree, { width: cardWidth - 42 }));
+        h += 3; // spacing between bullets
+      });
+
+      h += 15; // bottom padding
+      return h;
+    });
+
+    const rowHeights = [
+      Math.max(cardHeights[0] || 0, cardHeights[1] || 0),
+      Math.max(cardHeights[2] || 0, cardHeights[3] || 0)
+    ];
+
+    streamData.fields.forEach((field, index) => {
+      const col = index % 2;
+      const row = Math.floor(index / 2);
+
+      const cardX = margin + col * (cardWidth + 15);
+      const cardY = gridY + (row === 0 ? 0 : rowHeights[0] + 15);
+      const cardHeight = rowHeights[row];
+
+      // Card Background with simulated shadow border
+      this.doc
+        .roundedRect(cardX, cardY, cardWidth, cardHeight, 8)
+        .lineWidth(0.5)
+        .strokeColor('#E0E0E0')
+        .fillColor('#FFFFFF')
+        .fillAndStroke();
+
+      this.doc
+        .roundedRect(cardX + 1, cardY + 1, cardWidth, cardHeight, 8)
+        .lineWidth(0.5)
+        .strokeColor('#D0D0D0') // slightly darker for pseudo-shadow
+        .stroke();
+
+      // Card Inner Content Padding
+      const innerX = cardX + 15;
+      let currentCardY = cardY + 15;
+
+      // Small Icon (Top Left)
+      const fieldIconPath = field.icon ? `public/assets/images/school/${field.icon}` : null;
+      if (fieldIconPath && fs.existsSync(fieldIconPath)) {
+        this.doc.image(fieldIconPath, innerX, currentCardY, { width: 14, height: 14 });
+      } else {
+        // Fallback Icon Placeholder
+        this.doc
+          .circle(innerX + 7, currentCardY + 7, 7)
+          .lineWidth(1)
+          .strokeColor('#A0A0A0')
+          .stroke();
+      }
+
+      // Field Name (Bold)
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(11)
+        .fillColor(this.COLOR_DEEP_BLUE)
+        .text(field.name, innerX + 22, currentCardY, {
+          width: cardWidth - 40,
+        });
+
+      currentCardY = this.doc.y + 5;
+
+      // Field Vibe (Regular/Italic)
+      this.doc
+        .font(this.FONT_SORA_REGULAR)
+        .fontSize(9)
+        .fillColor('#4A4A4A')
+        .text(field.vibe, innerX, currentCardY, {
+          width: cardWidth - 30,
+        });
+
+      currentCardY = this.doc.y + 10;
+
+      // Bulleted list of mapped degrees
+      const degreesList = field.mappedDegrees.split(',').map(d => d.trim().replace(/\.$/, '')); // clean up list
+
+      this.doc.font(this.FONT_SORA_REGULAR).fontSize(9).fillColor(this.COLOR_BLACK);
+
+      degreesList.forEach((degree) => {
+        // Draw Checkmark
+        this.doc
+          .circle(innerX + 4, currentCardY + 4, 4)
+          .fillColor(this.COLOR_BRIGHT_GREEN)
+          .fill();
+        this.doc
+          .moveTo(innerX + 2.5, currentCardY + 4)
+          .lineTo(innerX + 4, currentCardY + 5.5)
+          .lineTo(innerX + 6, currentCardY + 2.5)
+          .lineWidth(1)
+          .strokeColor('#FFFFFF')
+          .stroke();
+
+        this.doc
+          .fillColor(this.COLOR_BLACK)
+          .text(degree, innerX + 12, currentCardY, {
+            width: cardWidth - 42,
+          });
+
+        currentCardY = this.doc.y + 3;
+      });
+    });
+
+    // Bottom tracker spacing handling
+    this.doc.y = gridY + rowHeights[0] + 15 + rowHeights[1] + 15 + 10;
+  }
+
+  private generateStreamOdysseyRoadmap(streamKey: string): void {
+    const streamOdyssey = STREAM_ODYSSEY_ROADMAP[streamKey];
+    if (!streamOdyssey) {
+      logger.warn(`[School REPORT] No stream odyssey data found for: ${streamKey}`);
+      return;
+    }
+
+    // this.doc.addPage();
+    // this._useStdMargins = true;
+
+    // --- Graph Properties ---
+    const startX = this.MARGIN_STD + 60; // Increased to prevent first node's text from slipping past margin
+    const endX = this.PAGE_WIDTH - this.MARGIN_STD - 80; // Increased to prevent last node's text from slipping past
+
+    let amplitude = 30; // wave height
+    let graphTopPadding = 45;  // Space for labels above
+    let graphBottomPadding = 85; // Space for labels below
+    let textOffset = 40;
+    const headerNeededSpace = 40;
+
+    const availableHeight = this.PAGE_HEIGHT - this.MARGIN_STD - this.doc.y;
+    const fortyPercentSpace = 0.4 * this.PAGE_HEIGHT;
+
+    // User requested rule: if at least 40% space is available, render as usual.
+    // If not, reduce the scaling by 10%.
+    if (availableHeight >= fortyPercentSpace) {
+      // Render as usual
+    } else {
+      // Reduce scaling by 10%
+      amplitude *= 0.9;
+      graphTopPadding *= 0.9;
+      graphBottomPadding *= 0.9;
+      textOffset *= 0.9;
+    }
+
+    // Since the path uses Math.cos over >1 periods, the exact bounds are always ±amplitude.
+    const maxGraphY = amplitude;
+    const minGraphY = -amplitude;
+
+    const totalGraphHeight = (maxGraphY - minGraphY) + graphTopPadding + graphBottomPadding;
+    const totalNeededSpace = headerNeededSpace + totalGraphHeight;
+
+    // Ensure we have enough space for the WHOLE section, or move to next page to prevent
+    // mid-drawing auto-pagination which breaks elements onto the next page.
+    if (this.doc.y + totalNeededSpace > this.PAGE_HEIGHT - this.MARGIN_STD) {
+      this.doc.addPage();
+      // Reset scaling to normal for the new page
+      amplitude = 30;
+      graphTopPadding = 75;
+      graphBottomPadding = 85;
+      textOffset = 40;
+    }
+
+    // NOW draw the header
+    this.pHtml(`${streamOdyssey.tagline}`);
+
+    // The vertical center of the wave
+    const startY = this.doc.y + graphTopPadding - minGraphY;
+
+    // Draw the continuous winding wave path
+    this.doc.save();
+    this.doc
+      .lineWidth(4)
+      .strokeColor('#E8EAF6') // Light periwinkle/grey for path
+      .lineJoin('round')
+      .lineCap('round');
+
+    this.doc.moveTo(startX, startY);
+
+    // Draw smooth curve using bezier logic or small line segments
+    const segments = 100;
+    for (let j = 0; j <= segments; j++) {
+      const p = j / segments;
+      const x = startX + p * (endX - startX);
+      const ang = p * Math.PI * 2.5;
+      // Start from bottom means we want the first yOffset to be positive (down)
+      // Math.cos(ang) starts at 1. If we multiply by amplitude, the wave starts at bottom.
+      const y = startY + Math.cos(ang) * amplitude;
+
+      if (j === 0) {
+        this.doc.moveTo(x, y);
+      } else {
+        this.doc.lineTo(x, y);
+      }
+    }
+    this.doc.stroke();
+    this.doc.restore();
+
+    // Draw Nodes and Text
+    streamOdyssey.nodes.forEach((node, i) => {
+      const progress = i / (streamOdyssey.nodes.length - 1);
+      const nodeX = startX + progress * (endX - startX);
+      const angle = progress * Math.PI * 2.5;
+      const nodeYOffset = Math.cos(angle) * amplitude;
+      const nodeY = startY + nodeYOffset;
+
+      // Draw dashed connector from node to text
+      const isAbove = nodeYOffset > 0; // if > 0, wave is below center, text might be ABOVE
+      // Actually let's strictly alternate text placement for clarity
+      const textAbove = i % 2 !== 0;
+      const textY = textAbove ? nodeY - textOffset : nodeY + textOffset;
+
+      this.doc
+        .save()
+        .lineWidth(1)
+        .strokeColor('#A0AABF')
+        .dash(3, { space: 3 })
+        .moveTo(nodeX, nodeY + (textAbove ? -8 : 8))
+        .lineTo(nodeX, textY + (textAbove ? 8 : -8))
+        .stroke()
+        .restore();
+
+      // Draw the circular node point
+      this.doc
+        .circle(nodeX, nodeY, 8)
+        .fill(CI_COLORS.GREEN)
+        .lineWidth(3)
+        .strokeColor('#FFFFFF')
+        .stroke();
+
+      // Render Text Label (Year/Phase)
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(9)
+        .fillColor(CI_COLORS.INDIGO)
+        .text(node.label, nodeX - 45, textAbove ? textY - 28 : textY - 6, {
+          width: 90,
+          align: 'center',
+        });
+
+      // Render Title
+      this.doc
+        .font(this.FONT_SORA_SEMIBOLD)
+        .fontSize(8)
+        .fillColor('#333333')
+        .text(node.title, nodeX - 55, textAbove ? textY - 16 : textY + 6, {
+          width: 110,
+          align: 'center',
+        });
+
+      // Render Subtitle
+      this.doc
+        .font(this.FONT_SORA_REGULAR)
+        .fontSize(7)
+        .fillColor('#666666')
+        .text(node.subtitle, nodeX - 55, textAbove ? textY - 4 : textY + 16, {
+          width: 110,
+          align: 'center',
+        });
+    });
+
+    this.doc.y = startY + maxGraphY + graphBottomPadding + 20;
+  }
 
   private generateCoverPage(): void {
     const bgPath = 'public/assets/images/Cover_Background.jpg';
@@ -834,7 +718,7 @@ export class SchoolReport extends BaseReport {
     const bottomLimit = this.PAGE_HEIGHT - 30 * this.MM;
 
     // 1. Print Header on the first page
-    this.h1('Table of Contents', { x: headerX, y: headerX, fontSize: 38 });
+    this.h1('Table of Contents', { x: headerX, y: headerX });
 
     // Set the starting Y position for the first item
     let currentY = 45 * this.MM;
@@ -856,7 +740,6 @@ export class SchoolReport extends BaseReport {
         this.h1('Table of Contents', {
           x: headerX,
           y: headerX,
-          fontSize: 38,
         });
 
         // 4. Reset Y position for the content (same as the first page start)
@@ -984,7 +867,7 @@ export class SchoolReport extends BaseReport {
 
     this.ci_generateCorePersonality();
 
-    // 2. Understanding Yourself - Who I Am
+    // 2. Understanding Yourself - Who I Am 
     this.h2('Understanding Yourself - Who I Am');
     this.pHtml(content.understanding_yourself_1);
     this.pHtml(content.understanding_yourself_2);
@@ -994,10 +877,7 @@ export class SchoolReport extends BaseReport {
     this.pHtml(content.strengths_intro);
     this.h2('Your Natural Strengths');
     this.list(content.strengths_list, { indent: 30 });
-    this.h2('Nature Style Graph', {
-      align: 'center',
-      color: this.COLOR_DEEP_BLUE,
-    });
+    this.h2('Nature Style Graph', { align: 'center' });
     const topTrait = this.getTopTwoTraits(
       this.data.most_answered_answer_type,
       this.data,
@@ -1114,10 +994,10 @@ export class SchoolReport extends BaseReport {
   private generateACI(): void {
     const contentBlock =
       ACI[
-        this.getTopTwoTraits(
-          this.data.most_answered_answer_type,
-          this.data,
-        ).join('')
+      this.getTopTwoTraits(
+        this.data.most_answered_answer_type,
+        this.data,
+      ).join('')
       ];
     const agileSum =
       this.data.agile_scores[0].commitment +
@@ -1133,7 +1013,7 @@ export class SchoolReport extends BaseReport {
 
     this.h2('Personalized Insight');
     this.pHtml(contentBlock.personalized_insight);
-
+    this.ensureSpace(0.25, true);
     this.h2('Agile Value-Wise Breakdown Table');
 
     const awbtHeaders = [
@@ -1394,7 +1274,7 @@ export class SchoolReport extends BaseReport {
       type: 'number',
     });
 
-    this.h2('Trait Mapping', { ensureSpace: 0.2 });
+    this.h2('Trait Mapping');
 
     const headers = [
       'Trait Combination',
@@ -1427,6 +1307,7 @@ export class SchoolReport extends BaseReport {
    * - Includes the "Nature Style - Word Sketch".
    */
   private async generateCourseCompatibility(): Promise<void> {
+    this.ensureSpace(0.5, true);
     this.h1('Course Compatibility Matrix');
     const topTwoTraits = this.getTopTwoTraits(
       this.data.most_answered_answer_type,
@@ -1444,7 +1325,9 @@ export class SchoolReport extends BaseReport {
       topTwoTraits[1],
     );
     this.doc.moveDown();
+  }
 
+  private generateWordSketchSection(): void {
     this.h2('Nature Style - Word Sketch');
     this.pHtml(SCHOOL_CONTENT.natural_style_work_sketch_desc);
     this.pHtml(SCHOOL_CONTENT.natural_style_work_sketch_desc_1);
@@ -2642,7 +2525,7 @@ export class SchoolReport extends BaseReport {
     }
 
     this.p(interpretation, { gap: 6 });
-    this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
+    // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
 
   // ── S2: Behavioral Capability Radar ───────────────────────────
@@ -2653,7 +2536,7 @@ export class SchoolReport extends BaseReport {
     this.h1('Behavioral Capability Profile');
 
     this.p(
-      'An overview of core behavioral capabilities derived from assessment responses. Higher values indicate stronger natural orientation in that capability area.',
+      'An overview of core behavioral capabilities derived from your assessment responses. Higher values indicate stronger natural orientation in that capability area.',
     );
     this.doc.moveDown(2);
 
@@ -2686,7 +2569,7 @@ export class SchoolReport extends BaseReport {
     });
 
     this.doc.y += 10;
-    this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
+    // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
 
   // ── S3: Core Identity + Strength Intensity Bars ───────────────
@@ -2726,7 +2609,7 @@ export class SchoolReport extends BaseReport {
       .slice(0, 2)
       .forEach((s) => strengths.push({ ...s, value: top2.val }));
 
-    // Draw horizontal bars — color based on the underlying trait score
+    // Draw horizontal bars - color based on the underlying trait score
     const barData = strengths.map((s) => ({
       label: s.label,
       value: s.value,
@@ -2735,7 +2618,7 @@ export class SchoolReport extends BaseReport {
 
     this.drawHorizontalBars(barData);
     this.doc.y += 6;
-    this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
+    // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
 
   // ── S4: Development Acceleration Zones ────────────────────────
@@ -2769,7 +2652,7 @@ export class SchoolReport extends BaseReport {
 
     this.doc.moveDown(2);
 
-    this.p('These are growth opportunities — not limitations.', {
+    this.p('These are growth opportunities - not limitations.', {
       font: this.FONT_ITALIC,
       fontSize: 9,
       color: CI_COLORS.MEDIUM_TEXT,
@@ -2777,7 +2660,7 @@ export class SchoolReport extends BaseReport {
       align: 'center',
     });
 
-    this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
+    // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
 
   // ── S5: Work Readiness Radar + Indicators ─────────────────────
@@ -2877,7 +2760,7 @@ export class SchoolReport extends BaseReport {
     }
 
     this.p(readinessDesc, { gap: 6 });
-    this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
+    // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
 
   // ── S6: Career Domain Compatibility Table ─────────────────────
@@ -3015,7 +2898,7 @@ export class SchoolReport extends BaseReport {
       this.p(this.ci_tv('disc-balanced'), { gap: 6 });
     }
 
-    this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
+    // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
 
   // ── S2: Agile Maturity Visualization ──────────────────────────
@@ -3090,7 +2973,7 @@ export class SchoolReport extends BaseReport {
     if (p.leadership > 75) {
       this.p(
         '★ ' +
-          (TEXT_VARIATIONS['skill-leadership-high']?.[p.textVariant] ?? ''),
+        (TEXT_VARIATIONS['skill-leadership-high']?.[p.textVariant] ?? ''),
         {
           color: CI_COLORS.STRONG_GREEN,
           gap: 3,
@@ -3100,7 +2983,7 @@ export class SchoolReport extends BaseReport {
     if (p.collaboration < 50) {
       this.p(
         '△ ' +
-          (TEXT_VARIATIONS['skill-collaboration-low']?.[p.textVariant] ?? ''),
+        (TEXT_VARIATIONS['skill-collaboration-low']?.[p.textVariant] ?? ''),
         {
           color: CI_COLORS.MODERATE_AMBER,
           gap: 3,
@@ -3109,7 +2992,7 @@ export class SchoolReport extends BaseReport {
     }
 
     this.doc.y += 4;
-    this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
+    // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
 
   // ── S4: Career Fit Variations ─────────────────────────────────
@@ -3133,66 +3016,95 @@ export class SchoolReport extends BaseReport {
     const C = this.data.score_C;
 
     const fits = [
-      {
-        label: 'Engineering & Technology',
-        score: Math.round((C + nFocus) / 2),
-        condition: C > 65 && nFocus > 65,
-      },
-      {
-        label: 'Management & Leadership',
-        score: Math.round((D + nCourage) / 2),
-        condition: D > 65 && nCourage > 65,
-      },
-      {
-        label: 'Creative & Design',
-        score: Math.round((I + nOpenness) / 2),
-        condition: I > 65 && nOpenness > 65,
-      },
-      {
-        label: 'People & HR',
-        score: Math.round((S + nRespect) / 2),
-        condition: S > 65 && nRespect > 65,
-      },
+      { label: 'Engineering & Technology', score: Math.round((C + nFocus) / 2), condition: C > 65 && nFocus > 65, color: CI_COLORS.BAR_BLUE },
+      { label: 'Management & Leadership', score: Math.round((D + nCourage) / 2), condition: D > 65 && nCourage > 65, color: CI_COLORS.BAR_TEAL },
+      { label: 'Creative & Design', score: Math.round((I + nOpenness) / 2), condition: I > 65 && nOpenness > 65, color: CI_COLORS.BAR_PURPLE },
+      { label: 'People & HR', score: Math.round((S + nRespect) / 2), condition: S > 65 && nRespect > 65, color: CI_COLORS.ACCENT_GREEN },
     ];
 
-    const fitColors = [
-      CI_COLORS.BAR_BLUE,
-      CI_COLORS.BAR_TEAL,
-      CI_COLORS.BAR_PURPLE,
-      CI_COLORS.ACCENT_GREEN,
-    ];
+    // ── Sort high → low ──────────────────────────────────────────
+    fits.sort((a, b) => b.score - a.score);
 
-    const barData = fits.map((f, i) => ({
-      label: f.label,
-      value: f.score,
-      color: fitColors[i],
-    }));
+    // ── Layout constants ─────────────────────────────────────────
+    const labelFontSize = 9;
+    const barHeight = 14;
+    const barRadius = barHeight / 2;
+    const rowGap = 8;
+    const pctColW = 34;  // fixed width for the "XX%" label on the right
+    const x = this.MARGIN_STD;
+    const totalW = this.PAGE_WIDTH - 2 * this.MARGIN_STD;
 
-    this.drawHorizontalBars(barData);
+    // Measure the widest label once so all bars share the same start edge.
+    this.doc.font(this.FONT_REGULAR).fontSize(labelFontSize);
+    const labelColW = Math.max(
+      ...fits.map((f) => this.doc.widthOfString(f.label)),
+    ) + 10;  // +10pt breathing room between label and bar
 
-    // Add fit labels
+    const barX = x + labelColW;
+    const barW = totalW - labelColW - pctColW - 4;
+
+    this.ensureSpace(fits.length * (barHeight + rowGap) + 8);
+
+    fits.forEach((f) => {
+      const y = this.doc.y;
+      const fillW = Math.max(0, barW * Math.min(1, f.score / 100));
+
+      // Label - right-flush to the bar's left edge, single line
+      this.doc
+        .font(this.FONT_REGULAR)
+        .fontSize(labelFontSize)
+        .fillColor(CI_COLORS.DARK_TEXT)
+        .text(f.label, x, y + 2, {
+          width: labelColW - 10,
+          align: 'right',
+          lineBreak: false,
+        });
+
+      // Track (background capsule)
+      this.doc
+        .roundedRect(barX, y, barW, barHeight, barRadius)
+        .fill(CI_COLORS.GAUGE_BG);
+
+      // Filled portion - clipped so left edge stays rounded
+      if (fillW > 0) {
+        this.doc.save();
+        this.doc.roundedRect(barX, y, barW, barHeight, barRadius).clip();
+        this.doc.roundedRect(barX, y, fillW, barHeight, barRadius).fill(f.color);
+        this.doc.restore();
+      }
+
+      // Percentage label right of bar
+      this.doc
+        .font(this.FONT_SEMIBOLD)
+        .fontSize(8)
+        .fillColor(CI_COLORS.DARK_TEXT)
+        .text(`${Math.round(f.score)}%`, barX + barW + 4, y + 3, {
+          width: pctColW,
+          align: 'left',
+          lineBreak: false,
+        });
+
+      this.doc.y = y + barHeight + rowGap;
+    });
+
+    // Strong-fit callouts
     fits.forEach((f) => {
       if (f.condition) {
-        this.p(`✓ ${f.label}: Strong Fit`, {
-          color: CI_COLORS.STRONG_GREEN,
-          gap: 2,
-        });
+        this.p(`✓ ${f.label}: Strong Fit`, { color: CI_COLORS.STRONG_GREEN, gap: 2 });
       }
     });
 
     this.doc.y += 4;
-    this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
+    // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
+
 
   // ── S5: Stress Behavior Model ─────────────────────────────────
 
   private ci_generateStressBehavior(): void {
     this.ensureSpace(0.14, true);
 
-    this.h2('STRESS RESPONSE MODEL', {
-      color: CI_COLORS.SECTION_BLUE,
-      topGap: 6,
-    });
+    this.h2('STRESS RESPONSE MODEL', { topGap: 6 });
 
     const p = this.ci_patterns;
     const stressLabels: Record<
@@ -3232,7 +3144,7 @@ export class SchoolReport extends BaseReport {
     const stressInfo = stressLabels[p.stressType] || stressLabels['balanced'];
     this.drawStressProgression(stressInfo.stages, stressInfo.color);
     this.p(this.ci_tv(`stress-${p.stressType}`), { gap: 6 });
-    this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
+    // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
 
   // ── S6: Academic Strategy ─────────────────────────────────────
@@ -3246,40 +3158,40 @@ export class SchoolReport extends BaseReport {
     });
 
     const styleTitles: Record<string, { title: string; techniques: string[] }> =
-      {
-        structured: {
-          title: 'Structured Learning Approach',
-          techniques: [
-            'Detailed revision timetables with milestone tracking',
-            'Systematic note-taking and concept mapping',
-            'Regular self-assessment against defined benchmarks',
-          ],
-        },
-        collaborative: {
-          title: 'Collaborative Learning Approach',
-          techniques: [
-            'Group discussions and peer-teaching sessions',
-            'Presentation-based learning and debate',
-            'Interactive workshops and case study analysis',
-          ],
-        },
-        'self-paced': {
-          title: 'Self-Paced Learning Approach',
-          techniques: [
-            'Consistent daily study routines with fixed duration',
-            'Repetitive practice with familiar question formats',
-            'Incremental complexity progression over time',
-          ],
-        },
-        competitive: {
-          title: 'Competitive Learning Approach',
-          techniques: [
-            'Mock tests and timed exam simulations',
-            'Leaderboard-based study challenges',
-            'Goal-setting with visible progress metrics',
-          ],
-        },
-      };
+    {
+      structured: {
+        title: 'Structured Learning Approach',
+        techniques: [
+          'Detailed revision timetables with milestone tracking',
+          'Systematic note-taking and concept mapping',
+          'Regular self-assessment against defined benchmarks',
+        ],
+      },
+      collaborative: {
+        title: 'Collaborative Learning Approach',
+        techniques: [
+          'Group discussions and peer-teaching sessions',
+          'Presentation-based learning and debate',
+          'Interactive workshops and case study analysis',
+        ],
+      },
+      'self-paced': {
+        title: 'Self-Paced Learning Approach',
+        techniques: [
+          'Consistent daily study routines with fixed duration',
+          'Repetitive practice with familiar question formats',
+          'Incremental complexity progression over time',
+        ],
+      },
+      competitive: {
+        title: 'Competitive Learning Approach',
+        techniques: [
+          'Mock tests and timed exam simulations',
+          'Leaderboard-based study challenges',
+          'Goal-setting with visible progress metrics',
+        ],
+      },
+    };
 
     const style =
       styleTitles[this.ci_patterns.academicStyle] || styleTitles['structured'];
@@ -3308,7 +3220,7 @@ export class SchoolReport extends BaseReport {
     });
 
     this.doc.y += 4;
-    this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
+    // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
 
   // ── S7: 360 Impact Rings ──────────────────────────────────────
@@ -3316,14 +3228,11 @@ export class SchoolReport extends BaseReport {
   private ci_generate360Impact(): void {
     this.ensureSpace(0.3, true);
 
-    this.h2('360° IMPACT ASSESSMENT', {
-      color: CI_COLORS.SECTION_BLUE,
-      topGap: 6,
-    });
+    this.h2('360° Impact Assessment');
 
     this.p(
       'A holistic view of impact across personality, behavioural agility, and leadership dimensions.',
-      { color: CI_COLORS.MEDIUM_TEXT, gap: 6 },
+      { gap: 6 },
     );
 
     const D = this.data.score_D;
@@ -3340,7 +3249,7 @@ export class SchoolReport extends BaseReport {
         norm(agile?.focus ?? 0) +
         norm(agile?.openness ?? 0) +
         norm(agile?.respect ?? 0)) /
-        5,
+      5,
     );
     const leadershipScore = this.ci_patterns.leadership;
 
@@ -3383,7 +3292,7 @@ export class SchoolReport extends BaseReport {
       );
     }
 
-    this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
+    // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
 
   // ════════════════════════════════════════════════════════════════
@@ -3489,7 +3398,7 @@ export class SchoolReport extends BaseReport {
       const fillRatio = Math.min(1, Math.max(0, item.value / 100));
       const fillW = Math.max(0, barWidth * fillRatio);
 
-      // Label — right-aligned so it ends flush with the bar start
+      // Label - right-aligned so it ends flush with the bar start
       this.doc
         .font(this.FONT_REGULAR)
         .fontSize(9)
@@ -3500,12 +3409,12 @@ export class SchoolReport extends BaseReport {
           lineBreak: false,
         });
 
-      // Background track — fully rounded
+      // Background track - fully rounded
       this.doc
         .roundedRect(barX, y, barWidth, barHeight, radius)
         .fill(CI_COLORS.GAUGE_BG);
 
-      // Filled portion — clip to the track shape so corners stay round
+      // Filled portion - clip to the track shape so corners stay round
       if (fillW > 0) {
         this.doc.save();
         // clip path = the full bar track shape
@@ -3589,12 +3498,12 @@ export class SchoolReport extends BaseReport {
     const filledWidth = barWidth * fillRatio;
     const remainingWidth = barWidth - filledWidth;
 
-    // Full background (growth runway) — light teal
+    // Full background (growth runway) - light teal
     this.doc
       .roundedRect(barX, barY, barWidth, barHeight, 4)
       .fill(CI_COLORS.TEAL_LIGHT);
 
-    // Current level (gradient teal fill) — clipped to track so corners round
+    // Current level (gradient teal fill) - clipped to track so corners round
     if (filledWidth > 0) {
       const grad = this.doc.linearGradient(
         barX,
@@ -3668,8 +3577,8 @@ export class SchoolReport extends BaseReport {
    */
   /**
    * Renders a two-column panel split:
-   *  LEFT  — "Agile Strengths"        (indigo panel, scores ≥ threshold)
-   *  RIGHT — "Growth Opportunities"   (green panel,  scores < threshold)
+   *  LEFT  - "Agile Strengths"        (indigo panel, scores ≥ threshold)
+   *  RIGHT - "Growth Opportunities"   (green panel,  scores < threshold)
    * Each row: dimension label (left) + pill score badge (right).
    */
   private drawAgileSplitPanel(
@@ -3774,7 +3683,7 @@ export class SchoolReport extends BaseReport {
       });
     };
 
-    // Left — Strengths (indigo)
+    // Left - Strengths (indigo)
     drawPanel(
       x,
       '✦  Agile Strengths',
@@ -3784,7 +3693,7 @@ export class SchoolReport extends BaseReport {
       'All areas have growth potential',
     );
 
-    // Right — Growth (green)
+    // Right - Growth (green)
     drawPanel(
       x + panelW + gap,
       '↑  Growth Opportunities',
@@ -4129,7 +4038,7 @@ export class SchoolReport extends BaseReport {
 
       const innerY = cy + (cellH - 14) / 2; // vertically center the text row
 
-      // Label — left side
+      // Label - left side
       this.doc
         .font(this.FONT_SORA_SEMIBOLD)
         .fontSize(10)
@@ -4139,7 +4048,7 @@ export class SchoolReport extends BaseReport {
           lineBreak: false,
         });
 
-      // Score — right side
+      // Score - right side
       this.doc
         .font(this.FONT_SORA_BOLD)
         .fontSize(13)
@@ -4228,85 +4137,640 @@ export class SchoolReport extends BaseReport {
   }
 
   /**
-   * S7 helper: draws concentric impact rings (donut arcs).
+   * Draws concentric impact rings (donut arcs) with:
+   *  - Rounded end caps (circles at start + end of each filled arc)
+   *  - Percentage label drawn inside the arc at its tip
+   *  - Legend as a single horizontal row centered below the rings
    */
   private drawImpactRings(
     rings: { label: string; value: number; color: string }[],
   ): void {
-    const totalH = 180;
+    const ringDiameter = 160;
+    const legendH = 24;
+    const totalH = ringDiameter + legendH + 16;
     this.ensureSpace(totalH + 10);
 
     const x = this.MARGIN_STD;
     const totalWidth = this.PAGE_WIDTH - 2 * this.MARGIN_STD;
     const centerX = x + totalWidth / 2;
     const y = this.doc.y;
-    const centerY = y + totalH / 2;
-    const maxRadius = 70;
-    const ringThickness = 14;
-    const gap = 4;
+    const centerY = y + ringDiameter / 2;
+    const maxRadius = 68;
+    const ringThickness = 13;
+    const gap = 5;
+    // Half-thickness used as the cap-circle radius
+    const capR = ringThickness / 2;
 
     rings.forEach((ring, i) => {
       const radius = maxRadius - i * (ringThickness + gap);
-      const arcAngle = (ring.value / 100) * 360;
-      const startAngle = -90; // Top
+      const pct = Math.min(100, Math.max(0, ring.value));
+      const arcAngle = (pct / 100) * 360;
+      const startAngle = -90; // 12 o'clock
       const endAngle = startAngle + arcAngle;
+      const startRad = (startAngle * Math.PI) / 180;
+      const endRad = (endAngle * Math.PI) / 180;
 
-      // Background ring (full circle, light)
+      // ── Background track (full circle) ───────────────────────────
       this.doc
         .circle(centerX, centerY, radius)
         .lineWidth(ringThickness)
         .strokeColor('#EEEEEE')
         .stroke();
 
-      // Filled arc
-      if (arcAngle > 0) {
-        const startRad = (startAngle * Math.PI) / 180;
-        const endRad = (endAngle * Math.PI) / 180;
+      if (pct <= 0) return;
 
-        // Draw arc as a series of small line segments
-        this.doc.save();
-        this.doc.lineWidth(ringThickness).strokeColor(ring.color);
+      // ── Filled arc (polyline approximation) ──────────────────────
+      this.doc.save();
+      this.doc.lineWidth(ringThickness).strokeColor(ring.color);
+      const segments = Math.max(12, Math.round(arcAngle / 3));
+      const angleStep = (endRad - startRad) / segments;
 
-        const segments = Math.max(8, Math.round(arcAngle / 5));
-        const angleStep = (endRad - startRad) / segments;
-
-        this.doc.moveTo(
-          centerX + radius * Math.cos(startRad),
-          centerY + radius * Math.sin(startRad),
+      this.doc.moveTo(
+        centerX + radius * Math.cos(startRad),
+        centerY + radius * Math.sin(startRad),
+      );
+      for (let s = 1; s <= segments; s++) {
+        const a = startRad + s * angleStep;
+        this.doc.lineTo(
+          centerX + radius * Math.cos(a),
+          centerY + radius * Math.sin(a),
         );
-
-        for (let s = 1; s <= segments; s++) {
-          const angle = startRad + s * angleStep;
-          const px = centerX + radius * Math.cos(angle);
-          const py = centerY + radius * Math.sin(angle);
-          if (s === 1) {
-            this.doc.moveTo(
-              centerX + radius * Math.cos(startRad),
-              centerY + radius * Math.sin(startRad),
-            );
-          }
-          this.doc.lineTo(px, py);
-        }
-        this.doc.stroke();
-        this.doc.restore();
       }
+      this.doc.stroke();
+      this.doc.restore();
 
-      // Label to the right of the rings
-      const labelX = centerX + maxRadius + 18;
-      const labelY = centerY - maxRadius + i * 26 + 10;
+      // ── Rounded cap: start (12 o'clock) ──────────────────────────
+      const startCapX = centerX + radius * Math.cos(startRad);
+      const startCapY = centerY + radius * Math.sin(startRad);
+      this.doc.circle(startCapX, startCapY, capR).fill(ring.color);
 
-      // Color dot
-      this.doc.circle(labelX, labelY + 4, 4).fill(ring.color);
+      // ── Rounded cap: end (tip of arc) ────────────────────────────
+      const endCapX = centerX + radius * Math.cos(endRad);
+      const endCapY = centerY + radius * Math.sin(endRad);
+      this.doc.circle(endCapX, endCapY, capR).fill(ring.color);
 
-      this.doc
-        .font(this.FONT_SORA_SEMIBOLD)
-        .fontSize(9)
-        .fillColor(CI_COLORS.DARK_TEXT)
-        .text(`${ring.label}: ${ring.value}%`, labelX + 10, labelY, {
-          width: 120,
-        });
+      // ── Curved text at the arc END, quadrant-aware ───────────────
+      // • Lower half (sin(endRad) ≥ 0): chars go clockwise, last char near end cap.
+      // • Upper half (sin(endRad) < 0): chars reversed + counter-clockwise from end,
+      //   rotation flipped by π so text is never upside-down.
+      const labelText = `${Math.round(pct)}%`;
+      const labelFontSize = 6.5;
+      this.doc.font(this.FONT_SORA_BOLD).fontSize(labelFontSize);
+
+      const charWidths = labelText.split('').map((ch) =>
+        this.doc.widthOfString(ch),
+      );
+      const totalLabelArc = charWidths.reduce((a, b) => a + b, 0);
+
+      // Flip text in Q3 + Q4 (lower half of circle, sin > 0).
+      // Q1/Q2 (upper half, sin ≤ 0) → standard clockwise rotation, readable.
+      // Q3/Q4 (lower half, sin > 0) → flip: CCW + −π/2 rotation so text stays right-side-up.
+      const isFlipped = Math.sin(endRad) > 0;
+
+      // Chars always in normal order - CCW placement in the flipped zone naturally
+      // reads left-to-right without reversing (% stays at arc tip).
+      const drawChars = labelText.split('');
+      const drawWidths = charWidths;
+
+      // Anchor text right at the arc tip (endRad).
+      //   Normal  (CW)  → start = endRad - totalSpan, so last char "%" lands at endRad
+      //   Flipped (CCW) → start = endRad, so first char "5" is at the tip,
+      //                    "%" ends up displaced CCW (leftward in page coords) = reads "55%"
+      const arcLabelSpanRad = totalLabelArc / radius;
+      let charAnglePos = isFlipped
+        ? endRad                             // CCW from the arc tip
+        : endRad - arcLabelSpanRad;          // CW run ending at the arc tip
+      const angleDir = isFlipped ? -1 : 1;
+
+      drawChars.forEach((ch, ci) => {
+        const cw = drawWidths[ci];
+        // Centre angle for this character
+        const charMidAngle = charAnglePos + angleDir * (cw / (2 * radius));
+        const px = centerX + radius * Math.cos(charMidAngle);
+        const py = centerY + radius * Math.sin(charMidAngle);
+
+        // Tangent rotation:
+        //   Normal  → clockwise  (+π/2)
+        //   Flipped → counter-clockwise (−π/2) so text doesn't appear upside-down
+        const rot = isFlipped
+          ? charMidAngle - Math.PI / 2
+          : charMidAngle + Math.PI / 2;
+
+        this.doc.save();
+        (this.doc as any).transform(
+          Math.cos(rot), Math.sin(rot),
+          -Math.sin(rot), Math.cos(rot),
+          px, py,
+        );
+        this.doc
+          .font(this.FONT_SORA_BOLD)
+          .fontSize(labelFontSize)
+          .fillColor('#FFFFFF')
+          .text(ch, -cw / 2, -labelFontSize / 2, { lineBreak: false });
+        this.doc.restore();
+
+        charAnglePos += angleDir * (cw / radius);
+      });
     });
 
-    this.doc.y = y + totalH + 6;
+    // ── Horizontal legend row below the rings ─────────────────────
+    const legendY = y + ringDiameter + 10;
+    const dotR = 4;
+    const itemGap = 32;   // gap between items
+    const dotTextGap = 6; // gap between dot and text
+
+    // Measure total legend width to center it
+    this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(8);
+    const itemWidths = rings.map((ring) => {
+      const txt = `${ring.label}: ${ring.value}%`;
+      return dotR * 2 + dotTextGap + this.doc.widthOfString(txt);
+    });
+    const totalLegendW =
+      itemWidths.reduce((a, b) => a + b, 0) + itemGap * (rings.length - 1);
+    let legendX = centerX - totalLegendW / 2;
+
+    rings.forEach((ring, i) => {
+      const itemW = itemWidths[i];
+      const dotCX = legendX + dotR;
+      const dotCY = legendY + dotR;
+
+      // Dot
+      this.doc.circle(dotCX, dotCY, dotR).fill(ring.color);
+
+      // Label
+      this.doc
+        .font(this.FONT_SORA_SEMIBOLD)
+        .fontSize(8)
+        .fillColor(CI_COLORS.DARK_TEXT)
+        .text(
+          `${ring.label}: ${ring.value}%`,
+          legendX + dotR * 2 + dotTextGap,
+          legendY,
+          { lineBreak: false },
+        );
+
+      legendX += itemW + itemGap;
+    });
+
+    this.doc.y = legendY + dotR * 2 + 8;
+  }
+
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // YOUR REACH INSTITUTIONS
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private async generateReachInstitutions(): Promise<void> {
+    this.ensureSpace(0.5, true);
+
+    this.h1('Your Reach Institutions');
+    this.h2('College Compatibility Matrix');
+
+    const topTwoTraits = this.getTopTwoTraits(
+      this.data.most_answered_answer_type,
+      this.data,
+    );
+    const traitCode = topTwoTraits[0] + topTwoTraits[1];
+    const primaryTrait = topTwoTraits[0];
+
+    const traitParamMap: Record<string, { primary: string; secondary: string }> = {
+      D: { primary: 'Graduation Outcomes (GO)', secondary: 'Perception (PR)' },
+      I: { primary: 'Outreach & Inclusivity (OI)', secondary: 'Perception (PR)' },
+      S: { primary: 'Teaching, Learning & Resources (TLR)', secondary: 'Outreach & Inclusivity (OI)' },
+      C: { primary: 'Research & Professional Practice (RPC)', secondary: 'Teaching, Learning & Resources (TLR)' },
+    };
+
+    const params = traitParamMap[primaryTrait] ?? { primary: 'Overall Score', secondary: 'Rank' };
+
+    const streamLabel =
+      this.data.school_stream_id === 1
+        ? 'Engineering / Science'
+        : this.data.school_stream_id === 2
+          ? 'Commerce / Management'
+          : this.data.school_stream_id === 3
+            ? 'Arts / Humanities'
+            : 'All Streams (Science, Commerce and Arts)';
+
+    this.pHtml(
+      `Based on your Personality trait, the institutions below have been selected and ranked using <b>${params.primary} </b> as the primary parameter and <b>${params.secondary} </b> as the secondary parameter. ` +
+      `Results are filtered for <b>${streamLabel} </b> and ordered by NIRF national rank after selection.`,
+    );
+
+    const colleges: UniversityData[] = await getTopCollegesForStudent(
+      traitCode,
+      this.data.school_stream_id,
+    );
+
+    if (colleges.length === 0) {
+      this.p('No institution data is currently available for your stream. Please check back later.');
+      return;
+    }
+
+    this.renderReachInstitutionsTable(colleges, primaryTrait);
+  }
+
+  private renderReachInstitutionsTable(
+    colleges: UniversityData[],
+    _primaryTrait: string,
+  ): void {
+    const headers = ['S.No', 'Institution Name', 'City', 'State', 'NIRF Score', 'NIRF Rank'];
+    const tableOptions = {
+      colWidths: ['fit', 'fill', 'fit', 'fit', 'fit', 'fit'] as ('fit' | 'fill' | number)[],
+      fontSize: 8,
+      headerFontSize: 8,
+      headerColor: '#150089',
+      headerTextColor: '#FFFFFF',
+      borderColor: '#CCCCCC',
+      borderWidth: 0.5,
+      cellPadding: 5,
+      mergeSupportedColumn: true,
+      rowAlign: ['center', 'left', 'left', 'left', 'center', 'center'] as TextAlignment[],
+    };
+
+    const isStream1 = colleges.length > 0 && colleges[0].school_stream_id === 1;
+    let rows: ((string | number | null | undefined)[] | StyledRow)[];
+
+    if (isStream1) {
+      const groupOrder = ['ENGINEERING', 'MEDICAL', 'RESEARCH'];
+      const grouped = new Map<string, UniversityData[]>();
+      for (const c of colleges) {
+        const g = (c.school_group ?? 'OTHER').toUpperCase();
+        if (!grouped.has(g)) grouped.set(g, []);
+        grouped.get(g)!.push(c);
+      }
+      rows = [];
+      for (const groupKey of groupOrder) {
+        const group = grouped.get(groupKey);
+        if (!group || group.length === 0) continue;
+        const label = `${this.riTitleCase(groupKey)} Institutions`;
+        const subheader: StyledRow = {
+          type: 'subheader',
+          data: [label, label, label, label, label, label],
+          fill: '#2c2a7d',
+          color: '#FFFFFF',
+          font: this.FONT_SORA_SEMIBOLD,
+          fontSize: 8,
+          align: 'left',
+          isMergeable: true,
+        };
+        rows.push(subheader);
+        group.forEach((c, idx) => {
+          rows.push([String(idx + 1), c.name, c.city, c.state, c.score ? String(c.score) : 'N/A', c.rank ? String(c.rank) : 'N/A']);
+        });
+      }
+    } else if (this.data.school_stream_id === undefined || this.data.school_stream_id === null) {
+      const streamGroupOrder = [1, 2, 3];
+      const streamGroupLabels: Record<number, string> = {
+        1: 'Science Institutions',
+        2: 'Commerce Institutions',
+        3: 'Humanities Institutions',
+      };
+      const groupedByStream = new Map<number, UniversityData[]>();
+      for (const c of colleges) {
+        const sid = c.school_stream_id;
+        if (!groupedByStream.has(sid)) groupedByStream.set(sid, []);
+        groupedByStream.get(sid)!.push(c);
+      }
+      rows = [];
+      for (const sid of streamGroupOrder) {
+        const group = groupedByStream.get(sid);
+        if (!group || group.length === 0) continue;
+        const label = streamGroupLabels[sid] ?? `Stream ${sid} Institutions`;
+        const subheader: StyledRow = {
+          type: 'subheader',
+          data: [label, label, label, label, label, label],
+          fill: '#2c2a7d',
+          color: '#FFFFFF',
+          font: this.FONT_SORA_SEMIBOLD,
+          fontSize: 8,
+          align: 'left',
+          isMergeable: true,
+        };
+        rows.push(subheader);
+        group.forEach((c, idx) => {
+          rows.push([String(idx + 1), c.name, c.city, c.state, c.score ? String(c.score) : 'N/A', c.rank ? String(c.rank) : 'N/A']);
+        });
+      }
+    } else {
+      rows = colleges.map((c, index) => [
+        String(index + 1),
+        c.name,
+        c.city,
+        c.state,
+        c.score ? String(c.score) : 'N/A',
+        c.rank ? String(c.rank) : 'N/A',
+      ]);
+    }
+
+    this.table(headers, rows, tableOptions);
+    this.doc.moveDown(0.5);
+    this.pHtml(
+      '"Note: This list is based on objective, publicly available NIRF 2025 data. Rankings are subject to change. This does not constitute a guaranteed admission or a direct endorsement of any specific institution."',
+      { fontSize: 8, font: this.FONT_ITALIC, align: 'center' },
+    );
+  }
+
+  /** Converts "ENGINEERING" → "Engineering" */
+  private riTitleCase(str: string): string {
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CAREER FLIGHT PATH VISUALISATION
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private generateCareerFlightPath(): void {
+    this.ensureSpace(0.35, true);
+
+    const [primaryTrait] = this.getTopTwoTraits(
+      this.data.most_answered_answer_type,
+      this.data,
+    );
+
+    const agile: AgileScore =
+      this.data.agile_scores?.[0] ??
+      { focus: 0, courage: 0, respect: 0, openness: 0, commitment: 0 };
+
+    const agileKeyMap: Record<string, keyof AgileScore> = {
+      Commitment: 'commitment',
+      Courage: 'courage',
+      Focus: 'focus',
+      Openness: 'openness',
+      Respect: 'respect',
+    };
+
+    let topAgileValue = 'Commitment';
+    let topAgileScore = -1;
+    for (const [label, key] of Object.entries(agileKeyMap)) {
+      const score = agile[key] ?? 0;
+      if (score > topAgileScore) {
+        topAgileScore = score;
+        topAgileValue = label;
+      }
+    }
+
+    const group = DISC_AGILE_CAREER_PACE[primaryTrait];
+    const entry: DiscAgileEntry =
+      group?.entries.find((e) => e.agileValue === topAgileValue) ??
+      group?.entries[0];
+
+    if (!entry) {
+      logger.warn('[School REPORT] No DISC-Agile entry found; skipping flight path.');
+      return;
+    }
+
+    this.h1('Career Flight Path');
+    // this.h2(`${group.traitName} Personality × ${entry.agileValue} Agile Value`);
+
+    this.pHtml(
+      `Based on your personality trait and top Agile scrum value your career trajectory has been mapped below. ` +
+      `The gauge shows how your combination accelerates your journey compared to the industry average.`,
+    );
+
+    const parsePace = (s: string): [number, number] => {
+      const nums = s.match(/\d+/g)?.map(Number) ?? [0];
+      return nums.length >= 2 ? [nums[0], nums[1]] : [nums[0], nums[0]];
+    };
+    const parseAvg = (s: string): number => parseInt(s.match(/\d+/)?.[0] ?? '12', 10);
+
+    const [paceStart, paceEnd] = parsePace(entry.predictedPace);
+    const industryYear = parseAvg(entry.industryAvg);
+
+    this.drawFlightPathGauge(paceStart, paceEnd, industryYear, entry);
+
+    this.doc.y += 6;
+    this.pHtml(
+      `<b>Your Edge: </b>${entry.motivation}\n<b>Speed Bump - ${entry.challengeTitle}: </b>${entry.challengeDesc}`,
+    );
+  }
+
+  private drawFlightPathGauge(
+    _paceStart: number,
+    paceEnd: number,
+    industryYear: number,
+    entry: DiscAgileEntry,
+  ): void {
+    const barX = this.MARGIN_STD;
+    const barY = this.doc.y + 38;
+    const barW = this.PAGE_WIDTH - 2 * this.MARGIN_STD;
+    const barH = 18;
+    const barRadius = barH / 2;
+    const MAX_YEAR = Math.max(15, industryYear + 2);
+    const toX = (yr: number) => barX + (yr / MAX_YEAR) * barW;
+
+    const tickNums = [0, 5, 10, 15].filter((t) => t <= MAX_YEAR);
+    if (!tickNums.includes(MAX_YEAR)) tickNums.push(MAX_YEAR);
+    this.doc.save();
+    this.doc.font(this.FONT_REGULAR).fontSize(7).fillColor('#555555');
+    for (const yr of tickNums) {
+      const tx = toX(yr);
+      this.doc.moveTo(tx, barY + barH + 2).lineTo(tx, barY + barH + 6).strokeColor('#999999').lineWidth(0.5).stroke();
+      this.doc.text(`${yr}y`, tx - 8, barY + barH + 8, { width: 16, align: 'center' });
+    }
+    this.doc.restore();
+
+    const x1 = toX(0);
+    const x2 = toX(paceEnd);
+    const x3 = toX(industryYear);
+    const x4 = toX(MAX_YEAR);
+
+    const fillSlice = (fromX: number, toXVal: number, fill: string) => {
+      if (toXVal <= fromX) return;
+      this.doc.save();
+      this.doc.roundedRect(barX, barY, barW, barH, barRadius).clip();
+      this.doc.rect(fromX, barY, toXVal - fromX, barH).fill(fill);
+      this.doc.restore();
+    };
+
+    fillSlice(x1, x2, '#4DB6AC');
+
+    if (x3 > x2) {
+      this.doc.save();
+      this.doc.roundedRect(barX, barY, barW, barH, barRadius).clip();
+      const grad = this.doc.linearGradient(x2, barY, x3, barY);
+      grad.stop(0, '#4DB6AC');
+      grad.stop(1, '#E8633A');
+      this.doc.rect(x2, barY, x3 - x2, barH).fill(grad);
+      this.doc.restore();
+    }
+
+    fillSlice(x3, x4, '#E8633A');
+
+    const markerX = x2;
+    const markerCY = barY - 2;
+    const rocketPath = 'public/assets/images/rocket.png';
+    if (fs.existsSync(rocketPath)) {
+      this.doc.image(rocketPath, markerX - 12, markerCY - 22, { width: 24, height: 24 });
+    } else {
+      this.doc.circle(markerX, barY + barH / 2, 7).fillAndStroke('#FFFFFF', '#4DB6AC');
+      this.doc.font(this.FONT_SORA_BOLD).fontSize(5).fillColor('#004D40').text('YOU', markerX - 8, barY + barH / 2 - 3, { width: 16, align: 'center' });
+    }
+
+    const calloutBW = 130;
+    const calloutBH = 30;
+    const calloutBX = Math.min(Math.max(markerX - calloutBW / 2, barX), barX + barW - calloutBW);
+    const calloutBY = barY + barH + 24;
+    const calloutBRadius = 5;
+    this.doc.roundedRect(calloutBX, calloutBY, calloutBW, calloutBH, calloutBRadius).fill('#2B6CB0');
+    const tipX = markerX;
+    this.doc.moveTo(tipX - 5, calloutBY).lineTo(tipX + 5, calloutBY).lineTo(tipX, calloutBY - 6).fill('#2B6CB0');
+    this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(7).fillColor('#FFFFFF').text(`Your Predicted Pace: ${entry.predictedPace}`, calloutBX + 6, calloutBY + 5, { width: calloutBW - 12, align: 'center' });
+    this.doc.font(this.FONT_REGULAR).fontSize(7).fillColor('#DBEAFE').text('Years to Senior Management', calloutBX + 6, calloutBY + 16, { width: calloutBW - 12, align: 'center' });
+
+    const industryX = toX(industryYear);
+    const calloutTW = 130;
+    const calloutTH = 30;
+    const calloutTX = Math.min(Math.max(industryX - calloutTW / 2, barX), barX + barW - calloutTW);
+    const calloutTY = barY - calloutTH - 10;
+    this.doc.roundedRect(calloutTX, calloutTY, calloutTW, calloutTH, calloutBRadius).fill('#E8633A');
+    const tipTX = industryX;
+    this.doc.moveTo(tipTX - 5, calloutTY + calloutTH).lineTo(tipTX + 5, calloutTY + calloutTH).lineTo(tipTX, calloutTY + calloutTH + 6).fill('#E8633A');
+    this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(7).fillColor('#FFFFFF').text(`Average Industry Pace: ${entry.industryAvg}`, calloutTX + 6, calloutTY + 5, { width: calloutTW - 12, align: 'center' });
+    this.doc.font(this.FONT_REGULAR).fontSize(7).fillColor('#FCE4D6').text('Years to Senior Management', calloutTX + 6, calloutTY + 16, { width: calloutTW - 12, align: 'center' });
+
+    this.doc.y = calloutBY + calloutBH + 6;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CAREER ODYSSEY ROADMAP
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private generateCareerOdysseyRoadmap(): void {
+    this.ensureSpace(.4, true);
+    const streamKey = String(this.data.school_stream_id ?? '0');
+    const streamData = CAREER_ODYSSEY_ROADMAP[streamKey] ?? CAREER_ODYSSEY_ROADMAP['0'];
+
+    this.h1(streamData.streamTitle);
+    this.h3(streamData.tagline);
+    this.doc.moveDown(2);
+
+    this.drawOdysseyRoadmap(streamData.nodes);
+  }
+
+  private drawOdysseyRoadmap(nodes: OdysseyNode[]): void {
+    if (!nodes || nodes.length === 0) return;
+
+    const margin = this.MARGIN_STD;
+    const inset = 55;
+    const usableW = this.PAGE_WIDTH - 2 * margin - 2 * inset;
+    const startX = margin + inset;
+    const endX = startX + usableW;
+
+    const midY = this.doc.y + 100;
+    const waveAmp = 20;
+    const circleR = 14;
+    const stubH = 24;
+    const jDotR = 3;
+    const textW = 96;
+
+    const n = nodes.length;
+    const segW = usableW / (n - 1);
+
+    const lerpColor = (t: number): string => {
+      const sr = 0x06, sg = 0xB6, sb = 0xD4;
+      const er = 0x7C, eg = 0x3A, eb = 0xED;
+      const r = Math.round(sr + (er - sr) * t);
+      const g = Math.round(sg + (eg - sg) * t);
+      const b = Math.round(sb + (eb - sb) * t);
+      return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    };
+
+    const pts: { x: number; y: number; isAbove: boolean | null }[] = [];
+    for (let i = 0; i < n; i++) {
+      let yPos: number;
+      let isAbove: boolean | null;
+      if (i === 0) {
+        yPos = midY + waveAmp;
+        isAbove = null;
+      } else {
+        isAbove = (i % 2 === 1);
+        yPos = isAbove ? midY - waveAmp : midY + waveAmp;
+      }
+      pts.push({ x: startX + i * segW, y: yPos, isAbove });
+    }
+
+    for (let i = 0; i < n - 1; i++) {
+      const p0 = pts[i];
+      const p1 = pts[i + 1];
+      const t = (i + 0.5) / (n - 1);
+      const color = lerpColor(t);
+      const cpOff = segW * 0.45;
+      this.doc.save();
+      this.doc.moveTo(p0.x, p0.y).bezierCurveTo(p0.x + cpOff, p0.y, p1.x - cpOff, p1.y, p1.x, p1.y).strokeColor(color).lineWidth(3).stroke();
+      this.doc.restore();
+    }
+
+    for (let i = 0; i < n; i++) {
+      const pt = pts[i];
+      const t = i / Math.max(n - 1, 1);
+      const color = lerpColor(t);
+      const { isAbove } = pt;
+      const goesUp = isAbove === null ? false : isAbove;
+      const circleCY = goesUp ? pt.y - stubH - circleR : pt.y + stubH + circleR;
+
+      this.doc.save();
+      this.doc.circle(pt.x, pt.y, jDotR).fillAndStroke('#FFFFFF', color);
+      this.doc.restore();
+
+      const stubEndY = goesUp ? circleCY + circleR : circleCY - circleR;
+      this.doc.save();
+      this.doc.moveTo(pt.x, pt.y).lineTo(pt.x, stubEndY).strokeColor(color).lineWidth(1.5).stroke();
+      this.doc.restore();
+
+      this.doc.save();
+      this.doc.circle(pt.x, circleCY, circleR).fillColor('#FFFFFF').strokeColor(color).lineWidth(2).fillAndStroke();
+      this.doc.restore();
+
+      const labelFontSize = 6;
+      const rawLabel = nodes[i].label;
+      const yearMatch = rawLabel.match(/^(Year)\s+(.+)$/);
+      const labelLines = yearMatch ? [yearMatch[1], yearMatch[2]] : [rawLabel];
+      const lineH = labelFontSize + 1;
+      const totalLabelH = labelLines.length * lineH;
+      const labelStartY = circleCY - totalLabelH / 2;
+
+      this.doc.save();
+      this.doc.font(this.FONT_SORA_BOLD).fontSize(labelFontSize).fillColor(color);
+      labelLines.forEach((line, li) => {
+        this.doc.text(line, pt.x - circleR + 2, labelStartY + li * lineH, { width: (circleR - 2) * 2, align: 'center', lineBreak: false });
+      });
+      this.doc.restore();
+
+      const textX = Math.max(margin, Math.min(this.PAGE_WIDTH - margin - textW, pt.x - textW / 2));
+      const titleFS = 7;
+      const subFS = 6;
+      const titleText = nodes[i].title || '';
+      const subText = nodes[i].subtitle || '';
+      const textGap = 2;
+
+      if (goesUp) {
+        this.doc.font(this.FONT_REGULAR).fontSize(subFS);
+        const subH = this.doc.heightOfString(subText, { width: textW, align: 'center' });
+        this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(titleFS);
+        const titleH = this.doc.heightOfString(titleText, { width: textW, align: 'center' });
+        const subTop = circleCY - circleR - 4 - subH;
+        const titleTop = subTop - textGap - titleH;
+        this.doc.save();
+        this.doc.fillColor('#1A1A2E');
+        this.doc.text(titleText, textX, titleTop, { width: textW, align: 'center' });
+        this.doc.font(this.FONT_REGULAR).fontSize(subFS).fillColor('#666666').text(subText, textX, subTop, { width: textW, align: 'center' });
+        this.doc.restore();
+      } else {
+        this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(titleFS);
+        const titleH = this.doc.heightOfString(titleText, { width: textW, align: 'center' });
+        const titleTop = circleCY + circleR + 4;
+        const subTop = titleTop + titleH + textGap;
+        this.doc.save();
+        this.doc.fillColor('#1A1A2E');
+        this.doc.text(titleText, textX, titleTop, { width: textW, align: 'center' });
+        this.doc.font(this.FONT_REGULAR).fontSize(subFS).fillColor('#666666').text(subText, textX, subTop, { width: textW, align: 'center' });
+        this.doc.restore();
+      }
+    }
+
+    // suppress unused variable warning for endX
+    void endX;
+    const bottomMost = midY + waveAmp + stubH + circleR * 2 + 20 + 22;
+    this.doc.y = bottomMost + this.DEFAULT_GAP * 2;
   }
 }

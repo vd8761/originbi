@@ -1,19 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
 import { logger } from './logger';
 import { getPool } from './dbPool';
-import { CollegeData, AnswerTypeCount, AgileScore } from '../types/types';
-
-export interface MergedUserData extends CollegeData {
-  // Using CollegeData as base, covers most fields
-  program_type: number;
-  report_password?: string;
-  school_level_id?: number;
-  school_stream_id?: number;
-}
+import { AnswerTypeCount, AgileScore, MergedReportData, CollegeData, SchoolData, EmployeeData, CxoData } from '../types/types';
+import { SCHOOL_LEVEL_ID, SCHOOL_STREAM_ID } from '../reports/BaseConstants';
 
 export async function fetchGroupAssessmentData(
   groupId: string,
-): Promise<MergedUserData[]> {
+): Promise<MergedReportData[]> {
   const client = await getPool().connect();
 
   try {
@@ -60,7 +53,7 @@ export async function fetchGroupAssessmentData(
 
 export async function fetchUserAssessmentData(
   userIds: string[],
-): Promise<MergedUserData[]> {
+): Promise<MergedReportData[]> {
   const client = await getPool().connect();
 
   try {
@@ -155,8 +148,8 @@ export async function fetchUserAssessmentData(
 async function processSessionRows(
   client: any,
   sessionRows: any[],
-): Promise<MergedUserData[]> {
-  const validUsersData: MergedUserData[] = [];
+): Promise<MergedReportData[]> {
+  const validUsersData: MergedReportData[] = [];
 
   for (const session of sessionRows) {
     const programId = Number(session.program_id); // Ensure number
@@ -248,7 +241,7 @@ async function processSessionRows(
         .replace('CXO_GENERAL', 'CG');
     };
 
-    const userData: MergedUserData = {
+    const baseData = {
       full_name: (() => {
         // Sanitize: Remove newlines, non-word characters (except spaces)
         const sanitized = session.full_name
@@ -268,15 +261,15 @@ async function processSessionRows(
       email_id: session.email,
       exam_start: session.started_at
         ? new Date(session.started_at)
-            .toISOString()
-            .replace('T', ' ')
-            .split('.')[0]
+          .toISOString()
+          .replace('T', ' ')
+          .split('.')[0]
         : '',
       exam_end: session.completed_at
         ? new Date(session.completed_at)
-            .toISOString()
-            .replace('T', ' ')
-            .split('.')[0]
+          .toISOString()
+          .replace('T', ' ')
+          .split('.')[0]
         : '',
       bi_registration_ID: session.registration_id,
       assigned_exam_id: session.session_id,
@@ -291,38 +284,60 @@ async function processSessionRows(
       most_answered_answer_type: typeCounts,
       top_answered_types: [],
       program_type: programId,
-      department_deg_id: session.department_degree_id,
-      dept_code: session.dept_code,
-      group_name: session.group_name,
       agile_scores: [transformedAgile],
       report_password: session.report_password,
     };
 
-    // --- SCHOOL LOGIC ---
+    // --- PROGRAM LOGIC ---
     if (programId === 1) {
       // School
-      const schoolLevelMap: Record<string, number> = { SSLC: 1, HSC: 2 };
-      const schoolStreamMap: Record<string, number> = {
-        SCIENCE: 1,
-        COMMERCE: 2,
-        HUMANITIES: 3,
+      const levelId = SCHOOL_LEVEL_ID[session.school_level as keyof typeof SCHOOL_LEVEL_ID];
+      if (!levelId) {
+        logger.warn(`User ${session.user_id} has invalid or missing school_level: ${session.school_level}. Skipping.`);
+        continue;
+      }
+
+      const schoolData: SchoolData = {
+        ...baseData,
+        school_level_id: levelId,
       };
 
-      const levelId = schoolLevelMap[session.school_level];
-      if (levelId) {
-        userData.school_level_id = levelId;
-
-        // Case A: HSC - Map Stream
-        if (levelId === 2) {
-          userData.school_stream_id = schoolStreamMap[session.school_stream];
+      if (levelId === SCHOOL_LEVEL_ID.HSC && session.school_stream) {
+        const streamId = SCHOOL_STREAM_ID[session.school_stream as keyof typeof SCHOOL_STREAM_ID];
+        if (streamId) {
+          schoolData.school_stream_id = streamId;
         }
-        // Case B: SSLC - Stream undefined (handled by default)
       }
-    }
-    logger.debug('Processing for Program:', reportTitleMap[programId]);
-    logger.debug('User Data:', userData);
 
-    validUsersData.push(userData);
+      logger.debug('Processing for Program:', reportTitleMap[programId]);
+      validUsersData.push(schoolData);
+    } else if (programId === 2) {
+      // College
+      const collegeData: CollegeData = {
+        ...baseData,
+        department_deg_id: session.department_degree_id,
+        dept_code: session.dept_code,
+        group_name: session.group_name,
+      };
+      logger.debug('Processing for Program:', reportTitleMap[programId]);
+      validUsersData.push(collegeData);
+    } else if (programId === 3) {
+      // Employee
+      const employeeData: EmployeeData = {
+        ...baseData,
+        group_name: session.group_name,
+      };
+      logger.debug('Processing for Program:', reportTitleMap[programId]);
+      validUsersData.push(employeeData);
+    } else {
+      // CXO or other
+      const cxoData: CxoData = {
+        ...baseData,
+        group_name: session.group_name,
+      };
+      logger.debug('Processing for Program:', reportTitleMap[programId]);
+      validUsersData.push(cxoData);
+    }
   }
 
   logger.info(`Final processed data count: ${validUsersData.length}`);
