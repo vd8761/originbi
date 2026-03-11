@@ -266,8 +266,6 @@ const Header: React.FC<HeaderProps> = ({
                 return <CoinIcon className={iconClass} />;
             case 'EMPLOYEE_TEST_COMPLETED':
                 return <CompletedStepIcon className={iconClass} />;
-            case 'EXAM_EXPIRATION':
-                return <NotificationIcon className={`${iconClass} text-red-500 font-bold`} />;
             default:
                 return <RoadmapIcon className={iconClass} />;
         }

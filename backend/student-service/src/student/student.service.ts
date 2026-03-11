@@ -807,37 +807,45 @@ export class StudentService {
           const earnedCommission =
             (registrationAmount * commissionPercentage) / 100;
 
-          // Create the referral transaction record
-          const transactionData = {
-            affiliateAccountId: Number(affiliate.id),
-            registrationId: Number(savedReg.id),
-            registrationAmount,
-            commissionPercentage,
-            earnedCommissionAmount: earnedCommission,
-            settlementStatus: 0 as any, // 0 - Not Settled
-            metadata: {
-              studentName: dto.full_name,
-              studentEmail: dto.email,
-              referralCode: dto.referral_code,
-            },
-          };
+          let currentReferralCount = 0;
+          await this.affiliateRepo.manager.transaction(async (manager) => {
+            // Re-fetch with pessimistic write lock to prevent race conditions
+            const lockedAffiliate = await manager.getRepository(AffiliateAccount).findOne({
+              where: { id: affiliate.id },
+              lock: { mode: 'pessimistic_write' },
+            });
 
-          const referralTransaction =
-            this.affiliateTransactionRepo.create(transactionData);
-          await this.affiliateTransactionRepo.save(referralTransaction);
-          this.logger.log(
-            `Affiliate referral transaction recorded for registration ${savedReg.id}`,
-          );
+            if (lockedAffiliate) {
+              const transactionData = {
+                affiliateAccountId: Number(lockedAffiliate.id),
+                registrationId: Number(savedReg.id),
+                registrationAmount,
+                commissionPercentage,
+                earnedCommissionAmount: earnedCommission,
+                settlementStatus: 0 as any, // 0 - Not Settled
+                metadata: {
+                  studentName: dto.full_name,
+                  studentEmail: dto.email,
+                  referralCode: dto.referral_code,
+                },
+              };
 
-          const currentReferralCount = (Number(affiliate.referralCount) || 0) + 1;
-          affiliate.referralCount = currentReferralCount;
-          affiliate.totalEarnedCommission =
-            (Number(affiliate.totalEarnedCommission) || 0) + earnedCommission;
-          affiliate.totalPendingCommission =
-            (Number(affiliate.totalPendingCommission) || 0) + earnedCommission;
-          await this.affiliateRepo.save(affiliate);
+              const referralTransaction = manager.getRepository(AffiliateReferralTransaction).create(transactionData);
+              await manager.save(referralTransaction);
+
+              currentReferralCount = (Number(lockedAffiliate.referralCount) || 0) + 1;
+              lockedAffiliate.referralCount = currentReferralCount;
+              lockedAffiliate.totalEarnedCommission =
+                (Number(lockedAffiliate.totalEarnedCommission) || 0) + earnedCommission;
+              lockedAffiliate.totalPendingCommission =
+                (Number(lockedAffiliate.totalPendingCommission) || 0) + earnedCommission;
+
+              await manager.save(lockedAffiliate);
+            }
+          });
+
           this.logger.log(
-            `Affiliate ${affiliate.id} aggregates updated: referralCount=${affiliate.referralCount}, totalEarned=${affiliate.totalEarnedCommission}, totalPending=${affiliate.totalPendingCommission}`,
+            `Affiliate ${affiliate.id} aggregates updated atomically: referralCount=${currentReferralCount}, earned=${earnedCommission}`,
           );
 
           // 1. Notify Affiliate of Successful Referral

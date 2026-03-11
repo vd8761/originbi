@@ -328,9 +328,7 @@ const Header: React.FC<HeaderProps> = ({
             case 'LEVEL_UNLOCKED':
                 return <JobsIcon className={iconClass} />;
             case 'ASSESSMENT_REPORT_READY':
-                return <CheckCircleIcon className={iconClass} />;
-            case 'EXAM_EXPIRATION':
-                return <NotificationIcon className={`${iconClass} text-red-500 font-bold`} />;
+                return <CompletedStepIcon className={iconClass} />;
             default:
                 return <RoadmapIcon className={iconClass} />;
         }
