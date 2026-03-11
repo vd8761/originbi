@@ -1391,29 +1391,29 @@ export class StudentService {
     this.logger.log(`Handling assessment completion for user ${userId}`);
 
     try {
-      // 1. Verify User and Registration
+      // 1. Find the latest completed session for this user to get the correct registration
+      const session = await this.sessionRepo.findOne({
+        where: { userId: userId, status: 'COMPLETED' },
+        order: { updatedAt: 'DESC' },
+      });
+
+      if (!session) {
+        this.logger.warn(`Skipping process: No completed session found for user ${userId}`);
+        return;
+      }
+
       const registration = await this.registrationRepo.findOne({
-        where: { userId: userId },
-        relations: ['program'],
+        where: { id: session.registrationId },
       });
 
       if (!registration) {
-        this.logger.warn(
-          `Skipping email: No registration found for user ${userId}`,
-        );
+        this.logger.warn(`Skipping process: No registration found for user ${userId} / session ${session.id}`);
         return;
       }
 
-      // Check for allowed registration sources
-      if (
-        registration.registrationSource !== 'SELF' &&
-        registration.registrationSource !== 'CORPORATE'
-      ) {
-        this.logger.warn(
-          `Skipping email: registration source ${registration.registrationSource} is not SELF or CORPORATE`,
-        );
-        return;
-      }
+      const program = await this.sessionRepo.manager.getRepository(Program).findOne({
+        where: { id: session.programId },
+      });
 
       const user = await this.userRepo.findOne({ where: { id: userId } });
       if (!user) {
@@ -1423,30 +1423,43 @@ export class StudentService {
 
       // --- 8. Notify Corporate User (MOVED UP) ---
       if (registration.registrationSource === 'CORPORATE') {
-        const corporateUserId = user.corporateId || registration.createdByUserId;
-        if (corporateUserId) {
+        let corporateNotificationUserId = registration.createdByUserId;
+
+        // If createdByUserId is missing, try to resolve from corporateAccountId
+        if (!corporateNotificationUserId && registration.corporateAccountId) {
+          const corpAccount = await this.sessionRepo.manager.query(
+            `SELECT user_id FROM corporate_accounts WHERE id = $1`,
+            [registration.corporateAccountId]
+          );
+          if (corpAccount && corpAccount.length > 0) {
+            corporateNotificationUserId = corpAccount[0].user_id;
+          }
+        }
+
+        if (corporateNotificationUserId) {
           try {
             // Check if already notified for this registration using JSONB path query
             const existingNotif = await this.notificationRepo.createQueryBuilder('n')
-              .where('n.user_id = :userId', { userId: Number(corporateUserId) })
+              .where('n.user_id = :userId', { userId: Number(corporateNotificationUserId) })
               .andWhere('n.type = :type', { type: 'EMPLOYEE_TEST_COMPLETED' })
               .andWhere("n.metadata ->> 'registrationId' = :regId", { regId: registration.id.toString() })
               .getOne();
 
             if (!existingNotif) {
               await this.notificationRepo.save({
-                userId: Number(corporateUserId),
+                userId: Number(corporateNotificationUserId),
                 role: 'CORPORATE',
                 type: 'EMPLOYEE_TEST_COMPLETED',
                 title: 'Assessment Completed',
-                message: `${registration.fullName || 'An employee'} has successfully completed the ${registration.program?.name ? registration.program.name + ' assessment' : 'assessment'}.`,
+                message: `${registration.fullName || 'An employee'} has successfully completed the ${program?.name || 'Employee'} assessment.`,
                 metadata: {
                   studentId: userId,
                   studentName: registration.fullName,
+                  programName: program?.name,
                   registrationId: registration.id,
                 },
               });
-              this.logger.log(`Corporate notification saved for corporate user ${corporateUserId} (Student: ${userId})`);
+              this.logger.log(`Corporate notification saved for corporate user ${corporateNotificationUserId} (Student: ${userId})`);
             } else {
               this.logger.log(`Corporate notification already exists for student ${userId}, skipping duplicate.`);
             }
@@ -1524,14 +1537,7 @@ export class StudentService {
       this.logger.log(`Downloading PDF from: ${downloadUrl}`);
 
       // 5. Fetch Report Entity for Password
-      const session = await this.sessionRepo.findOne({
-        where: { userId: userId, registrationId: registration.id },
-        order: { createdAt: 'DESC' },
-      });
-
-      if (!session) {
-        throw new Error('No assessment session found');
-      }
+      // session is already fetched at the beginning of this function
 
       let password = '';
       // Quick retry for password persistence (in case report service updates DB slightly after file gen)
