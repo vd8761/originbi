@@ -9,7 +9,7 @@ import { Repository, DataSource, EntityManager, In, Not } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import * as nodemailer from 'nodemailer';
-import { SES } from 'aws-sdk';
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 
 import {
   CorporateAccount,
@@ -65,7 +65,13 @@ export class CorporateRegistrationsService {
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
     private readonly assessmentGenService: AssessmentGenerationService,
-  ) {}
+  ) { }
+
+  private toBigIntOrNull(v?: string | null): number | null {
+    if (!v) return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
 
   async registerCandidate(dto: CreateCandidateDto, corporateUserId: number) {
     // 0. (Optional) Verify User exists if needed, but we can trust the ID for now or just let the Corp lookup fail
@@ -108,8 +114,8 @@ export class CorporateRegistrationsService {
     const password =
       dto.password ||
       Math.random().toString(36).slice(-8) +
-        Math.random().toString(36).slice(-4).toUpperCase() +
-        '1!';
+      Math.random().toString(36).slice(-4).toUpperCase() +
+      '1!';
 
     // 3. Create Cognito User
     let sub: string;
@@ -160,6 +166,7 @@ export class CorporateRegistrationsService {
         createdByUserId: corporateAccount.id,
         metadata: {
           fullName: dto.fullName,
+          countryCode: dto.countryCode || '+91',
           mobile: dto.mobile,
           gender: dto.gender,
         },
@@ -197,14 +204,20 @@ export class CorporateRegistrationsService {
         fullName: dto.fullName,
         mobileNumber: dto.mobile,
         gender: dto.gender,
-        countryCode: '+91',
+        countryCode: dto.countryCode || '+91',
         groupId: groupId,
-        metadata: {
-          programType: dto.programType,
-          groupName: dto.groupName,
-          sendEmail: true,
-        },
       });
+      registration.departmentDegreeId = this.toBigIntOrNull(dto.departmentId);
+      registration.schoolLevel = dto.schoolLevel || null;
+      registration.schoolStream = dto.schoolStream || null;
+      registration.studentBoard = dto.studentBoard || null;
+
+      registration.metadata = {
+        programType: dto.programType,
+        groupName: dto.groupName,
+        sendEmail: true,
+        currentYear: dto.currentYear,
+      };
       await manager.save(registration);
 
       // E. Create Assessment Session
@@ -212,7 +225,10 @@ export class CorporateRegistrationsService {
       // We expect 'Employee' or 'CXO General' sent in dto.programType
       // We search name containing this string or exact match
       const program = await manager.getRepository(Program).findOne({
-        where: { name: dto.programType },
+        where: [
+          { name: dto.programType },
+          { id: this.toBigIntOrNull(dto.programType) as any },
+        ],
       });
 
       if (!program) {
@@ -317,17 +333,19 @@ export class CorporateRegistrationsService {
     );
 
     try {
-      // Use aws-sdk v2 (Standard, matches Admin Service)
-      const ses = new SES({
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-        sessionToken: process.env.AWS_SESSION_TOKEN, // Optional
+      // Nodemailer SES transport in this project expects AWS SDK v3 style client.
+      const sesClient = new SESv2Client({
         region: process.env.AWS_REGION,
+        credentials: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+          sessionToken: process.env.AWS_SESSION_TOKEN, // Optional
+        },
       });
 
-      // Create transport securely
+      // Create transport using SESv2 client + command constructor.
       const transporter = nodemailer.createTransport({
-        SES: ses,
+        SES: { sesClient, SendEmailCommand },
       } as any);
 
       // Use full URLs for assets ("from application itself")
@@ -442,21 +460,29 @@ export class CorporateRegistrationsService {
           fullName: user.metadata?.fullName || dto.fullName,
           mobileNumber: user.metadata?.mobile || dto.mobile,
           gender: user.metadata?.gender || dto.gender || 'FEMALE',
-          countryCode: '+91',
+          countryCode: dto.countryCode || '+91',
           groupId: groupId,
+          departmentDegreeId: this.toBigIntOrNull(dto.departmentId),
+          schoolLevel: dto.schoolLevel || null,
+          schoolStream: dto.schoolStream || null,
+          studentBoard: dto.studentBoard || null,
           metadata: {
             programType: dto.programType,
             groupName: dto.groupName,
             sendEmail: true,
+            currentYear: dto.currentYear,
           },
         });
         await manager.save(registration);
       }
 
       // 3. Find Program
-      const program = await manager
-        .getRepository(Program)
-        .findOne({ where: { name: dto.programType } });
+      const program = await manager.getRepository(Program).findOne({
+        where: [
+          { name: dto.programType },
+          { id: this.toBigIntOrNull(dto.programType) as any },
+        ],
+      });
       if (!program)
         throw new BadRequestException(
           `Program '${dto.programType}' not found.`,

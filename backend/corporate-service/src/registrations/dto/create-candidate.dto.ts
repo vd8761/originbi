@@ -15,6 +15,10 @@ export class CreateCandidateDto {
 
   @IsString()
   @IsOptional()
+  countryCode?: string;
+
+  @IsString()
+  @IsOptional()
   gender?: 'MALE' | 'FEMALE' | 'OTHER';
 
   @IsString()
@@ -42,4 +46,25 @@ export class CreateCandidateDto {
 
   @IsOptional()
   sendEmail?: boolean;
+
+  // College / School Fields
+  @IsString()
+  @IsOptional()
+  schoolLevel?: string;
+
+  @IsString()
+  @IsOptional()
+  schoolStream?: string;
+
+  @IsString()
+  @IsOptional()
+  departmentId?: string;
+
+  @IsString()
+  @IsOptional()
+  currentYear?: string;
+
+  @IsString()
+  @IsOptional()
+  studentBoard?: string;
 }

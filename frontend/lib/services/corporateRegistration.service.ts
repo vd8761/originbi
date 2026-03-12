@@ -300,5 +300,51 @@ export const corporateRegistrationService = {
 
         if (!res.ok) return []; // Return empty if failed or not implemented
         return res.json();
+    },
+
+    // Single Candidate Registration
+    async registerCandidate(
+        payload: any,
+        corporateUserId: string
+    ): Promise<any> {
+        const token = AuthService.getToken();
+        const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_URL;
+
+        // Map frontend fields (CreateRegistrationDto) to backend (CreateCandidateDto)
+        const backendPayload = {
+            fullName: payload.full_name,
+            email: payload.email,
+            mobile: payload.mobile_number,
+            gender: payload.gender,
+            programType: payload.program_id,
+            groupName: payload.group_name,
+            password: payload.password,
+            examStart: payload.exam_start,
+            examEnd: payload.exam_end,
+            sendEmail: payload.send_email,
+
+            // College / School
+            schoolLevel: payload.school_level,
+            schoolStream: payload.school_stream,
+            departmentId: payload.department_degree_id,
+            currentYear: payload.current_year,
+            studentBoard: payload.student_board,
+        };
+
+        const res = await fetch(`${CORP_API}/corporate/registrations?userId=${corporateUserId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: token ? `Bearer ${token}` : '',
+            },
+            body: JSON.stringify(backendPayload),
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.message || 'Failed to register candidate');
+        }
+
+        return res.json();
     }
 };

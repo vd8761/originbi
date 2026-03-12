@@ -70,3 +70,6 @@ run-all-private.ps1
 
 dev.ps1
 dev-start.ps1
+
+start-all.sh
+stop-all.sh

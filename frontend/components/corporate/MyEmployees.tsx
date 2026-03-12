@@ -493,6 +493,7 @@ const MyEmployees: React.FC = () => {
                     setView("list");
                     fetchData();
                 }}
+                corporateUserId={userId}
             />
         );
     }

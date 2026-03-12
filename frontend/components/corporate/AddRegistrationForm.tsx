@@ -1,28 +1,32 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { BulkUploadIcon, ArrowRightWithoutLineIcon, EyeIcon, EyeOffIcon } from '../icons';
+import { toast } from 'react-hot-toast';
 import MobileInput from '../ui/MobileInput';
 import CustomSelect from '../ui/CustomSelect';
 import CustomDatePicker from '../ui/CustomDatePicker';
 import { corporateRegistrationService } from '../../lib/services/corporateRegistration.service';
 import { registrationService, CreateRegistrationDto } from '../../lib/services/registration.service';
 import { BulkUploadModal } from '../ui/BulkUploadModal';
+import { Program, Department } from '../../lib/types';
 
 interface AddRegistrationFormProps {
   onCancel: () => void;
   onRegister: () => void;
+  corporateUserId: string;
 }
 
-// Hardcoded programs for Corporate
-const CORPORATE_PROGRAMS = [
-  { label: "Employee", value: "Employee" },
-  { label: "CXO General", value: "CXO General" },
-];
+// Hardcoded programs for Corporate - initially used before dynamic fetch
+// const CORPORATE_PROGRAMS = [
+//   { label: "Employee", value: "Employee" },
+//   { label: "CXO General", value: "CXO General" },
+// ];
 
 const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
   onCancel,
   onRegister,
+  corporateUserId,
 }) => {
   // --- State ---
   const [formData, setFormData] = useState<CreateRegistrationDto>({
@@ -37,12 +41,43 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     // Unused but kept for type compatibility if needed, though DTO allows optionals
   });
 
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [activeField, setActiveField] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        const [progRes, deptRes] = await Promise.all([
+          registrationService.getPrograms(),
+          registrationService.getDepartmentDegrees()
+        ]);
+        setPrograms(progRes);
+        setDepartments(deptRes);
+      } catch (err) {
+        console.error("Failed to load initial data", err);
+      }
+    };
+    fetchInitialData();
+  }, []);
+
+  // Filter programs for corporate
+  const corporateProgramOptions = programs
+    .filter(p => ["EMPLOYEE", "CXO_GENERAL", "COLLEGE_STUDENT"].includes(p.code))
+    .map(p => ({ label: p.name, value: p.id }));
+
+  const departmentOptions = departments.map((d) => ({
+    value: d.id,
+    label: d.name,
+  }));
+
+  const selectedProgram = programs.find((p) => p.id === formData.program_id);
+  const isCollegeProgram = selectedProgram?.code === "COLLEGE_STUDENT";
 
   // --- Handlers ---
   const handleInputChange = (field: keyof CreateRegistrationDto, value: any) => {
@@ -73,12 +108,14 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     if (!formData.full_name.trim()) errors.full_name = "Required";
     if (!formData.email.trim()) errors.email = "Required";
     if (!formData.mobile_number.trim()) errors.mobile_number = "Required";
-    if (!formData.mobile_number.trim()) errors.mobile_number = "Required";
     if (!formData.program_id) errors.program_id = "Required";
     if (!formData.password?.trim()) errors.password = "Required";
     if (!formData.exam_start) errors.exam_start = "Required";
 
-    // Email format validation could be added here
+    if (isCollegeProgram) {
+      if (!formData.department_degree_id) errors.department_degree_id = "Required";
+      if (!formData.current_year) errors.current_year = "Required";
+    }
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -90,8 +127,10 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
       return;
     }
     setIsLoading(true);
+    setError(null);
     try {
-      await registrationService.createRegistration(formData);
+      await corporateRegistrationService.registerCandidate(formData, corporateUserId);
+      toast.success("Registration successful!");
       onRegister();
     } catch (err: any) {
       setError(err.message || "Failed to create registration.");
@@ -298,9 +337,14 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
               <CustomSelect
                 label="Program Type"
                 required
-                options={CORPORATE_PROGRAMS}
+                options={corporateProgramOptions}
                 value={formData.program_id}
-                onChange={(val) => handleInputChange("program_id", val)}
+                onChange={(val) => {
+                  handleInputChange("program_id", val);
+                  // Reset college fields if program changes
+                  handleInputChange("department_degree_id", "");
+                  handleInputChange("current_year", "");
+                }}
                 placeholder="Select Program"
               />
               {formErrors.program_id && (
@@ -309,6 +353,57 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                 </p>
               )}
             </div>
+
+            {/* Department (College Students) */}
+            {isCollegeProgram && (
+              <div
+                className={`relative animate-fade-in ${activeField === "dept" ? "z-50" : "z-auto"}`}
+                onMouseEnter={() => setActiveField("dept")}
+                onMouseLeave={() => setActiveField(null)}
+              >
+                <CustomSelect
+                  label="Department"
+                  required
+                  options={departmentOptions}
+                  value={formData.department_degree_id || ""}
+                  onChange={(val) => handleInputChange("department_degree_id", val)}
+                  placeholder="Select Department"
+                />
+                {formErrors.department_degree_id && (
+                  <p className="text-xs text-red-500 ml-1 mt-1">
+                    {formErrors.department_degree_id}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Current Year (College Students) */}
+            {isCollegeProgram && (
+              <div className="space-y-2 animate-fade-in relative z-0">
+                <label className={baseLabelClasses}>
+                  Current Year <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={6}
+                  value={formData.current_year || ""}
+                  onChange={(e) =>
+                    handleInputChange(
+                      "current_year",
+                      e.target.value.replace(/\D/g, "")
+                    )
+                  }
+                  placeholder="Enter Year (1–4)"
+                  className={`${baseInputClasses} ${formErrors.current_year ? "border-red-500/50" : ""}`}
+                />
+                {formErrors.current_year && (
+                  <p className="text-xs text-red-500 ml-1 mt-1">
+                    {formErrors.current_year}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Group Name */}
             <div className="space-y-2 relative z-0">

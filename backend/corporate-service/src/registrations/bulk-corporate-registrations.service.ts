@@ -52,7 +52,7 @@ export class BulkCorporateRegistrationsService {
     private groupAssessmentRepo: Repository<GroupAssessment>,
     private dataSource: DataSource,
     private readonly corporateRegistrationsService: CorporateRegistrationsService,
-  ) {}
+  ) { }
 
   /**
    * Phase 1: Preview & Validate
@@ -103,12 +103,13 @@ export class BulkCorporateRegistrationsService {
     const allPrograms = await this.programRepo.find();
     const programMap = new Map<string, Program>();
     allPrograms.forEach((p) => {
-      // Only allow Employee and CXO General
+      // Only allow Employee, CXO General, and College Students
       const normName = this.normalizeString(p.name);
       if (
         normName.includes('employee') ||
         normName.includes('cxo') ||
-        normName.includes('general')
+        normName.includes('general') ||
+        normName.includes('college')
       ) {
         programMap.set(this.normalizeString(p.code), p);
         programMap.set(normName, p);
@@ -775,6 +776,12 @@ export class BulkCorporateRegistrationsService {
       examEnd: this.parseDateAsIST(
         this.getValue(rawData, ['ExamEnd', 'exam_end_date', 'valid_to']),
       ),
+      // College / School Fields
+      schoolLevel: this.getValue(rawData, ['SchoolLevel', 'school_level']),
+      schoolStream: this.getValue(rawData, ['SchoolStream', 'school_stream']),
+      departmentId: this.getValue(rawData, ['DepartmentId', 'department_id', 'Department']),
+      currentYear: this.getValue(rawData, ['CurrentYear', 'current_year', 'Year']),
+      studentBoard: this.getValue(rawData, ['StudentBoard', 'student_board', 'Board']),
     };
   }
 
@@ -900,10 +907,11 @@ export class BulkCorporateRegistrationsService {
       program ||
       pNorm.includes('employee') ||
       pNorm.includes('cxo') ||
-      pNorm.includes('general');
+      pNorm.includes('general') ||
+      pNorm.includes('college');
 
     if (!isValidProgram) {
-      return `Program '${programCode}' invalid. Must be 'Employee' or 'CXO General'.`;
+      return `Program '${programCode}' invalid. Must be 'Employee', 'CXO General' or 'College Student'.`;
     }
 
     // 4. Dates
