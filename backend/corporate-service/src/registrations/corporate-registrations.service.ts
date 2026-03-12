@@ -8,8 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, EntityManager, In, Not } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import * as nodemailer from 'nodemailer';
-import { SES } from 'aws-sdk';
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 
 import {
   CorporateAccount,
@@ -65,7 +64,7 @@ export class CorporateRegistrationsService {
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
     private readonly assessmentGenService: AssessmentGenerationService,
-  ) {}
+  ) { }
 
   async registerCandidate(dto: CreateCandidateDto, corporateUserId: number) {
     // 0. (Optional) Verify User exists if needed, but we can trust the ID for now or just let the Corp lookup fail
@@ -108,8 +107,8 @@ export class CorporateRegistrationsService {
     const password =
       dto.password ||
       Math.random().toString(36).slice(-8) +
-        Math.random().toString(36).slice(-4).toUpperCase() +
-        '1!';
+      Math.random().toString(36).slice(-4).toUpperCase() +
+      '1!';
 
     // 3. Create Cognito User
     let sub: string;
@@ -123,7 +122,7 @@ export class CorporateRegistrationsService {
           }),
         ),
       );
-      sub = res.data.sub;
+      sub = (res as any).data.sub;
     } catch (err: any) {
       this.logger.error(
         'Error creating Cognito user',
@@ -135,7 +134,7 @@ export class CorporateRegistrationsService {
     }
 
     // 4. Transaction
-    return this.dataSource.transaction(async (manager: EntityManager) => {
+    const result = await this.dataSource.transaction(async (manager: EntityManager) => {
       // A. Debit Credit & Ledger
       corporateAccount.availableCredits -= 1;
       await manager.save(corporateAccount);
@@ -199,21 +198,19 @@ export class CorporateRegistrationsService {
         gender: dto.gender,
         countryCode: '+91',
         groupId: groupId,
+        departmentDegreeId: dto.departmentId ? Number(dto.departmentId) : null,
         metadata: {
           programType: dto.programType,
           groupName: dto.groupName,
           sendEmail: true,
+          currentYear: dto.currentYear,
         },
       });
       await manager.save(registration);
 
       // E. Create Assessment Session
-      // Search for Program
-      // We expect 'Employee' or 'CXO General' sent in dto.programType
-      // We search name containing this string or exact match
-      const program = await manager.getRepository(Program).findOne({
-        where: { name: dto.programType },
-      });
+      // Search for Program (Robust lookup)
+      const program = await this.findProgram(manager, dto.programType);
 
       if (!program) {
         // Try finding by like if exact match fails, or rely on frontend sending exact name
@@ -281,19 +278,15 @@ export class CorporateRegistrationsService {
         }
       }
 
-      // G. Send Email
+      // G. Send Email (non-blocking)
       if (dto.sendEmail) {
-        try {
-          await this.sendWelcomeEmail(
-            dto.email,
-            dto.fullName,
-            password,
-            validFrom,
-            program.assessmentTitle || program.name,
-          );
-        } catch (e) {
-          this.logger.error('Failed to send welcome email', e);
-        }
+        void this.sendWelcomeEmail(
+          dto.email,
+          dto.fullName,
+          password,
+          validFrom,
+          program.assessmentTitle || program.name,
+        );
       }
 
       return {
@@ -303,6 +296,8 @@ export class CorporateRegistrationsService {
         creditsLeft: corporateAccount.availableCredits,
       };
     });
+
+    return result;
   }
 
   private async sendWelcomeEmail(
@@ -317,21 +312,19 @@ export class CorporateRegistrationsService {
     );
 
     try {
-      // Use aws-sdk v2 (Standard, matches Admin Service)
-      const ses = new SES({
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-        sessionToken: process.env.AWS_SESSION_TOKEN, // Optional
+      const sesClient = new SESClient({
         region: process.env.AWS_REGION,
+        credentials: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+          ...(process.env.AWS_SESSION_TOKEN
+            ? { sessionToken: process.env.AWS_SESSION_TOKEN }
+            : {}),
+        },
       });
 
-      // Create transport securely
-      const transporter = nodemailer.createTransport({
-        SES: ses,
-      } as nodemailer.TransportOptions);
-
       // Use full URLs for assets ("from application itself")
-      const apiUrl = process.env.API_URL;
+      const apiUrl = process.env.API_URL || process.env.CORPORATE_SERVICE_URL || '';
 
       const assets = {
         popper: `${apiUrl}/email-assets/Popper.png`,
@@ -350,15 +343,31 @@ export class CorporateRegistrationsService {
         assessmentTitle,
       );
 
-      const info = await transporter.sendMail({
-        from: `"${process.env.EMAIL_SEND_FROM_NAME || 'Origin BI'}" <${process.env.EMAIL_FROM || 'no-reply@originbi.com'}>`,
-        to,
-        subject: 'Welcome to OriginBI - Assessment Invitation',
-        html,
+      const source =
+        process.env.EMAIL_FROM ||
+        `"${process.env.EMAIL_SEND_FROM_NAME || 'Origin BI'}" <no-reply@originbi.com>`;
+
+      const command = new SendEmailCommand({
+        Source: source,
+        Destination: { ToAddresses: [to] },
+        Message: {
+          Subject: {
+            Data: 'Welcome to OriginBI - Assessment Invitation',
+            Charset: 'UTF-8',
+          },
+          Body: {
+            Html: {
+              Data: html,
+              Charset: 'UTF-8',
+            },
+          },
+        },
       });
 
+      const info = await sesClient.send(command);
+
       this.logger.log(
-        `Email sent successfully to ${to}. MessageId: ${info.messageId}`,
+        `Email sent successfully to ${to}. MessageId: ${info.MessageId}`,
       );
     } catch (error) {
       this.logger.error(`Failed to send email to ${to}`, error);
@@ -444,23 +453,19 @@ export class CorporateRegistrationsService {
           gender: user.metadata?.gender || dto.gender || 'FEMALE',
           countryCode: '+91',
           groupId: groupId,
+          departmentDegreeId: dto.departmentId ? Number(dto.departmentId) : null,
           metadata: {
             programType: dto.programType,
             groupName: dto.groupName,
             sendEmail: true,
+            currentYear: dto.currentYear,
           },
         });
         await manager.save(registration);
       }
 
-      // 3. Find Program
-      const program = await manager
-        .getRepository(Program)
-        .findOne({ where: { name: dto.programType } });
-      if (!program)
-        throw new BadRequestException(
-          `Program '${dto.programType}' not found.`,
-        );
+      // 3. Find Program (Robust lookup)
+      const program = await this.findProgram(manager, dto.programType);
 
       // 4. Create Session (Linked to GroupAssessment Header)
       const validFrom = dto.examStart ? new Date(dto.examStart) : new Date();
@@ -505,20 +510,16 @@ export class CorporateRegistrationsService {
         }
       }
 
-      // 6. Send Email
+      // 6. Send Email (non-blocking)
       if (dto.sendEmail) {
-        try {
-          // Pass null password as we didn't create it
-          await this.sendWelcomeEmail(
-            user.email,
-            (user.metadata?.fullName as string) || dto.fullName,
-            '******', // Masked password for existing users
-            validFrom,
-            program.assessmentTitle || program.name,
-          );
-        } catch (e) {
-          this.logger.error('Failed to send welcome email', e);
-        }
+        // Pass masked password as this account already exists.
+        void this.sendWelcomeEmail(
+          user.email,
+          (user.metadata?.fullName as string) || dto.fullName,
+          '******',
+          validFrom,
+          program.assessmentTitle || program.name,
+        );
       }
 
       return {
@@ -527,5 +528,45 @@ export class CorporateRegistrationsService {
         userId: user.id,
       };
     });
+  }
+
+  private normalizeString(str: string): string {
+    return str ? str.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+  }
+
+  private async findProgram(manager: EntityManager, programType: string): Promise<Program> {
+    const programRepo = manager.getRepository(Program);
+    const allPrograms = await programRepo.find();
+
+    const normInput = this.normalizeString(programType);
+
+    // 1. Exact Name/Code match
+    let program = allPrograms.find(p =>
+      this.normalizeString(p.name) === normInput ||
+      this.normalizeString(p.code) === normInput
+    );
+
+    // 2. Handle Singular/Plural mismatch (specifically for College Student/Students)
+    if (!program) {
+      if (normInput === 'collegestudent') {
+        program = allPrograms.find(p => this.normalizeString(p.name) === 'collegestudents');
+      } else if (normInput === 'collegestudents') {
+        program = allPrograms.find(p => this.normalizeString(p.name) === 'collegestudent');
+      }
+    }
+
+    // 3. Partial match (last resort)
+    if (!program) {
+      program = allPrograms.find(p =>
+        this.normalizeString(p.name).includes(normInput) ||
+        normInput.includes(this.normalizeString(p.name))
+      );
+    }
+
+    if (!program) {
+      throw new BadRequestException(`Program '${programType}' not found.`);
+    }
+
+    return program;
   }
 }

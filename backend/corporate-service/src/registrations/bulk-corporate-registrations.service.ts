@@ -28,6 +28,8 @@ import {
   Program,
   CorporateAccount,
   GroupAssessment,
+  Department,
+  DepartmentDegree,
 } from '@originbi/shared-entities';
 import { CorporateRegistrationsService } from './corporate-registrations.service';
 
@@ -50,9 +52,13 @@ export class BulkCorporateRegistrationsService {
     private corporateAccountRepo: Repository<CorporateAccount>,
     @InjectRepository(GroupAssessment)
     private groupAssessmentRepo: Repository<GroupAssessment>,
+    @InjectRepository(Department)
+    private departmentRepo: Repository<Department>,
+    @InjectRepository(DepartmentDegree)
+    private departmentDegreeRepo: Repository<DepartmentDegree>,
     private dataSource: DataSource,
     private readonly corporateRegistrationsService: CorporateRegistrationsService,
-  ) {}
+  ) { }
 
   /**
    * Phase 1: Preview & Validate
@@ -108,7 +114,9 @@ export class BulkCorporateRegistrationsService {
       if (
         normName.includes('employee') ||
         normName.includes('cxo') ||
-        normName.includes('general')
+        normName.includes('general') ||
+        normName.includes('college') ||
+        p.code === 'COLLEGE_STUDENT'
       ) {
         programMap.set(this.normalizeString(p.code), p);
         programMap.set(normName, p);
@@ -122,6 +130,22 @@ export class BulkCorporateRegistrationsService {
     const groupMap = new Map<string, Groups>();
     allGroups.forEach((g) => {
       groupMap.set(this.normalizeString(g.name), g);
+    });
+
+    const allDepartments = await this.departmentRepo.find();
+    const allDeptDegrees = await this.departmentDegreeRepo.find({
+      relations: ['department'],
+    });
+    const departmentMap = new Map<string, Department>();
+    allDepartments.forEach((d) => {
+      departmentMap.set(this.normalizeString(d.name), d);
+    });
+
+    const degreeMap = new Map<string, DepartmentDegree>();
+    allDeptDegrees.forEach((dd) => {
+      // Map by standard names like "B.Tech IT" or just "IT"
+      const key = this.normalizeString(`${dd.department.name}`);
+      degreeMap.set(key, dd);
     });
 
     // 3. Parse All Rows First
@@ -258,6 +282,8 @@ export class BulkCorporateRegistrationsService {
         userAssessmentMap,
         seenEmails,
         seenMobiles,
+        departmentMap,
+        degreeMap,
       );
       rowsToInsert.push(processedRow);
 
@@ -406,6 +432,22 @@ export class BulkCorporateRegistrationsService {
       programMap.set(this.normalizeString(p.code), p); // Add code mapping too
     });
 
+    const allDepartments = await this.departmentRepo.find();
+    const allDeptDegrees = await this.departmentDegreeRepo.find({
+      relations: ['department'],
+    });
+    const departmentMap = new Map<string, Department>();
+    allDepartments.forEach((d) => {
+      departmentMap.set(this.normalizeString(d.name), d);
+    });
+
+    const degreeMap = new Map<string, DepartmentDegree>();
+    allDeptDegrees.forEach((dd) => {
+      // Map by standard names like "B.Tech IT" or just "IT"
+      const key = this.normalizeString(`${dd.department.name}`);
+      degreeMap.set(key, dd);
+    });
+
     const rows = await this.bulkImportRowRepo.find({
       where: { importId: jobId, status: 'READY' },
       order: { rowIndex: 'ASC' },
@@ -433,7 +475,12 @@ export class BulkCorporateRegistrationsService {
         if (matchedName) effectiveGroupName = matchedName;
       }
 
-      const dto = this.mapRowToDto(row.rawData, effectiveGroupName, programMap);
+      const dto = this.mapRowToDto(
+        row.rawData,
+        effectiveGroupName,
+        programMap,
+        degreeMap,
+      );
 
       // Find Program ID for Header
       let programId: number | null = null;
@@ -732,18 +779,49 @@ export class BulkCorporateRegistrationsService {
     rawData: unknown,
     groupName: string,
     programMap: Map<string, Program>,
+    degreeMap?: Map<string, DepartmentDegree>,
   ) {
     const pCode = this.getValue(rawData, ['ProgramId', 'program_code']);
     let pName = 'Employee'; // Default fallback? Or strict?
+
+    const program = pCode
+      ? programMap.get(this.normalizeString(pCode))
+      : undefined;
 
     if (pCode) {
       // Check if matches specific keywords
       const norm = this.normalizeString(pCode);
       if (norm.includes('cxo')) pName = 'CXO General';
       else if (norm.includes('employee')) pName = 'Employee';
+      else if (norm.includes('college') || norm === 'collegestudent' || norm === 'collegestudents')
+        pName = 'College Students';
       else {
         // If user provided exact name 'CXO General Assessment' etc.
         if (programMap.has(norm)) pName = programMap.get(norm).name;
+      }
+    }
+
+    // Extract College fields
+    let deptId = null;
+    let degreeId = null;
+    const currentYear = this.getValue(rawData, [
+      'CurrentYear',
+      'current_year',
+      'Year',
+    ]);
+
+    if (pName === 'College Students' && degreeMap) {
+      const deptName = this.getValue(rawData, [
+        'Department',
+        'department',
+        'Stream',
+      ]);
+      if (deptName) {
+        const dd = degreeMap.get(this.normalizeString(deptName));
+        if (dd) {
+          deptId = Number(dd.departmentId);
+          degreeId = Number(dd.id);
+        }
       }
     }
 
@@ -775,6 +853,9 @@ export class BulkCorporateRegistrationsService {
       examEnd: this.parseDateAsIST(
         this.getValue(rawData, ['ExamEnd', 'exam_end_date', 'valid_to']),
       ),
+      departmentId: deptId ? String(deptId) : undefined,
+      degreeId: degreeId ? String(degreeId) : undefined,
+      currentYear: currentYear ? String(currentYear) : undefined,
     };
   }
 
@@ -790,12 +871,15 @@ export class BulkCorporateRegistrationsService {
     userAssessmentMap: Map<number, any[]>,
     seenEmails: Set<string>,
     seenMobiles: Set<string>,
+    departmentMap: Map<string, Department>,
+    degreeMap: Map<string, DepartmentDegree>,
   ): BulkImportRow {
-    const rowEntity = new BulkImportRow();
-    rowEntity.import = importJob;
-    rowEntity.rowIndex = index;
-    rowEntity.rawData = rawData;
-    rowEntity.normalizedData = { ...rawData };
+    const rowEntity = this.bulkImportRowRepo.create({
+      importId: importJob.id,
+      rowIndex: index,
+      rawData,
+      status: 'PROCESSING',
+    });
 
     const validationError = this.validateRules(
       rawData,
@@ -805,6 +889,8 @@ export class BulkCorporateRegistrationsService {
       userAssessmentMap,
       seenEmails,
       seenMobiles,
+      departmentMap,
+      degreeMap,
     );
 
     if (validationError) {
@@ -870,6 +956,8 @@ export class BulkCorporateRegistrationsService {
     userAssessmentMap: Map<number, any[]>,
     seenEmails: Set<string>,
     seenMobiles: Set<string>,
+    departmentMap: Map<string, Department>,
+    degreeMap: Map<string, DepartmentDegree>,
   ): string | null {
     // 1. Mandatory Fields
     const email = row['Email'] || row['email'];
@@ -900,10 +988,32 @@ export class BulkCorporateRegistrationsService {
       program ||
       pNorm.includes('employee') ||
       pNorm.includes('cxo') ||
-      pNorm.includes('general');
+      pNorm.includes('general') ||
+      pNorm.includes('college') ||
+      pNorm === 'collegestudent';
 
     if (!isValidProgram) {
-      return `Program '${programCode}' invalid. Must be 'Employee' or 'CXO General'.`;
+      return `Program '${programCode}' invalid. Must be 'Employee', 'CXO General' or 'College Students'.`;
+    }
+
+    // College Specific Validation
+    const effectivePName =
+      program?.name ||
+      (pNorm.includes('cxo')
+        ? 'CXO General'
+        : pNorm.includes('college') || pNorm === 'collegestudent' || pNorm === 'collegestudents'
+          ? 'College Students'
+          : 'Employee');
+
+    if (effectivePName === 'College Students') {
+      const deptName = this.getValue(row, ['Department', 'department', 'Stream']);
+      const currentYear = this.getValue(row, ['CurrentYear', 'current_year', 'Year']);
+
+      if (!deptName) return 'Department is required for College Students';
+      if (!currentYear) return 'Current Year is required for College Students';
+
+      const dd = degreeMap.get(this.normalizeString(deptName));
+      if (!dd) return `Department '${deptName}' not found in system.`;
     }
 
     // 4. Dates
