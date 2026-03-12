@@ -3,7 +3,6 @@ import { useRouter } from "next/navigation";
 import { studentService } from '../../lib/services/student.service';
 import Header from "./Header";
 import Dashboard from "./Dashboard";
-import FloatingChatBot from "../admin/FloatingChatBot";
 
 interface DashboardLayoutProps {
     onLogout: () => void;
@@ -67,14 +66,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, currentView
             </div>
 
             {/* Content Area with Top Padding for Fixed Header */}
-            <main className="flex-1 pt-[72px] sm:pt-[80px] lg:pt-[65px] relative">
-                <div className="w-full h-full px-4 py-4 sm:px-6 sm:py-6 lg:px-[1.666vw] lg:py-[1.666vw] max-w-[2000px] mx-auto">
+            <main className="flex-1 pt-[60px] sm:pt-[80px] lg:pt-[65px] relative">
+                <div className="w-full h-full px-4 py-2 sm:px-6 sm:py-6 lg:px-[1.666vw] lg:py-[1.666vw] max-w-[2000px] mx-auto">
                     {children ? children : <Dashboard />}
                 </div>
             </main>
-
-            {/* AI Chat Assistant for Students */}
-            <FloatingChatBot userRole="STUDENT" />
         </div>
     );
 };

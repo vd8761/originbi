@@ -4,6 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { StudentModule } from './student/student.module';
 import { ForgotPasswordModule } from './forgotpassword/forgotpassword.module';
 import { CounsellingModule } from './modules/counselling/counselling.module';
+import { PgBossModule } from '@wavezync/nestjs-pgboss';
+import { ReportModule } from './report/report.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { CounsellingModule } from './modules/counselling/counselling.module';
       useFactory: (config: ConfigService) => {
         const databaseUrl = config.get<string>('DATABASE_URL');
 
+        const shouldSync = config.get<string>('DB_SYNC') === 'true';
+
         if (databaseUrl) {
           const isLocal =
             databaseUrl.includes('localhost') ||
@@ -25,7 +29,7 @@ import { CounsellingModule } from './modules/counselling/counselling.module';
             type: 'postgres',
             url: databaseUrl,
             autoLoadEntities: true,
-            synchronize: false,
+            synchronize: shouldSync,
             ssl: isLocal ? false : { rejectUnauthorized: false },
           };
         }
@@ -38,14 +42,37 @@ import { CounsellingModule } from './modules/counselling/counselling.module';
           password: config.get<string>('DB_PASS') || '',
           database: config.get<string>('DB_NAME') || 'originbi',
           autoLoadEntities: true,
-          synchronize: false,
+          synchronize: shouldSync,
           ssl: false,
+        };
+      },
+    }),
+    PgBossModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const databaseUrl = config.get<string>('DATABASE_URL');
+        let connectionString = databaseUrl;
+
+        if (!connectionString) {
+          const host = config.get<string>('DB_HOST') || 'localhost';
+          const port = config.get<number>('DB_PORT') || 5432;
+          const user = config.get<string>('DB_USER') || 'origin_user';
+          const pass = config.get<string>('DB_PASS') || '';
+          const dbName = config.get<string>('DB_NAME') || 'originbi';
+          connectionString = `postgresql://${user}:${pass}@${host}:${port}/${dbName}`;
+        }
+
+        return {
+          connectionString,
+          application_name: 'student-service-boss',
         };
       },
     }),
     StudentModule,
     ForgotPasswordModule,
     CounsellingModule,
+    ReportModule,
   ],
 })
 export class AppModule {}

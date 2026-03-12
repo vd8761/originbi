@@ -23,7 +23,7 @@ import { AssessmentGenerationService } from '../assessment/assessment-generation
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
 
 import * as nodemailer from 'nodemailer';
-import { SES } from 'aws-sdk';
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 
 @Injectable()
 export class RegistrationsService {
@@ -45,7 +45,7 @@ export class RegistrationsService {
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
-  ) {}
+  ) { }
 
   async withRetry<T>(
     operation: () => Promise<T>,
@@ -245,14 +245,20 @@ export class RegistrationsService {
         let programTitle: string;
 
         if (dto.programType) {
-          // Strict lookup for selected program
-          const selectedProgram = await manager
-            .getRepository(Program)
-            .findOne({ where: { id: Number(dto.programType) } });
+          // Strict lookup for selected program (by ID or Name)
+          const isNumericId =
+            !isNaN(Number(dto.programType)) &&
+            String(dto.programType).trim() !== '';
+
+          const selectedProgram = await manager.getRepository(Program).findOne({
+            where: isNumericId
+              ? { id: Number(dto.programType) }
+              : { name: dto.programType },
+          });
 
           if (!selectedProgram) {
             throw new BadRequestException(
-              `Selected Program (ID: ${dto.programType}) not found.`,
+              `Selected Program ('${dto.programType}') not found.`,
             );
           }
           if (!selectedProgram.isActive) {
@@ -453,9 +459,15 @@ export class RegistrationsService {
       let programId: number;
 
       if (dto.programType) {
-        const selectedProgram = await manager
-          .getRepository(Program)
-          .findOne({ where: { id: Number(dto.programType) } });
+        const isNumericId =
+          !isNaN(Number(dto.programType)) &&
+          String(dto.programType).trim() !== '';
+
+        const selectedProgram = await manager.getRepository(Program).findOne({
+          where: isNumericId
+            ? { id: Number(dto.programType) }
+            : { name: dto.programType },
+        });
 
         if (!selectedProgram)
           throw new BadRequestException(`Program ${dto.programType} not found`);
@@ -626,6 +638,7 @@ export class RegistrationsService {
         examStart: r.metadata?.examStart,
         examEnd: r.metadata?.examEnd,
         createdAt: r.createdAt,
+        has_ai_counsellor: r.hasAiCounsellor ?? false,
       }));
 
       return { data, total, page, limit };
@@ -659,6 +672,56 @@ export class RegistrationsService {
   }
 
   // ---------------------------------------------------------
+  // TOGGLE AI COUNSELLOR
+  // ---------------------------------------------------------
+  async toggleAiCounsellor(id: string, enabled: boolean) {
+    const value = !!enabled;
+
+    // Ensure column exists (safe idempotent ALTER)
+    await this.dataSource
+      .query(
+        `ALTER TABLE registrations ADD COLUMN IF NOT EXISTS has_ai_counsellor BOOLEAN NOT NULL DEFAULT false`,
+      )
+      .catch(() => {
+        /* column already exists */
+      });
+
+    // Use raw SQL to avoid BigInt/entity serialization issues
+    const result = await this.dataSource.query(
+      `UPDATE registrations SET has_ai_counsellor = $1, updated_at = NOW() WHERE id = $2 RETURNING id, has_ai_counsellor`,
+      [value, id],
+    );
+
+    if (!result || result.length === 0) {
+      throw new BadRequestException('Registration not found');
+    }
+
+    return { success: true, hasAiCounsellor: result[0].has_ai_counsellor };
+  }
+
+  // ---------------------------------------------------------
+  // CHECK AI COUNSELLOR ACCESS (public, by email)
+  // ---------------------------------------------------------
+  async checkCounsellorAccess(email: string): Promise<{ hasAccess: boolean }> {
+    try {
+      const result = await this.dataSource.query(
+        `SELECT r.has_ai_counsellor
+         FROM registrations r
+         JOIN users u ON r.user_id = u.id
+         WHERE LOWER(u.email) = LOWER($1) AND r.is_deleted = false
+         ORDER BY r.created_at DESC LIMIT 1`,
+        [email],
+      );
+      if (result && result.length > 0) {
+        return { hasAccess: !!result[0].has_ai_counsellor };
+      }
+      return { hasAccess: false };
+    } catch (error) {
+      return { hasAccess: false };
+    }
+  }
+
+  // ---------------------------------------------------------
   // Helper: Send Welcome Email
   // ---------------------------------------------------------
   private async sendWelcomeEmail(
@@ -668,14 +731,16 @@ export class RegistrationsService {
     startDateTime?: Date | string,
     assessmentTitle?: string,
   ) {
-    const ses = new SES({
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-      sessionToken: process.env.AWS_SESSION_TOKEN,
+    const sesClient = new SESv2Client({
       region: process.env.AWS_REGION,
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+        sessionToken: process.env.AWS_SESSION_TOKEN,
+      },
     });
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    const transporter = nodemailer.createTransport({ SES: ses } as any);
+    const transporter = nodemailer.createTransport({ SES: { sesClient, SendEmailCommand } } as any);
     const ccEmail = process.env.EMAIL_CC || '';
 
     const fromName = process.env.EMAIL_SEND_FROM_NAME || 'Origin BI Mind Works';

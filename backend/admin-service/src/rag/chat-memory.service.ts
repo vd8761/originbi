@@ -4,7 +4,7 @@ import { DataSource } from 'typeorm';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
- * ║                 MITHRA  CHAT  MEMORY  SERVICE                            ║
+ * ║                 BI  CHAT  MEMORY  SERVICE                                ║
  * ║         DB-persisted conversations  ·  ChatGPT-style history            ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
  * ║  • Create / list / delete conversations                                   ║
@@ -241,7 +241,7 @@ export class ChatMemoryService {
 
     let history = '--- CONVERSATION HISTORY ---\n';
     for (const row of rows) {
-      const label = row.role === 'user' ? 'User' : 'MITHRA';
+      const label = row.role === 'user' ? 'User' : 'BI';
       let content: string = row.content || '';
       if (content.length > this.MSG_TRUNCATE_LEN) {
         content = content.slice(0, this.MSG_TRUNCATE_LEN) + '… [truncated]';

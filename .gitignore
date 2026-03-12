@@ -34,7 +34,8 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env*
+.env
+.env.local
 
 # vercel
 .vercel
@@ -67,9 +68,13 @@ run-all.sh
 run-all-private.ps1
 
 /originbi-schools
+/originbi-app
 
 dev.ps1
 dev-start.ps1
 
 start-all.sh
 stop-all.sh
+
+act.exe
+/bin

@@ -36,6 +36,9 @@ const config: Config = {
                 "progress-bar": "progress 5s linear forwards",
                 "spin-slow": "spin 15s linear infinite",
                 "spin-slow-reverse": "spin-reverse 15s linear infinite",
+                "ping-once": "ping 1s cubic-bezier(0, 0, 0.2, 1) forwards",
+                "ripple-once": "ripple-once 1.5s ease-out forwards",
+                "shimmer": "shimmer 2s linear infinite",
             },
             keyframes: {
                 "fade-in": {
@@ -54,6 +57,15 @@ const config: Config = {
                 },
                 "spin-reverse": {
                     to: { transform: "rotate(-360deg)" },
+                },
+                "ripple-once": {
+                    "0%": { transform: "scale(0.8)", opacity: "0.5" },
+                    "50%": { transform: "scale(1.5)", opacity: "0.2" },
+                    "100%": { transform: "scale(2)", opacity: "0" },
+                },
+                "shimmer": {
+                    from: { left: "-100%" },
+                    to: { left: "200%" },
                 },
             },
         },

@@ -24,9 +24,14 @@ export const corporateDashboardService = {
         return res.json();
     },
 
-    async getStats(email: string): Promise<any> {
+    async getStats(email: string, startDate?: string, endDate?: string): Promise<any> {
         const token = AuthService.getToken();
-        const res = await fetch(`${API_URL}/dashboard/stats?email=${encodeURIComponent(email)}`, {
+        const query = new URLSearchParams({
+            email,
+            ...(startDate && { startDate }),
+            ...(endDate && { endDate }),
+        });
+        const res = await fetch(`${API_URL}/dashboard/stats?${query.toString()}`, {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",
@@ -319,6 +324,33 @@ export const corporateDashboardService = {
 
         if (!res.ok) {
             throw new Error("Failed to fetch counselling report");
+        }
+        return res.json();
+    },
+
+    // ============================================================================
+    // SEARCH REPORT BY REPORT NUMBER (Origin BI ID)
+    // ============================================================================
+
+    async searchByReportNumber(email: string, reportNumber: string): Promise<any | null> {
+        const token = AuthService.getToken();
+        const res = await fetch(
+            `${API_URL}/dashboard/search-report/${encodeURIComponent(reportNumber)}?email=${encodeURIComponent(email)}`,
+            {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+            }
+        );
+
+        if (res.status === 404) {
+            return null;
+        }
+
+        if (!res.ok) {
+            throw new Error("Failed to search report");
         }
         return res.json();
     }

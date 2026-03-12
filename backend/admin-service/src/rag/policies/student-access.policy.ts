@@ -35,12 +35,16 @@ export class StudentAccessPolicy implements IAccessPolicy {
             'greeting',
             'help',
             'test_results',          // Their own results
+            'self_results',          // "my results" / "my score"
             'career_report',         // Their own career report
             'career_guidance',       // Personalized guidance
             'job_eligibility',       // Check their eligibility
             'skill_development',     // Recommended skills
             'higher_studies',        // Education recommendations
             'personality_insights',  // Their DISC profile
+            'general_knowledge',     // General questions (routed to LLM)
+            'personal_info',         // "my name", "my profile"
+            'data_query',            // Dynamic SQL queries (scoped to their own data)
         ];
     }
 

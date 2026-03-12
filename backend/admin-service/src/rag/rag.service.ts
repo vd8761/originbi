@@ -10,19 +10,20 @@ import { ConversationService } from './conversation.service';
 import { ChatMemoryService } from './chat-memory.service';
 import { OriIntelligenceService } from './ori-intelligence.service';
 import { JDMatchingService } from './jd-matching.service';
+import { TextToSqlService } from './text-to-sql.service';
 
 // RBAC Imports
 import { AccessPolicyFactory } from './policies';
 import { AuditLoggerService } from './audit';
 import { UserContext } from '../common/interfaces/user-context.interface';
 
-import { MITHRA_PERSONA, getRandomResponse, getSignOff } from './ori-persona';
+import { BI_PERSONA, getRandomResponse, getSignOff } from './ori-persona';
 import * as fs from 'fs';
 import * as path from 'path';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
- * ║                          🤖 MITHRA v2.0 - JARVIS EDITION                  ║
+ * ║                          🤖 BI v2.0 - JARVIS EDITION                      ║
  * ║              OriginBI Intelligent - Your Career Guide                    ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
  * ║  FEATURES:                                                                ║
@@ -42,50 +43,100 @@ interface QueryResult {
   confidence: number;
   reportUrl?: string;
   reportId?: string;
+  suggestions?: string[];
 }
 
 // Complete Database Schema
 const COMPLETE_SCHEMA = `
 ═══════════════════════════════════════════════════════════════════════════════
-ORIGINBI DATABASE SCHEMA
+ORIGINBI DATABASE SCHEMA — COMPLETE REFERENCE
 ═══════════════════════════════════════════════════════════════════════════════
 
 TABLE: users
-Columns: email, role, is_active, is_blocked, login_count, last_login_at
-Notes: System users (admins, managers). Role can be ADMIN, SUPER_ADMIN, CORPORATE, STUDENT
+Columns: id, cognito_sub, email, email_verified, role, avatar_url, first_login_at, last_login_at, last_login_ip, login_count, metadata(jsonb), is_active, is_blocked, corporate_id, created_at, updated_at
+Notes: System login accounts. role = ADMIN | SUPER_ADMIN | CORPORATE | STUDENT. corporate_id links corporate users to their company.
+Relationships: users.id → registrations.user_id, users.id → corporate_accounts.user_id
 
-TABLE: registrations  
-Columns: full_name, mobile_number, gender, status, registration_source
-Notes: Candidates/students. ALWAYS use full_name for person searches. Status: INCOMPLETE, COMPLETED, CANCELLED
+TABLE: registrations
+Columns: id, user_id, full_name, country_code, mobile_number, gender(MALE/FEMALE/OTHER), registration_source(SELF/ADMIN/CORPORATE/RESELLER), created_by_user_id, corporate_account_id, reseller_account_id, group_id, school_level, school_stream, student_board, department_degree_id, program_id, assessment_session_id, payment_required, payment_provider, payment_reference, payment_amount, payment_status(NOT_REQUIRED/PENDING/PAID/FAILED/REFUNDED), payment_created_at, paid_at, status(INCOMPLETE/COMPLETED/CANCELLED), metadata(jsonb), has_ai_counsellor, is_deleted, created_at, updated_at
+Notes: Candidates/students. ALWAYS use full_name for person searches. Email is NOT in this table — join users for email. "resource" / "employee" = registration (corporate candidate).
+Relationships: registrations.user_id → users.id, registrations.corporate_account_id → corporate_accounts.id, registrations.group_id → groups.id, registrations.program_id → programs.id
 
 TABLE: assessment_attempts
-Columns: registration_id, program_id, total_score, status, dominant_trait_id, started_at, completed_at
-Notes: Exam results. JOIN with registrations ON registration_id for candidate name. dominant_trait_id links to personality_traits
+Columns: id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, unlock_at, expires_at, started_at, must_finish_by, completed_at, status(NOT_STARTED/IN_PROGRESS/COMPLETED), total_score(numeric), max_score_snapshot, sincerity_index(numeric), sincerity_class, dominant_trait_id, agile_score(numeric), is_deleted, created_at, updated_at
+Notes: Exam/assessment results. JOIN with registrations ON registration_id for candidate name. total_score & agile_score are numeric (cast as needed).
+Relationships: assessment_attempts.registration_id → registrations.id, assessment_attempts.dominant_trait_id → personality_traits.id, assessment_attempts.program_id → programs.id
+
+TABLE: assessment_answers
+Columns: id, assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, question_source(MAIN/OPEN), main_question_id, open_question_id, question_sequence, main_option_id, open_option_id, answer_text, answer_score(numeric), time_spent_seconds, is_multiple_selection, answer_change_count, is_attention_fail, is_distraction_chosen, sincerity_flag, created_at, updated_at
+Notes: Individual answers per question in an assessment attempt.
 
 TABLE: personality_traits
-Columns: id, blended_style_name, blended_style_desc
-Notes: DISC behavioral styles. Join using assessment_attempts.dominant_trait_id = personality_traits.id
+Columns: id, code, blended_style_name, blended_style_desc, color_rgb, metadata(jsonb), is_active, is_deleted, created_at, updated_at
+Notes: DISC behavioral styles (e.g., "Influential Leader", "Steady Analyst"). Join using assessment_attempts.dominant_trait_id
 
-TABLE: assessment_levels
-Columns: name, description, duration_minutes, max_score
-Notes: Types of assessments (Behavioral, Agile, etc.)
+TABLE: assessment_sessions
+Columns: id, user_id, registration_id, program_id
+Notes: Links a user's assessment session to their registration and program.
 
 TABLE: programs
-Columns: code, name, description, is_active, is_demo
-Notes: Assessment programs
+Columns: id, code, name, description, assessment_title, report_title, is_demo, is_active, created_at, updated_at
+Notes: Assessment programs (e.g., "Career Compass", "Student Discovery")
 
 TABLE: career_roles
-Columns: career_role_name, short_description, is_active
-Notes: Job roles for career matching
+Columns: id, career_role_name, short_description, is_active, is_deleted
+Notes: Job roles for career matching. Use career_role_name (NOT "name").
+
+TABLE: career_role_tools
+Columns: id, career_role_id, tool_name, is_deleted
+Notes: Technologies/skills per career role. JOIN with career_roles ON career_role_id.
 
 TABLE: corporate_accounts
-Columns: company_name, sector_code, total_credits, available_credits
-Notes: Company accounts
+Columns: id, user_id, company_name, full_name, sector_code, job_title, gender, country_code, mobile_number, linkedin_url, business_locations, employee_ref_id, total_credits, available_credits, is_active, is_blocked, created_at, updated_at
+Notes: Company/employer accounts. company_name = organization name, full_name = contact person. "resource"/"employee" of a corporate = registrations WHERE corporate_account_id = corporate_accounts.id
+Relationships: corporate_accounts.user_id → users.id (the corporate user login). Candidates link via registrations.corporate_account_id → corporate_accounts.id
 
 TABLE: groups
-Columns: code, name
-Notes: Candidate batches
+Columns: id, code, name, corporate_account_id, reseller_account_id, created_by_user_id, is_default, is_active, is_deleted, metadata(jsonb), created_at, updated_at
+Notes: Candidate batches/groups within a corporate. groups.corporate_account_id → corporate_accounts.id
 
+TABLE: affiliate_accounts
+Columns: id, user_id, name, email, country_code, mobile_number, address, referral_code, referral_count, commission_percentage(numeric), total_earned_commission(numeric), total_settled_commission(numeric), total_pending_commission(numeric), upi_id, upi_number, banking_name, account_number, ifsc_code, branch_name, aadhar_documents(jsonb), pan_documents(jsonb), is_active, metadata(jsonb), created_at, updated_at
+Notes: Affiliate/referral partners
+
+TABLE: affiliate_referral_transactions
+Columns: id, affiliate_account_id, registration_id, registration_amount(numeric), commission_percentage(numeric), earned_commission_amount(numeric), settlement_status(0=Not Settled/1=Processing/2=Settled), metadata(jsonb), payment_at, created_at, updated_at
+Notes: Individual referral records.
+
+TABLE: affiliate_settlement_transactions
+Columns: id, affiliate_account_id, settle_amount(numeric), transaction_mode, settlement_transaction_id, payment_date, metadata(jsonb), created_at
+Notes: Payout records to affiliates
+
+TABLE: trait_based_course_details
+Columns: id, trait_id, course_name, course_description, is_deleted
+Notes: Course recommendations per personality trait
+
+TABLE: departments
+Columns: id, name, short_name, category, metadata(jsonb), is_active, is_deleted, created_at, updated_at
+Notes: Academic departments
+
+TABLE: department_degrees
+Columns: id, department_id, degree_type_id
+Notes: Links departments to degree types. department_degrees.department_id → departments.id, department_degrees.degree_type_id → degree_types.id
+
+TABLE: degree_types
+Columns: id, name, level, is_active, is_deleted, created_at, updated_at
+Notes: Degree levels (Bachelor's, Master's, Diploma, etc.)
+
+═══════════════════════════════════════════════════════════════════════════════
+COMMON VOCABULARY MAPPING:
+- "resource" / "employee" / "candidate" / "student" / "member" = registrations table
+- "corporate" / "company" / "employer" / "organization" = corporate_accounts table
+- "score" / "result" / "marks" / "assessment" = assessment_attempts table
+- "personality" / "trait" / "style" / "DISC" = personality_traits table
+- "program" / "course" / "exam type" = programs table
+- "group" / "batch" = groups table
+- "affiliate" / "partner" / "referral" = affiliate_accounts table
 ═══════════════════════════════════════════════════════════════════════════════
 `;
 
@@ -119,7 +170,7 @@ const AGILE_LEVELS = {
 
 @Injectable()
 export class RagService {
-  private readonly logger = new Logger('MITHRA');
+  private readonly logger = new Logger('BI');
   private llm: ChatGroq | null = null;
   private reportsDir: string;
 
@@ -127,9 +178,13 @@ export class RagService {
   private queryCache = new Map<string, any>();
   private readonly CACHE_EXPIRY = 60 * 60 * 1000; // 1 hour (was 30 minutes)
 
+  // Column safety: tracks which optional columns exist in the DB
+  private safeColumnsChecked = false;
+  private hasSincerityColumns = true; // assume true, checked on first query
+
   // Disambiguation follow-up cache: remembers the search term when multiple candidates are shown
-  // so that a bare number reply ("1", "#2") re-routes to the correct career report.
-  private disambiguationCache = new Map<string, { searchTerm: string; timestamp: number }>();
+  // so that a bare number reply ("1", "#2") re-routes to the correct handler.
+  private disambiguationCache = new Map<string, { searchTerm: string; timestamp: number; handler?: string }>();
   private readonly DISAMBIG_EXPIRY = 5 * 60 * 1000; // 5 minutes
 
   // ── PAGINATION STATE ──
@@ -160,6 +215,7 @@ export class RagService {
     private chatMemory: ChatMemoryService,
     private oriIntelligence: OriIntelligenceService,
     private jdMatchingService: JDMatchingService,
+    private textToSqlService: TextToSqlService,
     private policyFactory: AccessPolicyFactory,
     private auditLogger: AuditLoggerService,
   ) {
@@ -167,7 +223,67 @@ export class RagService {
     if (!fs.existsSync(this.reportsDir)) {
       fs.mkdirSync(this.reportsDir, { recursive: true });
     }
-    this.logger.log('🤖 MITHRA v2.0 initialized with RBAC - Your intelligent career guide!');
+    this.logger.log('🤖 BI v2.0 initialized with RBAC - Your intelligent career guide!');
+  }
+
+  /**
+   * Check which optional columns exist in the DB (runs once, lazily)
+   * Prevents "column does not exist" errors from crashing queries
+   */
+  private async ensureColumnSafety(): Promise<void> {
+    if (this.safeColumnsChecked) return;
+    try {
+      const result = await this.dataSource.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'assessment_attempts' AND column_name IN ('sincerity_class', 'sincerity_index')
+      `);
+      const existingCols = new Set(result.map((r: any) => r.column_name));
+      this.hasSincerityColumns = existingCols.has('sincerity_class') && existingCols.has('sincerity_index');
+      if (!this.hasSincerityColumns) {
+        this.logger.warn('⚠️ sincerity_class/sincerity_index columns not found in assessment_attempts — queries will omit them');
+      }
+      this.safeColumnsChecked = true;
+    } catch (e) {
+      this.logger.warn(`Column safety check failed: ${e.message} — assuming columns exist`);
+      this.safeColumnsChecked = true;
+    }
+  }
+
+  /** Returns sincerity SELECT fields if columns exist, or NULL aliases */
+  private getSinceritySelectFields(alias: string = 'aa'): string {
+    if (this.hasSincerityColumns) {
+      return `${alias}.sincerity_index, ${alias}.sincerity_class`;
+    }
+    return `NULL::numeric as sincerity_index, NULL::varchar as sincerity_class`;
+  }
+
+  /** Sanitize error messages — never expose raw SQL/DB internals to users */
+  private sanitizeErrorForUser(error: any): string {
+    const msg = error?.message || 'An unexpected error occurred';
+    // Strip SQL internals
+    if (/column.*does not exist/i.test(msg)) {
+      return 'A database schema mismatch was detected. Please contact your administrator.';
+    }
+    if (/relation.*does not exist/i.test(msg)) {
+      return 'A required database table is missing. Please contact your administrator.';
+    }
+    if (/permission denied/i.test(msg)) {
+      return 'You do not have permission to access this data.';
+    }
+    if (/timeout|timed out/i.test(msg)) {
+      return 'The request took too long. Please try a simpler query.';
+    }
+    if (/syntax error/i.test(msg)) {
+      return 'There was a problem processing your request. Please try rephrasing your question.';
+    }
+    if (/connect|connection/i.test(msg)) {
+      return 'Unable to connect to the database. Please try again in a moment.';
+    }
+    // For any other DB errors, return generic message
+    if (/ECONNREFUSED|ENOTFOUND|ERROR/i.test(msg)) {
+      return 'A system error occurred. Please try again or contact support.';
+    }
+    return msg;
   }
 
   private getLlm(): ChatGroq {
@@ -185,12 +301,179 @@ export class RagService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // SMART QUERY NORMALIZATION — Auto-correct typos, map synonyms, clean input
+  // ═══════════════════════════════════════════════════════════════════════════
+  private normalizeQuery(question: string): string {
+    let q = question.trim();
+
+    // ── Step 0: Fix commonly joined/merged words ──
+    q = q.replace(/\bhowmany\b/gi, 'how many');
+    q = q.replace(/\bhoware\b/gi, 'how are');
+    q = q.replace(/\bwhatis\b/gi, 'what is');
+    q = q.replace(/\bwhatare\b/gi, 'what are');
+    q = q.replace(/\bwhatabout\b/gi, 'what about');
+    q = q.replace(/\blistmy\b/gi, 'list my');
+    q = q.replace(/\bshowmy\b/gi, 'show my');
+
+    // ── Domain-specific typo dictionary ──
+    // Maps common misspellings to correct terms
+    const typoMap: Record<string, string> = {
+      // Candidate variations
+      'candiate': 'candidate', 'candadate': 'candidate', 'candidte': 'candidate',
+      'candiates': 'candidates', 'candidtes': 'candidates', 'candadates': 'candidates',
+      'canidate': 'candidate', 'canidates': 'candidates', 'candidat': 'candidate',
+      'candidats': 'candidates', 'canditae': 'candidate', 'canditaes': 'candidates',
+      'canditare': 'candidate', 'canditares': 'candidates', 'canditate': 'candidate',
+      'canditates': 'candidates', 'candidaet': 'candidate', 'candidaets': 'candidates',
+      'cadnidate': 'candidate', 'canddidate': 'candidate', 'candadite': 'candidate',
+      // Employee variations
+      'employe': 'employee', 'employes': 'employees', 'employeee': 'employee',
+      'emplyee': 'employee', 'emplyees': 'employees', 'emploee': 'employee',
+      'emploees': 'employees', 'employi': 'employee', 'employess': 'employees',
+      // Resource variations
+      'resourse': 'resource', 'resourses': 'resources', 'resorce': 'resource',
+      'resorces': 'resources', 'resouces': 'resources',
+      // Performer variations
+      'performar': 'performer', 'performars': 'performers', 'preformer': 'performer',
+      'preformers': 'performers', 'perfomer': 'performer', 'perfomers': 'performers',
+      'performaer': 'performer', 'performaers': 'performers', 'performaes': 'performers',
+      'performr': 'performer', 'performrs': 'performers', 'preformner': 'performer',
+      // Assessment variations
+      'assesment': 'assessment', 'assesments': 'assessments', 'asessment': 'assessment',
+      'assessmnt': 'assessment', 'assement': 'assessment',
+      // Result variations 
+      'reslt': 'result', 'reslts': 'results', 'reult': 'result', 'reults': 'results',
+      // Development variations
+      'developement': 'development', 'devlopment': 'development', 'developmnt': 'development',
+      // Score variations
+      'scor': 'score', 'scors': 'scores', 'scroe': 'score',
+      // Report variations
+      'reprt': 'report', 'repert': 'report', 'reprot': 'report',
+      // Other common typos
+      'detils': 'details', 'detials': 'details', 'deatils': 'details',
+      'carreer': 'career', 'carrer': 'career', 'carier': 'career',
+      'abut': 'about', 'abot': 'about', 'abour': 'about',
+      'knw': 'know', 'konw': 'know',
+      'shw': 'show', 'shwo': 'show',
+      'lst': 'list', 'lsit': 'list',
+      'fir': 'fit', // "fir for" → "fit for" (from screenshot)
+      'sutable': 'suitable', 'sutiable': 'suitable', 'suitble': 'suitable',
+      'sutaible': 'suitable', 'suitabel': 'suitable', 'suitabale': 'suitable',
+      'eligble': 'eligible', 'elegible': 'eligible', 'eligibel': 'eligible',
+      'devlop': 'develop', 'develp': 'develop', 'develope': 'develop',
+      'devloper': 'developer', 'develper': 'developer', 'developar': 'developer',
+      'ful': 'full', 'stck': 'stack',
+      'thier': 'their', 'theri': 'their',
+      'managr': 'manager', 'managrs': 'managers',
+      'analsis': 'analysis', 'anaylsis': 'analysis',
+      'personalti': 'personality', 'personalty': 'personality',
+      'teh': 'the', 'hte': 'the',
+      // Count/total typos
+      'toal': 'total', 'totl': 'total', 'tatal': 'total',
+      'conut': 'count', 'cont': 'count',
+      // Pronoun typos
+      'im': 'i am', 'iam': 'i am',
+      // Gender typos
+      'mal': 'male', 'femal': 'female', 'femle': 'female',
+      // Project/role typos
+      'projct': 'project', 'managar': 'manager', 'mangaer': 'manager',
+      'engneer': 'engineer', 'enginer': 'engineer', 'enginear': 'engineer',
+      'desginer': 'designer', 'desgner': 'designer',
+      'analyt': 'analyst', 'analist': 'analyst', 'analitcs': 'analytics',
+      'complet': 'complete', 'complted': 'completed', 'compleated': 'completed',
+      'registred': 'registered', 'registerd': 'registered', 'regstered': 'registered',
+      'afiliate': 'affiliate', 'affilate': 'affiliate', 'affilait': 'affiliate',
+      'referal': 'referral', 'referel': 'referral', 'refferal': 'referral',
+      // Company/Corporate typos
+      'comany': 'company', 'compny': 'company', 'compnay': 'company', 'companie': 'company',
+      'companyes': 'companies', 'companis': 'companies', 'compaines': 'companies',
+      'corporte': 'corporate', 'corporat': 'corporate', 'corparate': 'corporate',
+      'corpoarte': 'corporate', 'coroprate': 'corporate', 'corprate': 'corporate',
+      'corportes': 'corporates', 'corparates': 'corporates',
+      // Comparison/question typos
+      'comparision': 'comparison', 'compaire': 'compare', 'comapre': 'compare',
+      'averge': 'average', 'avrage': 'average', 'avreage': 'average',
+      'highst': 'highest', 'lowst': 'lowest',
+      'montly': 'monthly', 'weakly': 'weekly', 'yealy': 'yearly',
+    };
+
+    // ── Corporate synonym mapping ──
+    // In corporate context, these all mean "candidate" (registrations table)
+    const corporateSynonyms: Record<string, string> = {
+      'employee': 'candidate', 'employees': 'candidates',
+      'resource': 'candidate', 'resources': 'candidates',
+      'staff': 'candidate', 'staffs': 'candidates',
+      'worker': 'candidate', 'workers': 'candidates',
+      'team member': 'candidate', 'team members': 'candidates',
+      'member': 'candidate', 'members': 'candidates',
+      'people': 'candidates', 'person': 'candidate',
+    };
+
+    // Step 1: Apply typo corrections (word-boundary aware)
+    const words = q.split(/\s+/);
+    const correctedWords = words.map(word => {
+      // Remove trailing punctuation for matching, preserve it
+      const match = word.match(/^([\w']+)([^\w]*)$/);
+      if (!match) return word;
+      const [, core, punct] = match;
+      const lower = core.toLowerCase();
+      if (typoMap[lower]) {
+        this.logger.log(`✏️ Auto-correct: "${core}" → "${typoMap[lower]}"`);
+        return typoMap[lower] + punct;
+      }
+      return word;
+    });
+    q = correctedWords.join(' ');
+
+    // Step 2: Apply multi-word synonym mapping
+    const qLower = q.toLowerCase();
+    for (const [synonym, replacement] of Object.entries(corporateSynonyms)) {
+      if (synonym.includes(' ')) {
+        // Multi-word synonym
+        const regex = new RegExp(`\\b${synonym}\\b`, 'gi');
+        if (regex.test(qLower)) {
+          q = q.replace(regex, replacement);
+          this.logger.log(`🔄 Synonym mapped: "${synonym}" → "${replacement}"`);
+        }
+      }
+    }
+    // Single-word synonyms
+    const finalWords = q.split(/\s+/);
+    const mappedWords = finalWords.map(word => {
+      const match = word.match(/^([\w']+)([^\w]*)$/);
+      if (!match) return word;
+      const [, core, punct] = match;
+      const lower = core.toLowerCase();
+      // Only map single-word synonyms (multi-word already handled)
+      if (corporateSynonyms[lower] && !lower.includes(' ')) {
+        this.logger.log(`🔄 Synonym mapped: "${core}" → "${corporateSynonyms[lower]}"`);
+        return corporateSynonyms[lower] + punct;
+      }
+      return word;
+    });
+    q = mappedWords.join(' ');
+
+    // Step 3: Clean up grammar artifacts
+    q = q.replace(/\s{2,}/g, ' ').trim(); // double spaces
+    q = q.replace(/\?{2,}/g, '?'); // multiple question marks
+
+    if (q !== question.trim()) {
+      this.logger.log(`📝 Normalized: "${question}" → "${q}"`);
+    }
+
+    return q;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // MAIN QUERY ENTRY POINT
   // ═══════════════════════════════════════════════════════════════════════════
-  async query(question: string, user: any): Promise<QueryResult> {
+  async query(question: string, user: any, conversationId: number = 0, mode?: string): Promise<QueryResult> {
     this.logger.log(`🚀 RAG Query Started at ${new Date().toISOString()}`);
     this.logger.log(`📝 Input Question: "${question}"`);
     this.logger.log(`👤 User:`, JSON.stringify(user));
+
+    // Ensure column safety check runs once
+    await this.ensureColumnSafety();
 
     if (!question?.trim()) {
       this.logger.log(`❌ Empty question detected`);
@@ -199,6 +482,56 @@ export class RagService {
         searchType: 'none',
         confidence: 0,
       };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // AI COUNSELLOR MODE — Premium career counselling for students
+    // Bypasses normal intent classification and routes directly to
+    // the advanced counsellor prompt engine.
+    // ═══════════════════════════════════════════════════════════════
+    if (mode === 'counsellor') {
+      this.logger.log('🎓 AI Counsellor mode activated — premium career guidance');
+      try {
+        const userId = user?.id || 0;
+        const userEmail = user?.email || user?.sub || '';
+        this.logger.log(`🎓 Counsellor: userId=${userId}, email=${userEmail}`);
+
+        let userProfile: any = null;
+        try {
+          userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
+          this.logger.log(`🎓 Counsellor: profile found = ${!!userProfile}`);
+        } catch (profileErr) {
+          this.logger.warn(`🎓 Profile lookup failed (non-blocking): ${profileErr.message}`);
+        }
+
+        // Build conversation context from memory + chat history
+        let conversationHistory = '';
+        if (userId > 0) {
+          try {
+            this.oriIntelligence.extractAndStoreFacts(userId, question);
+            conversationHistory = this.oriIntelligence.getConversationContext(userId);
+          } catch { /* non-blocking */ }
+        }
+        if (conversationId > 0) {
+          try {
+            const history = await this.chatMemory.buildLlmHistory(conversationId);
+            if (history) conversationHistory += '\n' + history;
+          } catch { /* non-blocking */ }
+        }
+
+        const answer = await this.oriIntelligence.answerCounsellorQuestion(
+          question, userProfile, conversationHistory,
+        );
+        this.logger.log(`🎓 Counsellor answer generated (${answer.length} chars)`);
+        return { answer, searchType: 'ai_counsellor', confidence: 0.97 };
+      } catch (counsellorError) {
+        this.logger.error(`🎓 AI Counsellor error: ${counsellorError.message}`, counsellorError.stack);
+        return {
+          answer: 'I apologize for the inconvenience. The AI Counsellor is experiencing a temporary issue. Please try again in a moment.',
+          searchType: 'ai_counsellor',
+          confidence: 0,
+        };
+      }
     }
 
     this.logger.log(`\n${'═'.repeat(70)}`);
@@ -213,7 +546,7 @@ export class RagService {
       if (['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'].includes(normalizedQ)) {
         this.logger.log('🎯 Intent: greeting (bypassed LLM)');
         return {
-          answer: getRandomResponse(MITHRA_PERSONA.greetings),
+          answer: getRandomResponse(BI_PERSONA.greetings),
           searchType: 'greeting',
           confidence: 1.0,
         };
@@ -222,11 +555,17 @@ export class RagService {
       if (['help', 'what can you do', 'what can you help me with'].includes(normalizedQ)) {
         this.logger.log('🎯 Intent: help (bypassed LLM)');
         return {
-          answer: MITHRA_PERSONA.help,
+          answer: BI_PERSONA.help,
           searchType: 'help',
           confidence: 1.0,
         };
       }
+
+      // ═══════════════════════════════════════════════════════════════
+      // SMART NORMALIZATION: Auto-correct typos + map synonyms
+      // This runs BEFORE intent classification to fix user input
+      // ═══════════════════════════════════════════════════════════════
+      question = this.normalizeQuery(question);
 
       this.logger.log('🔄 No bypass match, proceeding to LLM understanding...');
 
@@ -271,7 +610,11 @@ export class RagService {
             searchTerm: null as string | null,
             table: pagCtx.intent === 'list_users' ? 'users' :
               pagCtx.intent === 'list_candidates' ? 'registrations' :
-                pagCtx.intent === 'career_roles' ? 'career_roles' : 'assessment_attempts',
+                pagCtx.intent === 'career_roles' ? 'career_roles' :
+                  pagCtx.intent === 'affiliate_referrals' ? 'affiliate_referral_transactions' :
+                    pagCtx.intent === 'affiliate_payments' ? 'affiliate_settlement_transactions' :
+                      pagCtx.intent === 'affiliate_list' || pagCtx.intent === 'affiliate_earnings' ? 'affiliate_accounts' :
+                        'assessment_attempts',
             includePersonality: ['test_results', 'best_performer'].includes(pagCtx.intent),
           };
           const data = await this.executeQuery(interpretation, user as UserContext, offset);
@@ -292,26 +635,139 @@ export class RagService {
         const disambigKey = this.getDisambiguationKey(user);
         const ctx = this.disambiguationCache.get(disambigKey);
         if (ctx && Date.now() - ctx.timestamp < this.DISAMBIG_EXPIRY) {
-          this.logger.log(`🔢 Bare number "${normalizedQ}" detected — resuming disambiguation for "${ctx.searchTerm}"`);
+          this.logger.log(`🔢 Bare number "${normalizedQ}" detected — resuming disambiguation for "${ctx.searchTerm}" (handler=${ctx.handler || 'career_report'})`);
           this.disambiguationCache.delete(disambigKey);
+          // Route to the correct handler based on what created the disambiguation
+          if (ctx.handler === 'person_lookup') {
+            return await this.handlePersonLookup(`${ctx.searchTerm} #${bareNumberMatch[1]}`, user);
+          }
           return await this.handleCareerReport(`${ctx.searchTerm} #${bareNumberMatch[1]}`, user);
         }
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // STEP 1: LLM QUERY UNDERSTANDING (role-aware for better routing)
+      // STEP 1: CONVERSATION CONTEXT + QUERY UNDERSTANDING
       // ═══════════════════════════════════════════════════════════════
       const userRole = (user?.role || 'STUDENT').toUpperCase();
-      const interpretation = await this.understandQuery(question, userRole);
+      const sessionId = conversationId > 0 ? `conv_${conversationId}` : `user_${user?.id || 0}`;
+
+      // Build conversation history for context-aware intent classification
+      let conversationHistory = '';
+      if (conversationId > 0) {
+        try {
+          conversationHistory = await this.chatMemory.buildLlmHistory(conversationId);
+        } catch (e) {
+          this.logger.warn(`Failed to build conversation history: ${e}`);
+        }
+      }
+
+      // Enrich conversation history with tracked entity context
+      const session = this.conversationService.getSession(sessionId);
+      const ctx = session.currentContext;
+      if (ctx.lastPersonMentioned || ctx.entitiesDiscussed.length > 0) {
+        let entityContext = '--- ENTITY CONTEXT ---\n';
+        if (ctx.lastPersonMentioned) {
+          entityContext += `Last person discussed: ${ctx.lastPersonMentioned}\n`;
+        }
+        if (ctx.entitiesDiscussed.length > 0) {
+          entityContext += `People mentioned in this conversation: ${ctx.entitiesDiscussed.join(', ')}\n`;
+        }
+        if (ctx.lastIntent) {
+          entityContext += `Last topic: ${ctx.lastIntent}\n`;
+        }
+        entityContext += '---\n';
+        conversationHistory = entityContext + conversationHistory;
+      }
+
+      // ── Smart Pronoun Resolution & Entity Tracking ──
+      // Resolve "him", "her", "that person" → actual name from conversation context
+      let resolvedQuestion = question;
+      const isFollowUp = this.conversationService.isFollowUp(sessionId, question);
+      if (isFollowUp) {
+        resolvedQuestion = this.conversationService.resolveReferences(sessionId, question);
+        if (resolvedQuestion !== question) {
+          this.logger.log(`🔄 Pronoun resolved: "${question}" → "${resolvedQuestion}"`);
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // SMART FOLLOW-UP CONTEXT RESOLVER
+      // "list the details" / "list those" / "show them" / "give details"
+      // These generic queries need context from the previous intent to
+      // decide WHAT to list. Without this, the LLM hallucinates text.
+      // ═══════════════════════════════════════════════════════════════
+      const followUpResolved = this.resolveFollowUpIntent(sessionId, resolvedQuestion, userRole);
+      if (followUpResolved) {
+        this.logger.log(`🔁 Follow-up resolved: "${resolvedQuestion}" → intent: ${followUpResolved.intent} (from lastIntent context)`);
+        // Track in conversation
+        this.conversationService.addUserMessage(sessionId, question, followUpResolved.intent, []);
+        // Execute directly
+        const followUpData = await this.executeQuery(followUpResolved, user as any, 0);
+
+        // Store pagination state
+        if (['list_users', 'list_candidates', 'test_results', 'best_performer', 'career_roles', 'corporate_details', 'affiliate_referrals'].includes(followUpResolved.intent)) {
+          const pagKey = this.getPaginationKey(user);
+          this.paginationCache.set(pagKey, {
+            intent: followUpResolved.intent,
+            page: 0,
+            totalCount: Array.isArray(followUpData) ? followUpData.length : 0,
+            timestamp: Date.now(),
+          });
+        }
+
+        if (!followUpData || (Array.isArray(followUpData) && followUpData.length === 0)) {
+          return {
+            answer: `No data found for this follow-up query.`,
+            searchType: followUpResolved.intent,
+            confidence: 0.8,
+          };
+        }
+
+        const formattedAnswer = this.formatResponse(followUpResolved, followUpData, 0);
+        return {
+          answer: formattedAnswer,
+          searchType: followUpResolved.intent,
+          confidence: 0.95,
+        };
+      }
+
+      const interpretation = await this.understandQuery(resolvedQuestion, userRole, conversationHistory);
       this.logger.log(`🎯 Intent: ${interpretation.intent}`);
       this.logger.log(`🔍 Search: ${interpretation.searchTerm || 'general'}`);
+
+      // Track entities: extract person names from the question for future pronoun resolution
+      const mentionedEntities: string[] = [];
+      if (interpretation.searchTerm) {
+        mentionedEntities.push(interpretation.searchTerm);
+      }
+      // Extract names from the raw question for entity tracking
+      const nameFromQuestion = this.extractName(resolvedQuestion);
+      if (nameFromQuestion && !mentionedEntities.includes(nameFromQuestion)) {
+        mentionedEntities.push(nameFromQuestion);
+      }
+      // Also extract "Name: XYZ" format (from chat_profile_report messages)
+      const nameFieldMatch = resolvedQuestion.match(/name[:\s]+([^\n,]+)/i);
+      if (nameFieldMatch && nameFieldMatch[1]) {
+        const profileName = nameFieldMatch[1].trim().replace(/[.,;:!?]+$/, '');
+        if (profileName.length >= 2 && !mentionedEntities.includes(profileName)) {
+          mentionedEntities.push(profileName);
+        }
+      }
+
+      // Add user message to conversation session with tracked entities
+      this.conversationService.addUserMessage(
+        sessionId,
+        question,
+        interpretation.intent,
+        mentionedEntities,
+      );
 
       // ═══════════════════════════════════════════════════════════════
       // ORI GREETING & HELP - Jarvis-like personality
       // ═══════════════════════════════════════════════════════════════
       if (interpretation.intent === 'greeting') {
         return {
-          answer: getRandomResponse(MITHRA_PERSONA.greetings),
+          answer: getRandomResponse(BI_PERSONA.greetings),
           searchType: 'greeting',
           confidence: 1.0,
         };
@@ -319,10 +775,33 @@ export class RagService {
 
       if (interpretation.intent === 'help') {
         return {
-          answer: MITHRA_PERSONA.help,
+          answer: BI_PERSONA.help,
           searchType: 'help',
           confidence: 1.0,
         };
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // MULTI-PERSON QUERY HANDLER: "X and Y report" / "X and Y results"
+      // Split multi-person queries and handle each separately
+      // ═══════════════════════════════════════════════════════════════
+      if (interpretation.searchTerm && /\band\b/i.test(interpretation.searchTerm)) {
+        const names = interpretation.searchTerm.split(/\s+and\s+/i).map((n: string) => n.trim()).filter((n: string) => n.length >= 2);
+        if (names.length >= 2) {
+          this.logger.log(`👥 Multi-person query detected: ${names.join(', ')}`);
+          const results: string[] = [];
+          for (const name of names) {
+            const result = interpretation.intent === 'career_report'
+              ? await this.handleCareerReport(name, user)
+              : await this.handlePersonLookup(name, user);
+            results.push(`### ${name}\n${result.answer}`);
+          }
+          return {
+            answer: results.join('\n\n---\n\n'),
+            searchType: interpretation.intent,
+            confidence: 0.9,
+          };
+        }
       }
 
       // ═══════════════════════════════════════════════════════════════
@@ -333,10 +812,17 @@ export class RagService {
       }
 
       // ═══════════════════════════════════════════════════════════════
+      // SPECIAL HANDLER: PERSON LOOKUP (name search + disambiguation)
+      // ═══════════════════════════════════════════════════════════════
+      if (interpretation.intent === 'person_lookup' && interpretation.searchTerm) {
+        return await this.handlePersonLookup(interpretation.searchTerm, user);
+      }
+
+      // ═══════════════════════════════════════════════════════════════
       // SPECIAL HANDLER: OVERALL ROLE FITMENT REPORT
       // ═══════════════════════════════════════════════════════════════
       if (interpretation.intent === 'overall_report') {
-        return await this.handleOverallReport(user);
+        return await this.handleOverallReport(user, question);
       }
 
       // ═══════════════════════════════════════════════════════════════
@@ -344,7 +830,7 @@ export class RagService {
       // Detects when user provides profile details in chat
       // ═══════════════════════════════════════════════════════════════
       if (interpretation.intent === 'chat_profile_report') {
-        return await this.handleChatProfileReport(question);
+        return await this.handleChatProfileReport(question, user);
       }
 
       // ═══════════════════════════════════════════════════════════════
@@ -385,114 +871,207 @@ export class RagService {
           return { answer: personalAnswer, searchType: 'personal_info', confidence: 0.98 };
         }
         // Fallback to LLM if no structured answer available
-        const context = this.oriIntelligence.getConversationContext(userId);
-        const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, context);
+        const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, conversationHistory);
         return { answer, searchType: 'personal_info', confidence: 0.9 };
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // 🧠 JARVIS-LIKE INTELLIGENT HANDLERS
-      // Personal career guidance, job eligibility, higher studies, etc.
+      // 🧠 INTELLIGENT ROUTING (v3.0 — intent-driven, no keyword hijacking)
+      //
+      // The intent classification (fastLocalMatch + LLM understandQuery)
+      // already handles routing to general_knowledge / career_guidance.
+      // DB-bound intents MUST flow through to executeQuery() with RBAC.
       // ═══════════════════════════════════════════════════════════════
-      const qLower = question.toLowerCase();
       const userId = user?.id || user?.user_id || 0;
       const userEmail = user?.email || user?.sub || '';
 
-      // Get user profile for personalization (using email if userId not available)
-      const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
+      // ═══════════════════════════════════════════════════════════════
+      // PERSON-SPECIFIC QUERY GUARD
+      // If the query mentions a person's name (from current question or
+      // conversation context), verify they exist in our DB before routing
+      // to general_knowledge. This prevents the LLM from searching the
+      // web for biographical info about people.
+      // ═══════════════════════════════════════════════════════════════
+      if (interpretation.intent === 'general_knowledge' || interpretation.intent === 'career_guidance') {
+        const personNameToCheck = interpretation.searchTerm
+          || this.extractName(resolvedQuestion)
+          || (nameFieldMatch && nameFieldMatch[1]?.trim());
 
-      this.logger.log(`👤 User: ${userProfile?.name || 'Anonymous'} (${userEmail || 'no email'})`);
+        // Detect if this is a person-specific query (not a generic concept question)
+        const isPersonSpecificQuery = this.isPersonSpecificQuery(resolvedQuestion, ctx);
 
-      // Store any facts the user shares
-      if (userId || userEmail) {
-        this.oriIntelligence.extractAndStoreFacts(userProfile?.userId || userId, question);
+        if (isPersonSpecificQuery && personNameToCheck) {
+          this.logger.log(`🔍 Person guard: checking if "${personNameToCheck}" exists in DB (role=${userRole})`);
+
+          // RBAC: Corporate users can ONLY see people in their organization
+          const guardRole = (user?.role || 'STUDENT').toUpperCase();
+          const guardCorporateId = user?.corporateId;
+          let guardFilter = '';
+          const guardParams: any[] = [`\\m${personNameToCheck}\\M`];
+          if (guardRole === 'CORPORATE' && guardCorporateId) {
+            guardFilter = ' AND r.corporate_account_id = $2';
+            guardParams.push(guardCorporateId);
+          }
+
+          // Word-boundary match first for precision, then ILIKE fallback
+          let personCheck = await this.dataSource.query(
+            `SELECT r.full_name, 
+                    (SELECT COUNT(*) FROM assessment_attempts aa WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
+             FROM registrations r
+             WHERE r.full_name ~* $1 AND r.is_deleted = false${guardFilter}
+             LIMIT 3`,
+            guardParams
+          );
+          let usedILIKEFallback = false;
+          if (!personCheck || personCheck.length === 0) {
+            const iLikeParams: any[] = [`%${personNameToCheck.toLowerCase()}%`];
+            let iLikeFilter = '';
+            if (guardRole === 'CORPORATE' && guardCorporateId) {
+              iLikeFilter = ' AND r.corporate_account_id = $2';
+              iLikeParams.push(guardCorporateId);
+            }
+            personCheck = await this.dataSource.query(
+              `SELECT r.full_name, 
+                      (SELECT COUNT(*) FROM assessment_attempts aa WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
+               FROM registrations r
+               WHERE LOWER(r.full_name) LIKE $1 AND r.is_deleted = false${iLikeFilter}
+               LIMIT 5`,
+              iLikeParams
+            );
+            usedILIKEFallback = true;
+          }
+
+          if (!personCheck || personCheck.length === 0) {
+            const scopeMsg = guardRole === 'CORPORATE' ? ' within your organization' : '';
+            this.logger.warn(`⚠️ Person guard: "${personNameToCheck}" not found${scopeMsg}`);
+
+            // Smart fallback: try LLM to answer the question intelligently
+            // instead of dead-ending with "not found"
+            try {
+              const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
+              const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, conversationHistory);
+              if (answer && answer.length > 20) {
+                this.logger.log(`✅ Person guard fallback: LLM gave a useful answer`);
+                return {
+                  answer,
+                  searchType: 'intelligent_response',
+                  confidence: 0.85,
+                };
+              }
+            } catch (fallbackErr) {
+              this.logger.warn(`Person guard LLM fallback failed: ${fallbackErr.message}`);
+            }
+
+            // If LLM fallback also fails, use the improved error message
+            return {
+              answer: BI_PERSONA.errors.notFound(personNameToCheck),
+              searchType: 'person_not_found',
+              confidence: 0.6,
+            };
+          }
+
+          // If ILIKE fallback was used, verify we have an exact word-token match
+          // to prevent "jai" → "JAISHREE" style substring mismatches
+          if (usedILIKEFallback && !this.hasExactTokenMatch(personNameToCheck, personCheck)) {
+            this.logger.log(`⚠️ Person guard: ILIKE matched but no exact token for "${personNameToCheck}" — showing disambiguation`);
+            return this.buildFuzzyDisambiguation(personNameToCheck, personCheck, 'disambiguation');
+          }
+
+          // Person found but user asked general_knowledge → redirect to person_lookup or career_report
+          this.logger.log(`✅ Person guard: "${personNameToCheck}" found in DB — redirecting to person_lookup`);
+          const matchedName = personCheck[0].full_name;
+          const hasAssessment = parseInt(personCheck[0].completed_count) > 0;
+
+          if (hasAssessment) {
+            // Redirect to career_report or person_lookup
+            return await this.handleCareerReport(matchedName, user);
+          } else {
+            return {
+              answer: `**Found "${matchedName}"**, but they haven't completed any assessments yet. Results will be available once an assessment is completed.`,
+              searchType: 'person_no_assessment',
+              confidence: 0.9,
+            };
+          }
+        }
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // PERSONAL QUESTIONS: "what is my name", "my profile", etc.
+      // TEXT-TO-SQL ENGINE — "JARVIS MODE"
+      // Routes data_query intent (or any unrecognized data question)
+      // through the dynamic SQL generation engine for maximum flexibility.
+      // Can answer ANY question about the database data without templates.
       // ═══════════════════════════════════════════════════════════════
-      const personalAnswer = this.oriIntelligence.answerPersonalQuestion(question, userProfile);
-      if (personalAnswer) {
-        this.logger.log('🎯 Detected: Personal question');
+      if (interpretation.intent === 'data_query') {
+        this.logger.log('🧠 Intent: data_query → Text-to-SQL Jarvis Engine');
+        try {
+          const tsResult = await this.textToSqlService.answerQuestion(
+            resolvedQuestion, user as UserContext, conversationHistory,
+          );
+          if (tsResult.confidence > 0.3) {
+            return {
+              answer: tsResult.answer,
+              searchType: tsResult.searchType,
+              confidence: tsResult.confidence,
+              sources: { rows: tsResult.rowCount, sql: tsResult.sql },
+            };
+          }
+          // Low confidence — try LLM as this might be a general question misclassified
+          this.logger.log('🔄 Text-to-SQL low confidence — falling through to LLM');
+        } catch (tsError) {
+          this.logger.warn(`Text-to-SQL data_query failed: ${tsError.message} — trying LLM fallback`);
+        }
+        // Fallback: answer via LLM if Text-to-SQL can't handle it
+        const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
+        const llmAnswer = await this.oriIntelligence.answerAnyQuestion(resolvedQuestion, userProfile, conversationHistory);
         return {
-          answer: personalAnswer,
-          searchType: 'personal_info',
-          confidence: 0.98,
+          answer: llmAnswer,
+          searchType: 'intelligent_response',
+          confidence: 0.8,
         };
       }
 
-      // Questions about job eligibility
-      if (qLower.includes('eligible') || qLower.includes('jobs for me') || qLower.includes('suitable') ||
-        qLower.includes('what jobs') || qLower.includes('fit for') || qLower.includes('career for me')) {
-        this.logger.log('🎯 Detected: Career eligibility question');
-        const answer = await this.oriIntelligence.generateCareerGuidance(question, userProfile);
-        return {
-          answer,
-          searchType: 'career_guidance',
-          confidence: 0.95,
-        };
-      }
+      if (interpretation.intent === 'general_knowledge') {
+        this.logger.log('🧠 Intent: general_knowledge → checking if data question first');
 
-      // Questions about specific jobs ("can I try...", "can I become...")
-      if ((qLower.includes('can i') || qLower.includes('should i')) &&
-        (qLower.includes('try') || qLower.includes('apply') || qLower.includes('become') || qLower.includes('work as'))) {
-        this.logger.log('🎯 Detected: Job compatibility question');
-        const answer = await this.oriIntelligence.generateCareerGuidance(question, userProfile);
-        return {
-          answer,
-          searchType: 'job_analysis',
-          confidence: 0.95,
-        };
-      }
+        // SMART ROUTING: If the question looks like it wants DB data,
+        // route through Text-to-SQL instead of generic LLM
+        if (this.textToSqlService.isDataQuestion(resolvedQuestion)) {
+          this.logger.log('🔄 Rerouting general_knowledge → Text-to-SQL (data question detected)');
+          try {
+            const tsResult = await this.textToSqlService.answerQuestion(
+              resolvedQuestion, user as UserContext, conversationHistory,
+            );
+            if (tsResult.confidence > 0.5) {
+              return {
+                answer: tsResult.answer,
+                searchType: tsResult.searchType,
+                confidence: tsResult.confidence,
+                sources: { rows: tsResult.rowCount },
+              };
+            }
+          } catch (tsErr) {
+            this.logger.warn(`Text-to-SQL reroute failed: ${tsErr.message} — falling through to LLM`);
+          }
+          // If Text-to-SQL had low confidence or failed, fall through to LLM
+        }
 
-      // Higher studies questions
-      if (qLower.includes('higher studies') || qLower.includes('masters') || qLower.includes('mba') ||
-        qLower.includes('further studies') || qLower.includes('education') || qLower.includes('degree') ||
-        qLower.includes('university') || qLower.includes('phd')) {
-        this.logger.log('🎯 Detected: Higher studies question');
-        const answer = await this.oriIntelligence.generateCareerGuidance(question, userProfile);
-        return {
-          answer,
-          searchType: 'higher_studies',
-          confidence: 0.95,
-        };
-      }
+        // ── Enhanced role-aware context for LLM ──
+        const userRole = user?.role || 'STUDENT';
+        const roleContext = userRole === 'ADMIN'
+          ? 'The user is a platform ADMIN with full access to all candidates, users, and analytics. They may ask about platform metrics, candidate management, or hiring insights.'
+          : userRole === 'CORPORATE'
+            ? 'The user is a CORPORATE employer who manages their own candidates/employees. They care about team performance, hiring decisions, and employee development.'
+            : userRole === 'AFFILIATE'
+              ? 'The user is an AFFILIATE partner who refers candidates. They care about referral performance, commissions, and partner growth.'
+              : 'The user is a STUDENT/individual who took assessments. They care about their own career growth, skill development, and career opportunities.';
 
-      // Personal questions about themselves or career advice
-      if ((qLower.includes('my ') || qLower.includes('i am') || qLower.includes("i'm") || qLower.includes('me')) &&
-        (qLower.includes('career') || qLower.includes('future') || qLower.includes('path') || qLower.includes('advice') ||
-          qLower.includes('suggest') || qLower.includes('recommend') || qLower.includes('help me'))) {
-        this.logger.log('🎯 Detected: Personal career advice question');
-        const context = this.oriIntelligence.getConversationContext(userProfile?.userId || userId);
-        const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, context);
-        return {
-          answer,
-          searchType: 'personal_advice',
-          confidence: 0.9,
-        };
-      }
+        const enrichedHistory = conversationHistory
+          ? `[User Role: ${userRole}] ${roleContext}\n\n${conversationHistory}`
+          : `[User Role: ${userRole}] ${roleContext}`;
 
-      // ═══════════════════════════════════════════════════════════════
-      // 🧠 GENERAL QUESTIONS - Route to LLM (courses, learning, how-to)
-      // These should NOT search the database
-      // ═══════════════════════════════════════════════════════════════
-      const isGeneralQuestion =
-        qLower.includes('what is') || qLower.includes('what are') || qLower.includes('how to') ||
-        qLower.includes('how do') || qLower.includes('how can') || qLower.includes('best way') ||
-        qLower.includes('course') || qLower.includes('learn') || qLower.includes('study') ||
-        qLower.includes('become a') || qLower.includes('become an') ||
-        qLower.includes('should i') || qLower.includes('can you') ||
-        qLower.includes('tell me about') || qLower.includes('explain') || qLower.includes('difference between') ||
-        qLower.includes('compare') || qLower.includes('vs') || qLower.includes('versus') ||
-        qLower.includes('tips') || qLower.includes('advice') || qLower.includes('recommend') ||
-        qLower.includes('certification') || qLower.includes('skill') || qLower.includes('path');
-
-      // Don't go to DB for general questions - use LLM directly
-      // But ALWAYS respect explicit DB intents from the LLM (best_performer, person_lookup, etc.)
-      if (isGeneralQuestion && !['list_users', 'list_candidates', 'test_results', 'career_roles', 'count', 'best_performer', 'person_lookup'].includes(interpretation.intent)) {
-        this.logger.log('🧠 Detected: General question - using LLM');
-        const context = this.oriIntelligence.getConversationContext(userProfile?.userId || userId);
-        const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, context);
+        this.logger.log('🧠 Using LLM directly for general knowledge');
+        const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
+        const answer = await this.oriIntelligence.answerAnyQuestion(resolvedQuestion, userProfile, enrichedHistory);
         return {
           answer,
           searchType: 'intelligent_response',
@@ -505,12 +1084,12 @@ export class RagService {
       // ═══════════════════════════════════════════════════════════════
 
       // ── Anonymous / unauthenticated user check ──
-      // If user id is 0 and role is STUDENT, they are anonymous.
-      // Return a friendly login prompt instead of crashing.
-      if ((!user || user.id === 0) && (user?.role === 'STUDENT' || !user?.role)) {
+      // If user id is 0 AND no email is available, they are truly anonymous.
+      // Users with email from Cognito can still use email-based DB lookups.
+      if ((!user || (user.id === 0 && !user.email && !user.sub)) && (user?.role === 'STUDENT' || !user?.role)) {
         this.logger.log('🔒 RBAC: Anonymous user detected — prompting to log in');
         return {
-          answer: 'Welcome to MITHRA. To access your personalized data and results, please log in first. If you have any general career questions, feel free to ask.',
+          answer: 'Welcome to Ask BI. To access your personalized data and results, please log in first. If you have any general career questions, feel free to ask.',
           searchType: 'auth_required',
           confidence: 1.0,
         };
@@ -543,6 +1122,22 @@ export class RagService {
         };
       }
 
+      // ── Inject gender filter for count queries ──
+      if (interpretation.intent === 'count') {
+        const qLow = (resolvedQuestion || question).toLowerCase();
+        const hasMale = /\b(male|boys?|men)\b/.test(qLow);
+        const hasFemale = /\b(female|girls?|women)\b/.test(qLow);
+        if (hasMale && hasFemale) {
+          // Both genders requested → gender breakdown
+          (interpretation as any).genderBreakdown = true;
+          interpretation.table = 'registrations'; // force registrations table
+        } else if (hasMale) {
+          (interpretation as any).gender = 'MALE';
+        } else if (hasFemale) {
+          (interpretation as any).gender = 'FEMALE';
+        }
+      }
+
       // ── First, get total count for pagination ──
       const totalCount = await this.getTotalCount(interpretation, user as UserContext);
 
@@ -550,7 +1145,7 @@ export class RagService {
       this.logger.log(`📊 Results: ${data.length} rows (total: ${totalCount})`);
 
       // ── Store pagination state for "next 10" follow-ups ──
-      if (['list_users', 'list_candidates', 'test_results', 'best_performer', 'career_roles'].includes(interpretation.intent)) {
+      if (['list_users', 'list_candidates', 'test_results', 'best_performer', 'career_roles', 'corporate_details', 'affiliate_referrals', 'affiliate_payments', 'affiliate_list', 'affiliate_earnings', 'affiliate_students'].includes(interpretation.intent)) {
         const pagKey = this.getPaginationKey(user);
         this.paginationCache.set(pagKey, {
           intent: interpretation.intent,
@@ -576,11 +1171,54 @@ export class RagService {
         responseTime: 0,
       });
 
-      // If no data found, ALWAYS use LLM for intelligent response
+      // If no data found, provide a helpful response based on intent
       if (data.length === 0) {
-        this.logger.log('🧠 No data found, using intelligent LLM response');
-        const context = this.oriIntelligence.getConversationContext(userProfile?.userId || userId);
-        const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, context);
+        this.logger.log('🧠 No data found for intent: ' + interpretation.intent);
+
+        const curRole = (user?.role || 'STUDENT').toUpperCase();
+        const scopeMsg = curRole === 'CORPORATE' ? ' in your organization' : '';
+
+        // ═══════════════════════════════════════════════════════════
+        // DB-BOUND INTENTS: Return clear "no data" — NEVER use LLM
+        // This prevents generic web-like responses for DB queries
+        // ═══════════════════════════════════════════════════════════
+        const dbBoundIntents = [
+          'list_users', 'list_candidates', 'test_results', 'best_performer',
+          'person_lookup', 'self_results', 'career_roles', 'count', 'count_by_role',
+          'corporate_details',
+          'affiliate_dashboard', 'affiliate_referrals', 'affiliate_earnings',
+          'affiliate_payments', 'affiliate_list', 'affiliate_lookup',
+          'affiliate_students',
+        ];
+
+        if (dbBoundIntents.includes(interpretation.intent)) {
+          // Specific messages per intent
+          const noDataMessages: Record<string, string> = {
+            person_lookup: BI_PERSONA.errors.notFound(interpretation.searchTerm || 'that person'),
+            self_results: `You don't have any completed assessments yet. Complete an assessment to see your results here.`,
+            list_candidates: `No candidates found${scopeMsg}.`,
+            list_users: `No users found.`,
+            test_results: `No completed assessment results found${scopeMsg}.`,
+            best_performer: `No candidates or completed assessments found${scopeMsg}.`,
+            career_roles: `No career roles found in the database.`,
+            count: `**Total: 0**`,
+            count_by_role: `No accounts found.`,
+            corporate_details: `No corporate accounts found${scopeMsg}.`,
+          };
+
+          const answer = noDataMessages[interpretation.intent]
+            || `No data found for this query${scopeMsg}.`;
+
+          return {
+            answer,
+            searchType: interpretation.intent,
+            confidence: 0.8,
+          };
+        }
+
+        // Only use LLM fallback for non-DB intents (general_knowledge, career_guidance)
+        const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
+        const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, conversationHistory);
         return {
           answer,
           searchType: 'intelligent_response',
@@ -601,8 +1239,61 @@ export class RagService {
       };
     } catch (error) {
       this.logger.error(`❌ Error: ${error.message}`);
+
+      // ═══════════════════════════════════════════════════════════
+      // LAST RESORT: Try Text-to-SQL when the standard pipeline fails
+      // This catches edge cases the intent classifier missed
+      // ═══════════════════════════════════════════════════════════
+      try {
+        this.logger.log('🔄 Standard pipeline failed — trying Text-to-SQL fallback...');
+        const tsResult = await this.textToSqlService.answerQuestion(
+          question, user as UserContext, '',
+        );
+        if (tsResult.confidence > 0.5) {
+          return {
+            answer: tsResult.answer,
+            searchType: 'text_to_sql_fallback',
+            confidence: tsResult.confidence,
+            sources: { rows: tsResult.rowCount },
+          };
+        }
+      } catch (tsError) {
+        this.logger.warn(`Text-to-SQL fallback also failed: ${tsError.message}`);
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // GRACEFUL FALLBACK: Try LLM general knowledge as last attempt
+      // Even if the DB query fails, the LLM can still help with the question
+      // ═══════════════════════════════════════════════════════════
+      try {
+        this.logger.log('🧠 All DB paths failed — trying LLM general knowledge fallback...');
+        const userId = user?.id || 0;
+        const userEmail = user?.email || '';
+        const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
+        const llmAnswer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, '');
+        if (llmAnswer && !llmAnswer.includes('experiencing high demand')) {
+          return {
+            answer: llmAnswer,
+            searchType: 'llm_fallback',
+            confidence: 0.7,
+          };
+        }
+      } catch (llmError) {
+        this.logger.warn(`LLM fallback also failed: ${llmError.message}`);
+      }
+
+      // ── Role-aware error message as absolute last resort ──
+      const userRole = user?.role || 'STUDENT';
+      const roleSuggestions: Record<string, string> = {
+        ADMIN: 'You can try: **"list candidates"**, **"show top performers"**, **"how many users registered this month"**, or **"find candidates for [role]"**.',
+        CORPORATE: 'You can try: **"show my employees"**, **"best performers in my team"**, **"how many candidates completed"**, or ask any career-related question.',
+        STUDENT: 'You can try: **"show my results"**, **"what careers suit me"**, **"generate my career report"**, or ask any career or tech question.',
+        AFFILIATE: 'You can try: **"my referrals"**, **"my earnings"**, **"affiliate dashboard"**, or ask any general question.',
+      };
+      const suggestion = roleSuggestions[userRole] || roleSuggestions.STUDENT;
+
       return {
-        answer: `I was unable to process that request. You can try queries like: "list users", "test results", or "show [person name]'s score".`,
+        answer: `I couldn't process that request right now. ${suggestion}\n\nYou can also ask me general questions about careers, technologies, skills, or interview preparation — I'm happy to help!`,
         searchType: 'error',
         confidence: 0,
       };
@@ -622,17 +1313,30 @@ export class RagService {
 
     if (!searchTerm) {
       // For students, auto-generate report for themselves
-      if (userRole === 'STUDENT' && userId) {
-        const selfData = await this.executeDatabaseQuery(
-          `SELECT r.full_name FROM registrations r WHERE r.user_id = $1 AND r.is_deleted = false ORDER BY r.created_at DESC LIMIT 1`,
-          [userId]
-        );
+      if (userRole === 'STUDENT') {
+        let selfData: any[] = [];
+        // Try user_id first (if available and valid)
+        if (userId && userId > 0) {
+          selfData = await this.executeDatabaseQuery(
+            `SELECT r.full_name FROM registrations r WHERE r.user_id = $1 AND r.is_deleted = false ORDER BY r.created_at DESC LIMIT 1`,
+            [userId]
+          );
+        }
+        // Fallback: use email from Cognito token when userId is 0 or lookup failed
+        if (selfData.length === 0 && (user?.email || user?.sub)) {
+          const email = user?.email || user?.sub;
+          this.logger.log(`📋 userId=${userId} lookup failed, trying email fallback: ${email}`);
+          selfData = await this.executeDatabaseQuery(
+            `SELECT r.full_name FROM registrations r JOIN users u ON r.user_id = u.id WHERE u.email = $1 AND r.is_deleted = false ORDER BY r.created_at DESC LIMIT 1`,
+            [email]
+          );
+        }
         if (selfData.length > 0) {
           searchTerm = selfData[0].full_name;
           this.logger.log(`📋 Student auto-generating career report for self: ${searchTerm}`);
         } else {
           return {
-            answer: `I couldn't find your registration data. Please make sure you've completed your profile.`,
+            answer: `I couldn't find your registration data. Please make sure you've completed your profile and assessment.`,
             searchType: 'career_report',
             confidence: 0.3,
           };
@@ -687,11 +1391,12 @@ export class RagService {
           paramIndex++;
         }
       } else {
-        // Only search by full_name when the term is a plain name.
-        // Do NOT match email substrings — e.g. searching "ajay" must NOT
-        // match "yesodharanramajayam@gmail.com".
-        whereParts.push(`(r.full_name ILIKE $${paramIndex})`);
-        params.push(`%${nameSearch}%`);
+        // Smart name matching with word-boundary precision:
+        // 1. Use PostgreSQL regex \m (word start) and \M (word end) for exact word matching
+        // 2. This prevents "jai" from matching "JAISHREE" (substring match was too broad)
+        // 3. Falls back to ILIKE if word-boundary match returns 0 results (handled below)
+        whereParts.push(`(r.full_name ~* $${paramIndex})`);
+        params.push(`\\m${nameSearch}\\M`);
         paramIndex++;
       }
 
@@ -709,7 +1414,7 @@ export class RagService {
         paramIndex++;
       }
 
-      const personData = await this.dataSource.query(`
+      const careerReportSql = `
                 SELECT 
                     r.id,
                     r.full_name,
@@ -729,15 +1434,56 @@ export class RagService {
                 WHERE (${whereClause})
                 AND r.is_deleted = false${rbacFilter}
                 ORDER BY r.id, aa.total_score DESC NULLS LAST
-                LIMIT 10
-            `, params);
+                LIMIT 10`;
+
+      let personData = await this.dataSource.query(careerReportSql, params);
+
+      // Fallback: if word-boundary match returned 0 and we used ~*, try ILIKE fuzzy match
+      let usedCareerILIKEFallback = false;
+      if (!personData.length && !emailSearch) {
+        this.logger.log(`🔄 Word-boundary match for "${nameSearch}" returned 0, falling back to ILIKE`);
+        usedCareerILIKEFallback = true;
+        const fallbackParams: any[] = [`%${nameSearch}%`];
+        let fallbackRbac = '';
+        if (userRole === 'CORPORATE' && corporateId) {
+          fallbackRbac = ` AND r.corporate_account_id = $2`;
+          fallbackParams.push(corporateId);
+        } else if (userRole === 'STUDENT' && userId) {
+          fallbackRbac = ` AND r.user_id = $2`;
+          fallbackParams.push(userId);
+        }
+        personData = await this.dataSource.query(`
+                SELECT 
+                    r.id, r.full_name, r.gender, r.mobile_number, u.email,
+                    aa.total_score,
+                    pt.blended_style_name as behavioral_style,
+                    pt.blended_style_desc as behavior_description,
+                    (SELECT MAX(aa2.total_score) FROM assessment_attempts aa2 WHERE aa2.registration_id = r.id) as best_score,
+                    (SELECT COUNT(*) FROM assessment_attempts aa3 WHERE aa3.registration_id = r.id AND aa3.status = 'COMPLETED') as attempt_count
+                FROM registrations r
+                LEFT JOIN users u ON r.user_id = u.id
+                LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id 
+                    AND aa.id = (SELECT id FROM assessment_attempts WHERE registration_id = r.id ORDER BY completed_at DESC LIMIT 1)
+                LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+                WHERE r.full_name ILIKE $1 AND r.is_deleted = false${fallbackRbac}
+                ORDER BY r.id, aa.total_score DESC NULLS LAST
+                LIMIT 10`, fallbackParams);
+      }
 
       if (!personData.length) {
+        const scopeMsg = userRole === 'CORPORATE' ? ' within your organization' : '';
         return {
-          answer: `**❌ No candidate found matching "${cleanSearchTerm}"**\n\nPlease check the name or email and try again.`,
+          answer: `**"${cleanSearchTerm}" not found${scopeMsg}.** Check the spelling or try "list candidates".`,
           searchType: 'career_report',
           confidence: 0.3,
         };
+      }
+
+      // If ILIKE fallback was used, verify exact word-token match
+      // Prevents "jai" from auto-matching "JAISHREE M" — shows "did you mean?" instead
+      if (usedCareerILIKEFallback && !numberMatch && !this.hasExactTokenMatch(nameSearch, personData)) {
+        this.logger.log(`⚠️ Career report: ILIKE matched but no exact token for "${nameSearch}" — showing fuzzy disambiguation`);
+        return this.buildFuzzyDisambiguation(nameSearch, personData, 'career_report');
       }
 
       // If email was provided and exactly one match found, skip disambiguation
@@ -814,7 +1560,7 @@ export class RagService {
     } catch (error) {
       this.logger.error(`Career report error: ${error.message}`);
       return {
-        answer: `**❌ Error generating report:** ${error.message}`,
+        answer: `**I couldn't generate the career report right now.** ${this.sanitizeErrorForUser(error)}\n\n💡 Try: "list candidates" to find the right person first.`,
         searchType: 'error',
         confidence: 0,
       };
@@ -823,9 +1569,253 @@ export class RagService {
 
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // HANDLER: OVERALL ROLE FITMENT
+  // HANDLER: PERSON LOOKUP (with smart matching + disambiguation)
   // ═══════════════════════════════════════════════════════════════════════════
-  private async handleOverallReport(user: any): Promise<QueryResult> {
+  private async handlePersonLookup(
+    searchTerm: string,
+    user?: any,
+  ): Promise<QueryResult> {
+    const userRole = user?.role || 'STUDENT';
+    const corporateId = user?.corporateId;
+    const userId = user?.id;
+
+    // Check for disambiguation number (e.g., "jai #2" or bare "2")
+    const numberMatch = searchTerm.match(/(.+?)\s*[#]?\s*(\d+)$/);
+    let targetIndex = -1;
+    let cleanSearch = searchTerm;
+    if (numberMatch && numberMatch[1].trim().length > 0) {
+      cleanSearch = numberMatch[1].trim();
+      targetIndex = parseInt(numberMatch[2]) - 1; // 0-based
+    }
+
+    try {
+      // ── Step 1: Smart name search (word-boundary first, ILIKE fallback) ──
+      // Build RBAC filter with parameterized query for security
+      let rbacFilterClause = '';
+      const extraParams: any[] = [];
+      if (userRole === 'CORPORATE' && corporateId) {
+        rbacFilterClause = ' AND r.corporate_account_id = $2';
+        extraParams.push(corporateId);
+      } else if (userRole === 'STUDENT' && userId) {
+        rbacFilterClause = ' AND r.user_id = $2';
+        extraParams.push(userId);
+      }
+
+      const sincerityFields = this.getSinceritySelectFields('aa');
+      const lookupSql = (whereNameClause: string) => `
+        SELECT 
+          r.id as reg_id,
+          r.full_name,
+          r.gender,
+          r.mobile_number,
+          u.email,
+          aa.total_score,
+          ${sincerityFields},
+          aa.status,
+          aa.completed_at,
+          pt.blended_style_name as behavioral_style,
+          pt.blended_style_desc as behavior_description,
+          p.name as program_name,
+          (SELECT MAX(aa2.total_score) FROM assessment_attempts aa2 WHERE aa2.registration_id = r.id AND aa2.status = 'COMPLETED') as best_score,
+          (SELECT COUNT(*) FROM assessment_attempts aa3 WHERE aa3.registration_id = r.id AND aa3.status = 'COMPLETED') as attempt_count
+        FROM registrations r
+        LEFT JOIN users u ON r.user_id = u.id
+        LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id AND aa.status = 'COMPLETED'
+        LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+        LEFT JOIN programs p ON aa.program_id = p.id
+        WHERE r.is_deleted = false AND ${whereNameClause}${rbacFilterClause}
+        ORDER BY r.full_name, aa.completed_at DESC NULLS LAST
+        LIMIT 20`;
+
+      // Try word-boundary match first
+      let data = await this.executeDatabaseQuery(
+        lookupSql(`r.full_name ~* $1`),
+        [`\\m${cleanSearch}\\M`, ...extraParams],
+      );
+
+      // Fallback to ILIKE if no results
+      let usedLookupILIKEFallback = false;
+      if (data.length === 0) {
+        this.logger.log(`🔄 person_lookup: word-boundary for "${cleanSearch}" → 0, trying ILIKE`);
+        usedLookupILIKEFallback = true;
+        data = await this.executeDatabaseQuery(
+          lookupSql(`r.full_name ILIKE $1`),
+          [`%${cleanSearch}%`, ...extraParams],
+        );
+      }
+
+      if (data.length === 0) {
+        const scopeMsg = userRole === 'CORPORATE' ? ' within your organization' : '';
+        return {
+          answer: `**"${cleanSearch}" not found${scopeMsg}.** Check the spelling or try "list candidates".`,
+          searchType: 'person_not_found',
+          confidence: 0.7,
+        };
+      }
+
+      // If ILIKE fallback was used, verify exact word-token match
+      // Prevents "jai" from auto-matching "JAISHREE M" — shows "did you mean?" instead
+      if (usedLookupILIKEFallback && targetIndex < 0 && !this.hasExactTokenMatch(cleanSearch, data)) {
+        this.logger.log(`⚠️ Person lookup: ILIKE matched but no exact token for "${cleanSearch}" — showing fuzzy disambiguation`);
+        // Deduplicate by full_name for the disambiguation prompt
+        const seen = new Set<string>();
+        const uniqueForPrompt = data.filter((r: any) => {
+          if (seen.has(r.full_name)) return false;
+          seen.add(r.full_name);
+          return true;
+        });
+        return this.buildFuzzyDisambiguation(cleanSearch, uniqueForPrompt, 'person_lookup');
+      }
+
+      // ── Step 2: Group by unique person (by registration ID) ──
+      const personMap = new Map<number, { person: any; attempts: any[] }>();
+      for (const row of data) {
+        const regId = parseInt(row.reg_id);
+        if (!personMap.has(regId)) {
+          personMap.set(regId, {
+            person: {
+              full_name: row.full_name,
+              gender: row.gender,
+              mobile_number: row.mobile_number,
+              email: row.email,
+              best_score: row.best_score,
+              attempt_count: parseInt(row.attempt_count) || 0,
+            },
+            attempts: [],
+          });
+        }
+        if (row.status === 'COMPLETED') {
+          personMap.get(regId)!.attempts.push({
+            total_score: row.total_score,
+            behavioral_style: row.behavioral_style,
+            behavior_description: row.behavior_description,
+            sincerity_index: row.sincerity_index,
+            sincerity_class: row.sincerity_class,
+            completed_at: row.completed_at,
+            program_name: row.program_name,
+          });
+        }
+      }
+
+      const uniquePersons = Array.from(personMap.values());
+
+      // ── Step 3: Disambiguation if multiple unique people ──
+      if (uniquePersons.length > 1 && targetIndex < 0) {
+        let response = `**👥 Multiple candidates found matching "${cleanSearch}":**\n\n`;
+        response += `Please specify which one:\n\n`;
+
+        uniquePersons.forEach((entry, index) => {
+          const p = entry.person;
+          const email = p.email ? ` | ${p.email}` : '';
+          const attempts = p.attempt_count > 0 ? ` (${p.attempt_count} assessment${p.attempt_count > 1 ? 's' : ''})` : ' (no assessments)';
+          const bestStyle = entry.attempts.length > 0 ? ` | ${entry.attempts[0].behavioral_style || 'N/A'}` : '';
+          response += `**${index + 1}.** ${p.full_name}${email}${bestStyle}${attempts}\n`;
+        });
+
+        response += `\n**Reply with a number** (e.g. **1** or **2**) or try:\n• "${cleanSearch} #1"\n• "${cleanSearch} #2"`;
+
+        // Store disambiguation context for follow-up
+        this.disambiguationCache.set(this.getDisambiguationKey(user), {
+          searchTerm: cleanSearch,
+          timestamp: Date.now(),
+          handler: 'person_lookup',
+        });
+
+        return {
+          answer: response,
+          searchType: 'disambiguation',
+          confidence: 0.7,
+        };
+      }
+
+      // Validate index for numbered selections
+      if (targetIndex >= uniquePersons.length) {
+        return {
+          answer: `**❌ Invalid selection.** Only ${uniquePersons.length} candidate(s) found matching "${cleanSearch}".\nPlease use a number between 1 and ${uniquePersons.length}.`,
+          searchType: 'person_lookup',
+          confidence: 0.3,
+        };
+      }
+
+      // ── Step 4: Format consolidated results for the selected person ──
+      const selected = targetIndex >= 0 ? uniquePersons[targetIndex] : uniquePersons[0];
+      const person = selected.person;
+      const attempts = selected.attempts;
+
+      let response = `**📊 Assessment Results for ${person.full_name}**\n\n`;
+
+      if (person.email) response += `📧 **Email:** ${person.email}\n`;
+      if (person.gender) response += `👤 **Gender:** ${person.gender}\n`;
+
+      if (attempts.length === 0) {
+        response += `\n⚠️ **No completed assessments found.** This candidate has registered but hasn't completed any tests yet.\n`;
+      } else {
+        // Show the latest/best attempt details
+        const latest = attempts[0];
+        const scoreNum = latest.total_score ? parseFloat(latest.total_score) : NaN;
+
+        if (latest.behavioral_style) {
+          response += `\n📋 **Behavioral Style: ${latest.behavioral_style}**\n`;
+          if (latest.behavior_description) {
+            response += `${latest.behavior_description}\n`;
+          }
+        }
+
+        if (!isNaN(scoreNum)) {
+          const agile = this.getAgileLevel(scoreNum);
+          response += `\n🎯 **Agile Compatibility: ${agile.name}** (Score: ${scoreNum}/125)\n`;
+          response += `${agile.desc}\n`;
+        }
+
+        if (latest.sincerity_class) {
+          response += `\n🔒 **Sincerity:** ${latest.sincerity_class}`;
+          if (latest.sincerity_index) response += ` (Index: ${parseFloat(latest.sincerity_index).toFixed(1)})`;
+          response += '\n';
+        }
+
+        if (latest.program_name) {
+          response += `📚 **Program:** ${latest.program_name}\n`;
+        }
+
+        if (latest.completed_at) {
+          response += `📅 **Completed:** ${new Date(latest.completed_at).toLocaleDateString()}\n`;
+        }
+
+        // Show additional attempts if any
+        if (attempts.length > 1) {
+          response += `\n---\n📊 **All ${attempts.length} Completed Assessments:**\n\n`;
+          attempts.forEach((att, i) => {
+            const s = att.total_score ? parseFloat(att.total_score) : 0;
+            const style = att.behavioral_style || 'N/A';
+            const date = att.completed_at ? new Date(att.completed_at).toLocaleDateString() : 'N/A';
+            response += `**${i + 1}.** Score: ${s}/125 | Style: ${style} | Date: ${date}\n`;
+          });
+        }
+      }
+
+      response += `\n💡 *Want a detailed analysis? Try: "generate career report for ${person.full_name}"*`;
+
+      return {
+        answer: response,
+        searchType: 'person_lookup',
+        confidence: 0.95,
+      };
+
+    } catch (error) {
+      this.logger.error(`Person lookup error: ${error.message}`);
+      return {
+        answer: `**I couldn't look up that person right now.** ${this.sanitizeErrorForUser(error)}\n\n💡 Try: "list candidates" to browse available records.`,
+        searchType: 'error',
+        confidence: 0,
+      };
+    }
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HANDLER: OVERALL ROLE FITMENT (WITH ADVANCED FILTERS)
+  // ═══════════════════════════════════════════════════════════════════════════
+  private async handleOverallReport(user: any, question?: string): Promise<QueryResult> {
     try {
       const userRole = user?.role || 'STUDENT';
       const corporateId = user?.corporateId;
@@ -841,43 +1831,178 @@ export class RagService {
 
       this.logger.log(`📊 Generating Overall Role Fitment Report | role=${userRole} corporateId=${corporateId || 'ALL'}`);
 
-      const reportTitle = 'Placement Guidance Report';
-      const input: any = { title: reportTitle };
+      // ── Extract filters from natural language query ──
+      const filters = question ? await this.extractReportFilters(question) : {};
+
+      const reportTitle = filters.title || 'Placement Guidance Report';
+      const input: any = {
+        title: reportTitle,
+        ...filters,
+      };
 
       // RBAC: Corporate users → scope to their company
       if (userRole === 'CORPORATE' && corporateId) {
         input.corporateId = corporateId;
       }
 
-      // Only filter by group if the user has a group
-      if (user?.group_id) {
+      // Only filter by group if the user has a group and no explicit college filter
+      if (user?.group_id && !input.collegeName) {
         input.groupId = user.group_id;
       }
 
-      // Build download URL with appropriate scoping params
+      // Build download URL with all filter parameters
       let downloadUrl = `/rag/overall-report/pdf?title=${encodeURIComponent(reportTitle)}`;
-      if (user?.group_id) {
-        downloadUrl += `&groupId=${user.group_id}`;
-      }
-      if (userRole === 'CORPORATE' && corporateId) {
-        downloadUrl += `&corporateId=${corporateId}`;
-      }
+      if (input.groupId) downloadUrl += `&groupId=${input.groupId}`;
+      if (input.corporateId) downloadUrl += `&corporateId=${input.corporateId}`;
+      if (input.dateFrom) downloadUrl += `&dateFrom=${encodeURIComponent(input.dateFrom)}`;
+      if (input.dateTo) downloadUrl += `&dateTo=${encodeURIComponent(input.dateTo)}`;
+      if (input.collegeName) downloadUrl += `&collegeName=${encodeURIComponent(input.collegeName)}`;
+      if (input.affiliateName) downloadUrl += `&affiliateName=${encodeURIComponent(input.affiliateName)}`;
+      if (input.schoolLevel) downloadUrl += `&schoolLevel=${encodeURIComponent(input.schoolLevel)}`;
+      if (input.schoolStream) downloadUrl += `&schoolStream=${encodeURIComponent(input.schoolStream)}`;
+      if (input.departmentName) downloadUrl += `&departmentName=${encodeURIComponent(input.departmentName)}`;
+      if (input.gender) downloadUrl += `&gender=${encodeURIComponent(input.gender)}`;
 
       const report = await this.overallRoleFitmentService.generateReport(input);
 
       return {
-        answer: `I've generated the **Overall Role Fitment Report** for you. \n\n📄 **[Click here to download the PDF Report](${downloadUrl})**\n\nSince I can't display the full graphical report here, please download the PDF for the complete analysis including charts and tables.\n\nSummary:\n${this.overallRoleFitmentService.formatForChat(report)}`,
+        answer: `I've generated the **Overall Role Fitment Report** for you.\n\n📄 **[Click here to download the PDF Report](${downloadUrl})**\n\nSince I can't display the full graphical report here, please download the PDF for the complete analysis including charts and tables.\n\nSummary:\n${this.overallRoleFitmentService.formatForChat(report, input)}`,
         searchType: 'overall_report',
         confidence: 0.95,
       };
     } catch (error) {
       this.logger.error(`Overall report error: ${error.message}`);
       return {
-        answer: `**❌ Error generating overall report:** ${error.message}\n\nPlease ensure there are completed assessments with personality data.`,
+        answer: `**I couldn't generate the overall report right now.** ${this.sanitizeErrorForUser(error)}\n\nPlease ensure there are completed assessments with personality data.\n\n💡 **Tip:** Try refining your query, for example:\n- "Generate overall report for students completed on 2024-01-15"\n- "Report for ABC college students"\n- "Overall report for SSLC students"\n- "Generate report for affiliate John's referrals"`,
         searchType: 'error',
         confidence: 0,
       };
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FILTER EXTRACTION: Natural language → structured filters
+  // ═══════════════════════════════════════════════════════════════════════════
+  private async extractReportFilters(question: string): Promise<any> {
+    const q = question.toLowerCase();
+    const filters: any = {};
+
+    // ── Date extraction (regex-based for speed) ──
+    // "on 2024-01-15", "from 2024-01-01 to 2024-01-31", "today", "this month", "last week"
+    const isoDatePattern = /(\d{4}-\d{2}-\d{2})/g;
+    const dates = q.match(isoDatePattern);
+    if (dates) {
+      if (dates.length === 1) {
+        // Single date: both from and to = same day
+        filters.dateFrom = dates[0];
+        filters.dateTo = dates[0];
+      } else if (dates.length >= 2) {
+        filters.dateFrom = dates[0];
+        filters.dateTo = dates[1];
+      }
+    }
+
+    // "today"
+    if (/\btoday\b/.test(q)) {
+      const today = new Date().toISOString().split('T')[0];
+      filters.dateFrom = today;
+      filters.dateTo = today;
+    }
+    // "yesterday"
+    if (/\byesterday\b/.test(q)) {
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+      filters.dateFrom = yesterday;
+      filters.dateTo = yesterday;
+    }
+    // "this week"
+    if (/\bthis\s+week\b/.test(q)) {
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+      filters.dateFrom = monday.toISOString().split('T')[0];
+      filters.dateTo = now.toISOString().split('T')[0];
+    }
+    // "this month"
+    if (/\bthis\s+month\b/.test(q)) {
+      const now = new Date();
+      filters.dateFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+      filters.dateTo = now.toISOString().split('T')[0];
+    }
+    // "last month"
+    if (/\blast\s+month\b/.test(q)) {
+      const now = new Date();
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+      filters.dateFrom = lastMonth.toISOString().split('T')[0];
+      filters.dateTo = lastMonthEnd.toISOString().split('T')[0];
+    }
+
+    // ── School level ──
+    if (/\bsslc\b/.test(q)) {
+      filters.schoolLevel = 'SSLC';
+    } else if (/\bhsc\b/.test(q)) {
+      filters.schoolLevel = 'HSC';
+    } else if (/\bschool\b/.test(q) && !filters.schoolLevel) {
+      // Generic "school students" — include both
+      // Don't set filter; let it include all school levels
+    }
+
+    // ── School stream ──
+    if (/\bscience\b/.test(q)) filters.schoolStream = 'SCIENCE';
+    else if (/\bcommerce\b/.test(q)) filters.schoolStream = 'COMMERCE';
+    else if (/\bhumanities\b|\barts\b/.test(q)) filters.schoolStream = 'HUMANITIES';
+
+    // ── Gender ──
+    if (/\b(male|boys?|men)\b/.test(q) && !/\bfemale\b/.test(q)) filters.gender = 'MALE';
+    else if (/\b(female|girls?|women)\b/.test(q)) filters.gender = 'FEMALE';
+
+    // ── Affiliate ──
+    const affiliateMatch = q.match(/\baffiliate\s+([a-z][a-z\s]+?)(?:'s|\s+referral|\s+student|\s+report|\b)/);
+    if (affiliateMatch) {
+      const name = affiliateMatch[1].trim();
+      if (name.length > 1 && !/\b(student|report|overall|referral|list|all)\b/.test(name)) {
+        filters.affiliateName = name;
+      }
+    }
+
+    // ── College / group name — use LLM if regex doesn't capture clean enough ──
+    // Try common patterns: "for [college name] students", "[college] college", "group [name]"
+    const collegeMatch = q.match(
+      /(?:for|from|of|in)\s+([a-z][a-z\s&.]+?)\s*(?:college|university|institute|school|group|students|batch)/i
+    );
+    if (collegeMatch) {
+      const name = collegeMatch[1].trim();
+      // Exclude generic words that aren't college names
+      if (name.length > 2 && !/\b(all|the|every|each|our|my|sslc|hsc|overall|completed)\b/.test(name)) {
+        filters.collegeName = name;
+      }
+    }
+
+    // ── Department ──
+    const deptMatch = q.match(
+      /(?:department|dept|degree|branch)\s+(?:of\s+)?([a-z][a-z\s&.]+?)(?:\s+student|\s+report|$)/i
+    );
+    if (deptMatch) {
+      filters.departmentName = deptMatch[1].trim();
+    }
+
+    // ── Build dynamic title based on filters ──
+    const titleParts: string[] = [];
+    if (filters.schoolLevel) titleParts.push(filters.schoolLevel);
+    if (filters.schoolStream) titleParts.push(filters.schoolStream);
+    if (filters.collegeName) titleParts.push(filters.collegeName);
+    if (filters.affiliateName) titleParts.push(`Affiliate: ${filters.affiliateName}`);
+    if (filters.dateFrom) titleParts.push(`From: ${filters.dateFrom}`);
+    if (filters.dateTo && filters.dateTo !== filters.dateFrom) titleParts.push(`To: ${filters.dateTo}`);
+    if (filters.gender) titleParts.push(filters.gender);
+
+    if (titleParts.length > 0) {
+      filters.title = `Career Fitment Report — ${titleParts.join(' | ')}`;
+    }
+
+    this.logger.log(`🔍 Extracted report filters: ${JSON.stringify(filters)}`);
+    return filters;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -893,21 +2018,32 @@ export class RagService {
 
       // RBAC: Students can only generate reports for themselves
       if (userRole === 'STUDENT') {
-        if (userId) {
-          const selfLookup = await this.executeDatabaseQuery(
+        let selfLookup: any[] = [];
+        // Try user_id first
+        if (userId && userId > 0) {
+          selfLookup = await this.executeDatabaseQuery(
             `SELECT r.user_id, r.full_name FROM registrations r WHERE r.user_id = $1 AND r.is_deleted = false ORDER BY r.created_at DESC LIMIT 1`,
             [userId]
           );
-          if (selfLookup.length > 0) {
-            targetUserId = parseInt(selfLookup[0].user_id);
-            targetName = selfLookup[0].full_name;
-          } else {
-            return {
-              answer: `I couldn't find your registration data. Please make sure you've completed your profile.`,
-              searchType: 'error',
-              confidence: 0,
-            };
-          }
+        }
+        // Fallback: use email when userId is 0 or lookup failed
+        if (selfLookup.length === 0 && (user?.email || user?.sub)) {
+          const email = user?.email || user?.sub;
+          this.logger.log(`📋 Custom report: userId=${userId} lookup failed, trying email: ${email}`);
+          selfLookup = await this.executeDatabaseQuery(
+            `SELECT r.user_id, r.full_name FROM registrations r JOIN users u ON r.user_id = u.id WHERE u.email = $1 AND r.is_deleted = false ORDER BY r.created_at DESC LIMIT 1`,
+            [email]
+          );
+        }
+        if (selfLookup.length > 0) {
+          targetUserId = parseInt(selfLookup[0].user_id);
+          targetName = selfLookup[0].full_name;
+        } else {
+          return {
+            answer: `I couldn't find your registration data. Please make sure you've completed your profile.`,
+            searchType: 'error',
+            confidence: 0,
+          };
         }
       } else {
         // ADMIN or CORPORATE: lookup by name
@@ -991,7 +2127,7 @@ export class RagService {
     } catch (error) {
       this.logger.error(`Custom report error: ${error.message}`);
       return {
-        answer: `**❌ Error generating custom report:** ${error.message}`,
+        answer: `**I couldn't generate the custom report right now.** ${this.sanitizeErrorForUser(error)}`,
         searchType: 'error',
         confidence: 0,
       };
@@ -1001,7 +2137,7 @@ export class RagService {
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLER: CHAT-BASED PROFILE REPORT (User provides profile data in chat)
   // ═══════════════════════════════════════════════════════════════════════════
-  private async handleChatProfileReport(question: string): Promise<QueryResult> {
+  private async handleChatProfileReport(question: string, user?: any): Promise<QueryResult> {
     try {
       this.logger.log('📋 Processing chat-based profile for custom report generation');
 
@@ -1016,9 +2152,87 @@ export class RagService {
         };
       }
 
-      // Encode the profile data as base64 for the URL
+      // ══════════════════════════════════════════════════════════
+      // DB VALIDATION: Verify the person exists in our database
+      // with completed assessment data before generating a report.
+      // We NEVER generate reports for people not in our system.
+      // Uses word-boundary matching for precision (prevents "jai" → "JAISHREE")
+      // ══════════════════════════════════════════════════════════
+      let corporateFilter = '';
+      const profileGuardParams: any[] = [`\\m${profileData.name}\\M`];
+      const profileUserRole = (user?.role || 'STUDENT').toUpperCase();
+      const profileCorporateId = user?.corporateId;
+      if (profileUserRole === 'CORPORATE' && profileCorporateId) {
+        corporateFilter = ' AND r.corporate_account_id = $2';
+        profileGuardParams.push(profileCorporateId);
+      }
+
+      let dbCheck = await this.dataSource.query(
+        `SELECT r.id, r.full_name, r.user_id,
+                (SELECT COUNT(*) FROM assessment_attempts aa
+                 WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
+         FROM registrations r
+         WHERE r.full_name ~* $1 AND r.is_deleted = false${corporateFilter}
+         ORDER BY r.created_at DESC LIMIT 5`,
+        profileGuardParams
+      );
+
+      // Fallback to ILIKE if word-boundary returned 0
+      let usedProfileILIKEFallback = false;
+      if (!dbCheck || dbCheck.length === 0) {
+        usedProfileILIKEFallback = true;
+        const iLikeParams2: any[] = [`%${profileData.name.toLowerCase()}%`];
+        let iLikeFilter2 = '';
+        if (profileUserRole === 'CORPORATE' && profileCorporateId) {
+          iLikeFilter2 = ' AND r.corporate_account_id = $2';
+          iLikeParams2.push(profileCorporateId);
+        }
+        dbCheck = await this.dataSource.query(
+          `SELECT r.id, r.full_name, r.user_id,
+                  (SELECT COUNT(*) FROM assessment_attempts aa
+                   WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
+           FROM registrations r
+           WHERE LOWER(r.full_name) LIKE $1 AND r.is_deleted = false${iLikeFilter2}
+           ORDER BY r.created_at DESC LIMIT 5`,
+          iLikeParams2
+        );
+      }
+
+      if (!dbCheck || dbCheck.length === 0) {
+        const scopeMsg = profileUserRole === 'CORPORATE' ? ' within your organization' : ' in our database';
+        this.logger.warn(`❌ Chat profile report: "${profileData.name}" not found${scopeMsg}`);
+        return {
+          answer: `**⚠️ "${profileData.name}" was not found${scopeMsg}.**\n\nI can only generate Career Fitment Reports for candidates who are registered on the OriginBI platform${profileUserRole === 'CORPORATE' ? ' and belong to your organization' : ''}.\n\n**What you can do:**\n• Check if the name is spelled correctly\n• Ask me to **"list candidates"** to see registered users\n• The person needs to register and complete an assessment first\n\nAll reports are based exclusively on real assessment data from our platform.`,
+          searchType: 'person_not_found',
+          confidence: 0.95,
+        };
+      }
+
+      // If ILIKE fallback was used, verify exact word-token match
+      if (usedProfileILIKEFallback && !this.hasExactTokenMatch(profileData.name, dbCheck)) {
+        this.logger.log(`⚠️ Chat profile: ILIKE matched but no exact token for "${profileData.name}" — showing fuzzy disambiguation`);
+        return this.buildFuzzyDisambiguation(profileData.name, dbCheck, 'career_report');
+      }
+
+      // Check if at least one match has completed assessments
+      const withAssessment = dbCheck.filter((r: any) => parseInt(r.completed_count) > 0);
+      if (withAssessment.length === 0) {
+        const names = dbCheck.map((r: any) => r.full_name).join(', ');
+        this.logger.warn(`❌ Chat profile report: "${profileData.name}" found but no completed assessments`);
+        return {
+          answer: `**⚠️ Found "${names}" in our database, but they have not completed any assessments yet.**\n\nA Career Fitment Report requires completed assessment data (DISC personality profiling + Agile scoring) to generate meaningful career recommendations.\n\n**The candidate needs to:**\n1. Complete the behavioral assessment\n2. Complete the aptitude/agile assessment\n\nOnce the assessment is completed, I can generate a comprehensive report with career path recommendations, role fitment scores, and skill gap analysis.`,
+          searchType: 'no_assessment_data',
+          confidence: 0.95,
+        };
+      }
+
+      // Use the best match from DB (person with completed assessment)
+      const bestMatch = withAssessment[0];
+      this.logger.log(`✅ DB validated: ${bestMatch.full_name} (userId: ${bestMatch.user_id}, assessments: ${bestMatch.completed_count})`);
+
+      // Encode the profile data as base64 for the URL — merge DB data with provided profile
       const reportPayload = {
-        name: profileData.name,
+        name: bestMatch.full_name, // Use the DB name for accuracy
         currentRole: profileData.currentRole,
         currentJobDescription: profileData.currentJobDescription,
         yearsOfExperience: profileData.yearsOfExperience,
@@ -1032,7 +2246,7 @@ export class RagService {
       const downloadUrl = `/rag/chat-report/download?profile=${encodedProfile}`;
 
       return {
-        answer: `**✅ Profile Captured Successfully for ${profileData.name}!** 🎯\n\n📊 **Profile Summary:**\n- **Name:** ${profileData.name}\n- **Current Role:** ${profileData.currentRole}\n- **Experience:** ${profileData.yearsOfExperience} years\n- **Industry:** ${profileData.currentIndustry}\n- **Target Role:** ${profileData.expectedFutureRole}\n\n📄 **[Click here to download your personalized Career Fitment Report](${downloadUrl})**`,
+        answer: `**✅ Profile Captured Successfully for ${bestMatch.full_name}!** 🎯\n\n📊 **Profile Summary:**\n- **Name:** ${bestMatch.full_name}\n- **Current Role:** ${profileData.currentRole}\n- **Experience:** ${profileData.yearsOfExperience} years\n- **Industry:** ${profileData.currentIndustry}\n- **Target Role:** ${profileData.expectedFutureRole}\n- **Assessments Completed:** ${bestMatch.completed_count}\n\n📄 **[Click here to download your personalized Career Fitment Report](${downloadUrl})**\n\n*Report is generated using real assessment data from our platform combined with the profile details you provided.*`,
         searchType: 'chat_profile_report',
         confidence: 0.95,
         reportUrl: downloadUrl,
@@ -1040,7 +2254,7 @@ export class RagService {
     } catch (error) {
       this.logger.error(`Chat profile report error: ${error.message}`);
       return {
-        answer: `**❌ Error processing profile:** ${error.message}\n\nPlease make sure you've provided all required details (Name, Current Role, Years of Experience, Current Industry, Expected Future Role).`,
+        answer: `**I couldn't process that profile.** ${this.sanitizeErrorForUser(error)}\n\nPlease make sure you've provided all required details (Name, Current Role, Years of Experience, Current Industry, Expected Future Role).`,
         searchType: 'error',
         confidence: 0,
       };
@@ -1179,7 +2393,7 @@ export class RagService {
     } catch (error) {
       this.logger.error(`JD Matching error: ${error.message}`);
       return {
-        answer: `**Error during JD matching:** ${error.message}\n\nPlease try again with a more detailed job description.`,
+        answer: `**I couldn't run the candidate matching right now.** ${this.sanitizeErrorForUser(error)}\n\n💡 Please try again with a more detailed job description.`,
         searchType: 'error',
         confidence: 0,
       };
@@ -1191,6 +2405,15 @@ export class RagService {
    * Handles various formats: "find candidates for: [JD]", "match for [JD]", etc.
    */
   private extractJDFromMessage(message: string): string {
+    // Try short role extraction first: "best/top candidate for [role]"
+    const shortRolePattern = /(?:best|top|ideal)\s+(?:candidates?|performer|person|employee|resource|member)s?\s+(?:for|to)\s*[:\-]?\s*([\s\S]+)/i;
+    const shortMatch = message.match(shortRolePattern);
+    if (shortMatch && shortMatch[1] && shortMatch[1].trim().length > 3) {
+      // Return the role name as a JD prompt for the LLM to understand
+      const role = shortMatch[1].trim();
+      return `Find the best candidate for the role: ${role}. Required: strong behavioral traits, leadership potential, and personality fit for ${role}.`;
+    }
+
     // Try to extract JD after common prefixes
     const prefixPatterns = [
       /(?:find|match|search|identify|list|show|get|who)\s+(?:candidates?|people|users?|suitable)\s+(?:for|matching|suited\s+for|that\s+match|who\s+(?:fit|match|suit))\s*[:\-]?\s*([\s\S]+)/i,
@@ -1232,7 +2455,7 @@ export class RagService {
       throw error;
     }
   }
-  private async understandQuery(question: string, userRole: string = 'STUDENT'): Promise<{
+  private async understandQuery(question: string, userRole: string = 'STUDENT', conversationHistory: string = ''): Promise<{
     intent: string;
     searchTerm: string | null;
     table: string;
@@ -1260,23 +2483,36 @@ export class RagService {
       : userRole === 'CORPORATE' ? 'CORPORATE(company-scoped)'
         : 'STUDENT(personal only)';
 
-    const prompt = `You are an intent classifier for OriginBI, a career assessment platform. Your job is to classify user questions into the correct intent for routing.
+    const prompt = `You are the intent classifier for Ask BI (OriginBI's AI talent intelligence assistant). Classify user questions into the correct intent for routing.
 
 User role: ${roleHint}
-
+${conversationHistory ? `\n${conversationHistory}\n` : ''}
 Output JSON: {"intent":"...","searchTerm":"...or null","table":"...","includePersonality":bool}
 
+AUTO-CORRECTION (CRITICAL):
+Before classifying, mentally correct obvious misspellings and interpret user intent:
+- "candiate"/"candidte"/"canidate" = candidate
+- "employe"/"emploee"/"emplyee" = employee (which means candidate in this platform)
+- "fir" in context like "fir for" = "fit for"
+- "resourse" = resource (which means candidate)
+- In corporate context: employee = resource = staff = member = worker = candidate (all refer to registrations table)
+- "my employee" / "my resource" / "my staff" = asking about their candidates → list_candidates
+- "know about my employee" = list_candidates (NOT person_lookup)
+- "list of [misspelled word similar to candidate]" = list_candidates
+
 INTENTS (choose the MOST SPECIFIC one):
+- data_query: **USE THIS for ANY complex, analytical, or flexible data question** that doesn't fit a specific intent below. Examples: "female candidates who scored above 80", "average score by personality type", "candidates who completed last week", "gender distribution", "score range breakdown", "which departments have the most candidates", "compare scores between groups". This intent powers dynamic SQL generation and can answer virtually ANY database question.
 - general_knowledge: ANY question about skills, technologies, career advice, how-to guides, courses, learning, salaries, job markets, comparisons, explanations, tips, tutorials, roadmaps, programming concepts, or general world knowledge. This is the DEFAULT for any question that does NOT require looking up specific platform data.
 - career_guidance: Personal career advice ("what jobs suit ME", "am I eligible", "should I try X")
 - personal_info: "my name", "my profile", "who am I" (user asking about their own stored data)
-- jd_candidate_match: User provides a job description, role description, or hiring criteria and wants to find/match/identify suitable candidates from the platform's assessment data. Trigger words: "find candidates for", "match candidates", "who is suitable for", "best candidates for [role/JD]", "job description:", "identify suitable users for"
+- self_results: User asking about THEIR OWN results/scores/data ("my results", "my score", "show my test", "my details", "my assessment")
+- jd_candidate_match: User provides a job description, role description, or hiring criteria and wants to find/match/identify suitable candidates from the platform's assessment data.
 - greeting: hi, hello, hey
 - help: what can you do
-- list_users: ONLY when explicitly asking to "list users", "show all users"
-- list_candidates: ONLY when explicitly asking to "list candidates", "show registrations", "show students"
+- list_users: ONLY for listing platform users from the "users" table (NOT affiliates, NOT candidates)
+- list_candidates: For listing candidates/students/registrations OR when user asks about "my employees"/"my resources"/"my staff"/"my team"/"my people" — these ALL mean candidates in the registrations table
 - test_results: ONLY when asking for assessment scores/exam results from the platform
-- person_lookup: ONLY when asking about a SPECIFIC named person's data in the system (e.g. "show John's score")
+- person_lookup: ONLY when asking about a SPECIFIC named person's data in the system (e.g. "show John's score"). The searchTerm MUST be an actual human name, NEVER a domain word like "employee", "candidate", "development", etc.
 - best_performer: "top performer", "highest score", "best candidates"
 - career_roles: ONLY for listing job roles stored in the platform database
 - career_report: generate career report for someone
@@ -1284,18 +2520,34 @@ INTENTS (choose the MOST SPECIFIC one):
 - custom_report: career fitment report (with user profile data)
 - chat_profile_report: message contains structured fields like "Name:", "Current Role:", "Experience:"
 - count: "how many users/candidates"
+- count_by_role: "how many corporate/admin/student accounts" (role-based user breakdown)
+- corporate_details: Listing corporate/company accounts, corporate details, company info, "list corporates", "show corporate accounts", "corporate details", "list those details" (when conversation context is about corporates). If user is CORPORATE, show ONLY their own company details.
+- affiliate_dashboard: Affiliate program overview/stats
+- affiliate_referrals: Referral transactions
+- affiliate_earnings: Affiliate commissions/earnings
+- affiliate_payments: Affiliate settlements/payment history
+- affiliate_list: List all affiliate accounts
+- affiliate_lookup: Look up a specific affiliate by name
+- affiliate_students: Students referred by affiliate(s)
 
-Tables: users|registrations|assessment_attempts|career_roles|none
+Tables: users|registrations|assessment_attempts|career_roles|corporate_accounts|affiliate_accounts|affiliate_referral_transactions|affiliate_settlement_transactions|none
 
 CRITICAL RULES:
 1. If someone asks "what are the skills to become X" or "how to become X" or "best courses for X" or "explain X" → general_knowledge (NOT list_users, NOT career_roles)
 2. general_knowledge should be used for ANY educational, informational, or advisory question
-3. list_users/list_candidates should ONLY be used when the user EXPLICITLY asks to list/show platform users
-4. career_roles should ONLY be used when asking to list the career roles stored in the DATABASE
-5. If you're unsure, default to general_knowledge rather than list_users
-6. searchTerm should be null unless the query mentions a specific person's name
-7. includePersonality=true for: test_results, person_lookup, best_performer, career_report, overall_report, custom_report, jd_candidate_match
-8. jd_candidate_match should be used when the user explicitly wants to find candidates matching a job description or role description. The searchTerm should be null for this intent.
+3. **DOMAIN PRIORITY**: If the query mentions "affiliate", "referral", "commission", "settlement", or "payout", it MUST route to an affiliate_* intent
+4. **DATA QUERY PRIORITY**: If the question involves filtering, comparing, aggregating, or analyzing data from the platform (scores, dates, gender, personality types, etc.), use data_query to leverage dynamic SQL generation. Examples that MUST be data_query: "female candidates above 80 score", "average score", "personality distribution", "candidates completed this month", "score comparison between personality types"
+5. list_users/list_candidates should ONLY be used when the user EXPLICITLY asks to list platform users/candidates WITHOUT filtering, analysis, or specific criteria
+6. career_roles should ONLY be used when asking to list the career roles stored in the DATABASE
+7. If the question is analytical or requires combining multiple filters → data_query
+8. If the question is purely educational/advisory with no DB data needed → general_knowledge
+9. **searchTerm MUST be null unless the query mentions a specific human person's name (first name + optional last name). NEVER put domain words like "employee", "candidate", "resource", "full stack development", "my employee" as searchTerm.**
+10. includePersonality=true for: test_results, self_results, person_lookup, best_performer, career_report, overall_report, custom_report, jd_candidate_match, data_query
+11. If conversation history is provided, use it to resolve follow-up references like "her", "him", "that person", "their report"
+12. All affiliate_* intents are ADMIN-ONLY
+13. **"candidates for [role]" or "candidate's for [role]" = the user wants to find/match candidates for that role → jd_candidate_match or list_candidates, NEVER person_lookup**
+14. **CORPORATE DATA**: "list corporates", "corporate details", "company accounts", "show companies" → corporate_details. If conversation previously mentioned corporates/companies and user says "list those details" or "show details" → corporate_details
+15. **FOLLOW-UP CONTEXT**: When conversation history mentions a topic (e.g., corporate accounts, candidates), follow-up like "list those", "show details", "tell me more" should route to the same topic's intent
 
 Query: "${question}"
 JSON:`;
@@ -1310,20 +2562,258 @@ JSON:`;
       // Extract JSON if wrapped in markdown code block
       const cleanJson = jsonStr.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
       const parsed = JSON.parse(cleanJson);
-      const result = {
+      let result = {
         intent: parsed.intent || 'general_knowledge',
         searchTerm: parsed.searchTerm || null,
         table: parsed.table || 'none',
         includePersonality: parsed.includePersonality || false,
       };
 
+      // ══════════════════════════════════════════════════════
+      // POST-CLASSIFICATION SAFETY NET
+      // Override misclassified intents based on domain keywords
+      // ══════════════════════════════════════════════════════
+      result = this.applyDomainOverrides(question, result);
+
       this.queryCache.set(cacheKey, { result, timestamp: Date.now() });
       if (this.queryCache.size > 200) this.cleanCache();
       return result;
     } catch (error) {
-      this.logger.warn(`Query interpretation failed: ${error.message}, using fallback`);
+      this.logger.warn(`Query interpretation failed: ${error.message}, trying Gemini fallback...`);
+
+      // ── Gemini fallback for query understanding ──
+      try {
+        const googleApiKey = process.env.GOOGLE_API_KEY;
+        if (googleApiKey) {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${googleApiKey}`;
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Referer': 'https://originbi.com' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0, maxOutputTokens: 200 },
+            }),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            const geminiText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            if (geminiText) {
+              const cleanJson = geminiText.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
+              const parsed = JSON.parse(cleanJson);
+              let result = {
+                intent: parsed.intent || 'general_knowledge',
+                searchTerm: parsed.searchTerm || null,
+                table: parsed.table || 'none',
+                includePersonality: parsed.includePersonality || false,
+              };
+              result = this.applyDomainOverrides(question, result);
+              this.logger.log('✅ Gemini query understanding fallback succeeded');
+              this.queryCache.set(cacheKey, { result, timestamp: Date.now() });
+              return result;
+            }
+          }
+        }
+      } catch (geminiErr) {
+        this.logger.warn(`Gemini fallback also failed: ${geminiErr.message}`);
+      }
+
+      this.logger.warn('Using keyword-based fallback interpretation');
       return this.fallbackInterpretation(question);
     }
+  }
+
+  /**
+   * Post-classification safety net: overrides obviously wrong LLM intent classification
+   * based on domain-specific keyword presence in the original query.
+   */
+  private applyDomainOverrides(
+    question: string,
+    result: { intent: string; searchTerm: string | null; table: string; includePersonality: boolean },
+  ): { intent: string; searchTerm: string | null; table: string; includePersonality: boolean } {
+    const q = question.toLowerCase();
+    const affiliateKeywords = /\b(affiliate|referral|commission|settlement|payout)\b/;
+    const nonAffiliateIntents = ['list_users', 'list_candidates', 'general_knowledge', 'person_lookup'];
+
+    // If query has affiliate keywords but LLM returned a non-affiliate intent → correct it
+    if (affiliateKeywords.test(q) && nonAffiliateIntents.includes(result.intent)) {
+      this.logger.warn(
+        `🔄 Domain override: LLM returned "${result.intent}" for affiliate query, correcting...`,
+      );
+
+      // Determine the best affiliate sub-intent
+      if (/\bstudents?\b/.test(q)) {
+        return { ...result, intent: 'affiliate_students', table: 'affiliate_referral_transactions' };
+      }
+      if (/\b(dashboard|overview|summary)\b/.test(q)) {
+        return { ...result, intent: 'affiliate_dashboard', table: 'affiliate_accounts' };
+      }
+      if (/\breferral\b/.test(q) && /\b(list|show|get|transaction|details?)\b/.test(q)) {
+        return { ...result, intent: 'affiliate_referrals', table: 'affiliate_referral_transactions' };
+      }
+      if (/\b(earning|commission|total\s*earn)\b/.test(q)) {
+        return { ...result, intent: 'affiliate_earnings', table: 'affiliate_accounts' };
+      }
+      if (/\b(payment|settlement|payout)\b/.test(q)) {
+        return { ...result, intent: 'affiliate_payments', table: 'affiliate_settlement_transactions' };
+      }
+      if (/\b(detail|info|profile|status|lookup)\b/.test(q) && result.searchTerm) {
+        return { ...result, intent: 'affiliate_lookup', table: 'affiliate_accounts' };
+      }
+      // Default to affiliate_list
+      return { ...result, intent: 'affiliate_list', table: 'affiliate_accounts' };
+    }
+
+    // If query asks about "corporate" data but got list_users → correct to list_candidates or keep
+    // (Add more domain overrides here as needed in the future)
+
+    // ═══════════════════════════════════════════════════════════════
+    // CRITICAL SAFETY NET: Strip domain words from searchTerm
+    // The LLM sometimes puts "all candidate", "my employee", "full stack development"
+    // as searchTerm when it should be null. This catches those cases.
+    // ═══════════════════════════════════════════════════════════════
+    if (result.searchTerm) {
+      const domainTerms = new Set([
+        'candidate', 'candidates', 'employee', 'employees', 'student', 'students',
+        'resource', 'resources', 'member', 'members', 'staff', 'worker', 'workers',
+        'people', 'person', 'team', 'everyone', 'everybody',
+        'user', 'users', 'account', 'accounts', 'registration', 'registrations',
+        'all', 'my', 'the', 'our', 'their', 'your', 'every', 'each',
+        'development', 'developer', 'engineering', 'full', 'stack', 'frontend', 'backend',
+        'manager', 'lead', 'senior', 'junior', 'role', 'position', 'job',
+        'report', 'reports', 'result', 'results', 'score', 'scores',
+        'assessment', 'data', 'details', 'info', 'information',
+        'company', 'organization', 'department', 'performance', 'performer', 'performers',
+      ]);
+
+      const searchWords = result.searchTerm.toLowerCase().split(/\s+/);
+      const allDomainWords = searchWords.every(w => domainTerms.has(w));
+
+      if (allDomainWords) {
+        this.logger.warn(
+          `🔄 Domain override: searchTerm "${result.searchTerm}" is all domain words — nullifying and reclassifying`,
+        );
+        result.searchTerm = null;
+
+        // Reclassify intent based on the query content
+        if (result.intent === 'person_lookup') {
+          // Figure out what they ACTUALLY want
+          if (/\b(report|overall|summary|placement)\b/.test(q)) {
+            result.intent = 'overall_report';
+            result.table = 'assessment_attempts';
+            result.includePersonality = true;
+          } else if (/\b(list|show|get|all|every)\b/.test(q) && /\b(candidate|registration|student)\b/.test(q)) {
+            result.intent = 'list_candidates';
+            result.table = 'registrations';
+            result.includePersonality = false;
+          } else if (/\b(list|show|get|all|every)\b/.test(q) && /\buser\b/.test(q)) {
+            result.intent = 'list_users';
+            result.table = 'users';
+            result.includePersonality = false;
+          } else if (/\b(best|top|highest|performer)\b/.test(q)) {
+            result.intent = 'best_performer';
+            result.table = 'assessment_attempts';
+            result.includePersonality = true;
+          } else if (/\b(count|how many|total|number)\b/.test(q)) {
+            result.intent = 'count';
+            result.table = /\buser\b/.test(q) ? 'users' : 'registrations';
+            result.includePersonality = false;
+          } else {
+            // Default: if they say "candidate" → list_candidates, otherwise general_knowledge
+            if (/\bcandidate\b/.test(q)) {
+              result.intent = 'list_candidates';
+              result.table = 'registrations';
+              result.includePersonality = false;
+            } else {
+              result.intent = 'general_knowledge';
+              result.table = 'none';
+              result.includePersonality = false;
+            }
+          }
+          this.logger.log(`🎯 Reclassified to: ${result.intent}`);
+        }
+      }
+    }
+
+    return result;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SMART FOLLOW-UP CONTEXT RESOLVER
+  // Resolves generic follow-ups like "list the details" / "show those" / 
+  // "give details" by mapping the previous intent to the right detail intent.
+  // ═══════════════════════════════════════════════════════════════════════════
+  private resolveFollowUpIntent(
+    sessionId: string,
+    question: string,
+    userRole: string,
+  ): { intent: string; searchTerm: string | null; table: string; includePersonality: boolean } | null {
+    const q = question.toLowerCase().trim();
+
+    // Only trigger on generic follow-up patterns (no specific subject mentioned)
+    const isGenericFollowUp = /^(list|show|get|give|display|tell)\s+(all\s+)?(the|those|these|them|me\s+the|me\s+those)?\s*(detail|info|data|accounts?|name|list|record|more)s?\s*\??$/i.test(q)
+      || /^(list|show|tell\s+me)\s+(all\s+)?(the|those|these|them)\s*(detail|info|data|record|more)s?\s*\??$/i.test(q)
+      || /^(list|show|tell\s+me)\s+(the|those|these|all|them)\s*\??$/i.test(q)
+      || /^(what|who)\s+are\s+(they|those|them)\s*\??$/i.test(q)
+      || /^(detail|details|more\s+details?|full\s+details?)\s*\??$/i.test(q)
+      || /^(list|show)\s+(all\s+)?(the|their|those)?\s*(details|info|names?)?\s*\??$/i.test(q)
+      || /^(give|tell)\s+(me\s+)?(all\s+)?(the\s+|those\s+)?(detail|info|data|name)s?\s*\??$/i.test(q);
+
+    if (!isGenericFollowUp) return null;
+
+    // Get conversation context
+    const session = this.conversationService.getSession(sessionId);
+    const lastIntent = session?.currentContext?.lastIntent;
+
+    if (!lastIntent) return null;
+
+    this.logger.log(`🔁 Generic follow-up detected: "${question}" | lastIntent: ${lastIntent}`);
+
+    // Map lastIntent → detail intent
+    const intentMapping: Record<string, { intent: string; table: string; includePersonality: boolean }> = {
+      // After counting roles (CORPORATE: 6) → list corporate accounts
+      'count_by_role': { intent: 'corporate_details', table: 'corporate_accounts', includePersonality: false },
+      // After counting candidates → list candidates
+      'count': { intent: 'list_candidates', table: 'registrations', includePersonality: false },
+      // After listing candidates → show test results
+      'list_candidates': { intent: 'test_results', table: 'assessment_attempts', includePersonality: true },
+      // After test results → show detailed results
+      'test_results': { intent: 'test_results', table: 'assessment_attempts', includePersonality: true },
+      // After corporate details → show candidates per corporate
+      'corporate_details': { intent: 'list_candidates', table: 'registrations', includePersonality: false },
+      // After best performer → show their details
+      'best_performer': { intent: 'test_results', table: 'assessment_attempts', includePersonality: true },
+      // After career roles → keep showing career roles
+      'career_roles': { intent: 'career_roles', table: 'career_roles', includePersonality: false },
+      // After affiliate dashboard → show referrals
+      'affiliate_dashboard': { intent: 'affiliate_referrals', table: 'affiliate_referral_transactions', includePersonality: false },
+      'affiliate_referrals': { intent: 'affiliate_referrals', table: 'affiliate_referral_transactions', includePersonality: false },
+      'affiliate_earnings': { intent: 'affiliate_referrals', table: 'affiliate_referral_transactions', includePersonality: false },
+      // After listing users → list users again (different page)
+      'list_users': { intent: 'list_users', table: 'users', includePersonality: false },
+    };
+
+    // Check conversation history for more context
+    const lastMessages = session.messages.slice(-4).map(m => m.content.toLowerCase()).join(' ');
+
+    // Smart override: if last response mentioned "corporate" but lastIntent was count_by_role
+    if (lastIntent === 'count_by_role' && lastMessages.includes('corporate')) {
+      return { intent: 'corporate_details', searchTerm: null, table: 'corporate_accounts', includePersonality: false };
+    }
+    // If last response mentioned "candidate" or "student"
+    if ((lastIntent === 'count_by_role' || lastIntent === 'count') && (lastMessages.includes('candidate') || lastMessages.includes('student') || lastMessages.includes('registration'))) {
+      return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
+    }
+    // If last response mentioned "affiliate"
+    if (lastIntent === 'count_by_role' && lastMessages.includes('affiliate')) {
+      return { intent: 'affiliate_referrals', searchTerm: null, table: 'affiliate_referral_transactions', includePersonality: false };
+    }
+
+    const mapped = intentMapping[lastIntent];
+    if (mapped) {
+      return { ...mapped, searchTerm: null };
+    }
+
+    return null;
   }
 
   /**
@@ -1338,6 +2828,13 @@ JSON:`;
   } | null {
     const q = question.toLowerCase().trim();
 
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE 0: Domain-keyword detection
+    // Detect domain-specific keywords FIRST to route to the correct
+    // intent family and prevent generic patterns from mis-matching.
+    // ═══════════════════════════════════════════════════════════════
+    const isAffiliateDomain = /\b(affiliate|referral|commission|settlement|payout)\b/.test(q);
+
     // Greetings
     if (/^(hi|hello|hey|good\s*(morning|afternoon|evening)|howdy)\b/.test(q)) {
       return { intent: 'greeting', searchTerm: null, table: 'none', includePersonality: false };
@@ -1348,9 +2845,119 @@ JSON:`;
       return { intent: 'help', searchTerm: null, table: 'none', includePersonality: false };
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // EARLY CATCH: Common corporate/admin queries that often get misrouted
+    // These run AFTER normalizeQuery (employee→candidate etc.)
+    // ═══════════════════════════════════════════════════════════════
+
+    // "all person report" / "all candidate report" / "all report" → overall_report
+    if (/\b(all|every|overall|complete|full)\s+(candidate|person|student|user)?\s*(report|summary|overview|dashboard)\b/.test(q)) {
+      return { intent: 'overall_report', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    // "best candidate for [role]" → jd_candidate_match (role-specific matching, NOT generic best_performer)
+    if (/\b(best|top|ideal)\s+(candidate|performer|person|employee|resource)s?\s+(for|to)\s+\w/i.test(q)) {
+      return { intent: 'jd_candidate_match', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    // "best employee" / "best candidate" / "top performer" / "best performer" (generic, no role specified)
+    if (/\b(best|top|highest)\s+(candidate|performer|student|person|scorer)\b/.test(q)) {
+      return { intent: 'best_performer', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    // "show my employees" / "list my resources" / "my staff" / "my candidates"
+    if (/\b(show|list|get|display|view)\s+(my|our)\s+(candidate|candidates|student|students)\b/.test(q)) {
+      return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
+    }
+
+    // "list my resource" (even before normalizeQuery — catches if synonym mapping missed)
+    if (/\b(list|show|get|display|view)\s+(my|our)\s+(resource|resources|employee|employees|staff|member|members|worker|workers|people|team)\b/.test(q)) {
+      return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // FOLLOW-UP & GENDER PATTERNS — prevent "male"/"female" from
+    // being treated as person names in follow-up queries
+    // ═══════════════════════════════════════════════════════════════
+
+    // "what about male?" / "how about female?" / "and male?" / "and female?"
+    if (/\b(what\s+about|how\s+about|and|and\s+the)\s+(male|female|males|females|boys?|girls?|men|women)\b/.test(q)) {
+      const gender = /\b(female|females|girls?|women)\b/i.test(q) ? 'FEMALE' : 'MALE';
+      return { intent: 'count', searchTerm: null, table: 'registrations', includePersonality: false, gender } as any;
+    }
+
+    // Standalone "male" / "female" (likely follow-up to a count query)
+    if (/^(male|female|males|females)\s*\??$/i.test(q.trim())) {
+      const gender = /^(female|females)/i.test(q.trim()) ? 'FEMALE' : 'MALE';
+      return { intent: 'count', searchTerm: null, table: 'registrations', includePersonality: false, gender } as any;
+    }
+
+    // "how many male/female candidates/resources?" / "male count" / "total male"
+    if (/\b(how\s+many|count|total|number\s+of)\s+(male|female)\b/.test(q)) {
+      const gender = /\bfemale\b/i.test(q) ? 'FEMALE' : 'MALE';
+      return { intent: 'count', searchTerm: null, table: 'registrations', includePersonality: false, gender } as any;
+    }
+
+    // "im asking about toal male resources?" → after normalizeQuery → "i am asking about total male candidate?"
+    if (/\b(asking\s+about|tell\s+me\s+about|about)\s+(total\s+)?(male|female)\b/.test(q)) {
+      const gender = /\bfemale\b/i.test(q) ? 'FEMALE' : 'MALE';
+      return { intent: 'count', searchTerm: null, table: 'registrations', includePersonality: false, gender } as any;
+    }
+
     // Chat profile report (contains structured "Name:", "Current Role:", etc.)
     if (/name\s*:/i.test(q) && (/current\s*role\s*:/i.test(q) || /experience\s*:/i.test(q) || /industry\s*:/i.test(q))) {
       return { intent: 'chat_profile_report', searchTerm: null, table: 'none', includePersonality: false };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE 1: AFFILIATE / REFERRAL DOMAIN (checked BEFORE generic patterns)
+    // If query contains affiliate/referral/commission/settlement,
+    // route to affiliate intents to prevent generic mis-matches.
+    // ═══════════════════════════════════════════════════════════════
+    if (isAffiliateDomain) {
+      // "students on affiliate", "students referred by", "affiliate students"
+      if (/\bstudents?\b/.test(q)) {
+        const name = this.extractName(question);
+        return { intent: 'affiliate_students', searchTerm: name, table: 'affiliate_referral_transactions', includePersonality: false };
+      }
+
+      // Affiliate dashboard: "affiliate dashboard", "referral dashboard", "affiliate overview"
+      if (/\b(dashboard|overview|summary)\b/.test(q)) {
+        return { intent: 'affiliate_dashboard', searchTerm: null, table: 'affiliate_accounts', includePersonality: false };
+      }
+
+      // Affiliate referrals: "referral list", "show referrals", "how many referrals", "referral transactions"
+      if (/\breferral/i.test(q) && /\b(list|show|get|all|details?|transaction|count|how\s*many|recent)\b/.test(q)) {
+        return { intent: 'affiliate_referrals', searchTerm: null, table: 'affiliate_referral_transactions', includePersonality: false };
+      }
+
+      // Affiliate earnings: "commission details", "earnings", "total earned", "pending commission"
+      if (/\b(earning|commission|total\s*earn|pending\s*commission)\b/.test(q)) {
+        return { intent: 'affiliate_earnings', searchTerm: null, table: 'affiliate_accounts', includePersonality: false };
+      }
+
+      // Affiliate payments: "payment status", "settlement history", "payout", "settled amount"
+      if (/\b(payment|settlement|payout|settled\s*amount|paid\s*amount)\b/.test(q)) {
+        return { intent: 'affiliate_payments', searchTerm: null, table: 'affiliate_settlement_transactions', includePersonality: false };
+      }
+
+      // Affiliate lookup: "affiliate details for [name]", "[name]'s affiliate info", "affiliate info"
+      if (/\b(detail|info|profile|status|lookup)\b/.test(q)) {
+        const name = this.extractName(question);
+        return { intent: 'affiliate_lookup', searchTerm: name, table: 'affiliate_accounts', includePersonality: false };
+      }
+
+      // Catch-all: any "list/show/get affiliate..." or "affiliate list/accounts/users/details"
+      if (/\b(list|show|get|all|display)\b/.test(q) || /\b(accounts?|list|all|users?|details?|data|members?)\b/.test(q)) {
+        return { intent: 'affiliate_list', searchTerm: null, table: 'affiliate_accounts', includePersonality: false };
+      }
+
+      // If it's still affiliate-domain but no sub-pattern matched, default to affiliate_list for listing or affiliate_dashboard
+      if (/\b(how\s*many|count|total)\b/.test(q)) {
+        return { intent: 'count', searchTerm: null, table: 'affiliate_accounts', includePersonality: false };
+      }
+
+      return { intent: 'affiliate_list', searchTerm: null, table: 'affiliate_accounts', includePersonality: false };
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -1381,25 +2988,98 @@ JSON:`;
       return { intent: 'career_report', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
     }
 
-    // Best/top performer
-    if (/\b(best|top|highest)\s*(performer|score|candidate|student|result)\b/i.test(q) ||
+    // "[Name(s)] report" — e.g. "DINESH S J and PRAKASH B report", "dinesh report"
+    if (/\breport\b/i.test(q)) {
+      const beforeReport = question.replace(/\s*report\b.*/i, '').trim();
+      if (beforeReport.length >= 2 && !/^(show|get|list|create|generate|overall|custom|my)$/i.test(beforeReport)) {
+        return { intent: 'career_report', searchTerm: beforeReport, table: 'assessment_attempts', includePersonality: true };
+      }
+    }
+
+    // "best/top candidate for [role]" → jd_candidate_match (role-specific)
+    if (/\b(best|top|ideal)\s*(candidate|performer|person|employee|resource|member)s?\s+(for|to)\s+\w/i.test(q)) {
+      return { intent: 'jd_candidate_match', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    // Best/top performer (generic, no specific role)
+    if (/\b(best|top|highest)\s*(performer|score|candidate|student|result|employee|resource|member)s?\b/i.test(q) ||
       /\b(show|list|get)\s*(top|best)\b/i.test(q) ||
+      /\b(best|top)\s*(employee|resource|member)s?\b/i.test(q) ||
       /\btop\s*\d+\b/.test(q)) {
       return { intent: 'best_performer', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
     }
 
-    // Count
-    if (/\b(how\s*many|count|total\s*number)\b/.test(q)) {
-      const table = /user/i.test(q) ? 'users' : /candidate|registration|student/i.test(q) ? 'registrations' : 'assessment_attempts';
-      return { intent: 'count', searchTerm: null, table, includePersonality: false };
+    // Count — "how many users/candidates/students/male/female/corporate/admin" / "total candidates" / "total male and female"
+    if (/\b(how\s*many|count|total\s*number)\b/.test(q) || /\btotal\s+(candidate|candidates|student|students|user|users|male|female|people|resource|employee|member|registration|count|number)s?\b/i.test(q)) {
+      // Detect role-based count (corporate, admin, student breakdown)
+      const rolesRequested: string[] = [];
+      if (/\b(corporate|corporates|company|companies)\b/i.test(q)) rolesRequested.push('CORPORATE');
+      if (/\badmin\b/i.test(q)) rolesRequested.push('ADMIN');
+      if (/\bstudent\b/i.test(q)) rolesRequested.push('STUDENT');
+      if (/\baffiliate\b/i.test(q)) rolesRequested.push('AFFILIATE');
+      if (rolesRequested.length > 0) {
+        const result: any = { intent: 'count_by_role', searchTerm: null, table: 'users', includePersonality: false };
+        result.roles = rolesRequested;
+        return result;
+      }
+
+      // Detect "corporate logins/accounts" or "company accounts" specifically
+      if (/\b(corporate|company)\s*(login|account|user)s?\b/i.test(q)) {
+        const result: any = { intent: 'count_by_role', searchTerm: null, table: 'users', includePersonality: false };
+        result.roles = ['CORPORATE'];
+        return result;
+      }
+
+      const table = /user|login|account/i.test(q) ? 'users' : /candidate|registration|student|resource|employee|people|member/i.test(q) ? 'registrations' : 'registrations';
+      // Extract gender filter
+      const hasMale = /\b(male|boys?|men)\b/i.test(q);
+      const hasFemale = /\b(female|girls?|women)\b/i.test(q);
+      const result: any = { intent: 'count', searchTerm: null, table, includePersonality: false };
+      if (hasMale && hasFemale) {
+        result.genderBreakdown = true;
+        result.table = 'registrations';
+      } else if (hasMale) {
+        result.gender = 'MALE';
+      } else if (hasFemale) {
+        result.gender = 'FEMALE';
+      }
+      return result;
     }
 
-    // List users
-    if (/\b(list|show|get)\b.*\busers?\b/.test(q) || /^users?\b/.test(q)) {
+    // ═══════════════════════════════════════════════════════════════
+    // SYNONYM-AWARE PATTERNS (after normalizeQuery: employee→candidate)
+    // ═══════════════════════════════════════════════════════════════
+    // "my candidate(s)" / "about my candidate(s)" / "know about my candidate(s)"
+    if (/\b(my|about\s+my|know\s+about\s+my|need\s+to\s+know\s+about\s+my)\s+candidates?\b/.test(q)) {
+      return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
+    }
+    // "my resource(s)" / "my employee(s)" / "my people" / "my team" / "my staff"
+    if (/\b(my\s+resources?|my\s+employees?|my\s+people|my\s+team|my\s+staff|my\s+members?)\b/i.test(q)) {
+      return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
+    }
+    // "list resource(s)" / "show resource(s)" / "list employees" / "show employees"
+    if (/\b(list|show|get|display)\s+(all\s+)?(resource|employee|member|staff|people)s?\b/i.test(q)) {
+      return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
+    }
+    // "about candidate(s)" / "know about candidate(s)" (without a specific name)
+    if (/\b(about|know\s+about|tell\s+me\s+about|information\s+about)\s+candidates?\b/.test(q)) {
+      return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
+    }
+    // "list of candidate(s)" / "list of the candidate(s)"
+    if (/\blist\s+(?:of\s+)?(?:the\s+)?candidates?\b/.test(q)) {
+      return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
+    }
+    // "candidate(s) for [role]" / "candidate's for [role]" — find matching candidates
+    if (/\bcandidates?(?:'s)?\s+(?:for|fit\s+for|suitable\s+for)\s+/i.test(q)) {
+      return { intent: 'jd_candidate_match', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    // List users (but NOT if the query has domain words — already handled above)
+    if ((/\b(list|show|get)\b.*\busers?\b/.test(q) || /^users?\b/.test(q))) {
       return { intent: 'list_users', searchTerm: null, table: 'users', includePersonality: false };
     }
 
-    // List candidates
+    // List candidates/students/registrations
     if (/\b(list|show|get)\b.*\b(candidate|registration|student)s?\b/.test(q) || /^candidates?\b/.test(q)) {
       return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
     }
@@ -1409,14 +3089,47 @@ JSON:`;
       return { intent: 'career_roles', searchTerm: null, table: 'career_roles', includePersonality: false };
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // CORPORATE DETAILS — List/show corporate accounts/companies
+    // ═══════════════════════════════════════════════════════════════
+    // "list corporates", "corporate accounts", "show companies", "corporate details"
+    if (/\b(list|show|get|display)\s+(all\s+)?(corporate|company|companies|corporate\s+account)/i.test(q)) {
+      return { intent: 'corporate_details', searchTerm: null, table: 'corporate_accounts', includePersonality: false };
+    }
+    // "corporate details", "company details", "corporate info"
+    if (/\b(corporate|company|companies)\s+(detail|info|account|data|profile)s?\b/i.test(q)) {
+      return { intent: 'corporate_details', searchTerm: null, table: 'corporate_accounts', includePersonality: false };
+    }
+    // "what is our company", "what is my company", "tell me about our company"
+    if (/\b(what\s+is|what's|tell\s+me\s+about|about)\s+(my|our)\s+(company|corporate|organization|business)\b/i.test(q)) {
+      return { intent: 'corporate_details', searchTerm: null, table: 'corporate_accounts', includePersonality: false };
+    }
+    // "my company", "my corporate", "my organization" (for corporate users)
+    if (/\b(my\s+company|my\s+corporate|my\s+organization|my\s+business)\b/i.test(q)) {
+      return { intent: 'corporate_details', searchTerm: null, table: 'corporate_accounts', includePersonality: false };
+    }
+    // "company details", "my company details", "our company", "our organization"
+    if (/\b(our\s+company|our\s+organization|our\s+corporate|company\s+profile|company\s+information)\b/i.test(q)) {
+      return { intent: 'corporate_details', searchTerm: null, table: 'corporate_accounts', includePersonality: false };
+    }
+    // "how many credits", "credit balance", "available credits" — corporate credit queries
+    if (/\b(credit|credits)\s*(balance|available|remaining|total|left)?\b/i.test(q) || /\b(available|remaining|total)\s+credits?\b/i.test(q)) {
+      return { intent: 'corporate_details', searchTerm: null, table: 'corporate_accounts', includePersonality: false };
+    }
+
     // Personal info: "my name", "my profile", "who am I"
     if (/\b(my\s*name|my\s*profile|who\s*am\s*i)\b/.test(q)) {
       return { intent: 'personal_info', searchTerm: null, table: 'none', includePersonality: false };
     }
 
-    // My results / my score
-    if (/\b(my\s*result|my\s*score|my\s*test|my\s*assessment|my\s*exam)\b/.test(q)) {
-      return { intent: 'test_results', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    // My results / my score / my details — dedicated self_results intent
+    if (/\b(my\s*result|my\s*score|my\s*test|my\s*assessment|my\s*exam|my\s*data|my\s*details?|my\s*report)\b/.test(q)) {
+      return { intent: 'self_results', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    // "show me my ..." or "what are my ..." (student self-queries)
+    if (/\b(show|get|display|what\s+are)\b.*\bmy\s+(result|score|test|assessment|detail|data)\b/.test(q)) {
+      return { intent: 'self_results', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
     }
 
     // Test results (general)
@@ -1429,6 +3142,118 @@ JSON:`;
     const possibleName = this.extractName(question);
     if (possibleName && /\b(score|result|detail|profile|data)\b/.test(q)) {
       return { intent: 'person_lookup', searchTerm: possibleName, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // DATA_QUERY — Dynamic SQL questions that don't fit fixed intents
+    // Complex filters, aggregations, comparisons, date ranges, etc.
+    // ═══════════════════════════════════════════════════════════════
+
+    // "average score", "mean score", "score distribution", "score breakdown"
+    if (/\b(average|mean|median|sum|min|max|total|distribution|breakdown|range)\s+(score|marks?|result|rating|percentage|attempt)/i.test(q)) {
+      return { intent: 'data_query', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    // "candidates who scored above/below X", "score greater than X"
+    if (/\b(score[ds]?\s+(above|below|more|less|greater|over|under|between|higher|lower))\b/i.test(q) ||
+        /\b(above|below|more\s+than|less\s+than|greater\s+than|over|under|between)\s+\d+/i.test(q)) {
+      return { intent: 'data_query', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    // "female candidates who...", "male candidates with...", gender + filter combos
+    if (/\b(male|female)\s+(candidate|student|user|people|person)s?\s+(who|with|that|having|above|below|scored)/i.test(q)) {
+      return { intent: 'data_query', searchTerm: null, table: 'registrations', includePersonality: true };
+    }
+
+    // "completed last week/month", "registered this month", "joined between"
+    if (/\b(completed|registered|joined|created|started|finished|attempted)\s+(last|this|in|between|during|before|after|since|from)/i.test(q)) {
+      return { intent: 'data_query', searchTerm: null, table: 'registrations', includePersonality: true };
+    }
+
+    // "group by personality", "by department", "per corporate", "by gender"
+    if (/\b(group\s+by|grouped\s+by|per|by\s+each|breakdown\s+by|categorize|split\s+by|segment\s+by)/i.test(q)) {
+      return { intent: 'data_query', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    // "compare scores", "comparison between", "difference in scores"
+    if (/\b(compare|comparison|difference\s+in|contrast)\b.*\b(score|result|candidate|personality|group|department|corporate)\b/i.test(q)) {
+      return { intent: 'data_query', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    // "which department/corporate/group has the most/least candidates"
+    if (/\b(which|what)\s+(department|corporate|group|company|organization)\s+(has|have|had|with)\s+(the\s+)?(most|least|highest|lowest|maximum|minimum)/i.test(q)) {
+      return { intent: 'data_query', searchTerm: null, table: 'registrations', includePersonality: true };
+    }
+
+    // "personality type distribution", "personality breakdown", "OCEAN scores"
+    if (/\b(personality|trait|OCEAN|openness|conscientiousness|extraversion|agreeableness|neuroticism)\s+(type|distribution|breakdown|analysis|pattern|score)/i.test(q)) {
+      return { intent: 'data_query', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    // "candidates with/without email", "users who have/haven't", complex filters
+    if (/\b(candidate|student|user|registration)s?\s+(with|without|who\s+have|who\s+haven't|that\s+have|that\s+don't|having|lacking|missing)/i.test(q)) {
+      return { intent: 'data_query', searchTerm: null, table: 'registrations', includePersonality: true };
+    }
+
+    // "percentage of", "ratio of", "proportion of"
+    if (/\b(percentage|ratio|proportion|rate)\s+of\b/i.test(q)) {
+      return { intent: 'data_query', searchTerm: null, table: 'registrations', includePersonality: true };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // DATA_QUERY — Additional patterns for real-world user questions
+    // Covers common ways admins, corporate users, and students ask
+    // ═══════════════════════════════════════════════════════════════
+
+    // "who completed", "who registered", "who scored", "who passed", "who failed"
+    if (/\bwho\s+(completed|registered|scored|passed|failed|attempted|took|finished|signed)/i.test(q)) {
+      return { intent: 'data_query', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    // "list candidates suitable for X / fit for X" — with typo tolerance (already corrected by normalizeQuery)
+    if (/\b(suitable|fit|eligible|qualified|ready)\s+(for|to)\s+\w+/i.test(q) && /\b(candidate|student|people|person)/i.test(q)) {
+      return { intent: 'jd_candidate_match', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    // "find candidates for [role]", "match candidates to [role]"
+    if (/\b(find|match|identify|suggest|recommend)\s+(candidate|student|people|person)s?\s+(for|to|who|that|suitable)/i.test(q)) {
+      return { intent: 'jd_candidate_match', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    // "which candidate is suitable for X", "who is suitable for X"
+    if (/\b(which|who)\s+(candidate|student|person|people)\s+(is|are)\s+(suitable|fit|eligible|qualified|best|good|ready)\s+(for|to)/i.test(q)) {
+      return { intent: 'jd_candidate_match', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    // "today's registrations", "weekly stats", "monthly report", "this week candidates"
+    if (/\b(today|yesterday|this\s+week|last\s+week|this\s+month|last\s+month|this\s+year)\b/i.test(q) &&
+        /\b(registration|candidate|user|assessment|completed|score|count|stat|report|data)/i.test(q)) {
+      return { intent: 'data_query', searchTerm: null, table: 'registrations', includePersonality: true };
+    }
+
+    // "show stats", "show analytics", "show dashboard", "show summary", "give me overview"
+    if (/\b(show|give|get|display)\s+(me\s+)?(stats|statistics|analytics|dashboard|summary|overview|metrics|numbers|data)/i.test(q)) {
+      return { intent: 'data_query', searchTerm: null, table: 'registrations', includePersonality: true };
+    }
+
+    // "latest candidates", "recent registrations", "newest users", "last 10 candidates"
+    if (/\b(latest|recent|newest|last\s+\d+|first\s+\d+|top\s+\d+)\s+(candidate|registration|user|assessment|student|attempt|result)/i.test(q)) {
+      return { intent: 'data_query', searchTerm: null, table: 'registrations', includePersonality: true };
+    }
+
+    // "age distribution", "age wise", "age group", "age range"
+    if (/\bage\s+(distribution|wise|group|range|breakdown|analysis)/i.test(q)) {
+      return { intent: 'data_query', searchTerm: null, table: 'registrations', includePersonality: true };
+    }
+
+    // "gender distribution", "gender ratio", "gender breakdown", "male vs female"
+    if (/\b(gender|male\s+vs\s+female|male.*female|female.*male)\s*(distribution|ratio|breakdown|split|comparison|count)?/i.test(q)) {
+      return { intent: 'data_query', searchTerm: null, table: 'registrations', includePersonality: true };
+    }
+
+    // "inactive candidates", "pending assessments", "incomplete assessments"
+    if (/\b(inactive|pending|incomplete|unfinished|not\s+completed|abandoned)\s+(candidate|assessment|registration|student|attempt)/i.test(q)) {
+      return { intent: 'data_query', searchTerm: null, table: 'registrations', includePersonality: true };
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -1654,42 +3479,206 @@ JSON:`;
 
   private extractName(question: string): string | null {
     const patterns = [
-      // "for ajay #1" → "ajay #1"  |  "for ajay" → "ajay"
-      /(?:for|about|of)\s+([A-Za-z]+(?:\s+[A-Za-z]+)?(?:\s*#\s*\d+)?)/i,
-      /([A-Za-z]+)'s?\s+(?:test|exam|score|result)/i,
-      /(?:show|get|find)\s+([A-Za-z]+)(?:'s)?/i,
+      // "for Jaya Krishna Reddy #1" → "Jaya Krishna Reddy #1"
+      /(?:for|about|bout|of)\s+((?:[A-Za-z]+\.?\s*){1,4}(?:\s*#\s*\d+)?)/i,
+      // "Jaya Krishna's score" → "Jaya Krishna"
+      /((?:[A-Za-z]+\.?\s+){0,3}[A-Za-z]+)'s?\s+(?:test|exam|score|result|detail|report|profile|data)/i,
+      // "show Jaya Krishna" → "Jaya Krishna"
+      /(?:show|get|find|search|display)\s+((?:[A-Za-z]+\.?\s*){1,4})(?:'s)?/i,
+      // "results of S. Rajesh" → "S. Rajesh"
+      /(?:results?|scores?|details?|report|profile|data)\s+(?:of|for)\s+((?:[A-Z]\.?\s*)?(?:[A-Za-z]+\s*){1,3})/i,
+      // "know about jai" → "jai"
+      /(?:know|tell|learn)\s+(?:about|bout)\s+((?:[A-Za-z]+\.?\s*){1,4})/i,
+      // Simple: "for ajay" → "ajay" (single word fallback)
+      /(?:for|about|bout|of)\s+([A-Za-z]+(?:\s*#\s*\d+)?)/i,
     ];
 
-    const stopWords = [
-      'test',
-      'exam',
-      'score',
-      'result',
-      'user',
-      'all',
-      'the',
-      'show',
-      'get',
-      'list',
-      'find',
-      'best',
-      'top',
-    ];
+    const stopWords = new Set([
+      'test', 'exam', 'score', 'result', 'results', 'user', 'users',
+      'all', 'the', 'show', 'get', 'list', 'find', 'best', 'top',
+      'my', 'their', 'our', 'your', 'his', 'her', 'its',
+      'this', 'that', 'these', 'those', 'some', 'any',
+      'career', 'report', 'details', 'data', 'profile',
+      'candidate', 'candidates', 'student', 'students',
+      'assessment', 'overall', 'custom', 'placement',
+      // Domain terms that should NEVER be treated as person names
+      'employee', 'employees', 'resource', 'resources',
+      'member', 'members', 'staff', 'worker', 'workers',
+      'people', 'person', 'team', 'everyone', 'everybody',
+      'company', 'organization', 'organisation', 'department',
+      'development', 'developer', 'engineering', 'full', 'stack',
+      'frontend', 'backend', 'manager', 'lead', 'senior', 'junior',
+      'role', 'position', 'job', 'work', 'tasks', 'skill', 'skills',
+      'information', 'info', 'help', 'status', 'count',
+      // Gender terms — NOT person names
+      'male', 'female', 'males', 'females', 'boys', 'girls', 'men', 'women',
+      'boy', 'girl', 'man', 'woman',
+    ]);
 
     for (const pattern of patterns) {
       const match = question.match(pattern);
-      if (match && match[1] && !stopWords.includes(match[1].toLowerCase())) {
-        return match[1];
+      if (match && match[1]) {
+        // Clean up: trim trailing punctuation and whitespace
+        let name = match[1].replace(/[.,;:!?]+$/, '').trim();
+        // Remove trailing stop words (e.g. "show Anjaly details" → "Anjaly")
+        const words = name.split(/\s+/);
+        while (words.length > 0 && stopWords.has(words[words.length - 1].toLowerCase())) {
+          words.pop();
+        }
+        name = words.join(' ').trim();
+        if (name && !stopWords.has(name.toLowerCase()) && name.length >= 2) {
+          return name;
+        }
       }
     }
     return null;
+  }
+
+  /**
+   * Determines if the query is asking about a specific person
+   * (as opposed to a generic concept question like "what is a CFO?").
+   * Uses pronoun signals, conversation context, and name detection.
+   */
+  /**
+   * Check if searchTerm matches as a complete word/token in any result's name.
+   * Returns true if at least one result contains the search term as a whole word.
+   * Used to distinguish exact matches ("jai" in "JAI KUMAR") from fuzzy substring
+   * matches ("jai" in "JAISHREE M") when falling back to ILIKE.
+   */
+  private hasExactTokenMatch(searchTerm: string, results: any[], nameField = 'full_name'): boolean {
+    const escaped = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+    return results.some(r => regex.test(r[nameField]));
+  }
+
+  /**
+   * Build a "Did you mean?" disambiguation response for fuzzy ILIKE matches.
+   */
+  private buildFuzzyDisambiguation(searchTerm: string, results: any[], searchType: string): QueryResult {
+    let response = `**🔍 No exact match found for "${searchTerm}".**\n\n`;
+    if (results.length === 1) {
+      response += `Did you mean **${results[0].full_name}**?\n\n`;
+      response += `If yes, try: *"${searchTerm === results[0].full_name ? searchTerm : results[0].full_name}"*\n`;
+      response += `Or use the full name for a precise match.`;
+    } else {
+      response += `These candidates have similar names:\n\n`;
+      results.slice(0, 5).forEach((person: any, index: number) => {
+        const email = person.email ? ` | ${person.email}` : '';
+        response += `**${index + 1}.** ${person.full_name}${email}\n`;
+      });
+      response += `\nPlease use the **full name** or reply with the number (e.g. **1** or **2**).`;
+    }
+    return { answer: response, searchType, confidence: 0.6 };
+  }
+
+  private isPersonSpecificQuery(question: string, ctx: any): boolean {
+    const q = question.toLowerCase();
+
+    // ── Domain terms that are NEVER person names ──
+    // If the "name" extracted from the query is one of these, it's a domain question, NOT person-specific.
+    const domainTerms = new Set([
+      'employee', 'employees', 'candidate', 'candidates', 'student', 'students',
+      'resource', 'resources', 'member', 'members', 'staff', 'worker', 'workers',
+      'people', 'person', 'team', 'everyone', 'everybody',
+      'company', 'organization', 'organisation', 'department',
+      'development', 'developer', 'engineering', 'full stack', 'frontend', 'backend',
+      'manager', 'lead', 'senior', 'junior', 'role', 'position', 'job',
+      'skill', 'skills', 'information', 'info', 'help', 'status', 'assessment',
+      'result', 'results', 'score', 'scores', 'report', 'data', 'details',
+      'career', 'work', 'performance', 'performer', 'performers',
+      'user', 'users', 'account', 'accounts', 'registration', 'registrations',
+    ]);
+
+    // Helper: check if the text after "about/for" is a domain term, not a person
+    const getObjectOfPrep = (text: string): string | null => {
+      const match = text.match(/\b(?:about|bout|regarding|for|of)\s+((?:\w+\s*){1,4})/i);
+      return match ? match[1].trim().toLowerCase() : null;
+    };
+
+    const objectText = getObjectOfPrep(q);
+    if (objectText) {
+      // Check each word and the full phrase against domain terms
+      const objectWords = objectText.split(/\s+/);
+      const allAreDomainTerms = objectWords.every(w => domainTerms.has(w));
+      if (allAreDomainTerms) {
+        this.logger.log(`🛡️ Person guard skipped: "${objectText}" is a domain term, not a person name`);
+        return false;
+      }
+      // Also check combined phrases like "full stack development"
+      if (domainTerms.has(objectText)) {
+        this.logger.log(`🛡️ Person guard skipped: "${objectText}" is a domain term`);
+        return false;
+      }
+      // Check if it starts with "my" + domain term (e.g., "my employee", "my candidate")
+      if (/^my\s+/i.test(objectText)) {
+        const afterMy = objectText.replace(/^my\s+/i, '').trim();
+        if (domainTerms.has(afterMy) || domainTerms.has(afterMy + 's')) {
+          this.logger.log(`🛡️ Person guard skipped: "my ${afterMy}" is a domain reference, not a person name`);
+          return false;
+        }
+      }
+    }
+
+    // Pronoun references to a person in conversation
+    const pronounPatterns = /\b(him|her|his|hers|he|she|that person|that candidate|that student|this person)\b/i;
+    if (pronounPatterns.test(q)) return true;
+
+    // "know about/bout" or "want to know about" patterns — but ONLY if followed by a likely person name
+    if (/\b(know|tell|learn|inform)\s+(about|bout|regarding)\b/i.test(q)) {
+      // Check if what follows is NOT a domain concept
+      if (objectText && !objectText.split(/\s+/).every(w => domainTerms.has(w))) {
+        return true;
+      }
+      return false;
+    }
+    if (/\b(want|need|like)\s+to\s+know\b/i.test(q)) {
+      if (objectText && !objectText.split(/\s+/).every(w => domainTerms.has(w))) {
+        return true;
+      }
+      return false;
+    }
+    if (/\bwhat[s']?\s+.*\b(about|bout)\s+/i.test(q)) {
+      if (objectText && !objectText.split(/\s+/).every(w => domainTerms.has(w))) {
+        return true;
+      }
+      return false;
+    }
+
+    // Explicit "about <name>" or "asking about" patterns
+    if (/\b(about|bout|regarding|for)\s+[A-Z][a-z]+/i.test(question)) {
+      // Exclude generic concept queries like "about becoming a CFO"
+      if (/\b(about|regarding)\s+(becoming|being|working|learning|studying|getting)/i.test(q)) return false;
+      // Exclude domain term references
+      if (objectText && objectText.split(/\s+/).every(w => domainTerms.has(w))) return false;
+      return true;
+    }
+
+    // "does it suit him/her" or "is he/she suitable" patterns
+    if (/\b(suit|suitable|fit|good for|ready for)\s+(him|her|them)\b/i.test(q)) return true;
+    if (/\b(is|does)\s+(he|she)\b/i.test(q)) return true;
+
+    // Conversation context has a person being discussed
+    if (ctx?.lastPersonMentioned) {
+      // Check if question references qualitative traits about a person
+      if (/\b(make|become|role|position|suited|career|job|fitment|readiness)\b/i.test(q)) return true;
+    }
+
+    // "I'm asking about <name>" pattern
+    if (/\b(asking|talking|enquiring|inquiring)\s+(about|bout|regarding)\b/i.test(q)) {
+      if (objectText && !objectText.split(/\s+/).every(w => domainTerms.has(w))) {
+        return true;
+      }
+      return false;
+    }
+
+    return false;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // TOTAL COUNT FOR PAGINATION
   // ═══════════════════════════════════════════════════════════════════════════
   private async getTotalCount(
-    interpretation: { intent: string; table: string },
+    interpretation: { intent: string; table: string; searchTerm?: string | null },
     user?: UserContext
   ): Promise<number> {
     const userRole = user?.role || 'STUDENT';
@@ -1717,6 +3706,7 @@ JSON:`;
           break;
         case 'test_results':
         case 'best_performer':
+        case 'self_results':
           if (userRole === 'ADMIN') {
             sql = `SELECT COUNT(*) as count FROM assessment_attempts aa JOIN registrations r ON aa.registration_id = r.id WHERE aa.status = 'COMPLETED' AND r.is_deleted = false`;
           } else if (userRole === 'CORPORATE' && corporateId) {
@@ -1729,6 +3719,31 @@ JSON:`;
           break;
         case 'career_roles':
           sql = `SELECT COUNT(*) as count FROM career_roles WHERE is_deleted = false AND is_active = true`;
+          break;
+        case 'affiliate_referrals':
+          if (userRole !== 'ADMIN') return 0;
+          sql = `SELECT COUNT(*) as count FROM affiliate_referral_transactions`;
+          break;
+        case 'affiliate_payments':
+          if (userRole !== 'ADMIN') return 0;
+          sql = `SELECT COUNT(*) as count FROM affiliate_settlement_transactions`;
+          break;
+        case 'affiliate_list':
+          if (userRole !== 'ADMIN') return 0;
+          sql = `SELECT COUNT(*) as count FROM affiliate_accounts`;
+          break;
+        case 'affiliate_earnings':
+          if (userRole !== 'ADMIN') return 0;
+          sql = `SELECT COUNT(*) as count FROM affiliate_accounts WHERE is_active = true`;
+          break;
+        case 'affiliate_students':
+          if (userRole !== 'ADMIN') return 0;
+          if (interpretation.searchTerm) {
+            sql = `SELECT COUNT(*) as count FROM affiliate_referral_transactions art JOIN affiliate_accounts aa ON art.affiliate_account_id = aa.id WHERE aa.name ILIKE $1`;
+            params.push(`%${interpretation.searchTerm}%`);
+          } else {
+            sql = `SELECT COUNT(*) as count FROM affiliate_referral_transactions`;
+          }
           break;
         default:
           return 0;
@@ -1777,12 +3792,12 @@ JSON:`;
 
       case 'list_candidates':
         if (userRole === 'ADMIN') {
-          sql = `SELECT full_name, gender, status FROM registrations WHERE is_deleted = false ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+          sql = `SELECT full_name, gender, mobile_number, status FROM registrations WHERE is_deleted = false ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
         } else if (userRole === 'CORPORATE' && corporateId) {
-          sql = `SELECT full_name, gender, status FROM registrations WHERE is_deleted = false AND corporate_account_id = $1 ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+          sql = `SELECT full_name, gender, mobile_number, status FROM registrations WHERE is_deleted = false AND corporate_account_id = $1 ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
           params.push(corporateId);
         } else {
-          sql = `SELECT full_name, gender, status FROM registrations WHERE is_deleted = false AND user_id = $1 LIMIT ${limit}`;
+          sql = `SELECT full_name, gender, mobile_number, status FROM registrations WHERE is_deleted = false AND user_id = $1 LIMIT ${limit}`;
           params.push(userId);
         }
         break;
@@ -1808,39 +3823,124 @@ JSON:`;
         } else if (userRole === 'CORPORATE' && corporateId) {
           sql = `${baseTestSql} AND registrations.corporate_account_id = $1 ORDER BY assessment_attempts.total_score DESC LIMIT ${limit} OFFSET ${offset}`;
           params.push(corporateId);
-        } else {
+        } else if (userId && userId > 0) {
           sql = `${baseTestSql} AND registrations.user_id = $1 LIMIT ${limit} OFFSET ${offset}`;
           params.push(userId);
+        } else if (user?.email) {
+          // Fallback: email-based lookup when userId is 0
+          sql = `${baseTestSql} AND registrations.user_id = (SELECT id FROM users WHERE email = $1 LIMIT 1) LIMIT ${limit} OFFSET ${offset}`;
+          params.push(user.email);
+        } else {
+          this.logger.log('⚠️ test_results: No userId or email for student scoping');
+          return [];
+        }
+        break;
+      }
+
+      case 'self_results': {
+        // Dedicated intent for "my results" / "my score" — always user-scoped
+        // Joins assessment_answers for detailed per-question stats
+        const selfSincFields = this.getSinceritySelectFields('assessment_attempts');
+        const selfResultSql = `
+          SELECT 
+            registrations.full_name,
+            registrations.registration_source,
+            assessment_attempts.id as attempt_id,
+            assessment_attempts.total_score,
+            assessment_attempts.max_score_snapshot,
+            ${selfSincFields},
+            assessment_attempts.status,
+            assessment_attempts.completed_at,
+            assessment_attempts.started_at,
+            personality_traits.blended_style_name as behavioral_style,
+            personality_traits.blended_style_desc as behavior_description,
+            programs.name as program_name,
+            (SELECT COUNT(*) FROM assessment_answers WHERE assessment_attempt_id = assessment_attempts.id) as total_questions,
+            (SELECT COUNT(*) FROM assessment_answers WHERE assessment_attempt_id = assessment_attempts.id AND status = 'ANSWERED') as answered_questions,
+            (SELECT COALESCE(SUM(answer_score), 0) FROM assessment_answers WHERE assessment_attempt_id = assessment_attempts.id) as total_answer_score,
+            (SELECT COALESCE(SUM(time_spent_seconds), 0) FROM assessment_answers WHERE assessment_attempt_id = assessment_attempts.id) as total_time_spent_seconds,
+            (SELECT COUNT(*) FROM assessment_answers WHERE assessment_attempt_id = assessment_attempts.id AND answer_score > 0) as correct_answers
+          FROM assessment_attempts
+          JOIN registrations ON assessment_attempts.registration_id = registrations.id
+          LEFT JOIN personality_traits ON assessment_attempts.dominant_trait_id = personality_traits.id
+          LEFT JOIN programs ON assessment_attempts.program_id = programs.id
+          WHERE assessment_attempts.status = 'COMPLETED' AND registrations.is_deleted = false`;
+
+        if (userId && userId > 0) {
+          sql = `${selfResultSql} AND registrations.user_id = $1 ORDER BY assessment_attempts.completed_at DESC LIMIT 5`;
+          params.push(userId);
+        } else if (user?.email) {
+          // Fallback: use email when userId is 0
+          sql = `${selfResultSql} AND registrations.user_id = (SELECT id FROM users WHERE email = $1 LIMIT 1) ORDER BY assessment_attempts.completed_at DESC LIMIT 5`;
+          params.push(user.email);
+        } else {
+          this.logger.log('⚠️ self_results: No userId or email — cannot scope');
+          return [];
         }
         break;
       }
 
       case 'person_lookup': {
+        // If person_lookup but no searchTerm, ask for clarification instead of returning broad data
+        if (!interpretation.searchTerm) {
+          this.logger.log('⚠️ person_lookup with no searchTerm — returning clarification');
+          return [];
+        }
         const searchName = interpretation.searchTerm || '';
+        const lookupSincFields = this.getSinceritySelectFields('assessment_attempts');
         const baseLookupSql = `
           SELECT 
+            registrations.id as reg_id,
             registrations.full_name,
             registrations.gender,
             registrations.mobile_number,
             assessment_attempts.total_score,
+            ${lookupSincFields},
             assessment_attempts.status,
+            assessment_attempts.completed_at,
             personality_traits.blended_style_name as behavioral_style,
             personality_traits.blended_style_desc as behavior_description,
-            programs.name as program_name
+            programs.name as program_name,
+            users.email
           FROM registrations
+          LEFT JOIN users ON registrations.user_id = users.id
           LEFT JOIN assessment_attempts ON assessment_attempts.registration_id = registrations.id
+            AND assessment_attempts.status = 'COMPLETED'
           LEFT JOIN personality_traits ON assessment_attempts.dominant_trait_id = personality_traits.id
           LEFT JOIN programs ON assessment_attempts.program_id = programs.id
           WHERE registrations.is_deleted = false`;
 
+        // Use word-boundary regex for precise name matching (prevents "jai" → "JAISHREE")
         if (userRole === 'ADMIN') {
-          sql = `${baseLookupSql} AND registrations.full_name ILIKE $1 LIMIT 10`;
-          params.push(`%${searchName}%`);
+          sql = `${baseLookupSql} AND registrations.full_name ~* $1 ORDER BY registrations.full_name, assessment_attempts.completed_at DESC NULLS LAST LIMIT 20`;
+          params.push(`\\m${searchName}\\M`);
         } else if (userRole === 'CORPORATE' && corporateId) {
-          sql = `${baseLookupSql} AND registrations.full_name ILIKE $1 AND registrations.corporate_account_id = $2 LIMIT 10`;
-          params.push(`%${searchName}%`, corporateId);
+          sql = `${baseLookupSql} AND registrations.full_name ~* $1 AND registrations.corporate_account_id = $2 ORDER BY registrations.full_name, assessment_attempts.completed_at DESC NULLS LAST LIMIT 20`;
+          params.push(`\\m${searchName}\\M`, corporateId);
         } else {
           // Students can only see themselves — ignore search term
+          sql = `${baseLookupSql} AND registrations.user_id = $1 LIMIT 1`;
+          params.push(userId);
+        }
+
+        // Execute the word-boundary query
+        try {
+          const exactResults = await this.executeDatabaseQuery(sql, params);
+          if (exactResults.length > 0) return exactResults;
+        } catch (e) {
+          this.logger.warn(`Word-boundary search failed: ${e.message}`);
+        }
+
+        // Fallback: ILIKE fuzzy match if word-boundary returned 0
+        this.logger.log(`🔄 person_lookup: word-boundary match for "${searchName}" returned 0, falling back to ILIKE`);
+        params.length = 0;
+        if (userRole === 'ADMIN') {
+          sql = `${baseLookupSql} AND registrations.full_name ILIKE $1 ORDER BY registrations.full_name, assessment_attempts.completed_at DESC NULLS LAST LIMIT 20`;
+          params.push(`%${searchName}%`);
+        } else if (userRole === 'CORPORATE' && corporateId) {
+          sql = `${baseLookupSql} AND registrations.full_name ILIKE $1 AND registrations.corporate_account_id = $2 ORDER BY registrations.full_name, assessment_attempts.completed_at DESC NULLS LAST LIMIT 20`;
+          params.push(`%${searchName}%`, corporateId);
+        } else {
           sql = `${baseLookupSql} AND registrations.user_id = $1 LIMIT 1`;
           params.push(userId);
         }
@@ -1851,7 +3951,31 @@ JSON:`;
         sql = `SELECT career_role_name, short_description FROM career_roles WHERE is_deleted = false AND is_active = true ORDER BY career_role_name ASC LIMIT ${limit} OFFSET ${offset}`;
         break;
 
-      case 'count':
+      case 'count': {
+        // Extract gender filter from searchTerm (set by ask() method)
+        const genderFilter = (interpretation as any).gender;
+        const genderBreakdown = (interpretation as any).genderBreakdown;
+        let genderClause = '';
+
+        // ── Gender breakdown: "total male and female" → return both counts ──
+        if (genderBreakdown) {
+          if (userRole === 'ADMIN') {
+            sql = `SELECT gender, COUNT(*) as count FROM registrations WHERE is_deleted = false AND gender IS NOT NULL GROUP BY gender ORDER BY gender`;
+          } else if (userRole === 'CORPORATE' && corporateId) {
+            params.push(corporateId);
+            sql = `SELECT gender, COUNT(*) as count FROM registrations WHERE is_deleted = false AND corporate_account_id = $${params.length} AND gender IS NOT NULL GROUP BY gender ORDER BY gender`;
+          } else {
+            params.push(userId);
+            sql = `SELECT gender, COUNT(*) as count FROM registrations WHERE is_deleted = false AND user_id = $${params.length} AND gender IS NOT NULL GROUP BY gender ORDER BY gender`;
+          }
+          break;
+        }
+
+        if (genderFilter) {
+          params.push(genderFilter);
+          genderClause = ` AND gender = $${params.length}`;
+        }
+
         if (interpretation.table === 'users') {
           if (userRole !== 'ADMIN') {
             return [{ count: 0 }];
@@ -1859,26 +3983,245 @@ JSON:`;
           sql = `SELECT COUNT(*) as count FROM users`;
         } else if (interpretation.table === 'registrations') {
           if (userRole === 'ADMIN') {
-            sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false`;
+            sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false${genderClause}`;
           } else if (userRole === 'CORPORATE' && corporateId) {
-            sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false AND corporate_account_id = $1`;
             params.push(corporateId);
+            sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false AND corporate_account_id = $${params.length}${genderClause}`;
           } else {
-            sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false AND user_id = $1`;
             params.push(userId);
+            sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false AND user_id = $${params.length}${genderClause}`;
           }
         } else {
           if (userRole === 'ADMIN') {
-            sql = `SELECT COUNT(*) as count FROM assessment_attempts WHERE status = 'COMPLETED'`;
+            sql = `SELECT COUNT(*) as count FROM assessment_attempts aa JOIN registrations r ON aa.registration_id = r.id WHERE aa.status = 'COMPLETED' AND r.is_deleted = false${genderClause ? genderClause.replace('gender', 'r.gender') : ''}`;
           } else if (userRole === 'CORPORATE' && corporateId) {
-            sql = `SELECT COUNT(*) as count FROM assessment_attempts aa JOIN registrations r ON aa.registration_id = r.id WHERE aa.status = 'COMPLETED' AND r.is_deleted = false AND r.corporate_account_id = $1`;
             params.push(corporateId);
+            sql = `SELECT COUNT(*) as count FROM assessment_attempts aa JOIN registrations r ON aa.registration_id = r.id WHERE aa.status = 'COMPLETED' AND r.is_deleted = false AND r.corporate_account_id = $${params.length}${genderClause ? genderClause.replace('gender', 'r.gender') : ''}`;
           } else {
-            sql = `SELECT COUNT(*) as count FROM assessment_attempts WHERE status = 'COMPLETED' AND user_id = $1`;
             params.push(userId);
+            sql = `SELECT COUNT(*) as count FROM assessment_attempts WHERE status = 'COMPLETED' AND user_id = $${params.length}`;
           }
         }
         break;
+      }
+
+      case 'count_by_role': {
+        // Role-based user count breakdown (admin only for full view)
+        if (userRole !== 'ADMIN') {
+          return [{ role: userRole, count: 1, note: 'Only admins can view role breakdown' }];
+        }
+        const requestedRoles = (interpretation as any).roles as string[] || ['ADMIN', 'CORPORATE', 'STUDENT'];
+
+        // For CORPORATE counts, use corporate_accounts (is_active = true) for accuracy
+        // For other roles, use the users table
+        if (requestedRoles.length === 1 && requestedRoles[0] === 'CORPORATE') {
+          sql = `SELECT 'CORPORATE' as role, COUNT(*) as count FROM corporate_accounts WHERE is_active = true`;
+        } else if (requestedRoles.includes('CORPORATE') && requestedRoles.length > 1) {
+          // Mixed: union corporate_accounts count with users count for other roles
+          const otherRoles = requestedRoles.filter(r => r !== 'CORPORATE');
+          const otherPlaceholders = otherRoles.map((_: string, i: number) => `$${i + 1}`).join(', ');
+          sql = `SELECT role, COUNT(*) as count FROM users WHERE role IN (${otherPlaceholders}) GROUP BY role
+                 UNION ALL
+                 SELECT 'CORPORATE' as role, COUNT(*) as count FROM corporate_accounts WHERE is_active = true
+                 ORDER BY role`;
+          params.push(...otherRoles);
+        } else {
+          const rolePlaceholders = requestedRoles.map((_: string, i: number) => `$${i + 1}`).join(', ');
+          sql = `SELECT role, COUNT(*) as count FROM users WHERE role IN (${rolePlaceholders}) GROUP BY role ORDER BY role`;
+          params.push(...requestedRoles);
+        }
+        break;
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // CORPORATE DETAILS — List corporate/company accounts
+      // ═══════════════════════════════════════════════════════════════
+      case 'corporate_details': {
+        if (userRole === 'ADMIN') {
+          sql = `SELECT ca.id, ca.company_name, ca.full_name AS contact_person, ca.mobile_number,
+                   ca.sector_code AS industry, ca.job_title, ca.gender, ca.business_locations,
+                   ca.total_credits, ca.available_credits, ca.is_active, u.email, ca.created_at
+                 FROM corporate_accounts ca
+                 LEFT JOIN users u ON ca.user_id = u.id
+                 WHERE ca.is_active = true
+                 ORDER BY ca.company_name ASC
+                 LIMIT ${limit} OFFSET ${offset}`;
+        } else if (userRole === 'CORPORATE' && corporateId) {
+          params.push(corporateId);
+          sql = `SELECT ca.id, ca.company_name, ca.full_name AS contact_person, ca.mobile_number,
+                   ca.sector_code AS industry, ca.job_title, ca.gender, ca.business_locations,
+                   ca.total_credits, ca.available_credits, ca.is_active, u.email, ca.created_at
+                 FROM corporate_accounts ca
+                 LEFT JOIN users u ON ca.user_id = u.id
+                 WHERE ca.id = $1
+                 LIMIT 1`;
+        } else {
+          return [{ message: 'Corporate account details are only available to admin and corporate users.' }];
+        }
+        break;
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // AFFILIATE / REFERRAL INTENTS
+      // ═══════════════════════════════════════════════════════════════
+
+      case 'affiliate_dashboard': {
+        // Admin only: overall affiliate program stats
+        if (userRole !== 'ADMIN') return [];
+        sql = `SELECT
+                 COUNT(*) as total_affiliates,
+                 SUM(referral_count) as total_referrals,
+                 CAST(SUM(total_earned_commission) AS FLOAT) as total_earned,
+                 CAST(SUM(total_settled_commission) AS FLOAT) as total_settled,
+                 CAST(SUM(total_pending_commission) AS FLOAT) as total_pending
+               FROM affiliate_accounts WHERE is_active = true`;
+        break;
+      }
+
+      case 'affiliate_referrals': {
+        if (userRole !== 'ADMIN') return [];
+        sql = `SELECT
+                 art.id,
+                 aa.name as affiliate_name,
+                 r.full_name as referred_name,
+                 CAST(art.registration_amount AS FLOAT) as registration_amount,
+                 art.commission_percentage,
+                 CAST(art.earned_commission_amount AS FLOAT) as earned_commission,
+                 art.settlement_status,
+                 art.created_at as referred_at
+               FROM affiliate_referral_transactions art
+               JOIN affiliate_accounts aa ON art.affiliate_account_id = aa.id
+               LEFT JOIN registrations r ON art.registration_id = r.id
+               ORDER BY art.created_at DESC
+               LIMIT ${limit} OFFSET ${offset}`;
+        break;
+      }
+
+      case 'affiliate_earnings': {
+        if (userRole !== 'ADMIN') return [];
+        // Admin: earnings summary across all affiliates
+        sql = `SELECT
+                 aa.name,
+                 aa.email,
+                 aa.referral_count,
+                 aa.commission_percentage,
+                 CAST(aa.total_earned_commission AS FLOAT) as total_earned,
+                 CAST(aa.total_settled_commission AS FLOAT) as total_settled,
+                 CAST(aa.total_pending_commission AS FLOAT) as total_pending
+               FROM affiliate_accounts aa
+               WHERE aa.is_active = true
+               ORDER BY aa.total_earned_commission DESC
+               LIMIT ${limit} OFFSET ${offset}`;
+        break;
+      }
+
+      case 'affiliate_payments': {
+        if (userRole !== 'ADMIN') return [];
+        sql = `SELECT
+                 ast.id,
+                 aa.name as affiliate_name,
+                 CAST(ast.settle_amount AS FLOAT) as settle_amount,
+                 ast.transaction_mode,
+                 ast.settlement_transaction_id as transaction_ref,
+                 ast.payment_date
+               FROM affiliate_settlement_transactions ast
+               JOIN affiliate_accounts aa ON ast.affiliate_account_id = aa.id
+               ORDER BY ast.payment_date DESC
+               LIMIT ${limit} OFFSET ${offset}`;
+        break;
+      }
+
+      case 'affiliate_list': {
+        // Admin only: list all affiliate accounts
+        if (userRole !== 'ADMIN') return [];
+        sql = `SELECT
+                 aa.name,
+                 aa.email,
+                 aa.referral_code,
+                 aa.referral_count,
+                 aa.commission_percentage,
+                 CAST(aa.total_earned_commission AS FLOAT) as total_earned,
+                 CAST(aa.total_pending_commission AS FLOAT) as total_pending,
+                 aa.is_active,
+                 aa.created_at
+               FROM affiliate_accounts aa
+               ORDER BY aa.created_at DESC
+               LIMIT ${limit} OFFSET ${offset}`;
+        break;
+      }
+
+      case 'affiliate_lookup': {
+        const searchName = interpretation.searchTerm || '';
+        if (!searchName) {
+          this.logger.log('⚠️ affiliate_lookup with no searchTerm — returning empty');
+          return [];
+        }
+        if (userRole === 'ADMIN') {
+          sql = `SELECT
+                   aa.name,
+                   aa.email,
+                   aa.referral_code,
+                   aa.referral_count,
+                   aa.commission_percentage,
+                   CAST(aa.total_earned_commission AS FLOAT) as total_earned,
+                   CAST(aa.total_settled_commission AS FLOAT) as total_settled,
+                   CAST(aa.total_pending_commission AS FLOAT) as total_pending,
+                   aa.is_active,
+                   aa.mobile_number,
+                   aa.created_at
+                 FROM affiliate_accounts aa
+                 WHERE aa.name ILIKE $1
+                 LIMIT 10`;
+          params.push(`%${searchName}%`);
+        } else {
+          return [];
+        }
+        break;
+      }
+
+      case 'affiliate_students': {
+        // Admin only: students referred by a specific affiliate (or all affiliates)
+        if (userRole !== 'ADMIN') return [];
+        const searchName = interpretation.searchTerm || '';
+        if (searchName) {
+          sql = `SELECT
+                   r.full_name as student_name,
+                   r.email,
+                   r.mobile_number,
+                   r.registration_source,
+                   r.gender,
+                   aa.name as affiliate_name,
+                   aa.referral_code,
+                   CAST(art.registration_amount AS FLOAT) as registration_amount,
+                   CAST(art.earned_commission_amount AS FLOAT) as commission_earned,
+                   art.settlement_status,
+                   art.created_at as referred_at
+                 FROM affiliate_referral_transactions art
+                 JOIN affiliate_accounts aa ON art.affiliate_account_id = aa.id
+                 LEFT JOIN registrations r ON art.registration_id = r.id
+                 WHERE aa.name ILIKE $1
+                 ORDER BY art.created_at DESC
+                 LIMIT ${limit} OFFSET ${offset}`;
+          params.push(`%${searchName}%`);
+        } else {
+          // No specific affiliate — show all referred students
+          sql = `SELECT
+                   r.full_name as student_name,
+                   r.email,
+                   r.mobile_number,
+                   aa.name as affiliate_name,
+                   aa.referral_code,
+                   CAST(art.registration_amount AS FLOAT) as registration_amount,
+                   art.settlement_status,
+                   art.created_at as referred_at
+                 FROM affiliate_referral_transactions art
+                 JOIN affiliate_accounts aa ON art.affiliate_account_id = aa.id
+                 LEFT JOIN registrations r ON art.registration_id = r.id
+                 ORDER BY art.created_at DESC
+                 LIMIT ${limit} OFFSET ${offset}`;
+        }
+        break;
+      }
 
       default:
         // For unknown intents, return empty to trigger LLM fallback
@@ -1909,11 +4252,19 @@ JSON:`;
     totalCount: number = 0,
   ): string {
     if (!data.length) {
+      // Contextual no-data messages
+      if (interpretation.intent.startsWith('affiliate_')) {
+        return `No affiliate data found. Try:\n• "list affiliates"\n• "show referrals"\n• "affiliate earnings"\n• "affiliate payment status"\n• "students on affiliate [name]"`;
+      }
       return `No results found. Try:\n• "list users"\n• "show test results"\n• "candidates"\n• "[name]'s score"`;
     }
 
     let body = '';
     switch (interpretation.intent) {
+      case 'self_results':
+        body = this.formatSelfResults(data);
+        break;
+
       case 'test_results':
       case 'best_performer':
       case 'person_lookup':
@@ -1932,8 +4283,71 @@ JSON:`;
         body = this.formatCareerRoles(data, offset);
         break;
 
-      case 'count':
-        return `**Total: ${data[0]?.count || 0}**`;
+      case 'corporate_details':
+        body = this.formatCorporateDetails(data, offset);
+        break;
+
+      case 'count': {
+        // Gender breakdown: "total male and female" → show both
+        if ((interpretation as any).genderBreakdown && data.length > 0 && data[0].gender) {
+          let gBody = '**👥 Gender Breakdown:**\n\n';
+          let total = 0;
+          for (const row of data) {
+            const c = parseInt(row.count) || 0;
+            total += c;
+            const icon = row.gender === 'MALE' ? '👨' : row.gender === 'FEMALE' ? '👩' : '🧑';
+            gBody += `${icon} **${row.gender}**: ${c}\n`;
+          }
+          gBody += `\n**Total: ${total}**`;
+          return gBody;
+        }
+        const cnt = data[0]?.count || 0;
+        const gLabel = (interpretation as any).gender;
+        if (gLabel === 'MALE') return `👨 **Male: ${cnt}**`;
+        if (gLabel === 'FEMALE') return `👩 **Female: ${cnt}**`;
+        return `**${cnt} candidates total.**`;
+      }
+
+      case 'count_by_role': {
+        let roleBody = '**Account Breakdown:**\n\n';
+        let total = 0;
+        for (const row of data) {
+          const count = parseInt(row.count) || 0;
+          total += count;
+          roleBody += `• **${row.role}**: ${count}\n`;
+        }
+        roleBody += `\n**Total: ${total}**`;
+        return roleBody;
+      }
+
+      // ── Affiliate intents ──
+      case 'affiliate_dashboard':
+        body = this.formatAffiliateDashboard(data, true);
+        break;
+
+      case 'affiliate_referrals':
+        body = this.formatAffiliateReferrals(data, offset, true);
+        break;
+
+      case 'affiliate_earnings':
+        body = this.formatAffiliateEarnings(data, true);
+        break;
+
+      case 'affiliate_payments':
+        body = this.formatAffiliatePayments(data, offset, true);
+        break;
+
+      case 'affiliate_list':
+        body = this.formatAffiliateList(data, offset);
+        break;
+
+      case 'affiliate_lookup':
+        body = this.formatAffiliateLookup(data);
+        break;
+
+      case 'affiliate_students':
+        body = this.formatAffiliateStudents(data, offset);
+        break;
 
       default:
         body = this.formatGenericList(data, offset);
@@ -1941,7 +4355,7 @@ JSON:`;
     }
 
     // ── Append pagination footer ──
-    if (totalCount > 0 && ['list_users', 'list_candidates', 'test_results', 'best_performer', 'career_roles'].includes(interpretation.intent)) {
+    if (totalCount > 0 && ['list_users', 'list_candidates', 'test_results', 'best_performer', 'career_roles', 'affiliate_referrals', 'affiliate_payments', 'affiliate_list', 'affiliate_earnings', 'affiliate_students'].includes(interpretation.intent)) {
       const from = offset + 1;
       const to = Math.min(offset + data.length, totalCount);
       const hasMore = to < totalCount;
@@ -1952,6 +4366,111 @@ JSON:`;
     }
 
     return body;
+  }
+
+  /**
+   * Personal dashboard format for "my results" / "my score" queries.
+   * Shows a personalized card instead of a generic table.
+   */
+  private formatSelfResults(data: any[]): string {
+    if (!data.length) {
+      return `You don't have any completed assessments yet. Complete an assessment to see your personalized results here!`;
+    }
+
+    const latest = data[0];
+    const name = latest.full_name || 'there';
+    const scoreNum = latest.total_score ? parseFloat(latest.total_score) : NaN;
+    const maxScore = latest.max_score_snapshot ? parseInt(latest.max_score_snapshot) : null;
+    const isSelf = (latest.registration_source || '').toUpperCase() === 'SELF';
+
+    let response = `**🎯 Your Assessment Results, ${name}**\n`;
+    response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    if (isSelf) {
+      response += `📌 **Registration Type:** Self-registered student\n\n`;
+    }
+
+    if (latest.behavioral_style) {
+      response += `📋 **Personality Style:** ${latest.behavioral_style}\n`;
+      if (latest.behavior_description) {
+        response += `   _${latest.behavior_description}_\n\n`;
+      }
+    }
+
+    if (!isNaN(scoreNum)) {
+      const agile = this.getAgileLevel(scoreNum);
+      const maxStr = maxScore ? `/${maxScore}` : '/100';
+      response += `🎯 **Agile Score:** ${scoreNum.toFixed(1)}${maxStr} — **${agile.name}**\n`;
+      response += `   _${agile.desc}_\n\n`;
+    }
+
+    // Assessment answer details (from assessment_answers table)
+    const totalQ = parseInt(latest.total_questions || '0');
+    const answeredQ = parseInt(latest.answered_questions || '0');
+    const correctQ = parseInt(latest.correct_answers || '0');
+    const totalTime = parseInt(latest.total_time_spent_seconds || '0');
+
+    if (totalQ > 0) {
+      response += `📝 **Exam Breakdown:**\n`;
+      response += `   • Total Questions: ${totalQ}\n`;
+      response += `   • Answered: ${answeredQ} / ${totalQ}`;
+      if (totalQ > 0) response += ` (${Math.round((answeredQ / totalQ) * 100)}%)`;
+      response += `\n`;
+      response += `   • Correct Answers: ${correctQ}`;
+      if (answeredQ > 0) response += ` (${Math.round((correctQ / answeredQ) * 100)}% accuracy)`;
+      response += `\n`;
+      if (totalTime > 0) {
+        const mins = Math.floor(totalTime / 60);
+        const secs = totalTime % 60;
+        response += `   • Time Spent: ${mins}m ${secs}s\n`;
+      }
+      response += `\n`;
+    }
+
+    // Sincerity info
+    if (latest.sincerity_index) {
+      const sincIdx = parseFloat(latest.sincerity_index);
+      response += `🔍 **Sincerity Index:** ${sincIdx.toFixed(1)}%`;
+      if (latest.sincerity_class) response += ` (${latest.sincerity_class})`;
+      response += `\n\n`;
+    }
+
+    if (latest.program_name) {
+      response += `📝 **Program:** ${latest.program_name}\n`;
+    }
+    if (latest.started_at && latest.completed_at) {
+      const start = new Date(latest.started_at);
+      const end = new Date(latest.completed_at);
+      const durationMs = end.getTime() - start.getTime();
+      const durationMins = Math.round(durationMs / 60000);
+      response += `📅 **Completed:** ${end.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`;
+      if (durationMins > 0) response += ` (Duration: ${durationMins} min)`;
+      response += `\n`;
+    } else if (latest.completed_at) {
+      const completedDate = new Date(latest.completed_at);
+      response += `📅 **Completed:** ${completedDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}\n`;
+    }
+
+    // Show additional attempts if multiple
+    if (data.length > 1) {
+      response += `\n**📊 All Attempts (${data.length}):**\n`;
+      data.forEach((row, i) => {
+        const score = row.total_score ? parseFloat(row.total_score).toFixed(1) : 'N/A';
+        const prog = row.program_name || 'Assessment';
+        const date = row.completed_at ? new Date(row.completed_at).toLocaleDateString() : '';
+        const tq = parseInt(row.total_questions || '0');
+        const aq = parseInt(row.answered_questions || '0');
+        const answerInfo = tq > 0 ? ` · ${aq}/${tq} answered` : '';
+        response += `  ${i + 1}. ${prog} — Score: ${score}${answerInfo} ${date ? `(${date})` : ''}\n`;
+      });
+    }
+
+    response += `\n💡 **Want more?** Ask me:\n`;
+    response += `  • "Generate my career report"\n`;
+    response += `  • "What careers suit my personality?"\n`;
+    response += `  • "Am I eligible for project manager?"`;
+
+    return response;
   }
 
   private formatTestResults(data: any[], isBestPerformer: boolean, offset: number = 0): string {
@@ -2021,9 +4540,12 @@ JSON:`;
 
   private formatCandidateList(data: any[], offset: number = 0): string {
     let response = '**📋 Candidates:**\n\n';
+    response += '| # | Name | Gender | Mobile | Status |\n';
+    response += '|---|------|--------|--------|--------|\n';
     data.forEach((row, i) => {
       const num = offset + i + 1;
-      response += `**${num}.** **${row.full_name}** | ${row.gender || 'N/A'} | ${row.status}\n`;
+      const mobile = row.mobile_number || '-';
+      response += `| ${num} | ${row.full_name} | ${row.gender || 'N/A'} | ${mobile} | ${row.status} |\n`;
     });
     return response;
   }
@@ -2036,6 +4558,41 @@ JSON:`;
       if (row.short_description) {
         response += `   ${row.short_description}\n`;
       }
+    });
+    return response;
+  }
+
+  private formatCorporateDetails(data: any[], offset: number = 0): string {
+    if (data.length === 0) return 'No corporate accounts found.';
+
+    // Single corporate (corporate user viewing their own)
+    if (data.length === 1 && data[0].company_name) {
+      const row = data[0];
+      let response = `**🏢 Corporate Account Details**\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+      response += `**Company:** ${row.company_name || 'N/A'}\n`;
+      response += `**Contact Person:** ${row.contact_person || 'N/A'}\n`;
+      if (row.email) response += `**Email:** ${row.email}\n`;
+      if (row.job_title) response += `**Job Title:** ${row.job_title}\n`;
+      if (row.industry) response += `**Industry:** ${row.industry}\n`;
+      if (row.gender) response += `**Gender:** ${row.gender}\n`;
+      if (row.business_locations) response += `**Locations:** ${row.business_locations}\n`;
+      response += `**Total Credits:** ${row.total_credits || 0}\n`;
+      response += `**Available Credits:** ${row.available_credits || 0}\n`;
+      response += `**Status:** ${row.is_active ? '✅ Active' : '❌ Inactive'}\n`;
+      if (row.mobile_number) response += `**Mobile:** ${row.mobile_number}\n`;
+      if (row.created_at) response += `**Registered:** ${new Date(row.created_at).toLocaleDateString()}\n`;
+      return response;
+    }
+
+    // Multiple corporates (admin view)
+    let response = `**🏢 Corporate Accounts (${data.length})**\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    response += '| # | Company | Contact | Industry | Credits | Status |\n';
+    response += '|---|---------|---------|----------|---------|--------|\n';
+    data.forEach((row, i) => {
+      const num = offset + i + 1;
+      const status = row.is_active ? '✅' : '❌';
+      const contact = row.mobile_number || row.contact_person || 'N/A';
+      response += `| ${num} | **${row.company_name || 'N/A'}** | ${contact} | ${row.industry || 'N/A'} | ${row.available_credits || 0}/${row.total_credits || 0} | ${status} |\n`;
     });
     return response;
   }
@@ -2056,6 +4613,360 @@ JSON:`;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // AFFILIATE / REFERRAL FORMATTERS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Format affiliate dashboard — personalized overview card
+   */
+  private formatAffiliateDashboard(data: any[], isAdmin: boolean): string {
+    if (!data.length) return 'No affiliate data found.';
+    const row = data[0];
+
+    if (isAdmin) {
+      // Admin sees aggregate stats
+      return `**📊 Affiliate Program Overview**\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `👥 **Total Affiliates:** ${row.total_affiliates || 0}\n` +
+        `🔗 **Total Referrals:** ${row.total_referrals || 0}\n\n` +
+        `💰 **Commission Summary:**\n` +
+        `   • Total Earned: **₹${this.formatCurrency(row.total_earned)}**\n` +
+        `   • Total Settled: **₹${this.formatCurrency(row.total_settled)}**\n` +
+        `   • Total Pending: **₹${this.formatCurrency(row.total_pending)}**\n\n` +
+        `💡 Say **"list affiliates"** to see individual accounts or **"show payments"** for settlement history.`;
+    }
+
+    // Affiliate's personal dashboard
+    const name = row.name || 'Partner';
+    return `**📊 Your Referral Dashboard, ${name}**\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `🔗 **Referral Code:** \`${row.referral_code}\`\n` +
+      `👥 **Total Referrals:** ${row.referral_count || 0}\n` +
+      `📈 **Commission Rate:** ${row.commission_percentage}%\n\n` +
+      `💰 **Earnings Summary:**\n` +
+      `   • Total Earned: **₹${this.formatCurrency(row.total_earned)}**\n` +
+      `   • Settled: **₹${this.formatCurrency(row.total_settled)}** ✅\n` +
+      `   • Pending: **₹${this.formatCurrency(row.total_pending)}** ⏳\n\n` +
+      `📋 **Transaction Status:**\n` +
+      `   • Unsettled: ${row.unsettled_count || 0}\n` +
+      `   • Processing: ${row.processing_count || 0}\n` +
+      `   • Settled: ${row.settled_count || 0}\n\n` +
+      `💡 Try: **"my referrals"** · **"my earnings"** · **"payment history"**`;
+  }
+
+  /**
+   * Format affiliate referral transactions list
+   */
+  private formatAffiliateReferrals(data: any[], offset: number = 0, isAdmin: boolean = false): string {
+    if (!data.length) return 'No referral transactions found yet. Share your referral link to start earning!';
+
+    const statusLabels: Record<number, string> = { 0: '🔴 Not Settled', 1: '🟡 Processing', 2: '🟢 Settled' };
+    let response = `**🔗 ${isAdmin ? 'All ' : 'Your '}Referral Transactions**\n`;
+    response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    data.forEach((row, i) => {
+      const num = offset + i + 1;
+      const name = row.referred_name || row.referred_email || 'Unknown';
+      const status = statusLabels[row.settlement_status] || '⚪ Unknown';
+      const date = row.referred_at ? new Date(row.referred_at).toLocaleDateString('en-IN') : 'N/A';
+
+      response += `**${num}.** ${isAdmin && row.affiliate_name ? `[${row.affiliate_name}] → ` : ''}**${name}**\n`;
+      response += `   💵 Amount: ₹${this.formatCurrency(row.registration_amount)} · Commission: ₹${this.formatCurrency(row.earned_commission)} (${row.commission_percentage}%)\n`;
+      response += `   ${status} · ${date}\n\n`;
+    });
+
+    return response;
+  }
+
+  /**
+   * Format affiliate earnings/commission details
+   */
+  private formatAffiliateEarnings(data: any[], isAdmin: boolean = false): string {
+    if (!data.length) return 'No earnings data found.';
+
+    if (isAdmin) {
+      // Admin: table of all affiliates' earnings
+      let response = `**💰 Affiliate Earnings Overview**\n`;
+      response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+      data.forEach((row, i) => {
+        response += `**${i + 1}.** **${row.name}** (${row.email})\n`;
+        response += `   📈 Rate: ${row.commission_percentage}% · Referrals: ${row.referral_count}\n`;
+        response += `   💰 Earned: ₹${this.formatCurrency(row.total_earned)} · Settled: ₹${this.formatCurrency(row.total_settled)} · Pending: ₹${this.formatCurrency(row.total_pending)}\n\n`;
+      });
+      return response;
+    }
+
+    // Affiliate's detailed earnings
+    const row = data[0];
+    return `**💰 Your Earnings Detail**\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `👤 **${row.name}** · Commission Rate: **${row.commission_percentage}%**\n` +
+      `🔗 Total Referrals: **${row.referral_count}**\n\n` +
+      `📊 **Commission Breakdown:**\n` +
+      `   ┌──────────────────────────────────┐\n` +
+      `   │ 💵 Total Earned:    ₹${this.formatCurrency(row.total_earned).padStart(10)}\n` +
+      `   │ ✅ Settled:         ₹${this.formatCurrency(row.settled_amount).padStart(10)}\n` +
+      `   │ 🟡 Processing:     ₹${this.formatCurrency(row.processing_amount).padStart(10)}\n` +
+      `   │ ⏳ Unsettled:      ₹${this.formatCurrency(row.unsettled_amount).padStart(10)}\n` +
+      `   │ 💰 Net Pending:    ₹${this.formatCurrency(row.total_pending).padStart(10)}\n` +
+      `   └──────────────────────────────────┘\n\n` +
+      `💡 Say **"payment history"** to see settlement transactions or **"my referrals"** for details.`;
+  }
+
+  /**
+   * Format affiliate payment/settlement history
+   */
+  private formatAffiliatePayments(data: any[], offset: number = 0, isAdmin: boolean = false): string {
+    if (!data.length) return 'No payment settlements found yet. Payments are processed once your commissions reach the settlement threshold.';
+
+    let response = `**💳 ${isAdmin ? 'All ' : 'Your '}Payment History**\n`;
+    response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    data.forEach((row, i) => {
+      const num = offset + i + 1;
+      const date = row.payment_date ? new Date(row.payment_date).toLocaleDateString('en-IN') : 'N/A';
+      const mode = row.transaction_mode || 'N/A';
+      const ref = row.transaction_ref || 'N/A';
+
+      response += `**${num}.** ${isAdmin && row.affiliate_name ? `**${row.affiliate_name}** · ` : ''}₹${this.formatCurrency(row.settle_amount)}\n`;
+      response += `   📅 ${date} · 🏦 ${mode} · Ref: \`${ref}\`\n\n`;
+    });
+
+    return response;
+  }
+
+  /**
+   * Format affiliate list (Admin view)
+   */
+  private formatAffiliateList(data: any[], offset: number = 0): string {
+    if (!data.length) return 'No affiliate accounts found.';
+
+    let response = `**👥 Affiliate Accounts**\n`;
+    response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    data.forEach((row, i) => {
+      const num = offset + i + 1;
+      const status = row.is_active ? '🟢 Active' : '🔴 Inactive';
+      const joined = row.created_at ? new Date(row.created_at).toLocaleDateString('en-IN') : 'N/A';
+
+      response += `**${num}.** **${row.name}** (${row.email})\n`;
+      response += `   🔗 Code: \`${row.referral_code}\` · Referrals: ${row.referral_count} · Rate: ${row.commission_percentage}%\n`;
+      response += `   💰 Earned: ₹${this.formatCurrency(row.total_earned)} · Pending: ₹${this.formatCurrency(row.total_pending)}\n`;
+      response += `   ${status} · Joined: ${joined}\n\n`;
+    });
+
+    return response;
+  }
+
+  /**
+   * Format affiliate lookup (specific affiliate details — Admin view)
+   */
+  private formatAffiliateLookup(data: any[]): string {
+    if (!data.length) return 'No affiliate found with that name. Try "list affiliates" to see all accounts.';
+
+    let response = `**🔍 Affiliate Details**\n`;
+    response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    data.forEach((row) => {
+      const status = row.is_active ? '🟢 Active' : '🔴 Inactive';
+      const joined = row.created_at ? new Date(row.created_at).toLocaleDateString('en-IN') : 'N/A';
+
+      response += `👤 **${row.name}** · ${row.email}\n`;
+      response += `📱 ${row.mobile_number || 'N/A'} · ${status}\n\n`;
+      response += `🔗 **Referral Code:** \`${row.referral_code}\`\n`;
+      response += `👥 **Referrals:** ${row.referral_count} · Rate: ${row.commission_percentage}%\n\n`;
+      response += `💰 **Financials:**\n`;
+      response += `   • Earned: ₹${this.formatCurrency(row.total_earned)}\n`;
+      response += `   • Settled: ₹${this.formatCurrency(row.total_settled)}\n`;
+      response += `   • Pending: ₹${this.formatCurrency(row.total_pending)}\n\n`;
+      response += `📅 Joined: ${joined}\n`;
+    });
+
+    return response;
+  }
+
+  /**
+   * Format students referred by affiliate(s).
+   */
+  private formatAffiliateStudents(data: any[], offset: number = 0): string {
+    if (!data.length) return 'No students found for this affiliate. The affiliate may not have any referrals yet.';
+
+    const affiliateName = data[0]?.affiliate_name;
+    let response = affiliateName
+      ? `**👥 Students Referred by ${affiliateName}**\n`
+      : `**👥 All Affiliate-Referred Students**\n`;
+    response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    data.forEach((row, i) => {
+      const num = offset + i + 1;
+      const studentName = row.student_name || 'Unknown';
+      const email = row.email || 'N/A';
+      const mobile = row.mobile_number || '';
+      const affName = row.affiliate_name || 'N/A';
+      const referralCode = row.referral_code || '';
+      const regAmount = row.registration_amount ? `₹${this.formatCurrency(row.registration_amount)}` : 'N/A';
+      const commission = row.commission_earned ? `₹${this.formatCurrency(row.commission_earned)}` : '';
+      const status = row.settlement_status === 2 ? '✅ Settled'
+        : row.settlement_status === 1 ? '⏳ Processing'
+          : row.settlement_status === 0 ? '🔴 Not Settled' : '';
+      const referredAt = row.referred_at ? new Date(row.referred_at).toLocaleDateString('en-IN') : '';
+
+      response += `**${num}.** **${studentName}** · ${email}`;
+      if (mobile) response += ` · 📱 ${mobile}`;
+      response += `\n`;
+      if (!affiliateName) response += `   🔗 Affiliate: ${affName} (${referralCode})\n`;
+      response += `   💳 Reg Amount: ${regAmount}`;
+      if (commission) response += ` · Commission: ${commission}`;
+      if (status) response += ` · ${status}`;
+      response += `\n`;
+      if (referredAt) response += `   📅 Referred: ${referredAt}\n`;
+      response += `\n`;
+    });
+
+    return response;
+  }
+
+  /**
+   * Format currency amount with commas (Indian numbering)
+   */
+  private formatCurrency(amount: number | string | null | undefined): string {
+    const num = typeof amount === 'string' ? parseFloat(amount) : (amount || 0);
+    if (isNaN(num)) return '0.00';
+    return num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FOLLOW-UP SUGGESTION GENERATOR
+  // ═══════════════════════════════════════════════════════════════════════════
+  generateFollowUpSuggestions(question: string, answer: string, searchType: string): string[] {
+    const q = question.toLowerCase();
+    const a = answer.toLowerCase();
+    const suggestions: string[] = [];
+
+    // Context-aware suggestions based on search type
+    switch (searchType) {
+
+      // ── AI COUNSELLOR MODE — context-driven follow-ups ──
+      case 'ai_counsellor': {
+        // Detect what topic was discussed and suggest natural follow-ups
+
+        const talkedAboutCareer = q.includes('career') || q.includes('job') || q.includes('role') || a.includes('career') || a.includes('job role');
+        const talkedAboutSkills = q.includes('skill') || q.includes('learn') || q.includes('course') || a.includes('skill') || a.includes('develop');
+        const talkedAboutPersonality = q.includes('personality') || q.includes('trait') || q.includes('style') || a.includes('personality') || a.includes('disc') || a.includes('strength');
+        const talkedAboutAssessment = q.includes('score') || q.includes('assessment') || q.includes('result') || q.includes('test') || a.includes('assessment') || a.includes('score');
+        const talkedAboutSalary = q.includes('salary') || q.includes('pay') || q.includes('package') || a.includes('salary') || a.includes('lpa') || a.includes('package');
+        const talkedAboutRoadmap = q.includes('roadmap') || q.includes('plan') || q.includes('steps') || q.includes('how to') || a.includes('roadmap') || a.includes('step');
+        const talkedAboutInterview = q.includes('interview') || q.includes('resume') || q.includes('cv') || a.includes('interview') || a.includes('resume');
+
+        if (talkedAboutCareer && talkedAboutSkills) {
+          suggestions.push('What certifications will help me the most?');
+          suggestions.push('How long will it take to be job-ready?');
+          suggestions.push('What projects should I build for my portfolio?');
+        } else if (talkedAboutCareer) {
+          suggestions.push('What skills do I need for this career?');
+          suggestions.push('What is the salary range for this role?');
+          suggestions.push('How do I get started in this field?');
+        } else if (talkedAboutPersonality) {
+          suggestions.push('What careers best match my personality?');
+          suggestions.push('How can I use my strengths at work?');
+          suggestions.push('What work environments suit me?');
+        } else if (talkedAboutAssessment) {
+          suggestions.push('What do my assessment scores say about me?');
+          suggestions.push('How can I improve my weak areas?');
+          suggestions.push('Which careers match my assessment profile?');
+        } else if (talkedAboutSkills) {
+          suggestions.push('Show me a learning roadmap');
+          suggestions.push('Which online platforms do you recommend?');
+          suggestions.push('How can I practice these skills?');
+        } else if (talkedAboutSalary) {
+          suggestions.push('Which skills command higher salaries?');
+          suggestions.push('How do I negotiate a better offer?');
+          suggestions.push('What is the career growth trajectory?');
+        } else if (talkedAboutRoadmap) {
+          suggestions.push('What should I focus on this month?');
+          suggestions.push('How do I stay on track with my goals?');
+          suggestions.push('Who can mentor me in this field?');
+        } else if (talkedAboutInterview) {
+          suggestions.push('What are common interview questions?');
+          suggestions.push('How do I write a strong resume?');
+          suggestions.push('How should I prepare for my first interview?');
+        } else {
+          // General counsellor follow-ups
+          suggestions.push('What careers match my profile?');
+          suggestions.push('What are my strongest skills?');
+          suggestions.push('How do I plan my career path?');
+        }
+        break;
+      }
+
+      case 'list_candidates':
+      case 'list_registrations':
+        suggestions.push('Show top performers');
+        suggestions.push('How many candidates completed assessments?');
+        suggestions.push('Generate career report for a candidate');
+        break;
+      case 'person_lookup':
+      case 'career_report':
+        suggestions.push('Show their personality traits');
+        suggestions.push('What careers suit this person?');
+        suggestions.push('Generate a detailed career report');
+        break;
+      case 'test_results':
+        suggestions.push('Who are the top scorers?');
+        suggestions.push('Show average scores');
+        suggestions.push('Compare performance across groups');
+        break;
+      case 'career_guidance':
+        suggestions.push('What skills should I develop?');
+        suggestions.push('Show recommended courses');
+        suggestions.push('What certifications are valuable?');
+        break;
+      case 'intelligent_response':
+      case 'general_knowledge':
+        if (q.includes('skill') || q.includes('learn') || q.includes('course')) {
+          suggestions.push('Show me a learning roadmap');
+          suggestions.push('What certifications should I get?');
+          suggestions.push('Compare online learning platforms');
+        } else if (q.includes('career') || q.includes('job') || q.includes('role')) {
+          suggestions.push('What skills are needed?');
+          suggestions.push('Show salary ranges');
+          suggestions.push('How to prepare for interviews?');
+        } else if (q.includes('technology') || q.includes('programming') || q.includes('framework')) {
+          suggestions.push('Show me a getting started guide');
+          suggestions.push('What projects should I build?');
+          suggestions.push('Compare with alternatives');
+        } else {
+          suggestions.push('Tell me more about this');
+          suggestions.push('How can I apply this?');
+          suggestions.push('What are the next steps?');
+        }
+        break;
+      case 'list_users':
+        suggestions.push('Show active users');
+        suggestions.push('How many admins are there?');
+        suggestions.push('Show user activity summary');
+        break;
+      case 'count_by_role':
+        suggestions.push('List all corporate accounts');
+        suggestions.push('Show all candidates');
+        suggestions.push('How many completed assessments?');
+        break;
+      case 'corporate_details':
+        suggestions.push('How many candidates in each corporate?');
+        suggestions.push('Show active corporates');
+        suggestions.push('Which corporate has the most candidates?');
+        break;
+      default:
+        suggestions.push('List all candidates');
+        suggestions.push('Show top performers');
+        suggestions.push('Ask me about career paths');
+        break;
+    }
+
+    return suggestions.slice(0, 3);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // SERVICE METHODS
   // ═══════════════════════════════════════════════════════════════════════════
   async getStatus(): Promise<any> {
@@ -2069,18 +4980,20 @@ JSON:`;
 
     return {
       status: 'ok',
-      name: 'MITHRA',
-      version: '2.0.0-jarvis',
-      description: 'OriginBI Intelligent - Your Career Guide (JARVIS Edition)',
+      name: 'Ask BI',
+      version: '3.0.0-jarvis',
+      description: 'Ask BI — OriginBI Intelligent Assistant (Jarvis Edition)',
       features: [
+        'corporate_scoped_intelligence',
         'personalized_career_guidance',
         'job_eligibility_analysis',
         'higher_studies_recommendations',
-        'emotional_ai_responses',
         'user_memory',
         'any_question_intelligent',
         'conversation_context',
         'llm_powered',
+        'strict_db_only_person_data',
+        'smart_name_disambiguation',
       ],
       knowledgeBase: { documents: totalDocs },
     };

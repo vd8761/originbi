@@ -5,7 +5,7 @@ import { getCorporateWelcomeEmailTemplate } from '../mail/templates/corporate-we
 import * as fs from 'fs';
 import * as path from 'path';
 import * as nodemailer from 'nodemailer';
-import { SES } from 'aws-sdk';
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 
 @Controller('test')
 export class TestController {
@@ -116,14 +116,16 @@ export class TestController {
       'Role Match Explorer',
     );
 
-    const ses = new SES({
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    const sesClient = new SESv2Client({
       region: process.env.AWS_REGION,
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+      },
     });
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    const transporter = nodemailer.createTransport({ SES: ses } as any);
+    const transporter = nodemailer.createTransport({ SES: { sesClient, SendEmailCommand } } as any);
 
     const fromName = process.env.EMAIL_SEND_FROM_NAME || 'Origin BI';
     const fromEmail = process.env.EMAIL_FROM || 'no-reply@originbi.com';
@@ -166,14 +168,16 @@ export class TestController {
       assets,
     );
 
-    const ses = new SES({
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    const sesClient = new SESv2Client({
       region: process.env.AWS_REGION,
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+      },
     });
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    const transporter = nodemailer.createTransport({ SES: ses } as any);
+    const transporter = nodemailer.createTransport({ SES: { sesClient, SendEmailCommand } } as any);
 
     const fromName =
       process.env.EMAIL_SEND_FROM_NAME || 'Origin BI (Corporate)';

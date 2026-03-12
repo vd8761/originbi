@@ -1,14 +1,50 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
-import { Search, Edit2, MoreHorizontal, CheckCircle, Clock, Users, Briefcase } from "lucide-react";
-import { TrendUpIcon, TrendDownIcon, CircleArrowUpIcon, EditPencilIcon, DiamondIcon } from '../icons';
+import { Search, Edit2, MoreHorizontal, CheckCircle, Clock, Users, Briefcase, Eye } from "lucide-react";
+import { TrendUpIcon, TrendDownIcon, CircleArrowUpIcon, DiamondIcon } from '../icons';
 import { CorporateAccount } from '../../lib/types';
 import { corporateDashboardService } from '../../lib/services';
 import { ToastContainer, ToastMessage } from '../ui/Toast';
 import BuyCreditsModal from './BuyCreditsModal';
 
+
 // --- Types ---
+interface MiniStatsData {
+    totalRegistrations: number;
+    newRegistrationsThisMonth: number;
+    assessmentsAssigned: number;
+    assessmentsCompleted: number;
+    registrationsTrend: number;
+    assessmentsAssignedTrend: number;
+    assessmentsCompletedTrend: number;
+}
+
+interface AssessmentInsight {
+    month: string;
+    year: number;
+    assigned: number;
+    completed: number;
+}
+
+interface PipelineOverviewData {
+    totalRegistered: number;
+    assessmentsAssigned: number;
+    assessmentsInProgress: number;
+    assessmentsCompleted: number;
+}
+
+interface TraitData {
+    traitName: string;
+    count: number;
+    colorRgb: string;
+}
+
+interface PersonalityDistributionData {
+    totalWithTraits: number;
+    topTraits: TraitData[];
+}
+
 interface DashboardStats {
     companyName: string;
     availableCredits: number;
@@ -16,6 +52,11 @@ interface DashboardStats {
     studentsRegistered: number;
     isActive: boolean;
     perCreditCost: number;
+    miniStats: MiniStatsData;
+    assessmentInsights: AssessmentInsight[];
+    pipelineOverview: PipelineOverviewData;
+    personalityDistribution: PersonalityDistributionData;
+    recentParticipants: Participant[];
 }
 
 interface Participant {
@@ -112,25 +153,20 @@ const CreditsCard = ({ credits, onBuy }: { credits: number, onBuy: () => void })
     </div>
 );
 
-const AssessmentBarChart = () => {
-    // Mock Data (Adjusted for Max 400 Scale)
-    const data = [
-        { label: 'Jan', assigned: 280, completed: 350 },
-        { label: 'Feb', assigned: 350, completed: 330 },
-        { label: 'Mar', assigned: 350, completed: 250 },
-        { label: 'Apr', assigned: 320, completed: 390 },
-        { label: 'May', assigned: 300, completed: 340 },
-    ];
-    // Re-adjusting to match Design Image 0 roughly
-    const chartData = [
-        { label: 'Jan', assigned: 280, completed: 340 },
-        { label: 'Feb', assigned: 340, completed: 340 },
-        { label: 'Mar', assigned: 350, completed: 250 },
-        { label: 'Apr', assigned: 310, completed: 395 },
-        { label: 'May', assigned: 300, completed: 350 },
-    ];
+const AssessmentBarChart = ({ insights }: { insights: AssessmentInsight[] }) => {
+    const chartData = insights.length > 0
+        ? insights.map(d => ({ label: d.month, assigned: d.assigned, completed: d.completed }))
+        : [
+            { label: 'Jan', assigned: 0, completed: 0 },
+            { label: 'Feb', assigned: 0, completed: 0 },
+            { label: 'Mar', assigned: 0, completed: 0 },
+            { label: 'Apr', assigned: 0, completed: 0 },
+            { label: 'May', assigned: 0, completed: 0 },
+        ];
 
-    const max = 400;
+    const maxVal = Math.max(...chartData.flatMap(d => [d.assigned, d.completed]), 1);
+    const max = Math.ceil(maxVal / 100) * 100 || 100;
+    const yLabels = Array.from({ length: 4 }, (_, i) => max - (i * max / 4));
 
     return (
         <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-8 border border-[#E0E0E0] dark:border-white/10 h-full flex flex-col font-['Haskoy'] overflow-visible shadow-sm">
@@ -145,10 +181,7 @@ const AssessmentBarChart = () => {
             <div className="flex-1 flex gap-4">
                 {/* Y Axis */}
                 <div className="flex flex-col justify-between text-[#19211C] dark:text-white font-light text-[clamp(14px,1vw,17px)] pb-8 pt-2">
-                    <span>400</span>
-                    <span>300</span>
-                    <span>200</span>
-                    <span>100</span>
+                    {yLabels.map((v, i) => <span key={i}>{v}</span>)}
                 </div>
 
                 {/* Chart Area */}
@@ -216,12 +249,58 @@ const AssessmentBarChart = () => {
     );
 };
 
-const RecruitmentOverview = () => {
+const RecruitmentOverview = ({
+    pipeline,
+    onDateChange,
+    selectedRange
+}: {
+    pipeline: PipelineOverviewData;
+    onDateChange: (start: Date | null, end: Date | null, label: string) => void;
+    selectedRange: string;
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const months = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ];
+
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({ length: 11 }, (_, i) => currentYear - 5 + i);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const handleSelect = (m: number | null, y: number | null) => {
+        setIsOpen(false);
+        if (m === null || y === null) {
+            onDateChange(null, null, "All");
+            return;
+        }
+        setSelectedMonth(m);
+        setSelectedYear(y);
+
+        const start = new Date(y, m, 1);
+        const end = new Date(y, m + 1, 0);
+        onDateChange(start, end, `${months[m]} ${y}`);
+    };
+
+    const maxVal = Math.max(pipeline.totalRegistered, 1);
     const items = [
-        { label: 'Total Applicants', val: 453, max: 500 },
-        { label: 'Short Listed', val: 242, max: 500 },
-        { label: 'Interviewed', val: 165, max: 500 },
-        { label: 'Hired', val: 125, max: 500 },
+        { label: 'Total Registered', val: pipeline.totalRegistered, max: maxVal },
+        { label: 'Assessments Assigned', val: pipeline.assessmentsAssigned, max: maxVal },
+        { label: 'In Progress', val: pipeline.assessmentsInProgress, max: maxVal },
+        { label: 'Completed', val: pipeline.assessmentsCompleted, max: maxVal },
     ];
 
     return (
@@ -229,14 +308,59 @@ const RecruitmentOverview = () => {
             {/* Header */}
             <div className="flex justify-between items-center mb-8">
                 <h3 className="text-[clamp(18px,1.2vw,22px)] font-semibold text-[#19211C] dark:text-white leading-none">
-                    Recruitment Overview
+                    Assessment Pipeline
                 </h3>
-                {/* Date Dropdown */}
-                <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#E0E0E0] dark:border-white/10 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                    <span className="text-[clamp(13px,1vw,15px)] font-normal text-[#19211C] dark:text-white leading-none whitespace-nowrap">
-                        September 2025
-                    </span>
-                    <svg className="w-4 h-4 text-[#19211C] dark:text-white opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 9l-7 7-7-7" /></svg>
+
+                {/* Selective Month/Year Dropdown */}
+                <div className="relative" ref={dropdownRef}>
+                    <div
+                        onClick={() => setIsOpen(!isOpen)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#E0E0E0] dark:border-white/10 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                    >
+                        <span className="text-[clamp(13px,1vw,15px)] font-normal text-[#19211C] dark:text-white leading-none whitespace-nowrap">
+                            {selectedRange === "All" ? "All Records" : selectedRange}
+                        </span>
+                        <svg className={`w-4 h-4 text-[#19211C] dark:text-white opacity-60 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+
+                    {isOpen && (
+                        <div className="absolute top-full right-0 mt-2 p-4 bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl z-50 min-w-[300px]">
+                            <div
+                                onClick={() => handleSelect(null, null)}
+                                className="mb-4 px-4 py-2 rounded-xl text-center text-sm font-semibold bg-gray-100 dark:bg-white/5 text-[#19211C] dark:text-white cursor-pointer hover:bg-[#1ED36A] hover:text-white transition-colors"
+                            >
+                                All Time Records
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1 max-h-[200px] overflow-y-auto scrollbar-hide">
+                                    <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-2 px-2">Month</div>
+                                    {months.map((m, idx) => (
+                                        <div
+                                            key={m}
+                                            onClick={() => handleSelect(idx, selectedYear)}
+                                            className={`px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-colors ${selectedRange !== "All" && selectedMonth === idx ? 'bg-[#1ED36A] text-white' : 'text-[#19211C] dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5'}`}
+                                        >
+                                            {m}
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="space-y-1 max-h-[200px] overflow-y-auto scrollbar-hide">
+                                    <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-2 px-2 text-center">Year</div>
+                                    {years.map((y) => (
+                                        <div
+                                            key={y}
+                                            onClick={() => handleSelect(selectedMonth, y)}
+                                            className={`px-3 py-1.5 rounded-lg text-sm text-center cursor-pointer transition-colors ${selectedRange !== "All" && selectedYear === y ? 'bg-[#1ED36A] text-white' : 'text-[#19211C] dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5'}`}
+                                        >
+                                            {y}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -268,36 +392,38 @@ const RecruitmentOverview = () => {
 };
 
 // --- Updated Donut Chart & Personality Distribution ---
-const DonutChart = () => (
-    <div className="relative w-[clamp(200px,14vw,260px)] h-[clamp(200px,14vw,260px)] mx-auto flex items-center justify-center">
-        {/* Chart SVG with 4 Rings - adjusted for larger inner space */}
-        <svg viewBox="0 0 200 200" className="w-full h-full rotate-[-90deg]">
-            {/* Ring 1 (Outer) - Supportive Energizer (45) */}
-            <circle cx="100" cy="100" r="90" fill="none" stroke="#e5e5e5" strokeWidth="10" strokeLinecap="round" className="dark:stroke-white/5" />
-            <circle cx="100" cy="100" r="90" fill="none" stroke="#C2185B" strokeWidth="10" strokeDasharray="500, 1000" strokeDashoffset="0" strokeLinecap="round" />
+const RING_RADII = [90, 75, 60, 45];
+const FALLBACK_COLORS = ['#C2185B', '#FBC02D', '#D4E157', '#D32F2F'];
 
-            {/* Ring 2 - Strategic Stabilizer (32) */}
-            <circle cx="100" cy="100" r="75" fill="none" stroke="#e5e5e5" strokeWidth="10" strokeLinecap="round" className="dark:stroke-white/5" />
-            <circle cx="100" cy="100" r="75" fill="none" stroke="#FBC02D" strokeWidth="10" strokeDasharray="300, 1000" strokeDashoffset="-20" strokeLinecap="round" />
-
-            {/* Ring 3 - Decisive Analyst (28) */}
-            <circle cx="100" cy="100" r="60" fill="none" stroke="#e5e5e5" strokeWidth="10" strokeLinecap="round" className="dark:stroke-white/5" />
-            <circle cx="100" cy="100" r="60" fill="none" stroke="#D4E157" strokeWidth="10" strokeDasharray="200, 1000" strokeDashoffset="-40" strokeLinecap="round" />
-
-            {/* Ring 4 (Inner) - Charismatic Leader (21) */}
-            <circle cx="100" cy="100" r="45" fill="none" stroke="#e5e5e5" strokeWidth="10" strokeLinecap="round" className="dark:stroke-white/5" />
-            <circle cx="100" cy="100" r="45" fill="none" stroke="#D32F2F" strokeWidth="10" strokeDasharray="120, 1000" strokeDashoffset="-60" strokeLinecap="round" />
-        </svg>
-
-        {/* Center Text */}
-        <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
-            <span className="font-['Haskoy'] font-semibold text-[clamp(20px,1.5vw,26px)] text-[#150089] dark:text-[#1ED36A] leading-tight">200</span>
-            <span className="font-['Haskoy'] font-normal text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white leading-tight">Candidates</span>
+const DonutChart = ({ total, traits }: { total: number; traits: TraitData[] }) => {
+    const maxCount = Math.max(...traits.map(t => t.count), 1);
+    return (
+        <div className="relative w-[clamp(200px,14vw,260px)] h-[clamp(200px,14vw,260px)] mx-auto flex items-center justify-center">
+            <svg viewBox="0 0 200 200" className="w-full h-full rotate-[-90deg]">
+                {traits.map((trait, i) => {
+                    const r = RING_RADII[i] || 45;
+                    const circumference = 2 * Math.PI * r;
+                    const fillRatio = total > 0 ? trait.count / maxCount : 0;
+                    const dashArray = `${fillRatio * circumference * 0.8}, ${circumference}`;
+                    const color = trait.colorRgb || FALLBACK_COLORS[i] || '#1ED36A';
+                    return (
+                        <React.Fragment key={i}>
+                            <circle cx="100" cy="100" r={r} fill="none" stroke="#e5e5e5" strokeWidth="10" strokeLinecap="round" className="dark:stroke-white/5" />
+                            <circle cx="100" cy="100" r={r} fill="none" stroke={color} strokeWidth="10" strokeDasharray={dashArray} strokeDashoffset={`-${i * 20}`} strokeLinecap="round" />
+                        </React.Fragment>
+                    );
+                })}
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
+                <span className="font-['Haskoy'] font-semibold text-[clamp(20px,1.5vw,26px)] text-[#150089] dark:text-[#1ED36A] leading-tight">{total}</span>
+                <span className="font-['Haskoy'] font-normal text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white leading-tight">Candidates</span>
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
-const PersonalityDistribution = () => {
+const PersonalityDistribution = ({ data }: { data: PersonalityDistributionData }) => {
+    const traits = data.topTraits.length > 0 ? data.topTraits : [];
     return (
         <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-6 border border-[#E0E0E0] dark:border-white/10 h-full font-['Haskoy'] flex flex-col justify-between shadow-sm">
             {/* Header */}
@@ -308,10 +434,10 @@ const PersonalityDistribution = () => {
                     </h3>
                     <div className="flex flex-row items-center gap-2 sm:gap-6 whitespace-nowrap">
                         <span className="font-normal text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white">
-                            Total Applicants : <span className="font-semibold">200</span>
+                            Total Applicants : <span className="font-semibold">{data.totalWithTraits}</span>
                         </span>
                         <span className="flex items-center gap-1.5 font-semibold text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white">
-                            <span className="w-3 h-3 rounded-full bg-[#1ED36A]"></span> Top 4
+                            <span className="w-3 h-3 rounded-full bg-[#1ED36A]"></span> Top {traits.length}
                             <span className="font-normal">traits shown</span>
                         </span>
                     </div>
@@ -325,72 +451,64 @@ const PersonalityDistribution = () => {
             <div className="flex flex-col xl:flex-row items-center justify-between gap-6 flex-1">
                 {/* Chart Left */}
                 <div className="flex-shrink-0">
-                    <DonutChart />
+                    <DonutChart total={data.totalWithTraits} traits={traits} />
                 </div>
 
                 {/* Legend Right */}
                 <div className="grid grid-cols-2 gap-4 w-full xl:flex xl:flex-col xl:w-auto xl:min-w-[140px]">
-                    {/* Item 1 */}
-                    <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-4 rounded-full bg-[#C2185B]"></span>
-                            <span className="font-medium text-[clamp(20px,1.5vw,26px)] text-[#19211C] dark:text-white leading-none">45</span>
+                    {traits.length > 0 ? traits.map((trait, i) => (
+                        <div key={i} className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                                <span className="w-2 h-4 rounded-full" style={{ backgroundColor: trait.colorRgb || FALLBACK_COLORS[i] || '#1ED36A' }}></span>
+                                <span className="font-medium text-[clamp(20px,1.5vw,26px)] text-[#19211C] dark:text-white leading-none">{trait.count}</span>
+                            </div>
+                            <span className="font-medium text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white leading-none pl-4">{trait.traitName}</span>
                         </div>
-                        <span className="font-medium text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white leading-none pl-4">Supportive Energizer</span>
-                    </div>
-                    {/* Item 2 */}
-                    <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-4 rounded-full bg-[#FBC02D]"></span>
-                            <span className="font-medium text-[clamp(20px,1.5vw,26px)] text-[#19211C] dark:text-white leading-none">32</span>
+                    )) : (
+                        <div className="col-span-2 text-center text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white opacity-60">
+                            No personality data yet
                         </div>
-                        <span className="font-medium text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white leading-none pl-4">Strategic Stabilizer</span>
-                    </div>
-                    {/* Item 3 */}
-                    <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-4 rounded-full bg-[#D4E157]"></span>
-                            <span className="font-medium text-[clamp(20px,1.5vw,26px)] text-[#19211C] dark:text-white leading-none">28</span>
-                        </div>
-                        <span className="font-medium text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white leading-none pl-4">Decisive Analyst</span>
-                    </div>
-                    {/* Item 4 */}
-                    <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-4 rounded-full bg-[#D32F2F]"></span>
-                            <span className="font-medium text-[clamp(20px,1.5vw,26px)] text-[#19211C] dark:text-white leading-none">21</span>
-                        </div>
-                        <span className="font-medium text-[clamp(13px,1vw,15px)] text-[#19211C] dark:text-white leading-none pl-4">Charismatic Leader</span>
-                    </div>
+                    )}
                 </div>
             </div>
         </div>
     );
 };
 
-const ParticipantsTable = ({ participants }: { participants: Participant[] }) => {
-    // Exact Design Data Structure
-    const tableData = [
-        { name: 'Monishwar Rajasekaran (M)', type: 'School Student', date: '13 May 2025', mobile: '8787627634', status: true },
-        { name: 'Monishwar Rajasekaran (M)', type: 'School Student', date: '13 May 2025', mobile: '8787627634', status: true },
-        { name: 'Monishwar Rajasekaran (M)', type: 'School Student', date: '13 May 2025', mobile: '8787627634', status: true },
-        { name: 'Monishwar Rajasekaran (M)', type: 'School Student', date: '13 May 2025', mobile: '8787627634', status: true },
-        { name: 'Monishwar Rajasekaran (M)', type: 'School Student', date: '13 May 2025', mobile: '8787627634', status: true },
-    ];
+const ParticipantsTable = ({
+    participants,
+    onViewAll,
+    onView
+}: {
+    participants: Participant[];
+    onViewAll: () => void;
+    onView: (id: string) => void;
+}) => {
+    const tableData = participants.map(p => ({
+        id: p.id,
+        name: p.name,
+        type: p.programType,
+        date: p.registerDate,
+        mobile: p.mobile,
+        status: p.status,
+    }));
 
     return (
         <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] border border-[#E0E0E0] dark:border-white/10 h-full overflow-hidden flex flex-col font-['Haskoy'] shadow-sm">
             {/* Header */}
             <div className="flex justify-between items-center p-6">
                 <h3 className="font-semibold text-[clamp(16px,1.04vw,20px)] text-[#19211C] dark:text-white leading-none">
-                    Assessment Participants
+                    Recently Added Participants
                 </h3>
-                <span className="font-medium text-[clamp(13px,1vw,15px)] text-[#1ED36A] cursor-pointer hover:underline">
+                <span
+                    onClick={onViewAll}
+                    className="font-medium text-[clamp(13px,1vw,15px)] text-[#1ED36A] cursor-pointer hover:underline"
+                >
                     View all
                 </span>
             </div>
 
-            {/* Table Area */}
+            {/* Table Area ... */}
             <div className="w-full overflow-x-auto">
                 <table className="w-full min-w-[800px]">
                     <thead>
@@ -427,8 +545,11 @@ const ParticipantsTable = ({ participants }: { participants: Participant[] }) =>
                                     {row.mobile}
                                 </td>
                                 <td className="py-3.5 pl-4 pr-6 text-center">
-                                    <div className="flex justify-center items-center cursor-pointer hover:opacity-80 transition-opacity">
-                                        <EditPencilIcon className="w-[18px] h-[18px] text-[#1ED36A]" />
+                                    <div
+                                        onClick={() => onView(row.id)}
+                                        className="flex justify-center items-center cursor-pointer hover:opacity-80 transition-opacity"
+                                    >
+                                        <Eye className="w-[18px] h-[18px] text-[#1ED36A]" />
                                     </div>
                                 </td>
                             </tr>
@@ -440,159 +561,231 @@ const ParticipantsTable = ({ participants }: { participants: Participant[] }) =>
     );
 };
 
+// --- Report Data Interface ---
+interface ReportData {
+    reportNumber: string;
+    generatedAt: string;
+    candidateName: string;
+    email: string;
+    mobile: string;
+    gender: string;
+    programName: string;
+    assessmentTitle: string;
+    departmentName: string;
+    degreeTypeName: string;
+    currentYear: string | null;
+    institutionName: string | null;
+    personalityTrait: {
+        id: number;
+        code: string;
+        name: string;
+        description: string;
+        colorRgb: string;
+        imageKey: string;
+        characterImage: string;
+        strengthChartImage: string;
+        metadata: any;
+    };
+    discScores: { D: number; I: number; S: number; C: number };
+    totalScore: string;
+    sincerityIndex: string;
+    sincerityClass: string;
+    attemptStatus: string;
+    completedAt: string;
+    keyStrengths: string[];
+    roleAlignment: string[];
+    careerGrowthTips: { title: string; desc: string }[] | string[];
+    keyBehaviors: string[];
+    typicalScenarios: string[];
+}
+
 // --- Detailed Profile Card (Bottom Search Result) ---
-const ProfileResult = () => (
-    <div className="mt-8 pt-8 text-left border-t border-gray-100 dark:border-white/5 relative overflow-hidden transition-colors">
-        {/* Main Content Area */}
-        {/* Main Content Area */}
-        <div className="flex flex-col lg:flex-row gap-8 items-center lg:items-start mb-8">
+const ProfileResult = ({ data }: { data: ReportData }) => {
+    const trait = data.personalityTrait;
+    const traitNameWords = trait.name ? trait.name.split(' ') : ['Unknown'];
 
-            {/* Left: Personality Title */}
-            <div className="lg:w-1/4 text-center lg:text-left flex flex-col justify-center pt-8 lg:pt-16">
-                <h2 className="text-[clamp(36px,2.5vw,48px)] font-semibold text-[#150089] dark:text-white leading-[1.1] flex flex-col items-center lg:block">
-                    <span>Supportive</span>
-                    <span className="lg:ml-16 block">Energizer</span>
-                </h2>
-            </div>
+    // Build subtitle line (e.g., "B.Tech Information Technology (3rd Year)")
+    const subtitleParts: string[] = [];
+    if (data.degreeTypeName) subtitleParts.push(data.degreeTypeName);
+    if (data.departmentName) subtitleParts.push(data.departmentName);
+    if (data.currentYear) subtitleParts.push(`(${data.currentYear})`);
+    const subtitle = subtitleParts.join(' ') || data.programName || 'Assessment Completed';
 
-            {/* Center: Character Image */}
-            <div className="lg:w-1/3 flex justify-center relative py-6 lg:py-0">
-                {/* Background Glow */}
-                <div className="w-[260px] h-[260px] sm:w-[320px] sm:h-[320px] bg-[#FDE047]/20 dark:bg-yellow-500/10 rounded-full absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 blur-3xl pointer-events-none"></div>
-                <div className="relative w-[300px] h-[300px] sm:w-[350px] sm:h-[350px]">
-                    <img
-                        src="/Corporate_Analytical_Leader.png"
-                        alt="Supportive Energizer Character"
-                        className="w-full h-full object-contain drop-shadow-2xl relative z-10"
-                        onError={(e) => {
-                            // Fallback if image missing - remove this in prod
-                            e.currentTarget.src = "https://via.placeholder.com/350x350/transparent/transparent?text=Character";
+    // Normalize career growth tips to always be { title, desc } objects
+    const careerTips = (data.careerGrowthTips || []).map((tip: any) => {
+        if (typeof tip === 'string') return { title: '', desc: tip };
+        return { title: tip.title || '', desc: tip.desc || tip.description || '' };
+    });
+
+    return (
+        <div className="mt-8 pt-8 text-left border-t border-gray-100 dark:border-white/5 relative overflow-hidden transition-colors">
+            {/* Main Content Area */}
+            <div className="flex flex-col lg:flex-row gap-8 items-center lg:items-start mb-8">
+
+                {/* Left: Personality Title */}
+                <div className="lg:w-1/4 text-center lg:text-left flex flex-col justify-center pt-8 lg:pt-16">
+                    <h2 className="text-[clamp(36px,2.5vw,48px)] font-semibold text-[#150089] dark:text-white leading-[1.1] flex flex-col items-center lg:block">
+                        {traitNameWords.map((word, i) => (
+                            <span key={i} className={i > 0 ? "lg:ml-16 block" : ""}>{word}</span>
+                        ))}
+                    </h2>
+                </div>
+
+                {/* Center: Character Image */}
+                <div className="lg:w-1/3 flex justify-center relative py-6 lg:py-0">
+                    {/* Background Glow */}
+                    <div
+                        className="w-[260px] h-[260px] sm:w-[320px] sm:h-[320px] rounded-full absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 blur-3xl pointer-events-none transition-colors duration-500"
+                        style={{
+                            backgroundColor: trait.colorRgb || '#FDE047',
+                            opacity: 0.2
                         }}
-                    />
-                </div>
-            </div>
-
-            {/* Right: Profile Details & Strengths */}
-            <div className="lg:w-5/12 w-full text-left pl-0 lg:pl-4">
-                {/* Header Info */}
-                <div className="mb-8 border-b border-gray-100 dark:border-white/5 pb-6">
-                    <h1 className="text-[clamp(20px,1.5vw,26px)] font-semibold text-[#19211C] dark:text-white mb-2 leading-tight">Pushparaaj</h1>
-                    <div className="text-[clamp(14px,1.1vw,17px)] font-medium text-[#1ED36A] mb-1 leading-snug">B.Tech Information Technology (3rd Year)</div>
-                    <div className="text-[clamp(13px,1.1vw,16px)] font-normal text-[#19211C] dark:text-white opacity-80 leading-snug">Peri Institute of Engineering and Technology</div>
-                </div>
-
-                {/* Key Strengths Section */}
-                <div className="flex flex-row items-start gap-4 sm:gap-6">
-                    {/* Strength Chart Graphic */}
-                    <div className="shrink-0 pt-1">
+                    ></div>
+                    <div className="relative w-[300px] h-[300px] sm:w-[350px] sm:h-[350px]">
                         <img
-                            src="/Analytical_Leader_Strength_Chart.png"
-                            alt="Strength Chart"
-                            className="w-[60px] sm:w-[80px] h-auto object-contain"
+                            src={trait.characterImage}
+                            alt={`${trait.name} Character`}
+                            className="w-full h-full object-contain drop-shadow-2xl relative z-10"
+                            onError={(e) => {
+                                e.currentTarget.src = `/traits/Corporate_${trait.imageKey}.png`;
+                            }}
                         />
                     </div>
+                </div>
 
-                    {/* Strength List */}
-                    <div>
-                        <h4 className="text-[clamp(16px,1.1vw,20px)] font-semibold text-[#19211C] dark:text-white mb-3">Key Strength</h4>
-                        <ul className="space-y-2.5">
-                            {[
-                                "Frequently reviews and aligns goals to stay focused and motivated.",
-                                "Continuously seeks ways to improve and refine processes.",
-                                "Stays informed about the latest trends and developments in the industry.",
-                                "Actively seeks constructive feedback from peers and mentors to grow and develop.",
-                                "Adapts strategies to remain effective in changing circumstances."
-                            ].map((item, i) => (
-                                <li key={i} className="flex items-start gap-2 text-[clamp(14px,1.1vw,17px)] font-normal text-[#19211C] dark:text-white leading-snug">
-                                    <span className="mt-1.5 w-1 h-1 rounded-full bg-[#19211C] dark:bg-white shrink-0"></span>
-                                    <span>{item}</span>
+                {/* Right: Profile Details & Strengths */}
+                <div className="lg:w-5/12 w-full text-left pl-0 lg:pl-4">
+                    {/* Header Info */}
+                    <div className="mb-8 border-b border-gray-100 dark:border-white/5 pb-6">
+                        <h1 className="text-[clamp(20px,1.5vw,26px)] font-semibold text-[#19211C] dark:text-white mb-2 leading-tight">{data.candidateName}</h1>
+                        <div className="text-[clamp(14px,1.1vw,17px)] font-medium text-[#1ED36A] mb-1 leading-snug">{subtitle}</div>
+                        {data.institutionName && (
+                            <div className="text-[clamp(13px,1.1vw,16px)] font-normal text-[#19211C] dark:text-white opacity-80 leading-snug">{data.institutionName}</div>
+                        )}
+                        <div className="text-[clamp(12px,0.9vw,14px)] font-normal text-[#19211C] dark:text-white opacity-60 mt-2">Report ID: {data.reportNumber}</div>
+                    </div>
+
+                    {/* Key Strengths Section */}
+                    <div className="flex flex-row items-start gap-4 sm:gap-6">
+                        {/* Strength Chart Graphic */}
+                        <div className="shrink-0 pt-1">
+                            <img
+                                src={trait.strengthChartImage}
+                                alt="Strength Chart"
+                                className="w-[60px] sm:w-[80px] h-auto object-contain"
+                                onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                }}
+                            />
+                        </div>
+
+                        {/* Strength List */}
+                        <div>
+                            <h4 className="text-[clamp(16px,1.1vw,20px)] font-semibold text-[#19211C] dark:text-white mb-3">Key Strength</h4>
+                            <ul className="space-y-2.5">
+                                {(data.keyStrengths.length > 0 ? data.keyStrengths : [
+                                    "Demonstrates strong analytical and strategic thinking.",
+                                    "Adapts to new environments and challenges with ease.",
+                                    "Builds effective working relationships across teams.",
+                                    "Maintains high standards of work quality and consistency.",
+                                    "Shows resilience and determination in achieving goals."
+                                ]).map((item, i) => (
+                                    <li key={i} className="flex items-start gap-2 text-[clamp(14px,1.1vw,17px)] font-normal text-[#19211C] dark:text-white leading-snug">
+                                        <span className="mt-1.5 w-1 h-1 rounded-full bg-[#19211C] dark:bg-white shrink-0"></span>
+                                        <span>{item}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+
+
+                </div>
+            </div>
+
+            {/* Bottom Section: Role Alignment & Career Tips */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 bg-[#F9F9F9] dark:bg-white/5 rounded-2xl overflow-hidden mb-8">
+                {/* Role Alignment */}
+                <div className="p-6 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-white/5">
+                    <h5 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(18px,1.4vw,22px)] font-semibold mb-4">Role Alignment</h5>
+                    {data.roleAlignment.length > 0 ? (
+                        <ul className="space-y-1">
+                            {data.roleAlignment.map((role, i) => (
+                                <li key={i} className="flex items-center gap-1 text-[clamp(14px,1.1vw,16px)] font-normal text-[#19211C] dark:text-white">
+                                    <span className="w-2 h-2 bg-[#1ED36A] rounded-full"></span> {typeof role === 'string' ? role : (role as any).name || (role as any).title || ''}
                                 </li>
                             ))}
                         </ul>
-                    </div>
+                    ) : (
+                        <p className="text-[clamp(14px,1.1vw,16px)] font-normal text-[#19211C] dark:text-white opacity-60">Role alignment data will be available after full analysis.</p>
+                    )}
                 </div>
-            </div>
-        </div>
 
-        {/* Bottom Section: Role Alignment & Career Tips */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 bg-[#F9F9F9] dark:bg-white/5 rounded-2xl overflow-hidden mb-8">
-            {/* Role Alignment */}
-            <div className="p-6 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-white/5">
-                <h5 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(18px,1.4vw,22px)] font-semibold mb-4">Role Alignment</h5>
-                <ul className="space-y-1">
-                    {["User Experience (UX) Designer", "IT Business Analyst", "Knowledge Management Specialist"].map(role => (
-                        <li key={role} className="flex items-center gap-1 text-[clamp(14px,1.1vw,16px)] font-normal text-[#19211C] dark:text-white">
-                            <span className="w-2 h-2 bg-gray-400 rounded-full"></span> {role}
-                        </li>
-                    ))}
-                </ul>
-            </div>
-
-            {/* Career Growth Tips */}
-            <div className="p-6">
-                <h5 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(16px,1.25vw,20px)] font-semibold mb-4">Career Growth Tips</h5>
-                <div className="space-y-5">
-                    <p className="text-[clamp(16px,1.3vw,19px)] text-[#19211C] dark:text-white leading-relaxed opacity-90 mb-4">
-                        The candidate's vibrant personality and optimistic outlook are among his/her greatest assets, but like any strength, these can be overextended. To ensure continued growth, here are some tailored recommendations for the candidate:
-                    </p>
-                    {[
-                        { title: "Delivering on Promises", desc: "The candidate's enthusiasm can sometimes lead him/her to take on more than can realistically be managed. By learning to prioritize and set boundaries, he/she can ensure commitments are met without feeling overwhelmed." },
-                        { title: "Active Listening", desc: "While the candidate's conversational skills are excellent, focusing more on listening can help build deeper connections. Taking the time to fully understand others' perspectives will enhance relationships and decision-making." },
-                        { title: "Staying Focused", desc: "The candidate's excitement about new ideas can occasionally distract him/her from existing priorities. Adopting tools like task lists or scheduling techniques can help channel energy effectively and maintain consistent productivity." },
-                        { title: "Digging Deeper", desc: "The candidate's natural optimism might lead to quick decisions without analyzing all the details. Developing the habit of gathering more information before acting will strengthen problem-solving skills." },
-                        { title: "Time Management", desc: "With a packed schedule and multiple interests, time management is key. Setting clear timelines and avoiding overcommitment will allow the candidate to balance aspirations with well-being." },
-                    ].map((tip, i) => (
-                        <div key={i}>
-                            <span className="font-bold text-[clamp(16px,1.3vw,19px)] text-[#19211C] dark:text-white block mb-1">{tip.title}</span>
-                            <p className="text-[clamp(16px,1.3vw,19px)] text-[#19211C] dark:text-white leading-relaxed font-normal">{tip.desc}</p>
+                {/* Career Growth Tips */}
+                <div className="p-6">
+                    <h5 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(16px,1.25vw,20px)] font-semibold mb-4">Career Growth Tips</h5>
+                    {careerTips.length > 0 ? (
+                        <div className="space-y-5">
+                            {careerTips.map((tip, i) => (
+                                <div key={i}>
+                                    {tip.title && <span className="font-bold text-[clamp(16px,1.3vw,19px)] text-[#19211C] dark:text-white block mb-1">{tip.title}</span>}
+                                    <p className="text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white leading-relaxed font-normal">{tip.desc}</p>
+                                </div>
+                            ))}
                         </div>
-                    ))}
+                    ) : (
+                        <p className="text-[clamp(14px,1.1vw,16px)] font-normal text-[#19211C] dark:text-white opacity-60">Career growth tips will be available after full analysis.</p>
+                    )}
+                </div>
+            </div>
+
+            {/* Footer Description */}
+            <div className="mt-8 pt-4">
+                <h3 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(24px,2vw,32px)] font-semibold mb-2">{data.candidateName} is {trait.name}</h3>
+                {trait.description && (
+                    <p className="text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white leading-relaxed font-normal mb-6">
+                        <span className="font-semibold text-black dark:text-white opacity-90">Description:</span> {trait.description}
+                    </p>
+                )}
+
+                <div className="space-y-6">
+                    {data.keyBehaviors.length > 0 && (
+                        <div>
+                            <h4 className="text-[clamp(16px,1.3vw,19px)] font-semibold text-[#19211C] dark:text-white mb-2">Key Behaviors:</h4>
+                            <ul className="list-disc pl-5 space-y-1.5 text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white font-normal">
+                                {data.keyBehaviors.map((behavior, i) => (
+                                    <li key={i}>{behavior}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    {data.typicalScenarios.length > 0 && (
+                        <div>
+                            <h4 className="text-[clamp(16px,1.3vw,19px)] font-semibold text-[#19211C] dark:text-white mb-2">Typical Scenarios:</h4>
+                            <ul className="list-disc pl-5 space-y-1.5 text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white font-normal">
+                                {data.typicalScenarios.map((scenario, i) => (
+                                    <li key={i}>{scenario}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
-
-        {/* Footer Description */}
-        <div className="mt-8 pt-4">
-            <h3 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(24px,2vw,32px)] font-semibold mb-2">Pushparaaj is Supportive Energizer</h3>
-            <p className="text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white leading-relaxed font-normal mb-6">
-                <span className="font-semibold text-black dark:text-white opacity-90">Description:</span> A warm, empathetic individual who thrives on fostering harmony and collaboration. Your focus on relationships and positivity makes you an invaluable team player and connector.
-            </p>
-
-            <div className="space-y-6">
-                <div>
-                    <h4 className="text-[clamp(16px,1.3vw,19px)] font-semibold text-[#19211C] dark:text-white mb-2">Key Behaviors:</h4>
-                    <ul className="list-disc pl-5 space-y-1.5 text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white font-normal">
-                        <li>Builds meaningful relationships and fosters trust within teams.</li>
-                        <li>Creates a collaborative environment where everyone feels valued.</li>
-                        <li>Acts as a calming presence in high-stress situations.</li>
-                        <li>Thrives in people-focused roles that require empathy and engagement.</li>
-                        <li>Encourages creativity and collaboration to achieve goals.</li>
-                        <li>Supports team members in their growth and development.</li>
-                        <li>Balances optimism with practicality in decision-making.</li>
-                        <li>Commits to long-term success and loyalty within organizations.</li>
-                    </ul>
-                </div>
-
-                <div>
-                    <h4 className="text-[clamp(16px,1.3vw,19px)] font-semibold text-[#19211C] dark:text-white mb-2">Typical Scenarios:</h4>
-                    <ul className="list-disc pl-5 space-y-1.5 text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white font-normal">
-                        <li>Coordinating a team-building initiative to boost morale.</li>
-                        <li>Leading a customer success program to improve retention rates.</li>
-                        <li>Acting as a mentor to help colleagues achieve their potential.</li>
-                        <li>Supporting recruitment efforts by creating a welcoming candidate experience.</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
-);
+    );
+};
 
 
 const CorporateDashboard: React.FC = () => {
     const router = useRouter();
     const [stats, setStats] = useState<DashboardStats | null>(null);
+    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [showResult, setShowResult] = useState(false);
+    const [reportData, setReportData] = useState<ReportData | null>(null);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const [searchError, setSearchError] = useState<string | null>(null);
     const [isBuyCreditsOpen, setIsBuyCreditsOpen] = useState(false);
 
     // Toast State
@@ -607,37 +800,80 @@ const CorporateDashboard: React.FC = () => {
         setToasts(prev => prev.filter(t => t.id !== id));
     };
 
-    // Mock Participants Data
-    const participants: Participant[] = [
-        { id: '1', name: 'Monishwar Rajasekaran (M)', programType: 'School Student', status: true, registerDate: '10 May 2024', mobile: '9585743154' },
-        { id: '2', name: 'Harishwar Rajasekaran (M)', programType: 'School Student', status: true, registerDate: '10 May 2024', mobile: '9080706050' },
-        { id: '3', name: 'SaiKiran Rajasekaran (M)', programType: 'School Student', status: true, registerDate: '10 May 2024', mobile: '8056233554' },
-        { id: '4', name: 'Monishwar Rajasekaran (M)', programType: 'School Student', status: true, registerDate: '11 May 2024', mobile: '9585743154' },
-        { id: '5', name: 'Harishwar Rajasekaran (M)', programType: 'School Student', status: true, registerDate: '12 May 2024', mobile: '9585743154' },
-    ];
+    // Filter states
+    const [dateRangeLabel, setDateRangeLabel] = useState<string>("All");
+    const [startDate, setStartDate] = useState<Date | null>(null);
+    const [endDate, setEndDate] = useState<Date | null>(null);
+
+    const fetchDashboardStats = async (start: Date | null = null, end: Date | null = null) => {
+        const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
+        if (!email) return;
+
+        setLoading(true);
+        try {
+            const formatDate = (d: Date | null) => {
+                if (!d) return undefined;
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${dd}`;
+            };
+
+            const data = await corporateDashboardService.getStats(
+                email,
+                formatDate(start),
+                formatDate(end)
+            );
+            setStats(data);
+        } catch (error) {
+            console.error("Error fetching dashboard stats:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
 
     useEffect(() => {
-        // Keeps the existing fetching logic specifically for credits/stats
-        const fetchStats = async () => {
-            const email = sessionStorage.getItem("userEmail");
-            const token = sessionStorage.getItem("accessToken");
-            if (email && token) {
-                try {
-                    const res = await fetch(`${API_URL}/dashboard/stats?email=${email}`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    if (res.ok) setStats(await res.json());
-                } catch (e) { console.error(e); }
-            }
-        };
-        fetchStats();
+        fetchDashboardStats(startDate, endDate);
     }, []);
 
-    const handleSearch = () => {
-        if (searchQuery.trim()) {
-            setShowResult(true);
-        } else {
+    // Real participants from API
+    const participants: Participant[] = stats?.recentParticipants ?? [];
+
+    const handleSearch = async () => {
+        const query = searchQuery.trim();
+        if (!query) {
             setShowResult(false);
+            setReportData(null);
+            setSearchError(null);
+            return;
+        }
+
+        const email = sessionStorage.getItem("userEmail");
+        if (!email) {
+            setSearchError("Please log in to search reports.");
+            return;
+        }
+
+        setSearchLoading(true);
+        setSearchError(null);
+        setShowResult(false);
+        setReportData(null);
+
+        try {
+            const result = await corporateDashboardService.searchByReportNumber(email, query);
+            if (result) {
+                setReportData(result);
+                setShowResult(true);
+            } else {
+                setSearchError(`No report found for ID: ${query}`);
+            }
+        } catch (err: any) {
+            console.error('Search failed:', err);
+            setSearchError(err.message || `No report found for ID: ${query}`);
+        } finally {
+            setSearchLoading(false);
         }
     };
 
@@ -658,18 +894,23 @@ const CorporateDashboard: React.FC = () => {
                 strategy="lazyOnload"
             />
             <div className="flex flex-col xl:flex-row justify-between items-start mb-10 gap-6">
-                <div>
-                    <div className="text-[clamp(12px,0.73vw,14px)] text-[#19211C] dark:text-white font-normal mb-1">Welcome Back!!</div>
-                    <h1 className="text-[clamp(28px,2.3vw,44px)] font-semibold text-[#150089] dark:text-white mb-2 leading-tight">{companyName}</h1>
-                    <p className="text-[clamp(16px,1.05vw,20px)] text-[#19211C] dark:text-white font-medium">Here's a quick overview of your activity</p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full">
+                    <div>
+                        <div className="text-[clamp(12px,0.73vw,14px)] text-[#19211C] dark:text-white font-normal mb-1 flex items-center gap-2">
+                            Welcome Back!!
+                            {loading && <span className="text-[10px] text-[#1ED36A] animate-pulse">(Updating...)</span>}
+                        </div>
+                        <h1 className="text-[clamp(28px,2.3vw,44px)] font-semibold text-[#150089] dark:text-white mb-2 leading-tight">{companyName}</h1>
+                        <p className="text-[clamp(16px,1.05vw,20px)] text-[#19211C] dark:text-white font-medium">Here's a quick overview of your activity</p>
+                    </div>
                 </div>
 
                 {/* Header Stats */}
                 <div className="flex flex-wrap sm:flex-nowrap w-full xl:w-auto xl:mt-6">
-                    <MiniStat label="Active Jobs" value="100" trend="12%" isPositive={true} />
-                    <MiniStat label="New Applicants" value="25" trend="12%" isPositive={false} />
-                    <MiniStat label="Assessments Assigned" value="25" trend="12%" isPositive={true} />
-                    <MiniStat label="Assessments Completed" value="18" trend="12%" isPositive={true} />
+                    <MiniStat label="Total Registered" value={String(stats?.miniStats?.totalRegistrations ?? 0)} trend={`${Math.abs(stats?.miniStats?.registrationsTrend ?? 0)}%`} isPositive={(stats?.miniStats?.registrationsTrend ?? 0) >= 0} />
+                    <MiniStat label="New This Month" value={String(stats?.miniStats?.newRegistrationsThisMonth ?? 0)} trend={`${Math.abs(stats?.miniStats?.registrationsTrend ?? 0)}%`} isPositive={(stats?.miniStats?.registrationsTrend ?? 0) >= 0} />
+                    <MiniStat label="Assessments Assigned" value={String(stats?.miniStats?.assessmentsAssigned ?? 0)} trend={`${Math.abs(stats?.miniStats?.assessmentsAssignedTrend ?? 0)}%`} isPositive={(stats?.miniStats?.assessmentsAssignedTrend ?? 0) >= 0} />
+                    <MiniStat label="Assessments Completed" value={String(stats?.miniStats?.assessmentsCompleted ?? 0)} trend={`${Math.abs(stats?.miniStats?.assessmentsCompletedTrend ?? 0)}%`} isPositive={(stats?.miniStats?.assessmentsCompletedTrend ?? 0) >= 0} />
                 </div>
             </div>
 
@@ -682,20 +923,33 @@ const CorporateDashboard: React.FC = () => {
                     />
                 </div>
                 <div className="lg:col-span-5 relative z-20">
-                    <AssessmentBarChart />
+                    <AssessmentBarChart insights={stats?.assessmentInsights ?? []} />
                 </div>
                 <div className="lg:col-span-4 relative z-10">
-                    <RecruitmentOverview />
+                    <RecruitmentOverview
+                        pipeline={stats?.pipelineOverview ?? { totalRegistered: 0, assessmentsAssigned: 0, assessmentsInProgress: 0, assessmentsCompleted: 0 }}
+                        selectedRange={dateRangeLabel}
+                        onDateChange={(start, end, label) => {
+                            setDateRangeLabel(label);
+                            setStartDate(start);
+                            setEndDate(end);
+                            fetchDashboardStats(start, end);
+                        }}
+                    />
                 </div>
             </div>
 
             {/* 3. Middle Grid: Personality, Participants */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
                 <div className="lg:col-span-4">
-                    <PersonalityDistribution />
+                    <PersonalityDistribution data={stats?.personalityDistribution ?? { totalWithTraits: 0, topTraits: [] }} />
                 </div>
                 <div className="lg:col-span-8">
-                    <ParticipantsTable participants={participants} />
+                    <ParticipantsTable
+                        participants={participants}
+                        onViewAll={() => router.push('/corporate/registrations')}
+                        onView={(id) => router.push(`/corporate/registrations?id=${id}`)}
+                    />
                 </div>
             </div>
 
@@ -737,8 +991,36 @@ const CorporateDashboard: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Profile Result Card (Only shows after search) */}
-                    {showResult && <ProfileResult />}
+                    {/* Loading State */}
+                    {searchLoading && (
+                        <div className="mt-8 pt-8 text-center">
+                            <div className="inline-flex items-center gap-3 text-[#19211C] dark:text-white">
+                                <svg className="animate-spin h-6 w-6 text-[#1ED36A]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span className="text-[clamp(14px,1vw,16px)] font-medium">Searching for report...</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Error State */}
+                    {searchError && !searchLoading && (
+                        <div className="mt-8 pt-8 text-center">
+                            <div className="inline-flex flex-col items-center gap-2">
+                                <div className="w-16 h-16 rounded-full bg-red-50 dark:bg-red-500/10 flex items-center justify-center mb-2">
+                                    <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <span className="text-[clamp(14px,1vw,16px)] font-medium text-red-400">{searchError}</span>
+                                <span className="text-[clamp(12px,0.8vw,14px)] text-[#19211C] dark:text-white opacity-60">Please check the Origin BI ID and try again</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Profile Result Card (Only shows after successful search) */}
+                    {showResult && reportData && <ProfileResult data={reportData} />}
                 </div>
             </div>
 
@@ -826,6 +1108,15 @@ const CorporateDashboard: React.FC = () => {
             />
 
             <ToastContainer toasts={toasts} removeToast={removeToast} />
+
+            {loading && !stats && (
+                <div className="fixed inset-0 bg-white/50 dark:bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-4 p-8 rounded-3xl bg-white dark:bg-[#19211C] shadow-2xl border border-gray-100 dark:border-white/10">
+                        <div className="w-12 h-12 border-4 border-[#1ED36A] border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-sm font-semibold text-[#19211C] dark:text-white">Loading data...</span>
+                    </div>
+                </div>
+            )}
         </div >
     );
 };

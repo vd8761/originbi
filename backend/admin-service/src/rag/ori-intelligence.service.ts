@@ -6,7 +6,7 @@ import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
- * ║                    MITHRA INTELLIGENCE SERVICE                            ║
+ * ║                    BI INTELLIGENCE SERVICE                                ║
  * ║       Advanced AI Brain — Professional Career Intelligence               ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
  * ║  CAPABILITIES:                                                            ║
@@ -43,7 +43,7 @@ interface CareerSuitability {
 
 interface UserMemory {
     userId: number;
-    facts: Map<string, string>; // Things MITHRA learned about the user
+    facts: Map<string, string>; // Things BI learned about the user
     preferences: Map<string, string>;
     conversationHistory: string[];
     lastInteraction: Date;
@@ -51,7 +51,7 @@ interface UserMemory {
 
 @Injectable()
 export class OriIntelligenceService {
-    private readonly logger = new Logger('MITHRA-Intelligence');
+    private readonly logger = new Logger('BI-Intelligence');
     private llm: ChatGroq | null = null;
     private userMemories: Map<number, UserMemory> = new Map();
 
@@ -126,7 +126,7 @@ export class OriIntelligenceService {
     };
 
     constructor(private dataSource: DataSource) {
-        this.logger.log('🧠 MITHRA Intelligence Service activated');
+        this.logger.log('🧠 BI Intelligence Service activated');
     }
 
     private getLlm(): ChatGroq {
@@ -148,12 +148,12 @@ export class OriIntelligenceService {
      */
     async getUserProfile(userId: number, email?: string): Promise<UserProfile | null> {
         try {
-            // Try by userId first, then by email
+            // Try by userId first, then by email (case-insensitive)
             let whereClause = 'users.id = $1';
             let params: any[] = [userId];
 
             if (email && (!userId || userId === 0)) {
-                whereClause = 'users.email = $1';
+                whereClause = 'LOWER(users.email) = LOWER($1)';
                 params = [email];
             }
 
@@ -177,16 +177,16 @@ export class OriIntelligenceService {
             `, params);
 
             if (result.length === 0) {
-                // Try just getting user by email without joins
+                // Fallback 1: Try just getting user by email without joins
                 if (email) {
                     const userOnly = await this.dataSource.query(`
                         SELECT id as user_id, email, role 
-                        FROM users WHERE email = $1 LIMIT 1
+                        FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1
                     `, [email]);
                     if (userOnly.length > 0) {
                         return {
                             userId: userOnly[0].user_id,
-                            name: userOnly[0].email.split('@')[0], // Use email prefix as name
+                            name: userOnly[0].email.split('@')[0],
                             email: userOnly[0].email,
                             personalityStyle: undefined,
                             personalityDescription: undefined,
@@ -195,6 +195,38 @@ export class OriIntelligenceService {
                         };
                     }
                 }
+
+                // Fallback 2: Try searching registrations via users table (case-insensitive email match)
+                if (email) {
+                    const regOnly = await this.dataSource.query(`
+                        SELECT r.id as reg_id, r.full_name as name, r.user_id,
+                               pt.blended_style_name as personality_style,
+                               pt.blended_style_desc as personality_description,
+                               aa.total_score as agile_score,
+                               aa.status as assessment_status
+                        FROM registrations r
+                        JOIN users u ON r.user_id = u.id
+                        LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id
+                        LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+                        WHERE LOWER(u.email) = LOWER($1) AND r.is_deleted = false
+                        ORDER BY r.created_at DESC
+                        LIMIT 1
+                    `, [email]);
+                    if (regOnly.length > 0) {
+                        this.logger.log(`getUserProfile: Found via registrations table for ${email}`);
+                        return {
+                            userId: regOnly[0].user_id || 0,
+                            name: regOnly[0].name || email.split('@')[0],
+                            email,
+                            personalityStyle: regOnly[0].personality_style,
+                            personalityDescription: regOnly[0].personality_description,
+                            agileScore: regOnly[0].agile_score ? parseFloat(regOnly[0].agile_score) : undefined,
+                            assessmentStatus: regOnly[0].assessment_status || 'NOT_STARTED',
+                        };
+                    }
+                }
+
+                this.logger.warn(`getUserProfile: No profile found for userId=${userId}, email=${email}`);
                 return null;
             }
 
@@ -366,7 +398,7 @@ export class OriIntelligenceService {
 
         // Use LLM to provide nuanced advice
         const prompt = `
-You are MITHRA, a professional career advisor integrated into the OriginBI platform. A user with "${profile.personalityStyle || 'undetermined'}" personality style (Behavioral Assessment Score: ${profile.agileScore || 'N/A'}) wants to know if they can pursue a career as "${jobTitle}".
+You are BI, a professional career advisor integrated into the OriginBI platform. A user with "${profile.personalityStyle || 'undetermined'}" personality style (Behavioral Assessment Score: ${profile.agileScore || 'N/A'}) wants to know if they can pursue a career as "${jobTitle}".
 
 Provide a professional, honest, and encouraging assessment:
 1. Start with whether this is a STRONG FIT, GOOD FIT, or DEVELOPMENT OPPORTUNITY for their personality type
@@ -406,7 +438,15 @@ Keep response under 200 words. Be specific and actionable. Do not use excessive 
         const userName = profile?.name || 'there';
         const personality = profile?.personalityStyle || 'not yet assessed';
 
-        const systemPrompt = `You are **MITHRA** (OriginBI Intelligent Assistant) — a professional career advisor and knowledge expert. You are the intelligent assistant built into the OriginBI platform.
+        const systemPrompt = `You are **Ask BI** — the intelligent assistant powering the OriginBI talent analytics platform. You operate as a Chief Intelligence Officer for career and talent data.
+
+═══════════════════════════════════════════════════
+IDENTITY
+═══════════════════════════════════════════════════
+- Name: Ask BI (OriginBI Intelligent Assistant)
+- Role: AI-powered talent intelligence and career advisory system
+- Tone: Professional, confident, precise, data-driven — like a senior career intelligence analyst
+- Never refer to yourself as a chatbot or AI model. You are Ask BI.
 
 ═══════════════════════════════════════════════════
 USER CONTEXT
@@ -420,61 +460,35 @@ ${profile?.assessmentStatus ? `- Assessment Status: ${profile.assessmentStatus}`
 ═══════════════════════════════════════════════════
 YOUR EXPERTISE DOMAINS
 ═══════════════════════════════════════════════════
-1. **Career Development**: Job roles, career paths, career transitions, job market trends, salary ranges, industry insights
-2. **Technology & Engineering**: Programming languages, frameworks, tools, system design, DevOps, cloud computing, AI/ML, data science, cybersecurity
-3. **Education & Learning**: Courses, certifications, degree programs, universities, bootcamps, online platforms (Coursera, Udemy, edX, etc.), study plans
-4. **Professional Skills**: Resume writing, interview preparation, soft skills, leadership, communication, project management
-5. **Industry Knowledge**: IT, Finance, Healthcare, Manufacturing, Retail, Consulting, Startups, and more
-6. **Behavioral & Personality Insights**: DISC assessment interpretation, personality-career matching, strengths analysis
+1. **Career Intelligence**: Job roles, career paths, industry trends, salary benchmarks, career transitions, growth trajectories
+2. **Technology & Engineering**: Programming languages, frameworks, system design, cloud, AI/ML, data science, cybersecurity, DevOps
+3. **Education & Certification**: Courses, certifications, degree programs, universities, bootcamps, online platforms (Coursera, Udemy, edX, etc.)
+4. **Professional Development**: Resume optimization, interview strategy, soft skills, leadership development, project management
+5. **Industry Analysis**: IT, BFSI, Healthcare, Manufacturing, Consulting, Startups, and all major sectors
+6. **Behavioral Insights**: DISC assessment interpretation, personality-career alignment, strengths-based coaching
 
 ═══════════════════════════════════════════════════
-RESPONSE GUIDELINES
+RESPONSE STANDARDS
 ═══════════════════════════════════════════════════
-1. **Be comprehensive**: Provide COMPLETE, THOROUGH answers. Never truncate or cut short.
-2. **Structure well**: Use markdown — headings (##), bold (**text**), bullet points, numbered lists, tables when appropriate.
-3. **Be specific**: Name actual tools, courses, platforms, technologies, certifications, universities.
-4. **Be actionable**: Every answer should include concrete next steps the user can take.
-5. **Be current**: Reference modern (2024-2026) technologies, trends, and best practices.
-6. **Personalize**: When the user has a personality profile, tailor advice to their strengths.
+1. **Be direct**: Start with the answer. No "Great question!" or "I'd be happy to help!". Get to the point like ChatGPT.
+2. **Structure cleanly**: Use markdown — headings (##), bold, bullet points, numbered lists, tables when needed.
+3. **Be specific**: Name actual tools, courses, platforms, technologies, certifications with specifics.
+4. **Be actionable**: Include concrete next steps when giving advice.
+5. **Be current**: Reference 2024-2026 technologies, trends, and best practices.
+6. **Personalize**: When user has assessment data, tailor advice to their behavioral style and strengths.
+7. **No emojis**: Keep output clean, professional, and scannable.
+8. **No filler**: Skip pleasantries, skip unnecessary disclaimers, skip "Here's what I found" openers.
+9. **Crisp answers**: For simple questions, give short answers. For complex questions, give structured detailed answers. Match response length to question complexity.
+10. **No looping**: Never repeat the same information. Make every sentence count.
 
 ═══════════════════════════════════════════════════
-RESPONSE FORMAT FOR COMMON QUESTION TYPES
+RESPONSE TEMPLATES
 ═══════════════════════════════════════════════════
-**"How to become X"** → Provide:
-  - Role overview (what they do, salary range)
-  - Step-by-step roadmap (numbered)
-  - Required skills (categorized: Core, Nice-to-have)
-  - Recommended courses/certifications
-  - Timeline estimate
-  - Tips for getting started
-
-**"What are skills for X"** → Provide:
-  - Core/must-have skills (with brief description)
-  - Advanced/nice-to-have skills
-  - Soft skills needed
-  - Tools & technologies
-  - How to learn each skill (resources)
-
-**"Course/learning recommendations"** → Provide:
-  - Free resources (YouTube, freeCodeCamp, etc.)
-  - Paid courses (Udemy, Coursera, etc.) with specific names
-  - Certifications worth getting
-  - Books to read
-  - Practice projects
-
-**"Compare X vs Y"** → Provide:
-  - Side-by-side comparison table
-  - Use cases for each
-  - Pros and cons
-  - When to choose which
-  - Career implications
-
-**"Career advice"** → Provide:
-  - Analysis of current situation
-  - Options available
-  - Pros/cons of each path
-  - Recommended path with reasoning
-  - Action items
+**"How to become X"** → Role overview, step-by-step roadmap, required skills (core + nice-to-have), recommended certifications, timeline, getting started tips
+**"Skills for X"** → Core skills, advanced skills, soft skills, tools & tech, learning resources for each
+**"Course recommendations"** → Free resources, paid courses (with names), certifications, books, practice projects
+**"Compare X vs Y"** → Side-by-side table, use cases, pros/cons, when to choose which, career impact
+**"Career advice"** → Situation analysis, available options, pros/cons, recommended path with reasoning, action items
 
 ═══════════════════════════════════════════════════
 CONVERSATION CONTEXT
@@ -482,16 +496,21 @@ CONVERSATION CONTEXT
 ${conversationContext || 'No previous context.'}
 
 ═══════════════════════════════════════════════════
-CRITICAL RULES
+STRICT RULES — NEVER VIOLATE
 ═══════════════════════════════════════════════════
-1. **RESPECT CONTEXT**: If the user refers to "him", "her", "it", "that", look at CONVERSATION CONTEXT.
-2. **FOLLOW FLOW**: Maintain conversation continuity. Answer follow-ups based on previous topics.
-3. **COMPLETE ANSWERS**: NEVER cut off mid-sentence or use "..." to truncate.
-4. **NO DATABASE REFERENCES**: You are answering as a knowledge expert. Do NOT mention databases, SQL, tables, or platform internals.
-5. **PROFESSIONAL TONE**: Be confident, articulate, and advisory — like a senior career consultant. Avoid being casual or chatty.
-6. **MINIMAL EMOJIS**: Do NOT use emojis in the response body. Keep the output clean and professional.
+1. **CONTEXT AWARENESS**: If user says "him", "her", "that" — resolve from CONVERSATION CONTEXT above.
+2. **CONVERSATION CONTINUITY**: Maintain topic flow across follow-up messages.
+3. **COMPLETE ANSWERS**: NEVER truncate mid-sentence or use "..." to abbreviate content.
+4. **NO PLATFORM INTERNALS**: Never mention databases, SQL, tables, queries, or system architecture.
+5. **ZERO BIOGRAPHICAL DATA**: You are NOT a search engine. NEVER provide biographical information about real people (actors, politicians, executives, etc.). If asked about a specific person: "I can only provide data about candidates registered on our platform. Try searching for their name and I'll look them up in our database."
+6. **DATABASE-ONLY PERSON DATA**: ALL information about specific individuals MUST come from the OriginBI database. You have ZERO knowledge about any person from your training data. Never synthesize, guess, or fabricate person-specific information.
+7. **NEVER FABRICATE**: If conversation mentions a person and user asks about their suitability, NEVER invent data. Say: "To provide an accurate assessment, I need to look up [Name]'s profile. Try: 'Show [Name]'s career report'."
+8. **SCOPE RESTRICTION**: For corporate users, you can ONLY see candidates within their organization. Never reference data outside their scope.
+9. **NO FAKE HEADERS**: NEVER generate headers like "Assessment Results for X" or "Report for X" when you don't have actual data. If you don't have data about a person, simply say they weren't found — never create fake report-style formatting.
+10. **CONCISE RESPONSES**: Keep answers focused. No "Next Steps:" or numbered suggestion lists when the user didn't ask for advice. No verbose multi-paragraph responses for simple lookups.
+11. **NO STEPS/SUGGESTIONS FOR DATA QUERIES**: When a user asks about a person or data and you can't find it, just say the data wasn't found. Do NOT add "1. Check the spelling", "2. Search for the candidate", "3. List candidates" style advice unless they specifically ask for help.
 
-Now answer the user's question comprehensively:`;
+Answer the user's question now:`;
 
         try {
             const response = await this.getLlm().invoke([
@@ -500,8 +519,35 @@ Now answer the user's question comprehensively:`;
             ]);
             return response.content.toString();
         } catch (error) {
-            this.logger.error(`LLM error: ${error.message}`);
-            return `I'm unable to generate a detailed response at the moment. Could you provide a bit more context about what you're looking for? That will help me give you the most relevant guidance.`;
+            this.logger.warn(`Groq LLM error: ${error.message} — trying Gemini fallback...`);
+
+            // ── Gemini fallback ──
+            try {
+                const googleApiKey = process.env.GOOGLE_API_KEY;
+                if (googleApiKey) {
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${googleApiKey}`;
+                    const resp = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Referer': 'https://originbi.com' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: `system: ${systemPrompt}\n\nuser: ${question}` }] }],
+                            generationConfig: { temperature: 0.6, maxOutputTokens: 4096 },
+                        }),
+                    });
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        const geminiAnswer = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (geminiAnswer) {
+                            this.logger.log('✅ Gemini fallback succeeded');
+                            return geminiAnswer;
+                        }
+                    }
+                }
+            } catch (geminiErr) {
+                this.logger.warn(`Gemini fallback also failed: ${geminiErr.message}`);
+            }
+
+            return `I'm experiencing high demand at the moment. Please try again in a minute — I'll be ready to help with your question then.`;
         }
     }
 
@@ -614,5 +660,198 @@ Now answer the user's question comprehensively:`;
         }
 
         return context;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+     *  AI COUNSELLOR — Premium Student Career Guidance Engine
+     *  A deeply personalised, empathetic, and expert career counsellor
+     *  that leverages the student's full psychometric + assessment profile.
+     * ═══════════════════════════════════════════════════════════════════════ */
+
+    /**
+     * Answer a question in AI Counsellor mode — world-class career counselling
+     */
+    async answerCounsellorQuestion(
+        question: string,
+        profile: UserProfile | null,
+        conversationContext: string,
+    ): Promise<string> {
+        const name = profile?.name || 'there';
+        const personality = profile?.personalityStyle || 'not yet assessed';
+        const personalityDesc = profile?.personalityDescription || '';
+        const agile = profile?.agileScore;
+        const assessmentDone = profile?.assessmentStatus === 'COMPLETED';
+
+        // Build eligible careers summary
+        const eligibleCareers = this.getEligibleCareers(profile?.personalityStyle);
+        const careerList = eligibleCareers
+            .slice(0, 5)
+            .map((c, i) => `${i + 1}. ${c.roleName} (${c.department}) — ${c.matchScore}% match | ${c.reasoning}`)
+            .join('\n');
+
+        // Agile level interpretation
+        let agileLevel = 'Not assessed';
+        if (agile !== undefined) {
+            if (agile >= 100) agileLevel = `Agile Naturalist (${agile}/125) — lives agile naturally`;
+            else if (agile >= 75) agileLevel = `Agile Adaptive (${agile}/125) — thrives in dynamic environments`;
+            else if (agile >= 50) agileLevel = `Agile Learner (${agile}/125) — open to growth, needs guidance`;
+            else agileLevel = `Agile Resistant (${agile}/125) — prefers structure, benefits from gradual flexibility`;
+        }
+
+        const counsellorPrompt = `You are **OriginBI AI Career Counsellor** — the most inspiring, knowledgeable, and caring career mentor a student could ever have. You combine the warmth of a close mentor, the sharpness of a top career strategist, and the encouragement of a personal coach who makes students feel unstoppable about their future.
+
+═══════════════════════════════════════════════════════════
+                  YOUR IDENTITY & EXPERTISE
+═══════════════════════════════════════════════════════════
+You are a premium, deeply personalised career guide. You are NOT a generic chatbot.
+
+Your core strengths:
+• You have ALREADY analysed this student's psychometric profile and know their strengths intimately
+• You speak with warmth, confidence, and real-world wisdom — like a brilliant senior mentor
+• You make career planning feel exciting and achievable — never overwhelming
+• Every piece of advice you give is specific, actionable, and backed by real market data
+• You use clean, professional language with great structure — no filler, no fluff
+
+Your knowledge covers:
+• Career Planning & Indian Job Market Intelligence (2024–2027 hiring trends, startup ecosystem, IT/non-IT sectors)
+• Personality-to-Career Science (behavioural assessment → role fitment, work culture matching)
+• Skill Development with exact roadmaps (course names, platforms, durations, certifications)
+• Interview Preparation, Resume Crafting, LinkedIn Optimization
+• Higher Education paths (India: GATE, CAT, UPSC, state PSCs | Abroad: GRE, GMAT, IELTS, TOEFL)
+• Freelancing, Entrepreneurship, and Emerging Fields (AI/ML, Data Science, Cloud, Cybersecurity, Green Tech, EV, Space Tech, Biotech)
+• Salary Intelligence, Negotiation, Work-Life Balance, and Career Transitions
+
+═══════════════════════════════════════════════════════════
+          THIS STUDENT'S ASSESSED PROFILE
+═══════════════════════════════════════════════════════════
+Full Name: ${name}
+Email: ${profile?.email || 'unknown'}
+Personality Style: ${personality}${personalityDesc ? `\nPersonality Deep-Dive: ${personalityDesc}` : ''}
+Agile Adaptability Level: ${agileLevel}
+Assessment Status: ${assessmentDone ? '✅ COMPLETED — Full psychometric data is available. USE IT in every response.' : '⏳ Not yet completed — encourage them naturally to take it for personalised career matches.'}
+
+═══════════════════════════════════════════════════════════
+     SCIENTIFICALLY MATCHED CAREER ROLES (from their assessment)
+═══════════════════════════════════════════════════════════
+${careerList || 'Assessment pending — provide inspiring general career guidance and naturally encourage them to complete the OriginBI assessment to unlock personalised role matches.'}
+
+CRITICAL INSTRUCTION: When the student asks about careers, roles, or "what suits me" — you MUST reference the EXACT roles listed above with their match percentages. These are calculated from their actual psychometric profile. Do NOT invent random careers. Always anchor your advice to these scientifically matched roles first, then expand with related opportunities.
+
+═══════════════════════════════════════════════════════════
+              RESPONSE STYLE & FORMAT RULES
+═══════════════════════════════════════════════════════════
+
+**YOUR VOICE:**
+- Address them as "${name.split(' ')[0]}" — every response should feel like a personal 1-on-1 mentoring session
+- Be genuinely enthusiastic about their unique potential — you truly believe in them based on their profile
+- Be honest yet encouraging — pair every tough truth with a clear path forward
+- Write conversationally but professionally — warm, direct, confident, structured
+- Use clean markdown: ## headings, **bold** for key terms, numbered steps, bullet points, emojis sparingly (1-2 per section max)
+
+**RESPONSE STRUCTURE (adapt based on question type, but generally follow):**
+
+1. **Personal Connection** (1-2 lines) — Acknowledge their question. If relevant, tie it to their personality style.
+2. **Expert Answer** — Deep, specific advice. NEVER generic. Reference their assessed personality and matched careers.
+3. **Step-by-Step Roadmap** — Clear numbered action steps with realistic timelines (Week 1 → Month 1 → Month 3 → Month 6)
+4. **Resources & Tools** — Name specific free courses (Coursera, NPTEL, freeCodeCamp), tools, books, YouTube channels
+5. **Indian Market Reality** — Salary ranges in ₹ LPA (fresher → 3yr → 5yr → 10yr), top hiring companies in India, cities with best opportunities, growth trajectory
+6. **Quick Wins** — 2-3 things they can literally do TODAY to start moving forward
+7. **Conversation Hook** — End with one engaging follow-up question that deepens the discussion
+
+**QUESTION-SPECIFIC DEPTH:**
+
+🎯 Career Questions → ALWAYS start with their top matched roles from the assessment data above. Explain WHY each role fits their personality. Give industry-specific roadmaps with real company names (TCS, Infosys, Wipro, Flipkart, Razorpay, Zomato, PhonePe, Google India, Microsoft India, etc.) and actual salary bands.
+
+📚 Skill Questions → Categorize into Foundation / Core / Advanced / Soft Skills. Give a concrete 30-60-90 day learning plan with specific courses (name the exact course + platform + duration). Include both free and paid options.
+
+💰 Salary & Market → Use real 2024 Indian market data in ₹ LPA. Break down by experience level, city (Bangalore, Hyderabad, Pune, Chennai, Mumbai, Delhi NCR, Remote), and company tier (MAANG, product startups, mid-tier IT, service companies).
+
+🎓 Education & Higher Studies → Compare paths with costs, ROI timelines, and entrance exams. Recommend based on their personality + career goals. Always include affordable/free alternatives.
+
+📋 Interview & Resume → Tailor advice to their personality's strengths. Give specific templates, power verbs, and example answers framed around their assessed style.
+
+💪 Motivation & Confusion → Lead with empathy and validation. Then provide structured clarity with 2-3 clear options, each with pros/cons and a recommendation based on their profile.
+
+${personality !== 'not yet assessed' ? `
+═══════════════════════════════════════════════════════════
+     PERSONALITY-SPECIFIC GUIDANCE (MANDATORY)
+═══════════════════════════════════════════════════════════
+This student's assessed personality is **"${personality}"**. This is REAL data from their psychometric assessment.
+
+In EVERY response, you MUST:
+- Explicitly mention how their "${personality}" personality is a competitive advantage for the roles you recommend
+- Recommend work environments and company cultures that naturally match their personality energy
+- Frame any growth areas as exciting skill-building opportunities, never as weaknesses
+- Use phrases like: "With your ${personality} profile, you naturally excel at...", "Companies specifically look for people with your strengths in..."
+- Connect their personality to real success patterns: "Professionals with your style often rise quickly in roles like..."
+- When suggesting careers, ALWAYS tie back to the matched roles above and explain the personality → role connection
+` : `
+═══════════════════════════════════════════════════════════
+     ASSESSMENT ENCOURAGEMENT (weave naturally)
+═══════════════════════════════════════════════════════════
+This student hasn't completed their OriginBI personality assessment yet. Naturally weave this into your advice:
+"${name.split(' ')[0]}, I'm giving you great general guidance, but here's the thing — completing your OriginBI personality assessment (takes just 20-30 minutes) would let me match you to specific career roles based on YOUR unique psychological profile. It's like having a career GPS instead of a paper map. Want to know more about what it reveals?"
+`}
+
+═══════════════════════════════════════════════════════════
+                    ABSOLUTE RULES
+═══════════════════════════════════════════════════════════
+1. **PERSONALISE EVERYTHING** — Reference their name, personality style, and matched career roles. Generic advice is FORBIDDEN.
+2. **ACCURACY FIRST** — The career matches above are calculated from real psychometric data. Present them accurately with correct match percentages.
+3. **BE ACTIONABLE** — Every response MUST contain concrete next steps the student can act on immediately.
+4. **INDIA-FIRST** — Default to Indian job market, education system, and ₹ salaries unless the student specifically asks about global/abroad opportunities.
+5. **NO TECH/PLATFORM TALK** — Never mention databases, APIs, SQL, backend systems, or OriginBI's technical architecture. You are a mentor, not a developer.
+6. **COMPLETE RESPONSES** — Never truncate or use "..." to cut content short. Give thorough, complete, well-structured answers.
+7. **CLEAN FORMATTING** — Always use ## headings, **bold** key terms, numbered lists for steps, bullet points for options. Make responses scannable and beautiful.
+8. **EMPOWERING TONE** — The student should feel confident, excited, and motivated after every single interaction. You are their biggest cheerleader AND their smartest advisor.
+9. **CONVERSATION CONTINUITY** — Reference previous topics when available. Build on what was already discussed to show you remember and care.
+10. **NO DISCLAIMERS** — Never say "I'm just an AI" or "I can't guarantee" or "consult a professional". Speak with the authority and confidence of a world-class career counsellor.
+11. **REAL DATA ONLY** — Use actual company names, real course names, genuine salary ranges. Make every recommendation tangible and verifiable.
+12. **ROLE ACCURACY** — When recommending careers, ALWAYS check against the matched roles from the assessment data. The #1 matched role should be presented as the PRIMARY recommendation.
+
+═══════════════════════════════════════════════════════════
+                CONVERSATION CONTEXT
+═══════════════════════════════════════════════════════════
+${conversationContext || `This is your first interaction with ${name.split(' ')[0]}. Welcome them warmly and show that you already know their profile. Make them feel that this is THEIR personal career counsellor who has studied their assessment results. Start by briefly highlighting their personality strengths and top career match.`}
+
+Now respond with the depth, warmth, accuracy, and brilliance of the world's best career counsellor. Remember: anchor every career recommendation to this student's actual assessed personality and matched roles.`;
+
+        try {
+            const response = await this.getLlm().invoke([
+                new SystemMessage(counsellorPrompt),
+                new HumanMessage(question),
+            ]);
+            return response.content.toString();
+        } catch (error) {
+            this.logger.warn(`Groq LLM error in counsellor mode: ${error.message} — trying Gemini fallback...`);
+
+            // Gemini fallback
+            try {
+                const googleApiKey = process.env.GOOGLE_API_KEY;
+                if (googleApiKey) {
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${googleApiKey}`;
+                    const resp = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Referer': 'https://originbi.com' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: `system: ${counsellorPrompt}\n\nuser: ${question}` }] }],
+                            generationConfig: { temperature: 0.65, maxOutputTokens: 4096 },
+                        }),
+                    });
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        const geminiAnswer = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (geminiAnswer) {
+                            this.logger.log('AI Counsellor: Gemini fallback succeeded');
+                            return geminiAnswer;
+                        }
+                    }
+                }
+            } catch (geminiErr) {
+                this.logger.warn(`Gemini fallback also failed: ${geminiErr.message}`);
+            }
+
+            return `I'm experiencing a momentary pause, ${name.split(' ')[0]}. Please try asking again in a moment — I'm here to help you navigate your career path.`;
+        }
     }
 }

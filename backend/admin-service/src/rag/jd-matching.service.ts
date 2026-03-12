@@ -210,6 +210,44 @@ const PERSONALITY_VECTORS: Record<string, {
     leadership: 90, creativity: 85, analytical: 80, teamwork: 65,
     independence: 88, adaptability: 80, communication: 85, empathy: 60,
   },
+
+  // ── Additional styles from DB (DISC code-based) ──
+
+  'Energetic Visionary': {
+    // DISC: ID — High Influence + High Dominance
+    // "Charismatic and bold leader focused on achieving goals while engaging and inspiring others"
+    dominance: 78, influence: 92, steadiness: 38, compliance: 35,
+    leadership: 82, creativity: 80, analytical: 48, teamwork: 75,
+    independence: 80, adaptability: 85, communication: 92, empathy: 65,
+  },
+  'Collaborative Optimist': {
+    // DISC: SI — High Steadiness + High Influence
+    // "Friendly and supportive, builds strong relationships, prioritizes harmony and teamwork"
+    dominance: 30, influence: 82, steadiness: 90, compliance: 38,
+    leadership: 45, creativity: 55, analytical: 38, teamwork: 95,
+    independence: 30, adaptability: 65, communication: 82, empathy: 92,
+  },
+  'Dependable Specialist': {
+    // DISC: SC — High Steadiness + High Compliance
+    // "Systematic, detail-oriented, excels in structured environments, precision and reliability"
+    dominance: 35, influence: 30, steadiness: 88, compliance: 92,
+    leadership: 40, creativity: 28, analytical: 82, teamwork: 65,
+    independence: 72, adaptability: 32, communication: 42, empathy: 55,
+  },
+  'Logical Innovator': {
+    // DISC: CI — High Compliance + High Influence
+    // "Creative and structured, balances analytical thinking with engaging communication"
+    dominance: 48, influence: 72, steadiness: 42, compliance: 88,
+    leadership: 55, creativity: 78, analytical: 90, teamwork: 60,
+    independence: 75, adaptability: 65, communication: 78, empathy: 55,
+  },
+  'Structured Supporter': {
+    // DISC: CS — High Compliance + High Steadiness
+    // "Systematic, reliable, values harmony, consistency, and accuracy"
+    dominance: 28, influence: 32, steadiness: 85, compliance: 92,
+    leadership: 35, creativity: 28, analytical: 85, teamwork: 72,
+    independence: 65, adaptability: 32, communication: 48, empathy: 65,
+  },
 };
 
 // Default vector for unknown personality styles
@@ -525,6 +563,19 @@ RULES:
       paramIdx++;
     }
 
+    // Check if sincerity columns exist (some DB instances may not have them)
+    let hasSincerityCols = true;
+    try {
+      const colCheck = await this.dataSource.query(
+        `SELECT column_name FROM information_schema.columns WHERE table_name = 'assessment_attempts' AND column_name = 'sincerity_class'`
+      );
+      hasSincerityCols = colCheck.length > 0;
+    } catch { hasSincerityCols = false; }
+
+    const sincerityFields = hasSincerityCols
+      ? 'aa.sincerity_index, aa.sincerity_class,'
+      : 'NULL::numeric as sincerity_index, NULL::varchar as sincerity_class,';
+
     const sql = `
       SELECT 
         r.id as registration_id,
@@ -538,8 +589,7 @@ RULES:
         pt.blended_style_desc as personality_description,
         pt.code as personality_code,
         aa.total_score,
-        aa.sincerity_index,
-        aa.sincerity_class,
+        ${sincerityFields}
         aa.status as assessment_status,
         (SELECT MAX(aa2.total_score::numeric) FROM assessment_attempts aa2 WHERE aa2.registration_id = r.id AND aa2.status = 'COMPLETED') as best_score,
         (SELECT COUNT(*) FROM assessment_attempts aa3 WHERE aa3.registration_id = r.id AND aa3.status = 'COMPLETED') as attempt_count
@@ -682,12 +732,52 @@ RULES:
     // Exact match first
     if (PERSONALITY_VECTORS[styleName]) return { ...PERSONALITY_VECTORS[styleName] };
 
-    // Fuzzy match
+    // Fuzzy match: check if any known style name is contained in the candidate's style or vice versa
     const key = Object.keys(PERSONALITY_VECTORS).find(
       k => styleName.toLowerCase().includes(k.toLowerCase()) ||
         k.toLowerCase().includes(styleName.toLowerCase())
     );
-    return key ? { ...PERSONALITY_VECTORS[key] } : { ...DEFAULT_VECTOR };
+    if (key) return { ...PERSONALITY_VECTORS[key] };
+
+    // Keyword-based fallback: map individual words to closest known style
+    const styleWords = styleName.toLowerCase();
+    const keywordMap: Record<string, string> = {
+      'charismatic': 'Charismatic Leader',
+      'strategic': 'Strategic Stabilizer',
+      'decisive': 'Decisive Analyst',
+      'energetic': 'Energetic Visionary',
+      'visionary': 'Energetic Visionary',
+      'supportive': 'Supportive Energizer',
+      'creative': 'Creative Thinker',
+      'collaborative': 'Collaborative Optimist',
+      'optimist': 'Collaborative Optimist',
+      'reliable': 'Reliable Executor',
+      'executor': 'Reliable Executor',
+      'dependable': 'Dependable Specialist',
+      'specialist': 'Dependable Specialist',
+      'analytical': 'Analytical Leader',
+      'logical': 'Logical Innovator',
+      'innovator': 'Logical Innovator',
+      'structured': 'Structured Supporter',
+      'methodical': 'Methodical Planner',
+      'planner': 'Methodical Planner',
+      'dynamic': 'Dynamic Achiever',
+      'achiever': 'Dynamic Achiever',
+      'influential': 'Influential Connector',
+      'connector': 'Influential Connector',
+      'steady': 'Steady Contributor',
+      'contributor': 'Steady Contributor',
+      'strategist': 'Visionary Strategist',
+    };
+
+    for (const [keyword, mappedStyle] of Object.entries(keywordMap)) {
+      if (styleWords.includes(keyword) && PERSONALITY_VECTORS[mappedStyle]) {
+        return { ...PERSONALITY_VECTORS[mappedStyle] };
+      }
+    }
+
+    this.logger.warn(`⚠️ Unknown personality style: "${styleName}" — using default vector`);
+    return { ...DEFAULT_VECTOR };
   }
 
   /**
@@ -1360,10 +1450,19 @@ Output ONLY a JSON array:
     let response = `🎯 **Candidate Matching Report**\n`;
     response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-    // ── Role Overview ──
-    response += `🏢 **Role:** ${req.roleTitle} *(${req.seniorityLevel} level)*\n`;
-    response += `📍 **Industry:** ${req.industryContext}\n`;
-    response += `👥 **Team:** ${req.teamDynamic.replace(/_/g, ' ')}\n\n`;
+    // ── Role Overview (only show known fields) ──
+    const isUnknown = (val: string) => !val || /^unknown$/i.test(val.trim());
+    if (!isUnknown(req.roleTitle)) {
+      const levelStr = !isUnknown(req.seniorityLevel) ? ` *(${req.seniorityLevel} level)*` : '';
+      response += `🏢 **Role:** ${req.roleTitle}${levelStr}\n`;
+    }
+    if (!isUnknown(req.industryContext)) {
+      response += `📍 **Industry:** ${req.industryContext}\n`;
+    }
+    if (!isUnknown(req.teamDynamic)) {
+      response += `👥 **Team:** ${req.teamDynamic.replace(/_/g, ' ')}\n`;
+    }
+    response += `\n`;
 
     // ── Core Competencies ──
     const competencies: string[] = [];

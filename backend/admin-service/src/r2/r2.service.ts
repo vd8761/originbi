@@ -103,20 +103,17 @@ export class R2Service {
     folderId: string,
     docType: 'pan' | 'aadhar',
   ): Promise<R2UploadResult[]> {
-    const results: R2UploadResult[] = [];
-
-    for (const file of files) {
-      const result = await this.uploadFile(
-        file.buffer,
-        folderId,
-        docType,
-        file.originalname,
-        file.mimetype,
-      );
-      results.push(result);
-    }
-
-    return results;
+    return Promise.all(
+      files.map((file) =>
+        this.uploadFile(
+          file.buffer,
+          folderId,
+          docType,
+          file.originalname,
+          file.mimetype,
+        ),
+      ),
+    );
   }
 
   /**

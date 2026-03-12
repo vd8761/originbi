@@ -142,7 +142,7 @@ export class CorporateDashboardService {
     return corporate.id;
   }
 
-  async getStats(email: string) {
+  async getStats(email: string, startDate?: string, endDate?: string) {
     const { ILike } = require('typeorm');
     const user = await this.userRepo.findOne({
       where: { email: ILike(email) },
@@ -167,17 +167,351 @@ export class CorporateDashboardService {
       throw new NotFoundException('Corporate account not found');
     }
 
-    // TODO: Fetch real student count once Student entity is available/linked
-    const studentsRegistered = 0;
+    const corpId = corporate.id;
+
+    // Run all dashboard queries in parallel for performance
+    const [
+      miniStatsResult,
+      assessmentInsightsResult,
+      pipelineResult,
+      personalityResult,
+      recentParticipantsResult,
+    ] = await Promise.all([
+      this.getMiniStats(corpId, startDate, endDate),
+      this.getAssessmentInsights(corpId, startDate, endDate),
+      this.getPipelineOverview(corpId, startDate, endDate),
+      this.getPersonalityDistribution(corpId, startDate, endDate),
+      this.getRecentParticipants(corpId),
+    ]);
 
     return {
       companyName: corporate.companyName,
       availableCredits: corporate.availableCredits,
       totalCredits: corporate.totalCredits,
-      studentsRegistered,
+      studentsRegistered: miniStatsResult.totalRegistrations,
       isActive: corporate.isActive,
       perCreditCost: this.perCreditCost,
+      miniStats: miniStatsResult,
+      assessmentInsights: assessmentInsightsResult,
+      pipelineOverview: pipelineResult,
+      personalityDistribution: personalityResult,
+      recentParticipants: recentParticipantsResult,
     };
+  }
+
+  // ========================================================================
+  // Dashboard Data Helpers
+  // ========================================================================
+
+  private async getMiniStats(
+    corpId: number,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<{
+    totalRegistrations: number;
+    newRegistrationsThisMonth: number;
+    assessmentsAssigned: number;
+    assessmentsCompleted: number;
+    registrationsTrend: number;
+    assessmentsAssignedTrend: number;
+    assessmentsCompletedTrend: number;
+  }> {
+    const now = new Date();
+
+    // Default ranges for trend calculation (current vs last month)
+    let currentStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    let prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    let prevEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+    // If user provided a specific filter (e.g. Feb 2026)
+    if (startDate && endDate) {
+      const filterStart = new Date(startDate);
+      const filterEnd = new Date(endDate);
+
+      // Use the filter as "current" for trend
+      currentStart = filterStart;
+
+      // Calculate "previous" period of same length
+      const diffTime = Math.abs(filterEnd.getTime() - filterStart.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      prevStart = new Date(filterStart);
+      prevStart.setDate(prevStart.getDate() - diffDays);
+      prevEnd = new Date(filterStart);
+      prevEnd.setDate(prevEnd.getDate() - 1);
+    }
+
+    const baseQuery = `corporate_account_id = $1 AND is_deleted = false`;
+    const dateQueryFromFilter =
+      startDate && endDate
+        ? ` AND created_at >= '${startDate} 00:00:00' AND created_at <= '${endDate} 23:59:59'`
+        : '';
+
+    const result = await this.dataSource.query(
+      `
+      SELECT
+        -- Main count (respects filter or shows all)
+        COUNT(r.id) AS total_registrations,
+        -- Count for "Current" period in trend
+        COUNT(r.id) FILTER (WHERE r.created_at >= $2) AS current_period_count,
+        -- Count for "Previous" period in trend
+        COUNT(r.id) FILTER (WHERE r.created_at >= $3 AND r.created_at <= $4) AS previous_period_count
+      FROM registrations r
+      WHERE ${baseQuery} ${dateQueryFromFilter}
+      `,
+      [
+        corpId,
+        currentStart.toISOString(),
+        prevStart.toISOString(),
+        prevEnd.toISOString(),
+      ],
+    );
+
+    const sessionDateQuery =
+      startDate && endDate
+        ? ` AND s.created_at >= '${startDate} 00:00:00' AND s.created_at <= '${endDate} 23:59:59'`
+        : '';
+
+    const sessionResult = await this.dataSource.query(
+      `
+      SELECT
+        -- Main stats (respects filter)
+        COUNT(s.id) AS total_assigned,
+        COUNT(s.id) FILTER (WHERE s.status = 'COMPLETED') AS total_completed,
+        -- Trend counts
+        COUNT(s.id) FILTER (WHERE s.created_at >= $2) AS assigned_current,
+        COUNT(s.id) FILTER (WHERE s.created_at >= $3 AND s.created_at <= $4) AS assigned_prev,
+        COUNT(s.id) FILTER (WHERE s.status = 'COMPLETED' AND s.completed_at >= $2) AS completed_current,
+        COUNT(s.id) FILTER (WHERE s.status = 'COMPLETED' AND s.completed_at >= $3 AND s.completed_at <= $4) AS completed_prev
+      FROM assessment_sessions s
+      JOIN registrations r ON s.registration_id = r.id
+      WHERE r.corporate_account_id = $1 AND r.is_deleted = false ${sessionDateQuery}
+      `,
+      [
+        corpId,
+        currentStart.toISOString(),
+        prevStart.toISOString(),
+        prevEnd.toISOString(),
+      ],
+    );
+
+    const reg = result[0] || {};
+    const sess = sessionResult[0] || {};
+
+    const calcTrend = (current: number, previous: number): number => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return Math.round(((current - previous) / previous) * 100);
+    };
+
+    return {
+      totalRegistrations: parseInt(
+        (reg.total_registrations as string) || '0',
+        10,
+      ),
+      newRegistrationsThisMonth: parseInt(
+        (reg.current_period_count as string) || '0',
+        10,
+      ),
+      assessmentsAssigned: parseInt((sess.total_assigned as string) || '0', 10),
+      assessmentsCompleted: parseInt(
+        (sess.total_completed as string) || '0',
+        10,
+      ),
+      registrationsTrend: calcTrend(
+        parseInt((reg.current_period_count as string) || '0', 10),
+        parseInt((reg.previous_period_count as string) || '0', 10),
+      ),
+      assessmentsAssignedTrend: calcTrend(
+        parseInt((sess.assigned_current as string) || '0', 10),
+        parseInt((sess.assigned_prev as string) || '0', 10),
+      ),
+      assessmentsCompletedTrend: calcTrend(
+        parseInt((sess.completed_current as string) || '0', 10),
+        parseInt((sess.completed_prev as string) || '0', 10),
+      ),
+    };
+  }
+
+  private async getAssessmentInsights(
+    corpId: number,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<any[]> {
+    let dateQuery = ` AND s.created_at >= NOW() - INTERVAL '5 months'`;
+
+    // If a month is filtered, show 6 months ending in that month
+    if (startDate && endDate) {
+      const end = new Date(endDate);
+      const startOfRange = new Date(end.getFullYear(), end.getMonth() - 5, 1);
+      dateQuery = ` AND s.created_at >= '${startOfRange.toISOString().split('T')[0]} 00:00:00' AND s.created_at <= '${endDate} 23:59:59'`;
+    }
+
+    const result = await this.dataSource.query(
+      `
+      SELECT
+        TO_CHAR(s.created_at, 'Mon') AS month,
+        EXTRACT(YEAR FROM s.created_at)::int AS year,
+        EXTRACT(MONTH FROM s.created_at)::int AS month_num,
+        COUNT(s.id) AS assigned,
+        COUNT(s.id) FILTER (WHERE s.status = 'COMPLETED') AS completed
+      FROM assessment_sessions s
+      JOIN registrations r ON s.registration_id = r.id
+      WHERE r.corporate_account_id = $1
+        AND r.is_deleted = false
+        ${dateQuery}
+      GROUP BY TO_CHAR(s.created_at, 'Mon'), EXTRACT(YEAR FROM s.created_at), EXTRACT(MONTH FROM s.created_at)
+      ORDER BY year, month_num
+      `,
+      [corpId],
+    );
+
+    return ((result || []) as any[]).map((row: any) => ({
+      month: row.month as string,
+      year: row.year as number,
+      assigned: parseInt((row.assigned as string) || '0', 10),
+      completed: parseInt((row.completed as string) || '0', 10),
+    }));
+  }
+
+  private async getPipelineOverview(
+    corpId: number,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<any> {
+    const dateQuery =
+      startDate && endDate
+        ? ` AND r.created_at >= '${startDate} 00:00:00' AND r.created_at <= '${endDate} 23:59:59'`
+        : '';
+
+    const result = await this.dataSource.query(
+      `
+      SELECT
+        COUNT(DISTINCT r.id) AS total_registered,
+        COUNT(s.id) AS assessments_assigned,
+        COUNT(s.id) FILTER (WHERE s.status = 'IN_PROGRESS') AS assessments_in_progress,
+        COUNT(s.id) FILTER (WHERE s.status = 'COMPLETED') AS assessments_completed
+      FROM registrations r
+      LEFT JOIN assessment_sessions s ON s.registration_id = r.id
+      WHERE r.corporate_account_id = $1 AND r.is_deleted = false ${dateQuery}
+      `,
+      [corpId],
+    );
+
+    const row = result[0] || {};
+    return {
+      totalRegistered: parseInt((row.total_registered as string) || '0', 10),
+      assessmentsAssigned: parseInt(
+        (row.assessments_assigned as string) || '0',
+        10,
+      ),
+      assessmentsInProgress: parseInt(
+        (row.assessments_in_progress as string) || '0',
+        10,
+      ),
+      assessmentsCompleted: parseInt(
+        (row.assessments_completed as string) || '0',
+        10,
+      ),
+    };
+  }
+
+  private async getPersonalityDistribution(
+    corpId: number,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<any> {
+    const dateQuery =
+      startDate && endDate
+        ? ` AND aa.created_at >= '${startDate} 00:00:00' AND aa.created_at <= '${endDate} 23:59:59'`
+        : '';
+
+    const result = await this.dataSource.query(
+      `
+      SELECT
+        pt.blended_style_name AS trait_name,
+        pt.color_rgb,
+        COUNT(aa.id) AS count
+      FROM assessment_attempts aa
+      JOIN registrations r ON aa.registration_id = r.id
+      JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+      WHERE r.corporate_account_id = $1
+        AND r.is_deleted = false
+        AND aa.dominant_trait_id IS NOT NULL
+        ${dateQuery}
+      GROUP BY pt.id, pt.blended_style_name, pt.color_rgb
+      ORDER BY count DESC
+      LIMIT 4
+      `,
+      [corpId],
+    );
+
+    // Get total count with traits
+    const totalResult = await this.dataSource.query(
+      `
+      SELECT COUNT(aa.id) AS total
+      FROM assessment_attempts aa
+      JOIN registrations r ON aa.registration_id = r.id
+      WHERE r.corporate_account_id = $1
+        AND r.is_deleted = false
+        AND aa.dominant_trait_id IS NOT NULL
+        ${dateQuery}
+      `,
+      [corpId],
+    );
+
+    return {
+      totalWithTraits: parseInt((totalResult[0]?.total as string) || '0', 10),
+      topTraits: (result || []).map((row: any) => ({
+        traitName: row.trait_name as string,
+        count: parseInt((row.count as string) || '0', 10),
+        colorRgb:
+          row.color_rgb &&
+            !row.color_rgb.startsWith('#') &&
+            !row.color_rgb.startsWith('rgb') &&
+            row.color_rgb.includes(',')
+            ? `rgb(${row.color_rgb})`
+            : (row.color_rgb as string) || '#1ED36A',
+      })),
+    };
+  }
+
+  private async getRecentParticipants(corpId: number): Promise<any[]> {
+    const result = await this.dataSource.query(
+      `
+      SELECT
+        r.id,
+        r.full_name AS name,
+        COALESCE(
+          p_direct.name,
+          (SELECT p_sess.name FROM assessment_sessions s JOIN programs p_sess ON s.program_id = p_sess.id WHERE s.registration_id = r.id ORDER BY s.created_at DESC LIMIT 1),
+          r.metadata->>'programType'
+        ) AS program_type,
+        r.status,
+        r.created_at AS register_date,
+        r.mobile_number AS mobile
+      FROM registrations r
+      LEFT JOIN programs p_direct ON r.program_id = p_direct.id
+      WHERE r.corporate_account_id = $1 AND r.is_deleted = false
+      ORDER BY r.created_at DESC
+      LIMIT 5
+      `,
+      [corpId],
+    );
+
+    return ((result || []) as any[]).map((row: any) => ({
+      id: String(row.id),
+      name: (row.name as string) || 'Unknown',
+      programType: (row.program_type as string) || 'N/A',
+      status: row.status === 'COMPLETED',
+      registerDate: row.register_date
+        ? new Date(row.register_date as string).toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        })
+        : 'N/A',
+      mobile: (row.mobile as string) || 'N/A',
+    }));
   }
 
   async initiateCorporateReset(email: string) {
@@ -1315,5 +1649,126 @@ export class CorporateDashboardService {
       selected_option: r.selectedOption.optionTextEn,
       selected_option_ta: r.selectedOption.optionTextTa,
     }));
+  }
+
+  // ========================================================================
+  // SEARCH BY REPORT NUMBER
+  // ========================================================================
+  async searchByReportNumber(reportNumber: string, corporateAccountId: number) {
+    const query = `
+      SELECT
+        ar.report_number,
+        ar.generated_at,
+        r.full_name,
+        r.mobile_number,
+        r.gender,
+        r.metadata as registration_metadata,
+        u.email,
+        pt.id as trait_id,
+        pt.code as trait_code,
+        pt.blended_style_name,
+        pt.blended_style_desc,
+        pt.color_rgb,
+        pt.metadata as trait_metadata,
+        aa.metadata as attempt_metadata,
+        aa.total_score,
+        aa.sincerity_index,
+        aa.sincerity_class,
+        aa.status as attempt_status,
+        aa.completed_at,
+        p.name as program_name,
+        p.assessment_title,
+        dpt.name as department_name,
+        dt.name as degree_type_name
+      FROM assessment_reports ar
+      JOIN assessment_attempts aa ON aa.assessment_session_id = ar.assessment_session_id
+      JOIN registrations r ON aa.registration_id = r.id
+      JOIN users u ON aa.user_id = u.id
+      LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+      LEFT JOIN programs p ON aa.program_id = p.id
+      LEFT JOIN department_degrees dd ON r.department_degree_id = dd.id
+      LEFT JOIN departments dpt ON dd.department_id = dpt.id
+      LEFT JOIN degree_types dt ON dd.degree_type_id = dt.id
+      WHERE ar.report_number = $1
+        AND r.corporate_account_id = $2
+      LIMIT 1
+    `;
+
+    const result = await this.dataSource.query(query, [
+      reportNumber,
+      corporateAccountId,
+    ]);
+
+    if (!result || result.length === 0) {
+      throw new NotFoundException(`Report not found for ID: ${reportNumber}`);
+    }
+
+    const row = result[0];
+
+    // Parse DISC scores from attempt metadata
+    const attemptMeta = row.attempt_metadata || {};
+    const discScores = attemptMeta.disc_scores || attemptMeta.discScores || {};
+
+    // Parse trait metadata for key strengths, role alignment, etc.
+    const traitMeta = row.trait_metadata || {};
+    const regMeta = row.registration_metadata || {};
+
+    // Build the trait name for image mapping (e.g., "Supportive Energizer" -> "Supportive_Energizer")
+    const traitName = (row.blended_style_name || '').trim();
+    const traitImageKey = traitName.replace(/\s+/g, '_');
+
+    return {
+      reportNumber: row.report_number,
+      generatedAt: row.generated_at,
+      candidateName: row.full_name,
+      email: row.email,
+      mobile: row.mobile_number,
+      gender: row.gender,
+      programName: row.program_name,
+      assessmentTitle: row.assessment_title,
+      departmentName: row.department_name,
+      degreeTypeName: row.degree_type_name,
+      currentYear: regMeta.currentYear || regMeta.year_of_study || null,
+      institutionName:
+        regMeta.institutionName ||
+        regMeta.institution ||
+        regMeta.collegeName ||
+        null,
+      personalityTrait: {
+        id: row.trait_id,
+        code: row.trait_code,
+        name: traitName,
+        description: row.blended_style_desc,
+        colorRgb:
+          row.color_rgb &&
+            !row.color_rgb.startsWith('#') &&
+            !row.color_rgb.startsWith('rgb') &&
+            row.color_rgb.includes(',')
+            ? `rgb(${row.color_rgb})`
+            : (row.color_rgb as string) || '#1ED36A',
+        imageKey: traitImageKey,
+        characterImage: `/traits/Corporate_${traitImageKey}.png`,
+        strengthChartImage: `/charts/${traitImageKey}_Strength_Chart.png`,
+        metadata: traitMeta,
+      },
+      discScores: {
+        D: discScores.D || discScores.d || 0,
+        I: discScores.I || discScores.i || 0,
+        S: discScores.S || discScores.s || 0,
+        C: discScores.C || discScores.c || 0,
+      },
+      totalScore: row.total_score,
+      sincerityIndex: row.sincerity_index,
+      sincerityClass: row.sincerity_class,
+      attemptStatus: row.attempt_status,
+      completedAt: row.completed_at,
+      keyStrengths: traitMeta.key_strengths || traitMeta.keyStrengths || [],
+      roleAlignment: traitMeta.role_alignment || traitMeta.roleAlignment || [],
+      careerGrowthTips:
+        traitMeta.career_growth_tips || traitMeta.careerGrowthTips || [],
+      keyBehaviors: traitMeta.key_behaviors || traitMeta.keyBehaviors || [],
+      typicalScenarios:
+        traitMeta.typical_scenarios || traitMeta.typicalScenarios || [],
+    };
   }
 }

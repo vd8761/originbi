@@ -40,6 +40,10 @@ export class CorporateAccessPolicy implements IAccessPolicy {
             'career_guidance',       // General guidance
             'overall_report',        // Their company report
             'count',                 // Count their candidates
+            'count_by_role',         // Role-based breakdown
+            'corporate_details',     // Their own corporate account info
+            'data_query',            // Dynamic SQL queries (scoped to their company)
+            'general_knowledge',     // General questions (routed to LLM)
         ];
     }
 

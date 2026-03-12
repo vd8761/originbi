@@ -10,7 +10,7 @@ export interface UserContext {
   email: string;
 
   /** User's role in the system */
-  role: 'ADMIN' | 'CORPORATE' | 'STUDENT';
+  role: 'ADMIN' | 'CORPORATE' | 'STUDENT' | 'AFFILIATE';
 
   /** AWS Cognito subject UUID (from users.cognito_sub) */
   cognitoSub?: string;
@@ -26,6 +26,12 @@ export interface UserContext {
 
   /** Registration ID — resolved from registrations.id (for STUDENT role) */
   registrationId?: number;
+
+  /** Affiliate account ID — resolved from affiliate_accounts.id (for AFFILIATE role) */
+  affiliateId?: number;
+
+  /** Cognito sub UUID (pass-through for fallback lookups) */
+  sub?: string;
 }
 
 /**

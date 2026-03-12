@@ -20,7 +20,7 @@ import {
 import { CreateCorporateRegistrationDto } from './dto/create-corporate-registration.dto';
 import { getCorporateWelcomeEmailTemplate } from '../mail/templates/corporate-welcome.template';
 import * as nodemailer from 'nodemailer';
-import { SES } from 'aws-sdk';
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as path from 'path'; // Actually removing this if truly unused?
 // I will just remove it.
@@ -120,8 +120,8 @@ export class CorporateService {
         typeof authErr === 'string'
           ? authErr
           : (authErr as { message?: string })?.message ||
-            JSON.stringify(authErr) ||
-            'Failed to create Cognito user';
+          JSON.stringify(authErr) ||
+          'Failed to create Cognito user';
 
       if (status === 429) {
         throw new HttpException(errorMessage, 429);
@@ -401,6 +401,24 @@ export class CorporateService {
       if (dto.gender) account.gender = dto.gender;
 
       if (dto.status !== undefined) account.isActive = dto.status;
+
+      // 2.5 Update Credits
+      if (dto.credits !== undefined && dto.credits !== account.availableCredits) {
+        const newCredits = Number(dto.credits);
+        if (!isNaN(newCredits)) {
+          const diff = newCredits - account.availableCredits;
+          account.availableCredits = newCredits;
+          account.totalCredits = account.totalCredits + diff;
+
+          const ledger = manager.create(CorporateCreditLedger, {
+            corporateAccountId: account.id,
+            creditDelta: diff,
+            ledgerType: diff > 0 ? 'CREDIT' : 'DEBIT',
+            reason: 'Manual update by admin during account edit',
+          });
+          await manager.save(ledger);
+        }
+      }
 
       await manager.save(account);
 
@@ -777,17 +795,18 @@ export class CorporateService {
   ) {
     // Imports moved to top
 
-    // Use legacy SES (SDK v2) for Nodemailer v6
-    const ses = new SES({
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-      sessionToken: process.env.AWS_SESSION_TOKEN,
+    const sesClient = new SESv2Client({
       region: process.env.AWS_REGION,
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+        sessionToken: process.env.AWS_SESSION_TOKEN,
+      },
     });
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const transporter = nodemailer.createTransport({
-      SES: ses, // Uppercase SES for Nodemailer v6
+      SES: { sesClient, SendEmailCommand },
     } as any);
     const ccEmail = process.env.EMAIL_CC || '';
     const frontendUrl = process.env.FRONTEND_URL ?? '';

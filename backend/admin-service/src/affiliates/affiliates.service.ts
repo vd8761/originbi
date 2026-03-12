@@ -16,7 +16,7 @@ import {
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import * as nodemailer from 'nodemailer';
-import * as AWS from 'aws-sdk';
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 
 import {
   User as AdminUser,
@@ -54,7 +54,7 @@ export class AffiliatesService {
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
     private readonly r2Service: R2Service,
-  ) {}
+  ) { }
 
   async updateReadyToProcessStatus() {
     const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
@@ -113,20 +113,29 @@ export class AffiliatesService {
     password: string,
     groupName: string = 'AFFILIATE',
   ) {
+    const authUrl = this.authServiceBaseUrl;
+
+    if (!authUrl) {
+      this.logger.error('AUTH_SERVICE_URL is not configured. Cannot create Cognito user.');
+      throw new InternalServerErrorException(
+        'AUTH_SERVICE_URL is not configured. Cannot create Cognito user.',
+      );
+    }
+
     try {
       const res = await this.withRetry(() =>
         firstValueFrom(
           this.http.post(
-            `${this.authServiceBaseUrl}/internal/cognito/users`,
+            `${authUrl}/internal/cognito/users`,
             { email, password, groupName },
-            { proxy: false },
+            { proxy: false, timeout: 30000 },
           ),
         ),
       );
       return res.data;
     } catch (err: any) {
       const authErr = err.response?.data || err.message || err;
-      this.logger.error('Error creating Cognito user:', authErr);
+      this.logger.error(`Error creating Cognito user: ${JSON.stringify(authErr)}`);
       throw new InternalServerErrorException(
         `Failed to create Cognito user: ${authErr.message || JSON.stringify(authErr)}`,
       );
@@ -203,35 +212,31 @@ export class AffiliatesService {
         return affiliateAccount;
       });
 
-      // Send Welcome Email after successful creation
-      try {
-        const referralBaseUrl = process.env.REFERAL_BASE_URL || '';
-        const fullReferralLink = `${referralBaseUrl}?ref=${referralCode}`;
+      // Fire-and-forget: send email without blocking response
+      const referralBaseUrl = process.env.REFERAL_BASE_URL || '';
+      const fullReferralLink = `${referralBaseUrl}?ref=${referralCode}`;
+      const affiliateLoginUrl = 'https://mind.originbi.com/affiliate/login';
 
-        // Redirection URL for affiliate login
-        const affiliateLoginUrl = 'https://mind.originbi.com/affiliate/login';
-
-        await this.sendWelcomeEmail(
-          dto.email,
-          dto.name,
-          dto.password,
-          dto.mobileNumber,
-          dto.countryCode ?? '+91',
-          dto.commissionPercentage ?? 0,
-          fullReferralLink,
-          affiliateLoginUrl,
+      this.sendWelcomeEmail(
+        dto.email,
+        dto.name,
+        dto.password,
+        dto.mobileNumber,
+        dto.countryCode ?? '+91',
+        fullReferralLink,
+        affiliateLoginUrl,
+      )
+        .then(() => this.logger.log(`Welcome email sent to: ${dto.email}`))
+        .catch((emailErr: any) =>
+          this.logger.error(
+            `Failed to send welcome email to ${dto.email}: ${emailErr.message}`,
+            emailErr.stack,
+          ),
         );
-        this.logger.log(`Welcome email sent to affiliate: ${dto.email}`);
-      } catch (emailErr: any) {
-        this.logger.error(
-          `Failed to send welcome email to affiliate ${dto.email}: ${emailErr.message}`,
-          emailErr.stack,
-        );
-        // Don't fail the creation if email fails
-      }
 
       return affiliate;
     } catch (e: any) {
+      this.logger.error(`Affiliate creation failed: ${e.message}`, e.stack);
       throw new BadRequestException(`Affiliate creation failed: ${e.message}`);
     }
   }
@@ -482,23 +487,22 @@ export class AffiliatesService {
     });
     if (!affiliate) throw new BadRequestException('Affiliate not found');
 
-    let aadharResults: R2UploadResult[] = [];
-    if (aadharFiles.length > 0) {
-      aadharResults = await this.r2Service.uploadMultipleFiles(
-        aadharFiles,
-        affiliate.referralCode,
-        'aadhar',
-      );
-    }
-
-    let panResults: R2UploadResult[] = [];
-    if (panFiles.length > 0) {
-      panResults = await this.r2Service.uploadMultipleFiles(
-        panFiles,
-        affiliate.referralCode,
-        'pan',
-      );
-    }
+    const [aadharResults, panResults] = await Promise.all([
+      aadharFiles.length > 0
+        ? this.r2Service.uploadMultipleFiles(
+          aadharFiles,
+          affiliate.referralCode,
+          'aadhar',
+        )
+        : Promise.resolve([]),
+      panFiles.length > 0
+        ? this.r2Service.uploadMultipleFiles(
+          panFiles,
+          affiliate.referralCode,
+          'pan',
+        )
+        : Promise.resolve([]),
+    ]);
 
     affiliate.aadharDocuments = [
       ...(affiliate.aadharDocuments || []),
@@ -527,20 +531,26 @@ export class AffiliatesService {
     pass: string,
     mobile: string,
     countryCode: string,
-    commissionPercentage: number,
     referralLink: string,
     loginUrl: string,
   ) {
-    const ses = new AWS.SES({
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-      sessionToken: process.env.AWS_SESSION_TOKEN,
+    if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_REGION) {
+      this.logger.warn('AWS SES credentials missing in environment. Skipping welcome email sending.');
+      return;
+    }
+
+    const sesClient = new SESv2Client({
       region: process.env.AWS_REGION,
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+        sessionToken: process.env.AWS_SESSION_TOKEN,
+      },
     });
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const transporter = nodemailer.createTransport({
-      SES: ses,
+      SES: { sesClient, SendEmailCommand },
     } as any);
 
     const ccEmail = process.env.EMAIL_CC || '';
@@ -565,7 +575,6 @@ export class AffiliatesService {
       pass,
       mobile,
       countryCode,
-      commissionPercentage,
       referralLink,
       loginUrl,
       assets,
@@ -579,7 +588,11 @@ export class AffiliatesService {
       html: html,
     };
 
-    return transporter.sendMail(mailOptions);
+    try {
+      return await transporter.sendMail(mailOptions);
+    } catch (e: any) {
+      this.logger.error(`Error sending email to ${to}: ${e.message}`);
+    }
   }
 
   // ---------------------------------------------------------

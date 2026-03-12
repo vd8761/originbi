@@ -1,509 +1,274 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import {
-    Send, Bot, User, Loader2, Copy, Check, Trash2,
-    MessageSquare, Download, X, Minus, Maximize2,
-    Sparkles, ChevronDown
-} from 'lucide-react';
-import { getAuthHeaders, getStoredUser, snapshotUserToSession } from '../../lib/auth-helpers';
-
-interface Message {
-    id: string;
-    role: 'user' | 'assistant';
-    content: string;
-    timestamp: Date;
-    isStreaming?: boolean;
-}
 
 interface FloatingChatBotProps {
     userRole?: 'ADMIN' | 'CORPORATE' | 'STUDENT';
     apiUrl?: string;
 }
 
-// Optimized typewriter - uses CSS animation for cursor, RAF for text
-const TypeWriter = memo(({ text, onDone }: { text: string; onDone?: () => void }) => {
-    const [display, setDisplay] = useState('');
-    const frameRef = useRef<number>(0);
-    const indexRef = useRef(0);
-    const completedRef = useRef(false);
-
-    useEffect(() => {
-        if (completedRef.current) return;
-
-        indexRef.current = 0;
-        const charsPerFrame = 8; // Faster typing speed
-
-
-        const animate = () => {
-            if (indexRef.current < text.length) {
-                indexRef.current = Math.min(indexRef.current + charsPerFrame, text.length);
-                setDisplay(text.slice(0, indexRef.current));
-                frameRef.current = requestAnimationFrame(animate);
-            } else {
-                completedRef.current = true;
-                onDone?.();
-            }
-        };
-
-        frameRef.current = requestAnimationFrame(animate);
-
-        return () => {
-            if (frameRef.current) cancelAnimationFrame(frameRef.current);
-        };
-    }, [text, onDone]);
-
-    return (
-        <span>
-            {display}
-            {display.length < text.length && (
-                <span className="inline-block w-0.5 h-4 ml-0.5 bg-emerald-500 animate-[blink_0.8s_infinite]" />
-            )}
-        </span>
-    );
-});
-
-TypeWriter.displayName = 'TypeWriter';
-
-// Optimized content renderer
-const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
-    content: string;
-    streaming?: boolean;
-    onDone?: () => void;
-    apiUrl?: string
-}) => {
-    if (streaming) return <TypeWriter text={content} onDone={onDone} />;
-
-    const handleDownload = async (reportPath: string) => {
-        try {
-            const baseUrl = apiUrl || process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
-            const url = `${baseUrl}${reportPath}`;
-            const token = typeof window !== 'undefined' ? sessionStorage.getItem('token') : null;
-            const userContext = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
-            const headers: Record<string, string> = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-            if (userContext) headers['X-User-Context'] = userContext;
-            const response = await fetch(url, { headers });
-            if (!response.ok) {
-                console.error('Download failed with status:', response.status);
-                return;
-            }
-            const blob = await response.blob();
-            const downloadUrl = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = downloadUrl;
-            const contentType = response.headers.get('content-type') || '';
-            const ext = contentType.includes('pdf') ? '.pdf' : '';
-            const filename = reportPath.split('/').pop()?.split('?')[0] || 'report';
-            a.download = `${filename}${ext}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(downloadUrl);
-        } catch (error) {
-            console.error('Download failed:', error);
-        }
-    };
-
-    const lines = content.split('\n');
-    return (
-        <div className="space-y-1.5 leading-relaxed text-[13px]">
-            {lines.map((line, i) => {
-                const downloadMatch = line.match(/\[([^\]]+)\]\(([^)]+)\)/);
-                if (downloadMatch && (line.includes('Download') || line.includes('report'))) {
-                    const [, linkText, linkUrl] = downloadMatch;
-                    return (
-                        <button
-                            key={i}
-                            onClick={() => handleDownload(linkUrl)}
-                            className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-lg font-medium text-xs transition-all shadow-sm hover:shadow-md mt-2"
-                        >
-                            <Download className="w-3.5 h-3.5" />
-                            {linkText.replace(/\[|\]/g, '')}
-                        </button>
-                    );
-                }
-
-                let processed: React.ReactNode = line;
-                if (line.includes('**')) {
-                    processed = line.split(/(\*\*[^*]+\*\*)/g).map((part, j) =>
-                        part.startsWith('**') ? (
-                            <strong key={j} className="font-semibold text-gray-900 dark:text-white">{part.slice(2, -2)}</strong>
-                        ) : part
-                    );
-                }
-
-                if (line.trim().startsWith('•') || line.trim().startsWith('-')) {
-                    return (
-                        <div key={i} className="flex items-start gap-2 pl-1">
-                            <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 flex-shrink-0" />
-                            <span className="text-gray-600 dark:text-gray-300">{typeof processed === 'string' ? processed.replace(/^[-•]\s*/, '') : processed}</span>
-                        </div>
-                    );
-                }
-
-                const numMatch = line.match(/^(\d+)\.\s/);
-                if (numMatch) {
-                    return (
-                        <div key={i} className="flex items-start gap-2 pl-1">
-                            <span className="w-4 h-4 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
-                                {numMatch[1]}
-                            </span>
-                            <span className="text-gray-600 dark:text-gray-300">{line.replace(/^\d+\.\s/, '')}</span>
-                        </div>
-                    );
-                }
-
-                if (!line.trim()) return <div key={i} className="h-1" />;
-                return <p key={i} className="text-gray-600 dark:text-gray-300">{processed}</p>;
-            }).filter(Boolean)}
-        </div>
-    );
-});
-
-RenderContent.displayName = 'RenderContent';
-
 export default function FloatingChatBot({
     userRole = 'ADMIN',
-    apiUrl = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL
 }: FloatingChatBotProps) {
     const router = useRouter();
     const pathname = usePathname();
-    const [isOpen, setIsOpen] = useState(false);
-    const [isMinimized, setIsMinimized] = useState(false);
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [input, setInput] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [copied, setCopied] = useState<string | null>(null);
-    const [hasUnread, setHasUnread] = useState(false);
-    const scrollRef = useRef<HTMLDivElement>(null);
-    const inputRef = useRef<HTMLTextAreaElement>(null);
+    const [isNavigating, setIsNavigating] = useState(false);
+    const [mounted, setMounted] = useState(false);
+    const [isHovered, setIsHovered] = useState(false);
+    const [pulseCount, setPulseCount] = useState(0);
 
-    // Snapshot user identity on mount so this tab keeps its own user
-    useEffect(() => { snapshotUserToSession(); }, []);
+    useEffect(() => { setIsNavigating(false); }, [pathname]);
+    useEffect(() => { const t = setTimeout(() => setMounted(true), 400); return () => clearTimeout(t); }, []);
 
-    // Check if on assistant page
-    const isAssistantPage = pathname?.includes('/assistant');
-
+    // Periodic attention-grab every 6 seconds
     useEffect(() => {
-        if (isOpen && !isMinimized) {
-            scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-            inputRef.current?.focus();
-            setHasUnread(false);
-        }
-    }, [messages, isOpen, isMinimized]);
-
-    const copyText = useCallback((text: string, id: string) => {
-        navigator.clipboard.writeText(text);
-        setCopied(id);
-        setTimeout(() => setCopied(null), 2000);
+        const interval = setInterval(() => setPulseCount(p => p + 1), 6000);
+        return () => clearInterval(interval);
     }, []);
 
-    const handleSend = useCallback(async () => {
-        if (!input.trim() || loading) return;
+    if (pathname?.includes('/assistant')) return null;
 
-        const userMsg: Message = {
-            id: `u-${Date.now()}`,
-            role: 'user',
-            content: input.trim(),
-            timestamp: new Date(),
-        };
-
-        setMessages(prev => [...prev, userMsg]);
-        setInput('');
-        setLoading(true);
-
-        const botId = `a-${Date.now()}`;
-
-        try {
-            const res = await fetch(`${apiUrl}/rag/query`, {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify({ question: userMsg.content }),
-            });
-
-            const data = await res.json();
-            setMessages(prev => [...prev, {
-                id: botId,
-                role: 'assistant',
-                content: data.answer || 'Sorry, I could not process that request.',
-                timestamp: new Date(),
-                isStreaming: true
-            }]);
-
-            if (!isOpen || isMinimized) setHasUnread(true);
-        } catch {
-            setMessages(prev => [...prev, {
-                id: botId,
-                role: 'assistant',
-                content: 'Unable to connect. Please check your connection.',
-                timestamp: new Date(),
-                isStreaming: false
-            }]);
-        } finally {
-            setLoading(false);
-        }
-    }, [input, loading, apiUrl, isOpen, isMinimized]);
-
-    const finishStreaming = useCallback((id: string) => {
-        setMessages(prev => prev.map(m => m.id === id ? { ...m, isStreaming: false } : m));
-    }, []);
-
-    const clearChat = useCallback(() => setMessages([]), []);
-
-    const suggestions = [
-        { icon: '👋', text: 'Hello MITHRA' },
-        { icon: '📊', text: 'Generate career report' },
-        { icon: '🏆', text: 'Show top performers' },
-    ];
-
-    // Hide floating chatbot on assistant page
-    if (isAssistantPage) return null;
+    const handleRedirect = () => {
+        setIsNavigating(true);
+        setTimeout(() => {
+            if (pathname?.includes('/corporate/')) router.push('/corporate/assistant');
+            else if (pathname?.includes('/student/')) router.push('/student/assistant');
+            else router.push('/admin/assistant');
+        }, 100);
+    };
 
     return (
         <>
-            {/* Floating Chat Button */}
-            <button
-                onClick={() => { setIsOpen(true); setIsMinimized(false); }}
-                className={`fixed right-6 bottom-6 z-50 group transition-all duration-300 ${isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100'}`}
+            <style jsx>{`
+                @keyframes fabEntry {
+                    0% { opacity: 0; transform: translateY(50px) scale(0.2); }
+                    60% { opacity: 1; transform: translateY(-6px) scale(1.08); }
+                    80% { transform: translateY(2px) scale(0.97); }
+                    100% { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                @keyframes fabFloat {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-5px); }
+                }
+                @keyframes ringPulse {
+                    0% { transform: scale(1); opacity: 0.5; }
+                    100% { transform: scale(2.4); opacity: 0; }
+                }
+                @keyframes ringPulse2 {
+                    0% { transform: scale(1); opacity: 0.3; }
+                    100% { transform: scale(3); opacity: 0; }
+                }
+                @keyframes shimmer {
+                    0% { background-position: -200% center; }
+                    100% { background-position: 200% center; }
+                }
+                @keyframes sparkle1 {
+                    0%, 100% { transform: translate(0, 0) scale(0.8); opacity: 0.3; }
+                    25% { transform: translate(-8px, -10px) scale(1.2); opacity: 0.9; }
+                    50% { transform: translate(-4px, -14px) scale(0.6); opacity: 0.4; }
+                    75% { transform: translate(4px, -8px) scale(1); opacity: 0.7; }
+                }
+                @keyframes sparkle2 {
+                    0%, 100% { transform: translate(0, 0) scale(0.6); opacity: 0.2; }
+                    33% { transform: translate(8px, -6px) scale(1.1); opacity: 0.8; }
+                    66% { transform: translate(4px, -12px) scale(0.7); opacity: 0.3; }
+                }
+                @keyframes sparkle3 {
+                    0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+                    50% { transform: translate(-6px, -8px) scale(1.4); opacity: 0.9; }
+                }
+                @keyframes nudge {
+                    0%, 100% { transform: scale(1) rotate(0deg); }
+                    20% { transform: scale(1.12) rotate(-3deg); }
+                    40% { transform: scale(0.96) rotate(2deg); }
+                    60% { transform: scale(1.06) rotate(-1deg); }
+                    80% { transform: scale(1); }
+                }
+                @keyframes labelReveal {
+                    0% { opacity: 0; transform: translateX(12px) scale(0.9); }
+                    100% { opacity: 1; transform: translateX(0) scale(1); }
+                }
+                @keyframes corePulse {
+                    0%, 100% { opacity: 0.6; transform: scale(1); }
+                    50% { opacity: 1; transform: scale(1.15); }
+                }
+                @keyframes orbitDot {
+                    0% { transform: rotate(0deg) translateX(36px) rotate(0deg); }
+                    100% { transform: rotate(360deg) translateX(36px) rotate(-360deg); }
+                }
+                @keyframes brainWave {
+                    0%, 100% { d: path("M16 22 C20 18, 26 26, 30 22 S38 18, 40 22"); }
+                    50% { d: path("M16 22 C20 26, 26 18, 30 22 S38 26, 40 22"); }
+                }
+            `}</style>
+
+            {/* Main wrapper — positions the FAB and the label together */}
+            <div
+                className="fixed right-5 bottom-5 z-50 flex items-center gap-3"
+                style={{
+                    animation: mounted
+                        ? `fabEntry 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, fabFloat 4s ease-in-out 1.5s infinite${pulseCount > 0 ? ', nudge 0.7s ease-in-out' : ''}`
+                        : 'none',
+                    opacity: mounted ? undefined : 0,
+                }}
+                key={pulseCount}
             >
-                <div className="relative">
-                    {/* Animated rings */}
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 animate-ping opacity-20" />
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 animate-pulse opacity-30" />
-
-                    {/* Main button */}
-                    <div className="relative w-14 h-14 rounded-full bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 shadow-lg shadow-emerald-500/30 flex items-center justify-center hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-105 transition-all duration-300">
-                        <Bot className="w-6 h-6 text-white" />
-                    </div>
-
-                    {/* Unread indicator */}
-                    {hasUnread && (
-                        <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold animate-bounce">
-                            !
+                {/* "Ask BI" label — LEFT of the icon, always visible */}
+                <div
+                    className="px-4 py-2 rounded-full shadow-lg pointer-events-none select-none"
+                    style={{
+                        background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+                        border: '1px solid rgba(147,197,253,0.25)',
+                        animation: mounted ? 'labelReveal 0.5s ease-out 0.8s both' : 'none',
+                        boxShadow: '0 4px 20px rgba(30,58,138,0.35), 0 0 0 1px rgba(255,255,255,0.08) inset',
+                    }}
+                >
+                    <span className="flex items-center gap-2 text-white text-xs font-semibold tracking-wide">
+                        <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-60" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400" />
                         </span>
-                    )}
-
-                    {/* Tooltip */}
-                    <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                        Chat with MITHRA
-                        <div className="absolute left-full top-1/2 -translate-y-1/2 border-4 border-transparent border-l-gray-900" />
-                    </div>
+                        Ask BI
+                    </span>
                 </div>
-            </button>
 
-            {/* Chat Window */}
-            <div className={`fixed right-6 bottom-6 z-50 transition-all duration-300 ease-out ${isOpen
-                ? 'opacity-100 translate-y-0 scale-100'
-                : 'opacity-0 translate-y-4 scale-95 pointer-events-none'
-                }`}>
-                <div className={`bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col transition-all duration-300 ${isMinimized ? 'w-72 h-14' : 'w-[380px] h-[560px]'
-                    }`}>
-                    {/* Header */}
-                    <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 text-white flex-shrink-0">
-                        <div className="flex items-center gap-3">
-                            <div className="relative">
-                                <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
-                                    <Sparkles className="w-5 h-5" />
+                {/* The circular FAB button */}
+                <button
+                    onClick={handleRedirect}
+                    onMouseEnter={() => setIsHovered(true)}
+                    onMouseLeave={() => setIsHovered(false)}
+                    disabled={isNavigating}
+                    className="relative group cursor-pointer focus:outline-none disabled:cursor-wait"
+                    aria-label="Open Ask BI Assistant"
+                >
+                    <div className="relative">
+                        {/* Animated pulse rings */}
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-[66px] h-[66px] rounded-full border-2 border-blue-400/40"
+                                style={{ animation: 'ringPulse 3s ease-out infinite' }} />
+                        </div>
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-[66px] h-[66px] rounded-full border border-cyan-400/25"
+                                style={{ animation: 'ringPulse2 3s ease-out 1.2s infinite' }} />
+                        </div>
+
+                        {/* Floating sparkle particles */}
+                        <div className="absolute -top-1 left-0 w-1.5 h-1.5 rounded-full bg-cyan-300 pointer-events-none"
+                            style={{ animation: 'sparkle1 5s ease-in-out infinite', filter: 'blur(0.3px)' }} />
+                        <div className="absolute top-0 -right-1 w-1 h-1 rounded-full bg-blue-300 pointer-events-none"
+                            style={{ animation: 'sparkle2 4s ease-in-out 0.5s infinite', filter: 'blur(0.3px)' }} />
+                        <div className="absolute -bottom-0.5 left-1 w-1 h-1 rounded-full bg-indigo-300 pointer-events-none"
+                            style={{ animation: 'sparkle3 6s ease-in-out 1s infinite', filter: 'blur(0.3px)' }} />
+
+                        {/* Outer white ring */}
+                        <div
+                            className="rounded-full p-[3px] transition-all duration-300 group-hover:scale-110 group-active:scale-95"
+                            style={{
+                                background: 'white',
+                                boxShadow: isHovered
+                                    ? '0 0 0 2px rgba(59,130,246,0.3), 0 8px 32px rgba(30,58,138,0.4), 0 0 20px rgba(59,130,246,0.2)'
+                                    : '0 0 0 1px rgba(59,130,246,0.15), 0 4px 20px rgba(30,58,138,0.25)',
+                                transition: 'box-shadow 0.3s ease, transform 0.3s ease',
+                            }}
+                        >
+                            {/* Inner dark-blue gradient circle */}
+                            <div
+                                className="relative rounded-full flex items-center justify-center overflow-hidden"
+                                style={{
+                                    width: '58px',
+                                    height: '58px',
+                                    background: 'linear-gradient(145deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%)',
+                                }}
+                            >
+                                {/* Shimmer overlay */}
+                                <div className="absolute inset-0 pointer-events-none"
+                                    style={{
+                                        background: 'linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.08) 50%, transparent 70%)',
+                                        backgroundSize: '200% 100%',
+                                        animation: 'shimmer 4s ease-in-out infinite',
+                                    }} />
+
+                                {/* Orbiting dot */}
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <div className="w-1 h-1 rounded-full bg-cyan-300"
+                                        style={{
+                                            animation: 'orbitDot 8s linear infinite',
+                                            opacity: 0.6,
+                                            filter: 'blur(0.3px)',
+                                        }} />
                                 </div>
-                                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-white" />
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-sm">MITHRA</h3>
-                                <p className="text-[10px] text-white/80">AI Assistant • Online</p>
+
+                                {/* Modern AI / Brain + Chat icon */}
+                                <svg width="32" height="32" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <defs>
+                                        <linearGradient id="iconGrad" x1="8" y1="8" x2="40" y2="40">
+                                            <stop offset="0%" stopColor="#e0f2fe" />
+                                            <stop offset="50%" stopColor="#bae6fd" />
+                                            <stop offset="100%" stopColor="#7dd3fc" />
+                                        </linearGradient>
+                                        <filter id="iconGlow">
+                                            <feGaussianBlur stdDeviation="1.5" result="blur" />
+                                            <feMerge>
+                                                <feMergeNode in="blur" />
+                                                <feMergeNode in="SourceGraphic" />
+                                            </feMerge>
+                                        </filter>
+                                    </defs>
+
+                                    {/* Chat bubble shape */}
+                                    <path d="M10 14 C10 10.7, 12.7 8, 16 8 L32 8 C35.3 8, 38 10.7, 38 14 L38 28 C38 31.3, 35.3 34, 32 34 L20 34 L14 39 L14 34 L16 34 C12.7 34, 10 31.3, 10 28 Z"
+                                        fill="url(#iconGrad)" opacity="0.95" filter="url(#iconGlow)" />
+
+                                    {/* Inner: AI sparkle brain pattern */}
+                                    {/* Central node */}
+                                    <circle cx="24" cy="20" r="2.5" fill="#1e40af">
+                                        <animate attributeName="r" values="2;3;2" dur="2s" repeatCount="indefinite" />
+                                        <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" />
+                                    </circle>
+
+                                    {/* Connection lines radiating from center */}
+                                    <line x1="24" y1="20" x2="17" y2="15" stroke="#1e40af" strokeWidth="1.2" opacity="0.5" />
+                                    <line x1="24" y1="20" x2="31" y2="15" stroke="#1e40af" strokeWidth="1.2" opacity="0.5" />
+                                    <line x1="24" y1="20" x2="18" y2="26" stroke="#1e40af" strokeWidth="1.2" opacity="0.5" />
+                                    <line x1="24" y1="20" x2="30" y2="26" stroke="#1e40af" strokeWidth="1.2" opacity="0.5" />
+
+                                    {/* Outer nodes */}
+                                    <circle cx="17" cy="15" r="1.5" fill="#2563eb" opacity="0.8">
+                                        <animate attributeName="opacity" values="0.5;1;0.5" dur="2.5s" begin="0.3s" repeatCount="indefinite" />
+                                    </circle>
+                                    <circle cx="31" cy="15" r="1.5" fill="#2563eb" opacity="0.8">
+                                        <animate attributeName="opacity" values="0.5;1;0.5" dur="2.5s" begin="0.8s" repeatCount="indefinite" />
+                                    </circle>
+                                    <circle cx="18" cy="26" r="1.5" fill="#2563eb" opacity="0.8">
+                                        <animate attributeName="opacity" values="0.5;1;0.5" dur="2.5s" begin="1.2s" repeatCount="indefinite" />
+                                    </circle>
+                                    <circle cx="30" cy="26" r="1.5" fill="#2563eb" opacity="0.8">
+                                        <animate attributeName="opacity" values="0.5;1;0.5" dur="2.5s" begin="0.5s" repeatCount="indefinite" />
+                                    </circle>
+
+                                    {/* Sparkle stars */}
+                                    <g opacity="0.7">
+                                        <path d="M15 21 L15.5 19.5 L16 21 L17.5 21.5 L16 22 L15.5 23.5 L15 22 L13.5 21.5 Z"
+                                            fill="#1e40af">
+                                            <animate attributeName="opacity" values="0.3;0.9;0.3" dur="3s" repeatCount="indefinite" />
+                                        </path>
+                                        <path d="M32 19 L32.4 17.8 L32.8 19 L34 19.4 L32.8 19.8 L32.4 21 L32 19.8 L30.8 19.4 Z"
+                                            fill="#1e40af">
+                                            <animate attributeName="opacity" values="0.3;0.9;0.3" dur="3s" begin="1s" repeatCount="indefinite" />
+                                        </path>
+                                    </g>
+                                </svg>
                             </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                            {messages.length > 0 && !isMinimized && (
-                                <button
-                                    onClick={clearChat}
-                                    className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
-                                    title="Clear chat"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            )}
-                            {!isMinimized && (
-                                <button
-                                    onClick={() => {
-                                        // Navigate to the correct assistant page based on current path
-                                        if (pathname?.includes('/corporate/')) {
-                                            router.push('/corporate/assistant');
-                                        } else if (pathname?.includes('/student/')) {
-                                            router.push('/student/assistant');
-                                        } else {
-                                            router.push('/admin/assistant');
-                                        }
-                                    }}
-                                    className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
-                                    title="Open full page"
-                                >
-                                    <Maximize2 className="w-4 h-4" />
-                                </button>
-                            )}
-                            <button
-                                onClick={() => setIsMinimized(!isMinimized)}
-                                className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
-                                title={isMinimized ? 'Expand' : 'Minimize'}
-                            >
-                                {isMinimized ? <ChevronDown className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
-                            </button>
-                            <button
-                                onClick={() => setIsOpen(false)}
-                                className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
-                                title="Close"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
+
+                        {/* Notification badge */}
+                        <div className="absolute -top-0.5 -right-0.5 flex items-center justify-center">
+                            <span className="absolute inline-flex h-3.5 w-3.5 rounded-full bg-cyan-400 opacity-40 animate-ping" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400 border border-white shadow-sm" />
                         </div>
                     </div>
-
-                    {/* Chat Body - Hidden when minimized */}
-                    {!isMinimized && (
-                        <>
-                            {/* Messages Area */}
-                            <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800/50">
-                                {messages.length === 0 ? (
-                                    <div className="h-full flex flex-col items-center justify-center p-6">
-                                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mb-4 shadow-lg shadow-emerald-500/30">
-                                            <Bot className="w-8 h-8 text-white" />
-                                        </div>
-                                        <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
-                                            Hi, I'm <span className="text-emerald-600">MITHRA</span>
-                                        </h4>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 text-center mb-4">
-                                            Your intelligent assistant for talent insights
-                                        </p>
-
-                                        <div className="w-full space-y-2">
-                                            {suggestions.map((s, i) => (
-                                                <button
-                                                    key={i}
-                                                    onClick={() => setInput(s.text)}
-                                                    className="w-full flex items-center gap-2 p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-emerald-400 dark:hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-left transition-all text-sm"
-                                                >
-                                                    <span className="text-lg">{s.icon}</span>
-                                                    <span className="text-gray-600 dark:text-gray-300 font-medium">{s.text}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="p-4 space-y-4">
-                                        {messages.map(m => (
-                                            <div key={m.id} className={`flex gap-2.5 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                                                {/* Avatar */}
-                                                <div className="flex-shrink-0">
-                                                    {m.role === 'assistant' ? (
-                                                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
-                                                            <Bot className="w-4 h-4 text-white" />
-                                                        </div>
-                                                    ) : (
-                                                        <div className="w-8 h-8 rounded-lg bg-gray-700 flex items-center justify-center">
-                                                            <User className="w-4 h-4 text-white" />
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Message */}
-                                                <div className={`group flex flex-col max-w-[75%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                                    <div className={`rounded-2xl px-3 py-2.5 ${m.role === 'user'
-                                                        ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white'
-                                                        : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm'
-                                                        }`}>
-                                                        {m.role === 'assistant' ? (
-                                                            <RenderContent
-                                                                content={m.content}
-                                                                streaming={m.isStreaming}
-                                                                onDone={() => finishStreaming(m.id)}
-                                                                apiUrl={apiUrl}
-                                                            />
-                                                        ) : (
-                                                            <p className="text-[13px]">{m.content}</p>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Actions */}
-                                                    {m.role === 'assistant' && !m.isStreaming && (
-                                                        <div className="flex items-center gap-2 mt-1 px-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <button
-                                                                onClick={() => copyText(m.content, m.id)}
-                                                                className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-600"
-                                                            >
-                                                                {copied === m.id ? (
-                                                                    <><Check className="w-3 h-3 text-emerald-500" /><span className="text-emerald-500">Copied</span></>
-                                                                ) : (
-                                                                    <><Copy className="w-3 h-3" /><span>Copy</span></>
-                                                                )}
-                                                            </button>
-                                                            <span className="text-[10px] text-gray-300">
-                                                                {m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-
-                                        {/* Typing indicator */}
-                                        {loading && (
-                                            <div className="flex gap-2.5">
-                                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
-                                                    <Bot className="w-4 h-4 text-white" />
-                                                </div>
-                                                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 shadow-sm">
-                                                    <div className="flex gap-1">
-                                                        <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                                        <span className="w-2 h-2 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                                        <span className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        <div ref={scrollRef} />
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Input Area */}
-                            <div className="p-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
-                                <div className="flex items-end gap-2 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 focus-within:border-emerald-400 focus-within:bg-white dark:focus-within:bg-gray-800 transition-all">
-                                    <textarea
-                                        ref={inputRef}
-                                        value={input}
-                                        onChange={(e) => setInput(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && !e.shiftKey) {
-                                                e.preventDefault();
-                                                handleSend();
-                                            }
-                                        }}
-                                        placeholder="Type your message..."
-                                        rows={1}
-                                        className="flex-1 bg-transparent px-3 py-2 text-gray-900 dark:text-gray-100 placeholder-gray-400 resize-none focus:outline-none text-sm"
-                                        disabled={loading}
-                                    />
-                                    <button
-                                        onClick={handleSend}
-                                        disabled={loading || !input.trim()}
-                                        className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:from-gray-300 disabled:to-gray-300 rounded-lg text-white disabled:text-gray-400 transition-all shadow-sm disabled:shadow-none"
-                                    >
-                                        {loading ? (
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                        ) : (
-                                            <Send className="w-4 h-4" />
-                                        )}
-                                    </button>
-                                </div>
-                                <p className="text-center text-[9px] text-gray-400 mt-2">
-                                    Powered by <span className="font-semibold text-emerald-600">MITHRA</span> • OriginBI
-                                </p>
-                            </div>
-                        </>
-                    )}
-                </div>
+                </button>
             </div>
         </>
     );

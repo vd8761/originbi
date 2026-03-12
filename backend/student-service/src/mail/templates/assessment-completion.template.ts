@@ -8,7 +8,7 @@ export const getAssessmentCompletionEmailTemplate = (
   },
   dateStr: string,
   reportTitle: string = 'Self Discovery Report',
-  year: string = '2025',
+  year: string = new Date().getFullYear().toString(),
 ) => {
   return `
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -35,7 +35,7 @@ export const getAssessmentCompletionEmailTemplate = (
                 <table border="0" cellpadding="0" cellspacing="0" width="600" style="width: 600px; background-color: transparent;">
                     
                     <tr>
-                        <td align="left" style="padding-bottom: 20px;">
+                        <td align="left" style="padding-bottom: 20px; padding-left: 25px;">
                             <img src="https://mind.originbi.com/Origin-BI-Logo-01.png" alt="Origin BI" width="150" style="display: block; border: 0;" />
                         </td>
                     </tr>
@@ -100,26 +100,19 @@ export const getAssessmentCompletionEmailTemplate = (
                     </tr>
 
                     <tr>
-                        <td style="padding: 20px 0;">
-                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
-                                <tr>
-                                    <td width="50%" align="left" style="font-family: 'Tahoma', sans-serif; font-size: 12px; line-height: 14px; color: #808080;">
-                                        © 2024-${year}. Origin BI | All Rights Reserved
-                                    </td>
-                                    <td width="50%" align="right" style="font-family: 'Tahoma', sans-serif; font-size: 12px; line-height: 14px; color: #150089;">
-                                        <a href="${frontendUrl}/privacy-policy" style="color: #150089; text-decoration: none;">Privacy Policy</a> | <a href="${frontendUrl}/terms-conditions" style="color: #150089; text-decoration: none;">Terms & Conditions</a>
-                                    </td>
-                                </tr>
-                            </table>
+                        <td align="center" style="padding: 20px 0; font-family: 'Tahoma', sans-serif; font-size: 12px; line-height: 22px;">
+                            <span style="color: #808080;">© ${year}. Origin BI | All Rights Reserved</span>
+                            <br/>
+                            <a href="${frontendUrl}/privacy-policy" style="color: #150089; text-decoration: none;">Privacy Policy</a> 
+                            <span style="color: #150089;">|</span> 
+                            <a href="${frontendUrl}/terms-conditions" style="color: #150089; text-decoration: none;">Terms & Conditions</a>
                         </td>
                     </tr>
 
                 </table>
-                </td>
+            </td>
         </tr>
     </table>
-
 </body>
-</html>
-    `;
+</html>`;
 };

@@ -3,6 +3,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { HttpModule } from '@nestjs/axios';
 import { StudentController } from './student.controller';
 import { StudentService } from './student.service';
+import { SubscriptionController } from './subscription.controller';
+import { SubscriptionService } from './subscription.service';
+import { StudentProcessor } from './student.processor';
 import { User } from '../entities/student.entity';
 import { AssessmentSession } from '../entities/assessment_session.entity';
 import { AssessmentAttempt } from '../entities/assessment_attempt.entity';
@@ -17,6 +20,7 @@ import {
   Groups,
   AffiliateSettlementTransaction,
   Registration,
+  StudentSubscription,
 } from '@originbi/shared-entities';
 
 @Module({
@@ -35,11 +39,12 @@ import {
       AffiliateAccount,
       AffiliateSettlementTransaction,
       Groups,
+      StudentSubscription,
     ]),
     HttpModule,
   ],
-  controllers: [StudentController],
-  providers: [StudentService],
-  exports: [StudentService],
+  controllers: [StudentController, SubscriptionController],
+  providers: [StudentService, SubscriptionService, StudentProcessor],
+  exports: [StudentService, SubscriptionService],
 })
 export class StudentModule {}

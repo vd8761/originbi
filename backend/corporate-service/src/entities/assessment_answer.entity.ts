@@ -14,30 +14,36 @@ export class AssessmentAnswer {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: number;
 
-  @Column({ name: 'assessment_attempt_id', type: 'bigint' })
-  assessmentAttemptId: number;
+  @Column({ name: 'assessment_attempt_id', type: 'bigint', nullable: true })
+  assessmentAttemptId: number | null;
 
   @ManyToOne(() => AssessmentAttempt)
   @JoinColumn({ name: 'assessment_attempt_id' })
   assessmentAttempt: AssessmentAttempt;
 
-  @Column({ name: 'assessment_session_id', type: 'bigint' })
-  assessmentSessionId: number;
+  @Column({ name: 'assessment_session_id', type: 'bigint', nullable: true })
+  assessmentSessionId: number | null;
 
-  @Column({ name: 'user_id', type: 'bigint' })
-  userId: number;
+  @Column({ name: 'user_id', type: 'bigint', nullable: true })
+  userId: number | null;
 
-  @Column({ name: 'registration_id', type: 'bigint' })
-  registrationId: number;
+  @Column({ name: 'registration_id', type: 'bigint', nullable: true })
+  registrationId: number | null;
 
-  @Column({ name: 'program_id', type: 'bigint' })
-  programId: number;
+  @Column({ name: 'program_id', type: 'bigint', nullable: true })
+  programId: number | null;
 
-  @Column({ name: 'assessment_level_id', type: 'bigint' })
-  assessmentLevelId: number;
+  @Column({ name: 'assessment_level_id', type: 'bigint', nullable: true })
+  assessmentLevelId: number | null;
 
-  @Column({ name: 'question_source', type: 'varchar', length: 10 })
-  questionSource: 'MAIN' | 'OPEN';
+  @Column({
+    name: 'question_source',
+    type: 'varchar',
+    length: 10,
+    nullable: true,
+    default: 'MAIN',
+  })
+  questionSource: 'MAIN' | 'OPEN' | null;
 
   @Column({ name: 'main_question_id', type: 'bigint', nullable: true })
   mainQuestionId: number | null;

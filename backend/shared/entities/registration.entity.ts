@@ -160,6 +160,9 @@ export class Registration {
     @Column({ name: 'metadata', type: 'jsonb', default: () => `'{}'` })
     metadata: any;
 
+    @Column({ name: 'has_ai_counsellor', type: 'boolean', default: false })
+    hasAiCounsellor: boolean;
+
     @Column({ name: 'is_deleted', type: 'boolean', default: false })
     isDeleted: boolean;
 

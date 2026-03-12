@@ -10,9 +10,12 @@
         "student-service"
     ],
     "dependencies": {
-        "typeorm": "^0.3.28",
+        "@nestjs/platform-express": "^11.1.14",
+        "@wavezync/nestjs-pgboss": "^5.1.1",
         "pg": "^8.11.3",
-        "reflect-metadata": "^0.2.1"
+        "pg-boss": "^12.13.0",
+        "reflect-metadata": "^0.2.1",
+        "typeorm": "^0.3.28"
     },
     "scripts": {
         "build:shared": "cd shared && npm run build",
@@ -26,6 +29,9 @@
         "start:auth": "cd auth-service && npm run start:dev",
         "start:corporate": "cd corporate-service && npm run start:dev",
         "start:student": "cd student-service && npm run start:dev",
-        "postinstall": "npm run build:shared"
+        "postinstall": "node patch-pgboss.js"
+    },
+    "devDependencies": {
+        "@types/jest": "^30.0.0"
     }
 }

@@ -7,9 +7,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, ILike, Not, IsNull } from 'typeorm';
 import { AssessmentReport } from '../entities/assessment-report.entity';
 import { getAssessmentCompletionEmailTemplate } from '../mail/templates/assessment-completion.template';
-import { lastValueFrom } from 'rxjs';
+import { getReportDeliveryEmailTemplate } from '../mail/templates/report-delivery.template';
+import { getPlacementReportEmailTemplate } from '../mail/templates/placement-report.template';
+import { firstValueFrom, lastValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
 import { User } from '../entities/student.entity';
 
 import { AssessmentSession } from '../entities/assessment_session.entity';
@@ -27,7 +28,7 @@ import {
   AffiliateReferralTransaction,
 } from '@originbi/shared-entities';
 import * as nodemailer from 'nodemailer';
-import { SES } from 'aws-sdk';
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
 
 export interface AssessmentProgressItem {
@@ -69,14 +70,41 @@ export class StudentService {
     private readonly affiliateRepo: Repository<AffiliateAccount>,
     @InjectRepository(AffiliateReferralTransaction)
     private readonly affiliateTransactionRepo: Repository<AffiliateReferralTransaction>,
-    private readonly http: HttpService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
-  async onModuleInit() {
-    // Check if imported functions are used to avoid TS error, or just use them
-    // They are used in handleAssessmentCompletion
+  /**
+   * Creates a configured nodemailer transporter backed by AWS SES v2.
+   * Throws if any required AWS credentials are missing from the environment.
+   */
+  private createEmailTransporter() {
+    const region =
+      this.configService.get<string>('AWS_REGION') ||
+      this.configService.get<string>('AWS_DEFAULT_REGION');
+    const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
+    const secretAccessKey = this.configService.get<string>(
+      'AWS_SECRET_ACCESS_KEY',
+    );
+
+    if (!region || !accessKeyId || !secretAccessKey) {
+      throw new Error(
+        'AWS SES configuration is missing. Ensure AWS_REGION, AWS_ACCESS_KEY_ID, and AWS_SECRET_ACCESS_KEY are set.',
+      );
+    }
+
+    const sesClient = new SESv2Client({
+      region,
+      credentials: { accessKeyId, secretAccessKey },
+    });
+
+    // nodemailer's SES v2 transport has no official @types declaration;
+    // the `as any` cast is unavoidable here.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    return nodemailer.createTransport({
+      SES: { sesClient, SendEmailCommand },
+    } as any);
   }
+
   private async createCognitoUser(email: string, password: string) {
     const authServiceUrl =
       process.env.AUTH_SERVICE_URL || 'http://localhost:4000'; // Default or Env
@@ -275,7 +303,29 @@ export class StudentService {
     const user = await this.userRepo.findOne({
       where: { email: ILike(email) },
     });
-    return user;
+
+    if (!user) return null;
+
+    // Fetch the dominant trait from the latest completed assessment attempt
+    const traitQuery = `
+      SELECT 
+        pt.id, 
+        pt.blended_style_name as name, 
+        pt.code,
+        pt.color_rgb
+      FROM assessment_attempts aa
+      JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+      WHERE aa.user_id = $1 AND aa.status = 'COMPLETED'
+      ORDER BY aa.completed_at DESC
+      LIMIT 1
+    `;
+    const traitResult = await this.userRepo.query(traitQuery, [user.id]);
+    const trait = traitResult && traitResult.length > 0 ? traitResult[0] : null;
+
+    return {
+      ...user,
+      personalityTrait: trait,
+    };
   }
 
   async createTestStudent(email: string, fullName: string) {
@@ -416,8 +466,8 @@ export class StudentService {
           totalCount > 0
             ? totalCount
             : level?.levelNumber === 2 ||
-                level?.name.includes('ACI') ||
-                level?.patternType === 'ACI'
+              level?.name.includes('ACI') ||
+              level?.patternType === 'ACI'
               ? 25
               : 60,
         unlockTime: unlockTime,
@@ -1107,7 +1157,7 @@ export class StudentService {
       throw new BadRequestException('Invalid URL');
     }
 
-    return { isValid: true, code: affiliate.referralCode };
+    return { isValid: true, code: affiliate.referralCode, name: affiliate.name };
   }
 
   // ---------------------------------------------------------
@@ -1120,37 +1170,9 @@ export class StudentService {
     startDateTime?: Date | string,
     assessmentTitle?: string,
   ) {
-    const region =
-      this.configService.get<string>('AWS_REGION') ||
-      this.configService.get<string>('AWS_DEFAULT_REGION');
-    const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-    const secretAccessKey = this.configService.get<string>(
-      'AWS_SECRET_ACCESS_KEY',
-    );
+    this.logger.log(`[Email Debug] AWS Config Check triggered for: ${to}`);
 
-    this.logger.log(
-      `[Email Debug] AWS Config Check: Region=${region}, KeyPresent=${!!accessKeyId}`,
-    );
-
-    if (!region) {
-      this.logger.error(
-        '[Email Critical] AWS_REGION is missing in environment variables.',
-      );
-      throw new Error(
-        'Configuration Error: AWS_REGION is not defined in the environment.',
-      );
-    }
-
-    const ses = new SES({
-      accessKeyId,
-      secretAccessKey,
-      region,
-    });
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    const transporter = nodemailer.createTransport({
-      SES: ses,
-    } as any);
+    const transporter = this.createEmailTransporter();
 
     const ccEmail = this.configService.get<string>('EMAIL_CC') || '';
     const fromName =
@@ -1235,7 +1257,8 @@ export class StudentService {
       }
 
       // 2. Trigger Report Generation
-      const reportServiceUrl = process.env.REPORT_SERVICE_URL;
+      const port = process.env.PORT || 4004;
+      const reportServiceUrl = `http://localhost:${port}/report`;
       const generateUrl = `${reportServiceUrl}/generate/student/${userId}`;
 
       this.logger.log(`Triggering report generation: ${generateUrl}`);
@@ -1315,10 +1338,6 @@ export class StudentService {
         });
         if (reportEntity && reportEntity.reportPassword) {
           password = reportEntity.reportPassword;
-          reportEntity.emailSent = true;
-          reportEntity.emailSentAt = new Date();
-          reportEntity.emailSentTo = user.email;
-          await this.assessmentReportRepository.save(reportEntity);
           break;
         }
         await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -1335,6 +1354,15 @@ export class StudentService {
       );
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const pdfBuffer = Buffer.from(pdfResponse.data, 'binary');
+
+      let attachmentFileName = `${(registration.fullName || 'Student').replace(/\s/g, '_')}_Report.pdf`;
+      const contentDisposition = pdfResponse.headers['content-disposition'];
+      if (contentDisposition && typeof contentDisposition === 'string') {
+        const match = contentDisposition.match(/filename="?([^";]+)"?/);
+        if (match && match[1]) {
+          attachmentFileName = match[1];
+        }
+      }
 
       // 7. Send Email
       const dateStr = new Date().toLocaleDateString('en-US', {
@@ -1355,32 +1383,11 @@ export class StudentService {
         assets,
         dateStr,
         ((registration as any).program?.reportTitle as string) ||
-          'Self Discovery Report',
+        'Self Discovery Report',
       );
 
       // --- Transporter Setup ---
-      const region =
-        this.configService.get<string>('AWS_REGION') ||
-        this.configService.get<string>('AWS_DEFAULT_REGION');
-      const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-      const secretAccessKey = this.configService.get<string>(
-        'AWS_SECRET_ACCESS_KEY',
-      );
-
-      if (!region || !accessKeyId || !secretAccessKey) {
-        throw new Error('AWS SES Config Missing');
-      }
-
-      const ses = new SES({
-        accessKeyId,
-        secretAccessKey,
-        region,
-      });
-
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      const transporter = nodemailer.createTransport({
-        SES: ses,
-      } as any);
+      const transporter = this.createEmailTransporter();
       // -------------------------
 
       const mailOptions = {
@@ -1391,7 +1398,7 @@ export class StudentService {
         html: emailHtml,
         attachments: [
           {
-            filename: `${(registration.fullName || 'Student').replace(/\s/g, '_')}_Report.pdf`,
+            filename: attachmentFileName,
             content: pdfBuffer,
             contentType: 'application/pdf',
           },
@@ -1400,8 +1407,272 @@ export class StudentService {
 
       await transporter.sendMail(mailOptions);
       this.logger.log(`Assessment completion email sent to ${user.email}`);
+
+      // Update assessment_reports to track the sent email
+      if (session) {
+        const reportEntity = await this.assessmentReportRepository.findOne({
+          where: { assessmentSessionId: session.id },
+        });
+        if (reportEntity) {
+          reportEntity.emailSent = true;
+          reportEntity.emailSentAt = new Date();
+          reportEntity.emailSentTo = user.email;
+          await this.assessmentReportRepository.save(reportEntity);
+          this.logger.log(
+            `assessment_reports updated: email_sent=true for session ${session.id}`,
+          );
+        }
+      }
     } catch (error) {
       this.logger.error('Failed to send assessment completion email', error);
+      throw error; // Re-throw so pg-boss marks the job as failed and retries
+    }
+  }
+
+  async sendManualReportEmail(userId: number, toEmail?: string): Promise<void> {
+    this.logger.log(
+      `Manual report email requested for user ${userId}${toEmail ? ` to ${toEmail}` : ''}`,
+    );
+
+    try {
+      // 1. Look up user
+      const user = await this.userRepo.findOne({ where: { id: userId } });
+      if (!user) {
+        throw new Error(`User not found: ${userId}`);
+      }
+
+      const recipientEmail = toEmail || user.email;
+
+      // 2. Look up registration
+      const registration = await this.registrationRepo.findOne({
+        where: { userId },
+        relations: ['program'],
+      });
+      if (!registration) {
+        throw new Error(`No registration found for user ${userId}`);
+      }
+
+      // 3. Find the latest completed session
+      const session = await this.sessionRepo.findOne({
+        where: { userId, registrationId: registration.id, status: 'COMPLETED' },
+        order: { createdAt: 'DESC' },
+      });
+      if (!session) {
+        throw new Error(`No completed session found for user ${userId}`);
+      }
+
+      // 4. Get report entity for password
+      const reportEntity = await this.assessmentReportRepository.findOne({
+        where: { assessmentSessionId: session.id },
+      });
+
+      const password = reportEntity?.reportPassword || 'Please contact support';
+
+      // 5. Generate + download PDF
+      const port = this.configService.get<number>('PORT') || 4004;
+      const reportServiceUrl = `http://localhost:${port}/report`;
+      const generateUrl = `${reportServiceUrl}/generate/student/${userId}`;
+      this.logger.log(`Triggering report generation: ${generateUrl}`);
+
+      const generateResponse = await lastValueFrom(
+        this.httpService.get(generateUrl),
+      );
+      const responseData = generateResponse.data as {
+        success: boolean;
+        jobId: string;
+      };
+      if (!responseData.success || !responseData.jobId) {
+        throw new Error('Failed to initiate report generation');
+      }
+
+      const jobId = responseData.jobId;
+      this.logger.log(`Report generation started. Job ID: ${jobId}`);
+
+      // Poll for completion
+      let jobStatus: 'PROCESSING' | 'COMPLETED' | 'ERROR' = 'PROCESSING';
+      let attempts = 0;
+      const maxAttempts = 30;
+      const pollUrl = `${reportServiceUrl}/download/status/${jobId}?json=true`;
+
+      while (jobStatus === 'PROCESSING' && attempts < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        try {
+          const statusRes = await lastValueFrom(this.httpService.get(pollUrl));
+          const statusData = statusRes.data as {
+            status: 'PROCESSING' | 'COMPLETED' | 'ERROR';
+            error?: string;
+          };
+          jobStatus = statusData.status;
+          if (jobStatus === 'ERROR') {
+            throw new Error(`Report generation failed: ${statusData.error}`);
+          }
+        } catch (err) {
+          this.logger.warn(
+            `Polling failed for job ${jobId}: ${(err as Error).message}`,
+          );
+        }
+        attempts++;
+      }
+
+      if (jobStatus !== 'COMPLETED') {
+        throw new Error(
+          `Report generation timed out. Final Status: ${jobStatus}`,
+        );
+      }
+
+      // Download PDF
+      const downloadUrl = `${reportServiceUrl}/download/status/${jobId}`;
+      const pdfResponse = await lastValueFrom(
+        this.httpService.get(downloadUrl, { responseType: 'arraybuffer' }),
+      );
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      const pdfBuffer = Buffer.from(pdfResponse.data, 'binary');
+
+      let attachmentFileName = `${(registration.fullName || 'Student').replace(/\s/g, '_')}_Report.pdf`;
+      const contentDisposition = pdfResponse.headers['content-disposition'];
+      if (contentDisposition && typeof contentDisposition === 'string') {
+        const match = contentDisposition.match(/filename="?([^";]+)"?/);
+        if (match && match[1]) {
+          attachmentFileName = match[1];
+        }
+      }
+
+      // 6. Build exam date from session
+      const examDate = session.updatedAt
+        ? new Date(session.updatedAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })
+        : new Date().toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
+
+      const reportTitle =
+        ((registration as any).program?.reportTitle as string) ||
+        'Self Discovery Report';
+
+      const assets = {
+        logo: 'https://mind.originbi.com/Origin-BI-Logo-01.png',
+        reportCover: 'https://mind.originbi.com/Origin-BI-Logo-01.png',
+      };
+
+      const isThirdParty = !!toEmail;
+
+      const emailHtml = getReportDeliveryEmailTemplate(
+        registration.fullName || 'Student',
+        password,
+        this.configService.get('FRONTEND_APP_URL') || 'http://localhost:3000',
+        assets,
+        examDate,
+        reportTitle,
+        undefined,
+        isThirdParty,
+      );
+
+      // 7. Send email
+      const transporter = this.createEmailTransporter();
+
+      const mailOptions = {
+        from: `"${this.configService.get('EMAIL_SEND_FROM_NAME') || 'Origin BI Mind Works'}" <${this.configService.get('EMAIL_FROM') || 'no-reply@originbi.com'}>`,
+        to: recipientEmail,
+        cc: [this.configService.get('EMAIL_CC') || ''],
+        subject: `Your Assessment Report – ${reportTitle}`,
+        html: emailHtml,
+        attachments: [
+          {
+            filename: attachmentFileName,
+            content: pdfBuffer,
+            contentType: 'application/pdf',
+          },
+        ],
+      };
+
+      await transporter.sendMail(mailOptions);
+      this.logger.log(
+        `Manual report email sent to ${recipientEmail} for user ${userId}`,
+      );
+
+      // 8. Update assessment_reports tracking
+      if (reportEntity) {
+        reportEntity.emailSent = true;
+        reportEntity.emailSentAt = new Date();
+        reportEntity.emailSentTo = recipientEmail;
+        await this.assessmentReportRepository.save(reportEntity);
+        this.logger.log(
+          `assessment_reports updated: email_sent=true for session ${session.id}`,
+        );
+      }
+    } catch (error) {
+      this.logger.error('Failed to send manual report email', error);
+      throw error;
+    }
+  }
+
+  async sendPlacementReportEmail(
+    groupId: number,
+    departmentId: number,
+    toEmail: string,
+    downloadUrl: string,
+    studentCount: number,
+    degreeType: string,
+    departmentName: string,
+  ): Promise<void> {
+    this.logger.log(
+      `Sending placement report email for group ${groupId}, dept ${departmentId} to ${toEmail} (${studentCount} students, ${degreeType} ${departmentName})`,
+    );
+
+    try {
+      // 1. Download the already-generated PDF from the report service
+      const pdfResponse = await lastValueFrom(
+        this.httpService.get(downloadUrl, { responseType: 'arraybuffer' }),
+      );
+      const pdfBuffer = Buffer.from(pdfResponse.data as ArrayBuffer);
+      this.logger.log(
+        `Downloaded placement report PDF: ${pdfBuffer.length} bytes`,
+      );
+
+      // 2. Create email transporter
+      const transporter = this.createEmailTransporter();
+
+      // 3. Build email using template
+      const fromName =
+        this.configService.get('EMAIL_SEND_FROM_NAME') ||
+        'Origin BI Mind Works';
+      const fromEmail =
+        this.configService.get('EMAIL_FROM') || 'no-reply@originbi.com';
+
+      const emailHtml = getPlacementReportEmailTemplate(
+        studentCount,
+        degreeType,
+        departmentName,
+        this.configService.get('FRONTEND_APP_URL') || 'http://localhost:3000',
+      );
+
+      const mailOptions = {
+        from: `"${fromName}" <${fromEmail}>`,
+        to: toEmail,
+        cc: [this.configService.get('EMAIL_CC') || ''],
+        subject: `Students Handbook – ${degreeType} ${departmentName}`,
+        html: emailHtml,
+        attachments: [
+          {
+            filename: `Students_Handbook_${degreeType}_${departmentName.replace(/\s+/g, '_')}.pdf`,
+            content: pdfBuffer,
+            contentType: 'application/pdf',
+          },
+        ],
+      };
+
+      await transporter.sendMail(mailOptions);
+      this.logger.log(
+        `Placement report email sent to ${toEmail} for group ${groupId}, dept ${departmentId}`,
+      );
+    } catch (error) {
+      this.logger.error('Failed to send placement report email', error);
+      throw error;
     }
   }
 }
