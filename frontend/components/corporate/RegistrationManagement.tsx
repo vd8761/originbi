@@ -37,6 +37,7 @@ const useDebounce = (value: string, delay: number) => {
 const RegistrationManagement: React.FC = () => {
   type ViewState = 'list' | 'add' | 'preview' | 'assessment-preview' | 'group-assessment-preview' | 'group-candidate-assessment-preview';
   const [view, setView] = useState<ViewState>("list");
+  const [corporateUserId, setCorporateUserId] = useState<string>("");
 
   const [activeTab, setActiveTab] = useState<"registrations" | "individual" | "group">("registrations");
 
@@ -90,6 +91,19 @@ const RegistrationManagement: React.FC = () => {
   // Initial Fetch for Tab Counts
   useEffect(() => {
     // Only fetching initial counts roughly, dynamic counts handled in fetchData
+  }, []);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      if (parsed?.id) {
+        setCorporateUserId(String(parsed.id));
+      }
+    } catch {
+      // Ignore malformed local storage payload.
+    }
   }, []);
 
   // Fetch Data Function
@@ -293,7 +307,16 @@ const RegistrationManagement: React.FC = () => {
 
   // Render Views
   if (view === "add") {
-    return <AddRegistrationForm onCancel={() => setView("list")} onRegister={() => { setView("list"); fetchData(); }} />;
+    return (
+      <AddRegistrationForm
+        onCancel={() => setView("list")}
+        onRegister={() => {
+          setView("list");
+          fetchData();
+        }}
+        corporateUserId={corporateUserId}
+      />
+    );
   }
 
   if (view === 'group-assessment-preview') {
