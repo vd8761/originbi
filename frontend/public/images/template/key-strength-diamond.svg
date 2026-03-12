@@ -1,0 +1,12 @@
+<svg width="60" height="120" viewBox="0 0 60 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Pastel diamond stack: pink top → yellow center → cyan bottom -->
+  <rect x="30" y="-2" width="30" height="30" rx="3" transform="rotate(45, 30, 13)" fill="#F2C4D0" fill-opacity="0.35"/>
+  <rect x="30" y="7" width="30" height="30" rx="3" transform="rotate(45, 30, 22)" fill="#F5C0B0" fill-opacity="0.4"/>
+  <rect x="30" y="16" width="30" height="30" rx="3" transform="rotate(45, 30, 31)" fill="#F8D098" fill-opacity="0.5"/>
+  <rect x="30" y="25" width="30" height="30" rx="3" transform="rotate(45, 30, 40)" fill="#FADE78" fill-opacity="0.6"/>
+  <rect x="30" y="34" width="32" height="32" rx="3" transform="rotate(45, 30, 50)" fill="#FFE840" fill-opacity="0.85"/>
+  <rect x="30" y="45" width="30" height="30" rx="3" transform="rotate(45, 30, 60)" fill="#C8E868" fill-opacity="0.55"/>
+  <rect x="30" y="54" width="30" height="30" rx="3" transform="rotate(45, 30, 69)" fill="#90D8A8" fill-opacity="0.45"/>
+  <rect x="30" y="63" width="30" height="30" rx="3" transform="rotate(45, 30, 78)" fill="#78C8D8" fill-opacity="0.4"/>
+  <rect x="30" y="72" width="30" height="30" rx="3" transform="rotate(45, 30, 87)" fill="#98D8E8" fill-opacity="0.3"/>
+</svg>

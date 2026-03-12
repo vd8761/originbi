@@ -128,28 +128,28 @@ function useClickOutside(ref: React.RefObject<HTMLElement | null>, handler: () =
 
 const STATUS_STYLES: Record<JobStatus, { bg: string; text: string; dot: string; border: string }> = {
     Active: {
-        bg: "bg-[#EAFBF1] dark:bg-brand-green/20",
-        text: "text-brand-green",
-        dot: "bg-brand-green",
-        border: "border border-brand-green/55 dark:border-brand-green/50",
+        bg: "bg-[#E8F8F0] dark:bg-[#1F6A45]",
+        text: "text-[#1F6A45] dark:text-white",
+        dot: "bg-[#1F6A45] dark:bg-brand-green",
+        border: "border border-transparent dark:border-[#2B8A59]",
     },
     Draft: {
-        bg: "bg-[#FFF9E6] dark:bg-[#FFB800]/20",
-        text: "text-[#FFB800] dark:text-amber-400",
-        dot: "bg-[#FFB800]",
-        border: "border border-[#FFB800]/50 dark:border-[#FFB800]/50",
+        bg: "bg-[#FFF8E6] dark:bg-[#6B5B23]",
+        text: "text-[#D99A00] dark:text-white",
+        dot: "bg-[#D99A00] dark:bg-[#FFB800]",
+        border: "border border-transparent dark:border-[#86702A]",
     },
     Closed: {
-        bg: "bg-[#FFE8E8] dark:bg-[#FF4B4B]/20",
-        text: "text-[#FF4B4B] dark:text-red-400",
-        dot: "bg-[#FF4B4B]",
-        border: "border border-[#FF4B4B]/50 dark:border-[#FF4B4B]/50",
+        bg: "bg-[#FFEBEB] dark:bg-[#6A2B2B]",
+        text: "text-[#FF4B4B] dark:text-white",
+        dot: "bg-[#FF4B4B] dark:bg-[#FF4B4B]",
+        border: "border border-transparent dark:border-[#8A3A3A]",
     },
     Hold: {
-        bg: "bg-purple-50 dark:bg-purple-500/20",
-        text: "text-purple-600 dark:text-purple-400",
-        dot: "bg-purple-500",
-        border: "border border-purple-500/50 dark:border-purple-500/50",
+        bg: "bg-[#F3F4F6] dark:bg-[#4D5A53]",
+        text: "text-[#6B7280] dark:text-white",
+        dot: "bg-[#6B7280] dark:bg-purple-500",
+        border: "border border-transparent dark:border-[#64726B]",
     },
 };
 
@@ -176,7 +176,7 @@ function StatusBadge({
                 <ChevronDownIcon className="w-2.5 h-2.5" />
             </button>
             {open && (
-                <div className="absolute right-0 top-full mt-1 w-28 bg-white dark:bg-[#303438] border border-gray-200 dark:border-white/10 rounded-lg shadow-xl z-50 overflow-hidden py-1">
+                <div className="absolute right-0 top-full mt-1 w-28 bg-white dark:bg-[#27322C] border border-gray-200 dark:border-white/10 rounded-lg shadow-xl z-50 overflow-hidden py-1">
                     {(["Active", "Draft", "Hold"] as JobStatus[]).map((opt) => (
                         <button
                             key={opt}
@@ -185,9 +185,9 @@ function StatusBadge({
                                 onChangeStatus?.(opt);
                                 setOpen(false);
                             }}
-                            className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-brand-green/10 transition-colors ${opt === status
-                                ? "bg-brand-green/30 dark:bg-brand-green/30 text-[#19211C] dark:text-white font-medium"
-                                : "text-[#19211C] dark:text-white"
+                            className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${opt === status
+                                ? "bg-brand-green/10 dark:bg-brand-green/25 text-brand-green dark:text-white font-medium"
+                                : "text-gray-700 dark:text-white"
                                 }`}
                         >
                             {opt}
@@ -217,7 +217,7 @@ function ThreeDotMenu({ onAction }: { onAction: (action: string) => void }) {
         <div className="relative" ref={ref}>
             <button
                 onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-                className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer group/btn ${open ? "bg-brand-green shadow-sm text-white" : "bg-white dark:bg-[#252A27] border border-gray-200 dark:border-white/10 hover:bg-brand-green hover:shadow-sm hover:border-transparent text-gray-400 dark:text-gray-500 hover:text-white"}`}
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer group/btn ${open ? "bg-brand-green shadow-sm text-white" : "bg-gray-100 dark:bg-[#2A312D] border border-gray-200 dark:border-white/15 hover:bg-brand-green hover:shadow-sm hover:border-transparent text-gray-500 dark:text-white/50 hover:text-white"}`}
             >
                 {/* Horizontal three dots */}
                 <svg width="14" height="4" viewBox="0 0 14 4" fill="currentColor" className="transition-colors">
@@ -227,19 +227,23 @@ function ThreeDotMenu({ onAction }: { onAction: (action: string) => void }) {
                 </svg>
             </button>
             {open && (
-                <div className="absolute right-0 top-full mt-1 w-36 bg-white dark:bg-[#303438] border border-gray-200 dark:border-white/10 rounded-lg shadow-xl z-50 overflow-hidden py-1 text-left">
-                    {items.map((item) => (
-                        <button
-                            key={item.key}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onAction(item.key);
-                                setOpen(false);
-                            }}
-                            className="w-full text-left px-4 py-2.5 text-[13px] hover:bg-gray-50 dark:hover:bg-white/10 transition-colors text-[#19211C] dark:text-white"
-                        >
-                            {item.label}
-                        </button>
+                <div className="absolute right-0 top-full mt-1 w-36 bg-white dark:bg-[#27322C] border border-gray-200 dark:border-white/10 rounded-lg shadow-xl z-50 overflow-hidden text-left">
+                    {items.map((item, index) => (
+                        <div key={item.key} className="relative">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onAction(item.key);
+                                    setOpen(false);
+                                }}
+                                className="w-full text-left px-4 py-3 text-[13px] hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-gray-700 dark:text-white"
+                            >
+                                {item.label}
+                            </button>
+                            {index < items.length - 1 && (
+                                <div className="absolute bottom-0 left-4 right-4 h-px bg-gray-100 dark:bg-white/10" />
+                            )}
+                        </div>
                     ))}
                 </div>
             )}
@@ -254,18 +258,30 @@ function JobCard({ job, onStatusChange, onAction }: {
     onStatusChange: (id: string, status: JobStatus) => void;
     onAction: (id: string, action: string) => void;
 }) {
+    const [clicked, setClicked] = useState(false);
+
+    const handleClick = () => {
+        setClicked(true);
+        setTimeout(() => {
+            onAction(job.id, "view");
+        }, 300);
+    };
+
     return (
         <div
-            onClick={() => onAction(job.id, "view")}
-            className="bg-white dark:bg-[#252A27] border border-[#E8E8E8] dark:border-brand-green/25 rounded-xl px-5 py-4 transition-all hover:shadow-md hover:border-brand-green/60 dark:hover:border-brand-green/40 group cursor-pointer">
+            onClick={handleClick}
+            className={`bg-white dark:bg-[#2A312D] border rounded-xl px-6 py-5 transition-all duration-200 group cursor-pointer ${clicked
+                ? "border-[#13D669] shadow-[0_0_8px_rgba(19,214,105,0.2)]"
+                : "border-gray-200 dark:border-[#3A4A3F] hover:border-brand-green dark:hover:border-white/30"
+                }`}>
             {/* Top row: Job ID + Status + Menu */}
-            <div className="flex items-center justify-between mb-2">
-                <h3 className="text-[15px] font-semibold text-[#19211C] dark:text-white group-hover:text-brand-green transition-colors">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+                <h3 className="text-[20px] sm:text-[24px] font-semibold text-gray-900 dark:text-white leading-tight">
                     {job.title}
                 </h3>
-                <div className="flex items-center gap-2.5">
-                    <span className="bg-[#F5F5F5] dark:bg-white/5 px-2 py-1 rounded-[4px] text-[10px] font-medium text-[#19211C] dark:text-white">
-                        Job ID : <span className="dark:text-brand-green">{job.jobId}</span>
+                <div className="flex items-center gap-3 flex-wrap">
+                    <span className="bg-gray-100 dark:bg-white/10 px-3 py-1.5 rounded-[6px] text-[13px] font-medium text-gray-700 dark:text-white/90 border border-transparent whitespace-nowrap">
+                        Job ID : <span className="text-brand-green">{job.jobId}</span>
                     </span>
                     <StatusBadge
                         status={job.status}
@@ -276,61 +292,61 @@ function JobCard({ job, onStatusChange, onAction }: {
             </div>
 
             {/* Company info */}
-            <p className="text-[13px] text-gray-500 dark:text-gray-400 mb-3">
+            <p className="text-[16px] text-gray-500 dark:text-white/60 mb-4">
                 {job.company} | {job.location}, {job.employmentType}
             </p>
 
             {/* Bottom row: Dates on left, Stats on right */}
-            <div className="flex items-end justify-between gap-4 mt-auto">
+            <div className="flex flex-col xl:flex-row items-start xl:items-end justify-between gap-4 mt-auto w-full overflow-hidden">
                 {/* Dates */}
-                <div className="flex flex-col gap-2 flex-shrink-0">
+                <div className="flex flex-col gap-2 shrink-0">
                     {job.expiresIn && (
                         <div className="flex">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded text-[12px] font-semibold bg-red-50 text-red-600 border-red-200 dark:bg-red-500/15 dark:text-[#FF8888] dark:border-red-400/30">
                                 Expires in {job.expiresIn} Days
                             </span>
                         </div>
                     )}
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-brand-green">
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-1.5 text-[13px] text-gray-500 dark:text-white/60 whitespace-nowrap">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-brand-green shrink-0">
                                 <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                 <path d="M16 2V6M8 2V6M3 10H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                             {job.expiresIn ? "Posted Today" : `Posted on ${job.postedDate}`}
                         </div>
-                        <span className="w-[4px] h-[4px] rounded-full bg-brand-green/80" />
-                        <div className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                        <span className="w-[5px] h-[5px] rounded-full bg-brand-green/80 shrink-0" />
+                        <div className="flex items-center gap-1.5 text-[13px] text-gray-500 dark:text-white/60 whitespace-nowrap">
                             Closes at {job.closingDate}
                         </div>
                     </div>
                 </div>
 
                 {/* Stats strip */}
-                <div className="flex items-center bg-[#F8FBF9] dark:bg-white/[0.04] border border-[#E8E8E8] dark:border-[#E8E8E8]/15 rounded-[6px] px-2 py-2.5 shadow-sm min-w-[500px] justify-between ml-auto">
-                    <div className="text-center px-4 flex-1">
-                        <div className="text-[20px] font-semibold text-[#11007A] dark:text-white leading-tight mb-1">{job.totalApplicants}</div>
-                        <div className="text-[14px] font-normal text-[#19211C] dark:text-gray-300 leading-tight whitespace-nowrap">Total Applicants</div>
+                <div className="flex items-center bg-[#F6F4F7] dark:bg-[#34403A] rounded-[8px] px-3 py-3 w-full xl:w-auto xl:min-w-[480px] 2xl:min-w-[540px] justify-between xl:ml-auto border border-gray-100 dark:border-transparent overflow-x-auto scrollbar-hide">
+                    <div className="text-center px-3 flex-1 min-w-[100px]">
+                        <div className="text-[20px] sm:text-[24px] font-semibold text-[#141566] dark:text-white leading-tight mb-1">{job.totalApplicants}</div>
+                        <div className="text-[12px] sm:text-[13px] font-normal text-[#2E2E2E] dark:text-white/70 leading-tight whitespace-nowrap">Total Applicants</div>
                     </div>
-                    <div className="w-px h-[32px] bg-[#E0E0E0] dark:bg-white/10 shrink-0" />
-                    <div className="text-center px-4 flex-1">
-                        <div className="text-[20px] font-semibold text-[#11007A] dark:text-white leading-tight mb-1">{job.newApplicants}</div>
-                        <div className="text-[14px] font-normal text-[#19211C] dark:text-gray-300 leading-tight whitespace-nowrap">New Applicants</div>
+                    <div className="w-px h-[36px] bg-gray-200 dark:bg-white/[0.08] shrink-0" />
+                    <div className="text-center px-3 flex-1 min-w-[100px]">
+                        <div className="text-[20px] sm:text-[24px] font-semibold text-[#141566] dark:text-white leading-tight mb-1">{job.newApplicants}</div>
+                        <div className="text-[12px] sm:text-[13px] font-normal text-[#2E2E2E] dark:text-white/70 leading-tight whitespace-nowrap">New Applicants</div>
                     </div>
-                    <div className="w-px h-[32px] bg-[#E0E0E0] dark:bg-white/10 shrink-0" />
-                    <div className="text-center px-4 flex-1">
-                        <div className="text-[20px] font-semibold text-[#11007A] dark:text-white leading-tight mb-1">{job.shortListed}</div>
-                        <div className="text-[14px] font-normal text-[#19211C] dark:text-gray-300 leading-tight whitespace-nowrap">Short Listed</div>
+                    <div className="w-px h-[36px] bg-gray-200 dark:bg-white/[0.08] shrink-0" />
+                    <div className="text-center px-3 flex-1 min-w-[90px]">
+                        <div className="text-[20px] sm:text-[24px] font-semibold text-[#141566] dark:text-white leading-tight mb-1">{job.shortListed}</div>
+                        <div className="text-[12px] sm:text-[13px] font-normal text-[#2E2E2E] dark:text-white/70 leading-tight whitespace-nowrap">Short Listed</div>
                     </div>
-                    <div className="w-px h-[32px] bg-[#E0E0E0] dark:bg-white/10 shrink-0" />
-                    <div className="text-center px-4 flex-1">
-                        <div className="text-[20px] font-semibold text-[#11007A] dark:text-white leading-tight mb-1">{job.hired}</div>
-                        <div className="text-[14px] font-normal text-[#19211C] dark:text-gray-300 leading-tight whitespace-nowrap">Hired</div>
+                    <div className="w-px h-[36px] bg-gray-200 dark:bg-white/[0.08] shrink-0" />
+                    <div className="text-center px-3 flex-1 min-w-[80px]">
+                        <div className="text-[20px] sm:text-[24px] font-semibold text-[#141566] dark:text-white leading-tight mb-1">{job.hired}</div>
+                        <div className="text-[12px] sm:text-[13px] font-normal text-[#2E2E2E] dark:text-white/70 leading-tight whitespace-nowrap">Hired</div>
                     </div>
-                    <div className="w-px h-[32px] bg-[#E0E0E0] dark:bg-white/10 shrink-0" />
-                    <div className="text-center px-4 flex-1">
-                        <div className="text-[20px] font-semibold text-[#11007A] dark:text-white leading-tight mb-1">{String(job.rejected).padStart(2, "0")}</div>
-                        <div className="text-[14px] font-normal text-[#19211C] dark:text-gray-300 leading-tight whitespace-nowrap">Rejected</div>
+                    <div className="w-px h-[36px] bg-gray-200 dark:bg-white/[0.08] shrink-0" />
+                    <div className="text-center px-3 flex-1 min-w-[80px]">
+                        <div className="text-[20px] sm:text-[24px] font-semibold text-gray-900 dark:text-white leading-tight mb-1">{String(job.rejected).padStart(2, "0")}</div>
+                        <div className="text-[12px] sm:text-[13px] font-normal text-gray-500 dark:text-white/70 leading-tight whitespace-nowrap">Rejected</div>
                     </div>
                 </div>
             </div>
@@ -352,24 +368,24 @@ function FilterItem({
     onChange: () => void;
 }) {
     return (
-        <button onClick={onChange} className="flex items-center gap-3 cursor-pointer group py-2.5 w-full text-left transition-colors border-b border-[#F0F0F0] dark:border-white/5 last:border-b-0">
-            <span
-                className={`w-[16px] h-[16px] rounded-[3px] shrink-0 transition-colors flex items-center justify-center border ${checked
-                    ? "bg-[#EAFBF1] dark:bg-brand-green/20 border-brand-green text-brand-green"
-                    : "bg-transparent border-[#D0D0D0] dark:border-white/20"
-                    }`}
-            >
-                {checked && (
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                        <path d="M2 5.5L4 7.5L8 2.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                )}
-            </span>
-            <span className={`text-[13px] flex-1 ${checked ? "text-brand-green font-medium" : "text-[#5A5A5A] dark:text-gray-300"}`}>{label}</span>
-            {count !== undefined && (
-                <span className="text-[12px] text-gray-400 dark:text-gray-500">({count})</span>
-            )}
-        </button>
+        <div className="border-b border-gray-100 dark:border-white/5 last:border-0 pb-1 mb-1">
+            <button onClick={onChange} className="flex items-center gap-3 cursor-pointer group py-2.5 px-2 w-full text-left transition-all hover:bg-gray-50/80 dark:hover:bg-white/5 rounded-md">
+                <span
+                    className={`w-[16px] h-[16px] rounded-[2px] shrink-0 transition-colors border ${checked
+                        ? "bg-brand-green border-brand-green"
+                        : "bg-white dark:bg-white/10 group-hover:bg-gray-50 dark:group-hover:bg-white/20 border-gray-300 dark:border-white/15"
+                        }`}
+                />
+                <div className="flex items-center gap-1.5 flex-1">
+                    <span className={`text-[13px] font-normal ${checked ? "text-gray-900 dark:text-white" : "text-gray-600 dark:text-white/80"}`}>{label}</span>
+                    {count !== undefined && (
+                        <span className={`text-[13px] font-normal ${checked ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-white/60"}`}>
+                            ({count})
+                        </span>
+                    )}
+                </div>
+            </button>
+        </div>
     );
 }
 
@@ -387,15 +403,15 @@ function FilterSection({
     const [open, setOpen] = useState(defaultOpen);
 
     return (
-        <div className="border border-[#E8E8E8] dark:border-white/10 rounded-lg mb-4 overflow-hidden">
+        <div className="mb-2 overflow-hidden bg-transparent">
             <button
                 onClick={() => setOpen(!open)}
-                className="flex items-center justify-between w-full px-4 py-3 text-[14px] font-semibold text-[#19211C] dark:text-white cursor-pointer hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors"
+                className="flex items-center justify-between w-full px-4 py-3 text-[14px] font-medium text-gray-900 dark:text-white cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
             >
                 {title}
-                <ChevronDownIcon className={`w-3.5 h-3.5 text-gray-400 transition-transform ${open ? "" : "-rotate-90"}`} />
+                <ChevronDownIcon className={`w-3.5 h-3.5 text-gray-400 dark:text-white/60 transition-transform ${open ? "" : "-rotate-90"}`} />
             </button>
-            <div className="border-t border-[#E8E8E8] dark:border-white/10" />
+            <div className="border-t border-gray-100 dark:border-white/10 mx-4" />
             {open && (
                 <div className="px-4 pb-3 pt-3 flex flex-col gap-1">
                     {children}
@@ -440,10 +456,10 @@ function FiltersSidebar({
     return (
         <div className="w-full">
             <div className="flex items-center justify-between mb-3">
-                <h3 className="text-[16px] font-semibold text-[#19211C] dark:text-white">Filters</h3>
+                <h3 className="text-[16px] font-medium text-gray-900 dark:text-white">Filters</h3>
                 <button
                     onClick={onClearAll}
-                    className={`text-[12px] transition-colors cursor-pointer ${hasFilters ? "text-brand-green hover:underline" : "text-gray-400 hover:text-brand-green"}`}
+                    className={`text-[12px] transition-colors cursor-pointer ${hasFilters ? "text-gray-600 dark:text-white/70 hover:text-brand-green dark:hover:text-brand-green" : "text-gray-400 dark:text-white/45 hover:text-brand-green dark:hover:text-brand-green"}`}
                 >
                     Clear all
                 </button>
@@ -572,6 +588,7 @@ export default function JobsPortal() {
     const [showEntriesDropdown, setShowEntriesDropdown] = useState(false);
     const [dateFilter, setDateFilter] = useState<DateFilter>("all");
     const [showDateDropdown, setShowDateDropdown] = useState(false);
+
 
     // Toast
     const [toast, setToast] = useState<{ message: string; submessage?: string } | null>(null);
@@ -738,7 +755,7 @@ export default function JobsPortal() {
     }
 
     return (
-        <div className="flex flex-col h-full w-full gap-5 font-sans p-4 sm:p-6 lg:p-8">
+        <div className="flex flex-col h-full w-full gap-5 font-sans p-4 sm:p-6 lg:p-8 bg-[#F9FAFB] dark:bg-[#19211C] min-h-screen">
             {/* Toast */}
             {toast && (
                 <ToastNotification
@@ -751,7 +768,7 @@ export default function JobsPortal() {
 
             {/* Breadcrumb + Title */}
             <div>
-                <div className="flex items-center text-xs text-black dark:text-white mb-1.5 font-normal">
+                <div className="flex items-center text-xs text-gray-500 dark:text-white/70 mb-1.5 font-normal">
                     <span>Dashboard</span>
                     <span className="mx-1.5">
                         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-gray-400 dark:text-gray-500">
@@ -760,13 +777,13 @@ export default function JobsPortal() {
                     </span>
                     <span className="text-brand-green font-semibold">Jobs</span>
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-semibold text-[#150089] dark:text-white">
+                <h1 className="text-[44px] font-semibold text-[#150089] dark:text-white leading-tight">
                     Job Posted
                 </h1>
             </div>
 
             {/* Tabs + Sort/Date/Create Row */}
-            <div className="flex flex-col xl:flex-row justify-between items-end xl:items-center border-b border-brand-light-tertiary dark:border-brand-dark-tertiary pb-0 gap-4 xl:gap-0">
+            <div className="flex flex-col xl:flex-row justify-between items-end xl:items-center border-b border-gray-200 dark:border-white/20 pb-0 gap-4 xl:gap-0">
                 {/* Tabs */}
                 <div className="flex items-center w-full xl:w-auto overflow-x-auto scrollbar-hide">
                     {([
@@ -778,33 +795,33 @@ export default function JobsPortal() {
                         <button
                             key={tab.key}
                             onClick={() => { setActiveTab(tab.key); setCurrentPage(1); }}
-                            className={`px-1 py-3 mr-8 text-[14px] border-b-[3px] transition-colors whitespace-nowrap cursor-pointer ${activeTab === tab.key
+                            className={`px-1 py-3 mr-8 text-[18px] border-b-[3px] transition-colors whitespace-nowrap cursor-pointer ${activeTab === tab.key
                                 ? "border-brand-green"
-                                : "border-transparent hover:border-gray-200 dark:hover:border-white/20"
+                                : "border-transparent hover:border-gray-300 dark:hover:border-white/20"
                                 }`}
                         >
-                            <span className={activeTab === tab.key ? "font-semibold text-[#19211C] dark:text-white" : "font-medium text-gray-500 dark:text-gray-400"}>{tab.label}</span>
-                            <span className={activeTab === tab.key ? "text-brand-green font-semibold ml-1.5" : "text-gray-400 dark:text-gray-500 font-medium ml-1.5"}>({tab.count})</span>
+                            <span className={activeTab === tab.key ? "font-semibold text-gray-900 dark:text-white" : "font-normal text-gray-500 dark:text-white/45"}>{tab.label}</span>
+                            <span className={activeTab === tab.key ? "text-brand-green font-semibold ml-1" : "text-gray-400 dark:text-white/45 font-medium ml-1"}>({tab.count})</span>
                         </button>
                     ))}
                 </div>
 
                 {/* Sort + Today + Create Job */}
-                <div className="flex items-center gap-2.5 py-2 w-full xl:w-auto justify-end flex-wrap">
+                <div className="flex flex-wrap md:flex-nowrap items-center gap-[27px] py-2 w-full xl:w-auto justify-end">
                     {/* Sort Dropdown */}
                     <div className="relative" ref={sortRef}>
                         <button
                             onClick={() => setShowSortDropdown(!showSortDropdown)}
-                            className="flex items-center gap-2 bg-white dark:bg-[#303438] px-3.5 py-[7px] rounded-full text-[13px] font-medium border border-[#E8E8E8] dark:border-white/10 hover:border-brand-green/50 transition-all text-[#19211C] dark:text-white cursor-pointer"
+                            className="flex items-center gap-2 bg-white dark:bg-[#23302A] px-4 py-[9px] rounded-[8px] text-[14px] font-medium border border-gray-200 dark:border-[#355041] hover:border-brand-green dark:hover:border-brand-green/60 transition-all text-gray-900 dark:text-white cursor-pointer h-[44px] shadow-sm dark:shadow-none"
                         >
-                            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" className="text-brand-green/70">
+                            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" className="text-brand-green">
                                 <path d="M5 1L9 8H1L5 1Z" />
                             </svg>
-                            <span className="flex-1 text-left px-1">Sort by Job Title</span>
-                            <ChevronDownIcon className={`w-3.5 h-3.5 text-black/50 transition-transform ${showSortDropdown ? "rotate-180" : ""}`} />
+                            <span className="text-left">Sort by</span>
+                            <ChevronDownIcon className={`w-3.5 h-3.5 text-gray-500 dark:text-white/60 transition-transform ${showSortDropdown ? "rotate-180" : ""}`} />
                         </button>
                         {showSortDropdown && (
-                            <div className="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-[#303438] border border-[#E8E8E8] dark:border-white/10 rounded-[10px] shadow-lg z-50 overflow-hidden py-0 text-left">
+                            <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-[#27322C] border border-gray-200 dark:border-white/10 rounded-[10px] shadow-lg z-50 overflow-hidden py-0 text-left">
                                 {SORT_OPTIONS.map((opt, index) => (
                                     <div key={opt.value} className="relative">
                                         <button
@@ -813,14 +830,14 @@ export default function JobsPortal() {
                                                 setShowSortDropdown(false);
                                             }}
                                             className={`w-full text-left px-5 py-3.5 text-[15px] transition-colors ${sortBy === opt.value
-                                                ? "bg-[#A7E9C0] dark:bg-brand-green/30 text-black dark:text-white font-medium"
-                                                : "text-[#333333] dark:text-white font-normal hover:bg-gray-50"
+                                                ? "bg-[#A2E0BA] dark:bg-brand-green/30 text-[#1F6A45] dark:text-white font-medium"
+                                                : "text-gray-700 dark:text-white font-normal hover:bg-gray-50 dark:hover:bg-white/5"
                                                 }`}
                                         >
                                             {opt.label}
                                         </button>
                                         {index < SORT_OPTIONS.length - 1 && (
-                                            <div className="w-full h-px bg-[#E8E8E8] dark:bg-white/10 absolute bottom-0 left-0" />
+                                            <div className="w-full h-px bg-gray-200 dark:bg-white/10 absolute bottom-0 left-0" />
                                         )}
                                     </div>
                                 ))}
@@ -832,17 +849,17 @@ export default function JobsPortal() {
                     <div className="relative" ref={dateRef}>
                         <button
                             onClick={() => setShowDateDropdown(!showDateDropdown)}
-                            className="flex items-center gap-2 bg-white dark:bg-[#303438] px-3.5 py-[7px] rounded-full text-[13px] font-medium border border-[#E8E8E8] dark:border-white/10 hover:border-brand-green/50 transition-all text-[#19211C] dark:text-white cursor-pointer"
+                            className="flex items-center gap-2 bg-white dark:bg-[#23302A] px-4 py-[9px] rounded-[8px] text-[14px] font-medium border border-gray-200 dark:border-[#355041] hover:border-brand-green dark:hover:border-brand-green/60 transition-all text-gray-900 dark:text-white cursor-pointer h-[44px] shadow-sm dark:shadow-none"
                         >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-brand-green">
                                 <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                 <path d="M16 2V6M8 2V6M3 10H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                             {dateFilter === "all" ? "Today" : DATE_FILTER_OPTIONS.find(o => o.value === dateFilter)?.label}
-                            <ChevronDownIcon className="w-2.5 h-2.5 text-gray-500 dark:text-gray-400" />
+                            <ChevronDownIcon className="w-2.5 h-2.5 text-gray-500 dark:text-white/60" />
                         </button>
                         {showDateDropdown && (
-                            <div className="absolute top-full right-0 mt-1 w-44 bg-white dark:bg-[#303438] border border-gray-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden py-1">
+                            <div className="absolute top-full right-0 mt-1 w-44 bg-white dark:bg-[#27322C] border border-gray-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden py-1">
                                 {DATE_FILTER_OPTIONS.map((opt) => (
                                     <button
                                         key={opt.value}
@@ -850,9 +867,9 @@ export default function JobsPortal() {
                                             setDateFilter(opt.value);
                                             setShowDateDropdown(false);
                                         }}
-                                        className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-white/10 transition-colors ${dateFilter === opt.value
+                                        className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${dateFilter === opt.value
                                             ? "text-brand-green font-medium bg-brand-green/5 dark:bg-brand-green/10"
-                                            : "text-[#19211C] dark:text-white"
+                                            : "text-gray-700 dark:text-white"
                                             }`}
                                     >
                                         {opt.label}
@@ -865,7 +882,7 @@ export default function JobsPortal() {
                     {/* Create Job Button */}
                     <button
                         onClick={() => setIsCreatingJob(true)}
-                        className="flex items-center gap-1.5 bg-brand-green hover:bg-[#10A958] text-white px-5 py-2.5 rounded-full text-[14px] font-medium transition-colors shadow-sm cursor-pointer whitespace-nowrap"
+                        className="flex items-center gap-1.5 bg-brand-green hover:bg-[#10A958] text-white px-6 py-[9px] rounded-[8px] text-[14px] font-semibold transition-colors shadow-sm cursor-pointer whitespace-nowrap h-[44px]"
                     >
                         Create Job
                         <PlusIcon className="w-3.5 h-3.5" />
@@ -876,8 +893,8 @@ export default function JobsPortal() {
             {/* Main Content: Sidebar + Jobs List */}
             <div className="flex gap-6 flex-1 min-h-0">
                 {/* Filters Sidebar */}
-                <div className="hidden lg:block w-[240px] shrink-0">
-                    <div className="bg-white dark:bg-[#252A27] border border-[#E8E8E8] dark:border-white/10 rounded-xl p-5 shadow-sm sticky top-6">
+                <div className="hidden lg:block w-[220px] xl:w-[240px] shrink-0">
+                    <div className="bg-white dark:bg-[#212A25] border border-gray-200 dark:border-white/10 rounded-xl p-5 sticky top-6 shadow-sm dark:shadow-none">
                         <FiltersSidebar
                             filters={filters}
                             onFilterChange={setFilters}
@@ -887,38 +904,38 @@ export default function JobsPortal() {
                 </div>
 
                 {/* Jobs Content */}
-                <div className="flex-1 min-w-0 flex flex-col gap-3">
+                <div className="flex-1 min-w-0 flex flex-col gap-3 bg-white dark:bg-[#212A25] border border-gray-200 dark:border-white/10 rounded-xl p-5 h-fit shadow-sm dark:shadow-none">
                     {/* Search + Pagination Bar */}
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                         {/* Search */}
-                        <div className="relative w-full sm:w-72">
+                        <div className="relative w-full sm:max-w-[420px]">
                             <input
                                 type="text"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 placeholder="Search By Job Title or Description..."
-                                className="w-full bg-transparent border border-[#19211C]/25 dark:border-brand-dark-tertiary rounded-lg py-2 pl-3.5 pr-9 text-[13px] text-[#19211C] dark:text-white placeholder-[#19211C]/40 placeholder:font-normal dark:placeholder-brand-text-secondary focus:outline-none focus:border-brand-green transition-colors"
+                                className="w-full bg-white dark:bg-transparent border border-gray-300 dark:border-white/35 rounded-xl py-2.5 pl-4 pr-10 text-[14px] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35 placeholder:font-normal focus:outline-none hover:border-gray-400 dark:hover:border-white/55 focus:border-brand-green transition-colors shadow-sm dark:shadow-none"
                             />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500">
-                                <SearchIcon className="w-3.5 h-3.5" />
+                            <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-white/40">
+                                <SearchIcon className="w-4 h-4" />
                             </div>
                         </div>
 
                         {/* Showing entries + nav */}
                         <div className="flex items-center gap-2.5 shrink-0">
-                            <span className="text-[13px] text-[#19211C] dark:text-brand-text-secondary font-[300]">
+                            <span className="text-[14px] text-gray-500 dark:text-white/60 font-normal">
                                 Showing
                             </span>
                             <div className="relative" ref={entriesRef}>
                                 <button
                                     onClick={() => setShowEntriesDropdown(!showEntriesDropdown)}
-                                    className="flex items-center gap-1.5 bg-[#E6FBF0] dark:bg-brand-green/20 px-2.5 py-1 rounded-[6px] text-[13px] text-brand-green font-semibold min-w-[50px] justify-between transition-all cursor-pointer"
+                                    className="flex items-center gap-1.5 bg-gray-50 dark:bg-white/10 border border-gray-200 dark:border-white/10 px-3 py-1.5 rounded-[8px] text-[14px] text-brand-green font-semibold min-w-[52px] justify-between transition-all cursor-pointer hover:border-brand-green/55 shadow-sm dark:shadow-none"
                                 >
                                     {entriesPerPage}
-                                    <ChevronDownIcon className={`w-2.5 h-2.5 text-brand-green transition-transform ${showEntriesDropdown ? 'rotate-180' : ''}`} />
+                                    <ChevronDownIcon className={`w-3 h-3 text-gray-400 dark:text-white/50 hover:text-brand-green transition-transform ${showEntriesDropdown ? 'rotate-180' : ''}`} />
                                 </button>
                                 {showEntriesDropdown && (
-                                    <div className="absolute top-full right-0 mt-1 w-20 bg-white dark:bg-[#303438] border border-gray-200 dark:border-white/10 rounded-lg shadow-xl z-50 overflow-hidden py-1">
+                                    <div className="absolute top-full right-0 mt-1 w-20 bg-white dark:bg-[#27322C] border border-gray-200 dark:border-white/10 rounded-lg shadow-xl z-50 overflow-hidden py-1">
                                         {[5, 10, 25, 50].map((num) => (
                                             <button
                                                 key={num}
@@ -927,9 +944,9 @@ export default function JobsPortal() {
                                                     setShowEntriesDropdown(false);
                                                     setCurrentPage(1);
                                                 }}
-                                                className={`w-full text-center py-1.5 text-[13px] hover:bg-gray-50 dark:hover:bg-white/10 cursor-pointer ${num === entriesPerPage
-                                                    ? "bg-brand-green/10 dark:bg-brand-green/20 text-[#19211C] dark:text-white font-medium"
-                                                    : "text-[#19211C] dark:text-white"
+                                                className={`w-full text-center py-1.5 text-[13px] hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer ${num === entriesPerPage
+                                                    ? "bg-brand-green/10 dark:bg-brand-green/20 text-brand-green dark:text-white font-medium"
+                                                    : "text-gray-700 dark:text-white"
                                                     }`}
                                             >
                                                 {num}
@@ -938,25 +955,25 @@ export default function JobsPortal() {
                                     </div>
                                 )}
                             </div>
-                            <span className="text-[13px] text-[#19211C] dark:text-brand-text-secondary whitespace-nowrap font-[300]">
+                            <span className="text-[14px] text-gray-500 dark:text-white/60 whitespace-nowrap font-normal">
                                 of {filteredJobs.length.toLocaleString()} entries
                             </span>
                             <div className="flex items-center gap-1.5 ml-1">
                                 <button
                                     onClick={() => handlePageChange(currentPage - 1)}
                                     disabled={currentPage === 1}
-                                    className="w-7 h-7 rounded-full bg-transparent flex items-center justify-center hover:bg-gray-100 dark:hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-gray-400 dark:text-gray-500"
+                                    className="w-10 h-10 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-gray-600 dark:text-white/70 hover:bg-brand-green dark:hover:bg-brand-green hover:text-white"
                                 >
-                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                                    <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
                                         <path d="M7.5 3L4.5 6L7.5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
                                 </button>
                                 <button
                                     onClick={() => handlePageChange(currentPage + 1)}
                                     disabled={currentPage === totalPages}
-                                    className="w-7 h-7 rounded-full bg-brand-green flex items-center justify-center text-white shadow-md shadow-brand-green/20 transition-colors hover:bg-brand-green/90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                    className="w-10 h-10 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-gray-600 dark:text-white/70 hover:bg-brand-green dark:hover:bg-brand-green hover:text-white"
                                 >
-                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                                    <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
                                         <path d="M4.5 3L7.5 6L4.5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
                                 </button>

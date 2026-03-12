@@ -18,6 +18,7 @@ import {
   OriginDataIcon,
   MyEmployeesIcon,
   UsersIcon,
+  CandidateIcon,
 } from '../icons';
 import { corporateDashboardService } from '../../lib/services';
 import { CorporateAccount } from '../../lib/types';
@@ -294,7 +295,7 @@ const Header: React.FC<HeaderProps> = ({
           <NavItem icon={<DashboardIcon className="w-4 h-4" />} label="Dashboard" active={activeView === "dashboard"} isMobile={isMobile} onClick={() => handleNavClick("dashboard")} />
           <NavItem icon={<MyEmployeesIcon className="w-4 h-4" />} label="My Employees" active={activeView === "registrations"} isMobile={isMobile} onClick={() => handleNavClick("registrations")} />
           <NavItem icon={<JobsIcon className="w-4 h-4" />} label="Jobs" active={activeView === "jobs"} isMobile={isMobile} onClick={() => handleNavClick("jobs")} />
-          <NavItem icon={<UsersIcon className="w-4 h-4" />} label="Candidates" active={activeView === "candidates"} isMobile={isMobile} onClick={() => handleNavClick("candidates")} />
+          <NavItem icon={<CandidateIcon className="w-4 h-4" />} label="Candidates" active={activeView === "candidates"} isMobile={isMobile} onClick={() => handleNavClick("candidates")} />
           <NavItem icon={<OriginDataIcon className="w-4 h-4" />} label="Origin Data" active={activeView === "origindata"} isMobile={isMobile} onClick={() => handleNavClick("origindata")} />
           <NavItem icon={<SettingsIcon className="w-4 h-4" />} label="Settings" active={activeView === "settings"} isMobile={isMobile} onClick={() => handleNavClick("settings")} />
         </>

@@ -3409,6 +3409,9 @@ JSON:`;
         'report', 'reports', 'result', 'results', 'score', 'scores',
         'assessment', 'data', 'details', 'info', 'information',
         'company', 'organization', 'department', 'performance', 'performer', 'performers',
+        'analyst', 'analysts', 'engineer', 'engineers', 'scientist', 'scientists',
+        'architect', 'architects', 'consultant', 'consultants', 'specialist', 'specialists',
+        'career', 'careers', 'path', 'paths', 'skills',
       ]);
 
       const searchWords = result.searchTerm.toLowerCase().split(/\s+/);
@@ -3458,6 +3461,45 @@ JSON:`;
           this.logger.log(`🎯 Reclassified to: ${result.intent}`);
         }
       }
+    }
+
+    // Advanced guardrail: role/topic phrase should not stay in person_lookup.
+    if (result.intent === 'person_lookup' && result.searchTerm && this.isLikelyRoleOrTopicPhrase(result.searchTerm)) {
+      const looksLikeCandidateMatching = /\b(candidate|candidates|people|person)\b/i.test(q) && /\b(for|suitable|fit|match)\b/i.test(q);
+      this.logger.warn(`🔄 Domain override: person_lookup searchTerm "${result.searchTerm}" looks like a role/topic phrase`);
+      if (looksLikeCandidateMatching) {
+        return {
+          ...result,
+          intent: 'jd_candidate_match',
+          searchTerm: null,
+          table: 'assessment_attempts',
+          includePersonality: true,
+        };
+      }
+      return {
+        ...result,
+        intent: 'general_knowledge',
+        searchTerm: null,
+        table: 'none',
+        includePersonality: false,
+      };
+    }
+
+    // Final guardrail: if person_lookup is triggered for a clear informational query,
+    // reroute to general_knowledge and clear searchTerm.
+    if (result.intent === 'person_lookup' &&
+      (/\bskills?\s+(for|to|needed|required|of|in)\b/.test(q) ||
+        /\bcareer\s*paths?\b/.test(q) ||
+        /\b(ask|tell)\s+me\s+about\b/.test(q)) &&
+      !/\b(my|candidate|registration|student|user|employee|resource|company|corporate|organization|score|result|assessment|test|report)\b/.test(q)) {
+      this.logger.warn('🔄 Domain override: informational career/skills query misrouted to person_lookup, correcting to general_knowledge');
+      return {
+        ...result,
+        intent: 'general_knowledge',
+        searchTerm: null,
+        table: 'none',
+        includePersonality: false,
+      };
     }
 
     return result;
@@ -4111,6 +4153,14 @@ JSON:`;
       return { intent: 'self_results', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
     }
 
+    // Guardrail: career/skills informational queries must NEVER become person lookup.
+    if ((/\bskills?\s+(for|to|needed|required|of|in)\b/.test(q) ||
+      /\bcareer\s*paths?\b/.test(q) ||
+      /\b(ask|tell)\s+me\s+about\b/.test(q)) &&
+      !/\b(my|candidate|registration|student|user|employee|resource|company|corporate|organization|score|result|assessment|test|list|show|get|count|how\s+many)\b/.test(q)) {
+      return { intent: 'general_knowledge', searchTerm: null, table: 'none', includePersonality: false };
+    }
+
     // Test results / test report for a specific person
     if (/\b(test|exam|assessment)\s*(result|score|report)s?\b/.test(q) || /\bresults?\b/.test(q)) {
       const name = this.extractName(question);
@@ -4119,7 +4169,7 @@ JSON:`;
 
     // Person lookup: "[name]'s score" or "show [name]" or "[name] report"
     const possibleName = this.extractName(question);
-    if (possibleName && /\b(score|result|detail|profile|data|report)\b/.test(q)) {
+    if (possibleName && /\b(score|result|detail|profile|report)\b/.test(q)) {
       return { intent: 'person_lookup', searchTerm: possibleName, table: 'assessment_attempts', includePersonality: true };
     }
 
@@ -4320,6 +4370,41 @@ JSON:`;
     }
   }
 
+  /**
+   * Detect role/topic phrases that can be mistaken for person names.
+   */
+  private isLikelyRoleOrTopicPhrase(text: string): boolean {
+    const value = (text || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!value) return false;
+
+    const roleIndicators = [
+      'analyst', 'engineer', 'developer', 'manager', 'architect', 'consultant',
+      'specialist', 'scientist', 'designer', 'administrator', 'officer', 'executive',
+      'lead', 'intern', 'cfo', 'ceo', 'cto', 'coo', 'hr',
+    ];
+    const domainIndicators = [
+      'data', 'business', 'financial', 'software', 'network', 'security', 'cloud',
+      'marketing', 'sales', 'operations', 'product', 'project', 'frontend', 'backend',
+      'full stack', 'devops', 'machine learning', 'artificial intelligence', 'ai',
+      'career', 'skills', 'path', 'paths', 'job', 'role', 'technology',
+    ];
+
+    const hasRoleIndicator = roleIndicators.some((k) => value.includes(k));
+    const hasDomainIndicator = domainIndicators.some((k) => value.includes(k));
+    const words = value.split(' ').filter(Boolean);
+
+    if (hasRoleIndicator && hasDomainIndicator) return true;
+    if (hasRoleIndicator && words.length <= 4) return true;
+    if (/\bcareer\s+paths?\b/.test(value) || /\bskills?\s+for\b/.test(value)) return true;
+
+    return false;
+  }
+
   private fallbackInterpretation(question: string): {
     intent: string;
     searchTerm: string | null;
@@ -4441,9 +4526,21 @@ JSON:`;
       };
     }
 
+    // Guardrail: keep informational skill/career prompts in general knowledge.
+    if (qLowerUniq.match(/\bskills?\s+(for|to|needed|required|of|in)\b/) ||
+      qLowerUniq.match(/\bcareer\s*paths?\b/) ||
+      qLowerUniq.match(/\b(ask|tell)\s+me\s+about\b/)) {
+      return {
+        intent: 'general_knowledge',
+        searchTerm: null,
+        table: 'none',
+        includePersonality: false,
+      };
+    }
+
     // Default - try to find a name
     const name = this.extractName(question);
-    if (name) {
+    if (name && !this.isLikelyRoleOrTopicPhrase(name)) {
       return {
         intent: 'person_lookup',
         searchTerm: name,
@@ -4494,6 +4591,8 @@ JSON:`;
       'corporate', 'business', 'employer', 'companies', 'corporates',
       'development', 'developer', 'engineering', 'full', 'stack',
       'frontend', 'backend', 'manager', 'lead', 'senior', 'junior',
+      'analyst', 'analysts', 'engineer', 'engineers', 'scientist', 'scientists',
+      'architect', 'architects', 'consultant', 'consultants', 'specialist', 'specialists',
       'role', 'position', 'job', 'work', 'tasks', 'skill', 'skills',
       'information', 'info', 'help', 'status', 'count',
       // Gender terms — NOT person names
@@ -4506,6 +4605,7 @@ JSON:`;
       // Follow-up / structural words — NOT person names
       'along', 'with', 'without', 'including', 'education', 'qualification',
       'qualifications', 'experience', 'details', 'detail', 'score', 'scores',
+      'path', 'paths', 'career', 'careers',
     ]);
 
     for (const pattern of patterns) {
@@ -4535,7 +4635,7 @@ JSON:`;
           return null;
         }
 
-        if (name && !stopWords.has(name.toLowerCase()) && name.length >= 2) {
+        if (name && !stopWords.has(name.toLowerCase()) && name.length >= 2 && !this.isLikelyRoleOrTopicPhrase(name)) {
           return name;
         }
       }
