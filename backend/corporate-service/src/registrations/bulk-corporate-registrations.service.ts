@@ -109,18 +109,8 @@ export class BulkCorporateRegistrationsService {
     const allPrograms = await this.programRepo.find();
     const programMap = new Map<string, Program>();
     allPrograms.forEach((p) => {
-      // Only allow Employee and CXO General
-      const normName = this.normalizeString(p.name);
-      if (
-        normName.includes('employee') ||
-        normName.includes('cxo') ||
-        normName.includes('general') ||
-        normName.includes('college') ||
-        p.code === 'COLLEGE_STUDENT'
-      ) {
-        programMap.set(this.normalizeString(p.code), p);
-        programMap.set(normName, p);
-      }
+      programMap.set(this.normalizeString(p.code), p);
+      programMap.set(this.normalizeString(p.name), p);
     });
 
     // Fetch Groups for Matching (Only for this Corporate Account)
@@ -447,8 +437,8 @@ export class BulkCorporateRegistrationsService {
     const allPrograms = await this.programRepo.find();
     const programMap = new Map<string, Program>();
     allPrograms.forEach((p) => {
+      programMap.set(this.normalizeString(p.code), p);
       programMap.set(this.normalizeString(p.name), p);
-      programMap.set(this.normalizeString(p.code), p); // Add code mapping too
     });
 
     const allDepartments = await this.departmentRepo.find();
@@ -588,6 +578,14 @@ export class BulkCorporateRegistrationsService {
           failCount++;
         }
         await this.bulkImportRowRepo.save(batch.rows);
+
+        // Fix stuck processing issue
+        await this.bulkImportRepo.increment(
+          { id: jobId },
+          'processedCount',
+          batch.rows.length,
+        );
+
         continue;
       }
 
@@ -609,24 +607,66 @@ export class BulkCorporateRegistrationsService {
           );
         }
 
-        this.logger.log(
-          `Creating GroupAssessment for Group: ${group.id}, Program: ${programId}`,
-        );
+        if (programId) {
+          this.logger.log(
+            `Creating GroupAssessment for Group: ${group.id}, Program: ${programId}`,
+          );
 
-        const groupAssessment = this.groupAssessmentRepo.create({
-          groupId: Number(group.id),
-          programId: programId,
-          validFrom,
-          validTo,
-          totalCandidates: batch.rows.length,
-          status: 'NOT_STARTED',
-          corporateAccountId: corporateAccountId,
-          createdByUserId: createdById,
-          metadata: { importId: jobId, source: 'BULK_UPLOAD' },
-        });
+          const groupAssessment = this.groupAssessmentRepo.create({
+            groupId: Number(group.id),
+            programId: programId,
+            validFrom,
+            validTo,
+            totalCandidates: batch.rows.length,
+            status: 'NOT_STARTED',
+            corporateAccountId: corporateAccountId,
+            createdByUserId: createdById,
+            metadata: { importId: jobId, source: 'BULK_UPLOAD' },
+          });
 
-        const savedGA = await this.groupAssessmentRepo.save(groupAssessment);
-        groupAssessmentId = savedGA.id;
+          const savedGA = await this.groupAssessmentRepo.save(groupAssessment);
+          groupAssessmentId = savedGA.id;
+        } else {
+          // Fallback: Find any active program
+          this.logger.warn(
+            `Program ID not found in batch template. Attempting to use default active program.`,
+          );
+          const defaultProgram = allPrograms.find((p) => p.isActive);
+
+          if (defaultProgram) {
+            this.logger.log(
+              `Using Default Program: ${defaultProgram.name} (ID: ${defaultProgram.id})`,
+            );
+
+            const groupAssessment = this.groupAssessmentRepo.create({
+              groupId: Number(group.id),
+              programId: Number(defaultProgram.id),
+              validFrom,
+              validTo,
+              totalCandidates: batch.rows.length,
+              status: 'NOT_STARTED',
+              corporateAccountId: corporateAccountId,
+              createdByUserId: createdById,
+              metadata: {
+                importId: jobId,
+                source: 'BULK_UPLOAD',
+                note: 'Used default program',
+              },
+            });
+            const savedGA = await this.groupAssessmentRepo.save(groupAssessment);
+            groupAssessmentId = savedGA.id;
+
+            // Important: Update the DTOs in this batch to use this program ID
+            for (const d of batch.dtos) {
+              if (!d.programType) d.programType = defaultProgram.id;
+            }
+          } else {
+            this.logger.error(
+              `CRITICAL: No programType in CSV and no default active program found.`,
+            );
+            throw new Error(`CRITICAL: No programType in CSV and no default active program found.`);
+          }
+        }
       } catch (err) {
         this.logger.error(
           `CRITICAL: Failed to create GroupAssessment Header for batch ${batch.groupName}`,
@@ -641,6 +681,14 @@ export class BulkCorporateRegistrationsService {
           failCount++;
         }
         await this.bulkImportRowRepo.save(batch.rows);
+
+        // Fix stuck processing issue
+        await this.bulkImportRepo.increment(
+          { id: jobId },
+          'processedCount',
+          batch.rows.length,
+        );
+
         continue; // Stop processing this batch
       }
 
@@ -835,22 +883,16 @@ export class BulkCorporateRegistrationsService {
     degreeMap?: Map<string, DepartmentDegree>,
   ) {
     const pCode = this.getValue(rawData, ['ProgramId', 'program_code']);
-    let pName = 'Employee'; // Default fallback? Or strict?
-
-    const program = pCode
-      ? programMap.get(this.normalizeString(pCode))
-      : undefined;
+    let pId: any = null;
+    let isCollege = false;
+    let isSchool = false;
 
     if (pCode) {
-      // Check if matches specific keywords
-      const norm = this.normalizeString(pCode);
-      if (norm.includes('cxo')) pName = 'CXO General';
-      else if (norm.includes('employee')) pName = 'Employee';
-      else if (norm.includes('college') || norm === 'collegestudent' || norm === 'collegestudents')
-        pName = 'College Students';
-      else {
-        // If user provided exact name 'CXO General Assessment' etc.
-        if (programMap.has(norm)) pName = programMap.get(norm).name;
+      const pObj = programMap.get(this.normalizeString(pCode));
+      if (pObj) {
+        pId = pObj.id;
+        isCollege = pObj.name.toLowerCase().includes('college') || pCode.toUpperCase().includes('COLLEGE');
+        isSchool = pObj.name.toLowerCase().includes('school') || pCode.toUpperCase().includes('SCHOOL');
       }
     }
 
@@ -861,11 +903,13 @@ export class BulkCorporateRegistrationsService {
       'CurrentYear',
       'current_year',
       'Year',
+      'year',
     ]);
 
-    if (pName === 'College Students' && degreeMap) {
+    if (isCollege && degreeMap) {
       const deptName = this.getValue(rawData, [
-        'Department',
+        'DepartmentId',
+        'department_degree',
         'department',
         'Stream',
       ]);
@@ -892,8 +936,24 @@ export class BulkCorporateRegistrationsService {
       gender: (
         this.getValue(rawData, ['Gender', 'gender']) || 'FEMALE'
       ).toUpperCase() as any,
-      programType: pName,
+
+      programType: pId,
       groupName: groupName,
+
+      schoolLevel: isSchool
+        ? this.getValue(rawData, ['SchoolLevel', 'school_level'])
+        : undefined,
+      schoolStream: isSchool
+        ? this.getValue(rawData, ['SchoolStream', 'school_stream'])
+        : undefined,
+      studentBoard: isSchool
+        ? this.getValue(rawData, ['StudentBoard', 'student_board', 'board'])
+        : undefined,
+
+      departmentId: deptId ? String(deptId) : undefined,
+      degreeId: degreeId ? String(degreeId) : undefined,
+      currentYear: currentYear ? String(currentYear) : undefined,
+
       password:
         this.getValue(rawData, ['Password', 'password']) || 'Welcome@123',
       sendEmail: (() => {
@@ -906,9 +966,6 @@ export class BulkCorporateRegistrationsService {
       examEnd: this.parseDateAsIST(
         this.getValue(rawData, ['ExamEnd', 'exam_end_date', 'valid_to']),
       ),
-      departmentId: deptId ? String(deptId) : undefined,
-      degreeId: degreeId ? String(degreeId) : undefined,
-      currentYear: currentYear ? String(currentYear) : undefined,
     };
   }
 
@@ -1035,38 +1092,44 @@ export class BulkCorporateRegistrationsService {
 
     if (!programCode) return 'Program is required';
     const program = programMap.get(this.normalizeString(programCode));
-    // Also allow generic keywords
-    const pNorm = this.normalizeString(programCode);
-    const isValidProgram =
-      program ||
-      pNorm.includes('employee') ||
-      pNorm.includes('cxo') ||
-      pNorm.includes('general') ||
-      pNorm.includes('college') ||
-      pNorm === 'collegestudent';
+    if (!program) return `Program '${programCode}' not found`;
 
-    if (!isValidProgram) {
-      return `Program '${programCode}' invalid. Must be 'Employee', 'CXO General' or 'College Students'.`;
-    }
+    const isSchool = program.name.toLowerCase().includes('school');
+    const isCollege = program.name.toLowerCase().includes('college');
 
-    // College Specific Validation
-    const effectivePName =
-      program?.name ||
-      (pNorm.includes('cxo')
-        ? 'CXO General'
-        : pNorm.includes('college') || pNorm === 'collegestudent' || pNorm === 'collegestudents'
-          ? 'College Students'
-          : 'Employee');
+    if (isSchool) {
+      const level = (
+        row['SchoolLevel'] ||
+        row['school_level'] ||
+        ''
+      ).toUpperCase();
+      if (!level) return 'School Level is required for School Students';
+      if (!['SSLC', 'HSC'].includes(level))
+        return 'School Level valid values are SSLC, HSC';
 
-    if (effectivePName === 'College Students') {
-      const deptName = this.getValue(row, ['Department', 'department', 'Stream']);
-      const currentYear = this.getValue(row, ['CurrentYear', 'current_year', 'Year']);
+      if (level === 'HSC') {
+        const stream = (
+          row['SchoolStream'] ||
+          row['school_stream'] ||
+          ''
+        ).toLowerCase();
+        const validStreams = ['science', 'commerce', 'humanities'];
+        if (!stream) return 'Stream is required for HSC students';
+        if (!validStreams.includes(stream))
+          return 'Stream must be Science, Commerce, or Humanities for HSC';
+      }
+    } else if (isCollege) {
+      const deptName = row['DepartmentId'] || row['department_degree'] || row['department'];
+      const currentYear = row['CurrentYear'] || row['current_year'];
 
       if (!deptName) return 'Department is required for College Students';
       if (!currentYear) return 'Current Year is required for College Students';
 
       const dd = degreeMap.get(this.normalizeString(deptName));
       if (!dd) return `Department '${deptName}' not found in system.`;
+
+      if (!['1', '2', '3', '4'].includes(String(currentYear).trim()))
+        return 'Current Year must be 1, 2, 3, or 4';
     }
 
     // 4. Dates
