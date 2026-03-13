@@ -33,6 +33,12 @@ import {
 } from '@originbi/shared-entities';
 import { CorporateRegistrationsService } from './corporate-registrations.service';
 
+type DegreeTypeRow = {
+  id: string | number;
+  name: string;
+  [key: string]: unknown;
+};
+
 @Injectable()
 export class BulkCorporateRegistrationsService {
   private readonly logger = new Logger(BulkCorporateRegistrationsService.name);
@@ -144,10 +150,10 @@ export class BulkCorporateRegistrationsService {
       }
     });
 
-    const degreeMap = new Map<string, any>();
+    const degreeMap = new Map<string, DegreeTypeRow>();
     const deptDegreeMap = new Map<string, string>(); // Map<departmentId_degreeTypeId, departmentDegreeId>
     try {
-      const allDegrees: any[] = await this.dataSource.query(
+      const allDegrees: DegreeTypeRow[] = await this.dataSource.query(
         'SELECT * FROM degree_types',
       );
       allDegrees.forEach((d) => {
@@ -490,10 +496,10 @@ export class BulkCorporateRegistrationsService {
       }
     });
 
-    const degreeMap = new Map<string, any>();
+    const degreeMap = new Map<string, DegreeTypeRow>();
     const deptDegreeMap = new Map<string, string>(); // Map<departmentId_degreeTypeId, departmentDegreeId>
     try {
-      const allDegrees: any[] = await this.dataSource.query(
+      const allDegrees: DegreeTypeRow[] = await this.dataSource.query(
         'SELECT * FROM degree_types',
       );
       allDegrees.forEach((d) => {
@@ -943,8 +949,8 @@ export class BulkCorporateRegistrationsService {
 
   private resolveDegreeType(
     degreeName: string,
-    degreeMap: Map<string, any>,
-  ): any | null {
+    degreeMap: Map<string, DegreeTypeRow>,
+  ): DegreeTypeRow | null {
     const norm = this.normalizeString(degreeName);
     if (!norm) return null;
 
@@ -977,7 +983,7 @@ export class BulkCorporateRegistrationsService {
     groupName: string,
     programMap: Map<string, Program>,
     deptMap: Map<string, Department>,
-    degreeMap: Map<string, any>,
+    degreeMap: Map<string, DegreeTypeRow>,
     deptDegreeMap: Map<string, string>,
   ) {
     const pCode = this.getValue(rawData, ['ProgramId', 'program_code']);
@@ -1086,7 +1092,7 @@ export class BulkCorporateRegistrationsService {
     importJob: BulkImport,
     programMap: Map<string, Program>,
     deptMap: Map<string, Department>,
-    degreeMap: Map<string, any>,
+    degreeMap: Map<string, DegreeTypeRow>,
     deptDegreeMap: Map<string, string>,
     allGroups: Groups[],
     groupMap: Map<string, Groups>,
@@ -1175,7 +1181,7 @@ export class BulkCorporateRegistrationsService {
     row: any,
     programMap: Map<string, Program>,
     deptMap: Map<string, Department>,
-    degreeMap: Map<string, any>,
+    degreeMap: Map<string, DegreeTypeRow>,
     deptDegreeMap: Map<string, string>,
     userMapByEmail: Map<string, User>, // Changed from AdminUser to User
     userMapByMobile: Map<string, User>, // Changed from AdminUser to User
