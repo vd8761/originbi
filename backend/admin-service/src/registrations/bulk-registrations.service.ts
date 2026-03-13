@@ -56,7 +56,7 @@ export class BulkRegistrationsService {
     private groupAssessmentRepo: Repository<GroupAssessment>,
     private dataSource: DataSource,
     private readonly registrationsService: RegistrationsService,
-  ) {}
+  ) { }
 
   /**
    * Phase 1: Preview & Validate
@@ -92,6 +92,9 @@ export class BulkRegistrationsService {
     const groupMap = new Map<string, Groups>();
     allGroups.forEach((g) => {
       groupMap.set(this.normalizeString(g.name), g);
+      if (g.code) {
+        groupMap.set(this.normalizeString(g.code), g);
+      }
     });
 
     const allDepartments = await this.departmentRepo.find();
@@ -406,15 +409,20 @@ export class BulkRegistrationsService {
 
     for (const row of rows) {
       try {
-        let effectiveGroupName =
-          row.rawData['GroupName'] || row.rawData['group_name'];
+        let effectiveGroupName = this.getValue(row.rawData, [
+          'GroupName',
+          'group_name',
+          'Corporate',
+          'corporate',
+          'Group',
+        ]);
         if (row.matchedGroupId) {
           const matchedName = groupMap.get(Number(row.matchedGroupId));
           if (matchedName) effectiveGroupName = matchedName;
         }
         const dto = this.mapRowToDto(
           row.rawData,
-          effectiveGroupName,
+          effectiveGroupName || '',
           programMap,
           deptMap,
           degreeMap,
@@ -429,13 +437,13 @@ export class BulkRegistrationsService {
         const eDate = dto.examEnd
           ? new Date(dto.examEnd).toISOString()
           : 'default_end';
-        const gNameNorm = this.normalizeString(effectiveGroupName);
+        const gNameNorm = this.normalizeString(effectiveGroupName || '');
 
         const key = `${gNameNorm}|${pId}|${sDate}|${eDate}`;
 
         if (!batchMap.has(key)) {
           batchMap.set(key, {
-            groupName: effectiveGroupName,
+            groupName: effectiveGroupName || '',
             dtoTemplate: dto, // Store sample for dates/program
             rows: [],
             dtos: [],
@@ -444,6 +452,7 @@ export class BulkRegistrationsService {
         const batch = batchMap.get(key)!;
         batch.rows.push(row);
         batch.dtos.push(dto);
+        batch.groupName = effectiveGroupName || '';
       } catch (err: any) {
         this.logger.error(`Row ${row.rowIndex} mapping failed`, err);
         row.status = 'FAILED';
@@ -474,6 +483,9 @@ export class BulkRegistrationsService {
             .createQueryBuilder('g')
             .where('LOWER(g.name) = :name', {
               name: batch.groupName.toLowerCase(),
+            })
+            .orWhere('LOWER(g.code) = :code', {
+              code: batch.groupName.toLowerCase(),
             })
             .getOne();
         }
@@ -828,11 +840,11 @@ export class BulkRegistrationsService {
       degreeId: undefined, // Not used in registration directly, inferred via DepartmentDegree
       currentYear: isCollege
         ? this.getValue(rawData, [
-            'current_year',
-            'CurrentYear',
-            'Year',
-            'year',
-          ])
+          'current_year',
+          'CurrentYear',
+          'Year',
+          'year',
+        ])
         : undefined,
 
       password: this.getValue(rawData, ['Password', 'password']) || 'Admin@123',
@@ -925,10 +937,10 @@ export class BulkRegistrationsService {
     }
 
     // Group Matching Logic
-    const groupNameInput = rawData['GroupName'] || rawData['group_name'];
+    const groupNameInput = this.getValue(rawData, ['GroupName', 'group_name', 'Corporate', 'corporate', 'Group']);
     if (!groupNameInput) {
       rowEntity.status = 'INVALID';
-      rowEntity.errorMessage = 'Group Name is required';
+      rowEntity.errorMessage = 'Group Name/Corporate is required';
       return rowEntity;
     }
 
