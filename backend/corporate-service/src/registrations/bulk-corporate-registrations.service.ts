@@ -130,6 +130,9 @@ export class BulkCorporateRegistrationsService {
     const groupMap = new Map<string, Groups>();
     allGroups.forEach((g) => {
       groupMap.set(this.normalizeString(g.name), g);
+      if (g.code) {
+        groupMap.set(this.normalizeString(g.code), g);
+      }
     });
 
     const allDepartments = await this.departmentRepo.find();
@@ -139,6 +142,9 @@ export class BulkCorporateRegistrationsService {
     const departmentMap = new Map<string, Department>();
     allDepartments.forEach((d) => {
       departmentMap.set(this.normalizeString(d.name), d);
+      if (d.shortName) {
+        departmentMap.set(this.normalizeString(d.shortName), d);
+      }
     });
 
     const degreeMap = new Map<string, DepartmentDegree>();
@@ -146,6 +152,12 @@ export class BulkCorporateRegistrationsService {
       // Map by standard names like "B.Tech IT" or just "IT"
       const key = this.normalizeString(`${dd.department.name}`);
       degreeMap.set(key, dd);
+      if (dd.department.shortName) {
+        const shortKey = this.normalizeString(dd.department.shortName);
+        if (!degreeMap.has(shortKey)) {
+          degreeMap.set(shortKey, dd);
+        }
+      }
     });
 
     // 3. Parse All Rows First
@@ -424,6 +436,13 @@ export class BulkCorporateRegistrationsService {
       where: { corporateAccountId },
     });
     const groupMap = new Map(allGroups.map((g) => [Number(g.id), g.name]));
+    const groupMapForMatching = new Map<string, Groups>();
+    allGroups.forEach((g) => {
+      groupMapForMatching.set(this.normalizeString(g.name), g);
+      if (g.code) {
+        groupMapForMatching.set(this.normalizeString(g.code), g);
+      }
+    });
 
     const allPrograms = await this.programRepo.find();
     const programMap = new Map<string, Program>();
@@ -439,6 +458,9 @@ export class BulkCorporateRegistrationsService {
     const departmentMap = new Map<string, Department>();
     allDepartments.forEach((d) => {
       departmentMap.set(this.normalizeString(d.name), d);
+      if (d.shortName) {
+        departmentMap.set(this.normalizeString(d.shortName), d);
+      }
     });
 
     const degreeMap = new Map<string, DepartmentDegree>();
@@ -446,6 +468,12 @@ export class BulkCorporateRegistrationsService {
       // Map by standard names like "B.Tech IT" or just "IT"
       const key = this.normalizeString(`${dd.department.name}`);
       degreeMap.set(key, dd);
+      if (dd.department.shortName) {
+        const shortKey = this.normalizeString(dd.department.shortName);
+        if (!degreeMap.has(shortKey)) {
+          degreeMap.set(shortKey, dd);
+        }
+      }
     });
 
     const rows = await this.bulkImportRowRepo.find({
@@ -468,8 +496,13 @@ export class BulkCorporateRegistrationsService {
     >();
 
     for (const row of rows) {
-      let effectiveGroupName =
-        row.rawData['GroupName'] || row.rawData['group_name'];
+      let effectiveGroupName = this.getValue(row.rawData, [
+        'GroupName',
+        'group_name',
+        'Corporate',
+        'corporate',
+        'Group',
+      ]);
       if (row.matchedGroupId) {
         const matchedName = groupMap.get(Number(row.matchedGroupId));
         if (matchedName) effectiveGroupName = matchedName;
@@ -477,7 +510,7 @@ export class BulkCorporateRegistrationsService {
 
       const dto = this.mapRowToDto(
         row.rawData,
-        effectiveGroupName,
+        effectiveGroupName || '',
         programMap,
         degreeMap,
       );
@@ -490,12 +523,12 @@ export class BulkCorporateRegistrationsService {
       }
 
       // Create Batch Key
-      const batchKey = `${this.normalizeString(effectiveGroupName)}|${programId || 'UNKNOWN'}`;
+      const batchKey = `${this.normalizeString(effectiveGroupName || '')}|${programId || 'UNKNOWN'}`;
 
       if (!batches.has(batchKey)) {
         batches.set(batchKey, {
           key: batchKey,
-          groupName: effectiveGroupName,
+          groupName: effectiveGroupName || '',
           programType: String(programId || 0), // store ID as string key
           examStart: dto.examStart,
           examEnd: dto.examEnd,
@@ -521,8 +554,8 @@ export class BulkCorporateRegistrationsService {
       // A. Create/Find Group
       let group = allGroups.find(
         (g) =>
-          this.normalizeString(g.name) ===
-          this.normalizeString(batch.groupName),
+          this.normalizeString(g.name) === this.normalizeString(batch.groupName) ||
+          (g.code && this.normalizeString(g.code) === this.normalizeString(batch.groupName)),
       );
       try {
         // If group doesn't exist in map but was passed, Create it ONLY if we are sure?
@@ -900,10 +933,10 @@ export class BulkCorporateRegistrationsService {
     }
 
     // Group Matching Logic
-    const groupNameInput = rawData['GroupName'] || rawData['group_name'];
+    const groupNameInput = this.getValue(rawData, ['GroupName', 'group_name', 'Corporate', 'corporate', 'Group']);
     if (!groupNameInput) {
       rowEntity.status = 'INVALID';
-      rowEntity.errorMessage = 'Group Name is required';
+      rowEntity.errorMessage = 'Group Name/Corporate is required';
       return rowEntity;
     }
 
