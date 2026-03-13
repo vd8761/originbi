@@ -1165,7 +1165,7 @@ export class BulkRegistrationsService {
       );
 
       if (activeSession) {
-        return `Error: AdminUser already has an active assessment (Status: ${activeSession.status}). Cannot create a new one.`;
+        return `Error: User already has an active assessment (Status: ${activeSession.status}). Cannot create a new one.`;
       }
     } else {
       // New User -> Check Duplicates within the file itself
