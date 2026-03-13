@@ -352,204 +352,176 @@ export class BulkRegistrationsService {
     job.status = 'PROCESSING';
     await this.bulkImportRepo.save(job);
 
-    // Pre-fetch reference data
-    const allGroups = await this.groupsRepo.find({ select: ['id', 'name'] });
-    const groupMap = new Map(allGroups.map((g) => [Number(g.id), g.name]));
-
-    const allPrograms = await this.programRepo.find();
-    const programMap = new Map<string, Program>();
-    allPrograms.forEach((p) => {
-      programMap.set(this.normalizeString(p.code), p);
-      programMap.set(this.normalizeString(p.name), p);
-    });
-
-    const allDepartments = await this.departmentRepo.find();
-    const deptMap = new Map<string, Department>();
-    allDepartments.forEach((d) => {
-      deptMap.set(this.normalizeString(d.name), d);
-      if (d.shortName) deptMap.set(this.normalizeString(d.shortName), d);
-    });
-
-    const degreeMap = new Map<string, any>();
     try {
-      const allDegrees: any[] = await this.dataSource.query(
-        'SELECT * FROM degree_types',
-      );
-      allDegrees.forEach((d) => {
-        degreeMap.set(this.normalizeString(d.name), d);
+
+      // Pre-fetch reference data
+      const allGroups = await this.groupsRepo.find({ select: ['id', 'name'] });
+      const groupMap = new Map(allGroups.map((g) => [Number(g.id), g.name]));
+
+      const allPrograms = await this.programRepo.find();
+      const programMap = new Map<string, Program>();
+      allPrograms.forEach((p) => {
+        programMap.set(this.normalizeString(p.code), p);
+        programMap.set(this.normalizeString(p.name), p);
       });
-    } catch (e) {
-      this.logger.warn(
-        'Could not fetch degree_types table, skipping degree validation',
-        e,
-      );
-    }
 
-    const allDeptDegrees = await this.departmentDegreeRepo.find();
-    const deptDegreeMap = new Map<string, string>();
-    allDeptDegrees.forEach((dd) => {
-      deptDegreeMap.set(`${dd.departmentId}_${dd.degreeTypeId}`, dd.id);
-    });
+      const allDepartments = await this.departmentRepo.find();
+      const deptMap = new Map<string, Department>();
+      allDepartments.forEach((d) => {
+        deptMap.set(this.normalizeString(d.name), d);
+        if (d.shortName) deptMap.set(this.normalizeString(d.shortName), d);
+      });
 
-    const rows = await this.bulkImportRowRepo.find({
-      where: { importId: jobId, status: 'READY' },
-      order: { rowIndex: 'ASC' },
-    });
-
-    // 1. Group Rows by Batch (Group + Program + Dates)
-    const batchMap = new Map<
-      string,
-      {
-        groupName: string;
-        dtoTemplate: any;
-        rows: BulkImportRow[];
-        dtos: any[];
-      }
-    >();
-
-    for (const row of rows) {
+      const degreeMap = new Map<string, any>();
       try {
-        let effectiveGroupName = this.getValue(row.rawData, [
-          'GroupName',
-          'group_name',
-          'Corporate',
-          'corporate',
-          'Group',
-        ]);
-        if (row.matchedGroupId) {
-          const matchedName = groupMap.get(Number(row.matchedGroupId));
-          if (matchedName) effectiveGroupName = matchedName;
+        const allDegrees: any[] = await this.dataSource.query(
+          'SELECT * FROM degree_types',
+        );
+        allDegrees.forEach((d) => {
+          degreeMap.set(this.normalizeString(d.name), d);
+        });
+      } catch (e) {
+        this.logger.warn(
+          'Could not fetch degree_types table, skipping degree validation',
+          e,
+        );
+      }
+
+      const allDeptDegrees = await this.departmentDegreeRepo.find();
+      const deptDegreeMap = new Map<string, string>();
+      allDeptDegrees.forEach((dd) => {
+        deptDegreeMap.set(`${dd.departmentId}_${dd.degreeTypeId}`, dd.id);
+      });
+
+      const rows = await this.bulkImportRowRepo.find({
+        where: { importId: jobId, status: 'READY' },
+        order: { rowIndex: 'ASC' },
+      });
+
+      // 1. Group Rows by Batch (Group + Program + Dates)
+      const batchMap = new Map<
+        string,
+        {
+          groupName: string;
+          dtoTemplate: any;
+          rows: BulkImportRow[];
+          dtos: any[];
         }
-        const dto = this.mapRowToDto(
-          row.rawData,
-          effectiveGroupName || '',
-          programMap,
-          deptMap,
-          degreeMap,
-          deptDegreeMap,
+      >();
+
+      for (const row of rows) {
+        try {
+          let effectiveGroupName = this.getValue(row.rawData, [
+            'GroupName',
+            'group_name',
+            'Corporate',
+            'corporate',
+            'Group',
+          ]);
+          if (row.matchedGroupId) {
+            const matchedName = groupMap.get(Number(row.matchedGroupId));
+            if (matchedName) effectiveGroupName = matchedName;
+          }
+          const dto = this.mapRowToDto(
+            row.rawData,
+            effectiveGroupName || '',
+            programMap,
+            deptMap,
+            degreeMap,
+            deptDegreeMap,
+          );
+
+          // Use a composite key to group assessments
+          const pId = dto.programType || '0';
+          const sDate = dto.examStart
+            ? new Date(dto.examStart).toISOString()
+            : 'default_start';
+          const eDate = dto.examEnd
+            ? new Date(dto.examEnd).toISOString()
+            : 'default_end';
+          const gNameNorm = this.normalizeString(effectiveGroupName || '');
+
+          const key = `${gNameNorm}|${pId}|${sDate}|${eDate}`;
+
+          if (!batchMap.has(key)) {
+            batchMap.set(key, {
+              groupName: effectiveGroupName || '',
+              dtoTemplate: dto, // Store sample for dates/program
+              rows: [],
+              dtos: [],
+            });
+          }
+          const batch = batchMap.get(key)!;
+          batch.rows.push(row);
+          batch.dtos.push(dto);
+          batch.groupName = effectiveGroupName || '';
+        } catch (err: any) {
+          this.logger.error(`Row ${row.rowIndex} mapping failed`, err);
+          row.status = 'FAILED';
+          row.errorMessage = err.message || 'Mapping error';
+          row.resultType = 'FAILED_VALIDATION';
+          await this.bulkImportRowRepo.save(row);
+        }
+      }
+
+      let successCount = 0;
+      let failCount = 0;
+
+      // 2. Process Batches
+      for (const [key, batch] of batchMap) {
+        let groupAssessmentId: number | null = null;
+        this.logger.log(
+          `Processing Batch: ${batch.groupName} with ${batch.rows.length} rows`,
         );
 
-        // Use a composite key to group assessments
-        const pId = dto.programType || '0';
-        const sDate = dto.examStart
-          ? new Date(dto.examStart).toISOString()
-          : 'default_start';
-        const eDate = dto.examEnd
-          ? new Date(dto.examEnd).toISOString()
-          : 'default_end';
-        const gNameNorm = this.normalizeString(effectiveGroupName || '');
-
-        const key = `${gNameNorm}|${pId}|${sDate}|${eDate}`;
-
-        if (!batchMap.has(key)) {
-          batchMap.set(key, {
-            groupName: effectiveGroupName || '',
-            dtoTemplate: dto, // Store sample for dates/program
-            rows: [],
-            dtos: [],
+        try {
+          // A. Ensure Group Exists
+          let group = await this.groupsRepo.findOne({
+            where: { name: batch.groupName },
           });
-        }
-        const batch = batchMap.get(key)!;
-        batch.rows.push(row);
-        batch.dtos.push(dto);
-        batch.groupName = effectiveGroupName || '';
-      } catch (err: any) {
-        this.logger.error(`Row ${row.rowIndex} mapping failed`, err);
-        row.status = 'FAILED';
-        row.errorMessage = err.message || 'Mapping error';
-        row.resultType = 'FAILED_VALIDATION';
-        await this.bulkImportRowRepo.save(row);
-      }
-    }
 
-    let successCount = 0;
-    let failCount = 0;
+          if (!group) {
+            group = await this.groupsRepo
+              .createQueryBuilder('g')
+              .where('LOWER(g.name) = :name', {
+                name: batch.groupName.toLowerCase(),
+              })
+              .orWhere('LOWER(g.code) = :code', {
+                code: batch.groupName.toLowerCase(),
+              })
+              .getOne();
+          }
 
-    // 2. Process Batches
-    for (const [key, batch] of batchMap) {
-      let groupAssessmentId: number | null = null;
-      this.logger.log(
-        `Processing Batch: ${batch.groupName} with ${batch.rows.length} rows`,
-      );
+          if (!group) {
+            this.logger.log(`Creating new group: ${batch.groupName}`);
+            group = this.groupsRepo.create({
+              name: batch.groupName,
+              createdByUserId: job.createdById,
+              isActive: true,
+            });
+            group = await this.groupsRepo.save(group);
+          }
 
-      try {
-        // A. Ensure Group Exists
-        let group = await this.groupsRepo.findOne({
-          where: { name: batch.groupName },
-        });
+          // B. Create Group Assessment Header
+          // Use first dto as template
+          const templateDto = batch.dtos[0];
+          const { programType, examStart, examEnd } = templateDto;
 
-        if (!group) {
-          group = await this.groupsRepo
-            .createQueryBuilder('g')
-            .where('LOWER(g.name) = :name', {
-              name: batch.groupName.toLowerCase(),
-            })
-            .orWhere('LOWER(g.code) = :code', {
-              code: batch.groupName.toLowerCase(),
-            })
-            .getOne();
-        }
-
-        if (!group) {
-          this.logger.log(`Creating new group: ${batch.groupName}`);
-          group = this.groupsRepo.create({
-            name: batch.groupName,
-            createdByUserId: job.createdById,
-            isActive: true,
-          });
-          group = await this.groupsRepo.save(group);
-        }
-
-        // B. Create Group Assessment Header
-        // Use first dto as template
-        const templateDto = batch.dtos[0];
-        const { programType, examStart, examEnd } = templateDto;
-
-        if (programType) {
-          const validFrom = examStart ? new Date(examStart) : new Date();
-          const validTo = examEnd ? new Date(examEnd) : null;
-          const program = await this.programRepo.findOne({
-            where: { id: programType },
-          });
-          const title = program ? program.name : 'Bulk Assessment';
-
-          this.logger.log(
-            `Creating GroupAssessment: GroupID=${group.id}, ProgramID=${programType}`,
-          );
-
-          const groupAssessment = this.groupAssessmentRepo.create({
-            groupId: Number(group.id),
-            programId: Number(programType),
-            validFrom,
-            validTo,
-            totalCandidates: batch.rows.length,
-            status: 'NOT_STARTED',
-            createdByUserId: job.createdById,
-            metadata: {
-              importId: jobId,
-              source: 'BULK_UPLOAD',
-            },
-          });
-          const savedGA = await this.groupAssessmentRepo.save(groupAssessment);
-          groupAssessmentId = Number(savedGA.id);
-          this.logger.log(`Created GroupAssessment ID: ${groupAssessmentId}`);
-        } else {
-          // Fallback: Find any active program
-          this.logger.warn(
-            `Program ID not found in batch template. Attempting to use default active program.`,
-          );
-          const defaultProgram = allPrograms.find((p) => p.isActive);
-
-          if (defaultProgram) {
-            this.logger.log(
-              `Using Default Program: ${defaultProgram.name} (ID: ${defaultProgram.id})`,
-            );
+          if (programType) {
             const validFrom = examStart ? new Date(examStart) : new Date();
             const validTo = examEnd ? new Date(examEnd) : null;
+            const program = await this.programRepo.findOne({
+              where: { id: programType },
+            });
+            const title = program ? program.name : 'Bulk Assessment';
+
+            this.logger.log(
+              `Creating GroupAssessment: GroupID=${group.id}, ProgramID=${programType}`,
+            );
 
             const groupAssessment = this.groupAssessmentRepo.create({
               groupId: Number(group.id),
-              programId: Number(defaultProgram.id),
+              programId: Number(programType),
               validFrom,
               validTo,
               totalCandidates: batch.rows.length,
@@ -558,129 +530,166 @@ export class BulkRegistrationsService {
               metadata: {
                 importId: jobId,
                 source: 'BULK_UPLOAD',
-                note: 'Used default program',
               },
             });
-            const savedGA =
-              await this.groupAssessmentRepo.save(groupAssessment);
+            const savedGA = await this.groupAssessmentRepo.save(groupAssessment);
             groupAssessmentId = Number(savedGA.id);
+            this.logger.log(`Created GroupAssessment ID: ${groupAssessmentId}`);
+          } else {
+            // Fallback: Find any active program
+            this.logger.warn(
+              `Program ID not found in batch template. Attempting to use default active program.`,
+            );
+            const defaultProgram = allPrograms.find((p) => p.isActive);
 
-            // Important: Update the DTOs in this batch to use this program ID,
-            // otherwise registrationsService.create might look for null
-            for (const d of batch.dtos) {
-              if (!d.programType) d.programType = defaultProgram.id;
+            if (defaultProgram) {
+              this.logger.log(
+                `Using Default Program: ${defaultProgram.name} (ID: ${defaultProgram.id})`,
+              );
+              const validFrom = examStart ? new Date(examStart) : new Date();
+              const validTo = examEnd ? new Date(examEnd) : null;
+
+              const groupAssessment = this.groupAssessmentRepo.create({
+                groupId: Number(group.id),
+                programId: Number(defaultProgram.id),
+                validFrom,
+                validTo,
+                totalCandidates: batch.rows.length,
+                status: 'NOT_STARTED',
+                createdByUserId: job.createdById,
+                metadata: {
+                  importId: jobId,
+                  source: 'BULK_UPLOAD',
+                  note: 'Used default program',
+                },
+              });
+              const savedGA =
+                await this.groupAssessmentRepo.save(groupAssessment);
+              groupAssessmentId = Number(savedGA.id);
+
+              // Important: Update the DTOs in this batch to use this program ID,
+              // otherwise registrationsService.create might look for null
+              for (const d of batch.dtos) {
+                if (!d.programType) d.programType = defaultProgram.id;
+              }
+            } else {
+              this.logger.error(
+                `CRITICAL: No programType in CSV and no default active program found.`,
+              );
+              // This will fall through to the "Group Assessment ID is missing" check and fail rows individually/gracefully
             }
-          } else {
-            this.logger.error(
-              `CRITICAL: No programType in CSV and no default active program found.`,
-            );
-            // This will fall through to the "Group Assessment ID is missing" check and fail rows individually/gracefully
           }
-        }
-      } catch (err) {
-        // ... error logging ...
-        this.logger.error(
-          `CRITICAL: Failed to create Group/Assessment Header for batch ${batch.groupName}. Stopping batch processing.`,
-          err,
-        );
-        // Mark all rows in this batch as FAILED
-        for (const row of batch.rows) {
-          row.status = 'FAILED';
-          row.errorMessage =
-            'System Error: Failed to create Group Assessment Header';
-          row.resultType = 'FAILED_DB';
-          failCount++;
-        }
-        await this.bulkImportRowRepo.save(batch.rows);
-
-        // Update processed count for failed batch
-        await this.bulkImportRepo.increment(
-          { id: jobId },
-          'processedCount',
-          batch.rows.length,
-        );
-
-        continue;
-      }
-
-      // C. Process Rows
-      let batchProcessedCount = 0;
-      for (let i = 0; i < batch.rows.length; i++) {
-        // Throttle to prevent Cognito 429 errors (approx 50 requests/second with retries)
-        await new Promise((resolve) => setTimeout(resolve, 20)); // SIGNIFICANTLY FASTER
-
-        const row = batch.rows[i];
-        const dto = batch.dtos[i];
-
-        try {
-          // Inject Header ID - Critical Check
-          if (!groupAssessmentId) {
-            throw new Error(
-              'Group Assessment ID is missing despite successful header creation.',
-            );
+        } catch (err) {
+          // ... error logging ...
+          this.logger.error(
+            `CRITICAL: Failed to create Group/Assessment Header for batch ${batch.groupName}. Stopping batch processing.`,
+            err,
+          );
+          // Mark all rows in this batch as FAILED
+          for (const row of batch.rows) {
+            row.status = 'FAILED';
+            row.errorMessage =
+              'System Error: Failed to create Group Assessment Header';
+            row.resultType = 'FAILED_DB';
+            failCount++;
           }
-          dto.groupAssessmentId = groupAssessmentId;
+          await this.bulkImportRowRepo.save(batch.rows);
 
-          // Check Redundancy
-          const existingUser = await this.userRepo.findOne({
-            where: { email: dto.email },
-          });
-
-          if (existingUser) {
-            await this.registrationsService.createForExistingUser(
-              existingUser,
-              dto,
-            );
-            row.resultType = 'SKIPPED_USER_CREATE';
-          } else {
-            await this.registrationsService.create(dto);
-            row.resultType = 'CREATED';
-          }
-
-          row.status = 'SUCCESS';
-          successCount++;
-          await this.bulkImportRowRepo.save(row);
-        } catch (err: any) {
-          console.error(`Row ${row.rowIndex} failed execution:`, err); // FORCE LOG
-          this.logger.error(`Row ${row.rowIndex} failed execution`, err);
-          row.status = 'FAILED';
-          row.errorMessage = err.message || 'Unknown error';
-          row.resultType = 'FAILED_DB';
-          failCount++;
-          await this.bulkImportRowRepo.save(row);
-        }
-
-        // Increment local counter
-        batchProcessedCount++;
-
-        // Update Job Progress every 5 rows
-        if (batchProcessedCount % 5 === 0) {
+          // Update processed count for failed batch
           await this.bulkImportRepo.increment(
             { id: jobId },
             'processedCount',
-            5,
+            batch.rows.length,
+          );
+
+          continue;
+        }
+
+        // C. Process Rows
+        let batchProcessedCount = 0;
+        for (let i = 0; i < batch.rows.length; i++) {
+          // Throttle to prevent Cognito 429 errors (approx 50 requests/second with retries)
+          await new Promise((resolve) => setTimeout(resolve, 20)); // SIGNIFICANTLY FASTER
+
+          const row = batch.rows[i];
+          const dto = batch.dtos[i];
+
+          try {
+            // Inject Header ID - Critical Check
+            if (!groupAssessmentId) {
+              throw new Error(
+                'Group Assessment ID is missing despite successful header creation.',
+              );
+            }
+            dto.groupAssessmentId = groupAssessmentId;
+
+            // Check Redundancy
+            const existingUser = await this.userRepo.findOne({
+              where: { email: dto.email },
+            });
+
+            if (existingUser) {
+              await this.registrationsService.createForExistingUser(
+                existingUser,
+                dto,
+              );
+              row.resultType = 'SKIPPED_USER_CREATE';
+            } else {
+              await this.registrationsService.create(dto);
+              row.resultType = 'CREATED';
+            }
+
+            row.status = 'SUCCESS';
+            successCount++;
+            await this.bulkImportRowRepo.save(row);
+          } catch (err: any) {
+            console.error(`Row ${row.rowIndex} failed execution:`, err); // FORCE LOG
+            this.logger.error(`Row ${row.rowIndex} failed execution`, err);
+            row.status = 'FAILED';
+            row.errorMessage = err.message || 'Unknown error';
+            row.resultType = 'FAILED_DB';
+            failCount++;
+            await this.bulkImportRowRepo.save(row);
+          }
+
+          // Increment local counter
+          batchProcessedCount++;
+
+          // Update Job Progress every 5 rows
+          if (batchProcessedCount % 5 === 0) {
+            await this.bulkImportRepo.increment(
+              { id: jobId },
+              'processedCount',
+              5,
+            );
+          }
+        }
+
+        // Update remaining progress for this batch
+        const remaining = batchProcessedCount % 5;
+        if (remaining > 0) {
+          await this.bulkImportRepo.increment(
+            { id: jobId },
+            'processedCount',
+            remaining,
           );
         }
       }
 
-      // Update remaining progress for this batch
-      const remaining = batchProcessedCount % 5;
-      if (remaining > 0) {
-        await this.bulkImportRepo.increment(
-          { id: jobId },
-          'processedCount',
-          remaining,
-        );
+      job.status = 'COMPLETED';
+      job.processedCount = successCount + failCount;
+      job.completedAt = new Date();
+      await this.bulkImportRepo.save(job);
+      this.logger.log(
+        `Job ${jobId} Completed. Success: ${successCount}, Fail: ${failCount}`,
+      );
+    } catch (error: any) {
+      this.logger.error(`Critical overarching error in processing job ${jobId}`, error);
+      if (job) {
+        job.status = 'FAILED';
+        await this.bulkImportRepo.save(job);
       }
     }
-
-    job.status = 'COMPLETED';
-    job.processedCount = successCount + failCount;
-    job.completedAt = new Date();
-    await this.bulkImportRepo.save(job);
-    this.logger.log(
-      `Job ${jobId} Completed. Success: ${successCount}, Fail: ${failCount}`,
-    );
   }
 
   // ---------------------------------------------------------

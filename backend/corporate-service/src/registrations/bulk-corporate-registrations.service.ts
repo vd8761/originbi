@@ -138,6 +138,7 @@ export class BulkCorporateRegistrationsService {
     });
 
     const degreeMap = new Map<string, DepartmentDegree>();
+    const deptDegreeMap = new Map<string, string>(); // Map<departmentId_degreeId, departmentDegreeId>
     allDeptDegrees.forEach((dd) => {
       // Map by standard names like "B.Tech IT" or just "IT"
       const key = this.normalizeString(`${dd.department.name}`);
@@ -148,6 +149,7 @@ export class BulkCorporateRegistrationsService {
           degreeMap.set(shortKey, dd);
         }
       }
+      deptDegreeMap.set(`${dd.departmentId}_${dd.degreeId}`, dd.id);
     });
 
     // 3. Parse All Rows First
@@ -277,6 +279,9 @@ export class BulkCorporateRegistrationsService {
         rowIndex,
         importJob,
         programMap,
+        departmentMap,
+        degreeMap,
+        deptDegreeMap,
         allGroups,
         groupMap, // Pass group map
         userMapByEmail,
@@ -284,8 +289,6 @@ export class BulkCorporateRegistrationsService {
         userAssessmentMap,
         seenEmails,
         seenMobiles,
-        departmentMap,
-        degreeMap,
       );
       rowsToInsert.push(processedRow);
 
@@ -367,6 +370,17 @@ export class BulkCorporateRegistrationsService {
       where: { importId: jobId, status: 'SUCCESS' },
     });
 
+    const latestFailure = await this.bulkImportRowRepo.findOne({
+      where: { importId: jobId, status: 'FAILED' },
+      order: { rowIndex: 'ASC' },
+    });
+
+    // Also check if the job itself failed for overarching reasons
+    let jobLastError = undefined;
+    if (job.status === 'FAILED') {
+      jobLastError = "Job crashed unexpectedly during preprocessing. Please contact support.";
+    }
+
     return {
       status: job.status,
       total: job.totalRecords,
@@ -377,6 +391,7 @@ export class BulkCorporateRegistrationsService {
         job.totalRecords > 0
           ? Math.round((job.processedCount / job.totalRecords) * 100)
           : 0,
+      lastError: jobLastError || latestFailure?.errorMessage,
     };
   }
 
@@ -398,6 +413,7 @@ export class BulkCorporateRegistrationsService {
     job.status = 'PROCESSING';
     await this.bulkImportRepo.save(job);
 
+    try {
     // Fetch Corporate Account
     let corporateAccount = await this.corporateAccountRepo.findOne({
       where: { userId: createdById },
@@ -454,6 +470,7 @@ export class BulkCorporateRegistrationsService {
     });
 
     const degreeMap = new Map<string, DepartmentDegree>();
+    const deptDegreeMap = new Map<string, string>(); // Map<departmentId_degreeId, departmentDegreeId>
     allDeptDegrees.forEach((dd) => {
       // Map by standard names like "B.Tech IT" or just "IT"
       const key = this.normalizeString(`${dd.department.name}`);
@@ -464,6 +481,7 @@ export class BulkCorporateRegistrationsService {
           degreeMap.set(shortKey, dd);
         }
       }
+      deptDegreeMap.set(`${dd.departmentId}_${dd.degreeId}`, dd.id);
     });
 
     const rows = await this.bulkImportRowRepo.find({
@@ -502,7 +520,9 @@ export class BulkCorporateRegistrationsService {
         row.rawData,
         effectiveGroupName || '',
         programMap,
+        departmentMap,
         degreeMap,
+        deptDegreeMap,
       );
 
       // Find Program ID for Header
@@ -797,6 +817,13 @@ export class BulkCorporateRegistrationsService {
     this.logger.log(
       `Job ${jobId} Completed. Success: ${successCount}, Fail: ${failCount}`,
     );
+    } catch (error: any) {
+      this.logger.error(`Critical overarching error in processing job ${jobId}`, error);
+      if (job) {
+        job.status = 'FAILED';
+        await this.bulkImportRepo.save(job);
+      }
+    }
   }
 
   // ---------------------------------------------------------
@@ -880,7 +907,9 @@ export class BulkCorporateRegistrationsService {
     rawData: unknown,
     groupName: string,
     programMap: Map<string, Program>,
-    degreeMap?: Map<string, DepartmentDegree>,
+    deptMap: Map<string, Department>,
+    degreeMap: Map<string, DepartmentDegree>,
+    deptDegreeMap: Map<string, string>,
   ) {
     const pCode = this.getValue(rawData, ['ProgramId', 'program_code']);
     let pId: any = null;
@@ -891,36 +920,47 @@ export class BulkCorporateRegistrationsService {
       const pObj = programMap.get(this.normalizeString(pCode));
       if (pObj) {
         pId = pObj.id;
-        isCollege = pObj.name.toLowerCase().includes('college') || pCode.toUpperCase().includes('COLLEGE');
-        isSchool = pObj.name.toLowerCase().includes('school') || pCode.toUpperCase().includes('SCHOOL');
       }
     }
 
-    // Extract College fields
-    let deptId = null;
-    let degreeId = null;
-    const currentYear = this.getValue(rawData, [
-      'CurrentYear',
-      'current_year',
-      'Year',
-      'year',
-    ]);
+    isCollege = pCode && pCode.toUpperCase().includes('COLLEGE');
+    isSchool = pCode && pCode.toUpperCase().includes('SCHOOL');
 
-    if (isCollege && degreeMap) {
+    // Resolve DepartmentDegreeId
+    let departmentDegreeId: string | undefined = undefined;
+    if (isCollege) {
       const deptName = this.getValue(rawData, [
         'DepartmentId',
         'department_degree',
         'department',
         'Stream',
       ]);
-      if (deptName) {
-        const dd = degreeMap.get(this.normalizeString(deptName));
-        if (dd) {
-          deptId = Number(dd.departmentId);
-          degreeId = Number(dd.id);
+      const degreeName = this.getValue(rawData, [
+        'DegreeId',
+        'degree_name',
+        'degree',
+        'Degree',
+      ]);
+
+      if (deptName && degreeName) {
+        const dept = deptMap.get(this.normalizeString(deptName));
+        const degree = degreeMap.get(this.normalizeString(degreeName));
+
+        if (dept && degree) {
+          const key = `${dept.id}_${degree.id}`;
+          if (deptDegreeMap.has(key)) {
+            departmentDegreeId = deptDegreeMap.get(key);
+          }
         }
       }
     }
+
+    const currentYear = this.getValue(rawData, [
+      'CurrentYear',
+      'current_year',
+      'Year',
+      'year',
+    ]);
 
     return {
       fullName: this.getValue(rawData, ['FullName', 'Name', 'full_name']) || '',
@@ -950,9 +990,9 @@ export class BulkCorporateRegistrationsService {
         ? this.getValue(rawData, ['StudentBoard', 'student_board', 'board'])
         : undefined,
 
-      departmentId: deptId ? String(deptId) : undefined,
-      degreeId: degreeId ? String(degreeId) : undefined,
-      currentYear: currentYear ? String(currentYear) : undefined,
+      departmentId: departmentDegreeId ? String(departmentDegreeId) : undefined, // Corporate frontend dto expects departmentId as string which maps to departmentDegreeId in backend
+      degreeId: undefined, // Not used in registration directly, inferred via DepartmentDegree
+      currentYear: isCollege ? String(currentYear) : undefined,
 
       password:
         this.getValue(rawData, ['Password', 'password']) || 'Welcome@123',
@@ -974,15 +1014,16 @@ export class BulkCorporateRegistrationsService {
     index: number,
     importJob: BulkImport,
     programMap: Map<string, Program>,
+    deptMap: Map<string, Department>,
+    degreeMap: Map<string, DepartmentDegree>, // Changed from any to DepartmentDegree
+    deptDegreeMap: Map<string, string>,
     allGroups: Groups[],
     groupMap: Map<string, Groups>,
-    userMapByEmail: Map<string, User>,
-    userMapByMobile: Map<string, User>,
+    userMapByEmail: Map<string, User>, // Changed from AdminUser to User
+    userMapByMobile: Map<string, User>, // Changed from AdminUser to User
     userAssessmentMap: Map<number, any[]>,
     seenEmails: Set<string>,
     seenMobiles: Set<string>,
-    departmentMap: Map<string, Department>,
-    degreeMap: Map<string, DepartmentDegree>,
   ): BulkImportRow {
     const rowEntity = this.bulkImportRowRepo.create({
       importId: importJob.id,
@@ -994,13 +1035,14 @@ export class BulkCorporateRegistrationsService {
     const validationError = this.validateRules(
       rawData,
       programMap,
+      deptMap,
+      degreeMap,
+      deptDegreeMap,
       userMapByEmail,
       userMapByMobile,
       userAssessmentMap,
       seenEmails,
       seenMobiles,
-      departmentMap,
-      degreeMap,
     );
 
     if (validationError) {
@@ -1061,13 +1103,14 @@ export class BulkCorporateRegistrationsService {
   private validateRules(
     row: any,
     programMap: Map<string, Program>,
-    userMapByEmail: Map<string, User>,
-    userMapByMobile: Map<string, User>,
+    deptMap: Map<string, Department>,
+    degreeMap: Map<string, DepartmentDegree>, // Changed from any to DepartmentDegree
+    deptDegreeMap: Map<string, string>,
+    userMapByEmail: Map<string, User>, // Changed from AdminUser to User
+    userMapByMobile: Map<string, User>, // Changed from AdminUser to User
     userAssessmentMap: Map<number, any[]>,
     seenEmails: Set<string>,
     seenMobiles: Set<string>,
-    departmentMap: Map<string, Department>,
-    degreeMap: Map<string, DepartmentDegree>,
   ): string | null {
     // 1. Mandatory Fields
     const email = row['Email'] || row['email'];
@@ -1120,16 +1163,26 @@ export class BulkCorporateRegistrationsService {
       }
     } else if (isCollege) {
       const deptName = row['DepartmentId'] || row['department_degree'] || row['department'];
+      const degreeName = row['DegreeId'] || row['degree_name'] || row['degree'] || row['Degree'];
       const currentYear = row['CurrentYear'] || row['current_year'];
 
-      if (!deptName) return 'Department is required for College Students';
+      if (!deptName) return 'Department is required for College students';
+      const dept = deptMap.get(this.normalizeString(deptName));
+      if (!dept) return `Department '${deptName}' not found`;
+
+      if (!degreeName) return 'Degree is required for College students';
+      const deg = degreeMap.get(this.normalizeString(degreeName));
+      if (!deg) return `Degree '${degreeName}' not found`;
+
       if (!currentYear) return 'Current Year is required for College Students';
-
-      const dd = degreeMap.get(this.normalizeString(deptName));
-      if (!dd) return `Department '${deptName}' not found in system.`;
-
       if (!['1', '2', '3', '4'].includes(String(currentYear).trim()))
         return 'Current Year must be 1, 2, 3, or 4';
+
+      // Ensure the combination maps to a valid departmentDegreeId
+      const key = `${dept.id}_${deg.id}`;
+      if (!deptDegreeMap.has(key)) {
+         return `The combination of Department '${deptName}' and Degree '${degreeName}' is invalid or not found.`;
+      }
     }
 
     // 4. Dates
