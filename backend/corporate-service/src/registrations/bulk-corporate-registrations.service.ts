@@ -139,24 +139,27 @@ export class BulkCorporateRegistrationsService {
     });
     const departmentMap = new Map<string, Department>();
     allDepartments.forEach((d) => {
-      departmentMap.set(this.normalizeString(d.name), d);
       if (d.shortName) {
         departmentMap.set(this.normalizeString(d.shortName), d);
       }
     });
 
-    const degreeMap = new Map<string, DepartmentDegree>();
+    const degreeMap = new Map<string, any>();
     const deptDegreeMap = new Map<string, string>(); // Map<departmentId_degreeTypeId, departmentDegreeId>
+    try {
+      const allDegrees: any[] = await this.dataSource.query(
+        'SELECT * FROM degree_types',
+      );
+      allDegrees.forEach((d) => {
+        degreeMap.set(this.normalizeString(d.name), d);
+      });
+    } catch (e) {
+      this.logger.warn(
+        'Could not fetch degree_types table, skipping degree validation',
+        e,
+      );
+    }
     allDeptDegrees.forEach((dd) => {
-      // Map by standard names like "B.Tech IT" or just "IT"
-      const key = this.normalizeString(`${dd.department.name}`);
-      degreeMap.set(key, dd);
-      if (dd.department.shortName) {
-        const shortKey = this.normalizeString(dd.department.shortName);
-        if (!degreeMap.has(shortKey)) {
-          degreeMap.set(shortKey, dd);
-        }
-      }
       deptDegreeMap.set(`${dd.departmentId}_${dd.degreeTypeId}`, dd.id);
     });
 
@@ -482,24 +485,27 @@ export class BulkCorporateRegistrationsService {
     });
     const departmentMap = new Map<string, Department>();
     allDepartments.forEach((d) => {
-      departmentMap.set(this.normalizeString(d.name), d);
       if (d.shortName) {
         departmentMap.set(this.normalizeString(d.shortName), d);
       }
     });
 
-    const degreeMap = new Map<string, DepartmentDegree>();
+    const degreeMap = new Map<string, any>();
     const deptDegreeMap = new Map<string, string>(); // Map<departmentId_degreeTypeId, departmentDegreeId>
+    try {
+      const allDegrees: any[] = await this.dataSource.query(
+        'SELECT * FROM degree_types',
+      );
+      allDegrees.forEach((d) => {
+        degreeMap.set(this.normalizeString(d.name), d);
+      });
+    } catch (e) {
+      this.logger.warn(
+        'Could not fetch degree_types table, skipping degree validation',
+        e,
+      );
+    }
     allDeptDegrees.forEach((dd) => {
-      // Map by standard names like "B.Tech IT" or just "IT"
-      const key = this.normalizeString(`${dd.department.name}`);
-      degreeMap.set(key, dd);
-      if (dd.department.shortName) {
-        const shortKey = this.normalizeString(dd.department.shortName);
-        if (!degreeMap.has(shortKey)) {
-          degreeMap.set(shortKey, dd);
-        }
-      }
       deptDegreeMap.set(`${dd.departmentId}_${dd.degreeTypeId}`, dd.id);
     });
 
@@ -935,12 +941,43 @@ export class BulkCorporateRegistrationsService {
     return undefined;
   }
 
+  private resolveDegreeType(
+    degreeName: string,
+    degreeMap: Map<string, any>,
+  ): any | null {
+    const norm = this.normalizeString(degreeName);
+    if (!norm) return null;
+
+    const exact = degreeMap.get(norm);
+    if (exact) return exact;
+
+    // Common CSV variants for B.Tech/B.E
+    if (norm === 'btech' || norm === 'betech') {
+      for (const [key, val] of degreeMap.entries()) {
+        if (
+          key.includes('bacheloroftechnology') ||
+          key.includes('engineering')
+        ) {
+          return val;
+        }
+      }
+    }
+
+    // Generic fallback match
+    for (const [key, val] of degreeMap.entries()) {
+      if (key.includes(norm) || norm.includes(key)) {
+        return val;
+      }
+    }
+    return null;
+  }
+
   private mapRowToDto(
     rawData: unknown,
     groupName: string,
     programMap: Map<string, Program>,
     deptMap: Map<string, Department>,
-    degreeMap: Map<string, DepartmentDegree>,
+    degreeMap: Map<string, any>,
     deptDegreeMap: Map<string, string>,
   ) {
     const pCode = this.getValue(rawData, ['ProgramId', 'program_code']);
@@ -978,7 +1015,7 @@ export class BulkCorporateRegistrationsService {
 
       if (deptName && degreeName) {
         const dept = deptMap.get(this.normalizeString(deptName));
-        const degree = degreeMap.get(this.normalizeString(degreeName));
+        const degree = this.resolveDegreeType(degreeName, degreeMap);
 
         if (dept && degree) {
           const key = `${dept.id}_${degree.id}`;
@@ -1049,7 +1086,7 @@ export class BulkCorporateRegistrationsService {
     importJob: BulkImport,
     programMap: Map<string, Program>,
     deptMap: Map<string, Department>,
-    degreeMap: Map<string, DepartmentDegree>, // Changed from any to DepartmentDegree
+    degreeMap: Map<string, any>,
     deptDegreeMap: Map<string, string>,
     allGroups: Groups[],
     groupMap: Map<string, Groups>,
@@ -1138,7 +1175,7 @@ export class BulkCorporateRegistrationsService {
     row: any,
     programMap: Map<string, Program>,
     deptMap: Map<string, Department>,
-    degreeMap: Map<string, DepartmentDegree>, // Changed from any to DepartmentDegree
+    degreeMap: Map<string, any>,
     deptDegreeMap: Map<string, string>,
     userMapByEmail: Map<string, User>, // Changed from AdminUser to User
     userMapByMobile: Map<string, User>, // Changed from AdminUser to User
@@ -1202,10 +1239,11 @@ export class BulkCorporateRegistrationsService {
 
       if (!deptName) return 'Department is required for College students';
       const dept = deptMap.get(this.normalizeString(deptName));
-      if (!dept) return `Department '${deptName}' not found`;
+      if (!dept)
+        return `Department '${deptName}' not found in departments.short_name`;
 
       if (!degreeName) return 'Degree is required for College students';
-      const deg = degreeMap.get(this.normalizeString(degreeName));
+      const deg = this.resolveDegreeType(degreeName, degreeMap);
       if (!deg) return `Degree '${degreeName}' not found`;
 
       if (!currentYear) return 'Current Year is required for College Students';

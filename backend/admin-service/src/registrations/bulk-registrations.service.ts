@@ -108,8 +108,9 @@ export class BulkRegistrationsService {
     const allDepartments = await this.departmentRepo.find();
     const deptMap = new Map<string, Department>();
     allDepartments.forEach((d) => {
-      deptMap.set(this.normalizeString(d.name), d);
-      if (d.shortName) deptMap.set(this.normalizeString(d.shortName), d);
+      if (d.shortName) {
+        deptMap.set(this.normalizeString(d.shortName), d);
+      }
     });
 
     const degreeMap = new Map<string, any>();
@@ -387,8 +388,9 @@ export class BulkRegistrationsService {
       const allDepartments = await this.departmentRepo.find();
       const deptMap = new Map<string, Department>();
       allDepartments.forEach((d) => {
-        deptMap.set(this.normalizeString(d.name), d);
-        if (d.shortName) deptMap.set(this.normalizeString(d.shortName), d);
+        if (d.shortName) {
+          deptMap.set(this.normalizeString(d.shortName), d);
+        }
       });
 
       const degreeMap = new Map<string, any>();
@@ -1085,7 +1087,8 @@ export class BulkRegistrationsService {
 
       if (!deptName) return 'Department is required for College students';
       const dept = deptMap.get(this.normalizeString(deptName));
-      if (!dept) return `Department '${deptName}' not found`;
+      if (!dept)
+        return `Department '${deptName}' not found in departments.short_name`;
 
       if (!degreeName) return 'Degree is required for College students';
       if (degreeMap.size > 0) {
