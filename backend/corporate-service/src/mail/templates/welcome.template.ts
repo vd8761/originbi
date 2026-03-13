@@ -39,6 +39,25 @@ export const getWelcomeEmailTemplate = (
       .header-title { font-size: 24px !important; padding: 40px 20px 20px 20px !important; }
       .content-padding { padding: 20px !important; }
     }
+    @media (prefers-color-scheme: dark) {
+      .email-card,
+      .email-card td,
+      .email-card div,
+      .email-card p,
+      .text-dark,
+      .text-muted {
+        color: #111111 !important;
+      }
+      .email-card { background-color: #ffffff !important; }
+    }
+    [data-ogsc] .email-card,
+    [data-ogsc] .email-card td,
+    [data-ogsc] .email-card div,
+    [data-ogsc] .email-card p,
+    [data-ogsc] .text-dark,
+    [data-ogsc] .text-muted {
+      color: #111111 !important;
+    }
   </style>
 </head>
 <body style="margin: 0; padding: 0; background-color: #E9ECEF; color: #111111; font-family: Tahoma, Arial, sans-serif;">
