@@ -289,7 +289,7 @@ export const corporateRegistrationService = {
     },
 
     // Get Bulk Job Status
-    async getBulkJobStatus(importId: string): Promise<{ status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'; total: number; success: number; failed: number }> {
+    async getBulkJobStatus(importId: string): Promise<{ status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'; total: number; success: number; failed: number; lastError?: string }> {
         const token = AuthService.getToken();
         const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_URL;
 
