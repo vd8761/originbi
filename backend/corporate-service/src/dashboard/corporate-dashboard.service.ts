@@ -113,6 +113,14 @@ export class CorporateDashboardService {
     }
   }
 
+  private normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
+  private normalizeMobile(mobile: string): string {
+    return String(mobile || '').replace(/\D/g, '');
+  }
+
   // ========================================================================
   // Helper: Get Corporate Account ID by User Email
   // ========================================================================
@@ -676,17 +684,29 @@ export class CorporateDashboardService {
   }
 
   async registerCorporate(dto: RegisterCorporateDto) {
-    const email = dto.email.trim();
-    const existingUser = await this.userRepo.findOne({
-      where: { email: email },
-    });
+    const email = this.normalizeEmail(dto.email);
+    const mobileDigits = this.normalizeMobile(dto.mobile);
+
+    if (!mobileDigits) {
+      throw new BadRequestException('Valid mobile number is required');
+    }
+
+    const existingUser = await this.userRepo
+      .createQueryBuilder('u')
+      .where('LOWER(u.email) = :email', { email })
+      .getOne();
     if (existingUser) {
       throw new BadRequestException(`Email '${email}' is already registered`);
     }
 
-    const existingMobile = await this.corporateRepo.findOne({
-      where: { mobileNumber: dto.mobile, countryCode: dto.countryCode },
-    });
+    const existingMobile = await this.corporateRepo
+      .createQueryBuilder('ca')
+      .where('ca.countryCode = :countryCode', { countryCode: dto.countryCode })
+      .andWhere(
+        "regexp_replace(COALESCE(ca.mobileNumber, ''), '\\D', '', 'g') = :mobile",
+        { mobile: mobileDigits },
+      )
+      .getOne();
     if (existingMobile) {
       throw new BadRequestException(
         'Mobile number already exists for a corporate account',

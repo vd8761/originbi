@@ -31,6 +31,14 @@ export class CorporateRegistrationsService {
   private readonly logger = new Logger(CorporateRegistrationsService.name);
   private authServiceBaseUrl = process.env.AUTH_SERVICE_URL;
 
+  private normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
+  private normalizeMobile(mobile: string): string {
+    return String(mobile || '').replace(/\D/g, '');
+  }
+
   async withRetry<T>(
     operation: () => Promise<T>,
     retries = 5,
@@ -67,6 +75,13 @@ export class CorporateRegistrationsService {
   ) { }
 
   async registerCandidate(dto: CreateCandidateDto, corporateUserId: number) {
+    const email = this.normalizeEmail(dto.email);
+    const mobileDigits = this.normalizeMobile(dto.mobile);
+
+    if (!mobileDigits) {
+      throw new BadRequestException('Valid mobile number is required');
+    }
+
     // 0. (Optional) Verify User exists if needed, but we can trust the ID for now or just let the Corp lookup fail
 
     // 1. Fetch Corporate Account using the passed User ID
@@ -96,6 +111,29 @@ export class CorporateRegistrationsService {
       );
     }
 
+    const [existingByEmail, existingByMobile] = await Promise.all([
+      this.userRepo
+        .createQueryBuilder('u')
+        .where('LOWER(u.email) = :email', { email })
+        .getOne(),
+      this.userRepo
+        .createQueryBuilder('u')
+        .where(
+          "regexp_replace(COALESCE(u.metadata->>'mobile', ''), '\\D', '', 'g') = :mobile",
+          { mobile: mobileDigits },
+        )
+        .getOne(),
+    ]);
+
+    if (existingByEmail) {
+      throw new BadRequestException(`Email '${email}' is already registered`);
+    }
+    if (existingByMobile) {
+      throw new BadRequestException(
+        `Mobile number '${dto.mobile}' is already registered`,
+      );
+    }
+
     if (corporateAccount.availableCredits <= 0) {
       throw new BadRequestException(
         'Insufficient credits to register candidate',
@@ -116,7 +154,7 @@ export class CorporateRegistrationsService {
       const res = await this.withRetry(() =>
         firstValueFrom(
           this.http.post(`${this.authServiceBaseUrl}/internal/cognito/users`, {
-            email: dto.email,
+            email,
             password,
             groupName: 'STUDENT',
           }),
@@ -150,7 +188,7 @@ export class CorporateRegistrationsService {
 
       // B. Create User (Candidate)
       const user = manager.create(User, {
-        email: dto.email,
+        email,
         role: 'STUDENT',
         emailVerified: true,
         cognitoSub: sub,
@@ -281,7 +319,7 @@ export class CorporateRegistrationsService {
       // G. Send Email (non-blocking)
       if (dto.sendEmail) {
         void this.sendWelcomeEmail(
-          dto.email,
+          email,
           dto.fullName,
           password,
           validFrom,
