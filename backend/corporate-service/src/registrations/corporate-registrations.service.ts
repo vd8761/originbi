@@ -536,26 +536,37 @@ export class CorporateRegistrationsService {
 
   private async findProgram(manager: EntityManager, programType: string): Promise<Program> {
     const programRepo = manager.getRepository(Program);
-    const allPrograms = await programRepo.find();
-
     const normInput = this.normalizeString(programType);
 
-    // 1. Exact Name/Code match
-    let program = allPrograms.find(p =>
-      this.normalizeString(p.name) === normInput ||
-      this.normalizeString(p.code) === normInput
-    );
+    // 1. Try exact match first via DB
+    let program = await programRepo.findOne({
+      where: [
+        { name: programType },
+        { code: programType },
+      ]
+    });
 
-    // 2. Handle Singular/Plural mismatch (specifically for College Student/Students)
-    if (!program) {
-      if (normInput === 'collegestudent') {
-        program = allPrograms.find(p => this.normalizeString(p.name) === 'collegestudents');
-      } else if (normInput === 'collegestudents') {
-        program = allPrograms.find(p => this.normalizeString(p.name) === 'collegestudent');
-      }
+    if (program) return program;
+
+    // 2. Case insensitive exact match or code match
+    program = await programRepo.createQueryBuilder('p')
+      .where('LOWER(p.name) = :name', { name: programType.toLowerCase() })
+      .orWhere('LOWER(p.code) = :code', { code: programType.toLowerCase() })
+      .getOne();
+
+    if (program) return program;
+
+    // 3. Normalized matching (fallback to fetching all active programs once)
+    const allPrograms = await programRepo.find({ where: { isActive: true } });
+
+    // Handle Singular/Plural mismatch (specifically for College Student/Students)
+    if (normInput === 'collegestudent') {
+      program = allPrograms.find(p => this.normalizeString(p.name) === 'collegestudents');
+    } else if (normInput === 'collegestudents') {
+      program = allPrograms.find(p => this.normalizeString(p.name) === 'collegestudent');
     }
 
-    // 3. Partial match (last resort)
+    // 4. Partial match (last resort)
     if (!program) {
       program = allPrograms.find(p =>
         this.normalizeString(p.name).includes(normInput) ||

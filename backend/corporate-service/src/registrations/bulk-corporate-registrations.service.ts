@@ -644,8 +644,29 @@ export class BulkCorporateRegistrationsService {
         continue; // Stop processing this batch
       }
 
-      // C. Process Rows (Inject ID)
+      // Pre-fetch users for this batch to avoid N+1 queries
+      const emailsForBatch = batch.rows.map(r => r.rawData['Email'] || r.rawData['email']).filter(Boolean);
+      const mobilesForBatch = batch.rows.map(r => r.rawData['Mobile'] || r.rawData['mobile'] || r.rawData['mobile_number'])
+        .map(m => String(m).trim())
+        .filter(Boolean);
+
+      const batchUsers = await this.userRepo.find({
+        where: [
+          ...(emailsForBatch.length > 0 ? [{ email: In(emailsForBatch) }] : []),
+          // Note: Mobile column is in metadata->>'mobile'. find() doesn't support json queries well in where object.
+          // We'll use the email map and do a separate query if needed, or stick to emails for now as primary.
+        ]
+      });
+
+      const batchUserMapByEmail = new Map(batchUsers.map(u => [u.email, u]));
+      // For mobiles search, since it's common in college student programs, let's also fetch them if emails empty.
+      // But to be safe and efficient, let's use the maps we already build in the loop if needed or just optimized queries.
+
+      let batchProcessedCount = 0;
       for (let i = 0; i < batch.rows.length; i++) {
+        // Throttle to prevent Cognito 429 errors (Approx 50 req/sec)
+        await new Promise((resolve) => setTimeout(resolve, 20));
+
         const row = batch.rows[i];
         const dto = batch.dtos[i];
 
@@ -655,26 +676,15 @@ export class BulkCorporateRegistrationsService {
           }
           dto.groupAssessmentId = Number(groupAssessmentId);
 
-          // Check if user exists to decide between Register (Paid) or Assign (Free)
           const email = row.rawData['Email'] || row.rawData['email'];
-          const mobile =
-            row.rawData['Mobile'] ||
-            row.rawData['mobile'] ||
-            row.rawData['mobile_number'];
+          const mobile = row.rawData['Mobile'] || row.rawData['mobile'] || row.rawData['mobile_number'];
           const mobileNorm = mobile ? String(mobile).trim() : '';
 
-          // We need to re-verify existence here or use the map.
-          // Since specific user ID is needed for assignment, we need to query or re-use map.
-          // For safety, let's query the specific user.
-          // (To avoid N+1, ideally we passed the map, but processJob is batch-async)
-          // We can reuse the `existingUsersCheck` logic if we scope it correctly, but we didn't save it to a map with IDs.
-
           let existingUserId: number | null = null;
-          if (email) {
-            const u = await this.userRepo.findOne({ where: { email } });
-            if (u) existingUserId = u.id;
-          }
-          if (!existingUserId && mobileNorm) {
+          if (email && batchUserMapByEmail.has(email)) {
+            existingUserId = batchUserMapByEmail.get(email)!.id;
+          } else if (mobileNorm) {
+            // Secondary fallback for mobile if email didn't match
             const u = await this.userRepo
               .createQueryBuilder('u')
               .where("u.metadata->>'mobile' = :mobile", { mobile: mobileNorm })
@@ -711,15 +721,25 @@ export class BulkCorporateRegistrationsService {
           await this.bulkImportRowRepo.save(row);
         }
 
-        // 200ms delay to throttle requests (Approx 5 req/sec)
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        batchProcessedCount++;
+        // Update job progress incrementally every 5 rows
+        if (batchProcessedCount % 5 === 0) {
+          await this.bulkImportRepo.increment(
+            { id: jobId },
+            'processedCount',
+            5,
+          );
+        }
       }
-      // Update progress
-      await this.bulkImportRepo.increment(
-        { id: jobId },
-        'processedCount',
-        batch.rows.length,
-      );
+      // Update remaining progress for this batch
+      const remaining = batchProcessedCount % 5;
+      if (remaining > 0) {
+        await this.bulkImportRepo.increment(
+          { id: jobId },
+          'processedCount',
+          remaining,
+        );
+      }
     }
 
     job.status = 'COMPLETED';
