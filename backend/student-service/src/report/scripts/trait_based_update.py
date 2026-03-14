@@ -1,66 +1,137 @@
+import os
+import re
+import glob
 import pandas as pd
 import psycopg2
-from psycopg2.extras import execute_batch
 
+# -----------------------------
 # PostgreSQL connection
+# -----------------------------
 conn = psycopg2.connect(
     host="localhost",
     database="obidatanew",
     user="postgres",
-    password="postgres",
-    port="5432"
+    password="postgres"
 )
 
-cur = conn.cursor()
+cursor = conn.cursor()
 
-# Load CSV
-df = pd.read_csv("trait_based_course_details_remapped.csv")
+# -----------------------------
+# Trait mapping
+# personality_traits.code -> id
+# -----------------------------
+cursor.execute("SELECT id, code FROM personality_traits")
+trait_rows = cursor.fetchall()
 
-# Convert NaN to None
-df = df.where(pd.notnull(df), None)
+trait_map = {row[1]: row[0] for row in trait_rows}
 
-# Insert query
-query = """
-INSERT INTO trait_based_course_details (
-    id,
-    school_level_id,
-    school_stream_id,
-    trait_id,
-    course_name,
-    compatibility_percentage,
-    notes,
-    metadata,
-    is_active,
-    is_deleted,
-    created_at,
-    updated_at
-)
-VALUES (
-    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
-)
-ON CONFLICT (id) DO UPDATE SET
-    school_level_id = EXCLUDED.school_level_id,
-    school_stream_id = EXCLUDED.school_stream_id,
-    trait_id = EXCLUDED.trait_id,
-    course_name = EXCLUDED.course_name,
-    compatibility_percentage = EXCLUDED.compatibility_percentage,
-    notes = EXCLUDED.notes,
-    metadata = EXCLUDED.metadata,
-    is_active = EXCLUDED.is_active,
-    is_deleted = EXCLUDED.is_deleted,
-    created_at = EXCLUDED.created_at,
-    updated_at = EXCLUDED.updated_at;
-"""
+print("\nTrait Mapping Loaded:")
+print(trait_map)
 
-# Prepare data
-records = df.values.tolist()
+# -----------------------------
+# Folder path
+# -----------------------------
+csv_folder = "csv"
+csv_files = glob.glob(os.path.join(csv_folder, "*"))
 
-# Insert batch
-execute_batch(cur, query, records)
+# -----------------------------
+# Global counters
+# -----------------------------
+total_inserted = 0
+total_skipped = 0
 
-conn.commit()
+# -----------------------------
+# Process files
+# -----------------------------
+for file in csv_files:
 
-cur.close()
+    filename = os.path.basename(file)
+
+    match = re.search(r'field(\d+)', filename)
+
+    if not match:
+        print(f"\nSkipping file (no field id): {filename}")
+        continue
+
+    school_stream_field_id = int(match.group(1))
+
+    print(f"\n==============================")
+    print(f"Processing: {filename}")
+    print(f"Field ID: {school_stream_field_id}")
+
+    inserted = 0
+    skipped = 0
+
+    try:
+
+        # Supports CSV and XLSX
+        if filename.endswith(".csv"):
+            df = pd.read_csv(file)
+        elif filename.endswith(".xlsx"):
+            df = pd.read_excel(file)
+        else:
+            print("Unsupported file type")
+            continue
+
+        df.columns = [col.strip() for col in df.columns]
+
+        for _, row in df.iterrows():
+
+            trait_code = str(row["trait_code"]).strip()
+
+            if trait_code not in trait_map:
+                print(f"Skipped row: trait not found -> {trait_code}")
+                skipped += 1
+                continue
+
+            trait_id = trait_map[trait_code]
+
+            course_name = str(row["course_name"]).strip()
+            compatibility_percentage = int(row["compatibility_percentage"])
+            notes = str(row["notes"]).strip()
+
+            cursor.execute("""
+                INSERT INTO trait_based_course_details
+                (
+                    school_level_id,
+                    school_stream_field_id,
+                    trait_id,
+                    course_name,
+                    compatibility_percentage,
+                    notes
+                )
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                2,
+                school_stream_field_id,
+                trait_id,
+                course_name,
+                compatibility_percentage,
+                notes
+            ))
+
+            inserted += 1
+
+        conn.commit()
+
+        print(f"Inserted: {inserted}")
+        print(f"Skipped: {skipped}")
+
+        total_inserted += inserted
+        total_skipped += skipped
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Error in {filename}: {e}")
+
+# -----------------------------
+# Final summary
+# -----------------------------
+cursor.close()
 conn.close()
 
-print("Inserted successfully.")
+print("\n==============================")
+print("FINAL SUMMARY")
+print(f"Total Inserted: {total_inserted}")
+print(f"Total Skipped: {total_skipped}")
+print("==============================")
