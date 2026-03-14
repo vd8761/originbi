@@ -307,20 +307,26 @@ export class AssessmentService {
 
       if (!session) return null;
 
-      // Rehydrate transient report password for frontend candidate preview components
+      // Rehydrate transient report password and agile scores for frontend candidate preview components
+      let reportAgileScores: any = null;
       try {
         const report = await this.sessionRepo.manager.query(
-          `SELECT report_password as "reportPassword" FROM assessment_reports WHERE assessment_session_id = $1 LIMIT 1`,
+          `SELECT report_password as "reportPassword", agile_scores as "agileScores" FROM assessment_reports WHERE assessment_session_id = $1 LIMIT 1`,
           [id],
         );
-        if (report && report.length > 0 && report[0].reportPassword) {
-          if (!session.metadata) {
-            session.metadata = {};
+        if (report && report.length > 0) {
+          if (report[0].reportPassword) {
+            if (!session.metadata) {
+              session.metadata = {};
+            }
+            session.metadata.reportPassword = report[0].reportPassword;
           }
-          session.metadata.reportPassword = report[0].reportPassword;
+          if (report[0].agileScores) {
+            reportAgileScores = report[0].agileScores;
+          }
         }
       } catch (err) {
-        console.error('Failed to fetch password from assessment_reports:', err);
+        console.error('Failed to fetch from assessment_reports:', err);
       }
 
       // Fetch all attempts for the session to populate level-wise reports
@@ -388,6 +394,33 @@ export class AssessmentService {
         }
       }
       // ------------------------------------
+
+      // --- INJECT AGILE SCORES INTO ACI ATTEMPT METADATA ---
+      if (aciAttempt && reportAgileScores) {
+        // agile_scores is stored as an array; take the first element
+        const rawScores = Array.isArray(reportAgileScores)
+          ? reportAgileScores[0]
+          : reportAgileScores;
+        if (rawScores) {
+          if (!aciAttempt.metadata) {
+            aciAttempt.metadata = {};
+          }
+          // Store as agile_scores with PascalCase keys (frontend expects Commitment, Focus, etc.)
+          aciAttempt.metadata.agile_scores = {
+            Commitment: rawScores.commitment ?? rawScores.Commitment ?? 0,
+            Focus: rawScores.focus ?? rawScores.Focus ?? 0,
+            Openness: rawScores.openness ?? rawScores.Openness ?? 0,
+            Respect: rawScores.respect ?? rawScores.Respect ?? 0,
+            Courage: rawScores.courage ?? rawScores.Courage ?? 0,
+            total:
+              (rawScores.commitment ?? rawScores.Commitment ?? 0) +
+              (rawScores.focus ?? rawScores.Focus ?? 0) +
+              (rawScores.openness ?? rawScores.Openness ?? 0) +
+              (rawScores.respect ?? rawScores.Respect ?? 0) +
+              (rawScores.courage ?? rawScores.Courage ?? 0),
+          };
+        }
+      }
 
       // Maintain currentAttempt logic for stats bar if needed (usually latest active)
       // If we just sort attempts by ID DESC, the first one is the latest.
