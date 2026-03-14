@@ -40,24 +40,7 @@ export class CorporateRegistrationsService {
   }
 
   private resolveWelcomeFrontendUrl(): string {
-    const explicitUrl =
-      process.env.STUDENT_FRONTEND_URL?.trim() ||
-      process.env.WELCOME_FRONTEND_URL?.trim();
-    if (explicitUrl) {
-      return explicitUrl.replace(/\/+$/, '');
-    }
-
-    const configuredUrls = (process.env.FRONTEND_URL || '')
-      .split(',')
-      .map((url) => url.trim())
-      .filter(Boolean);
-
-    const selectedUrl =
-      configuredUrls.find((url) => /mind\.originbi\.com/i.test(url)) ||
-      configuredUrls.find((url) => !/originbi\.vercel\.app/i.test(url)) ||
-      'https://mind.originbi.com';
-
-    return selectedUrl.replace(/\/+$/, '');
+    return 'https://mind.originbi.com';
   }
 
   async withRetry<T>(
