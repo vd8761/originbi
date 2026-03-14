@@ -97,8 +97,15 @@ export class CxoReport extends BaseReport {
     logger.info(`[CXO REPORT] PDF generated successfully at: ${outputPath}`);
   }
 
-  // --- Section Methods (Placeholders) ---
-
+  // --- GENERATE COVER PAGE ---
+  /**
+   * Generates the Cover Page.
+   * Features:
+   * - Full bleed background image.
+   * - Rotated "Exam Ref No" on the side.
+   * - "Self Guidance" label and Date in the footer.
+   * - Smart Name Splitting to ensure names fit aesthetically.
+   */
   private generateCoverPage(): void {
     const bgPath = 'public/assets/images/Cover_Background.jpg';
     if (fs.existsSync(bgPath))
@@ -177,6 +184,14 @@ export class CxoReport extends BaseReport {
       .text(nameText, nameX, adjustedNameY, nameOptions);
   }
 
+  // --- GENERATE TABLE OF CONTENTS ---
+  /**
+   * Generates the Table of Contents.
+   * Logic:
+   * - Iterates through `CXO_TOC_CONTENT`.
+   * - Checks for page overflow and adds new pages if needed (re-printing header).
+   * - Draws connection circles and lines for each item.
+   */
   private generateTableOfContents(): void {
     const headerX = 15 * this.MM;
     const circleCenterX = 25 * this.MM;
@@ -242,6 +257,7 @@ export class CxoReport extends BaseReport {
     });
   }
 
+  // --- GENERATE INTRODUCTORY PAGES ---
   /**
    * Generates Intro Pages.
    * Covers:
@@ -295,6 +311,7 @@ export class CxoReport extends BaseReport {
     this.pHtml(CXO_CONTENT.important_note);
   }
 
+  // --- GENERATE PERSONALIZED INSIGHTS ---
   /**
    * Generates Personalized Insights.
    * Logic:
@@ -449,6 +466,10 @@ export class CxoReport extends BaseReport {
     });
   }
 
+  // --- GENERATE ACI ---
+  /**
+   * Calculates and draws the Agile Compatibility Index (ACI) scoring matrix designed for CXO perspective.
+   */
   private generateACI(): void {
     const contentBlock =
       ACI[
@@ -584,6 +605,7 @@ export class CxoReport extends BaseReport {
     this.pHtml(contentBlock.reflection_summary);
   }
 
+  // --- GENERATE NATURE GRAPH SECTION ---
   /**
    * Generates the Nature Style Graph Section.
    * Visuals:
@@ -688,6 +710,7 @@ export class CxoReport extends BaseReport {
     });
   }
 
+  // --- GENERATE BUSINESS VISION SECTION ---
   /**
    * Generates Business Vision Section.
    * Logic:
@@ -746,6 +769,10 @@ export class CxoReport extends BaseReport {
     this.generateWordSketch();
   }
 
+  // --- GENERATE DISCLAIMER SECTION ---
+  /**
+   * Generates the closing disclaimer, limitations, and indemnity sections for the report.
+   */
   private generateDisclaimerSection(): void {
     this.h1(DISCLAIMER_CONTENT.title);
     this.pHtml(DISCLAIMER_CONTENT.intro);
@@ -773,6 +800,7 @@ export class CxoReport extends BaseReport {
 
   // --- Special Generators ---
 
+  // --- GENERATE WORD SKETCH ---
   /**
    * Generates the Word Sketch Table.
    * Visuals:
@@ -1080,6 +1108,7 @@ export class CxoReport extends BaseReport {
     this.doc.x = this.MARGIN_STD;
   }
 
+  // --- GENERATE RESPOND PARAMETER TABLE ---
   /**
    * Generates the Respond Parameter Table.
    * Displays behavioral responses for specific areas:

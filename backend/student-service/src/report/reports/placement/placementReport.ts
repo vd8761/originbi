@@ -104,7 +104,15 @@ export class PlacementReport extends BaseReport {
     logger.info('[PLACEMENT REPORT] PDF Generated.');
   }
 
-  // --- Section 1: Cover Page ---
+  // --- GENERATE COVER PAGE ---
+  /**
+   * Generates the Cover Page.
+   * Features:
+   * - Full bleed background image.
+   * - Rotated "Exam Ref No" on the side.
+   * - "Placement Guidance" label and Date in the footer.
+   * - Smart Name Splitting to ensure names fit aesthetically.
+   */
   private generateCoverPage(): void {
     const bgPath = 'public/assets/images/Handbook_Cover_Default.jpg';
     if (fs.existsSync(bgPath))
@@ -204,7 +212,14 @@ export class PlacementReport extends BaseReport {
       .text(nameText, nameX, adjustedNameY, nameOptions);
   }
 
-  // --- Section 2: Table of Contents ---
+  // --- GENERATE TABLE OF CONTENTS ---
+  /**
+   * Generates the Table of Contents.
+   * Logic:
+   * - Iterates through valid traits dynamically.
+   * - Checks for page overflow and adds new pages if needed (re-printing header).
+   * - Draws connection circles and lines for each item.
+   */
   private generateTableOfContents(): void {
     const headerX = 15 * this.MM;
     const circleCenterX = 25 * this.MM;
@@ -279,7 +294,7 @@ export class PlacementReport extends BaseReport {
     });
   }
 
-  // --- Section 3: Executive Summary ---
+  // --- GENERATE EXECUTIVE SUMMARY ---
   /**
    * Generates the Executive Summary.
    * Includes:
@@ -456,7 +471,7 @@ export class PlacementReport extends BaseReport {
     );
   }
 
-  // --- Section 4: Trait Details ---
+  // --- GENERATE TRAIT SECTION ---
   /**
    * Generates a Detailed Section for a specific Trait.
    * Logic:
@@ -624,7 +639,11 @@ export class PlacementReport extends BaseReport {
     });
   }
 
-  // --- Section 5: Closing Pages ---
+  // --- GENERATE CLOSING PAGES ---
+  /**
+   * Generates the closing sections of the report.
+   * Includes Testimonials, About, Disclaimer, Services, and Contact info.
+   */
   private generateClosingPages(): void {
     // Testimonials
     this.h1('1. Testimonials');
@@ -660,8 +679,11 @@ export class PlacementReport extends BaseReport {
     this.pHtml(PLACEMENT_CONTENT.contact.details);
   }
 
-  // --- Helpers (Specific to this report) ---
-
+  // --- DRAW PERSONALITY GRID ---
+  /**
+   * Renders the Personality Grid table.
+   * Maps aggregate student counts against the 12 blended styles across two responsive tables.
+   */
   private drawPersonalityGrid(): void {
     // 1. Define the Top Row (Red -> Yellow/Green)
     const row1Defs = [
@@ -762,8 +784,12 @@ export class PlacementReport extends BaseReport {
     );
   }
 
-  // --- Data Processing Helpers ---
-
+  // --- CALCULATE AGILE COUNTERS ---
+  /**
+   * Calculates the number of students falling into each ACI category.
+   * Iterates through all grouped traits and tallies scores against `ACI_CONFIG`.
+   * @returns An array of counts mapping exactly to `ACI_CONFIG`.
+   */
   private calculateAgileCounters(): number[] {
     const counters = new Array(ACI_CONFIG.length).fill(0);
 
@@ -782,6 +808,15 @@ export class PlacementReport extends BaseReport {
     return counters;
   }
 
+  // --- PROCESS STUDENT ROW ---
+  /**
+   * Transforms raw student data into a structured row for the Students List table.
+   * Formats names, determines corporate readiness, and resolves edge cases (like "Product Company" tier).
+   * 
+   * @param student - Raw student data object
+   * @param index - Index of the student for ordering
+   * @returns An array structure compatible with the PDFkit-table format
+   */
   private processStudentRow(student: any, index: number): any[] {
     const aciScore = student.agile_score?.total || 0;
 

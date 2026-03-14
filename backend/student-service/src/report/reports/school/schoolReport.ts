@@ -1,4 +1,4 @@
-﻿/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unused-vars */
 import * as fs from 'fs';
 import { SchoolData, AgileScore, COLORS } from '../../types/types';
 import {
@@ -52,19 +52,14 @@ export class SchoolReport extends BaseReport {
     this.data = data;
   }
 
+  private ci_sortedTraits: { type: string; val: number }[] = [];
+  private ci_topTwo: string = '';
+  private ci_careerAlignmentIntensity: number = 0;
+  private ci_patterns!: ProfilePatterns;
+
+  // --- GENERATE REPORT ---
   /**
-   * Main Generation Method
-   * ----------------------
-   * Orchestrates the creation of the School Report PDF.
-   * Flow:
-   * 1. Cover Page
-   * 2. Table of Contents
-   * 3. Introductory Pages (About, Purpose)
-   * 4. Personalized Insights (General Characteristics, Strengths)
-   * 5. Nature Style Graph (Charts)
-   * 6. Academic & Career Goals (Leadership, Trait Mapping)
-   * 7. Course Compatibility Matrix
-   * 8. Disclaimer & Closing
+   * Orchestrates the complete creation of the School Report PDF.
    */
   public async generate(outputPath: string): Promise<void> {
     logger.info('[School REPORT] Starting PDF Generation...');
@@ -129,7 +124,7 @@ export class SchoolReport extends BaseReport {
     this.generateAcademicCareerGoals();
     logger.info('[School REPORT] Academic Career Goals Generated.');
 
-    // ── Branch: level-specific sections ──────────────────────────────────────
+    // --- Branch: level-specific sections ---
     if (this.data.school_level_id === 1) {
       // SSLC (Class 10)
       await this.generateSSLCSections();
@@ -137,8 +132,6 @@ export class SchoolReport extends BaseReport {
       // HSC (Class 11 / 12)
       await this.generateHSCSections();
     }
-    // ─────────────────────────────────────────────────────────────────────────
-
     this.generateWordSketchSection();
 
     // Disclaimer & Closing
@@ -152,469 +145,10 @@ export class SchoolReport extends BaseReport {
     logger.info(`[School REPORT] PDF generated successfully at: ${outputPath}`);
   }
 
-  // ── SSLC-specific sections (school_level_id === 1) ────────────────────────
-  private async generateSSLCSections(): Promise<void> {
-    // 1. Career Alignment Index
-    this.ci_generateCareerAlignmentIndex();
-
-    // 2. Career Fit
-    this.ci_generateCareerFit();
-
-    // 3. Career Domain Table
-    this.ci_generateCareerDomainTable();
-
-    // 4. Career Flight Path
-    try {
-      this.generateCareerFlightPath();
-      logger.info('[School REPORT][SSLC] Career Flight Path Generated.');
-    } catch (err) {
-      logger.warn('[School REPORT][SSLC] Career Flight Path skipped.', err);
-    }
-
-    // 5. Development Zones
-    this.ci_generateDevelopmentZones();
-
-    // 6. Future Pathways & Stream Odyssey
-    try {
-      this.generateStreamSelectionIntro();
-      ['PCMB', 'PCB', 'PCM', 'PCBZ', 'Commerce', 'Humanities'].forEach((streamKey) => {
-        this.generateStreamSelectionContent(streamKey);
-        this.generateStreamOdysseyRoadmap(streamKey);
-      });
-      logger.info('[School REPORT][SSLC] Stream Selection & Odyssey Generated.');
-    } catch (err) {
-      logger.warn('[School REPORT][SSLC] Stream Odyssey skipped.', err);
-    }
-  }
-
-  // ── HSC-specific sections (school_level_id === 2) ─────────────────────────
-  private async generateHSCSections(): Promise<void> {
-    // 1. Career Alignment Index
-    this.ci_generateCareerAlignmentIndex();
-
-    // 2. Career Fit
-    this.ci_generateCareerFit();
-
-    // 3. Career Domain Table
-    this.ci_generateCareerDomainTable();
-
-    // 4. Course Compatibility Matrix
-    try {
-      await this.generateCourseCompatibility();
-      logger.info('[School REPORT][HSC] Course Compatibility Generated.');
-    } catch {
-      logger.warn('[School REPORT][HSC] Course Compatibility skipped (DB unavailable).');
-    }
-
-    // 5. Your Reach Institutions
-    try {
-      await this.generateReachInstitutions();
-      logger.info('[School REPORT][HSC] Reach Institutions Generated.');
-    } catch (err) {
-      logger.warn('[School REPORT][HSC] Reach Institutions skipped (DB unavailable).', err);
-    }
-
-    // 6. Career Flight Path
-    try {
-      this.generateCareerFlightPath();
-      logger.info('[School REPORT][HSC] Career Flight Path Generated.');
-    } catch (err) {
-      logger.warn('[School REPORT][HSC] Career Flight Path skipped.', err);
-    }
-
-    // 7. Career Odyssey Roadmap
-    try {
-      this.generateCareerOdysseyRoadmap();
-      logger.info('[School REPORT][HSC] Career Odyssey Roadmap Generated.');
-    } catch (err) {
-      logger.warn('[School REPORT][HSC] Career Odyssey Roadmap skipped.', err);
-    }
-
-    // 8. Development Zones (Moved to the end for HSC)
-    this.ci_generateDevelopmentZones();
-  }
-
-  // --- Section Methods (Placeholders) ---
-
-  private generateStreamSelectionIntro(): void {
-    this.doc.addPage();
-    this._useStdMargins = true;
-
-    this.h1('Future Pathways: Stream Selection');
-
-    this.h2('Choosing Your Stream: The Blueprint to Your Future');
-    this.pHtml(
-      'Transitioning to higher secondary education marks a crucial crossroads in your academic journey. The stream you select now is a foundational step that will help shape your college education, your career trajectory, and your future lifestyle.',
-    );
-
-    this.h2('It is Not Just About Subjects—It is About Your Identity');
-    this.pHtml(
-      'When choosing a stream for the 11th and 12th grades, it is helpful to look beyond the immediate syllabus and ask yourself: What kind of impact do I want to make? <br/>• Do you want to build the technology of tomorrow?<br/>• Are you driven to heal people and advance medical science?<br/>• Do you enjoy the dynamics of business, finance, and leadership?<br/>• Or are you passionate about understanding human behavior, law, and creative expression?'
-    );
-    this.pHtml(
-      'Your natural interests and strengths are the best compass you have. When you align your studies with what you genuinely enjoy, building a highly successful career becomes a pursuit of purpose rather than just work.'
-    );
-
-    this.h2('Understanding Your Stream Options');
-    this.pHtml(
-      'To help you navigate this decision, the following section breaks down the complex landscape of college degrees into clear, easy-to-understand career pathways.'
-    );
-    this.pHtml(
-      'On the upcoming pages, you will find a dedicated breakdown for each major academic stream. Every page will show you the core focus of that stream and the broad professional fields it unlocks for your future. You do not need to select an exact college degree today; the goal of this section is to help you confidently choose the broad direction you want to walk in.'
-    );
-    this.pHtml(
-      'Keep an open mind and use the following breakdowns to explore what your future could look like based on the stream you select.'
-    );
-  }
-
-  private generateStreamSelectionContent(streamKey: string): void {
-    const streamData = STREAM_SELECTION_CONTENT[streamKey];
-    if (!streamData) {
-      logger.warn(`[School REPORT] No stream data found for key: ${streamKey}`);
-      return;
-    }
-
-    this.doc.addPage();
-    this._useStdMargins = true;
-    const margin = this.MARGIN_STD;
-
-    // --- Top Banner ---
-    // Title
-    this.doc
-      .font(this.FONT_SORA_BOLD)
-      .fontSize(22)
-      .fillColor(this.COLOR_DEEP_BLUE)
-      .text(`${streamData.shortName}\n(${streamData.title})`, margin, margin, {
-        width: this.PAGE_WIDTH - 2 * margin - 80, // Leave space for icon
-      });
-
-    // Icon Rendering
-    const iconBaseY = margin;
-    const iconBaseX = this.PAGE_WIDTH - margin - 60;
-    const iconName = streamKey === 'Humanities' ? 'humanity.png' : `${streamKey.toLowerCase()}.png`;
-    const iconPath = `public/assets/images/school/${iconName}`;
-
-    if (fs.existsSync(iconPath)) {
-      this.doc.image(iconPath, iconBaseX, iconBaseY, { width: 60, height: 60 });
-      this.doc.moveDown(0.5);
-    } else {
-      // Fallback Placeholder
-      this.doc
-        .rect(iconBaseX, iconBaseY, 60, 60)
-        .lineWidth(1)
-        .strokeColor('#D3D3D3')
-        .stroke();
-      this.doc
-        .font(this.FONT_SORA_REGULAR)
-        .fontSize(8)
-        .fillColor('#A0A0A0')
-        .text('Icon Place-', iconBaseX, iconBaseY + 20, { width: 60, align: 'center' });
-      this.doc.text('holder', iconBaseX, iconBaseY + 30, { width: 60, align: 'center' });
-      this.doc.moveDown(2.5);
-    }
-
-
-    // // --- Vibe Box ---
-    // const vibeBoxY = this.doc.y;
-
-    // // We measure the text to adapt the box height
-    // this.doc.font(this.FONT_SORA_REGULAR).fontSize(10);
-    // const vibeTextHeight = this.doc.heightOfString(streamData.vibe, { width: this.PAGE_WIDTH - 2 * margin - 20 }) + 20;
-
-    // this.doc
-    //   .rect(margin, vibeBoxY, this.PAGE_WIDTH - 2 * margin, vibeTextHeight)
-    //   .fillColor('#F4F7FB')
-    //   .fill();
-
-    // this.doc
-    //   .fillColor(this.COLOR_BLACK)
-    //   .text(streamData.vibe, margin + 10, vibeBoxY + 10, {
-    //     width: this.PAGE_WIDTH - 2 * margin - 20,
-    //     align: 'left',
-    //   });
-    this.p(streamData.vibe);
-
-    // --- The 2x2 Card Grid ---
-    this.doc.moveDown(0.5);
-    const gridY = this.doc.y;
-    const cardWidth = (this.PAGE_WIDTH - 2 * margin - 15) / 2; // 15 gap between cols
-
-    // Pre-calculate needed heights for each card to normalize row heights
-    const cardHeights = streamData.fields.map(field => {
-      let h = 15; // top padding
-
-      this.doc.font(this.FONT_SORA_BOLD).fontSize(11);
-      h += this.doc.heightOfString(field.name, { width: cardWidth - 50 });
-      h += 5; // spacing below title
-
-      this.doc.font(this.FONT_SORA_REGULAR).fontSize(9);
-      h += this.doc.heightOfString(field.vibe, { width: cardWidth - 30 });
-      h += 10; // spacing below vibe
-
-      const degreesList = field.mappedDegrees.split(',').map(d => d.trim().replace(/\.$/, ''));
-      degreesList.forEach(degree => {
-        // Bullet point text height, minimum roughly the icon height (6)
-        h += Math.max(12, this.doc.heightOfString(degree, { width: cardWidth - 42 }));
-        h += 3; // spacing between bullets
-      });
-
-      h += 15; // bottom padding
-      return h;
-    });
-
-    const rowHeights = [
-      Math.max(cardHeights[0] || 0, cardHeights[1] || 0),
-      Math.max(cardHeights[2] || 0, cardHeights[3] || 0)
-    ];
-
-    streamData.fields.forEach((field, index) => {
-      const col = index % 2;
-      const row = Math.floor(index / 2);
-
-      const cardX = margin + col * (cardWidth + 15);
-      const cardY = gridY + (row === 0 ? 0 : rowHeights[0] + 15);
-      const cardHeight = rowHeights[row];
-
-      // Card Background with simulated shadow border
-      this.doc
-        .roundedRect(cardX, cardY, cardWidth, cardHeight, 8)
-        .lineWidth(0.5)
-        .strokeColor('#E0E0E0')
-        .fillColor('#FFFFFF')
-        .fillAndStroke();
-
-      this.doc
-        .roundedRect(cardX + 1, cardY + 1, cardWidth, cardHeight, 8)
-        .lineWidth(0.5)
-        .strokeColor('#D0D0D0') // slightly darker for pseudo-shadow
-        .stroke();
-
-      // Card Inner Content Padding
-      const innerX = cardX + 15;
-      let currentCardY = cardY + 15;
-
-      // Small Icon (Top Left)
-      const fieldIconPath = field.icon ? `public/assets/images/school/${field.icon}` : null;
-      if (fieldIconPath && fs.existsSync(fieldIconPath)) {
-        this.doc.image(fieldIconPath, innerX, currentCardY, { width: 14, height: 14 });
-      } else {
-        // Fallback Icon Placeholder
-        this.doc
-          .circle(innerX + 7, currentCardY + 7, 7)
-          .lineWidth(1)
-          .strokeColor('#A0A0A0')
-          .stroke();
-      }
-
-      // Field Name (Bold)
-      this.doc
-        .font(this.FONT_SORA_BOLD)
-        .fontSize(11)
-        .fillColor(this.COLOR_DEEP_BLUE)
-        .text(field.name, innerX + 22, currentCardY, {
-          width: cardWidth - 40,
-        });
-
-      currentCardY = this.doc.y + 5;
-
-      // Field Vibe (Regular/Italic)
-      this.doc
-        .font(this.FONT_SORA_REGULAR)
-        .fontSize(9)
-        .fillColor('#4A4A4A')
-        .text(field.vibe, innerX, currentCardY, {
-          width: cardWidth - 30,
-        });
-
-      currentCardY = this.doc.y + 10;
-
-      // Bulleted list of mapped degrees
-      const degreesList = field.mappedDegrees.split(',').map(d => d.trim().replace(/\.$/, '')); // clean up list
-
-      this.doc.font(this.FONT_SORA_REGULAR).fontSize(9).fillColor(this.COLOR_BLACK);
-
-      degreesList.forEach((degree) => {
-        // Draw Checkmark
-        this.doc
-          .circle(innerX + 4, currentCardY + 4, 4)
-          .fillColor(this.COLOR_BRIGHT_GREEN)
-          .fill();
-        this.doc
-          .moveTo(innerX + 2.5, currentCardY + 4)
-          .lineTo(innerX + 4, currentCardY + 5.5)
-          .lineTo(innerX + 6, currentCardY + 2.5)
-          .lineWidth(1)
-          .strokeColor('#FFFFFF')
-          .stroke();
-
-        this.doc
-          .fillColor(this.COLOR_BLACK)
-          .text(degree, innerX + 12, currentCardY, {
-            width: cardWidth - 42,
-          });
-
-        currentCardY = this.doc.y + 3;
-      });
-    });
-
-    // Bottom tracker spacing handling
-    this.doc.y = gridY + rowHeights[0] + 15 + rowHeights[1] + 15 + 10;
-  }
-
-  private generateStreamOdysseyRoadmap(streamKey: string): void {
-    const streamOdyssey = STREAM_ODYSSEY_ROADMAP[streamKey];
-    if (!streamOdyssey) {
-      logger.warn(`[School REPORT] No stream odyssey data found for: ${streamKey}`);
-      return;
-    }
-
-    // this.doc.addPage();
-    // this._useStdMargins = true;
-
-    // --- Graph Properties ---
-    const startX = this.MARGIN_STD + 60; // Increased to prevent first node's text from slipping past margin
-    const endX = this.PAGE_WIDTH - this.MARGIN_STD - 80; // Increased to prevent last node's text from slipping past
-
-    let amplitude = 30; // wave height
-    let graphTopPadding = 45;  // Space for labels above
-    let graphBottomPadding = 85; // Space for labels below
-    let textOffset = 40;
-    const headerNeededSpace = 40;
-
-    const availableHeight = this.PAGE_HEIGHT - this.MARGIN_STD - this.doc.y;
-    const fortyPercentSpace = 0.4 * this.PAGE_HEIGHT;
-
-    // User requested rule: if at least 40% space is available, render as usual.
-    // If not, reduce the scaling by 10%.
-    if (availableHeight >= fortyPercentSpace) {
-      // Render as usual
-    } else {
-      // Reduce scaling by 10%
-      amplitude *= 0.9;
-      graphTopPadding *= 0.9;
-      graphBottomPadding *= 0.9;
-      textOffset *= 0.9;
-    }
-
-    // Since the path uses Math.cos over >1 periods, the exact bounds are always ±amplitude.
-    const maxGraphY = amplitude;
-    const minGraphY = -amplitude;
-
-    const totalGraphHeight = (maxGraphY - minGraphY) + graphTopPadding + graphBottomPadding;
-    const totalNeededSpace = headerNeededSpace + totalGraphHeight;
-
-    // Ensure we have enough space for the WHOLE section, or move to next page to prevent
-    // mid-drawing auto-pagination which breaks elements onto the next page.
-    if (this.doc.y + totalNeededSpace > this.PAGE_HEIGHT - this.MARGIN_STD) {
-      this.doc.addPage();
-      // Reset scaling to normal for the new page
-      amplitude = 30;
-      graphTopPadding = 75;
-      graphBottomPadding = 85;
-      textOffset = 40;
-    }
-
-    // NOW draw the header
-    this.pHtml(`${streamOdyssey.tagline}`);
-
-    // The vertical center of the wave
-    const startY = this.doc.y + graphTopPadding - minGraphY;
-
-    // Draw the continuous winding wave path
-    this.doc.save();
-    this.doc
-      .lineWidth(4)
-      .strokeColor('#E8EAF6') // Light periwinkle/grey for path
-      .lineJoin('round')
-      .lineCap('round');
-
-    this.doc.moveTo(startX, startY);
-
-    // Draw smooth curve using bezier logic or small line segments
-    const segments = 100;
-    for (let j = 0; j <= segments; j++) {
-      const p = j / segments;
-      const x = startX + p * (endX - startX);
-      const ang = p * Math.PI * 2.5;
-      // Start from bottom means we want the first yOffset to be positive (down)
-      // Math.cos(ang) starts at 1. If we multiply by amplitude, the wave starts at bottom.
-      const y = startY + Math.cos(ang) * amplitude;
-
-      if (j === 0) {
-        this.doc.moveTo(x, y);
-      } else {
-        this.doc.lineTo(x, y);
-      }
-    }
-    this.doc.stroke();
-    this.doc.restore();
-
-    // Draw Nodes and Text
-    streamOdyssey.nodes.forEach((node, i) => {
-      const progress = i / (streamOdyssey.nodes.length - 1);
-      const nodeX = startX + progress * (endX - startX);
-      const angle = progress * Math.PI * 2.5;
-      const nodeYOffset = Math.cos(angle) * amplitude;
-      const nodeY = startY + nodeYOffset;
-
-      // Draw dashed connector from node to text
-      const isAbove = nodeYOffset > 0; // if > 0, wave is below center, text might be ABOVE
-      // Actually let's strictly alternate text placement for clarity
-      const textAbove = i % 2 !== 0;
-      const textY = textAbove ? nodeY - textOffset : nodeY + textOffset;
-
-      this.doc
-        .save()
-        .lineWidth(1)
-        .strokeColor('#A0AABF')
-        .dash(3, { space: 3 })
-        .moveTo(nodeX, nodeY + (textAbove ? -8 : 8))
-        .lineTo(nodeX, textY + (textAbove ? 8 : -8))
-        .stroke()
-        .restore();
-
-      // Draw the circular node point
-      this.doc
-        .circle(nodeX, nodeY, 8)
-        .fill(CI_COLORS.GREEN)
-        .lineWidth(3)
-        .strokeColor('#FFFFFF')
-        .stroke();
-
-      // Render Text Label (Year/Phase)
-      this.doc
-        .font(this.FONT_SORA_BOLD)
-        .fontSize(9)
-        .fillColor(CI_COLORS.INDIGO)
-        .text(node.label, nodeX - 45, textAbove ? textY - 28 : textY - 6, {
-          width: 90,
-          align: 'center',
-        });
-
-      // Render Title
-      this.doc
-        .font(this.FONT_SORA_SEMIBOLD)
-        .fontSize(8)
-        .fillColor('#333333')
-        .text(node.title, nodeX - 55, textAbove ? textY - 16 : textY + 6, {
-          width: 110,
-          align: 'center',
-        });
-
-      // Render Subtitle
-      this.doc
-        .font(this.FONT_SORA_REGULAR)
-        .fontSize(7)
-        .fillColor('#666666')
-        .text(node.subtitle, nodeX - 55, textAbove ? textY - 4 : textY + 16, {
-          width: 110,
-          align: 'center',
-        });
-    });
-
-    this.doc.y = startY + maxGraphY + graphBottomPadding + 20;
-  }
-
+  // --- GENERATE COVER PAGE ---
+  /**
+   * Generates the cover page of the report including title, reference number, and user name.
+   */
   private generateCoverPage(): void {
     const bgPath = 'public/assets/images/Cover_Background.jpg';
     if (fs.existsSync(bgPath))
@@ -710,6 +244,10 @@ export class SchoolReport extends BaseReport {
       .text(nameText, nameX, adjustedNameY, nameOptions);
   }
 
+  // --- GENERATE TABLE OF CONTENTS ---
+  /**
+   * Generates the dynamic table of contents mapping section titles to page numbers.
+   */
   private generateTableOfContents(): void {
     const headerX = 15 * this.MM;
     const circleCenterX = 25 * this.MM;
@@ -782,12 +320,9 @@ export class SchoolReport extends BaseReport {
     });
   }
 
+  // --- GENERATE INTRODUCTORY PAGES ---
   /**
-   * Generates Intro Pages.
-   * Covers:
-   * - About the report.
-   * - Purpose and Benefits.
-   * - How the report helps the student.
+   * Generates introductory content detailing the purpose, benefits, and usage of the report.
    */
   private generateIntroductoryPages(): void {
     // About the Report
@@ -836,12 +371,37 @@ export class SchoolReport extends BaseReport {
     this.pHtml(SCHOOL_CONTENT.important_note_desc);
   }
 
+  // --- COMPUTE TRAITS ---
   /**
-   * Generates Personalized Insights.
-   * Logic:
-   * - Fetches dynamic content based on the primary Answer Type (DISC).
-   * - Renders sections: Who I Am, Key Strengths, Motivations, Communication Tips.
-   * - Includes Nature Style Graph and Agile Compatibility Index (ACI).
+   * Computes and sorts DISC traits, determines top traits and career alignment intensity.
+   */
+  private ci_computeTraits(): void {
+    const scores = [
+      { type: 'D', val: this.data.score_D },
+      { type: 'I', val: this.data.score_I },
+      { type: 'S', val: this.data.score_S },
+      { type: 'C', val: this.data.score_C },
+    ];
+
+    const PRIORITY = ['C', 'D', 'I', 'S'];
+    scores.sort((a, b) => {
+      const diff = b.val - a.val;
+      if (diff !== 0) return diff;
+      return PRIORITY.indexOf(a.type) - PRIORITY.indexOf(b.type);
+    });
+
+    this.ci_sortedTraits = scores;
+    this.ci_topTwo = scores[0].type + scores[1].type;
+    this.ci_careerAlignmentIntensity = Math.min(
+      15,
+      Math.round((scores[0].val + scores[1].val) / 10),
+    );
+    this.ci_detectPatterns();
+  }
+
+  // --- GENERATE PERSONALIZED INSIGHTS ---
+  /**
+   * Renders personalized user insights such as general characteristics, strengths, and communication tips.
    */
   private generatePersonalizedInsights(): void {
     // most_answered_answer_type is an array of objects {ANSWER_TYPE, COUNT}
@@ -991,6 +551,1043 @@ export class SchoolReport extends BaseReport {
     });
   }
 
+  // --- GENERATE NATURE GRAPH SECTION ---
+  /**
+   * Draws the Nature Style Graph and compares nature versus adapted behaviors visually.
+   */
+  private generateNatureGraphSection(): void {
+    const topTrait = this.getTopTwoTraits(
+      this.data.most_answered_answer_type,
+      this.data,
+    )[0];
+    let chartData: { label: string; value: number; color: number[] }[] = [];
+
+    if (topTrait === 'D') {
+      chartData = [
+        { label: 'D', value: 85, color: COLORS.D },
+        { label: 'I', value: 30, color: COLORS.I },
+        { label: 'S', value: 25, color: COLORS.S },
+        { label: 'C', value: 40, color: COLORS.C },
+      ];
+    } else if (topTrait === 'I') {
+      chartData = [
+        { label: 'D', value: 30, color: COLORS.D },
+        { label: 'I', value: 80, color: COLORS.I },
+        { label: 'S', value: 50, color: COLORS.S },
+        { label: 'C', value: 30, color: COLORS.C },
+      ];
+    } else if (topTrait === 'S') {
+      chartData = [
+        { label: 'D', value: 25, color: COLORS.D },
+        { label: 'I', value: 35, color: COLORS.I },
+        { label: 'S', value: 85, color: COLORS.S },
+        { label: 'C', value: 40, color: COLORS.C },
+      ];
+    } else if (topTrait === 'C') {
+      chartData = [
+        { label: 'D', value: 20, color: COLORS.D },
+        { label: 'I', value: 25, color: COLORS.I },
+        { label: 'S', value: 40, color: COLORS.S },
+        { label: 'C', value: 90, color: COLORS.C },
+      ];
+    } else {
+      // Fallback
+      chartData = [
+        { label: 'D', value: this.data.score_D, color: COLORS.D },
+        { label: 'I', value: this.data.score_I, color: COLORS.I },
+        { label: 'S', value: this.data.score_S, color: COLORS.S },
+        { label: 'C', value: this.data.score_C, color: COLORS.C },
+      ];
+    }
+    // --- Logic for Nature and Adapted Style Graph ---
+    const pageContentHeight = this.PAGE_HEIGHT - 2 * this.MARGIN_STD;
+    const heightPercent = 92; // 92%
+    const normalHeightNeeded = pageContentHeight * (heightPercent / 100);
+    const currentY = this.doc.y;
+    const pageHeight = this.PAGE_HEIGHT;
+    const bottomMargin = this.MARGIN_STD;
+    const availableSpace = pageHeight - bottomMargin - currentY;
+
+    let shouldAddPage = false;
+    let scalingAdjustment = 0;
+    let scale = 1;
+    let x = 0;
+
+    if (availableSpace >= normalHeightNeeded) {
+      // Fits perfectly
+      scalingAdjustment = -50;
+    } else if (availableSpace >= normalHeightNeeded - 50) {
+      scalingAdjustment = -50;
+      scale = 0.8;
+    } else {
+      // Does not fit even with shrink
+      shouldAddPage = true;
+      scalingAdjustment = 0;
+      scale = 1;
+      x = 0.5;
+    }
+
+    if (shouldAddPage) {
+      this.ensureSpace(1, true); // Force new page
+    }
+
+    this.h2(`Nature Style Graph`, {
+      align: 'center',
+      color: this.COLOR_DEEP_BLUE,
+      topGap: 0,
+    });
+    this.Image('public/assets/images/behavioural-charts.png', {
+      width: this.PAGE_WIDTH - 120,
+      align: 'center',
+    });
+    this.doc.moveDown(x);
+    this.h2(`Nature and Adapted Style`, {
+      align: 'center',
+      color: this.COLOR_DEEP_BLUE,
+    });
+    const adaptedData = [
+      { label: 'D', value: this.data.score_D, color: COLORS.D },
+      { label: 'I', value: this.data.score_I, color: COLORS.I },
+      { label: 'S', value: this.data.score_S, color: COLORS.S },
+      { label: 'C', value: this.data.score_C, color: COLORS.C },
+    ];
+    this.drawSideBySideBarCharts(chartData, adaptedData, {
+      scaleHeight: scalingAdjustment,
+      scale: scale,
+    });
+    this.PagedImage('public/assets/images/future-industries-nopage.jpg', {
+      resizeMode: 'stretch',
+      autoAddPage: false,
+    });
+    this.PagedImage('public/assets/images/career-popularity-nopage.jpg', {
+      resizeMode: 'stretch',
+      autoAddPage: false,
+    });
+    this.generateFutureTechPage();
+    this.doc.y += 10 * this.MM;
+    this.generateFutureOutlookPage({}, { addAsNewPage: false });
+  }
+
+  // --- GENERATE BEHAVIORAL RADAR ---
+  /**
+   * Generates a radar chart profiling core behavioral capabilities.
+   */
+  private ci_generateBehavioralRadar(): void {
+    this.ensureSpace(0.45, true);
+
+    this.h1('Behavioral Capability Profile');
+
+    this.p(
+      'An overview of core behavioral capabilities derived from your assessment responses. Higher values indicate stronger natural orientation in that capability area.',
+    );
+    this.doc.moveDown(2);
+
+    // Build radar data with non-DISC labels, scale to 0-10
+    const radarData: { [key: string]: number } = {};
+    radarData[BEHAVIOR_LABELS['D']] = Math.round(
+      (this.data.score_D / 100) * 10,
+    );
+    radarData[BEHAVIOR_LABELS['I']] = Math.round(
+      (this.data.score_I / 100) * 10,
+    );
+    radarData[BEHAVIOR_LABELS['S']] = Math.round(
+      (this.data.score_S / 100) * 10,
+    );
+    radarData[BEHAVIOR_LABELS['C']] = Math.round(
+      (this.data.score_C / 100) * 10,
+    );
+
+    this.drawRadarChart(radarData, {
+      radius: 90,
+      maxValue: 10,
+      levels: 5,
+      fontSize: 10,
+      font: this.FONT_SORA_SEMIBOLD,
+      colorFill: CI_COLORS.RADAR_FILL,
+      colorStroke: CI_COLORS.RADAR_STROKE,
+      colorPoint: CI_COLORS.RADAR_STROKE,
+      colorGrid: CI_COLORS.RADAR_GRID,
+      colorText: CI_COLORS.DARK_TEXT,
+    });
+
+    this.doc.y += 10;
+    // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
+  }
+
+  // --- GENERATE 360 IMPACT ---
+  /**
+   * Creates the 360 Impact Rings highlighting personality, agility, and leadership dimensions.
+   */
+  private ci_generate360Impact(): void {
+    this.ensureSpace(0.3, true);
+
+    this.h2('360° Impact Assessment');
+
+    this.p(
+      'A holistic view of impact across personality, behavioural agility, and leadership dimensions.',
+      { gap: 6 },
+    );
+
+    const D = this.data.score_D;
+    const I = this.data.score_I;
+    const S = this.data.score_S;
+    const C = this.data.score_C;
+    const agile = this.data.agile_scores?.[0];
+    const norm = (v: number) => Math.min(100, Math.round((v / 25) * 100));
+
+    const personalityAvg = Math.round((D + I + S + C) / 4);
+    const agilityAvg = Math.round(
+      (norm(agile?.commitment ?? 0) +
+        norm(agile?.courage ?? 0) +
+        norm(agile?.focus ?? 0) +
+        norm(agile?.openness ?? 0) +
+        norm(agile?.respect ?? 0)) /
+      5,
+    );
+    const leadershipScore = this.ci_patterns.leadership;
+
+    this.drawImpactRings([
+      {
+        label: 'Personality',
+        value: personalityAvg,
+        color: CI_COLORS.INDIGO,
+      },
+      {
+        label: 'Agility',
+        value: agilityAvg,
+        color: CI_COLORS.INDIGO_MID,
+      },
+      {
+        label: 'Leadership',
+        value: leadershipScore,
+        color: CI_COLORS.GREEN,
+      },
+    ]);
+
+    // Summary text
+    const allBalanced =
+      Math.abs(personalityAvg - agilityAvg) < 15 &&
+      Math.abs(agilityAvg - leadershipScore) < 15;
+    if (allBalanced) {
+      this.p(
+        'You maintain consistent performance across personality, behaviour, and collaboration.',
+        { gap: 6 },
+      );
+    } else if (leadershipScore > personalityAvg + 10) {
+      this.p(
+        'You influence direction strongly, but strengthening emotional alignment will improve cohesion.',
+        { gap: 6 },
+      );
+    } else {
+      this.p(
+        'Your profile shows distinct strengths across different dimensions. Targeted development will create more uniform impact.',
+        { gap: 6 },
+      );
+    }
+
+    // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
+  }
+
+  // --- GENERATE STRESS BEHAVIOR ---
+  /**
+   * Illustrates the stress response model and progression for the profile pattern.
+   */
+  private ci_generateStressBehavior(): void {
+    this.ensureSpace(0.14, true);
+
+    this.h2('Stress Response Model', { topGap: 6 });
+
+    const p = this.ci_patterns;
+    const stressLabels: Record<
+      string,
+      { stages: [string, string, string]; color: string }
+    > = {
+      assertive: {
+        stages: [
+          'Focused & Direct',
+          'Assertive & Impatient',
+          'Aggressive & Dismissive',
+        ],
+        color: CI_COLORS.DEVELOPING_RED,
+      },
+      overthink: {
+        stages: [
+          'Analytical & Careful',
+          'Cautious & Hesitant',
+          'Paralysed by Detail',
+        ],
+        color: CI_COLORS.MODERATE_AMBER,
+      },
+      withdrawal: {
+        stages: [
+          'Quiet & Observant',
+          'Reserved & Passive',
+          'Withdrawn & Disengaged',
+        ],
+        color: CI_COLORS.BAR_PURPLE,
+      },
+      balanced: {
+        stages: ['Calm & Steady', 'Mildly Reactive', 'Moderately Affected'],
+        color: CI_COLORS.BAR_TEAL,
+      },
+    };
+
+    const stressInfo = stressLabels[p.stressType] || stressLabels['balanced'];
+    this.drawStressProgression(stressInfo.stages, stressInfo.color);
+    this.p(this.ci_tv(`stress-${p.stressType}`), { gap: 6 });
+    // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
+  }
+
+  // --- GENERATE AGILE MATURITY ---
+  /**
+   * Generates a visualization for Agile Maturity including pattern titles and balance scales.
+   */
+  private ci_generateAgileMaturity(): void {
+    this.h2('Agile Maturity Analysis');
+
+    const agile = this.data.agile_scores?.[0];
+    const norm = (v: number) => Math.min(100, Math.round((v / 25) * 100));
+    const courage = norm(agile?.courage ?? 0);
+    const respect = norm(agile?.respect ?? 0);
+    const focus = norm(agile?.focus ?? 0);
+    const commitment = norm(agile?.commitment ?? 0);
+    const openness = norm(agile?.openness ?? 0);
+
+    const p = this.ci_patterns;
+    const patternTitles: Record<string, string> = {
+      'assertive-risk': 'Assertive Risk Pattern',
+      'execution-engine': 'Execution Engine Profile',
+      'creative-instability': 'Creative Instability Pattern',
+      balanced: 'Balanced Agility Profile',
+    };
+
+    this.h3(patternTitles[p.agilePattern], {
+      color: CI_COLORS.ACCENT_TEAL,
+    });
+
+    // Draw balance scale for the key pair
+    if (p.agilePattern === 'assertive-risk') {
+      this.drawBalanceScale('Courage', courage, 'Respect', respect);
+    } else if (p.agilePattern === 'execution-engine') {
+      this.drawBalanceScale('Focus', focus, 'Commitment', commitment);
+    } else if (p.agilePattern === 'creative-instability') {
+      this.drawBalanceScale('Openness', openness, 'Commitment', commitment);
+    } else {
+      // Balanced: show the most extreme pair
+      const pairs = [
+        { l: 'Courage', lv: courage, r: 'Respect', rv: respect },
+        { l: 'Focus', lv: focus, r: 'Commitment', rv: commitment },
+      ];
+      const widest = pairs.sort(
+        (a, b) => Math.abs(b.lv - b.rv) - Math.abs(a.lv - a.rv),
+      )[0];
+      this.drawBalanceScale(widest.l, widest.lv, widest.r, widest.rv);
+    }
+
+    this.p(this.ci_tv(`agile-${p.agilePattern}`), { align: 'center' });
+  }
+
+  // --- GENERATE SKILL HEATMAP ---
+  /**
+   * Assesses and visualizes professional skill competencies in a colored heatmap format.
+   */
+  private ci_generateSkillHeatmap(): void {
+    this.h2('Professiosnal Skill Heatmap');
+
+    this.p(
+      'Derived competency scores combining behavioural and agile assessment data. Darker blocks indicate stronger natural orientation.',
+    );
+
+    const p = this.ci_patterns;
+    const skills = [
+      { label: 'Leadership', value: p.leadership },
+      { label: 'Collaboration', value: p.collaboration },
+      { label: 'Innovation', value: p.innovation },
+      { label: 'Analytical', value: p.analytical },
+      { label: 'Resilience', value: p.resilience },
+      { label: 'Adaptability', value: p.adaptability },
+    ];
+
+    this.drawSkillHeatmapGrid(skills);
+
+    // Add contextual text for extreme scores
+    if (p.leadership > 75) {
+      this.p(
+        '★ ' +
+        (TEXT_VARIATIONS['skill-leadership-high']?.[p.textVariant] ?? ''),
+        {
+          color: CI_COLORS.STRONG_GREEN,
+          gap: 3,
+        },
+      );
+    }
+    if (p.collaboration < 50) {
+      this.p(
+        '△ ' +
+        (TEXT_VARIATIONS['skill-collaboration-low']?.[p.textVariant] ?? ''),
+        {
+          color: CI_COLORS.MODERATE_AMBER,
+          gap: 3,
+        },
+      );
+    }
+
+    this.doc.y += 4;
+    // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
+  }
+
+  // --- GENERATE ACADEMIC CAREER GOALS ---
+  /**
+   * Generates the Academic and Career Goals section mapping traits to elements, behaviors, and roles.
+   */
+  private generateAcademicCareerGoals(): void {
+    const [primaryType, secondaryType] = this.getTopTwoTraits(
+      this.data.most_answered_answer_type,
+      this.data,
+    );
+    const dominantTrait = primaryType + secondaryType;
+
+    const contentBlock = SCHOOL_BLENDED_STYLE_MAPPING[dominantTrait];
+    if (!contentBlock) return;
+
+    this.h1('Mapping Your Strengths to Future Academic and Career Goals');
+    this.h2(contentBlock.style_name);
+    this.pHtml(contentBlock.style_desc);
+
+    this.renderElementCombo(dominantTrait[0], dominantTrait[1]);
+
+    this.h3('Suggestions');
+    this.pHtml(contentBlock.nature_suggestions);
+
+    this.h3('Key Behaviours');
+    this.list(contentBlock.key_behaviours, { indent: 30, type: 'number' });
+
+    this.h3('Typical Scenarios');
+    this.list(contentBlock.typical_scenarios, {
+      indent: 30,
+      type: 'number',
+    });
+
+    this.h2('Trait Mapping');
+
+    const headers = [
+      'Trait Combination',
+      'Role Suggestions',
+      'Recommended Focus Areas',
+      'Stress Areas',
+    ];
+    const tableWidth =
+      this.PAGE_WIDTH -
+      2 * (this._useStdMargins ? this.MARGIN_STD : 15 * this.MM);
+    const colWidths = [
+      tableWidth * 0.2,
+      tableWidth * 0.3,
+      tableWidth * 0.25,
+      tableWidth * 0.25,
+    ];
+    this.table(headers, contentBlock.trait_mapping1, {
+      fontSize: 8,
+      headerFontSize: 8,
+      colWidths: colWidths,
+    });
+    this.generateRespondParameterTable(primaryType as 'D' | 'I' | 'S' | 'C');
+  }
+
+  // --- GENERATE SSLC SECTIONS ---
+  /**
+   * Orchestrates and renders SSLC specific sections such as Career Alignment, Flight Path, and Stream Odyssey.
+   */
+  private async generateSSLCSections(): Promise<void> {
+    // 1. Career Alignment Index
+    this.ci_generateCareerAlignmentIndex();
+
+    // 2. Career Fit
+    this.ci_generateCareerFit();
+
+    // 3. Career Domain Table
+    this.ci_generateCareerDomainTable();
+
+    // 4. Career Flight Path
+    try {
+      this.generateCareerFlightPath();
+      logger.info('[School REPORT][SSLC] Career Flight Path Generated.');
+    } catch (err) {
+      logger.warn('[School REPORT][SSLC] Career Flight Path skipped.', err);
+    }
+
+    // 5. Development Zones
+    this.ci_generateDevelopmentZones();
+
+    // 6. Future Pathways & Stream Odyssey
+    try {
+      this.generateStreamSelectionIntro();
+      ['PCMB', 'PCB', 'PCM', 'PCBZ', 'Commerce', 'Humanities'].forEach((streamKey) => {
+        this.generateStreamSelectionContent(streamKey);
+        this.generateStreamOdysseyRoadmap(streamKey);
+      });
+      logger.info('[School REPORT][SSLC] Stream Selection & Odyssey Generated.');
+    } catch (err) {
+      logger.warn('[School REPORT][SSLC] Stream Odyssey skipped.', err);
+    }
+  }
+
+  // --- GENERATE HSC SECTIONS ---
+  /**
+   * Orchestrates and renders HSC specific sections such as Course Compatibility and Reach Institutions.
+   */
+  private async generateHSCSections(): Promise<void> {
+    // 1. Career Alignment Index
+    this.ci_generateCareerAlignmentIndex();
+
+    // 2. Career Fit
+    this.ci_generateCareerFit();
+
+    // 3. Career Domain Table
+    this.ci_generateCareerDomainTable();
+
+    // 4. Course Compatibility Matrix
+    try {
+      await this.generateCourseCompatibility();
+      logger.info('[School REPORT][HSC] Course Compatibility Generated.');
+    } catch {
+      logger.warn('[School REPORT][HSC] Course Compatibility skipped (DB unavailable).');
+    }
+
+    // 5. Your Reach Institutions
+    try {
+      await this.generateReachInstitutions();
+      logger.info('[School REPORT][HSC] Reach Institutions Generated.');
+    } catch (err) {
+      logger.warn('[School REPORT][HSC] Reach Institutions skipped (DB unavailable).', err);
+    }
+
+    // 6. Career Flight Path
+    try {
+      this.generateCareerFlightPath();
+      logger.info('[School REPORT][HSC] Career Flight Path Generated.');
+    } catch (err) {
+      logger.warn('[School REPORT][HSC] Career Flight Path skipped.', err);
+    }
+
+    const streamMap: Record<string, string> = {
+      '1': 'PCMB',
+      '2': 'PCB',
+      '3': 'PCM',
+      '4': 'PCBZ',
+      '5': 'Commerce',
+      '6': 'Humanities',
+    };
+    let streamKey = streamMap[String(this.data.school_stream_id)];
+
+    // 6.5. Future Pathways
+    try {
+      if (streamKey) {
+        this.generateStreamSelectionContent(streamKey);
+        logger.info('[School REPORT][HSC] Future Pathways Generated.');
+      }
+    } catch (err) {
+      logger.warn('[School REPORT][HSC] Future Pathways skipped.', err);
+    }
+
+    // 7. Career Odyssey Roadmap
+    try {
+      this.generateStreamOdysseyRoadmap(streamKey);
+      logger.info('[School REPORT][HSC] Career Odyssey Roadmap Generated.');
+    } catch (err) {
+      logger.warn('[School REPORT][HSC] Career Odyssey Roadmap skipped.', err);
+    }
+
+    // 8. Development Zones (Moved to the end for HSC)
+    this.ci_generateDevelopmentZones();
+  }
+
+  // --- GENERATE WORD SKETCH SECTION ---
+  /**
+   * Generates the Nature Style - Word Sketch section with dynamic descriptions.
+   */
+  private generateWordSketchSection(): void {
+    this.h2('Nature Style - Word Sketch');
+    this.pHtml(SCHOOL_CONTENT.natural_style_work_sketch_desc);
+    this.pHtml(SCHOOL_CONTENT.natural_style_work_sketch_desc_1);
+    this.generateWordSketch();
+  }
+
+  // --- GENERATE DISCLAIMER SECTION ---
+  /**
+   * Generates the closing disclaimer, limitations, and indemnity sections for the report.
+   */
+  private generateDisclaimerSection(): void {
+    this.h1(DISCLAIMER_CONTENT.title);
+    this.pHtml(DISCLAIMER_CONTENT.intro);
+
+    this.h3(DISCLAIMER_CONTENT.limitations_title);
+    this.list(DISCLAIMER_CONTENT.limitations_bullets, { indent: 30 });
+
+    this.h3(DISCLAIMER_CONTENT.no_warranties_title);
+    this.pHtml(DISCLAIMER_CONTENT.no_warranties_intro, { gap: 10 });
+    this.pHtml(DISCLAIMER_CONTENT.no_warranties_disclaimer);
+    this.list(DISCLAIMER_CONTENT.no_warranties_bullets, { indent: 30 });
+
+    this.h3(DISCLAIMER_CONTENT.indemnity_title);
+    this.pHtml(DISCLAIMER_CONTENT.indemnity_intro);
+    this.list(DISCLAIMER_CONTENT.indemnity_bullets, { indent: 30 });
+    this.pHtml(DISCLAIMER_CONTENT.indemnity_outro);
+
+    this.h3(DISCLAIMER_CONTENT.no_liability_title);
+    this.pHtml(DISCLAIMER_CONTENT.no_liability_desc);
+
+    // Final Closing Note
+    this.doc.font(this.FONT_SORA_REGULAR).fontSize(10).fillColor('#555555'); // Greyish
+    this.pHtml(DISCLAIMER_CONTENT.closing_note);
+  }
+
+  // --- GENERATE STREAM SELECTION INTRO ---
+  /**
+   * Renders the introductory explanations and motivation for choosing an academic stream.
+   */
+  private generateStreamSelectionIntro(): void {
+    this.doc.addPage();
+    this._useStdMargins = true;
+
+    this.h1('Future Pathways: Stream Selection');
+
+    this.h2('Choosing Your Stream: The Blueprint to Your Future');
+    this.pHtml(
+      'Transitioning to higher secondary education marks a crucial crossroads in your academic journey. The stream you select now is a foundational step that will help shape your college education, your career trajectory, and your future lifestyle.',
+    );
+
+    this.h2('It is Not Just About Subjects—It is About Your Identity');
+    this.pHtml(
+      'When choosing a stream for the 11th and 12th grades, it is helpful to look beyond the immediate syllabus and ask yourself: What kind of impact do I want to make? <br/>• Do you want to build the technology of tomorrow?<br/>• Are you driven to heal people and advance medical science?<br/>• Do you enjoy the dynamics of business, finance, and leadership?<br/>• Or are you passionate about understanding human behavior, law, and creative expression?'
+    );
+    this.pHtml(
+      'Your natural interests and strengths are the best compass you have. When you align your studies with what you genuinely enjoy, building a highly successful career becomes a pursuit of purpose rather than just work.'
+    );
+
+    this.h2('Understanding Your Stream Options');
+    this.pHtml(
+      'To help you navigate this decision, the following section breaks down the complex landscape of college degrees into clear, easy-to-understand career pathways.'
+    );
+    this.pHtml(
+      'On the upcoming pages, you will find a dedicated breakdown for each major academic stream. Every page will show you the core focus of that stream and the broad professional fields it unlocks for your future. You do not need to select an exact college degree today; the goal of this section is to help you confidently choose the broad direction you want to walk in.'
+    );
+    this.pHtml(
+      'Keep an open mind and use the following breakdowns to explore what your future could look like based on the stream you select.'
+    );
+  }
+
+  // --- GENERATE STREAM SELECTION CONTENT ---
+  /**
+   * Displays the core fields, vibes, and mapped degrees tailored to a specific stream selection.
+   */
+  private generateStreamSelectionContent(streamKey: string): void {
+    const streamData = STREAM_SELECTION_CONTENT[streamKey];
+    if (!streamData) {
+      logger.warn(`[School REPORT] No stream data found for key: ${streamKey}`);
+      return;
+    }
+
+    this.doc.addPage();
+    this._useStdMargins = true;
+    const margin = this.MARGIN_STD;
+
+    // --- Top Banner ---
+    // Title
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(22)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text(`${streamData.shortName}\n(${streamData.title})`, margin, margin, {
+        width: this.PAGE_WIDTH - 2 * margin - 80, // Leave space for icon
+      });
+
+    // Icon Rendering
+    const iconBaseY = margin;
+    const iconBaseX = this.PAGE_WIDTH - margin - 60;
+    const iconName = streamKey === 'Humanities' ? 'humanity.png' : `${streamKey.toLowerCase()}.png`;
+    const iconPath = `public/assets/images/school/${iconName}`;
+
+    if (fs.existsSync(iconPath)) {
+      this.doc.image(iconPath, iconBaseX, iconBaseY, { width: 60, height: 60 });
+      this.doc.moveDown(0.5);
+    } else {
+      // Fallback Placeholder
+      this.doc
+        .rect(iconBaseX, iconBaseY, 60, 60)
+        .lineWidth(1)
+        .strokeColor('#D3D3D3')
+        .stroke();
+      this.doc
+        .font(this.FONT_SORA_REGULAR)
+        .fontSize(8)
+        .fillColor('#A0A0A0')
+        .text('Icon Place-', iconBaseX, iconBaseY + 20, { width: 60, align: 'center' });
+      this.doc.text('holder', iconBaseX, iconBaseY + 30, { width: 60, align: 'center' });
+      this.doc.moveDown(2.5);
+    }
+
+    // --- // --- Vibe Box ---
+    // const vibeBoxY = this.doc.y;
+
+    // // We measure the text to adapt the box height
+    // this.doc.font(this.FONT_SORA_REGULAR).fontSize(10);
+    // const vibeTextHeight = this.doc.heightOfString(streamData.vibe, { width: this.PAGE_WIDTH - 2 * margin - 20 }) + 20;
+
+    // this.doc
+    //   .rect(margin, vibeBoxY, this.PAGE_WIDTH - 2 * margin, vibeTextHeight)
+    //   .fillColor('#F4F7FB')
+    //   .fill();
+
+    // this.doc
+    //   .fillColor(this.COLOR_BLACK)
+    //   .text(streamData.vibe, margin + 10, vibeBoxY + 10, {
+    //     width: this.PAGE_WIDTH - 2 * margin - 20,
+    //     align: 'left',
+    //   });
+    this.p(streamData.vibe);
+
+    // --- The 2x2 Card Grid ---
+    this.doc.moveDown(0.5);
+    const gridY = this.doc.y;
+    const cardWidth = (this.PAGE_WIDTH - 2 * margin - 15) / 2; // 15 gap between cols
+
+    // Pre-calculate needed heights for each card to normalize row heights
+    const cardHeights = streamData.fields.map(field => {
+      let h = 15; // top padding
+
+      this.doc.font(this.FONT_SORA_BOLD).fontSize(11);
+      h += this.doc.heightOfString(field.name, { width: cardWidth - 50 });
+      h += 5; // spacing below title
+
+      this.doc.font(this.FONT_SORA_REGULAR).fontSize(9);
+      h += this.doc.heightOfString(field.vibe, { width: cardWidth - 30 });
+      h += 10; // spacing below vibe
+
+      const degreesList = field.mappedDegrees.split(',').map(d => d.trim().replace(/\.$/, ''));
+      degreesList.forEach(degree => {
+        // Bullet point text height, minimum roughly the icon height (6)
+        h += Math.max(12, this.doc.heightOfString(degree, { width: cardWidth - 42 }));
+        h += 3; // spacing between bullets
+      });
+
+      h += 15; // bottom padding
+      return h;
+    });
+
+    const rowHeights = [
+      Math.max(cardHeights[0] || 0, cardHeights[1] || 0),
+      Math.max(cardHeights[2] || 0, cardHeights[3] || 0)
+    ];
+
+    streamData.fields.forEach((field, index) => {
+      const col = index % 2;
+      const row = Math.floor(index / 2);
+
+      const cardX = margin + col * (cardWidth + 15);
+      const cardY = gridY + (row === 0 ? 0 : rowHeights[0] + 15);
+      const cardHeight = rowHeights[row];
+
+      // Card Background with simulated shadow border
+      this.doc
+        .roundedRect(cardX, cardY, cardWidth, cardHeight, 8)
+        .lineWidth(0.5)
+        .strokeColor('#E0E0E0')
+        .fillColor('#FFFFFF')
+        .fillAndStroke();
+
+      this.doc
+        .roundedRect(cardX + 1, cardY + 1, cardWidth, cardHeight, 8)
+        .lineWidth(0.5)
+        .strokeColor('#D0D0D0') // slightly darker for pseudo-shadow
+        .stroke();
+
+      // Card Inner Content Padding
+      const innerX = cardX + 15;
+      let currentCardY = cardY + 15;
+
+      // Small Icon (Top Left)
+      const fieldIconPath = field.icon ? `public/assets/images/school/${field.icon}` : null;
+      if (fieldIconPath && fs.existsSync(fieldIconPath)) {
+        this.doc.image(fieldIconPath, innerX, currentCardY, { width: 14, height: 14 });
+      } else {
+        // Fallback Icon Placeholder
+        this.doc
+          .circle(innerX + 7, currentCardY + 7, 7)
+          .lineWidth(1)
+          .strokeColor('#A0A0A0')
+          .stroke();
+      }
+
+      // Field Name (Bold)
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(11)
+        .fillColor(this.COLOR_DEEP_BLUE)
+        .text(field.name, innerX + 22, currentCardY, {
+          width: cardWidth - 40,
+        });
+
+      currentCardY = this.doc.y + 5;
+
+      // Field Vibe (Regular/Italic)
+      this.doc
+        .font(this.FONT_SORA_REGULAR)
+        .fontSize(9)
+        .fillColor('#4A4A4A')
+        .text(field.vibe, innerX, currentCardY, {
+          width: cardWidth - 30,
+        });
+
+      currentCardY = this.doc.y + 10;
+
+      // Bulleted list of mapped degrees
+      const degreesList = field.mappedDegrees.split(',').map(d => d.trim().replace(/\.$/, '')); // clean up list
+
+      this.doc.font(this.FONT_SORA_REGULAR).fontSize(9).fillColor(this.COLOR_BLACK);
+
+      degreesList.forEach((degree) => {
+        // Draw Checkmark
+        this.doc
+          .circle(innerX + 4, currentCardY + 4, 4)
+          .fillColor(this.COLOR_BRIGHT_GREEN)
+          .fill();
+        this.doc
+          .moveTo(innerX + 2.5, currentCardY + 4)
+          .lineTo(innerX + 4, currentCardY + 5.5)
+          .lineTo(innerX + 6, currentCardY + 2.5)
+          .lineWidth(1)
+          .strokeColor('#FFFFFF')
+          .stroke();
+
+        this.doc
+          .fillColor(this.COLOR_BLACK)
+          .text(degree, innerX + 12, currentCardY, {
+            width: cardWidth - 42,
+          });
+
+        currentCardY = this.doc.y + 3;
+      });
+    });
+
+    // Bottom tracker spacing handling
+    this.doc.y = gridY + rowHeights[0] + 15 + rowHeights[1] + 15 + 10;
+  }
+
+  // --- GENERATE STREAM ODYSSEY ROADMAP ---
+  /**
+   * Draws a dynamic winding roadmap graph with nodes illustrating the student's academic odyssey.
+   */
+  private generateStreamOdysseyRoadmap(streamKey: string): void {
+    const streamOdyssey = STREAM_ODYSSEY_ROADMAP[streamKey];
+    if (!streamOdyssey) {
+      logger.warn(`[School REPORT] No stream odyssey data found for: ${streamKey}`);
+      return;
+    }
+
+    // this.doc.addPage();
+    // this._useStdMargins = true;
+
+    // --- Graph Properties ---
+    const startX = this.MARGIN_STD + 60; // Increased to prevent first node's text from slipping past margin
+    const endX = this.PAGE_WIDTH - this.MARGIN_STD - 80; // Increased to prevent last node's text from slipping past
+
+    let amplitude = 30; // wave height
+    const headerNeededSpace = 25;
+    const DASHED_LINE_LENGTH = 18; // Fixed ~3 dashes (dash=3px, space=3px)
+
+    // --- First pass: measure text extents to derive dynamic paddings ---
+    // When subtitle text wraps, the graph shifts down slightly instead of shortening the dashed lines.
+    let neededTopPadding = 0;
+    let neededBottomPadding = 0;
+
+    streamOdyssey.nodes.forEach((node: { label: string; title: string; subtitle: string }, i: number) => {
+      this.doc.font(this.FONT_SORA_BOLD).fontSize(9);
+      const lH = this.doc.heightOfString(node.label, { width: 90, align: 'center' });
+      this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(8);
+      const tH = this.doc.heightOfString(node.title, { width: 110, align: 'center' });
+      this.doc.font(this.FONT_SORA_REGULAR).fontSize(7);
+      const sH = this.doc.heightOfString(node.subtitle, { width: 110, align: 'center' });
+
+      // Total extent from node center: circle radius + dashed line + gap + all text heights + spacing
+      const totalExtent = 8 + DASHED_LINE_LENGTH + 2 + lH + 2 + tH + 2 + sH;
+      const textAbove = i % 2 !== 0;
+      const progress = i / (streamOdyssey.nodes.length - 1);
+      const nodeYOff = Math.cos(progress * Math.PI * 2.5) * amplitude;
+
+      if (textAbove) {
+        // How much padding above the wave peak this node's text needs
+        const needed = totalExtent - (nodeYOff + amplitude);
+        neededTopPadding = Math.max(neededTopPadding, needed + 5);
+      } else {
+        // How much padding below the wave trough this node's text needs
+        const needed = totalExtent - (amplitude - nodeYOff);
+        neededBottomPadding = Math.max(neededBottomPadding, needed + 5);
+      }
+    });
+
+    // Use compact defaults as minimum, grow only when wrapped text demands more space
+    let graphTopPadding = Math.max(35, neededTopPadding);
+    let graphBottomPadding = Math.max(65, neededBottomPadding);
+
+    const availableHeight = this.PAGE_HEIGHT - this.MARGIN_STD - this.doc.y;
+    const fortyPercentSpace = 0.4 * this.PAGE_HEIGHT;
+
+    // User requested rule: if at least 40% space is available, render as usual.
+    // If not, reduce the scaling by 10%.
+    if (availableHeight >= fortyPercentSpace) {
+      // Render as usual — paddings already accommodate dynamic text heights
+    } else {
+      // Reduce scaling by 10%
+      amplitude *= 0.9;
+      graphTopPadding *= 0.9;
+      graphBottomPadding *= 0.9;
+    }
+
+    // Since the path uses Math.cos over >1 periods, the exact bounds are always ±amplitude.
+    const maxGraphY = amplitude;
+    const minGraphY = -amplitude;
+
+    const totalGraphHeight = (maxGraphY - minGraphY) + graphTopPadding + graphBottomPadding;
+    const totalNeededSpace = headerNeededSpace + totalGraphHeight;
+
+    // Ensure we have enough space for the WHOLE section, or move to next page to prevent
+    // mid-drawing auto-pagination which breaks elements onto the next page.
+    if (this.doc.y + totalNeededSpace > this.PAGE_HEIGHT - this.MARGIN_STD) {
+      this.doc.addPage();
+      // Reset scaling to normal for the new page
+      amplitude = 30;
+      graphTopPadding = Math.max(55, neededTopPadding);
+      graphBottomPadding = Math.max(65, neededBottomPadding);
+    }
+
+    // NOW draw the header
+    this.h3(`${streamOdyssey.tagline}`, { topGap: 0, ensureSpace: 0 });
+
+    // The vertical center of the wave
+    const startY = this.doc.y + graphTopPadding - minGraphY;
+
+    // Draw the continuous winding wave path
+    this.doc.save();
+    this.doc
+      .lineWidth(4)
+      .strokeColor('#E8EAF6') // Light periwinkle/grey for path
+      .lineJoin('round')
+      .lineCap('round');
+
+    this.doc.moveTo(startX, startY);
+
+    // Draw smooth curve using bezier logic or small line segments
+    const segments = 100;
+    for (let j = 0; j <= segments; j++) {
+      const p = j / segments;
+      const x = startX + p * (endX - startX);
+      const ang = p * Math.PI * 2.5;
+      // Start from bottom means we want the first yOffset to be positive (down)
+      // Math.cos(ang) starts at 1. If we multiply by amplitude, the wave starts at bottom.
+      const y = startY + Math.cos(ang) * amplitude;
+
+      if (j === 0) {
+        this.doc.moveTo(x, y);
+      } else {
+        this.doc.lineTo(x, y);
+      }
+    }
+    this.doc.stroke();
+    this.doc.restore();
+
+    // Draw Nodes and Text
+    streamOdyssey.nodes.forEach((node, i) => {
+      const progress = i / (streamOdyssey.nodes.length - 1);
+      const nodeX = startX + progress * (endX - startX);
+      const angle = progress * Math.PI * 2.5;
+      const nodeYOffset = Math.cos(angle) * amplitude;
+      const nodeY = startY + nodeYOffset;
+
+      // Strictly alternate text placement for clarity
+      const textAbove = i % 2 !== 0;
+
+      // Calculate heights of the text blocks dynamically
+      this.doc.font(this.FONT_SORA_BOLD).fontSize(9);
+      const labelHeight = this.doc.heightOfString(node.label, { width: 90, align: 'center' });
+      this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(8);
+      const titleHeight = this.doc.heightOfString(node.title, { width: 110, align: 'center' });
+      this.doc.font(this.FONT_SORA_REGULAR).fontSize(7);
+      const subtitleHeight = this.doc.heightOfString(node.subtitle, { width: 110, align: 'center' });
+
+      let labelY: number, titleY: number, subtitleY: number, dashLineEndY: number;
+
+      if (textAbove) {
+        // Fixed dashed line upward from node circle edge
+        dashLineEndY = nodeY - 8 - DASHED_LINE_LENGTH;
+        // Text stacks above: subtitle closest to node, then title, then label on top
+        subtitleY = dashLineEndY - 2 - subtitleHeight;
+        titleY = subtitleY - 2 - titleHeight;
+        labelY = titleY - 2 - labelHeight;
+      } else {
+        // Fixed dashed line downward from node circle edge
+        dashLineEndY = nodeY + 8 + DASHED_LINE_LENGTH;
+        // Text stacks below: label closest to node, then title, then subtitle
+        labelY = dashLineEndY + 2;
+        titleY = labelY + labelHeight + 2;
+        subtitleY = titleY + titleHeight + 2;
+      }
+
+      this.doc
+        .save()
+        .lineWidth(1)
+        .strokeColor('#A0AABF')
+        .dash(3, { space: 3 })
+        .moveTo(nodeX, nodeY + (textAbove ? -8 : 8))
+        .lineTo(nodeX, dashLineEndY)
+        .stroke()
+        .restore();
+
+      // Draw the circular node point
+      this.doc
+        .circle(nodeX, nodeY, 8)
+        .fill(CI_COLORS.GREEN)
+        .lineWidth(3)
+        .strokeColor('#FFFFFF')
+        .stroke();
+
+      // Render Text Label (Year/Phase)
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(9)
+        .fillColor(CI_COLORS.INDIGO)
+        .text(node.label, nodeX - 45, labelY, {
+          width: 90,
+          align: 'center',
+        });
+
+      // Render Title
+      this.doc
+        .font(this.FONT_SORA_SEMIBOLD)
+        .fontSize(8)
+        .fillColor('#333333')
+        .text(node.title, nodeX - 55, titleY, {
+          width: 110,
+          align: 'center',
+        });
+
+      // Render Subtitle
+      this.doc
+        .font(this.FONT_SORA_REGULAR)
+        .fontSize(7)
+        .fillColor('#666666')
+        .text(node.subtitle, nodeX - 55, subtitleY, {
+          width: 110,
+          align: 'center',
+        });
+    });
+
+    this.doc.y = startY + maxGraphY + graphBottomPadding + 20;
+  }
+
+  // --- GENERATE ACI ---
+  /**
+   * Calculates and draws the Agile Compatibility Index (ACI) scoring matrix.
+   */
   private generateACI(): void {
     const contentBlock =
       ACI[
@@ -1126,185 +1723,9 @@ export class SchoolReport extends BaseReport {
     this.pHtml(contentBlock.reflection_summary);
   }
 
-  private generateNatureGraphSection(): void {
-    const topTrait = this.getTopTwoTraits(
-      this.data.most_answered_answer_type,
-      this.data,
-    )[0];
-    let chartData: { label: string; value: number; color: number[] }[] = [];
-
-    if (topTrait === 'D') {
-      chartData = [
-        { label: 'D', value: 85, color: COLORS.D },
-        { label: 'I', value: 30, color: COLORS.I },
-        { label: 'S', value: 25, color: COLORS.S },
-        { label: 'C', value: 40, color: COLORS.C },
-      ];
-    } else if (topTrait === 'I') {
-      chartData = [
-        { label: 'D', value: 30, color: COLORS.D },
-        { label: 'I', value: 80, color: COLORS.I },
-        { label: 'S', value: 50, color: COLORS.S },
-        { label: 'C', value: 30, color: COLORS.C },
-      ];
-    } else if (topTrait === 'S') {
-      chartData = [
-        { label: 'D', value: 25, color: COLORS.D },
-        { label: 'I', value: 35, color: COLORS.I },
-        { label: 'S', value: 85, color: COLORS.S },
-        { label: 'C', value: 40, color: COLORS.C },
-      ];
-    } else if (topTrait === 'C') {
-      chartData = [
-        { label: 'D', value: 20, color: COLORS.D },
-        { label: 'I', value: 25, color: COLORS.I },
-        { label: 'S', value: 40, color: COLORS.S },
-        { label: 'C', value: 90, color: COLORS.C },
-      ];
-    } else {
-      // Fallback
-      chartData = [
-        { label: 'D', value: this.data.score_D, color: COLORS.D },
-        { label: 'I', value: this.data.score_I, color: COLORS.I },
-        { label: 'S', value: this.data.score_S, color: COLORS.S },
-        { label: 'C', value: this.data.score_C, color: COLORS.C },
-      ];
-    }
-    // --- Logic for Nature and Adapted Style Graph ---
-    const pageContentHeight = this.PAGE_HEIGHT - 2 * this.MARGIN_STD;
-    const heightPercent = 92; // 92%
-    const normalHeightNeeded = pageContentHeight * (heightPercent / 100);
-    const currentY = this.doc.y;
-    const pageHeight = this.PAGE_HEIGHT;
-    const bottomMargin = this.MARGIN_STD;
-    const availableSpace = pageHeight - bottomMargin - currentY;
-
-    let shouldAddPage = false;
-    let scalingAdjustment = 0;
-    let scale = 1;
-    let x = 0;
-
-    if (availableSpace >= normalHeightNeeded) {
-      // Fits perfectly
-      scalingAdjustment = -50;
-    } else if (availableSpace >= normalHeightNeeded - 50) {
-      scalingAdjustment = -50;
-      scale = 0.8;
-    } else {
-      // Does not fit even with shrink
-      shouldAddPage = true;
-      scalingAdjustment = 0;
-      scale = 1;
-      x = 0.5;
-    }
-
-    if (shouldAddPage) {
-      this.ensureSpace(1, true); // Force new page
-    }
-
-    this.h2(`Nature Style Graph`, {
-      align: 'center',
-      color: this.COLOR_DEEP_BLUE,
-      topGap: 0,
-    });
-    this.Image('public/assets/images/behavioural-charts.png', {
-      width: this.PAGE_WIDTH - 120,
-      align: 'center',
-    });
-    this.doc.moveDown(x);
-    this.h2(`Nature and Adapted Style`, {
-      align: 'center',
-      color: this.COLOR_DEEP_BLUE,
-    });
-    const adaptedData = [
-      { label: 'D', value: this.data.score_D, color: COLORS.D },
-      { label: 'I', value: this.data.score_I, color: COLORS.I },
-      { label: 'S', value: this.data.score_S, color: COLORS.S },
-      { label: 'C', value: this.data.score_C, color: COLORS.C },
-    ];
-    this.drawSideBySideBarCharts(chartData, adaptedData, {
-      scaleHeight: scalingAdjustment,
-      scale: scale,
-    });
-    this.PagedImage('public/assets/images/future-industries-nopage.jpg', {
-      resizeMode: 'stretch',
-      autoAddPage: false,
-    });
-    this.PagedImage('public/assets/images/career-popularity-nopage.jpg', {
-      resizeMode: 'stretch',
-      autoAddPage: false,
-    });
-    this.generateFutureTechPage();
-    this.doc.y += 10 * this.MM;
-    this.generateFutureOutlookPage({}, { addAsNewPage: false });
-  }
-
+  // --- GENERATE COURSE COMPATIBILITY ---
   /**
-   * Generates Academic & Career Goals Section.
-   * Logic:
-   * - Identifies the Dominant Trait Combo (e.g., "DI").
-   * - Renders the corresponding "Nature Elements" (Fire/Water/Earth/Air).
-   * - Provides Suggestions, Key Behaviours, and Trait Mapping tables.
-   */
-  private generateAcademicCareerGoals(): void {
-    const [primaryType, secondaryType] = this.getTopTwoTraits(
-      this.data.most_answered_answer_type,
-      this.data,
-    );
-    const dominantTrait = primaryType + secondaryType;
-
-    const contentBlock = SCHOOL_BLENDED_STYLE_MAPPING[dominantTrait];
-    if (!contentBlock) return;
-
-    this.h1('Mapping Your Strengths to Future Academic and Career Goals');
-    this.h2(contentBlock.style_name);
-    this.pHtml(contentBlock.style_desc);
-
-    this.renderElementCombo(dominantTrait[0], dominantTrait[1]);
-
-    this.h3('Suggestions');
-    this.pHtml(contentBlock.nature_suggestions);
-
-    this.h3('Key Behaviours');
-    this.list(contentBlock.key_behaviours, { indent: 30, type: 'number' });
-
-    this.h3('Typical Scenarios');
-    this.list(contentBlock.typical_scenarios, {
-      indent: 30,
-      type: 'number',
-    });
-
-    this.h2('Trait Mapping');
-
-    const headers = [
-      'Trait Combination',
-      'Role Suggestions',
-      'Recommended Focus Areas',
-      'Stress Areas',
-    ];
-    const tableWidth =
-      this.PAGE_WIDTH -
-      2 * (this._useStdMargins ? this.MARGIN_STD : 15 * this.MM);
-    const colWidths = [
-      tableWidth * 0.2,
-      tableWidth * 0.3,
-      tableWidth * 0.25,
-      tableWidth * 0.25,
-    ];
-    this.table(headers, contentBlock.trait_mapping1, {
-      fontSize: 8,
-      headerFontSize: 8,
-      colWidths: colWidths,
-    });
-    this.generateRespondParameterTable(primaryType as 'D' | 'I' | 'S' | 'C');
-  }
-
-  /**
-   * Generates Course Compatibility Matrix.
-   * Logic:
-   * - Fetches compatibility data for the student's stream and top traits.
-   * - Renders a Bar Chart comparing compatibility percentages for various courses.
-   * - Includes the "Nature Style - Word Sketch".
+   * Fetches compatibility data for the stream and traits, then renders a comparison chart.
    */
   private async generateCourseCompatibility(): Promise<void> {
     this.ensureSpace(0.5, true);
@@ -1327,40 +1748,12 @@ export class SchoolReport extends BaseReport {
     this.doc.moveDown();
   }
 
-  private generateWordSketchSection(): void {
-    this.h2('Nature Style - Word Sketch');
-    this.pHtml(SCHOOL_CONTENT.natural_style_work_sketch_desc);
-    this.pHtml(SCHOOL_CONTENT.natural_style_work_sketch_desc_1);
-    this.generateWordSketch();
-  }
-
-  private generateDisclaimerSection(): void {
-    this.h1(DISCLAIMER_CONTENT.title);
-    this.pHtml(DISCLAIMER_CONTENT.intro);
-
-    this.h3(DISCLAIMER_CONTENT.limitations_title);
-    this.list(DISCLAIMER_CONTENT.limitations_bullets, { indent: 30 });
-
-    this.h3(DISCLAIMER_CONTENT.no_warranties_title);
-    this.pHtml(DISCLAIMER_CONTENT.no_warranties_intro, { gap: 10 });
-    this.pHtml(DISCLAIMER_CONTENT.no_warranties_disclaimer);
-    this.list(DISCLAIMER_CONTENT.no_warranties_bullets, { indent: 30 });
-
-    this.h3(DISCLAIMER_CONTENT.indemnity_title);
-    this.pHtml(DISCLAIMER_CONTENT.indemnity_intro);
-    this.list(DISCLAIMER_CONTENT.indemnity_bullets, { indent: 30 });
-    this.pHtml(DISCLAIMER_CONTENT.indemnity_outro);
-
-    this.h3(DISCLAIMER_CONTENT.no_liability_title);
-    this.pHtml(DISCLAIMER_CONTENT.no_liability_desc);
-
-    // Final Closing Note
-    this.doc.font(this.FONT_SORA_REGULAR).fontSize(10).fillColor('#555555'); // Greyish
-    this.pHtml(DISCLAIMER_CONTENT.closing_note);
-  }
-
   // --- Special Generators ---
 
+  // --- GENERATE WORD SKETCH ---
+  /**
+   * Draws a Word Sketch table categorizing behavior attributes from Level 1 to 6.
+   */
   public generateWordSketch(): void {
     this._useStdMargins = true;
 
@@ -1662,6 +2055,10 @@ export class SchoolReport extends BaseReport {
     this.doc.x = this.MARGIN_STD;
   }
 
+  // --- GENERATE RESPOND PARAMETER TABLE ---
+  /**
+   * Creates a response parameter table matching a dominant trait against management scenarios.
+   */
   private generateRespondParameterTable(
     dominantType: 'D' | 'I' | 'S' | 'C',
   ): void {
@@ -1707,6 +2104,10 @@ export class SchoolReport extends BaseReport {
     });
   }
 
+  // --- GENERATE FUTURE TECH PAGE ---
+  /**
+   * Instantiates a page detailing emerging tech areas relevant to the user for the 2027-2035 timeline.
+   */
   private generateFutureTechPage(): void {
     this.doc.addPage();
     this._useStdMargins = true;
@@ -1879,6 +2280,10 @@ export class SchoolReport extends BaseReport {
     });
   }
 
+  // --- GENERATE FUTURE OUTLOOK PAGE ---
+  /**
+   * Produces the Future Outlook page, providing broader industry forecasts.
+   */
   private generateFutureOutlookPage(
     data: FutureOutlookData = {},
     options: FutureOutlookOptions = {},
@@ -1908,7 +2313,7 @@ export class SchoolReport extends BaseReport {
       .font(this.FONT_SORA_SEMIBOLD)
       .fontSize(options.titleFontSize || 20)
       .fillColor(options.titleColor || this.COLOR_DEEP_BLUE)
-      .text(title, startX, this.doc.y);
+      .text(title, this.MARGIN_STD, this.doc.y);
 
     // --- COORDINATE CALCULATIONS ---
     const centerX = 80 * this.MM;
@@ -1986,8 +2391,6 @@ export class SchoolReport extends BaseReport {
       .opacity(0.5)
       .circle(centerDotX + circleR + spacing, centerY, circleR)
       .stroke(); // Outer
-    // -----------------------------
-
     this.doc.undash().opacity(1);
 
     // --- CENTER GREEN DOT & LINE ---
@@ -2055,7 +2458,8 @@ export class SchoolReport extends BaseReport {
         align: 'center',
         width: this.PAGE_WIDTH - 2 * this.MARGIN_STD,
       });
-
+    this.doc.moveDown(0.2);
+    this.p("Students should embrace curiosity and futuristic learning to prepare for roles that don't yet exist", { align: 'center', font: this.FONT_ITALIC, fontSize: 9 });
     this.doc.restore();
     this.doc.y = footerY + 20 * this.MM;
   }
@@ -2375,38 +2779,6 @@ export class SchoolReport extends BaseReport {
     this.doc.fillColor(this.COLOR_BLACK);
   }
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-  // CAREER INTELLIGENCE APPENDIX â€” Properties
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-  private ci_sortedTraits: { type: string; val: number }[] = [];
-  private ci_topTwo: string = '';
-  private ci_careerAlignmentIntensity: number = 0;
-  private ci_patterns!: ProfilePatterns;
-
-  private ci_computeTraits(): void {
-    const scores = [
-      { type: 'D', val: this.data.score_D },
-      { type: 'I', val: this.data.score_I },
-      { type: 'S', val: this.data.score_S },
-      { type: 'C', val: this.data.score_C },
-    ];
-
-    const PRIORITY = ['C', 'D', 'I', 'S'];
-    scores.sort((a, b) => {
-      const diff = b.val - a.val;
-      if (diff !== 0) return diff;
-      return PRIORITY.indexOf(a.type) - PRIORITY.indexOf(b.type);
-    });
-
-    this.ci_sortedTraits = scores;
-    this.ci_topTwo = scores[0].type + scores[1].type;
-    this.ci_careerAlignmentIntensity = Math.min(
-      15,
-      Math.round((scores[0].val + scores[1].val) / 10),
-    );
-    this.ci_detectPatterns();
-  }
-
   private ci_detectPatterns(): void {
     const D = this.data.score_D;
     const I = this.data.score_I;
@@ -2495,7 +2867,7 @@ export class SchoolReport extends BaseReport {
     return variants[this.ci_patterns.textVariant % variants.length];
   }
 
-  // ── S1: Career Alignment Index with Gauge ─────────────────────
+  // --- S1: Career Alignment Index with Gauge ---
 
   private ci_generateCareerAlignmentIndex(): void {
     this.ensureSpace(0.12, true);
@@ -2528,51 +2900,7 @@ export class SchoolReport extends BaseReport {
     // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
 
-  // ── S2: Behavioral Capability Radar ───────────────────────────
-
-  private ci_generateBehavioralRadar(): void {
-    this.ensureSpace(0.45, true);
-
-    this.h1('Behavioral Capability Profile');
-
-    this.p(
-      'An overview of core behavioral capabilities derived from your assessment responses. Higher values indicate stronger natural orientation in that capability area.',
-    );
-    this.doc.moveDown(2);
-
-    // Build radar data with non-DISC labels, scale to 0-10
-    const radarData: { [key: string]: number } = {};
-    radarData[BEHAVIOR_LABELS['D']] = Math.round(
-      (this.data.score_D / 100) * 10,
-    );
-    radarData[BEHAVIOR_LABELS['I']] = Math.round(
-      (this.data.score_I / 100) * 10,
-    );
-    radarData[BEHAVIOR_LABELS['S']] = Math.round(
-      (this.data.score_S / 100) * 10,
-    );
-    radarData[BEHAVIOR_LABELS['C']] = Math.round(
-      (this.data.score_C / 100) * 10,
-    );
-
-    this.drawRadarChart(radarData, {
-      radius: 90,
-      maxValue: 10,
-      levels: 5,
-      fontSize: 10,
-      font: this.FONT_SORA_SEMIBOLD,
-      colorFill: CI_COLORS.RADAR_FILL,
-      colorStroke: CI_COLORS.RADAR_STROKE,
-      colorPoint: CI_COLORS.RADAR_STROKE,
-      colorGrid: CI_COLORS.RADAR_GRID,
-      colorText: CI_COLORS.DARK_TEXT,
-    });
-
-    this.doc.y += 10;
-    // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
-  }
-
-  // ── S3: Core Identity + Strength Intensity Bars ───────────────
+  // --- S3: Core Identity + Strength Intensity Bars ---
 
   private ci_generateCoreIdentityAndStrengths(): void {
     this.ensureSpace(0.3, true);
@@ -2585,7 +2913,7 @@ export class SchoolReport extends BaseReport {
 
     this.p(identity.description);
 
-    // ── Strength Intensity Bars ──
+    // --- Strength Intensity Bars ---
     this.h2('Top Strength Clusters');
 
     const top1 = this.ci_sortedTraits[0];
@@ -2621,7 +2949,7 @@ export class SchoolReport extends BaseReport {
     // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
 
-  // ── S4: Development Acceleration Zones ────────────────────────
+  // --- S4: Development Acceleration Zones ---
 
   private ci_generateDevelopmentZones(): void {
     this.ensureSpace(0.22, true);
@@ -2663,7 +2991,7 @@ export class SchoolReport extends BaseReport {
     // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
 
-  // ── S5: Work Readiness Radar + Indicators ─────────────────────
+  // --- S5: Work Readiness Radar + Indicators ---
 
   private ci_generateWorkReadinessRadar(): void {
     this.ensureSpace(0.45, true);
@@ -2720,7 +3048,7 @@ export class SchoolReport extends BaseReport {
       { label: 'Decision Courage', score: courage },
     ];
 
-    // ── Two-column Strength / Growth split ─────────
+    // --- Two-column Strength / Growth split ---
     const THRESHOLD = 17; // out of 25
 
     const strengths: { label: string; score: number }[] = [];
@@ -2763,7 +3091,7 @@ export class SchoolReport extends BaseReport {
     // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
 
-  // ── S6: Career Domain Compatibility Table ─────────────────────
+  // --- S6: Career Domain Compatibility Table ---
 
   private ci_generateCareerDomainTable(): void {
     this.ensureSpace(0.25, true);
@@ -2826,11 +3154,9 @@ export class SchoolReport extends BaseReport {
     });
   }
 
-  // ════════════════════════════════════════════════════════════════
-  // NEW CONDITIONAL SECTION RENDERERS
-  // ════════════════════════════════════════════════════════════════
+  // --- NEW CONDITIONAL SECTION RENDERERS ---
 
-  // ── S1: Core Personality Visualization ─────────────────────────
+  // --- S1: Core Personality Visualization ---
 
   private ci_generateCorePersonality(): void {
     this.h2('Core Personality Profile');
@@ -2901,101 +3227,7 @@ export class SchoolReport extends BaseReport {
     // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
 
-  // ── S2: Agile Maturity Visualization ──────────────────────────
-
-  private ci_generateAgileMaturity(): void {
-    this.h2('Agile Maturity Analysis');
-
-    const agile = this.data.agile_scores?.[0];
-    const norm = (v: number) => Math.min(100, Math.round((v / 25) * 100));
-    const courage = norm(agile?.courage ?? 0);
-    const respect = norm(agile?.respect ?? 0);
-    const focus = norm(agile?.focus ?? 0);
-    const commitment = norm(agile?.commitment ?? 0);
-    const openness = norm(agile?.openness ?? 0);
-
-    const p = this.ci_patterns;
-    const patternTitles: Record<string, string> = {
-      'assertive-risk': 'Assertive Risk Pattern',
-      'execution-engine': 'Execution Engine Profile',
-      'creative-instability': 'Creative Instability Pattern',
-      balanced: 'Balanced Agility Profile',
-    };
-
-    this.h3(patternTitles[p.agilePattern], {
-      color: CI_COLORS.ACCENT_TEAL,
-    });
-
-    // Draw balance scale for the key pair
-    if (p.agilePattern === 'assertive-risk') {
-      this.drawBalanceScale('Courage', courage, 'Respect', respect);
-    } else if (p.agilePattern === 'execution-engine') {
-      this.drawBalanceScale('Focus', focus, 'Commitment', commitment);
-    } else if (p.agilePattern === 'creative-instability') {
-      this.drawBalanceScale('Openness', openness, 'Commitment', commitment);
-    } else {
-      // Balanced: show the most extreme pair
-      const pairs = [
-        { l: 'Courage', lv: courage, r: 'Respect', rv: respect },
-        { l: 'Focus', lv: focus, r: 'Commitment', rv: commitment },
-      ];
-      const widest = pairs.sort(
-        (a, b) => Math.abs(b.lv - b.rv) - Math.abs(a.lv - a.rv),
-      )[0];
-      this.drawBalanceScale(widest.l, widest.lv, widest.r, widest.rv);
-    }
-
-    this.p(this.ci_tv(`agile-${p.agilePattern}`), { align: 'center' });
-  }
-
-  // ── S3: Skill Heatmap ─────────────────────────────────────────
-
-  private ci_generateSkillHeatmap(): void {
-    this.h2('Professiosnal Skill Heatmap');
-
-    this.p(
-      'Derived competency scores combining behavioural and agile assessment data. Darker blocks indicate stronger natural orientation.',
-    );
-
-    const p = this.ci_patterns;
-    const skills = [
-      { label: 'Leadership', value: p.leadership },
-      { label: 'Collaboration', value: p.collaboration },
-      { label: 'Innovation', value: p.innovation },
-      { label: 'Analytical', value: p.analytical },
-      { label: 'Resilience', value: p.resilience },
-      { label: 'Adaptability', value: p.adaptability },
-    ];
-
-    this.drawSkillHeatmapGrid(skills);
-
-    // Add contextual text for extreme scores
-    if (p.leadership > 75) {
-      this.p(
-        '★ ' +
-        (TEXT_VARIATIONS['skill-leadership-high']?.[p.textVariant] ?? ''),
-        {
-          color: CI_COLORS.STRONG_GREEN,
-          gap: 3,
-        },
-      );
-    }
-    if (p.collaboration < 50) {
-      this.p(
-        '△ ' +
-        (TEXT_VARIATIONS['skill-collaboration-low']?.[p.textVariant] ?? ''),
-        {
-          color: CI_COLORS.MODERATE_AMBER,
-          gap: 3,
-        },
-      );
-    }
-
-    this.doc.y += 4;
-    // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
-  }
-
-  // ── S4: Career Fit Variations ─────────────────────────────────
+  // --- S4: Career Fit Variations ---
 
   private ci_generateCareerFit(): void {
     this.ensureSpace(0.16, true);
@@ -3022,10 +3254,10 @@ export class SchoolReport extends BaseReport {
       { label: 'People & HR', score: Math.round((S + nRespect) / 2), condition: S > 65 && nRespect > 65, color: CI_COLORS.ACCENT_GREEN },
     ];
 
-    // ── Sort high → low ──────────────────────────────────────────
+    // --- Sort high → low ---
     fits.sort((a, b) => b.score - a.score);
 
-    // ── Layout constants ─────────────────────────────────────────
+    // --- Layout constants ---
     const labelFontSize = 9;
     const barHeight = 14;
     const barRadius = barHeight / 2;
@@ -3098,56 +3330,7 @@ export class SchoolReport extends BaseReport {
     // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
 
-
-  // ── S5: Stress Behavior Model ─────────────────────────────────
-
-  private ci_generateStressBehavior(): void {
-    this.ensureSpace(0.14, true);
-
-    this.h2('STRESS RESPONSE MODEL', { topGap: 6 });
-
-    const p = this.ci_patterns;
-    const stressLabels: Record<
-      string,
-      { stages: [string, string, string]; color: string }
-    > = {
-      assertive: {
-        stages: [
-          'Focused & Direct',
-          'Assertive & Impatient',
-          'Aggressive & Dismissive',
-        ],
-        color: CI_COLORS.DEVELOPING_RED,
-      },
-      overthink: {
-        stages: [
-          'Analytical & Careful',
-          'Cautious & Hesitant',
-          'Paralysed by Detail',
-        ],
-        color: CI_COLORS.MODERATE_AMBER,
-      },
-      withdrawal: {
-        stages: [
-          'Quiet & Observant',
-          'Reserved & Passive',
-          'Withdrawn & Disengaged',
-        ],
-        color: CI_COLORS.BAR_PURPLE,
-      },
-      balanced: {
-        stages: ['Calm & Steady', 'Mildly Reactive', 'Moderately Affected'],
-        color: CI_COLORS.BAR_TEAL,
-      },
-    };
-
-    const stressInfo = stressLabels[p.stressType] || stressLabels['balanced'];
-    this.drawStressProgression(stressInfo.stages, stressInfo.color);
-    this.p(this.ci_tv(`stress-${p.stressType}`), { gap: 6 });
-    // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
-  }
-
-  // ── S6: Academic Strategy ─────────────────────────────────────
+  // --- S6: Academic Strategy ---
 
   private ci_generateAcademicStrategy(): void {
     this.ensureSpace(0.12, true);
@@ -3223,81 +3406,7 @@ export class SchoolReport extends BaseReport {
     // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
 
-  // ── S7: 360 Impact Rings ──────────────────────────────────────
-
-  private ci_generate360Impact(): void {
-    this.ensureSpace(0.3, true);
-
-    this.h2('360° Impact Assessment');
-
-    this.p(
-      'A holistic view of impact across personality, behavioural agility, and leadership dimensions.',
-      { gap: 6 },
-    );
-
-    const D = this.data.score_D;
-    const I = this.data.score_I;
-    const S = this.data.score_S;
-    const C = this.data.score_C;
-    const agile = this.data.agile_scores?.[0];
-    const norm = (v: number) => Math.min(100, Math.round((v / 25) * 100));
-
-    const personalityAvg = Math.round((D + I + S + C) / 4);
-    const agilityAvg = Math.round(
-      (norm(agile?.commitment ?? 0) +
-        norm(agile?.courage ?? 0) +
-        norm(agile?.focus ?? 0) +
-        norm(agile?.openness ?? 0) +
-        norm(agile?.respect ?? 0)) /
-      5,
-    );
-    const leadershipScore = this.ci_patterns.leadership;
-
-    this.drawImpactRings([
-      {
-        label: 'Personality',
-        value: personalityAvg,
-        color: CI_COLORS.INDIGO,
-      },
-      {
-        label: 'Agility',
-        value: agilityAvg,
-        color: CI_COLORS.INDIGO_MID,
-      },
-      {
-        label: 'Leadership',
-        value: leadershipScore,
-        color: CI_COLORS.GREEN,
-      },
-    ]);
-
-    // Summary text
-    const allBalanced =
-      Math.abs(personalityAvg - agilityAvg) < 15 &&
-      Math.abs(agilityAvg - leadershipScore) < 15;
-    if (allBalanced) {
-      this.p(
-        'You maintain consistent performance across personality, behaviour, and collaboration.',
-        { gap: 6 },
-      );
-    } else if (leadershipScore > personalityAvg + 10) {
-      this.p(
-        'You influence direction strongly, but strengthening emotional alignment will improve cohesion.',
-        { gap: 6 },
-      );
-    } else {
-      this.p(
-        'Your profile shows distinct strengths across different dimensions. Targeted development will create more uniform impact.',
-        { gap: 6 },
-      );
-    }
-
-    // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
-  }
-
-  // ════════════════════════════════════════════════════════════════
-  // CUSTOM GRAPHICAL ELEMENT HELPERS
-  // ════════════════════════════════════════════════════════════════
+  // --- CUSTOM GRAPHICAL ELEMENT HELPERS ---
 
   /**
    * Draws a horizontal progress gauge with gradient fill.
@@ -3468,7 +3577,7 @@ export class SchoolReport extends BaseReport {
     const barWidth = totalWidth - (contentX - x) - 10;
     const barHeight = 12;
 
-    // ── Numbered circle badge (filled teal) ──
+    // --- Numbered circle badge (filled teal) ---
     this.doc
       .circle(badgeCenterX, badgeCenterY, badgeRadius)
       .fill(CI_COLORS.ACCENT_TEAL);
@@ -3483,7 +3592,7 @@ export class SchoolReport extends BaseReport {
         align: 'center',
       });
 
-    // ── Title ──
+    // --- Title ---
     this.doc
       .font(this.FONT_SORA_SEMIBOLD)
       .fontSize(10)
@@ -3492,7 +3601,7 @@ export class SchoolReport extends BaseReport {
         width: barWidth,
       });
 
-    // ── Dual-tone growth bar ──
+    // --- Dual-tone growth bar ---
     const barY = y + 18;
     const fillRatio = Math.min(1, Math.max(0, currentValue / 100));
     const filledWidth = barWidth * fillRatio;
@@ -3541,7 +3650,7 @@ export class SchoolReport extends BaseReport {
         });
     }
 
-    // ── Description ──
+    // --- Description ---
     this.doc
       .font(this.FONT_REGULAR)
       .fontSize(8)
@@ -3828,9 +3937,7 @@ export class SchoolReport extends BaseReport {
     this.doc.y = tileY + totalHeight + 5;
   }
 
-  // ════════════════════════════════════════════════════════════════
-  // NEW DRAWING HELPERS FOR CONDITIONAL SECTIONS
-  // ════════════════════════════════════════════════════════════════
+  // --- NEW DRAWING HELPERS FOR CONDITIONAL SECTIONS ---
 
   /**
    * S1 helper: draws a personality archetype card with colored header,
@@ -4170,7 +4277,7 @@ export class SchoolReport extends BaseReport {
       const startRad = (startAngle * Math.PI) / 180;
       const endRad = (endAngle * Math.PI) / 180;
 
-      // ── Background track (full circle) ───────────────────────────
+      // --- Background track (full circle) ---
       this.doc
         .circle(centerX, centerY, radius)
         .lineWidth(ringThickness)
@@ -4179,7 +4286,7 @@ export class SchoolReport extends BaseReport {
 
       if (pct <= 0) return;
 
-      // ── Filled arc (polyline approximation) ──────────────────────
+      // --- Filled arc (polyline approximation) ---
       this.doc.save();
       this.doc.lineWidth(ringThickness).strokeColor(ring.color);
       const segments = Math.max(12, Math.round(arcAngle / 3));
@@ -4199,17 +4306,17 @@ export class SchoolReport extends BaseReport {
       this.doc.stroke();
       this.doc.restore();
 
-      // ── Rounded cap: start (12 o'clock) ──────────────────────────
+      // --- Rounded cap: start (12 o'clock) ---
       const startCapX = centerX + radius * Math.cos(startRad);
       const startCapY = centerY + radius * Math.sin(startRad);
       this.doc.circle(startCapX, startCapY, capR).fill(ring.color);
 
-      // ── Rounded cap: end (tip of arc) ────────────────────────────
+      // --- Rounded cap: end (tip of arc) ---
       const endCapX = centerX + radius * Math.cos(endRad);
       const endCapY = centerY + radius * Math.sin(endRad);
       this.doc.circle(endCapX, endCapY, capR).fill(ring.color);
 
-      // ── Curved text at the arc END, quadrant-aware ───────────────
+      // --- Curved text at the arc END, quadrant-aware ---
       // • Lower half (sin(endRad) ≥ 0): chars go clockwise, last char near end cap.
       // • Upper half (sin(endRad) < 0): chars reversed + counter-clockwise from end,
       //   rotation flipped by π so text is never upside-down.
@@ -4273,7 +4380,7 @@ export class SchoolReport extends BaseReport {
       });
     });
 
-    // ── Horizontal legend row below the rings ─────────────────────
+    // --- Horizontal legend row below the rings ---
     const legendY = y + ringDiameter + 10;
     const dotR = 4;
     const itemGap = 32;   // gap between items
@@ -4315,10 +4422,7 @@ export class SchoolReport extends BaseReport {
     this.doc.y = legendY + dotR * 2 + 8;
   }
 
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // YOUR REACH INSTITUTIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // --- YOUR REACH INSTITUTIONS ---
 
   private async generateReachInstitutions(): Promise<void> {
     this.ensureSpace(0.5, true);
@@ -4342,14 +4446,18 @@ export class SchoolReport extends BaseReport {
 
     const params = traitParamMap[primaryTrait] ?? { primary: 'Overall Score', secondary: 'Rank' };
 
-    const streamLabel =
-      this.data.school_stream_id === 1
-        ? 'Engineering / Science'
-        : this.data.school_stream_id === 2
-          ? 'Commerce / Management'
-          : this.data.school_stream_id === 3
-            ? 'Arts / Humanities'
-            : 'All Streams (Science, Commerce and Arts)';
+    const streamNames: Record<number, string> = {
+      1: 'PCMB',
+      2: 'PCB',
+      3: 'PCM',
+      4: 'PCBZ',
+      5: 'Commerce / Management',
+      6: 'Arts / Humanities',
+    };
+
+    const streamLabel = this.data.school_stream_id
+      ? streamNames[this.data.school_stream_id] || 'Selected Stream'
+      : 'All Streams (Science, Commerce and Arts)';
 
     this.pHtml(
       `Based on your Personality trait, the institutions below have been selected and ranked using <b>${params.primary} </b> as the primary parameter and <b>${params.secondary} </b> as the secondary parameter. ` +
@@ -4387,22 +4495,41 @@ export class SchoolReport extends BaseReport {
       rowAlign: ['center', 'left', 'left', 'left', 'center', 'center'] as TextAlignment[],
     };
 
-    const isStream1 = colleges.length > 0 && colleges[0].school_stream_id === 1;
+    const isSpecificStream = this.data.school_stream_id !== undefined && this.data.school_stream_id !== null;
     let rows: ((string | number | null | undefined)[] | StyledRow)[];
 
-    if (isStream1) {
-      const groupOrder = ['ENGINEERING', 'MEDICAL', 'RESEARCH'];
+    if (isSpecificStream) {
+      // Group by the dynamically fetched field_name from the database
       const grouped = new Map<string, UniversityData[]>();
+      // We also want to maintain the sort order fetched from the database,
+      // so we use an array to track the order of field names
+      const groupOrder: string[] = [];
+
       for (const c of colleges) {
-        const g = (c.school_group ?? 'OTHER').toUpperCase();
-        if (!grouped.has(g)) grouped.set(g, []);
+        const g = c.field_name || (c.school_group ?? 'OTHER').toUpperCase();
+        if (!grouped.has(g)) {
+          grouped.set(g, []);
+          groupOrder.push(g);
+        }
         grouped.get(g)!.push(c);
       }
+
+      const numGroups = groupOrder.length;
+      let limitPerGroup = 3;
+      if (numGroups === 1) limitPerGroup = 10;
+      else if (numGroups === 2) limitPerGroup = 5;
+      else if (numGroups === 3) limitPerGroup = 5;
+      else if (numGroups === 4) limitPerGroup = 4;
+
       rows = [];
       for (const groupKey of groupOrder) {
-        const group = grouped.get(groupKey);
+        let group = grouped.get(groupKey);
         if (!group || group.length === 0) continue;
-        const label = `${this.riTitleCase(groupKey)} Institutions`;
+
+        group = group.slice(0, limitPerGroup);
+
+        // The subheader label will simply be the Field name
+        const label = groupKey;
         const subheader: StyledRow = {
           type: 'subheader',
           data: [label, label, label, label, label, label],
@@ -4419,22 +4546,40 @@ export class SchoolReport extends BaseReport {
         });
       }
     } else if (this.data.school_stream_id === undefined || this.data.school_stream_id === null) {
-      const streamGroupOrder = [1, 2, 3];
+      const streamGroupOrder = [1, 2, 3, 4, 5, 6];
       const streamGroupLabels: Record<number, string> = {
-        1: 'Science Institutions',
-        2: 'Commerce Institutions',
-        3: 'Humanities Institutions',
+        1: 'PCMB Institutions',
+        2: 'PCB Institutions',
+        3: 'PCM Institutions',
+        4: 'PCBZ Institutions',
+        5: 'Commerce Institutions',
+        6: 'Humanities Institutions',
       };
       const groupedByStream = new Map<number, UniversityData[]>();
       for (const c of colleges) {
-        const sid = c.school_stream_id;
-        if (!groupedByStream.has(sid)) groupedByStream.set(sid, []);
-        groupedByStream.get(sid)!.push(c);
+        let sid = c.school_stream_id;
+        if (sid) {
+          if (!groupedByStream.has(sid)) groupedByStream.set(sid, []);
+          groupedByStream.get(sid)!.push(c);
+        }
       }
+      const populatedGroups = streamGroupOrder.filter(sid => {
+        const g = groupedByStream.get(sid);
+        return g && g.length > 0;
+      });
+      const numGroups = populatedGroups.length;
+      let limitPerGroup = 3;
+      if (numGroups === 1) limitPerGroup = 10;
+      else if (numGroups === 2) limitPerGroup = 5;
+      else if (numGroups === 3 || numGroups === 4) limitPerGroup = 4;
+
       rows = [];
       for (const sid of streamGroupOrder) {
-        const group = groupedByStream.get(sid);
+        let group = groupedByStream.get(sid);
         if (!group || group.length === 0) continue;
+
+        group = group.slice(0, limitPerGroup);
+
         const label = streamGroupLabels[sid] ?? `Stream ${sid} Institutions`;
         const subheader: StyledRow = {
           type: 'subheader',
@@ -4451,15 +4596,6 @@ export class SchoolReport extends BaseReport {
           rows.push([String(idx + 1), c.name, c.city, c.state, c.score ? String(c.score) : 'N/A', c.rank ? String(c.rank) : 'N/A']);
         });
       }
-    } else {
-      rows = colleges.map((c, index) => [
-        String(index + 1),
-        c.name,
-        c.city,
-        c.state,
-        c.score ? String(c.score) : 'N/A',
-        c.rank ? String(c.rank) : 'N/A',
-      ]);
     }
 
     this.table(headers, rows, tableOptions);
@@ -4470,14 +4606,14 @@ export class SchoolReport extends BaseReport {
     );
   }
 
-  /** Converts "ENGINEERING" → "Engineering" */
+  /**
+     * Converts "ENGINEERING" → "Engineering"
+     */
   private riTitleCase(str: string): string {
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // CAREER FLIGHT PATH VISUALISATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // --- CAREER FLIGHT PATH VISUALISATION ---
 
   private generateCareerFlightPath(): void {
     this.ensureSpace(0.35, true);
@@ -4631,9 +4767,7 @@ export class SchoolReport extends BaseReport {
     this.doc.y = calloutBY + calloutBH + 6;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // CAREER ODYSSEY ROADMAP
-  // ─────────────────────────────────────────────────────────────────────────
+  // --- CAREER ODYSSEY ROADMAP ---
 
   private generateCareerOdysseyRoadmap(): void {
     this.ensureSpace(.4, true);

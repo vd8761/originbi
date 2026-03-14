@@ -8,8 +8,10 @@ import { logger } from './logger';
 export interface UniversityData {
     id: number;
     school_stream_id: number;
+    school_stream_field_id?: number;
+    field_name?: string;
     /** ENGINEERING | MEDICAL | RESEARCH (stream 1) or MANAGEMENT (stream 2) or LAW (stream 3) */
-    school_group: string;
+    school_group?: string;
     institute_id: string;
     name: string;
     city: string;
@@ -28,18 +30,31 @@ export interface UniversityData {
  * Priority parameter comes first, secondary parameter second.
  * Both are cast to FLOAT to allow numeric sort on string-stored values.
  */
+/**
+ * Safely extracts only digits and decimals from a string column to cast it to FLOAT,
+ * gracefully handling text like "101-150" or "N/A" by returning NULL/extracting just numbers.
+ */
+function safeCast(column: string): string {
+    return `CAST(NULLIF(regexp_replace(${column}, '[^0-9.]', '', 'g'), '') AS FLOAT)`;
+}
+
+/**
+ * Maps a primary DISC trait letter to the SQL ORDER BY clause.
+ * Priority parameter comes first, secondary parameter second.
+ * Both are cast safely to allow numeric sort on string-stored values.
+ */
 function getOrderByClause(primaryTrait: string): string {
     switch (primaryTrait.toUpperCase()) {
         case 'D':
-            return 'CAST(go AS FLOAT) DESC, CAST(perception AS FLOAT) DESC';
+            return `${safeCast('go')} DESC, ${safeCast('perception')} DESC`;
         case 'I':
-            return 'CAST(oi AS FLOAT) DESC, CAST(perception AS FLOAT) DESC';
+            return `${safeCast('oi')} DESC, ${safeCast('perception')} DESC`;
         case 'S':
-            return 'CAST(tlr AS FLOAT) DESC, CAST(oi AS FLOAT) DESC';
+            return `${safeCast('tlr')} DESC, ${safeCast('oi')} DESC`;
         case 'C':
-            return 'CAST(rpc AS FLOAT) DESC, CAST(tlr AS FLOAT) DESC';
+            return `${safeCast('rpc')} DESC, ${safeCast('tlr')} DESC`;
         default:
-            return 'CAST(score AS FLOAT) DESC';
+            return `${safeCast('score')} DESC`;
     }
 }
 
@@ -81,45 +96,47 @@ export async function getTopCollegesForStudent(
         let query: string;
         let params: number[];
 
-        if (schoolStreamId === 1) {
-            // HSC Science stream → 5 per school_group (ENGINEERING, MEDICAL, RESEARCH)
+        if (schoolStreamId !== undefined) {
+            // First, determine how many fields this stream has.
+            const countRes = await client.query(
+                `SELECT COUNT(*) as c FROM school_stream_fields WHERE stream_id = $1`,
+                [schoolStreamId]
+            );
+            const fieldCount = parseInt(countRes.rows[0].c, 10);
+
+            // Determine dynamically the number of colleges to show per field
+            let limitPerField = 3;
+            if (fieldCount === 1) limitPerField = 10;
+            else if (fieldCount === 2) limitPerField = 5;
+            else if (fieldCount === 3) limitPerField = 5;
+            else if (fieldCount === 4) limitPerField = 4;
+
+            // Distinct fetch: Top X colleges per field for the specific stream
             query = `
-        SELECT id, school_stream_id, school_group, institute_id, name, city,
-               score, rank, state, tlr, rpc, go, oi, perception
+        SELECT ud.id, ud.school_stream_id, ud.school_stream_field_id, ud.institute_id, ud.name, ud.city,
+               ud.score, ud.rank, ud.state, ud.tlr, ud.rpc, ud.go, ud.oi, ud.perception,
+               ssf.name as field_name, ssf.display_order
         FROM (
           SELECT *,
             ROW_NUMBER() OVER (
-              PARTITION BY school_group
+              PARTITION BY school_stream_field_id
               ORDER BY ${orderBy}
             ) AS rn
           FROM university_datas
-          WHERE school_stream_id = 1
-            AND school_group IN ('ENGINEERING', 'MEDICAL', 'RESEARCH')
-        ) AS ranked
-        WHERE rn <= 5
-        ORDER BY school_group ASC, CAST(rank AS FLOAT) ASC;
-      `;
-            params = [];
-        } else if (schoolStreamId !== undefined) {
-            // HSC Commerce (2) or Arts (3) → top 10 from that stream, ordered by rank
-            query = `
-        SELECT id, school_stream_id, school_group, institute_id, name, city,
-               score, rank, state, tlr, rpc, go, oi, perception
-        FROM (
-          SELECT *
-          FROM university_datas
           WHERE school_stream_id = $1
-          ORDER BY ${orderBy}
-          LIMIT 10
-        ) AS top_ten
-        ORDER BY CAST(rank AS FLOAT) ASC;
+        ) AS ud
+        JOIN school_stream_fields ssf ON ud.school_stream_field_id = ssf.id
+        WHERE ud.rn <= ${limitPerField}
+        ORDER BY ssf.display_order ASC, ${safeCast('ud.rank')} ASC;
       `;
             params = [schoolStreamId];
         } else {
-            // SSLC → top 5 per stream (1, 2, 3) → 15 total, ordered by rank
+            // SSLC → top 5 per stream ... leaving this as is unless specified otherwise.
+            // If they want field groupings for SSLC too, we shouldn't break the current grouping.
+            // But we can join it just in case.
             query = `
-        SELECT id, school_stream_id, school_group, institute_id, name, city,
-               score, rank, state, tlr, rpc, go, oi, perception
+        SELECT ud.id, ud.school_stream_id, ud.institute_id, ud.name, ud.city,
+               ud.score, ud.rank, ud.state, ud.tlr, ud.rpc, ud.go, ud.oi, ud.perception
         FROM (
           SELECT *,
             ROW_NUMBER() OVER (
@@ -127,10 +144,10 @@ export async function getTopCollegesForStudent(
               ORDER BY ${orderBy}
             ) AS rn
           FROM university_datas
-          WHERE school_stream_id IN (1, 2, 3)
-        ) AS ranked
-        WHERE rn <= 5
-        ORDER BY CAST(rank AS FLOAT) ASC;
+          WHERE school_stream_id IN (1, 2, 3, 4, 5, 6)
+        ) AS ud
+        WHERE ud.rn <= 5
+        ORDER BY ${safeCast('ud.rank')} ASC;
       `;
             params = [];
         }

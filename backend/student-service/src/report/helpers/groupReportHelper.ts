@@ -303,7 +303,7 @@ async function processSessionRows(
       };
 
       if (levelId === SCHOOL_LEVEL_ID.HSC && session.school_stream) {
-        const streamId = SCHOOL_STREAM_ID[session.school_stream as keyof typeof SCHOOL_STREAM_ID];
+        const streamId = SCHOOL_STREAM_ID[session.school_stream.toUpperCase() as keyof typeof SCHOOL_STREAM_ID];
         if (streamId) {
           schoolData.school_stream_id = streamId;
         }

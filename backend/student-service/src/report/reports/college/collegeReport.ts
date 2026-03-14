@@ -105,6 +105,10 @@ export class CollegeReport extends BaseReport {
     logger.info(`[CollegeREPORT] PDF generated successfully at: ${outputPath}`);
   }
 
+  // --- GENERATE RESPOND PARAMETER TABLE ---
+  /**
+   * Creates a response parameter table matching a dominant trait against management scenarios.
+   */
   private generateRespondParameterTable(
     dominantType: 'D' | 'I' | 'S' | 'C',
   ): void {
@@ -150,6 +154,7 @@ export class CollegeReport extends BaseReport {
     });
   }
 
+  // --- GENERATE COVER PAGE ---
   /**
    * Generates the Cover Page.
    * Features:
@@ -253,6 +258,7 @@ export class CollegeReport extends BaseReport {
       .text(nameText, nameX, adjustedNameY, nameOptions);
   }
 
+  // --- GENERATE TABLE OF CONTENTS ---
   /**
    * Generates the Table of Contents.
    * Logic:
@@ -335,6 +341,10 @@ export class CollegeReport extends BaseReport {
     });
   }
 
+  // --- GENERATE ABOUT REPORT PAGE ---
+  /**
+   * Renders the introductory explanations detailing the purpose and benefits of the report.
+   */
   private generateAboutReportPage(): void {
     this.h1(COLLEGE_TOC_CONTENT[0]);
     this.pHtml(CONTENT.about_report);
@@ -352,6 +362,10 @@ export class CollegeReport extends BaseReport {
     this.pHtml(CONTENT.about_obi_self_discovery_report);
   }
 
+  // --- GENERATE CONTENT 1 ---
+  /**
+   * Generates Content 1: Primary personality insights, graphs, and behavioral traits.
+   */
   private generateContent1(): void {
     const dominantType = this.getTopTwoTraits(
       this.data.most_answered_answer_type,
@@ -587,6 +601,10 @@ export class CollegeReport extends BaseReport {
     this.generateFutureOutlookPage({}, { addAsNewPage: false });
   }
 
+  // --- GENERATE CONTENT 2 ---
+  /**
+   * Generates Content 2: Details on mapping self-discovery to academic and career choices.
+   */
   private generateContent2(): void {
     const [t1, t2] = this.getTopTwoTraits(
       this.data.most_answered_answer_type,
@@ -635,6 +653,10 @@ export class CollegeReport extends BaseReport {
     this.generateRespondParameterTable(dominantType);
   }
 
+  // --- GENERATE ACI ---
+  /**
+   * Calculates and draws the Agile Compatibility Index (ACI) scoring matrix.
+   */
   private generateACI(): void {
     /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
     const contentBlock =
@@ -773,6 +795,7 @@ export class CollegeReport extends BaseReport {
     this.pHtml(contentBlock.reflection_summary);
   }
 
+  // --- GENERATE CONTENT 3 ---
   /**
    * Generates Content 3: Career Guidance & Roadmap.
    * Details:
@@ -1234,6 +1257,10 @@ export class CollegeReport extends BaseReport {
     this.doc.x = this.MARGIN_STD;
   }
 
+  // --- RENDER TIP BOX ---
+  /**
+   * Renders a styled tip box containing supplementary information.
+   */
   private renderTipBox(text: string): void {
     const startX = this.doc.x;
     const startY = this.doc.y;
@@ -1256,6 +1283,10 @@ export class CollegeReport extends BaseReport {
     this.doc.y = startY + boxHeight + 10;
   }
 
+  // --- GENERATE FUTURE TECH PAGE ---
+  /**
+   * Generates a page dedicated to emerging technologies and their evolution towards 2035.
+   */
   private generateFutureTechPage(): void {
     this.doc.addPage();
     this._useStdMargins = true;
@@ -1449,6 +1480,10 @@ export class CollegeReport extends BaseReport {
     });
   }
 
+  // --- GENERATE FUTURE OUTLOOK PAGE ---
+  /**
+   * Produces the Future Outlook page visually comparing current skills against future requirements.
+   */
   private generateFutureOutlookPage(
     data: FutureOutlookData = {},
     options: FutureOutlookOptions = {},
@@ -1478,7 +1513,7 @@ export class CollegeReport extends BaseReport {
       .font(this.FONT_SORA_SEMIBOLD)
       .fontSize(options.titleFontSize || 20)
       .fillColor(options.titleColor || this.COLOR_DEEP_BLUE)
-      .text(title, startX, this.doc.y);
+      .text(title, this.MARGIN_STD, this.doc.y);
 
     // --- COORDINATE CALCULATIONS ---
     const centerX = 80 * this.MM;
