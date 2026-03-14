@@ -217,7 +217,7 @@ export async function getCompatibilityMatrixDetails(
                         ) as rank
                     FROM trait_based_course_details 
                     WHERE trait_id = $1 
-                    AND school_stream_id IN (1, 2, 3) 
+                    AND school_stream_id IN (1, 2, 3, 4, 5, 6) 
                 )
                 SELECT 
                     course_name, 
@@ -237,9 +237,12 @@ export async function getCompatibilityMatrixDetails(
 
       // Transform: Append Stream Name
       const streamNames: Record<number, string> = {
-        1: 'Science',
-        2: 'Commerce',
-        3: 'Humanities',
+        1: 'PCMB',
+        2: 'PCB',
+        3: 'PCM',
+        4: 'PCBZ',
+        5: 'Commerce',
+        6: 'Humanities',
       };
 
       return result.rows.map((row) => ({

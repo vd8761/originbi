@@ -4,9 +4,12 @@ export const SCHOOL_LEVEL_ID = {
 };
 
 export const SCHOOL_STREAM_ID = {
-  SCIENCE: 1,
-  COMMERCE: 2,
-  HUMANITIES: 3,
+  PCMB: 1,
+  PCB: 2,
+  PCM: 3,
+  PCBZ: 4,
+  COMMERCE: 5,
+  HUMANITIES: 6,
 };
 
 export const DISCLAIMER: Record<string, any> = {

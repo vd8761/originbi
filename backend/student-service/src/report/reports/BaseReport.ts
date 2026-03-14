@@ -25,7 +25,6 @@ export interface TextOptions {
   itemEnsureSpacePercent?: boolean;
   topGap?: number;
   ensureSpace?: number;
-  /** If true, uses the current doc.x position instead of resetting to MARGIN_STD */
   useExistingXPos?: boolean;
 }
 
@@ -554,6 +553,12 @@ export class BaseReport {
 
     this.doc.text('', x, y, { continued: true });
 
+    // Track font-transition state so we can compensate for PDFKit trimming
+    // trailing whitespace from `continued: true` segments.
+    let prevWasBold = false;
+    let prevPartEndsWithSpace = false;
+    let firstContentSeen = false;
+
     parts.forEach((part, index) => {
       if (part === '<b>') {
         isBold = true;
@@ -564,6 +569,8 @@ export class BaseReport {
         this.doc.text('\n', { continued: false });
         // Restart chain at the correct X position
         this.doc.text('', x, this.doc.y, { continued: true });
+        prevPartEndsWithSpace = false;
+        firstContentSeen = false;
       } else if (part.length > 0) {
         // Determine if we need to continue the text chain
         let hasMore = false;
@@ -576,13 +583,31 @@ export class BaseReport {
           }
         }
 
+        // PDFKit trims trailing whitespace from `continued: true` segments.
+        // When we transition between bold and regular (or vice-versa), the
+        // trimmed trailing space from the previous part is lost. Compensate by
+        // prepending a space to the current part if needed.
+        let renderPart = part;
+        if (
+          firstContentSeen &&
+          isBold !== prevWasBold &&      // font is changing
+          prevPartEndsWithSpace &&        // previous segment ended with space (may be trimmed)
+          !renderPart.startsWith(' ')    // current segment has no leading space
+        ) {
+          renderPart = ' ' + renderPart;
+        }
+
         this.doc
           .font(isBold ? this.FONT_BOLD : opts.font || this.FONT_REGULAR)
-          .text(part, {
+          .text(renderPart, {
             width: width,
             align: opts.align ?? 'justify',
             continued: hasMore,
           });
+
+        prevWasBold = isBold;
+        prevPartEndsWithSpace = part.endsWith(' ');
+        firstContentSeen = true;
       }
     });
 
@@ -858,7 +883,7 @@ export class BaseReport {
         (this.PAGE_WIDTH -
           2 * (this._useStdMargins ? this.MARGIN_STD : 0) -
           w) /
-          2;
+        2;
 
     this.doc.image(path, x, opts.y ?? this.doc.y, { width: w, height: h });
     if (!opts.y) this.doc.y += h + (opts.gap ?? this.DEFAULT_GAP);
@@ -1068,7 +1093,7 @@ export class BaseReport {
     const {
       x = this._useStdMargins ? this.doc.x : this.MARGIN_STD,
       width = this.PAGE_WIDTH -
-        2 * (this._useStdMargins ? this.MARGIN_STD : 15 * this.MM),
+      2 * (this._useStdMargins ? this.MARGIN_STD : 15 * this.MM),
       cellPadding = 5,
       gap = this.DEFAULT_GAP,
       headerAlign = 'left',
@@ -1814,7 +1839,7 @@ export class BaseReport {
     const {
       x = this._useStdMargins ? this.doc.x : this.MARGIN_STD,
       width = this.PAGE_WIDTH -
-        2 * (this._useStdMargins ? this.MARGIN_STD : 15 * this.MM),
+      2 * (this._useStdMargins ? this.MARGIN_STD : 15 * this.MM),
       gap = 15 * this.MM, // ~42pt
       lineColor = '#D3D3D3',
       lineWidth = 2,
@@ -1960,7 +1985,7 @@ export class BaseReport {
     const {
       x = this._useStdMargins ? this.doc.x : this.MARGIN_STD,
       width = this.PAGE_WIDTH -
-        2 * (this._useStdMargins ? this.MARGIN_STD : 15 * this.MM),
+      2 * (this._useStdMargins ? this.MARGIN_STD : 15 * this.MM),
       blockGap = 25 * this.MM,
       circleRadius = 20 * this.MM,
       showLegend = true,
