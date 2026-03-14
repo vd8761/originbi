@@ -39,6 +39,10 @@ export class CorporateRegistrationsService {
     return String(mobile || '').replace(/\D/g, '');
   }
 
+  private resolveWelcomeFrontendUrl(): string {
+    return 'https://mind.originbi.com';
+  }
+
   async withRetry<T>(
     operation: () => Promise<T>,
     retries = 5,
@@ -370,12 +374,13 @@ export class CorporateRegistrationsService {
         footer: `${apiUrl}/email-assets/Email_Vector.png`,
         logo: `${apiUrl}/email-assets/logo.png`,
       };
+      const frontendUrl = this.resolveWelcomeFrontendUrl();
 
       const html = getWelcomeEmailTemplate(
         name,
         to,
         pass,
-        process.env.FRONTEND_URL,
+        frontendUrl,
         assets,
         startDateTime,
         assessmentTitle,
