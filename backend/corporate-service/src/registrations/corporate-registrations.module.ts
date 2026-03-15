@@ -17,6 +17,9 @@ import {
   AssessmentAttempt,
   AssessmentLevel,
   GroupAssessment,
+  Department,
+  DepartmentDegree,
+  DegreeType,
 } from '@originbi/shared-entities';
 
 // Corporate-specific entities (not shared)
@@ -41,6 +44,9 @@ import { BulkCorporateRegistrationsController } from './bulk-corporate-registrat
       BulkImport,
       BulkImportRow,
       GroupAssessment,
+      Department,
+      DepartmentDegree,
+      DegreeType,
     ]),
     HttpModule,
     AssessmentModule,
@@ -51,4 +57,4 @@ import { BulkCorporateRegistrationsController } from './bulk-corporate-registrat
   ],
   providers: [CorporateRegistrationsService, BulkCorporateRegistrationsService],
 })
-export class CorporateRegistrationsModule {}
+export class CorporateRegistrationsModule { }

@@ -28,12 +28,28 @@ import {
   Program,
   CorporateAccount,
   GroupAssessment,
+  Department,
+  DepartmentDegree,
 } from '@originbi/shared-entities';
 import { CorporateRegistrationsService } from './corporate-registrations.service';
+
+type DegreeTypeRow = {
+  id: string | number;
+  name: string;
+  [key: string]: unknown;
+};
 
 @Injectable()
 export class BulkCorporateRegistrationsService {
   private readonly logger = new Logger(BulkCorporateRegistrationsService.name);
+
+  private normalizeEmail(email: string): string {
+    return String(email || '').trim().toLowerCase();
+  }
+
+  private normalizeMobile(mobile: string): string {
+    return String(mobile || '').replace(/\D/g, '');
+  }
 
   constructor(
     @InjectRepository(BulkImport)
@@ -50,9 +66,13 @@ export class BulkCorporateRegistrationsService {
     private corporateAccountRepo: Repository<CorporateAccount>,
     @InjectRepository(GroupAssessment)
     private groupAssessmentRepo: Repository<GroupAssessment>,
+    @InjectRepository(Department)
+    private departmentRepo: Repository<Department>,
+    @InjectRepository(DepartmentDegree)
+    private departmentDegreeRepo: Repository<DepartmentDegree>,
     private dataSource: DataSource,
     private readonly corporateRegistrationsService: CorporateRegistrationsService,
-  ) {}
+  ) { }
 
   /**
    * Phase 1: Preview & Validate
@@ -103,16 +123,8 @@ export class BulkCorporateRegistrationsService {
     const allPrograms = await this.programRepo.find();
     const programMap = new Map<string, Program>();
     allPrograms.forEach((p) => {
-      // Only allow Employee and CXO General
-      const normName = this.normalizeString(p.name);
-      if (
-        normName.includes('employee') ||
-        normName.includes('cxo') ||
-        normName.includes('general')
-      ) {
-        programMap.set(this.normalizeString(p.code), p);
-        programMap.set(normName, p);
-      }
+      programMap.set(this.normalizeString(p.code), p);
+      programMap.set(this.normalizeString(p.name), p);
     });
 
     // Fetch Groups for Matching (Only for this Corporate Account)
@@ -122,6 +134,39 @@ export class BulkCorporateRegistrationsService {
     const groupMap = new Map<string, Groups>();
     allGroups.forEach((g) => {
       groupMap.set(this.normalizeString(g.name), g);
+      if (g.code) {
+        groupMap.set(this.normalizeString(g.code), g);
+      }
+    });
+
+    const allDepartments = await this.departmentRepo.find();
+    const allDeptDegrees = await this.departmentDegreeRepo.find({
+      relations: ['department'],
+    });
+    const departmentMap = new Map<string, Department>();
+    allDepartments.forEach((d) => {
+      if (d.shortName) {
+        departmentMap.set(this.normalizeString(d.shortName), d);
+      }
+    });
+
+    const degreeMap = new Map<string, DegreeTypeRow>();
+    const deptDegreeMap = new Map<string, string>(); // Map<departmentId_degreeTypeId, departmentDegreeId>
+    try {
+      const allDegrees: DegreeTypeRow[] = await this.dataSource.query(
+        'SELECT * FROM degree_types',
+      );
+      allDegrees.forEach((d) => {
+        degreeMap.set(this.normalizeString(d.name), d);
+      });
+    } catch (e) {
+      this.logger.warn(
+        'Could not fetch degree_types table, skipping degree validation',
+        e,
+      );
+    }
+    allDeptDegrees.forEach((dd) => {
+      deptDegreeMap.set(`${dd.departmentId}_${dd.degreeTypeId}`, dd.id);
     });
 
     // 3. Parse All Rows First
@@ -141,9 +186,13 @@ export class BulkCorporateRegistrationsService {
     });
 
     // 4. Batch Validation Checks (Duplicates)
-    const emails = rawRows.map((r) => r['Email'] || r['email']).filter(Boolean);
+    const emails = rawRows
+      .map((r) => this.normalizeEmail(r['Email'] || r['email']))
+      .filter(Boolean);
     const mobiles = rawRows
-      .map((r) => r['Mobile'] || r['mobile'] || r['mobile_number'])
+      .map((r) =>
+        this.normalizeMobile(r['Mobile'] || r['mobile'] || r['mobile_number']),
+      )
       .filter(Boolean);
 
     // Fetch users by Email OR Mobile
@@ -155,13 +204,19 @@ export class BulkCorporateRegistrationsService {
         .select(['u.id', 'u.email', 'u.metadata']);
 
       if (emails.length > 0) {
-        qb.where('u.email IN (:...emails)', { emails });
+        qb.where('LOWER(u.email) IN (:...emails)', { emails });
       }
       if (mobiles.length > 0) {
         if (emails.length > 0) {
-          qb.orWhere("u.metadata->>'mobile' IN (:...mobiles)", { mobiles });
+          qb.orWhere(
+            "regexp_replace(COALESCE(u.metadata->>'mobile', ''), '\\D', '', 'g') IN (:...mobiles)",
+            { mobiles },
+          );
         } else {
-          qb.where("u.metadata->>'mobile' IN (:...mobiles)", { mobiles });
+          qb.where(
+            "regexp_replace(COALESCE(u.metadata->>'mobile', ''), '\\D', '', 'g') IN (:...mobiles)",
+            { mobiles },
+          );
         }
       }
       existingUsers = await qb.getMany();
@@ -172,9 +227,10 @@ export class BulkCorporateRegistrationsService {
     const userMapByMobile = new Map<string, User>();
 
     existingUsers.forEach((u) => {
-      if (u.email) userMapByEmail.set(u.email, u);
-      const m = u.metadata?.mobile;
-      if (m) userMapByMobile.set(String(m).trim(), u);
+      const normalizedEmail = this.normalizeEmail(u.email);
+      if (normalizedEmail) userMapByEmail.set(normalizedEmail, u);
+      const normalizedMobile = this.normalizeMobile(u.metadata?.mobile || '');
+      if (normalizedMobile) userMapByMobile.set(normalizedMobile, u);
     });
 
     // Fetch Assessment Sessions for these existing users to check overlaps
@@ -203,10 +259,10 @@ export class BulkCorporateRegistrationsService {
     // Check Credits
     let newRegistrationsCount = 0;
     for (const row of rawRows) {
-      const email = row['Email'] || row['email'];
-      const mobile = row['Mobile'] || row['mobile'] || row['mobile_number'];
-      // Normalize mobile for comparison if available
-      const inputMobile = mobile ? String(mobile).trim() : '';
+      const email = this.normalizeEmail(row['Email'] || row['email']);
+      const inputMobile = this.normalizeMobile(
+        row['Mobile'] || row['mobile'] || row['mobile_number'],
+      );
 
       const exists =
         (email && userMapByEmail.has(email)) ||
@@ -251,6 +307,9 @@ export class BulkCorporateRegistrationsService {
         rowIndex,
         importJob,
         programMap,
+        departmentMap,
+        degreeMap,
+        deptDegreeMap,
         allGroups,
         groupMap, // Pass group map
         userMapByEmail,
@@ -339,6 +398,17 @@ export class BulkCorporateRegistrationsService {
       where: { importId: jobId, status: 'SUCCESS' },
     });
 
+    const latestFailure = await this.bulkImportRowRepo.findOne({
+      where: { importId: jobId, status: 'FAILED' },
+      order: { rowIndex: 'ASC' },
+    });
+
+    // Also check if the job itself failed for overarching reasons
+    let jobLastError = undefined;
+    if (job.status === 'FAILED') {
+      jobLastError = "Job crashed unexpectedly during preprocessing. Please contact support.";
+    }
+
     return {
       status: job.status,
       total: job.totalRecords,
@@ -349,6 +419,7 @@ export class BulkCorporateRegistrationsService {
         job.totalRecords > 0
           ? Math.round((job.processedCount / job.totalRecords) * 100)
           : 0,
+      lastError: jobLastError || latestFailure?.errorMessage,
     };
   }
 
@@ -370,6 +441,7 @@ export class BulkCorporateRegistrationsService {
     job.status = 'PROCESSING';
     await this.bulkImportRepo.save(job);
 
+    try {
     // Fetch Corporate Account
     let corporateAccount = await this.corporateAccountRepo.findOne({
       where: { userId: createdById },
@@ -398,12 +470,49 @@ export class BulkCorporateRegistrationsService {
       where: { corporateAccountId },
     });
     const groupMap = new Map(allGroups.map((g) => [Number(g.id), g.name]));
+    const groupMapForMatching = new Map<string, Groups>();
+    allGroups.forEach((g) => {
+      groupMapForMatching.set(this.normalizeString(g.name), g);
+      if (g.code) {
+        groupMapForMatching.set(this.normalizeString(g.code), g);
+      }
+    });
 
     const allPrograms = await this.programRepo.find();
     const programMap = new Map<string, Program>();
     allPrograms.forEach((p) => {
+      programMap.set(this.normalizeString(p.code), p);
       programMap.set(this.normalizeString(p.name), p);
-      programMap.set(this.normalizeString(p.code), p); // Add code mapping too
+    });
+
+    const allDepartments = await this.departmentRepo.find();
+    const allDeptDegrees = await this.departmentDegreeRepo.find({
+      relations: ['department'],
+    });
+    const departmentMap = new Map<string, Department>();
+    allDepartments.forEach((d) => {
+      if (d.shortName) {
+        departmentMap.set(this.normalizeString(d.shortName), d);
+      }
+    });
+
+    const degreeMap = new Map<string, DegreeTypeRow>();
+    const deptDegreeMap = new Map<string, string>(); // Map<departmentId_degreeTypeId, departmentDegreeId>
+    try {
+      const allDegrees: DegreeTypeRow[] = await this.dataSource.query(
+        'SELECT * FROM degree_types',
+      );
+      allDegrees.forEach((d) => {
+        degreeMap.set(this.normalizeString(d.name), d);
+      });
+    } catch (e) {
+      this.logger.warn(
+        'Could not fetch degree_types table, skipping degree validation',
+        e,
+      );
+    }
+    allDeptDegrees.forEach((dd) => {
+      deptDegreeMap.set(`${dd.departmentId}_${dd.degreeTypeId}`, dd.id);
     });
 
     const rows = await this.bulkImportRowRepo.find({
@@ -426,30 +535,42 @@ export class BulkCorporateRegistrationsService {
     >();
 
     for (const row of rows) {
-      let effectiveGroupName =
-        row.rawData['GroupName'] || row.rawData['group_name'];
+      let effectiveGroupName = this.getValue(row.rawData, [
+        'GroupName',
+        'group_name',
+        'Corporate',
+        'corporate',
+        'Group',
+      ]);
       if (row.matchedGroupId) {
         const matchedName = groupMap.get(Number(row.matchedGroupId));
         if (matchedName) effectiveGroupName = matchedName;
       }
 
-      const dto = this.mapRowToDto(row.rawData, effectiveGroupName, programMap);
+      const dto = this.mapRowToDto(
+        row.rawData,
+        effectiveGroupName || '',
+        programMap,
+        departmentMap,
+        degreeMap,
+        deptDegreeMap,
+      );
 
-      // Find Program ID for Header
-      let programId: number | null = null;
-      if (dto.programType) {
-        const p = programMap.get(this.normalizeString(dto.programType));
-        if (p) programId = Number(p.id);
-      }
+      // Find Program ID for Header from original CSV value
+      const rawProgram = this.getValue(row.rawData, ['ProgramId', 'program_code']);
+      const programObj = rawProgram
+        ? programMap.get(this.normalizeString(rawProgram))
+        : null;
+      const programId = programObj ? Number(programObj.id) : null;
 
       // Create Batch Key
-      const batchKey = `${this.normalizeString(effectiveGroupName)}|${programId || 'UNKNOWN'}`;
+      const batchKey = `${this.normalizeString(effectiveGroupName || '')}|${programId || 'UNKNOWN'}`;
 
       if (!batches.has(batchKey)) {
         batches.set(batchKey, {
           key: batchKey,
-          groupName: effectiveGroupName,
-          programType: String(programId || 0), // store ID as string key
+          groupName: effectiveGroupName || '',
+          programType: String(programId || ''), // store resolved Program ID
           examStart: dto.examStart,
           examEnd: dto.examEnd,
           rows: [],
@@ -474,8 +595,8 @@ export class BulkCorporateRegistrationsService {
       // A. Create/Find Group
       let group = allGroups.find(
         (g) =>
-          this.normalizeString(g.name) ===
-          this.normalizeString(batch.groupName),
+          this.normalizeString(g.name) === this.normalizeString(batch.groupName) ||
+          (g.code && this.normalizeString(g.code) === this.normalizeString(batch.groupName)),
       );
       try {
         // If group doesn't exist in map but was passed, Create it ONLY if we are sure?
@@ -508,6 +629,14 @@ export class BulkCorporateRegistrationsService {
           failCount++;
         }
         await this.bulkImportRowRepo.save(batch.rows);
+
+        // Fix stuck processing issue
+        await this.bulkImportRepo.increment(
+          { id: jobId },
+          'processedCount',
+          batch.rows.length,
+        );
+
         continue;
       }
 
@@ -523,30 +652,70 @@ export class BulkCorporateRegistrationsService {
           : new Date();
 
         const programId = Number(batch.programType);
-        if (!programId) {
-          throw new Error(
-            `Program ${dtoTemplate.programType} not found in system.`,
+        if (programId > 0) {
+          this.logger.log(
+            `Creating GroupAssessment for Group: ${group.id}, Program: ${programId}`,
           );
+
+          const groupAssessment = this.groupAssessmentRepo.create({
+            groupId: Number(group.id),
+            programId: programId,
+            validFrom,
+            validTo,
+            totalCandidates: batch.rows.length,
+            status: 'NOT_STARTED',
+            corporateAccountId: corporateAccountId,
+            createdByUserId: createdById,
+            metadata: { importId: jobId, source: 'BULK_UPLOAD' },
+          });
+
+          const savedGA = await this.groupAssessmentRepo.save(groupAssessment);
+          groupAssessmentId = savedGA.id;
+        } else {
+          // Fallback: Find any active program
+          this.logger.warn(
+            `Program ID could not be resolved for batch '${batch.groupName}'. Attempting default active program.`,
+          );
+          const defaultProgram = allPrograms.find((p) => p.isActive);
+
+          if (defaultProgram) {
+            this.logger.log(
+              `Using Default Program: ${defaultProgram.name} (ID: ${defaultProgram.id})`,
+            );
+
+            const groupAssessment = this.groupAssessmentRepo.create({
+              groupId: Number(group.id),
+              programId: Number(defaultProgram.id),
+              validFrom,
+              validTo,
+              totalCandidates: batch.rows.length,
+              status: 'NOT_STARTED',
+              corporateAccountId: corporateAccountId,
+              createdByUserId: createdById,
+              metadata: {
+                importId: jobId,
+                source: 'BULK_UPLOAD',
+                note: 'Used default program',
+              },
+            });
+            const savedGA = await this.groupAssessmentRepo.save(groupAssessment);
+            groupAssessmentId = savedGA.id;
+
+            // Important: Update the DTOs in this batch to use this program ID
+            for (const d of batch.dtos) {
+              if (!d.programType) {
+                d.programType = defaultProgram.code || defaultProgram.name;
+              }
+            }
+          } else {
+            this.logger.error(
+              `CRITICAL: No programType in CSV and no default active program found.`,
+            );
+            throw new Error(
+              'No valid program found for this batch and no default active program is available.',
+            );
+          }
         }
-
-        this.logger.log(
-          `Creating GroupAssessment for Group: ${group.id}, Program: ${programId}`,
-        );
-
-        const groupAssessment = this.groupAssessmentRepo.create({
-          groupId: Number(group.id),
-          programId: programId,
-          validFrom,
-          validTo,
-          totalCandidates: batch.rows.length,
-          status: 'NOT_STARTED',
-          corporateAccountId: corporateAccountId,
-          createdByUserId: createdById,
-          metadata: { importId: jobId, source: 'BULK_UPLOAD' },
-        });
-
-        const savedGA = await this.groupAssessmentRepo.save(groupAssessment);
-        groupAssessmentId = savedGA.id;
       } catch (err) {
         this.logger.error(
           `CRITICAL: Failed to create GroupAssessment Header for batch ${batch.groupName}`,
@@ -555,17 +724,56 @@ export class BulkCorporateRegistrationsService {
 
         for (const row of batch.rows) {
           row.status = 'FAILED';
-          row.errorMessage =
-            'System Error: Failed to create Group Assessment Header';
+          row.errorMessage = `System Error: Failed to create Group Assessment Header${err instanceof Error && err.message ? ` - ${err.message}` : ''
+            }`;
           row.resultType = 'FAILED_DB';
           failCount++;
         }
         await this.bulkImportRowRepo.save(batch.rows);
+
+        // Fix stuck processing issue
+        await this.bulkImportRepo.increment(
+          { id: jobId },
+          'processedCount',
+          batch.rows.length,
+        );
+
         continue; // Stop processing this batch
       }
 
-      // C. Process Rows (Inject ID)
+      // Pre-fetch users for this batch to avoid N+1 queries
+      const emailsForBatch = batch.rows
+        .map((r) => this.normalizeEmail(r.rawData['Email'] || r.rawData['email']))
+        .filter(Boolean);
+      const mobilesForBatch = batch.rows.map(r => r.rawData['Mobile'] || r.rawData['mobile'] || r.rawData['mobile_number'])
+        .map(m => this.normalizeMobile(String(m)))
+        .filter(Boolean);
+
+      const batchUsers = await this.userRepo
+        .createQueryBuilder('u')
+        .where(
+          emailsForBatch.length > 0 ? 'LOWER(u.email) IN (:...emails)' : '1=0',
+          { emails: emailsForBatch },
+        )
+        .orWhere(
+          mobilesForBatch.length > 0
+            ? "regexp_replace(COALESCE(u.metadata->>'mobile', ''), '\\D', '', 'g') IN (:...mobiles)"
+            : '1=0',
+          { mobiles: mobilesForBatch },
+        )
+        .getMany();
+
+      const batchUserMapByEmail = new Map(
+        batchUsers.map((u) => [this.normalizeEmail(u.email), u]),
+      );
+      // For mobiles search, since it's common in college student programs, let's also fetch them if emails empty.
+      // But to be safe and efficient, let's use the maps we already build in the loop if needed or just optimized queries.
+
+      let batchProcessedCount = 0;
       for (let i = 0; i < batch.rows.length; i++) {
+        // Throttle to prevent Cognito 429 errors (Approx 50 req/sec)
+        await new Promise((resolve) => setTimeout(resolve, 20));
+
         const row = batch.rows[i];
         const dto = batch.dtos[i];
 
@@ -575,29 +783,23 @@ export class BulkCorporateRegistrationsService {
           }
           dto.groupAssessmentId = Number(groupAssessmentId);
 
-          // Check if user exists to decide between Register (Paid) or Assign (Free)
-          const email = row.rawData['Email'] || row.rawData['email'];
-          const mobile =
-            row.rawData['Mobile'] ||
-            row.rawData['mobile'] ||
-            row.rawData['mobile_number'];
-          const mobileNorm = mobile ? String(mobile).trim() : '';
-
-          // We need to re-verify existence here or use the map.
-          // Since specific user ID is needed for assignment, we need to query or re-use map.
-          // For safety, let's query the specific user.
-          // (To avoid N+1, ideally we passed the map, but processJob is batch-async)
-          // We can reuse the `existingUsersCheck` logic if we scope it correctly, but we didn't save it to a map with IDs.
+          const email = this.normalizeEmail(
+            row.rawData['Email'] || row.rawData['email'],
+          );
+          const mobile = row.rawData['Mobile'] || row.rawData['mobile'] || row.rawData['mobile_number'];
+          const mobileNorm = this.normalizeMobile(mobile);
 
           let existingUserId: number | null = null;
-          if (email) {
-            const u = await this.userRepo.findOne({ where: { email } });
-            if (u) existingUserId = u.id;
-          }
-          if (!existingUserId && mobileNorm) {
+          if (email && batchUserMapByEmail.has(email)) {
+            existingUserId = batchUserMapByEmail.get(email)!.id;
+          } else if (mobileNorm) {
+            // Secondary fallback for mobile if email didn't match
             const u = await this.userRepo
               .createQueryBuilder('u')
-              .where("u.metadata->>'mobile' = :mobile", { mobile: mobileNorm })
+              .where(
+                "regexp_replace(COALESCE(u.metadata->>'mobile', ''), '\\D', '', 'g') = :mobile",
+                { mobile: mobileNorm },
+              )
               .getOne();
             if (u) existingUserId = u.id;
           }
@@ -631,15 +833,25 @@ export class BulkCorporateRegistrationsService {
           await this.bulkImportRowRepo.save(row);
         }
 
-        // 200ms delay to throttle requests (Approx 5 req/sec)
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        batchProcessedCount++;
+        // Update job progress incrementally every 5 rows
+        if (batchProcessedCount % 5 === 0) {
+          await this.bulkImportRepo.increment(
+            { id: jobId },
+            'processedCount',
+            5,
+          );
+        }
       }
-      // Update progress
-      await this.bulkImportRepo.increment(
-        { id: jobId },
-        'processedCount',
-        batch.rows.length,
-      );
+      // Update remaining progress for this batch
+      const remaining = batchProcessedCount % 5;
+      if (remaining > 0) {
+        await this.bulkImportRepo.increment(
+          { id: jobId },
+          'processedCount',
+          remaining,
+        );
+      }
     }
 
     job.status = 'COMPLETED';
@@ -649,6 +861,13 @@ export class BulkCorporateRegistrationsService {
     this.logger.log(
       `Job ${jobId} Completed. Success: ${successCount}, Fail: ${failCount}`,
     );
+    } catch (error: any) {
+      this.logger.error(`Critical overarching error in processing job ${jobId}`, error);
+      if (job) {
+        job.status = 'FAILED';
+        await this.bulkImportRepo.save(job);
+      }
+    }
   }
 
   // ---------------------------------------------------------
@@ -728,24 +947,97 @@ export class BulkCorporateRegistrationsService {
     return undefined;
   }
 
+  private resolveDegreeType(
+    degreeName: string,
+    degreeMap: Map<string, DegreeTypeRow>,
+  ): DegreeTypeRow | null {
+    const norm = this.normalizeString(degreeName);
+    if (!norm) return null;
+
+    const exact = degreeMap.get(norm);
+    if (exact) return exact;
+
+    // Common CSV variants for B.Tech/B.E
+    if (norm === 'btech' || norm === 'betech') {
+      for (const [key, val] of degreeMap.entries()) {
+        if (
+          key.includes('bacheloroftechnology') ||
+          key.includes('engineering')
+        ) {
+          return val;
+        }
+      }
+    }
+
+    // Generic fallback match
+    for (const [key, val] of degreeMap.entries()) {
+      if (key.includes(norm) || norm.includes(key)) {
+        return val;
+      }
+    }
+    return null;
+  }
+
   private mapRowToDto(
     rawData: unknown,
     groupName: string,
     programMap: Map<string, Program>,
+    deptMap: Map<string, Department>,
+    degreeMap: Map<string, DegreeTypeRow>,
+    deptDegreeMap: Map<string, string>,
   ) {
     const pCode = this.getValue(rawData, ['ProgramId', 'program_code']);
-    let pName = 'Employee'; // Default fallback? Or strict?
+    let pId: any = null;
+    let isCollege = false;
+    let isSchool = false;
 
     if (pCode) {
-      // Check if matches specific keywords
-      const norm = this.normalizeString(pCode);
-      if (norm.includes('cxo')) pName = 'CXO General';
-      else if (norm.includes('employee')) pName = 'Employee';
-      else {
-        // If user provided exact name 'CXO General Assessment' etc.
-        if (programMap.has(norm)) pName = programMap.get(norm).name;
+      const pObj = programMap.get(this.normalizeString(pCode));
+      if (pObj) {
+        pId = pObj.code || pObj.name;
+        isCollege = pObj.name.toLowerCase().includes('college') || pCode.toUpperCase().includes('COLLEGE');
+        isSchool = pObj.name.toLowerCase().includes('school') || pCode.toUpperCase().includes('SCHOOL');
       }
     }
+
+    isCollege = pCode && pCode.toUpperCase().includes('COLLEGE');
+    isSchool = pCode && pCode.toUpperCase().includes('SCHOOL');
+
+    // Resolve DepartmentDegreeId
+    let departmentDegreeId: string | undefined = undefined;
+    if (isCollege) {
+      const deptName = this.getValue(rawData, [
+        'DepartmentId',
+        'department_degree',
+        'department',
+        'Stream',
+      ]);
+      const degreeName = this.getValue(rawData, [
+        'DegreeId',
+        'degree_name',
+        'degree',
+        'Degree',
+      ]);
+
+      if (deptName && degreeName) {
+        const dept = deptMap.get(this.normalizeString(deptName));
+        const degree = this.resolveDegreeType(degreeName, degreeMap);
+
+        if (dept && degree) {
+          const key = `${dept.id}_${degree.id}`;
+          if (deptDegreeMap.has(key)) {
+            departmentDegreeId = deptDegreeMap.get(key);
+          }
+        }
+      }
+    }
+
+    const currentYear = this.getValue(rawData, [
+      'CurrentYear',
+      'current_year',
+      'Year',
+      'year',
+    ]);
 
     return {
       fullName: this.getValue(rawData, ['FullName', 'Name', 'full_name']) || '',
@@ -761,8 +1053,24 @@ export class BulkCorporateRegistrationsService {
       gender: (
         this.getValue(rawData, ['Gender', 'gender']) || 'FEMALE'
       ).toUpperCase() as any,
-      programType: pName,
+
+      programType: pId,
       groupName: groupName,
+
+      schoolLevel: isSchool
+        ? this.getValue(rawData, ['SchoolLevel', 'school_level'])
+        : undefined,
+      schoolStream: isSchool
+        ? this.getValue(rawData, ['SchoolStream', 'school_stream'])
+        : undefined,
+      studentBoard: isSchool
+        ? this.getValue(rawData, ['StudentBoard', 'student_board', 'board'])
+        : undefined,
+
+      departmentId: departmentDegreeId ? String(departmentDegreeId) : undefined, // Corporate frontend dto expects departmentId as string which maps to departmentDegreeId in backend
+      degreeId: undefined, // Not used in registration directly, inferred via DepartmentDegree
+      currentYear: isCollege ? String(currentYear) : undefined,
+
       password:
         this.getValue(rawData, ['Password', 'password']) || 'Welcome@123',
       sendEmail: (() => {
@@ -783,23 +1091,30 @@ export class BulkCorporateRegistrationsService {
     index: number,
     importJob: BulkImport,
     programMap: Map<string, Program>,
+    deptMap: Map<string, Department>,
+    degreeMap: Map<string, DegreeTypeRow>,
+    deptDegreeMap: Map<string, string>,
     allGroups: Groups[],
     groupMap: Map<string, Groups>,
-    userMapByEmail: Map<string, User>,
-    userMapByMobile: Map<string, User>,
+    userMapByEmail: Map<string, User>, // Changed from AdminUser to User
+    userMapByMobile: Map<string, User>, // Changed from AdminUser to User
     userAssessmentMap: Map<number, any[]>,
     seenEmails: Set<string>,
     seenMobiles: Set<string>,
   ): BulkImportRow {
-    const rowEntity = new BulkImportRow();
-    rowEntity.import = importJob;
-    rowEntity.rowIndex = index;
-    rowEntity.rawData = rawData;
-    rowEntity.normalizedData = { ...rawData };
+    const rowEntity = this.bulkImportRowRepo.create({
+      importId: importJob.id,
+      rowIndex: index,
+      rawData,
+      status: 'PROCESSING',
+    });
 
     const validationError = this.validateRules(
       rawData,
       programMap,
+      deptMap,
+      degreeMap,
+      deptDegreeMap,
       userMapByEmail,
       userMapByMobile,
       userAssessmentMap,
@@ -814,10 +1129,10 @@ export class BulkCorporateRegistrationsService {
     }
 
     // Group Matching Logic
-    const groupNameInput = rawData['GroupName'] || rawData['group_name'];
+    const groupNameInput = this.getValue(rawData, ['GroupName', 'group_name', 'Corporate', 'corporate', 'Group']);
     if (!groupNameInput) {
       rowEntity.status = 'INVALID';
-      rowEntity.errorMessage = 'Group Name is required';
+      rowEntity.errorMessage = 'Group Name/Corporate is required';
       return rowEntity;
     }
 
@@ -865,8 +1180,11 @@ export class BulkCorporateRegistrationsService {
   private validateRules(
     row: any,
     programMap: Map<string, Program>,
-    userMapByEmail: Map<string, User>,
-    userMapByMobile: Map<string, User>,
+    deptMap: Map<string, Department>,
+    degreeMap: Map<string, DegreeTypeRow>,
+    deptDegreeMap: Map<string, string>,
+    userMapByEmail: Map<string, User>, // Changed from AdminUser to User
+    userMapByMobile: Map<string, User>, // Changed from AdminUser to User
     userAssessmentMap: Map<number, any[]>,
     seenEmails: Set<string>,
     seenMobiles: Set<string>,
@@ -894,16 +1212,55 @@ export class BulkCorporateRegistrationsService {
 
     if (!programCode) return 'Program is required';
     const program = programMap.get(this.normalizeString(programCode));
-    // Also allow generic keywords
-    const pNorm = this.normalizeString(programCode);
-    const isValidProgram =
-      program ||
-      pNorm.includes('employee') ||
-      pNorm.includes('cxo') ||
-      pNorm.includes('general');
+    if (!program) return `Program '${programCode}' not found`;
 
-    if (!isValidProgram) {
-      return `Program '${programCode}' invalid. Must be 'Employee' or 'CXO General'.`;
+    const isSchool = program.name.toLowerCase().includes('school');
+    const isCollege = program.name.toLowerCase().includes('college');
+
+    if (isSchool) {
+      const level = (
+        row['SchoolLevel'] ||
+        row['school_level'] ||
+        ''
+      ).toUpperCase();
+      if (!level) return 'School Level is required for School Students';
+      if (!['SSLC', 'HSC'].includes(level))
+        return 'School Level valid values are SSLC, HSC';
+
+      if (level === 'HSC') {
+        const stream = (
+          row['SchoolStream'] ||
+          row['school_stream'] ||
+          ''
+        ).toLowerCase();
+        const validStreams = ['science', 'commerce', 'humanities'];
+        if (!stream) return 'Stream is required for HSC students';
+        if (!validStreams.includes(stream))
+          return 'Stream must be Science, Commerce, or Humanities for HSC';
+      }
+    } else if (isCollege) {
+      const deptName = row['DepartmentId'] || row['department_degree'] || row['department'];
+      const degreeName = row['DegreeId'] || row['degree_name'] || row['degree'] || row['Degree'];
+      const currentYear = row['CurrentYear'] || row['current_year'];
+
+      if (!deptName) return 'Department is required for College students';
+      const dept = deptMap.get(this.normalizeString(deptName));
+      if (!dept)
+        return `Department '${deptName}' not found in departments.short_name`;
+
+      if (!degreeName) return 'Degree is required for College students';
+      const deg = this.resolveDegreeType(degreeName, degreeMap);
+      if (!deg) return `Degree '${degreeName}' not found`;
+
+      if (!currentYear) return 'Current Year is required for College Students';
+      if (!['1', '2', '3', '4'].includes(String(currentYear).trim()))
+        return 'Current Year must be 1, 2, 3, or 4';
+
+      // Ensure the combination maps to a valid departmentDegreeId
+      const key = `${dept.id}_${deg.id}`;
+      if (!deptDegreeMap.has(key)) {
+         return `The combination of Department '${deptName}' and Degree '${degreeName}' is invalid or not found.`;
+      }
     }
 
     // 4. Dates
@@ -927,23 +1284,23 @@ export class BulkCorporateRegistrationsService {
     }
 
     // 5. Duplication Check
-    const normalizeMobile = (m: any) => String(m).trim();
-    const inputMobile = normalizeMobile(mobile);
+    const emailNorm = this.normalizeEmail(email);
+    const inputMobile = this.normalizeMobile(mobile);
 
-    const existingByEmail = userMapByEmail.get(email);
+    const existingByEmail = userMapByEmail.get(emailNorm);
     const existingByMobile = userMapByMobile.get(inputMobile);
 
     if (existingByEmail) {
-      const dbMobile = normalizeMobile(existingByEmail.metadata?.mobile || '');
+      const dbMobile = this.normalizeMobile(existingByEmail.metadata?.mobile || '');
       if (dbMobile !== inputMobile) {
-        return `Email ${email} exists with different phone no`;
+        return `Email '${email}' already exists with a different mobile number`;
       }
     }
 
     if (existingByMobile) {
-      const dbEmail = existingByMobile.email;
-      if (dbEmail !== email) {
-        return `Mobile no ${mobile} exists with different email id`;
+      const dbEmail = this.normalizeEmail(existingByMobile.email || '');
+      if (dbEmail !== emailNorm) {
+        return `Mobile '${mobile}' already exists with a different email`;
       }
     }
 
@@ -963,11 +1320,11 @@ export class BulkCorporateRegistrationsService {
     }
 
     // Internal File Dupes
-    if (seenEmails.has(email)) return `Duplicate Email in file: ${email}`;
-    if (seenMobiles.has(mobile)) return `Duplicate Mobile in file: ${mobile}`;
+    if (seenEmails.has(emailNorm)) return `Duplicate Email in file: ${email}`;
+    if (seenMobiles.has(inputMobile)) return `Duplicate Mobile in file: ${mobile}`;
 
-    seenEmails.add(email);
-    seenMobiles.add(mobile);
+    seenEmails.add(emailNorm);
+    seenMobiles.add(inputMobile);
 
     return null;
   }
