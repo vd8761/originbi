@@ -556,11 +556,11 @@ export default function CreateJob({ onBack }: CreateJobProps) {
                                     <h3 className="font-semibold text-[#19211C] dark:text-white mb-3">Required Skills (Mandatory for shortlisting)</h3>
                                     <div className="flex flex-wrap gap-2">
                                         {skills.length > 0 ? skills.map((skill: string, idx: number) => (
-                                            <span key={idx} className="px-3 py-1.5 rounded-full bg-gray-100 dark:bg-white text-gray-800 dark:text-black border border-transparent dark:border-transparent font-semibold text-[11px]">
+                                            <span key={idx} className="px-4 py-[7px] rounded-full bg-white text-gray-900 border border-transparent font-bold text-[11px] shadow-sm">
                                                 {skill}
                                             </span>
                                         )) : (
-                                            <span className="px-3 py-1.5 rounded-full bg-gray-100 dark:bg-white text-gray-800 dark:text-black border border-transparent dark:border-transparent font-semibold text-[11px]">Figma</span>
+                                            <span className="px-4 py-[7px] rounded-full bg-white text-gray-900 border border-transparent font-bold text-[11px] shadow-sm">Figma</span>
                                         )}
                                     </div>
                                 </div>
