@@ -25,10 +25,10 @@ export const getWelcomeEmailTemplate = (
       padding: 0; 
       background-color: #E9ECEF; 
       color: #111111;
-      font-family: Tahoma, Verdana, Segoe, sans-serif;
+      font-family: Tahoma, Arial, sans-serif;
     }
     .wrapper { width: 100%; table-layout: fixed; background-color: #E9ECEF; }
-    .main-table { width: 100%; max-width: 600px; margin: 0 auto; background-color: #E9ECEF; border-spacing: 0; color: #000000; font-family: Tahoma, sans-serif; }
+    .main-table { width: 100%; max-width: 600px; margin: 0 auto; background-color: #E9ECEF; border-spacing: 0; color: #000000; font-family: Tahoma, Arial, sans-serif; }
     .text-dark { color: #111111 !important; }
     .text-muted { color: #2F2F2F !important; }
     .text-accent { color: #0E8A3A !important; }
@@ -103,7 +103,7 @@ export const getWelcomeEmailTemplate = (
              </tr>
              <tr>
                 <td colspan="2" style="padding: 10px 0 20px 40px;">
-                    <h1 style="font-family: Tahoma; font-weight: 700; font-size: 28px; line-height: 100%; letter-spacing: 0%; color: #000000; margin: 0;">Thank you for Registering</h1>
+                    <h1 style="font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 28px; line-height: 100%; letter-spacing: 0%; color: #000000; margin: 0;">Thank you for Registering</h1>
                 </td>
              </tr>
            </table>
@@ -114,11 +114,11 @@ export const getWelcomeEmailTemplate = (
       <tr>
         <td style="padding: 0 20px;">
           <!-- Card Table -->
-          <table class="email-card" width="100%" cellpadding="0" cellspacing="0" border="0" background="${assets.pattern}" bgcolor="#ffffff" style="background-color: #ffffff !important; border-top: 4px solid #1ED36A; background-image: url('${assets.pattern}'); background-repeat: no-repeat; background-position: top center; background-size: cover;">
+          <table class="email-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color: #ffffff !important; border-top: 4px solid #1ED36A; ">
             <tr>
               <td class="content-padding" style="padding: 40px;">
                 <!-- Hidden image hack to prevent attachment chip in Gmail -->
-                <img src="${assets.pattern}" alt="" width="0" height="0" style="display:none; visibility:hidden;" />
+                
                 
                 <div class="text-dark" style="font-size: 16px; color: #111111 !important; margin-bottom: 20px; font-weight: 400;">Dear <strong style="font-weight: 700;">${name}</strong>,</div>
                 
