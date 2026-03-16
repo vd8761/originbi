@@ -25,6 +25,24 @@ export const SSLC_TOC_CONTENT = [
   'Disclaimer',
 ];
 
+export const STREAM_NAMES: Record<number, string> = {
+  1: 'PCMB',
+  2: 'PCB',
+  3: 'PCM',
+  4: 'PCBZ',
+  5: 'Commerce',
+  6: 'Humanities',
+};
+
+export const STREAM_FULL_NAMES: Record<number, string> = {
+  1: 'PCMB',
+  2: 'PCB',
+  3: 'PCM',
+  4: 'PCBZ',
+  5: 'Commerce / Management',
+  6: 'Arts / Humanities',
+};
+
 export const HSC_TOC_CONTENT = [
   'About the Origin BI Self-Discovery Report',
   'Benefits of Understanding Your Ideal Learning and Growth Paths',

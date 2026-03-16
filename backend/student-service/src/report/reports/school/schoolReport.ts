@@ -9,11 +9,14 @@ import {
   TextAlignment,
 } from '../BaseReport';
 import {
+  STREAM_NAMES,
+  STREAM_FULL_NAMES,
   SSLC_TOC_CONTENT,
   HSC_TOC_CONTENT,
   SCHOOL_CONTENT,
   SCHOOL_DYNAMIC_CONTENT,
   SCHOOL_BLENDED_STYLE_MAPPING,
+  STREAM_ODYSSEY_ROADMAP,
   WORD_SKETCH_DATA,
   DISCLAIMER_CONTENT,
   MAPPING,
@@ -32,7 +35,6 @@ import {
   DUAL_ARCHETYPE,
   TEXT_VARIATIONS,
   STREAM_SELECTION_CONTENT,
-  STREAM_ODYSSEY_ROADMAP,
 } from './schoolConstants';
 import {
   getCompatibilityMatrixDetails,
@@ -1032,11 +1034,7 @@ export class SchoolReport extends BaseReport {
       );
       const traitCode = topTwoTraits[0] + topTwoTraits[1];
 
-      const streamIdMap: Record<string, number> = {
-        PCMB: 1, PCB: 2, PCM: 3, PCBZ: 4, Commerce: 5, Humanities: 6,
-      };
-
-      for (const streamKey of ['PCMB', 'PCB', 'PCM', 'PCBZ', 'Commerce', 'Humanities']) {
+      for (const streamKey of Object.values(STREAM_NAMES)) {
         // Stream content page + odyssey roadmap
         this.generateStreamSelectionContent(streamKey);
         this.generateStreamOdysseyRoadmap(streamKey);
@@ -1044,7 +1042,11 @@ export class SchoolReport extends BaseReport {
         // Inline course compatibility — top 6 per department for this stream (SSLC threshold: 84)
         try {
           const SSLC_THRESHOLD = 86;
-          const streamId = streamIdMap[streamKey];
+          // Find the stream ID by value (e.g. 'PCMB' -> 1)
+          const streamId = parseInt(
+            Object.keys(STREAM_NAMES).find(key => STREAM_NAMES[Number(key)] === streamKey) ?? '0',
+            10
+          );
           const allCourses = await getCompatibilityMatrixDetails(traitCode, streamId);
 
           // Group by department_name (preserving DB order), then keep top 6 per department
@@ -1129,15 +1131,7 @@ export class SchoolReport extends BaseReport {
     // 3. Career Domain Table
     this.ci_generateCareerDomainTable();
 
-    const streamMap: Record<string, string> = {
-      '1': 'PCMB',
-      '2': 'PCB',
-      '3': 'PCM',
-      '4': 'PCBZ',
-      '5': 'Commerce',
-      '6': 'Humanities',
-    };
-    let streamKey = streamMap[String(this.data.school_stream_id)];
+    const streamKey = STREAM_NAMES[this.data.school_stream_id ?? 0];
 
     // 5 Future Pathways
     try {
@@ -4819,22 +4813,13 @@ export class SchoolReport extends BaseReport {
 
     const params = traitParamMap[primaryTrait] ?? { primary: 'Overall Score', secondary: 'Rank' };
 
-    const streamNames: Record<number, string> = {
-      1: 'PCMB',
-      2: 'PCB',
-      3: 'PCM',
-      4: 'PCBZ',
-      5: 'Commerce / Management',
-      6: 'Arts / Humanities',
-    };
-
     const streamLabel = this.data.school_stream_id
-      ? streamNames[this.data.school_stream_id] || 'Selected Stream'
+      ? STREAM_FULL_NAMES[this.data.school_stream_id] || 'Selected Stream'
       : 'All Streams (Science, Commerce and Arts)';
 
     this.pHtml(
-      `Based on your Personality trait, the institutions below have been selected and ranked using <b>${params.primary} </b> as the primary parameter and <b>${params.secondary} </b> as the secondary parameter. ` +
-      `Results are filtered for <b>${streamLabel} </b> and ordered by NIRF national rank after selection.`,
+      `Based on your Personality trait, the institutions below have been selected and ranked using <b>${params.primary}</b> as the primary parameter and <b>${params.secondary}</b> as the secondary parameter. ` +
+      `Results are filtered for <b>${streamLabel}</b> and ordered by NIRF national rank after selection.`,
     );
 
     const colleges: UniversityData[] = await getTopCollegesForStudent(
