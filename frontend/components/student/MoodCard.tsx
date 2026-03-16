@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { MoodItem as MoodItemType, MoodTag } from '../../lib/types';
 import { ClockIcon } from '../icons';
 
@@ -17,9 +17,8 @@ const getTagClasses = (tag: MoodTag | string): string => {
 
 const MoodItem: React.FC<{
     item: MoodItemType;
-    isActive: boolean;
     onClick: () => void;
-}> = ({ item, isActive, onClick }) => (
+}> = ({ item, onClick }) => (
     <div
         onClick={onClick}
         className="flex items-center space-x-4 lg:space-x-[0.833vw] p-4 lg:p-[0.833vw] rounded-xl transition-all duration-200 cursor-pointer group bg-[#19211C]/5 dark:bg-white/5 hover:bg-[#19211C]/10 dark:hover:bg-white/10"
@@ -70,7 +69,6 @@ const MoodItem: React.FC<{
 );
 
 const MoodCard: React.FC = () => {
-    const [activeIndex, setActiveIndex] = useState(0);
     const moodItems: MoodItemType[] = [
         {
             title: 'Smile Reset in 60 Seconds',
@@ -142,8 +140,7 @@ const MoodCard: React.FC = () => {
                             <MoodItem
                                 key={index}
                                 item={item}
-                                isActive={index === activeIndex}
-                                onClick={() => setActiveIndex(index)}
+                                onClick={() => { }}
                             />
                         ))}
                     </div>

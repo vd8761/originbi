@@ -14,7 +14,63 @@ export const getCorporateWelcomeEmailTemplate = (
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
 <title>Registration Successful - OriginBI</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    supported-color-schemes: light dark;
+  }
+  .content-area,
+  .content-area td,
+  .content-area p,
+  .content-area span,
+  .content-area strong {
+    color: #111111 !important;
+  }
+  @media (prefers-color-scheme: dark) {
+    body, table[style*="background-color: #EEEEEE"] {
+      background-color: #121212 !important;
+    }
+    table[bgcolor="#ffffff"] {
+      background-color: #1e1e1e !important;
+    }
+    td[style*="background-image"] {
+      background-image: none !important;
+    }
+    .content-area,
+    .content-area td,
+    .content-area p,
+    .content-area span,
+    .content-area strong {
+      color: #ffffff !important;
+    }
+    h1 {
+      color: #ffffff !important;
+    }
+    p[style*="color: #000000"] {
+      color: #dddddd !important;
+    }
+    td[style*="color: #000000"] {
+      color: #dddddd !important;
+    }
+    a[style*="background-color: #0F005E"] {
+      background-color: #1ED36A !important;
+      color: #000000 !important;
+    }
+  }
+
+  /* Gmail Specific Overrides */
+  [data-ogsc] td[style*="background-image"],
+  [data-ogsc] .content-area {
+    background-image: none !important;
+    color: #ffffff !important;
+  }
+  [data-ogsc] table[bgcolor="#ffffff"] {
+    background-color: #1e1e1e !important;
+  }
+</style>
 </head>
 <body style="margin: 0; padding: 0; background-color: #EEEEEE; font-family: Tahoma, Arial, sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #EEEEEE; width: 100%;">
@@ -38,7 +94,7 @@ export const getCorporateWelcomeEmailTemplate = (
                 </tr>
                 <tr>
                   <td colspan="2" style="padding: 10px 0 30px 40px;">
-                    <h1 style="font-family: Tahoma; font-weight: 700; font-size: 28px; line-height: 100%; letter-spacing: 0%; color: #FFFFFF; margin: 0;">Registration Successful</h1>
+                    <h1 style="font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 28px; line-height: 100%; letter-spacing: 0%; color: #FFFFFF; margin: 0;">Registration Successful</h1>
                   </td>
                 </tr>
               </table>
@@ -51,52 +107,52 @@ export const getCorporateWelcomeEmailTemplate = (
               <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color: #ffffff; border-top: 3px solid #1ED36A;">
                  <!-- Background Pattern Hack -->
                  <tr>
-                    <td style="background-image: url('${assets.pattern}'); background-repeat: no-repeat; background-position: top right; background-size: contain;">
+                    <td style="">
                       
                       <!-- Inner Content Padding -->
                       <table width="100%" cellpadding="0" cellspacing="0" border="0">
                         <tr>
-                          <td style="padding: 40px;">
+                          <td class="content-area" style="padding: 40px;">
                             
                             <!-- Salutation -->
-                            <p style="margin: 0 0 15px; font-family: Tahoma; font-weight: 400; font-size: 16px; line-height: 100%; letter-spacing: 0%; color: #333333;">
-                              Dear <span style="font-family: Tahoma; font-weight: 700; font-size: 16px; line-height: 100%; letter-spacing: 0%; color: #150089;">${name}</span>,
+                            <p style="margin: 0 0 15px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 16px; line-height: 100%; letter-spacing: 0%; color: #333333;">
+                              Dear <span style="font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 16px; line-height: 100%; letter-spacing: 0%; color: #150089;">${name}</span>,
                             </p>
-                            <p style="margin: 0 0 25px; font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">
+                            <p style="margin: 0 0 25px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">
                               Thank you for registering with OriginBI! We're excited to welcome you on board.
                             </p>
 
                             <!-- Login Details Header -->
-                            <p style="margin: 0 0 15px; font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #1ED36A;">
+                            <p style="margin: 0 0 15px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #1ED36A;">
                               Here are your login details:
                             </p>
 
                             <!-- Details Table -->
                             <table width="100%" cellpadding="8" cellspacing="0" border="0" style="margin-bottom: 25px;">
                               <tr>
-                                <td width="35%" style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Company Name</td>
-                                <td width="65%" style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${companyName}</td>
+                                <td width="35%" style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #111111; vertical-align: top;">Company Name</td>
+                                <td width="65%" style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${companyName}</td>
                               </tr>
                               <tr>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Contact Person</td>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${name}</td>
+                                <td style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #111111; vertical-align: top;">Contact Person</td>
+                                <td style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${name}</td>
                               </tr>
                               <tr>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Email ID</td>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${email}</td>
+                                <td style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #111111; vertical-align: top;">Email ID</td>
+                                <td style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${email}</td>
                               </tr>
                               <tr>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Mobile Number</td>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${countryCode} ${mobile}</td>
+                                <td style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #111111; vertical-align: top;">Mobile Number</td>
+                                <td style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${countryCode} ${mobile}</td>
                               </tr>
                               <tr>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Password</td>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${pass}</td>
+                                <td style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #111111; vertical-align: top;">Password</td>
+                                <td style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${pass}</td>
                               </tr>
                             </table>
 
                             <!-- Next Steps -->
-                            <p style="margin: 0 0 20px; font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">
+                            <p style="margin: 0 0 20px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">
                               You can now access your account and start exploring our platform:
                             </p>
 
@@ -104,20 +160,20 @@ export const getCorporateWelcomeEmailTemplate = (
                             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 25px;">
                               <tr>
                                 <td align="left">
-                                  <a href="${frontendUrl}/login" style="display: inline-block; padding: 12px 30px; background-color: #0F005E; color: #ffffff; text-decoration: none; border-radius: 4px; font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%;">Login Now</a>
+                                  <a href="${frontendUrl}/login" style="display: inline-block; padding: 12px 30px; background-color: #0F005E; color: #ffffff; text-decoration: none; border-radius: 4px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%;">Login Now</a>
                                 </td>
                               </tr>
                             </table>
 
                             <!-- Support Text -->
-                            <p style="margin: 0 0 20px; font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">
+                            <p style="margin: 0 0 20px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">
                               If you need any assistance, our team is here to help. Welcome aboard!
                             </p>
 
                             <!-- Sign Off -->
-                            <p style="margin: 0; font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">
+                            <p style="margin: 0; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">
                               Best regards,<br>
-                              <strong style="font-family: Tahoma; font-weight: 700; font-size: 14px; color: #000000;">Origin BI Team</strong>
+                              <strong style="font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 14px; color: #000000;">Origin BI Team</strong>
                             </p>
 
                           </td>
@@ -132,10 +188,10 @@ export const getCorporateWelcomeEmailTemplate = (
           <!-- Footer Section -->
            <tr>
             <td style="padding: 30px 20px 0 20px; background-color: #0F005E;">
-              <p style="margin: 0 0 5px; font-family: Tahoma; font-weight: 400; font-size: 12px; line-height: 100%; letter-spacing: 0%; color: #E9ECEF;">
+              <p style="margin: 0 0 5px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 12px; line-height: 100%; letter-spacing: 0%; color: #E9ECEF;">
                 © ${new Date().getFullYear()}. Origin BI | All Rights Reserved
               </p>
-              <p style="margin: 0 0 20px; font-family: Tahoma; font-weight: 400; font-size: 12px; line-height: 100%; letter-spacing: 0%; color: #1ED36A;">
+              <p style="margin: 0 0 20px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 12px; line-height: 100%; letter-spacing: 0%; color: #1ED36A;">
                 <a href="#" style="color: #1ED36A; text-decoration: none;">Privacy Policy</a> <span style="color: #E9ECEF;">|</span> <a href="#" style="color: #1ED36A; text-decoration: none;">Terms & Conditions</a>
               </p>
             </td>

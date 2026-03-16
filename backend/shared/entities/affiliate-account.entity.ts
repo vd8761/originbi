@@ -100,6 +100,9 @@ export class AffiliateAccount {
     @OneToMany(() => require('./affiliate-settlement-transaction.entity').AffiliateSettlementTransaction, (transaction: AffiliateSettlementTransaction) => transaction.affiliateAccount)
     settlementTransactions: AffiliateSettlementTransaction[];
 
+    @Column({ name: 'settlement_notification_sent', type: 'boolean', default: false })
+    settlementNotificationSent: boolean;
+
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 

@@ -21,6 +21,7 @@ import { AdministratorCounsellingModule } from './counselling/counselling.module
 import { AffiliatesModule } from './affiliates/affiliates.module';
 import { AffiliateLoginModule } from './affiliatelogin/affiliatelogin.module';
 import { R2Module } from './r2/r2.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -121,7 +122,8 @@ import { R2Module } from './r2/r2.module';
     AffiliatesModule,
     AffiliateLoginModule,
     R2Module,
+    NotificationModule,
   ],
   controllers: [TestController, MailAssetsController, HealthController],
 })
-export class AppModule {}
+export class AppModule { }

@@ -57,11 +57,11 @@ const AffiliateSettings: React.FC = () => {
             const storedUser = localStorage.getItem('affiliate_user');
             if (storedUser) {
                 const user = JSON.parse(storedUser);
-                // user.id IS the affiliate_accounts.id (stored by LoginForm)
-                const affId = user.id;
+                // Use affiliateId (AffiliateAccount table ID) for portal-specific stats
+                const affId = user.affiliateId || user.id;
                 if (affId) {
-                    setAffiliateId(affId);
-                    loadProfile(affId);
+                    setAffiliateId(String(affId));
+                    loadProfile(String(affId));
                 } else {
                     setLoading(false);
                 }

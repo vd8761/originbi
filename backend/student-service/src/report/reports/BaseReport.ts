@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call */
-import PDFDocument from 'pdfkit';
+import * as PDFDocument from 'pdfkit';
 import * as fs from 'fs';
 
 // --- Shared Interfaces ---
@@ -25,7 +25,6 @@ export interface TextOptions {
   itemEnsureSpacePercent?: boolean;
   topGap?: number;
   ensureSpace?: number;
-  /** If true, uses the current doc.x position instead of resetting to MARGIN_STD */
   useExistingXPos?: boolean;
 }
 
@@ -554,6 +553,12 @@ export class BaseReport {
 
     this.doc.text('', x, y, { continued: true });
 
+    // Track font-transition state so we can compensate for PDFKit trimming
+    // trailing whitespace from `continued: true` segments.
+    let prevWasBold = false;
+    let prevPartEndsWithSpace = false;
+    let firstContentSeen = false;
+
     parts.forEach((part, index) => {
       if (part === '<b>') {
         isBold = true;
@@ -564,6 +569,8 @@ export class BaseReport {
         this.doc.text('\n', { continued: false });
         // Restart chain at the correct X position
         this.doc.text('', x, this.doc.y, { continued: true });
+        prevPartEndsWithSpace = false;
+        firstContentSeen = false;
       } else if (part.length > 0) {
         // Determine if we need to continue the text chain
         let hasMore = false;
@@ -576,13 +583,31 @@ export class BaseReport {
           }
         }
 
+        // PDFKit trims trailing whitespace from `continued: true` segments.
+        // When we transition between bold and regular (or vice-versa), the
+        // trimmed trailing space from the previous part is lost. Compensate by
+        // prepending a space to the current part if needed.
+        let renderPart = part;
+        if (
+          firstContentSeen &&
+          isBold !== prevWasBold && // font is changing
+          prevPartEndsWithSpace && // previous segment ended with space (may be trimmed)
+          !renderPart.startsWith(' ') // current segment has no leading space
+        ) {
+          renderPart = ' ' + renderPart;
+        }
+
         this.doc
           .font(isBold ? this.FONT_BOLD : opts.font || this.FONT_REGULAR)
-          .text(part, {
+          .text(renderPart, {
             width: width,
             align: opts.align ?? 'justify',
             continued: hasMore,
           });
+
+        prevWasBold = isBold;
+        prevPartEndsWithSpace = part.endsWith(' ');
+        firstContentSeen = true;
       }
     });
 

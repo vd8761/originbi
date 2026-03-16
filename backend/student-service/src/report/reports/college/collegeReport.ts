@@ -105,6 +105,10 @@ export class CollegeReport extends BaseReport {
     logger.info(`[CollegeREPORT] PDF generated successfully at: ${outputPath}`);
   }
 
+  // --- GENERATE RESPOND PARAMETER TABLE ---
+  /**
+   * Creates a response parameter table matching a dominant trait against management scenarios.
+   */
   private generateRespondParameterTable(
     dominantType: 'D' | 'I' | 'S' | 'C',
   ): void {
@@ -150,6 +154,7 @@ export class CollegeReport extends BaseReport {
     });
   }
 
+  // --- GENERATE COVER PAGE ---
   /**
    * Generates the Cover Page.
    * Features:
@@ -253,6 +258,7 @@ export class CollegeReport extends BaseReport {
       .text(nameText, nameX, adjustedNameY, nameOptions);
   }
 
+  // --- GENERATE TABLE OF CONTENTS ---
   /**
    * Generates the Table of Contents.
    * Logic:
@@ -263,6 +269,8 @@ export class CollegeReport extends BaseReport {
   private generateTableOfContents(): void {
     const headerX = 15 * this.MM;
     const circleCenterX = 25 * this.MM;
+    const TOC_CIRCLE_RADIUS = 5 * this.MM;
+    const TOC_CIRCLE_STROKE = 0.4 * this.MM;
 
     // Define the bottom limit (Page Height - Footer Margin)
     const bottomLimit = this.PAGE_HEIGHT - 30 * this.MM;
@@ -298,13 +306,13 @@ export class CollegeReport extends BaseReport {
       }
 
       const contentText = item.replace('$full_name', this.data.full_name);
-      const circleY = currentY + 5 * this.MM;
+      const circleY = currentY + TOC_CIRCLE_RADIUS;
 
       // Draw the Circle
       this.doc
-        .lineWidth(0.4 * this.MM)
+        .lineWidth(TOC_CIRCLE_STROKE)
         .strokeColor(this.COLOR_BRIGHT_GREEN)
-        .circle(circleCenterX, circleY, 5 * this.MM)
+        .circle(circleCenterX, circleY, TOC_CIRCLE_RADIUS)
         .stroke();
 
       // Draw the Number inside the circle
@@ -333,6 +341,10 @@ export class CollegeReport extends BaseReport {
     });
   }
 
+  // --- GENERATE ABOUT REPORT PAGE ---
+  /**
+   * Renders the introductory explanations detailing the purpose and benefits of the report.
+   */
   private generateAboutReportPage(): void {
     this.h1(COLLEGE_TOC_CONTENT[0]);
     this.pHtml(CONTENT.about_report);
@@ -350,6 +362,10 @@ export class CollegeReport extends BaseReport {
     this.pHtml(CONTENT.about_obi_self_discovery_report);
   }
 
+  // --- GENERATE CONTENT 1 ---
+  /**
+   * Generates Content 1: Primary personality insights, graphs, and behavioral traits.
+   */
   private generateContent1(): void {
     const dominantType = this.getTopTwoTraits(
       this.data.most_answered_answer_type,
@@ -385,10 +401,7 @@ export class CollegeReport extends BaseReport {
       align: 'center',
       color: this.COLOR_DEEP_BLUE,
     });
-    const topTrait = this.getTopTwoTraits(
-      this.data.most_answered_answer_type,
-      this.data,
-    )[0];
+    const topTrait = dominantType; // reuse already-computed top trait
     let chartData: { label: string; value: number; color: number[] }[] = [];
 
     if (topTrait === 'D') {
@@ -531,7 +544,7 @@ export class CollegeReport extends BaseReport {
     let shouldAddPage = false;
     let scalingAdjustment = 0;
     let scale = 1;
-    let x = 0;
+    let postGraphGap = 0; // extra moveDown after graph image, only when page break occurred
 
     if (availableSpace >= normalHeightNeeded) {
       // Fits perfectly
@@ -544,7 +557,7 @@ export class CollegeReport extends BaseReport {
       shouldAddPage = true;
       scalingAdjustment = 0;
       scale = 1;
-      x = 0.5;
+      postGraphGap = 0.5;
     }
 
     if (shouldAddPage) {
@@ -560,7 +573,7 @@ export class CollegeReport extends BaseReport {
       width: this.PAGE_WIDTH - 120,
       align: 'center',
     });
-    this.doc.moveDown(x);
+    this.doc.moveDown(postGraphGap);
     this.h2(`Nature and Adapted Style`, {
       align: 'center',
       color: this.COLOR_DEEP_BLUE,
@@ -588,15 +601,17 @@ export class CollegeReport extends BaseReport {
     this.generateFutureOutlookPage({}, { addAsNewPage: false });
   }
 
+  // --- GENERATE CONTENT 2 ---
+  /**
+   * Generates Content 2: Details on mapping self-discovery to academic and career choices.
+   */
   private generateContent2(): void {
-    const dominantType = this.getTopTwoTraits(
+    const [t1, t2] = this.getTopTwoTraits(
       this.data.most_answered_answer_type,
       this.data,
-    )[0] as 'D' | 'I' | 'S' | 'C';
-    const dominantTrait = this.getTopTwoTraits(
-      this.data.most_answered_answer_type,
-      this.data,
-    ).join('');
+    );
+    const dominantType = t1 as 'D' | 'I' | 'S' | 'C';
+    const dominantTrait = t1 + t2;
     const contentBlock = blendedTraits[dominantTrait];
 
     this.h1('Applying Self-Discovery to Your Academic and Career Choices');
@@ -638,6 +653,10 @@ export class CollegeReport extends BaseReport {
     this.generateRespondParameterTable(dominantType);
   }
 
+  // --- GENERATE ACI ---
+  /**
+   * Calculates and draws the Agile Compatibility Index (ACI) scoring matrix.
+   */
   private generateACI(): void {
     /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
     const contentBlock =
@@ -659,7 +678,7 @@ export class CollegeReport extends BaseReport {
     this.pHtml(DISCLAIMER.aci_description);
     this.pHtml(contentBlock.agile_desc_1);
 
-    this.h2('Pesonalized Insight');
+    this.h2('Personalized Insight');
     this.pHtml(contentBlock.personalized_insight);
 
     this.h2('Agile Value-Wise Breakdown Table');
@@ -776,10 +795,7 @@ export class CollegeReport extends BaseReport {
     this.pHtml(contentBlock.reflection_summary);
   }
 
-  /**
-   * Generates Content 3: Alternating Roadmap and Detailed Guidance.
-   * Flow: Suggestion 1 Header -> Roadmap 1 -> Explanation 1 -> Suggestion 2...
-   */
+  // --- GENERATE CONTENT 3 ---
   /**
    * Generates Content 3: Career Guidance & Roadmap.
    * Details:
@@ -1241,6 +1257,10 @@ export class CollegeReport extends BaseReport {
     this.doc.x = this.MARGIN_STD;
   }
 
+  // --- RENDER TIP BOX ---
+  /**
+   * Renders a styled tip box containing supplementary information.
+   */
   private renderTipBox(text: string): void {
     const startX = this.doc.x;
     const startY = this.doc.y;
@@ -1263,6 +1283,10 @@ export class CollegeReport extends BaseReport {
     this.doc.y = startY + boxHeight + 10;
   }
 
+  // --- GENERATE FUTURE TECH PAGE ---
+  /**
+   * Generates a page dedicated to emerging technologies and their evolution towards 2035.
+   */
   private generateFutureTechPage(): void {
     this.doc.addPage();
     this._useStdMargins = true;
@@ -1456,6 +1480,10 @@ export class CollegeReport extends BaseReport {
     });
   }
 
+  // --- GENERATE FUTURE OUTLOOK PAGE ---
+  /**
+   * Produces the Future Outlook page visually comparing current skills against future requirements.
+   */
   private generateFutureOutlookPage(
     data: FutureOutlookData = {},
     options: FutureOutlookOptions = {},
@@ -1478,14 +1506,13 @@ export class CollegeReport extends BaseReport {
       this._useStdMargins = true;
     } else this.ensureSpace(120 * this.MM);
     if (options.addAsNewPage === false) this.doc.moveDown(1);
-    const startX = this._useStdMargins ? this.doc.x : this.MARGIN_STD;
 
     // --- TITLE ---
     this.doc
       .font(this.FONT_SORA_SEMIBOLD)
       .fontSize(options.titleFontSize || 20)
       .fillColor(options.titleColor || this.COLOR_DEEP_BLUE)
-      .text(title, startX, this.doc.y);
+      .text(title, this.MARGIN_STD, this.doc.y);
 
     // --- COORDINATE CALCULATIONS ---
     const centerX = 80 * this.MM;

@@ -10,7 +10,7 @@ export interface StoredUser {
     id: number;
     email: string;
     name?: string;
-    role: 'ADMIN' | 'CORPORATE' | 'STUDENT';
+    role: 'ADMIN' | 'CORPORATE' | 'STUDENT' | 'AFFILIATE';
     corporateId?: number;
 }
 
@@ -38,7 +38,14 @@ export function snapshotUserToSession(): void {
  */
 export function getStoredUser(): StoredUser {
     try {
-        const raw = sessionStorage.getItem('user') || localStorage.getItem('user');
+        let raw: string | null = null;
+
+        if (typeof window !== 'undefined' && window.location.pathname.startsWith('/affiliate')) {
+            raw = localStorage.getItem('affiliate_user') || sessionStorage.getItem('affiliate_user');
+        } else {
+            raw = sessionStorage.getItem('user') || localStorage.getItem('user');
+        }
+
         if (raw) {
             const parsed = JSON.parse(raw);
             return {
@@ -87,9 +94,10 @@ export function getAuthHeaders(): Record<string, string> {
 /**
  * Normalize role string to valid enum.
  */
-function normalizeRole(role: string | undefined): 'ADMIN' | 'CORPORATE' | 'STUDENT' {
+function normalizeRole(role: string | undefined): 'ADMIN' | 'CORPORATE' | 'STUDENT' | 'AFFILIATE' {
     const upper = (role || '').toUpperCase().trim();
     if (upper === 'ADMIN' || upper === 'SUPER_ADMIN') return 'ADMIN';
     if (upper === 'CORPORATE') return 'CORPORATE';
+    if (upper === 'AFFILIATE') return 'AFFILIATE';
     return 'STUDENT';
 }

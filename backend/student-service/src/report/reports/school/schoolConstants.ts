@@ -1188,3 +1188,1468 @@ export const WORD_SKETCH_DATA: Record<string, any> = {
     C: 'arbitrary defiant fearless obstinate rebellious sarcastic',
   },
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DISC × Agile Career Pace Mapping
+// Source: "Career Pace: DISC and Agile Insights" PDF
+//
+// Each DISC trait (D/I/S/C) maps to 5 Agile values:
+//   Commitment | Courage | Focus | Openness | Respect
+//
+// Each entry contains:
+//   industryAvg   – typical career years to seniority (industry benchmark)
+//   predictedPace – accelerated pace range for this DISC+Agile combination
+//   challenge     – the "Speed Bump": the key risk or pitfall to watch for
+//   motivation    – the "Why": the core motivational insight and advice
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DiscAgileEntry {
+  agileValue: string;
+  industryAvg: string; // e.g. "12 Years"
+  predictedPace: string; // e.g. "6-8 Years"
+  challengeTitle: string;
+  challengeDesc: string;
+  motivation: string;
+}
+
+export interface DiscAgileGroup {
+  traitName: string;
+  tagline: string;
+  entries: DiscAgileEntry[];
+}
+
+export const DISC_AGILE_CAREER_PACE: Record<string, DiscAgileGroup> = {
+  D: {
+    traitName: 'Dominance',
+    tagline: 'The Dominance (D) Drivers - Fast-Track Focus',
+    entries: [
+      {
+        agileValue: 'Commitment',
+        industryAvg: '12 Years',
+        predictedPace: '6-8 Years',
+        challengeTitle: 'Burnout',
+        challengeDesc:
+          'You may push so hard that you exhaust yourself and your team.',
+        motivation:
+          'Your drive for results is unmatched. Learning to delegate will sustain your high speed.',
+      },
+      {
+        agileValue: 'Courage',
+        industryAvg: '13 Years',
+        predictedPace: '5-7 Years',
+        challengeTitle: 'Recklessness',
+        challengeDesc:
+          'Your high risk-taking can lead to "expensive" mistakes.',
+        motivation:
+          'You start what others fear. Pairing bravery with data will make you a legendary disruptor.',
+      },
+      {
+        agileValue: 'Focus',
+        industryAvg: '12 Years',
+        predictedPace: '7-9 Years',
+        challengeTitle: 'Tunnel Vision',
+        challengeDesc:
+          'You might ignore team input or critical details in your quest for the finish line.',
+        motivation:
+          'You hit every target. A quick "people-check" ensures your team is still behind you.',
+      },
+      {
+        agileValue: 'Openness',
+        industryAvg: '11 Years',
+        predictedPace: '6-9 Years',
+        challengeTitle: 'Inconsistency',
+        challengeDesc: 'You may chase "new" ideas before finishing old ones.',
+        motivation:
+          'Your adaptability is your edge. Mastering the "Finish" will make you a strategic powerhouse.',
+      },
+      {
+        agileValue: 'Respect',
+        industryAvg: '12 Years',
+        predictedPace: '8-10 Years',
+        challengeTitle: 'Internal Friction',
+        challengeDesc: 'Balancing power with empathy can cause "indecision".',
+        motivation:
+          'You are a "tough but fair" leader. Direct talk will clear your path to the top.',
+      },
+    ],
+  },
+
+  I: {
+    traitName: 'Influence',
+    tagline: 'The Influence (I) Inspirers - Social Velocity',
+    entries: [
+      {
+        agileValue: 'Commitment',
+        industryAvg: '10 Years',
+        predictedPace: '7-9 Years',
+        challengeTitle: 'Over-Promising',
+        challengeDesc: 'Saying "Yes" to everyone can lead to missed deadlines.',
+        motivation:
+          'People trust you. Selective "Yeses" will turn your reputation into pure gold.',
+      },
+      {
+        agileValue: 'Courage',
+        industryAvg: '11 Years',
+        predictedPace: '6-8 Years',
+        challengeTitle: 'Attention-Seeking',
+        challengeDesc: 'Speaking up just to be heard rather than to add value.',
+        motivation:
+          'You are the voice of the project. Waiting for the "right" moment makes your words 10x stronger.',
+      },
+      {
+        agileValue: 'Focus',
+        industryAvg: '11 Years',
+        predictedPace: '8-10 Years',
+        challengeTitle: 'Distraction',
+        challengeDesc: 'Love for talk can eat up your "Deep Work" time.',
+        motivation:
+          'You make data human. Protecting your "Focus Hours" ensures you have the results to back up stories.',
+      },
+      {
+        agileValue: 'Openness',
+        industryAvg: '10 Years',
+        predictedPace: '5-7 Years',
+        challengeTitle: 'Disorganization',
+        challengeDesc: 'A dislike for "Rules" can lead to messy execution.',
+        motivation:
+          'You see the future first. Simple checklists ensure your big ideas actually get built.',
+      },
+      {
+        agileValue: 'Respect',
+        industryAvg: '11 Years',
+        predictedPace: '9-11 Years',
+        challengeTitle: 'Conflict Avoidance',
+        challengeDesc: 'Letting people slide just to keep the peace.',
+        motivation:
+          'You build great teams. "Kind Candor" (honesty with care) will make you a world-class mentor.',
+      },
+    ],
+  },
+
+  S: {
+    traitName: 'Steadiness',
+    tagline: 'The Steadiness (S) Stabilizers - Reliable Growth',
+    entries: [
+      {
+        agileValue: 'Commitment',
+        industryAvg: '14 Years',
+        predictedPace: '10-12 Years',
+        challengeTitle: 'Static Growth',
+        challengeDesc: 'Staying in a "safe" role too long out of loyalty.',
+        motivation:
+          'You are the company\'s heart. Embracing "Change" will allow you to scale your impact.',
+      },
+      {
+        agileValue: 'Courage',
+        industryAvg: '13 Years',
+        predictedPace: '8-10 Years',
+        challengeTitle: 'Hidden Stress',
+        challengeDesc:
+          'Taking risks but hiding anxiety, leading to quiet burnout.',
+        motivation:
+          'You have "Steel in your Silk." Sharing worries lightens the load while you lead.',
+      },
+      {
+        agileValue: 'Focus',
+        industryAvg: '14 Years',
+        predictedPace: '9-11 Years',
+        challengeTitle: 'Isolation',
+        challengeDesc:
+          'Getting so lost in process that you forget to update others.',
+        motivation:
+          'You never miss a detail. Short daily "Syncs" keep your value visible to the bosses.',
+      },
+      {
+        agileValue: 'Openness',
+        industryAvg: '12 Years',
+        predictedPace: '8-10 Years',
+        challengeTitle: 'Paralysis',
+        challengeDesc:
+          'Considering every "new" idea can stop you from making any choice.',
+        motivation:
+          'You are the ultimate balancer. Trusting your "First Instinct" will speed up your leadership path.',
+      },
+      {
+        agileValue: 'Respect',
+        industryAvg: '15 Years',
+        predictedPace: '11-13 Years',
+        challengeTitle: 'People-Pleasing',
+        challengeDesc: 'Prioritizing "Being Liked" over "Being Effective".',
+        motivation:
+          'You create safe spaces. Setting boundaries earns more respect than just being "nice".',
+      },
+    ],
+  },
+
+  C: {
+    traitName: 'Conscientiousness',
+    tagline: 'The Conscientiousness (C) Analysts - Precision Speed',
+    entries: [
+      {
+        agileValue: 'Commitment',
+        industryAvg: '12 Years',
+        predictedPace: '8-10 Years',
+        challengeTitle: 'Perfectionism',
+        challengeDesc:
+          'Missing deadlines because the work "isn\'t perfect yet".',
+        motivation:
+          'Your quality is unmatched. Knowing "Done is better than Perfect" will double your speed.',
+      },
+      {
+        agileValue: 'Courage',
+        industryAvg: '13 Years',
+        predictedPace: '7-9 Years',
+        challengeTitle: 'Rigidity',
+        challengeDesc:
+          'Being seen as the "No person" who stops new ideas with rules.',
+        motivation:
+          'You protect against disaster. Framing "No" as "Yes, if we do X" makes you a strategic partner.',
+      },
+      {
+        agileValue: 'Focus',
+        industryAvg: '12 Years',
+        predictedPace: '6-8 Years',
+        challengeTitle: 'Logic Gap',
+        challengeDesc: 'Speaking in data that others might not understand.',
+        motivation:
+          'You see what others miss. Using "Stories" instead of "Stats" helps people follow your plans.',
+      },
+      {
+        agileValue: 'Openness',
+        industryAvg: '13 Years',
+        predictedPace: '7-9 Years',
+        challengeTitle: 'Over-Analysis',
+        challengeDesc: 'Researching so much that you never pick a tool to use.',
+        motivation:
+          'You bridge logic and creativity. "Decision Deadlines" turn your research into results.',
+      },
+      {
+        agileValue: 'Respect',
+        industryAvg: '14 Years',
+        predictedPace: '9-11 Years',
+        challengeTitle: 'Sensitivity',
+        challengeDesc:
+          'Taking constructive feedback as a personal attack on skill.',
+        motivation:
+          'You raise the bar for everyone. Feedback is just "Data for Growth" to make you unshakeable.',
+      },
+    ],
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Career Odyssey Roadmap
+// Stream-based 10-year career milestone map (not DISC-score dependent).
+// school_stream_id: 1 = Science, 2 = Commerce, 3 = Humanities, 0/undefined = SSLC
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface OdysseyNode {
+  /** Short label rendered inside the circle (≤ 10 chars) */
+  label: string;
+  /** Bold title shown above or below the circle */
+  title: string;
+  /** Smaller descriptive subtitle */
+  subtitle: string;
+}
+
+export interface CareerOdysseyStream {
+  streamTitle: string;
+  tagline: string;
+  nodes: OdysseyNode[];
+}
+
+export const CAREER_ODYSSEY_ROADMAP: Record<string, CareerOdysseyStream> = {
+  // ── Science / Engineering Stream ─────────────────────────────────────────
+  '1': {
+    streamTitle: 'Science Stream Odyssey',
+    tagline: 'Innovation & Technical Mastery - Your 10-Year Vision',
+    nodes: [
+      {
+        label: 'Start',
+        title: 'Class 12 Graduate',
+        subtitle: 'Science stream completed with strong STEM foundation',
+      },
+      {
+        label: 'Year 1–2',
+        title: 'Undergraduate Degree',
+        subtitle: 'Pursue B.Tech, B.Sc or B.E in your chosen discipline',
+      },
+      {
+        label: 'Year 3–4',
+        title: 'Internship & Research',
+        subtitle: 'Hands-on industry exposure & research projects',
+      },
+      {
+        label: 'Year 5',
+        title: 'First Role / PG Entry',
+        subtitle: 'Join as Jr. Engineer or enrol for M.Tech / M.Sc',
+      },
+      {
+        label: 'Year 7',
+        title: 'Specialist / Leader',
+        subtitle: 'Senior engineer, research scientist or team lead',
+      },
+      {
+        label: 'Year 10',
+        title: 'Expert / Innovator',
+        subtitle: 'Principal engineer, PhD researcher or startup founder',
+      },
+    ],
+  },
+
+  // ── Commerce Stream ───────────────────────────────────────────────────────
+  '2': {
+    streamTitle: 'Commerce Stream Odyssey',
+    tagline: 'Leadership & Strategic Growth - Your 10-Year Vision',
+    nodes: [
+      {
+        label: 'Start',
+        title: 'Class 12 Graduate',
+        subtitle: 'Commerce stream completed with business & finance focus',
+      },
+      {
+        label: 'Year 1–3',
+        title: 'Undergraduate Degree',
+        subtitle: 'Pursue B.Com, BBA or CA Foundation & Inter',
+      },
+      {
+        label: 'Year 3–5',
+        title: 'Articleship / Internship',
+        subtitle: 'Practical training at firms, banks or corporate finance',
+      },
+      {
+        label: 'Year 5',
+        title: 'Qualified Professional',
+        subtitle: 'CA, CFA, CPA finalist or Junior Analyst',
+      },
+      {
+        label: 'Year 7',
+        title: 'Manager / Consultant',
+        subtitle: 'Finance manager, business consultant or product analyst',
+      },
+      {
+        label: 'Year 10',
+        title: 'CFO / Entrepreneur',
+        subtitle: 'Chief Financial Officer, Director or own venture founder',
+      },
+    ],
+  },
+
+  // ── Humanities / Arts Stream ──────────────────────────────────────────────
+  '3': {
+    streamTitle: 'Humanities Stream Odyssey',
+    tagline: 'Advocacy & Human-Centric Impact - Your 10-Year Vision',
+    nodes: [
+      {
+        label: 'Start',
+        title: 'Class 12 Graduate',
+        subtitle:
+          'Humanities stream with strengths in language, arts & society',
+      },
+      {
+        label: 'Year 1–3',
+        title: 'Undergraduate Degree',
+        subtitle: 'BA (English / History / Psych), Mass Comm, Law or Fine Arts',
+      },
+      {
+        label: 'Year 3–4',
+        title: 'Field Work / Internship',
+        subtitle: 'Journalism, NGO, legal internship or creative residency',
+      },
+      {
+        label: 'Year 5',
+        title: 'Entry Professional',
+        subtitle: 'Journalist, writer, social worker, lawyer or artist',
+      },
+      {
+        label: 'Year 7',
+        title: 'Senior Voice / Advisor',
+        subtitle: 'Editor, policy analyst, UX researcher or civil servant',
+      },
+      {
+        label: 'Year 10',
+        title: 'Leader / Change Maker',
+        subtitle: 'Author, IAS/IPS officer, professor, NGO head or director',
+      },
+    ],
+  },
+
+  // ── SSLC (Class 10, stream not yet chosen) ────────────────────────────────
+  '0': {
+    streamTitle: 'Your Career Odyssey',
+    tagline: 'Explore, Choose & Grow - Your 10-Year Vision',
+    nodes: [
+      {
+        label: 'Start',
+        title: 'Class 10 Graduate',
+        subtitle: 'Strong academic foundation across all core subjects',
+      },
+      {
+        label: 'Year 1–2',
+        title: 'Choose Your Stream',
+        subtitle: 'Science, Commerce or Humanities - pick your passion',
+      },
+      {
+        label: 'Year 3–5',
+        title: 'Undergraduate Journey',
+        subtitle: 'Complete your degree with focus and curiosity',
+      },
+      {
+        label: 'Year 5–6',
+        title: 'First Milestone',
+        subtitle: 'Graduate, certify or qualify in your chosen field',
+      },
+      {
+        label: 'Year 7–8',
+        title: 'Career Growth',
+        subtitle: 'Postgraduate study, specialisation or leadership role',
+      },
+      {
+        label: 'Year 10',
+        title: 'Your Future Self',
+        subtitle: 'A confident professional making a meaningful impact',
+      },
+    ],
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAREER INTELLIGENCE - Static Data Maps (migrated from schoolReport.ts)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const CI_COLORS = {
+  // Brand primaries
+  INDIGO: '#2c2a7d', // base indigo - high values
+  INDIGO_MID: '#4e4ba6', // medium shade
+  INDIGO_LIGHT: '#9896cc', // light shade - low values / tracks
+  INDIGO_PALE: '#e8e7f5', // very light - backgrounds / row stripes
+  GREEN: '#4cb966', // base green - secondary / accent
+  GREEN_DARK: '#2d8a45', // darker green
+  GREEN_LIGHT: '#a8e0b3', // light green tint
+  // Neutrals
+  LIGHT_GRAY: '#F5F5F5',
+  DARK_TEXT: '#1A1A1A',
+  MEDIUM_TEXT: '#444444',
+  // Semantic
+  STRONG_GREEN: '#2d8a45',
+  MODERATE_AMBER: '#C68A00',
+  DEVELOPING_RED: '#D04A4A',
+  // Kept for non-bar usage only
+  SECTION_BLUE: '#2c2a7d', // alias for INDIGO
+  ACCENT_GREEN: '#4cb966', // alias for GREEN
+  ACCENT_TEAL: '#4e4ba6', // remapped to indigo-mid
+  TEAL_LIGHT: '#e8e7f5', // remapped to indigo-pale
+  TEAL_MID: '#9896cc', // remapped to indigo-light
+  TILE_BLUE: '#e8e7f5',
+  TILE_TEAL: '#e8e7f5',
+  GAUGE_START: '#4cb966', // green start
+  GAUGE_END: '#2c2a7d', // indigo end
+  GAUGE_BG: '#e8e7f5',
+  RADAR_FILL: '#9896cc',
+  RADAR_STROKE: '#2c2a7d',
+  RADAR_GRID: '#BCBEC0',
+  BAR_BLUE: '#2c2a7d',
+  BAR_GREEN: '#4cb966',
+  BAR_TEAL: '#4e4ba6',
+  BAR_PURPLE: '#2c2a7d',
+  BAR_INDIGO: '#4e4ba6',
+};
+
+// Non-DISC axis labels for the behavioral radar
+export const BEHAVIOR_LABELS: Record<string, string> = {
+  D: 'Drive',
+  I: 'Expression',
+  S: 'Stability',
+  C: 'Precision',
+};
+
+/** Maps two-letter trait combos to professional identity titles and descriptions */
+export const IDENTITY_MAP: Record<
+  string,
+  { title: string; description: string }
+> = {
+  DC: {
+    title: 'Structured Strategic Performer',
+    description:
+      'You naturally prefer clarity, defined systems, and logical decision-making environments. You perform best where expectations are clear, processes are structured, and outcomes are measurable. You evaluate, plan, and then execute with discipline.',
+  },
+  CD: {
+    title: 'Precision-Driven Strategist',
+    description:
+      'You thrive in environments where quality standards are high and decisions are supported by evidence. You bring thoroughness and strategic thinking together, preferring to analyse before acting and holding yourself to exacting standards.',
+  },
+  DI: {
+    title: 'Adaptive Collaborative Driver',
+    description:
+      'You combine a goal-oriented mindset with strong interpersonal energy. You take charge confidently while engaging others, and perform best in dynamic settings that reward initiative, persuasion, and visible results.',
+  },
+  ID: {
+    title: 'Expressive Initiative Leader',
+    description:
+      'You lead through enthusiasm and social connection. You naturally rally people around ideas, communicate with energy, and thrive where creativity, collaboration, and rapid action intersect.',
+  },
+  DS: {
+    title: 'Resilient Operational Executor',
+    description:
+      'You blend a drive for results with steady follow-through. You set clear targets and build practical processes to reach them, bringing determination and patience together in equal measure.',
+  },
+  SD: {
+    title: 'Dependable Performance Anchor',
+    description:
+      'You bring reliability and quiet resolve to every environment. You follow systems faithfully, execute with discipline, and provide a stabilising force that others depend on during change.',
+  },
+  IS: {
+    title: 'Empathic Engagement Specialist',
+    description:
+      'You create trust and collaboration effortlessly. You sense team dynamics, build inclusive environments, and perform best where cooperation, empathy, and steady contribution are valued.',
+  },
+  SI: {
+    title: 'Supportive Team Catalyst',
+    description:
+      'You combine warmth with cooperative energy, naturally encouraging others while maintaining steady output. You thrive in team-first environments that value harmony and shared achievement.',
+  },
+  IC: {
+    title: 'Creative Analytical Innovator',
+    description:
+      'You bring a rare blend of imagination and logical rigour. You design thoughtful solutions, balance creativity with evidence, and perform best in environments that value both innovation and accuracy.',
+  },
+  CI: {
+    title: 'Methodical Creative Planner',
+    description:
+      'You approach creativity with discipline. You merge analytical depth with expressive communication, thriving where structured innovation and evidence-based storytelling are required.',
+  },
+  SC: {
+    title: 'Steady Quality Guardian',
+    description:
+      'You value consistency, precision, and calm performance. You maintain high standards through patience and systematic work, excelling in environments that reward reliability and thoroughness.',
+  },
+  CS: {
+    title: 'Careful Stability Architect',
+    description:
+      'You bring order and meticulous care to every project. You prefer predictable environments with clear processes, and your attention to detail ensures that standards are never compromised.',
+  },
+};
+
+/** Maps each trait letter to career-relevant strength labels + short descriptions */
+export const STRENGTH_MAP: Record<string, { label: string; desc: string }[]> = {
+  D: [
+    {
+      label: 'Goal-Driven Decision Making',
+      desc: 'You maintain focus on measurable results and defined objectives.',
+    },
+    {
+      label: 'Strategic Execution Authority',
+      desc: 'You are comfortable taking ownership and driving outcomes independently.',
+    },
+    {
+      label: 'Rapid Problem Resolution',
+      desc: 'You cut through ambiguity and deliver solutions under pressure.',
+    },
+  ],
+  I: [
+    {
+      label: 'Collaborative Influence',
+      desc: 'You have a strong ability to rally teams and build consensus around ideas.',
+    },
+    {
+      label: 'Adaptive Communication',
+      desc: 'You adjust your messaging instinctively to engage diverse audiences.',
+    },
+    {
+      label: 'Creative Solution Design',
+      desc: 'You generate fresh approaches and inspire innovative thinking.',
+    },
+  ],
+  S: [
+    {
+      label: 'Consistency & Reliability',
+      desc: 'You demonstrate dependable performance under structured expectations.',
+    },
+    {
+      label: 'Team Cohesion Building',
+      desc: 'You foster trust and psychological safety within groups.',
+    },
+    {
+      label: 'Sustained Task Commitment',
+      desc: 'You maintain steady effort over extended timelines without burnout.',
+    },
+  ],
+  C: [
+    {
+      label: 'Analytical Accuracy',
+      desc: 'You evaluate information carefully and make data-driven decisions with precision.',
+    },
+    {
+      label: 'Structured Execution Discipline',
+      desc: 'You perform consistently in environments that require procedure adherence.',
+    },
+    {
+      label: 'Strategic Planning Orientation',
+      desc: 'You are comfortable setting goals and aligning resources for long-term outcomes.',
+    },
+  ],
+};
+
+/** Maps each trait letter to positive development opportunity descriptions */
+export const DEVELOPMENT_MAP: Record<
+  string,
+  { label: string; desc: string }[]
+> = {
+  D: [
+    {
+      label: 'Emotional Flexibility',
+      desc: 'You may benefit from adapting your communication tone based on audience sensitivity.',
+    },
+    {
+      label: 'Delegation Comfort',
+      desc: 'Gradually build your confidence in sharing control and trusting your team to execute.',
+    },
+  ],
+  I: [
+    {
+      label: 'Sustained Focus Depth',
+      desc: 'You can strengthen your performance by completing deep-work cycles without distraction.',
+    },
+    {
+      label: 'Detail Verification',
+      desc: 'You may benefit from building routine checks before finalising your deliverables.',
+    },
+  ],
+  S: [
+    {
+      label: 'Spontaneous Adaptability',
+      desc: 'You can strengthen your performance in rapidly changing or ambiguous environments.',
+    },
+    {
+      label: 'Social Influence Confidence',
+      desc: 'Try expressing your ideas more assertively in collaborative discussions.',
+    },
+  ],
+  C: [
+    {
+      label: 'Pace Flexibility',
+      desc: 'You may benefit from releasing your work incrementally rather than waiting for perfection.',
+    },
+    {
+      label: 'Interpersonal Warmth',
+      desc: 'You can strengthen your impact by adding informal, empathetic elements to your communication.',
+    },
+  ],
+};
+
+/** Maps trait combos to career domains and automation risk */
+export const CAREER_DOMAIN_MAP: Record<
+  string,
+  { domains: { name: string; score: number }[]; automationRisk: string }
+> = {
+  DC: {
+    domains: [
+      { name: 'Engineering & Robotics', score: 95 },
+      { name: 'Data & Systems Management', score: 90 },
+      { name: 'Governance & Compliance', score: 85 },
+      { name: 'Research & Structured Technology', score: 80 },
+      { name: 'Risk & Strategic Planning', score: 75 },
+    ],
+    automationRisk:
+      'Low risk in analytical and strategic domains. Higher risk only in repetitive, low-decision roles.',
+  },
+  CD: {
+    domains: [
+      { name: 'Quality Assurance & Standards', score: 95 },
+      { name: 'Financial Analysis & Auditing', score: 90 },
+      { name: 'Research & Development', score: 85 },
+      { name: 'Policy Design & Regulation', score: 80 },
+      { name: 'Data Science & Machine Learning', score: 78 },
+    ],
+    automationRisk:
+      'Low risk due to analytical depth. Roles requiring human oversight remain resilient.',
+  },
+  DI: {
+    domains: [
+      { name: 'Business Development & Sales', score: 92 },
+      { name: 'Product Management', score: 88 },
+      { name: 'Startup & Entrepreneurship', score: 85 },
+      { name: 'Marketing Strategy', score: 82 },
+      { name: 'Consulting & Advisory', score: 78 },
+    ],
+    automationRisk:
+      'Low risk in leadership and relationship-driven roles. Higher risk only in transactional functions.',
+  },
+  ID: {
+    domains: [
+      { name: 'Creative Direction & Content', score: 90 },
+      { name: 'Public Relations & Comms', score: 88 },
+      { name: 'Brand Management', score: 85 },
+      { name: 'Event & Experience Design', score: 80 },
+      { name: 'Media Production', score: 76 },
+    ],
+    automationRisk:
+      'Low risk in creative and people-facing domains. AI augments but does not replace persuasive leadership.',
+  },
+  DS: {
+    domains: [
+      { name: 'Operations Management', score: 94 },
+      { name: 'Project & Program Management', score: 90 },
+      { name: 'Supply Chain & Logistics', score: 86 },
+      { name: 'Construction & Infrastructure', score: 82 },
+      { name: 'Defence Strategy', score: 78 },
+    ],
+    automationRisk:
+      'Low risk in operational leadership. Steady execution roles remain critical.',
+  },
+  SD: {
+    domains: [
+      { name: 'Healthcare Administration', score: 92 },
+      { name: 'Education & Training', score: 88 },
+      { name: 'Facilities & Operations', score: 84 },
+      { name: 'Government & Public Service', score: 80 },
+      { name: 'Agricultural Management', score: 76 },
+    ],
+    automationRisk:
+      'Low risk in service-oriented leadership. Human judgment remains indispensable.',
+  },
+  IS: {
+    domains: [
+      { name: 'Human Resources & People Ops', score: 94 },
+      { name: 'Counselling & Social Work', score: 90 },
+      { name: 'Customer Success', score: 86 },
+      { name: 'Community Development', score: 82 },
+      { name: 'Teaching & Academic Mentoring', score: 78 },
+    ],
+    automationRisk:
+      'Low risk in empathy-driven roles. Human connection is irreplaceable.',
+  },
+  SI: {
+    domains: [
+      { name: 'Team Coordination', score: 90 },
+      { name: 'Patient Care & Allied Health', score: 88 },
+      { name: 'Hospitality & Guest Experience', score: 84 },
+      { name: 'Retail Management', score: 80 },
+      { name: 'Nonprofit Program Management', score: 76 },
+    ],
+    automationRisk:
+      'Low risk in people-first service environments. Supportive roles require human presence.',
+  },
+  IC: {
+    domains: [
+      { name: 'UX/UI Design & Research', score: 92 },
+      { name: 'Advertising & Creative Strategy', score: 88 },
+      { name: 'Architecture & Interior Design', score: 84 },
+      { name: 'Content Creation & Storytelling', score: 80 },
+      { name: 'Innovation Labs & R&D', score: 76 },
+    ],
+    automationRisk:
+      'Low risk where human creativity meets analytical rigour. AI assists but does not replace design judgment.',
+  },
+  CI: {
+    domains: [
+      { name: 'Technical Writing', score: 90 },
+      { name: 'Information Architecture', score: 86 },
+      { name: 'Product Design & Prototyping', score: 84 },
+      { name: 'Data Visualisation & Analytics', score: 80 },
+      { name: 'EdTech & Instructional Design', score: 76 },
+    ],
+    automationRisk:
+      'Low risk in structured creative domains. Methodical innovation requires human oversight.',
+  },
+  SC: {
+    domains: [
+      { name: 'Compliance & Regulatory Affairs', score: 92 },
+      { name: 'Laboratory Science', score: 88 },
+      { name: 'Archival & Library Science', score: 84 },
+      { name: 'Accounting & Financial Planning', score: 80 },
+      { name: 'Environmental Safety', score: 76 },
+    ],
+    automationRisk:
+      'Low risk in precision-driven stability roles. Quality-focused work resists full automation.',
+  },
+  CS: {
+    domains: [
+      { name: 'Software Quality Assurance', score: 92 },
+      { name: 'Pharmaceutical R&D', score: 88 },
+      { name: 'Legal Research', score: 84 },
+      { name: 'Actuarial Science', score: 80 },
+      { name: 'Clinical Data Management', score: 76 },
+    ],
+    automationRisk:
+      'Low risk in detail-critical domains. Precision roles demand human verification.',
+  },
+};
+
+export interface ProfilePatterns {
+  discType: 'dominant' | 'dual' | 'balanced';
+  dominantTrait?: string;
+  dualTraits?: [string, string];
+  agilePattern: string;
+  leadership: number;
+  collaboration: number;
+  innovation: number;
+  analytical: number;
+  resilience: number;
+  adaptability: number;
+  stressType: string;
+  academicStyle: string;
+  textVariant: number;
+}
+
+export const ARCHETYPE_DATA: Record<
+  string,
+  {
+    dominant: {
+      title: string;
+      superpower: string;
+      risk: string;
+      environment: string;
+    };
+    secondary: {
+      title: string;
+      superpower: string;
+      risk: string;
+      environment: string;
+    };
+  }
+> = {
+  D: {
+    dominant: {
+      title: 'Strategic Driver',
+      superpower: 'Decisive action under pressure',
+      risk: 'May overlook team sentiment in pursuit of results',
+      environment: 'Competitive, fast-paced, outcome-driven',
+    },
+    secondary: {
+      title: 'Assertive Contributor',
+      superpower: 'Confident initiative in group settings',
+      risk: 'Can become impatient with slower processes',
+      environment: 'Project-based, target-oriented',
+    },
+  },
+  I: {
+    dominant: {
+      title: 'Dynamic Communicator',
+      superpower: 'Energising teams and building enthusiasm',
+      risk: 'May prioritise engagement over follow-through',
+      environment: 'Collaborative, creative, socially active',
+    },
+    secondary: {
+      title: 'Expressive Collaborator',
+      superpower: 'Building rapport and inspiring action',
+      risk: 'May struggle with sustained solo tasks',
+      environment: 'Team-based, interactive learning',
+    },
+  },
+  S: {
+    dominant: {
+      title: 'Steady Anchor',
+      superpower: 'Reliable consistency and calm under pressure',
+      risk: 'May resist necessary changes or new methods',
+      environment: 'Structured, predictable, supportive',
+    },
+    secondary: {
+      title: 'Supportive Stabiliser',
+      superpower: 'Creating trust and psychological safety',
+      risk: 'May avoid confrontation when needed',
+      environment: 'Team-oriented, routine-based',
+    },
+  },
+  C: {
+    dominant: {
+      title: 'Precision Architect',
+      superpower: 'Analytical depth and quality control',
+      risk: 'May delay action while seeking perfect data',
+      environment: 'Research-oriented, standard-driven, detail-rich',
+    },
+    secondary: {
+      title: 'Quality Analyst',
+      superpower: 'Systematic evaluation and process design',
+      risk: 'May over-analyse in time-sensitive situations',
+      environment: 'Data-centric, structured planning',
+    },
+  },
+};
+
+export const DUAL_ARCHETYPE: Record<
+  string,
+  { title: string; description: string }
+> = {
+  DC: {
+    title: 'Strategic Executor',
+    description:
+      'You combine decisiveness with structured thinking - a rare blend of action and precision.',
+  },
+  CD: {
+    title: 'Analytical Commander',
+    description: 'Your leadership style is analytical rather than impulsive.',
+  },
+  DI: {
+    title: 'Charismatic Driver',
+    description: 'You prefer taking charge while energising those around you.',
+  },
+  ID: {
+    title: 'Influential Initiator',
+    description: 'You lead through inspiration and bold action.',
+  },
+  DS: {
+    title: 'Resilient Operator',
+    description: 'You drive results with patient determination.',
+  },
+  SD: {
+    title: 'Steadfast Director',
+    description: 'You build systems while maintaining calm authority.',
+  },
+  IS: {
+    title: 'Empathetic Motivator',
+    description: 'You combine warmth with persuasive energy.',
+  },
+  SI: {
+    title: 'Harmonious Facilitator',
+    description: 'You build consensus through genuine care.',
+  },
+  IC: {
+    title: 'Creative Analyst',
+    description: 'You balance imagination with methodical evaluation.',
+  },
+  CI: {
+    title: 'Methodical Innovator',
+    description: 'You bring structure to creative problem-solving.',
+  },
+  SC: {
+    title: 'Reliable Perfectionist',
+    description: 'You combine steady commitment with quality focus.',
+  },
+  CS: {
+    title: 'Careful Maintainer',
+    description: 'You sustain high standards through disciplined patience.',
+  },
+};
+
+export const TEXT_VARIATIONS: Record<string, string[]> = {
+  'disc-dominant': [
+    'You naturally take control in complex situations and prefer driving results rather than waiting for direction.',
+    'You show a strong preference for leading decisions and influencing outcomes, often stepping forward in high-pressure moments.',
+    'Your strong drive gives you an edge in competitive environments. Developing patience will multiply your leadership impact.',
+  ],
+  'disc-dual': [
+    'You combine two strong capabilities that create a distinctive professional identity.',
+    'Your profile blends complementary strengths that few others possess naturally.',
+    'Your dual strengths position you uniquely - leveraging both will accelerate career growth.',
+  ],
+  'disc-balanced': [
+    'You demonstrate adaptability across different environments without extreme behavioural shifts.',
+    'You can comfortably adjust between leadership, collaboration, and analysis.',
+    'Your flexibility makes you versatile. Developing deeper expertise in one area will amplify your impact.',
+  ],
+  'agile-assertive-risk': [
+    'You are bold in expressing ideas, but strengthening listening skills will elevate your influence.',
+    'You challenge situations confidently. Building empathy will increase long-term trust.',
+    'Your confidence is powerful. Balancing it with patience will amplify impact.',
+  ],
+  'agile-execution-engine': [
+    'You show consistency in completing tasks even under pressure.',
+    "You don't just start strong - you sustain performance across the finish line.",
+    'You convert ideas into measurable outcomes with reliable follow-through.',
+  ],
+  'agile-creative-instability': [
+    'You generate ideas easily but may lose momentum in execution.',
+    'Your creativity thrives in flexible environments. Structure will increase success rate.',
+    'You adapt quickly, but consistency will turn potential into achievement.',
+  ],
+  'agile-balanced': [
+    'Your agile competencies are balanced, showing well-rounded readiness for professional environments.',
+    'You maintain consistent performance across all behavioural agility dimensions.',
+    'Your even distribution of agile capabilities supports adaptable career growth.',
+  ],
+  'stress-assertive': [
+    'Under pressure, your communication may become more direct and results-focused.',
+    'In high-stakes moments, you may prioritise outcomes over relationship management.',
+    'Stress can sharpen your decisiveness but may reduce diplomacy. Awareness is key.',
+  ],
+  'stress-overthink': [
+    'You may delay decisions seeking more data when under pressure.',
+    'Perfectionism can increase under uncertainty, slowing your response time.',
+    'Stress may push you toward over-analysis. Setting decision deadlines helps.',
+  ],
+  'stress-withdrawal': [
+    'Under pressure, you may become quieter and avoid confrontation.',
+    'Stress may lead you to internalise concerns rather than voicing them.',
+    'In difficult moments, building confidence to speak up will strengthen your resilience.',
+  ],
+  'stress-balanced': [
+    'You manage pressure with a reasonably steady approach, without strong behavioural shifts.',
+    'Under moderate stress, you maintain your typical work patterns and communication style.',
+    'Your stress responses are relatively balanced, allowing consistent performance in most environments.',
+  ],
+  'academic-structured': [
+    'You perform best with planned schedules and defined milestones.',
+    'Structured revision timetables and detailed notes align with your natural approach.',
+    'Clear deadlines and systematic preparation maximise your academic output.',
+  ],
+  'academic-collaborative': [
+    'Interactive environments and discussion-based learning increase retention.',
+    'Group projects, study circles, and presentation-based learning suit your style.',
+    'You learn best when you can engage with peers and exchange perspectives.',
+  ],
+  'academic-self-paced': [
+    'You prefer steady, self-paced study with consistent daily routines.',
+    'Regular practice with familiar materials builds your confidence and mastery.',
+    'You excel when given time to absorb content at your own speed.',
+  ],
+  'academic-competitive': [
+    'You thrive in competitive academic settings with visible rankings and challenges.',
+    'Mock tests, timed exercises, and performance benchmarks fuel your motivation.',
+    'Goal-setting and progress tracking align naturally with your approach to learning.',
+  ],
+};
+
+export interface StreamFieldContent {
+  name: string;
+  vibe: string;
+  mappedDegrees: string;
+  icon?: string;
+}
+
+export interface StreamSelectionContent {
+  shortName: string;
+  title: string;
+  vibe: string;
+  fields: StreamFieldContent[];
+}
+
+export const STREAM_SELECTION_CONTENT: Record<string, StreamSelectionContent> =
+  {
+    PCMB: {
+      shortName: 'PCMB',
+      title: 'Physics, Chemistry, Maths, Biology',
+      vibe: 'The ultimate flexible pathway. Keep all doors open for an inspiring career in technology or healing. Choose based on your dual interest!',
+      fields: [
+        {
+          name: 'Medical & Allied Health Sciences',
+          vibe: 'Healers, researchers, and technologists. Use science to improve lives directly.',
+          mappedDegrees:
+            'MBBS, BDS, Physiotherapy (BPT), Nursing, Radiology & Medical Imaging, Cardiac Technology.',
+          icon: 'medic.png',
+        },
+        {
+          name: 'Engineering & Technology',
+          vibe: 'Builders, coders, and creators of future infrastructure, systems, and software.',
+          mappedDegrees:
+            'Computer Science & AI, Robotics, Aerospace Engineering, Mechanical Engineering, Civil Engineering.',
+          icon: 'engineering.png',
+        },
+        {
+          name: 'Pure & Applied Science Research',
+          vibe: 'Discoverers, theorists, and problem solvers unlocking the secrets of the world.',
+          mappedDegrees:
+            'Theoretical Physics, Chemical Research, Biotechnology, Genetics, Microbiology, Biochemistry.',
+          icon: 'research.png',
+        },
+        {
+          name: 'Agriculture & Environmental',
+          vibe: 'Stewards of the earth, food, and environmental sustainability.',
+          mappedDegrees:
+            'Modern Farming, Horticulture, Forestry, Food Science & Production, Environmental Conservation.',
+          icon: 'tea.png',
+        },
+      ],
+    },
+    PCB: {
+      shortName: 'PCB',
+      title: 'Physics, Chemistry, Biology',
+      vibe: 'The gateway to healthcare, research, and natural sciences. Perfect for those passionate about life and medicine.',
+      fields: [
+        {
+          name: 'Medical Sciences',
+          vibe: "The traditional doctor's path to diagnosing and treating patients.",
+          mappedDegrees:
+            'MBBS, BDS, BAMS (Ayurveda), BHMS (Homeopathy), BUMS (Unani).',
+          icon: 'medic.png',
+        },
+        {
+          name: 'Allied Health Sciences',
+          vibe: 'The crucial backbone of hospital operations and patient care.',
+          mappedDegrees:
+            'Nursing, Physiotherapy (BPT), Optometry, Radiology, Medical Lab Technology.',
+          icon: 'health.png',
+        },
+        {
+          name: 'Life Sciences',
+          vibe: 'Deep dive into the building blocks of life, genetics, and organisms.',
+          mappedDegrees:
+            'Biotechnology, Microbiology, Biochemistry, Genetics, Zoology, Botany.',
+          icon: 'life.png',
+        },
+        {
+          name: 'Agriculture & Nutrition',
+          vibe: 'Cultivating resources and understanding the biology of human health.',
+          mappedDegrees:
+            'Agriculture, Horticulture, Forestry, Pharmacy, Food Technology, Nutrition.',
+          icon: 'agriculture.png',
+        },
+      ],
+    },
+    PCM: {
+      shortName: 'PCM',
+      title: 'Physics, Chemistry, Mathematics',
+      vibe: 'The builders, coders, and creators path. Designed for logical thinkers who want to engineer the future.',
+      fields: [
+        {
+          name: 'Engineering Fields',
+          vibe: 'Designing and building physical and digital solutions across all industries.',
+          mappedDegrees:
+            'Computer Science, AI & Data Science, Robotics, Mechanical, Civil, Aerospace.',
+          icon: 'engineering.png',
+        },
+        {
+          name: 'Technology & IT',
+          vibe: 'Creating the software, apps, and AI that power the modern world.',
+          mappedDegrees:
+            'Computer Applications (BCA), B.Sc Computer Science, B.Sc Artificial Intelligence.',
+          icon: 'tech.png',
+        },
+        {
+          name: 'Mathematical & Analytical',
+          vibe: 'Using complex numbers to predict trends, manage data, and solve puzzles.',
+          mappedDegrees:
+            'Mathematics, Statistics, Actuarial Science, Economics.',
+          icon: 'analytical.png',
+        },
+        {
+          name: 'Design, Architecture & Aviation',
+          vibe: 'Blending technical math with creative design, structures, or flight.',
+          mappedDegrees:
+            'Architecture (B.Arch), Industrial Design (B.Des), Aviation, Commercial Pilot Training.',
+          icon: 'architecture.png',
+        },
+      ],
+    },
+    PCBZ: {
+      shortName: 'PCBZ',
+      title: 'Physics, Chemistry, Botany, Zoology',
+      vibe: 'The ultimate biology specialist path. Dive deep into the specific study of plant and animal life alongside medicine.',
+      fields: [
+        {
+          name: 'Medical Degrees',
+          vibe: 'Direct patient care and exploring traditional medicine systems.',
+          mappedDegrees: 'MBBS, BDS, BAMS, BHMS.',
+          icon: 'medic.png',
+        },
+        {
+          name: 'Allied Health Degrees',
+          vibe: 'Supporting critical medical treatments and hospital infrastructure.',
+          mappedDegrees:
+            'Nursing, Physiotherapy (BPT), Radiology, Medical Lab Technology, Cardiac Technology.',
+          icon: 'health.png',
+        },
+        {
+          name: 'Life Science Degrees',
+          vibe: 'Specialized research and deep study into the natural world and organisms.',
+          mappedDegrees:
+            'Botany, Zoology, Biotechnology, Microbiology, Biochemistry.',
+          icon: 'virus.png',
+        },
+        {
+          name: 'Agriculture & Food Sciences',
+          vibe: 'Sustaining human life through food innovation and natural harmony.',
+          mappedDegrees:
+            'Agriculture, Horticulture, Food Technology, Dairy Technology, Fisheries.',
+          icon: 'food.png',
+        },
+      ],
+    },
+    Commerce: {
+      shortName: 'Commerce',
+      title: 'Commerce Stream',
+      vibe: 'The gateway to the corporate world. For future leaders focused on finance, business, and economics.',
+      fields: [
+        {
+          name: 'Commerce Degrees',
+          vibe: 'The foundation of corporate finance, auditing, and modern banking.',
+          mappedDegrees:
+            'B.Com (General), Accounting & Finance, Corporate Secretaryship, Banking & Insurance.',
+          icon: 'commerce.png',
+        },
+        {
+          name: 'Professional Certifications',
+          vibe: 'High-level, specialized financial and legal auditing and strategy.',
+          mappedDegrees:
+            'CA (Chartered Accountant), CMA (Cost Accountant), CS (Company Secretary).',
+          icon: 'professional.png',
+        },
+        {
+          name: 'Management Degrees',
+          vibe: 'Leading teams, running companies, and marketing products to the world.',
+          mappedDegrees:
+            'BBA, BMS (Management Studies), BBM (Business Management).',
+          icon: 'management.png',
+        },
+        {
+          name: 'Economics & Analytics',
+          vibe: 'Understanding global markets, human trends, and financial data.',
+          mappedDegrees:
+            'B.A/B.Sc Economics, Computer Applications (BCA), Data Analytics.',
+          icon: 'economics.png',
+        },
+      ],
+    },
+    Humanities: {
+      shortName: 'Humanities',
+      title: 'Humanities / Arts Stream',
+      vibe: 'The path of society, law, and expression. For those who want to understand human behavior and shape culture.',
+      fields: [
+        {
+          name: 'Social Sciences',
+          vibe: 'Studying how humans think, act, and organize globally across history.',
+          mappedDegrees: 'History, Political Science, Sociology, Psychology.',
+          icon: 'social.png',
+        },
+        {
+          name: 'Creative Fields & Media',
+          vibe: 'Storytelling, journalism, and managing public information.',
+          mappedDegrees: 'Journalism, Mass Communication, English Literature.',
+          icon: 'media.png',
+        },
+        {
+          name: 'Design Fields',
+          vibe: 'Shaping visual culture and functional aesthetics in the modern world.',
+          mappedDegrees: 'Design (B.Des), Fashion Designing.',
+          icon: 'design.png',
+        },
+        {
+          name: 'Law',
+          vibe: 'Fighting for justice, policy-making, and understanding legal frameworks.',
+          mappedDegrees: 'BA LLB.',
+          icon: 'law.png',
+        },
+      ],
+    },
+  };
+
+export interface StreamOdysseyNode {
+  label: string;
+  title: string;
+  subtitle: string;
+}
+
+export interface StreamOdysseyData {
+  streamTitle: string;
+  tagline: string;
+  nodes: StreamOdysseyNode[];
+}
+
+export const STREAM_ODYSSEY_ROADMAP: Record<string, StreamOdysseyData> = {
+  PCMB: {
+    streamTitle: 'PCMB Stream Odyssey',
+    tagline: 'Healthcare & Technology - Your 10-Year Vision',
+    nodes: [
+      {
+        label: 'Start',
+        title: 'Class 12 Graduate',
+        subtitle: 'PCMB stream completed',
+      },
+      {
+        label: 'Year 1–3',
+        title: 'Undergraduate Degree',
+        subtitle: 'B.Tech, MBBS prep, or B.Sc entry',
+      },
+      {
+        label: 'Year 4–5',
+        title: 'Specialization / Graduation',
+        subtitle: 'Complete core medical or engineering training',
+      },
+      {
+        label: 'Year 5–7',
+        title: 'Early Professional',
+        subtitle: 'Junior Doctor, Engineer, or Researcher',
+      },
+      {
+        label: 'Year 7–10',
+        title: 'Expert / Specialist',
+        subtitle: 'Attending Physician, Tech Lead, or Scientist',
+      },
+      {
+        label: 'Year 10+',
+        title: 'Leader / Innovator',
+        subtitle: 'Leading departments or groundbreaking research',
+      },
+    ],
+  },
+  PCB: {
+    streamTitle: 'PCB Stream Odyssey',
+    tagline: 'Medicine & Life Sciences - Your 10-Year Vision',
+    nodes: [
+      {
+        label: 'Start',
+        title: 'Class 12 Graduate',
+        subtitle: 'PCB stream completed',
+      },
+      {
+        label: 'Year 1–3',
+        title: 'Undergraduate / Pre-Med',
+        subtitle: 'MBBS prep, BDS, B.Sc or Allied Sciences',
+      },
+      {
+        label: 'Year 4–5',
+        title: 'Clinical Training / Degree',
+        subtitle: 'Internships, lab training, or final graduation',
+      },
+      {
+        label: 'Year 5–7',
+        title: 'Resident / Junior Scientist',
+        subtitle: 'Hospital residency or entry-level research',
+      },
+      {
+        label: 'Year 7–10',
+        title: 'Practitioner / Specialist',
+        subtitle: 'Licensed doctor, senior researcher',
+      },
+      {
+        label: 'Year 10+',
+        title: 'Consultant / Director',
+        subtitle: 'Specialist consultant or lab director',
+      },
+    ],
+  },
+  PCM: {
+    streamTitle: 'PCM Stream Odyssey',
+    tagline: 'Engineering & Innovation - Your 10-Year Vision',
+    nodes: [
+      {
+        label: 'Start',
+        title: 'Class 12 Graduate',
+        subtitle: 'PCM stream completed',
+      },
+      {
+        label: 'Year 1–4',
+        title: 'Undergraduate Degree',
+        subtitle: 'B.Tech, B.E., or B.Arch',
+      },
+      {
+        label: 'Year 4',
+        title: 'Graduate Engineer',
+        subtitle: 'Entry-level engineering or software development',
+      },
+      {
+        label: 'Year 5–7',
+        title: 'Mid-Level Professional',
+        subtitle: 'Senior developer, project engineer',
+      },
+      {
+        label: 'Year 7–10',
+        title: 'Technical Lead',
+        subtitle: 'Leading teams, architecting solutions',
+      },
+      {
+        label: 'Year 10+',
+        title: 'Principal / CTO',
+        subtitle: 'Principal engineer or tech executive',
+      },
+    ],
+  },
+  PCBZ: {
+    streamTitle: 'PCBZ Stream Odyssey',
+    tagline: 'Specialized Biosciences - Your 10-Year Vision',
+    nodes: [
+      {
+        label: 'Start',
+        title: 'Class 12 Graduate',
+        subtitle: 'PCBZ stream completed',
+      },
+      {
+        label: 'Year 1–3',
+        title: 'Undergraduate Degree',
+        subtitle: 'B.Sc in specialized biology or pre-med',
+      },
+      {
+        label: 'Year 4–5',
+        title: 'Postgrad / Research Entry',
+        subtitle: 'M.Sc, clinical lab setup, or early research',
+      },
+      {
+        label: 'Year 5–7',
+        title: 'Associate Scientist',
+        subtitle: 'Field researcher, lab associate',
+      },
+      {
+        label: 'Year 7–10',
+        title: 'Subject Expert',
+        subtitle: 'Biotechnologist, specialized clinician',
+      },
+      {
+        label: 'Year 10+',
+        title: 'Principal Investigator',
+        subtitle: 'Directing research or environmental policy',
+      },
+    ],
+  },
+  Commerce: {
+    streamTitle: 'Commerce Stream Odyssey',
+    tagline: 'Business & Finance - Your 10-Year Vision',
+    nodes: [
+      {
+        label: 'Start',
+        title: 'Class 12 Graduate',
+        subtitle: 'Commerce stream completed',
+      },
+      {
+        label: 'Year 1–3',
+        title: 'Undergraduate / Certs',
+        subtitle: 'B.Com, BBA, CA Foundation',
+      },
+      {
+        label: 'Year 4–5',
+        title: 'Articleship / Analyst',
+        subtitle: 'CA Inter, entry-level financial analyst',
+      },
+      {
+        label: 'Year 5–7',
+        title: 'Qualified Professional',
+        subtitle: 'CA, Financial Manager, Consultant',
+      },
+      {
+        label: 'Year 7–10',
+        title: 'Senior Management',
+        subtitle: 'Senior consultant, VP of Finance',
+      },
+      {
+        label: 'Year 10+',
+        title: 'CFO / Founder',
+        subtitle: 'Chief Financial Officer or business owner',
+      },
+    ],
+  },
+  Humanities: {
+    streamTitle: 'Humanities Stream Odyssey',
+    tagline: 'Society & Culture - Your 10-Year Vision',
+    nodes: [
+      {
+        label: 'Start',
+        title: 'Class 12 Graduate',
+        subtitle: 'Humanities stream completed',
+      },
+      {
+        label: 'Year 1–3',
+        title: 'Undergraduate Degree',
+        subtitle: 'B.A., Law prep, or Design fundamentals',
+      },
+      {
+        label: 'Year 4–5',
+        title: 'Postgrad / Early Practitioner',
+        subtitle: 'M.A., Law school, early journalism',
+      },
+      {
+        label: 'Year 5–7',
+        title: 'Professional Associate',
+        subtitle: 'Junior lawyer, writer, social worker',
+      },
+      {
+        label: 'Year 7–10',
+        title: 'Senior Professional',
+        subtitle: 'Senior editor, policy analyst, advocate',
+      },
+      {
+        label: 'Year 10+',
+        title: 'Leader / Change Maker',
+        subtitle: 'Partner, published author, or director',
+      },
+    ],
+  },
+};

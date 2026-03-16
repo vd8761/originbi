@@ -177,6 +177,14 @@ export const ClockIcon: React.FC<{ className?: string }> = ({
   </svg>
 );
 
+export const HistoryIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+    <path d="M3 3v5h5" />
+    <path d="M12 7v5l4 2" />
+  </svg>
+);
+
 export const DarkModeIcon: React.FC<{ className?: string }> = ({
   className = "w-5 h-5",
 }) => (
@@ -516,14 +524,14 @@ export const StepperDownArrowIcon: React.FC<{ className?: string }> = ({
   </svg>
 );
 
-export const CompletedStepIcon: React.FC = () => (
+export const CompletedStepIcon: React.FC<{ className?: string }> = ({
+  className = "w-8 h-8 sm:w-10 sm:h-10",
+}) => (
   <svg
-    width="40"
-    height="40"
     viewBox="0 0 40 40"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
-    className="w-8 h-8 sm:w-10 sm:h-10"
+    className={className}
   >
     <path
       d="M20 0C8.97243 0 0 8.97243 0 20C0 31.0276 8.97243 40 20 40C31.0276 40 40 31.0276 40 20C40 8.97243 31.0276 0 20 0ZM31.1779 14.7368L18.396 27.4185C17.6441 28.1704 16.4411 28.2206 15.6391 27.4185L8.87218 21.3033C8.07018 20.5514 8.02005 19.2982 8.72181 18.4962C9.47369 17.6942 10.7268 17.6441 11.5288 18.396L16.8922 23.3083L28.3208 11.8797C29.1228 11.0777 30.3759 11.0777 31.1779 11.8797C31.98 12.6817 31.98 13.9348 31.1779 14.7368Z"
@@ -1197,27 +1205,27 @@ export const XIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" 
 
 
 export const LoadingIcon: React.FC<{ className?: string }> = ({
-    className = "w-4 h-4",
+  className = "w-4 h-4",
 }) => (
-    <svg
-        className={className}
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
-        viewBox="0 0 24 24"
-    >
-        <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-        ></circle>
-        <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-        ></path>
-    </svg>
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 24 24"
+  >
+    <circle
+      className="opacity-25"
+      cx="12"
+      cy="12"
+      r="10"
+      stroke="currentColor"
+      strokeWidth="4"
+    ></circle>
+    <path
+      className="opacity-75"
+      fill="currentColor"
+      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+    ></path>
+  </svg>
 );
 

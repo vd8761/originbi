@@ -59,10 +59,10 @@ export class ReportController {
       res.json({
         success: true,
         jobId,
-        statusUrl: `/report/download/status/${jobId}`,
+        statusUrl: `/download/status/${jobId}`,
       });
     } else {
-      res.redirect(`/report/download/status/${jobId}`);
+      res.redirect(`/download/status/${jobId}`);
     }
   }
 
@@ -85,10 +85,10 @@ export class ReportController {
       res.json({
         success: true,
         jobId,
-        statusUrl: `/report/download/status/${jobId}`,
+        statusUrl: `/download/status/${jobId}`,
       });
     } else {
-      res.redirect(`/report/download/status/${jobId}`);
+      res.redirect(`/download/status/${jobId}`);
     }
   }
 
@@ -117,7 +117,7 @@ export class ReportController {
 
     res.json({
       success: true,
-      statusUrl: `/report/download/status/${jobId}`,
+      statusUrl: `/download/status/${jobId}`,
     });
   }
 
@@ -145,7 +145,7 @@ export class ReportController {
     res.json({
       success: true,
       jobId,
-      statusUrl: `/report/download/status/${jobId}`,
+      statusUrl: `/download/status/${jobId}`,
     });
   }
 
@@ -183,7 +183,7 @@ export class ReportController {
       if (job.status === 'COMPLETED') {
         res.json({
           status: 'COMPLETED',
-          downloadUrl: `/report/download/status/${jobId}?download=true`,
+          downloadUrl: `/download/status/${jobId}?download=true`,
           password: job.password,
         });
         return;
