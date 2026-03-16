@@ -113,6 +113,14 @@ export class CorporateDashboardService {
     }
   }
 
+  private normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
+  private normalizeMobile(mobile: string): string {
+    return String(mobile || '').replace(/\D/g, '');
+  }
+
   // ========================================================================
   // Helper: Get Corporate Account ID by User Email
   // ========================================================================
@@ -676,17 +684,29 @@ export class CorporateDashboardService {
   }
 
   async registerCorporate(dto: RegisterCorporateDto) {
-    const email = dto.email.trim();
-    const existingUser = await this.userRepo.findOne({
-      where: { email: email },
-    });
+    const email = this.normalizeEmail(dto.email);
+    const mobileDigits = this.normalizeMobile(dto.mobile);
+
+    if (!mobileDigits) {
+      throw new BadRequestException('Valid mobile number is required');
+    }
+
+    const existingUser = await this.userRepo
+      .createQueryBuilder('u')
+      .where('LOWER(u.email) = :email', { email })
+      .getOne();
     if (existingUser) {
       throw new BadRequestException(`Email '${email}' is already registered`);
     }
 
-    const existingMobile = await this.corporateRepo.findOne({
-      where: { mobileNumber: dto.mobile, countryCode: dto.countryCode },
-    });
+    const existingMobile = await this.corporateRepo
+      .createQueryBuilder('ca')
+      .where('ca.countryCode = :countryCode', { countryCode: dto.countryCode })
+      .andWhere(
+        "regexp_replace(COALESCE(ca.mobileNumber, ''), '\\D', '', 'g') = :mobile",
+        { mobile: mobileDigits },
+      )
+      .getOne();
     if (existingMobile) {
       throw new BadRequestException(
         'Mobile number already exists for a corporate account',
@@ -747,6 +767,19 @@ export class CorporateDashboardService {
         };
       });
 
+      // Notify Admins
+      this.sendAdminNotification({
+        role: 'ADMIN',
+        type: 'NEW_CORPORATE_SIGNUP',
+        title: 'New Corporate Signup',
+        message: `A registration request from "${dto.companyName}" is awaiting your approval.`,
+        metadata: {
+          email: email,
+          companyName: dto.companyName,
+          name: dto.name,
+        },
+      }).catch((err) => console.error('Admin notification failed:', err));
+
       // Send Confirmation Email after successful transaction
       this.sendRegistrationSuccessEmail(email, {
         name: dto.name,
@@ -773,6 +806,28 @@ export class CorporateDashboardService {
       }
       throw new InternalServerErrorException(
         `Database Transaction Failed: ${dbError.message}`,
+      );
+    }
+  }
+
+  private async sendAdminNotification(data: {
+    userId?: number;
+    role: string;
+    type: string;
+    title: string;
+    message: string;
+    metadata?: any;
+  }) {
+    const adminServiceUrl =
+      this.configService.get('ADMIN_SERVICE_URL') || 'http://localhost:4001';
+    try {
+      await firstValueFrom(
+        this.httpService.post(`${adminServiceUrl}/notifications/internal`, data),
+      );
+    } catch (err: any) {
+      console.error(
+        'Failed to notify admin via internal API:',
+        err.response?.data || err.message,
       );
     }
   }

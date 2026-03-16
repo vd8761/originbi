@@ -230,8 +230,8 @@ const LoginForm: React.FC<LoginFormProps> = ({
         // Store affiliate-specific user data
         const affiliateData = backendUser.affiliate || {};
         localStorage.setItem('affiliate_user', JSON.stringify({
-          id: affiliateData.id || 0,
-          userId: backendUser.id || 0,
+          id: backendUser.id || 0, // Store standard User table ID as 'id'
+          affiliateId: affiliateData.id || 0, // Store AffiliateAccount table ID as 'affiliateId'
           name: affiliateData.name || backendUser.email?.split('@')[0] || 'Affiliate',
           email: backendUser.email || '',
           role: 'AFFILIATE',

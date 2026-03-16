@@ -4,7 +4,6 @@ import { useRouter, usePathname } from 'next/navigation';
 import ThemeToggle from '../ui/ThemeToggle';
 import { studentService } from '../../lib/services/student.service';
 import {
-    NotificationWithDotIcon,
     NotificationIcon,
     ChevronDownIcon,
     DashboardIcon,
@@ -15,10 +14,15 @@ import {
     SettingsIcon,
     LogoutIcon,
     MenuIcon,
+    UsersIcon,
+    HistoryIcon,
+    CompletedStepIcon,
 } from '../icons';
 
 import { useTheme } from '../../contexts/ThemeContext';
 import { Brain } from 'lucide-react';
+import { capitalizeWords, formatRelativeTime } from "../../lib/utils";
+import { useNotifications } from "../../lib/hooks/useNotifications";
 
 interface HeaderProps {
     onLogout: () => void;
@@ -88,44 +92,41 @@ const NavItem: React.FC<NavItemProps> = ({
 };
 
 const NotificationItem: React.FC<{
-    icon: React.ReactNode;
+    icon?: React.ReactNode;
     title: string;
-    time: string;
+    message: string;
+    time?: string;
     isNew?: boolean;
-}> = ({ icon, title, time, isNew }) => (
-    <div className="flex items-start space-x-3 p-3 hover:bg-brand-light-tertiary dark:hover:bg-brand-dark-tertiary/60 transition-colors duration-200">
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand-light-tertiary dark:bg-brand-dark-tertiary flex items-center justify-center">
-            {icon}
-        </div>
-        <div className="flex-grow">
-            <p className="text-sm font-medium text-brand-text-light-primary dark:text-brand-text-primary">
+    onClick?: () => void;
+}> = ({ icon, title, message, time, isNew, onClick }) => (
+    <div
+        onClick={onClick}
+        className="flex items-start space-x-3 p-3 hover:bg-brand-light-tertiary dark:hover:bg-brand-dark-tertiary/60 transition-colors duration-200 cursor-pointer"
+    >
+        {icon && (
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand-light-tertiary dark:bg-brand-dark-tertiary flex items-center justify-center">
+                {icon}
+            </div>
+        )}
+        <div className="flex-grow min-w-0">
+            <div className="text-sm font-bold text-brand-green truncate">
                 {title}
-            </p>
-            <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary">
-                {time}
-            </p>
+            </div>
+            <div className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary mt-0.5 line-clamp-2">
+                {message}
+            </div>
+            {time && (
+                <p className="text-[10px] text-brand-text-light-secondary/60 dark:text-brand-text-secondary/60 mt-1">
+                    {time}
+                </p>
+            )}
         </div>
         {isNew && (
             <div className="w-2 h-2 bg-brand-green rounded-full mt-1 flex-shrink-0"></div>
         )}
     </div>
 );
-
-
-
 import { useLanguage } from '../../contexts/LanguageContext';
-
-// ... existing imports
-
-interface HeaderProps {
-    onLogout: () => void;
-    currentView?: "dashboard" | "assessment" | "roadmaps";
-    onNavigate?: (view: "dashboard" | "assessment") => void;
-    hideNav?: boolean;
-    showAssessmentOnly?: boolean;
-}
-
-// ... NavItem and NotificationItem components ...
 
 const Header: React.FC<HeaderProps> = ({
     onLogout,
@@ -140,7 +141,8 @@ const Header: React.FC<HeaderProps> = ({
     const [isLangOpen, setLangOpen] = useState(false);
     const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [isNotificationsOpen, setNotificationsOpen] = useState(false);
-    const [hasNotification, setHasNotification] = useState(true);
+    const [showHistory, setShowHistory] = useState(false);
+    const { unreadCount, notifications: realNotifications, fetchNotifications, markAllAsRead, markAsRead } = useNotifications();
 
     const profileMenuRef = useRef<HTMLDivElement>(null);
     const langMenuRef = useRef<HTMLDivElement>(null);
@@ -243,7 +245,13 @@ const Header: React.FC<HeaderProps> = ({
         const handleClickOutside = (event: MouseEvent) => {
             if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) { setProfileOpen(false); }
             if (langMenuRef.current && !langMenuRef.current.contains(event.target as Node)) { setLangOpen(false); }
-            if (notificationsMenuRef.current && !notificationsMenuRef.current.contains(event.target as Node)) { setNotificationsOpen(false); }
+            if (notificationsMenuRef.current && !notificationsMenuRef.current.contains(event.target as Node)) {
+                if (isNotificationsOpen) {
+                    if (unreadCount > 0) markAllAsRead();
+                    setNotificationsOpen(false);
+                    setShowHistory(false);
+                }
+            }
             if (isMobileMenuOpen && mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
                 const target = event.target as Element;
                 if (!target.closest("#mobile-menu-btn")) { setMobileMenuOpen(false); }
@@ -251,10 +259,22 @@ const Header: React.FC<HeaderProps> = ({
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => { document.removeEventListener("mousedown", handleClickOutside); };
-    }, [isMobileMenuOpen]);
+    }, [isMobileMenuOpen, isNotificationsOpen, unreadCount, markAllAsRead]);
 
     const handleLangChange = (lang: "ENG" | "TAM") => { setLanguage(lang); setLangOpen(false); };
-    const handleNotificationClick = () => { setNotificationsOpen((p) => !p); if (hasNotification) setHasNotification(false); };
+    const handleNotificationClick = () => {
+        const nextState = !isNotificationsOpen;
+        if (nextState) {
+            fetchNotifications();
+            setNotificationsOpen(true);
+        } else {
+            if (unreadCount > 0) {
+                markAllAsRead();
+            }
+            setNotificationsOpen(false);
+            setShowHistory(false);
+        }
+    };
 
     const router = useRouter();
     const pathname = usePathname();
@@ -278,11 +298,36 @@ const Header: React.FC<HeaderProps> = ({
     const isRoadmapsActive = pathname?.includes('/student/roadmaps') || currentView === 'roadmaps';
     const isCounsellorActive = pathname?.includes('/student/counsellor');
 
-    const notifications = [
-        { icon: <RoadmapIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />, title: "New Roadmap Unlocked!", time: "2 hours ago", isNew: true },
-        { icon: <JobsIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />, title: "3 new job matches for you", time: "Yesterday", isNew: true },
-        { icon: <ProfileIcon className="w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary" />, title: "Your profile is 85% complete", time: "3 days ago", isNew: false },
-    ];
+    const getNotificationIcon = (type: string) => {
+        const iconClass = "w-4 h-4 text-brand-text-light-secondary dark:text-brand-text-secondary";
+        switch (type) {
+            case 'STUDENT_REFERRAL_REGISTRATION':
+            case 'STUDENT_DIRECT_REGISTRATION':
+                return <ProfileIcon className={iconClass} />;
+            case 'NEW_CORPORATE_SIGNUP':
+                return <UsersIcon className={iconClass} />;
+            case 'EMPLOYEE_TEST_COMPLETED':
+                return <CompletedStepIcon className={iconClass} />;
+            case 'LEVEL_UNLOCKED':
+                return <JobsIcon className={iconClass} />;
+            case 'ASSESSMENT_REPORT_READY':
+                return <CompletedStepIcon className={iconClass} />;
+            default:
+                return <RoadmapIcon className={iconClass} />;
+        }
+    };
+
+
+    const displayNotifications = realNotifications.length > 0 ? realNotifications
+        .filter(n => showHistory || !n.isRead)
+        .map(n => ({
+            id: n.id,
+            icon: getNotificationIcon(n.type),
+            title: n.title || capitalizeWords(n.type.toLowerCase().replace(/_/g, ' ')),
+            message: n.message,
+            time: formatRelativeTime(n.createdAt),
+            isNew: !n.isRead
+        })) : [];
 
     const renderNavItems = (isMobile: boolean) => {
         if (showAssessmentOnly) {
@@ -380,20 +425,44 @@ const Header: React.FC<HeaderProps> = ({
                             className="bg-white border border-gray-200 shadow-sm text-[#150089] hover:bg-gray-50 hover:border-gray-300 dark:bg-black/20 dark:border-white/5 dark:shadow-none dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white w-7 h-7 2xl:w-7 2xl:h-7 rounded-full flex items-center justify-center transition-all relative cursor-pointer"
                         >
                             <NotificationIcon className="w-3.5 h-3.5 2xl:w-3.5 2xl:h-3.5 fill-current" />
-                            {hasNotification && (
-                                <span className="absolute top-[6px] right-[6px] w-1.5 h-1.5 bg-[#1ED36A] rounded-full border border-white dark:border-[#19211C]"></span>
+                            {unreadCount > 0 && (
+                                <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] flex items-center justify-center bg-[#1ED36A] text-white text-[9px] font-bold rounded-full border-2 border-white dark:border-[#19211C] px-0.5">
+                                    {unreadCount > 9 ? '9+' : unreadCount}
+                                </span>
                             )}
                         </button>
                         {isNotificationsOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-brand-dark-secondary rounded-lg shadow-xl py-2 ring-1 ring-black ring-opacity-5 z-50 border border-gray-100 dark:border-brand-dark-tertiary max-h-96 overflow-y-auto">
-                                <div className="px-4 py-2 border-b border-gray-100 dark:border-brand-dark-tertiary flex justify-between items-center">
-                                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Notifications</h3>
-                                    <button className="text-xs text-brand-green hover:underline">Mark all read</button>
+                            <div className="absolute right-0 top-full mt-2 w-80 sm:w-[380px] md:w-[420px] 2xl:w-[460px] bg-white dark:bg-brand-dark-secondary rounded-lg shadow-xl p-0 ring-1 ring-black ring-opacity-5 z-50 border border-gray-100 dark:border-brand-dark-tertiary animate-slide-down overflow-hidden">
+                                <div className="sticky top-0 bg-white dark:bg-brand-dark-secondary z-10 px-4 py-3 border-b border-gray-100 dark:border-brand-dark-tertiary flex justify-between items-center shadow-sm">
+                                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                        {showHistory ? 'Notification History' : 'Notifications'}
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setShowHistory(!showHistory); }}
+                                            title={showHistory ? "Show Unread" : "View History"}
+                                            className={`transition-colors p-1 rounded-md ${showHistory ? 'bg-brand-green/10 text-brand-green' : 'hover:text-brand-green'}`}
+                                        >
+                                            <HistoryIcon className="w-3.5 h-3.5" />
+                                        </button>
+                                    </h3>
+                                    {!showHistory && <button onClick={markAllAsRead} className="text-xs text-brand-green hover:underline">Mark all read</button>}
                                 </div>
-                                <div className="divide-y divide-gray-100 dark:divide-brand-dark-tertiary">
-                                    {notifications.map((n, i) => (
-                                        <NotificationItem key={i} {...n} />
-                                    ))}
+                                <div
+                                    key={showHistory ? 'history' : 'new'}
+                                    className="divide-y divide-gray-100 dark:divide-brand-dark-tertiary max-h-[320px] overflow-y-auto custom-scrollbar animate-slide-in-left"
+                                >
+                                    {displayNotifications.length > 0 ? (
+                                        displayNotifications.map((n, i) => (
+                                            <NotificationItem
+                                                key={i}
+                                                {...n}
+                                                onClick={() => n.isNew && markAsRead(n.id)}
+                                            />
+                                        ))
+                                    ) : (
+                                        <div className="p-8 text-center text-gray-400 text-sm">
+                                            {showHistory ? "No notification history (30 days)" : "No new notifications"}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}

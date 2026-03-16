@@ -116,7 +116,7 @@ const EarningsChart = ({ affiliateId }: { affiliateId?: string }) => {
 
     useEffect(() => {
         if (affiliateId) {
-            api.get(`/affiliates/portal/earnings-chart`, { params: { affiliateId } })
+            api.get(`/affiliates/portal/earnings-chart`, { params: { affiliateId: String(affiliateId) } })
                 .then(res => {
                     if (Array.isArray(res.data)) {
                         setChartData(res.data.map((d: any) => ({
@@ -745,10 +745,10 @@ const AffiliateDashboard: React.FC = () => {
                 const user = JSON.parse(storedUser);
                 setAffiliateUser(user);
 
-                // user.id IS the affiliate_accounts.id (stored by LoginForm)
-                const affId = user.id;
+                // Use affiliateId (AffiliateAccount table ID) for portal-specific stats
+                const affId = user.affiliateId || user.id;
                 if (affId) {
-                    fetchData(affId);
+                    fetchData(String(affId));
                 }
             }
         } catch { /* empty */ }

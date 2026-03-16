@@ -9,6 +9,9 @@ export { AssessmentLevel } from './assessment-level.entity';
 export { Program } from './program.entity';
 export { Groups } from './groups.entity';
 export { PersonalityTrait } from './personality-trait.entity';
+export { Department } from './department.entity';
+export { DepartmentDegree } from './department-degree.entity';
+export { DegreeType } from './degree-type.entity';
 
 // Corporate entities
 export { CorporateAccount } from './corporate-account.entity';
@@ -53,6 +56,9 @@ export { CorporateCounsellingAccess } from './corporate-counselling-access.entit
 
 // Student Subscription
 export { StudentSubscription, SubscriptionPlan, SubscriptionStatus } from './student-subscription.entity';
+
+// Notifications
+export { Notification } from './notification.entity';
 
 // ============================================
 // Usage in services:

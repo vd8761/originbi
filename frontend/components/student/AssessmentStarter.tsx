@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { CheckCircleIcon, StepperUpArrowIcon, StepperDownArrowIcon, StepperPendingDotIcon } from '../icons';
+import { CheckCircleIcon, StepperUpArrowIcon, StepperDownArrowIcon } from '../icons';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { studentService } from '../../lib/services/student.service';
 

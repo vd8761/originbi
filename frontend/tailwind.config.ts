@@ -39,8 +39,23 @@ const config: Config = {
                 "ping-once": "ping 1s cubic-bezier(0, 0, 0.2, 1) forwards",
                 "ripple-once": "ripple-once 1.5s ease-out forwards",
                 "shimmer": "shimmer 2s linear infinite",
+                "slide-in-right": "slide-in-right 0.3s ease-out forwards",
+                "slide-down": "slide-down 0.2s ease-out forwards",
+                "slide-in-left": "slide-in-left 0.3s ease-out forwards",
             },
             keyframes: {
+                "slide-down": {
+                    "0%": { opacity: "0", transform: "translateY(-10px)" },
+                    "100%": { opacity: "1", transform: "translateY(0)" },
+                },
+                "slide-in-left": {
+                    "0%": { opacity: "0", transform: "translateX(-20px)" },
+                    "100%": { opacity: "1", transform: "translateX(0)" },
+                },
+                "slide-in-right": {
+                    "0%": { opacity: "0", transform: "translateX(20px)" },
+                    "100%": { opacity: "1", transform: "translateX(0)" },
+                },
                 "fade-in": {
                     "0%": { opacity: "0.5", transform: "scale(1.05)" },
                     "100%": { opacity: "1", transform: "scale(1)" },

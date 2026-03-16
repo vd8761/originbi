@@ -61,6 +61,10 @@ const BulkUploadRegistration: React.FC<BulkUploadRegistrationProps> = ({ onCance
                             });
                             setView('success');
                         }
+                    } else if (status.status === 'FAILED') {
+                        clearInterval(interval);
+                        setError(status.lastError || "The bulk registration job failed unexpectedly.");
+                        setView('upload');
                     }
                 } catch (e) {
                     console.error("Polling failed", e);
@@ -135,6 +139,7 @@ const BulkUploadRegistration: React.FC<BulkUploadRegistrationProps> = ({ onCance
         setUploadProgress(0);
         setUploadComplete(false);
         setError(null);
+        setIsConfirming(false);
     };
 
     return (

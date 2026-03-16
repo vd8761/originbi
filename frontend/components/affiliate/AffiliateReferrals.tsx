@@ -66,10 +66,10 @@ const AffiliateReferrals: React.FC = () => {
             const storedUser = localStorage.getItem('affiliate_user');
             if (storedUser) {
                 const user = JSON.parse(storedUser);
-                // user.id IS the affiliate_accounts.id (stored by LoginForm)
-                const affId = user.id;
+                // Use affiliateId (AffiliateAccount table ID) for portal-specific stats
+                const affId = user.affiliateId || user.id;
                 if (affId) {
-                    setAffiliateId(affId);
+                    setAffiliateId(String(affId));
                     if (user.referralCode) {
                         setReferralCode(user.referralCode);
                         const baseUrl = process.env.NEXT_PUBLIC_REFERAL_BASE_URL || 'https://discover.originbi.com';

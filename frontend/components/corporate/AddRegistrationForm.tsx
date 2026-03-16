@@ -8,6 +8,8 @@ import CustomDatePicker from '../ui/CustomDatePicker';
 import { corporateRegistrationService } from '../../lib/services/corporateRegistration.service';
 import { registrationService, CreateRegistrationDto } from '../../lib/services/registration.service';
 import { BulkUploadModal } from '../ui/BulkUploadModal';
+import { Department } from "../../lib/types";
+import { useEffect } from "react";
 
 interface AddRegistrationFormProps {
   onCancel: () => void;
@@ -18,6 +20,7 @@ interface AddRegistrationFormProps {
 const CORPORATE_PROGRAMS = [
   { label: "Employee", value: "Employee" },
   { label: "CXO General", value: "CXO General" },
+  { label: "College Students", value: "College Students" },
 ];
 
 const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
@@ -34,7 +37,9 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     program_id: "Employee", // Default
     group_name: "",
     send_email: true, // Default true
-    // Unused but kept for type compatibility if needed, though DTO allows optionals
+    department_id: "",
+    degree_id: "",
+    current_year: "",
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -43,6 +48,24 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [activeField, setActiveField] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [isLoadingDept, setIsLoadingDept] = useState(false);
+
+  // --- Effects ---
+  useEffect(() => {
+    const fetchDepts = async () => {
+      setIsLoadingDept(true);
+      try {
+        const data = await registrationService.getDepartmentDegrees();
+        setDepartments(data);
+      } catch (err) {
+        console.error("Failed to fetch departments", err);
+      } finally {
+        setIsLoadingDept(false);
+      }
+    };
+    fetchDepts();
+  }, []);
 
   // --- Handlers ---
   const handleInputChange = (field: keyof CreateRegistrationDto, value: any) => {
@@ -59,12 +82,13 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
 
   const generatePassword = () => {
     const chars =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+";
-    let password = "";
-    for (let i = 0; i < 12; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
+      "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%^&*";
+    let pwd = "";
+    for (let i = 0; i < 10; i++) {
+      pwd += chars[Math.floor(Math.random() * chars.length)];
     }
-    handleInputChange("password", password);
+    handleInputChange("password", pwd);
+    setShowPassword(true);
   };
 
   const validateForm = () => {
@@ -75,8 +99,23 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     if (!formData.mobile_number.trim()) errors.mobile_number = "Required";
     if (!formData.mobile_number.trim()) errors.mobile_number = "Required";
     if (!formData.program_id) errors.program_id = "Required";
-    if (!formData.password?.trim()) errors.password = "Required";
+    if (!formData.password?.trim()) {
+      errors.password = "Required";
+    } else {
+      const pwd = formData.password;
+      if (pwd.length < 8) errors.password = "Minimum 8 characters";
+      else if (!/[A-Z]/.test(pwd)) errors.password = "Must contain 1 uppercase letter";
+      else if (!/[a-z]/.test(pwd)) errors.password = "Must contain 1 lowercase letter";
+      else if (!/[0-9]/.test(pwd)) errors.password = "Must contain 1 number";
+      else if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pwd))
+        errors.password = "Must contain 1 special character";
+    }
     if (!formData.exam_start) errors.exam_start = "Required";
+
+    if (formData.program_id === "College Students") {
+      if (!formData.department_id) errors.department_id = "Required";
+      if (!formData.current_year) errors.current_year = "Required";
+    }
 
     // Email format validation could be added here
 
@@ -113,6 +152,9 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
         examStart: formData.exam_start,
         examEnd: formData.exam_end,
         password: formData.password,
+        departmentId: formData.department_id,
+        degreeId: formData.degree_id,
+        currentYear: formData.current_year,
       };
 
       await corporateRegistrationService.registerCandidate(payload, userIdStr);
@@ -257,7 +299,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                 phoneNumber={formData.mobile_number}
                 onCountryChange={(code) => handleInputChange("country_code", code)}
                 onPhoneChange={(num) => handleInputChange("mobile_number", num)}
-                label="Mobile Number"
+                label="Mobile Number (without +91)"
                 required
                 error={formErrors.mobile_number}
               />
@@ -325,7 +367,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                 options={CORPORATE_PROGRAMS}
                 value={formData.program_id}
                 onChange={(val) => handleInputChange("program_id", val)}
-                placeholder="Select Program"
+                placeholder="Choose Program Type"
               />
               {formErrors.program_id && (
                 <p className="text-xs text-red-500 ml-1 mt-1">
@@ -333,6 +375,67 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                 </p>
               )}
             </div>
+
+
+
+            {/* College Specific Fields */}
+            {formData.program_id === "College Students" && (
+              <>
+                {/* Department */}
+                <div
+                  className={`relative ${activeField === "dept" ? "z-50" : "z-auto"}`}
+                  onMouseEnter={() => setActiveField("dept")}
+                  onMouseLeave={() => setActiveField(null)}
+                >
+                  <CustomSelect
+                    label="Department"
+                    required
+                    options={departments.map((d) => ({
+                      label: d.department?.name || d.name || "Unknown",
+                      value: d.id,
+                    }))}
+                    value={formData.department_id || ""}
+                    onChange={(val) => {
+                      handleInputChange("department_id", val);
+                      // Set both as the same ID for simplicity in backend mapping
+                      handleInputChange("degree_id", val);
+                    }}
+                    placeholder={isLoadingDept ? "Loading..." : "Select Department"}
+                  />
+                  {formErrors.department_id && (
+                    <p className="text-xs text-red-500 ml-1 mt-1">
+                      {formErrors.department_id}
+                    </p>
+                  )}
+                </div>
+
+                {/* Current Year */}
+                <div className="space-y-2 animate-fade-in relative z-0">
+                  <label className={baseLabelClasses}>
+                    Current Year <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={6}
+                    value={formData.current_year || ""}
+                    onChange={(e) =>
+                      handleInputChange(
+                        "current_year",
+                        e.target.value.replace(/\D/g, "")
+                      )
+                    }
+                    placeholder="Enter Year (1–4)"
+                    className={`${baseInputClasses} ${formErrors.current_year ? "border-red-500/50" : ""}`}
+                  />
+                  {formErrors.current_year && (
+                    <p className="text-xs text-red-500 ml-1 mt-1">
+                      {formErrors.current_year}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* Group Name */}
             <div className="space-y-2 relative z-0">

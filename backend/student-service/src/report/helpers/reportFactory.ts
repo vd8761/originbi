@@ -3,8 +3,7 @@ import { SchoolReport } from '../reports/school/schoolReport';
 import { CollegeReport } from '../reports/college/collegeReport';
 import { EmployeeReport } from '../reports/employee/employeeReport';
 import { CxoReport } from '../reports/cxo/cxoReport';
-import { CollegeData, SchoolData } from '../types/types';
-import { MergedUserData } from './groupReportHelper';
+import { CollegeData, SchoolData, MergedReportData } from '../types/types';
 import { logger } from './logger';
 import { updateReportPassword } from './sqlHelper';
 
@@ -40,7 +39,7 @@ function generateRandomPassword(length: number = 15): string {
  * @returns A Promise that resolves to the PDF user password.
  */
 export async function generateReportForUser(
-  user: MergedUserData,
+  user: MergedReportData,
   filePath: string,
 ): Promise<string> {
   logger.info(

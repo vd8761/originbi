@@ -57,7 +57,6 @@ export const cxoData: CollegeData = {
   ],
   top_answered_types: [],
   program_type: 1,
-  department_deg_id: 16,
   agile_scores: [
     {
       focus: 11,
@@ -119,6 +118,7 @@ export const schoolData: SchoolData = {
   ],
   top_answered_types: [],
   program_type: 1,
+  school_level_id: 2,
   school_stream_id: 1,
   agile_scores: [
     {
