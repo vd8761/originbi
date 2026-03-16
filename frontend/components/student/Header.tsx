@@ -4,7 +4,6 @@ import { useRouter, usePathname } from 'next/navigation';
 import ThemeToggle from '../ui/ThemeToggle';
 import { studentService } from '../../lib/services/student.service';
 import {
-    NotificationWithDotIcon,
     NotificationIcon,
     ChevronDownIcon,
     DashboardIcon,
@@ -17,7 +16,6 @@ import {
     MenuIcon,
     UsersIcon,
     HistoryIcon,
-    CheckCircleIcon,
     CompletedStepIcon,
 } from '../icons';
 
@@ -128,22 +126,7 @@ const NotificationItem: React.FC<{
         )}
     </div>
 );
-
-
-
 import { useLanguage } from '../../contexts/LanguageContext';
-
-// ... existing imports
-
-interface HeaderProps {
-    onLogout: () => void;
-    currentView?: "dashboard" | "assessment" | "roadmaps";
-    onNavigate?: (view: "dashboard" | "assessment") => void;
-    hideNav?: boolean;
-    showAssessmentOnly?: boolean;
-}
-
-// ... NavItem and NotificationItem components ...
 
 const Header: React.FC<HeaderProps> = ({
     onLogout,

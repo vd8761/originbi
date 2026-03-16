@@ -16,9 +16,6 @@ import { Program } from '../entities/program.entity';
 import { AssessmentReport } from '../entities/assessment-report.entity';
 import {
   Registration,
-  Gender,
-  RegistrationStatus,
-  PaymentStatus,
   AffiliateAccount,
   AffiliateReferralTransaction,
   Notification,
@@ -51,4 +48,4 @@ import {
   providers: [StudentService, SubscriptionService, StudentProcessor],
   exports: [StudentService, SubscriptionService],
 })
-export class StudentModule { }
+export class StudentModule {}

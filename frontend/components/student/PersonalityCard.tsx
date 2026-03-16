@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import ReportDownloadButton from './ReportDownloadButton';
 
 const PersonalityCard: React.FC = () => {
     const [trait, setTrait] = useState<{ id: number; name: string; code: string; colorRgb: string } | null>(null);
@@ -17,7 +16,7 @@ const PersonalityCard: React.FC = () => {
                         setIsLoadingUser(false);
                         return true;
                     }
-                    if (user.hasOwnProperty('id')) {
+                    if (Object.prototype.hasOwnProperty.call(user, 'id')) {
                         // User is present but no personality trait yet
                         setIsLoadingUser(false);
                         return true;

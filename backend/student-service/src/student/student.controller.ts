@@ -8,10 +8,10 @@ export class StudentController {
   constructor(
     private readonly studentService: StudentService,
     private readonly boss: PgBossService,
-  ) { }
+  ) {}
 
   @Post('profile')
-  async getProfile(@Body() body: { email: string }) {
+  async getProfile(@Body() body: { email: string }): Promise<any> {
     return this.studentService.getProfile(body.email);
   }
 
@@ -80,7 +80,10 @@ export class StudentController {
 
   @Post('assessment-level-unlocked')
   async levelUnlocked(@Body() body: { userId: number; levelNumber: number }) {
-    await this.studentService.handleLevelUnlocked(body.userId, body.levelNumber);
+    await this.studentService.handleLevelUnlocked(
+      body.userId,
+      body.levelNumber,
+    );
     return { success: true };
   }
 

@@ -302,7 +302,7 @@ export class StudentService {
     };
   }
 
-  async getProfile(email: string) {
+  async getProfile(email: string): Promise<any> {
     const user = await this.userRepo.findOne({
       where: { email: ILike(email) },
     });
@@ -383,7 +383,7 @@ export class StudentService {
         // Leadership score: same formula as CI patterns in the report
         const leadershipScore = Math.min(
           100,
-          Math.round((D * 0.4 + I * 0.3 + norm(Number(s.courage) || 0) * 0.3)),
+          Math.round(D * 0.4 + I * 0.3 + norm(Number(s.courage) || 0) * 0.3),
         );
 
         impactData = {
@@ -810,10 +810,12 @@ export class StudentService {
           let currentReferralCount = 0;
           await this.affiliateRepo.manager.transaction(async (manager) => {
             // Re-fetch with pessimistic write lock to prevent race conditions
-            const lockedAffiliate = await manager.getRepository(AffiliateAccount).findOne({
-              where: { id: affiliate.id },
-              lock: { mode: 'pessimistic_write' },
-            });
+            const lockedAffiliate = await manager
+              .getRepository(AffiliateAccount)
+              .findOne({
+                where: { id: affiliate.id },
+                lock: { mode: 'pessimistic_write' },
+              });
 
             if (lockedAffiliate) {
               const transactionData = {
@@ -830,15 +832,20 @@ export class StudentService {
                 },
               };
 
-              const referralTransaction = manager.getRepository(AffiliateReferralTransaction).create(transactionData);
+              const referralTransaction = manager
+                .getRepository(AffiliateReferralTransaction)
+                .create(transactionData);
               await manager.save(referralTransaction);
 
-              currentReferralCount = (Number(lockedAffiliate.referralCount) || 0) + 1;
+              currentReferralCount =
+                (Number(lockedAffiliate.referralCount) || 0) + 1;
               lockedAffiliate.referralCount = currentReferralCount;
               lockedAffiliate.totalEarnedCommission =
-                (Number(lockedAffiliate.totalEarnedCommission) || 0) + earnedCommission;
+                (Number(lockedAffiliate.totalEarnedCommission) || 0) +
+                earnedCommission;
               lockedAffiliate.totalPendingCommission =
-                (Number(lockedAffiliate.totalPendingCommission) || 0) + earnedCommission;
+                (Number(lockedAffiliate.totalPendingCommission) || 0) +
+                earnedCommission;
 
               await manager.save(lockedAffiliate);
             }
@@ -862,13 +869,19 @@ export class StudentService {
               },
             });
           } catch (err) {
-            this.logger.error(`Failed to notify affiliate of new referral: ${err.message}`);
+            this.logger.error(
+              `Failed to notify affiliate of new referral: ${err.message}`,
+            );
           }
 
           // 2. Milestone Notification Check
           const milestones = [10, 50, 100];
           let isMilestone = milestones.includes(currentReferralCount);
-          if (!isMilestone && currentReferralCount > 100 && currentReferralCount % 100 === 0) {
+          if (
+            !isMilestone &&
+            currentReferralCount > 100 &&
+            currentReferralCount % 100 === 0
+          ) {
             isMilestone = true;
           }
 
@@ -885,7 +898,9 @@ export class StudentService {
                 },
               });
             } catch (err) {
-              this.logger.error(`Failed to notify affiliate of milestone: ${err.message}`);
+              this.logger.error(
+                `Failed to notify affiliate of milestone: ${err.message}`,
+              );
             }
           }
         } else {
@@ -903,18 +918,23 @@ export class StudentService {
 
         await this.sendAdminNotification({
           role: 'ADMIN',
-          type: registeredWithAffiliate ? 'STUDENT_REFERRAL_REGISTRATION' : 'STUDENT_DIRECT_REGISTRATION',
+          type: registeredWithAffiliate
+            ? 'STUDENT_REFERRAL_REGISTRATION'
+            : 'STUDENT_DIRECT_REGISTRATION',
           title: 'New Student registration',
           message: message,
           metadata: {
             studentEmail: dto.email,
             studentName: dto.full_name,
             referralCode: dto.referral_code,
-            affiliateName: registeredWithAffiliate ? affiliateName : undefined
+            affiliateName: registeredWithAffiliate ? affiliateName : undefined,
           },
         });
       } catch (err) {
-        this.logger.error('Failed to send admin notification for registration', err.stack);
+        this.logger.error(
+          'Failed to send admin notification for registration',
+          err.stack,
+        );
       }
 
       // 6. Create Assessment Session with Schedule
@@ -1402,7 +1422,9 @@ export class StudentService {
       });
 
       if (!session) {
-        this.logger.warn(`Skipping process: No completed session found for user ${userId}`);
+        this.logger.warn(
+          `Skipping process: No completed session found for user ${userId}`,
+        );
         return;
       }
 
@@ -1411,13 +1433,17 @@ export class StudentService {
       });
 
       if (!registration) {
-        this.logger.warn(`Skipping process: No registration found for user ${userId} / session ${session.id}`);
+        this.logger.warn(
+          `Skipping process: No registration found for user ${userId} / session ${session.id}`,
+        );
         return;
       }
 
-      const program = await this.sessionRepo.manager.getRepository(Program).findOne({
-        where: { id: session.programId },
-      });
+      const program = await this.sessionRepo.manager
+        .getRepository(Program)
+        .findOne({
+          where: { id: session.programId },
+        });
 
       const user = await this.userRepo.findOne({ where: { id: userId } });
       if (!user) {
@@ -1433,7 +1459,7 @@ export class StudentService {
         if (!corporateNotificationUserId && registration.corporateAccountId) {
           const corpAccount = await this.sessionRepo.manager.query(
             `SELECT user_id FROM corporate_accounts WHERE id = $1`,
-            [registration.corporateAccountId]
+            [registration.corporateAccountId],
           );
           if (corpAccount && corpAccount.length > 0) {
             corporateNotificationUserId = corpAccount[0].user_id;
@@ -1443,10 +1469,15 @@ export class StudentService {
         if (corporateNotificationUserId) {
           try {
             // Check if already notified for this registration using JSONB path query
-            const existingNotif = await this.notificationRepo.createQueryBuilder('n')
-              .where('n.user_id = :userId', { userId: Number(corporateNotificationUserId) })
+            const existingNotif = await this.notificationRepo
+              .createQueryBuilder('n')
+              .where('n.user_id = :userId', {
+                userId: Number(corporateNotificationUserId),
+              })
               .andWhere('n.type = :type', { type: 'EMPLOYEE_TEST_COMPLETED' })
-              .andWhere("n.metadata ->> 'registrationId' = :regId", { regId: registration.id.toString() })
+              .andWhere("n.metadata ->> 'registrationId' = :regId", {
+                regId: registration.id.toString(),
+              })
               .getOne();
 
             if (!existingNotif) {
@@ -1463,9 +1494,13 @@ export class StudentService {
                   registrationId: registration.id,
                 },
               });
-              this.logger.log(`Corporate notification saved for corporate user ${corporateNotificationUserId} (Student: ${userId})`);
+              this.logger.log(
+                `Corporate notification saved for corporate user ${corporateNotificationUserId} (Student: ${userId})`,
+              );
             } else {
-              this.logger.log(`Corporate notification already exists for student ${userId}, skipping duplicate.`);
+              this.logger.log(
+                `Corporate notification already exists for student ${userId}, skipping duplicate.`,
+              );
             }
           } catch (err) {
             this.logger.error(
@@ -1594,7 +1629,8 @@ export class StudentService {
             role: user.role || 'STUDENT',
             type: 'ASSESSMENT_REPORT_READY',
             title: 'Assessment Report Ready',
-            message: 'Your assessment report is ready. Please check it in your email.',
+            message:
+              'Your assessment report is ready. Please check it in your email.',
             metadata: {
               registrationId: registration.id,
             },
@@ -1608,7 +1644,9 @@ export class StudentService {
           );
         }
       } catch (err) {
-        this.logger.error(`Failed to save student notification: ${err.message}`);
+        this.logger.error(
+          `Failed to save student notification: ${err.message}`,
+        );
       }
 
       // 10. Send Email
@@ -1673,7 +1711,6 @@ export class StudentService {
           );
         }
       }
-
     } catch (error) {
       this.logger.error('Failed to send assessment completion email', error);
       throw error; // Re-throw so pg-boss marks the job as failed and retries
@@ -1927,8 +1964,13 @@ export class StudentService {
     }
   }
 
-  async handleLevelUnlocked(userId: number, levelNumber: number): Promise<void> {
-    this.logger.log(`Handling level unlocked notification for user ${userId}, level ${levelNumber}`);
+  async handleLevelUnlocked(
+    userId: number,
+    levelNumber: number,
+  ): Promise<void> {
+    this.logger.log(
+      `Handling level unlocked notification for user ${userId}, level ${levelNumber}`,
+    );
     try {
       const user = await this.userRepo.findOne({ where: { id: userId } });
       const userRole = user?.role || 'STUDENT';
@@ -1950,21 +1992,32 @@ export class StudentService {
           levelNumber,
         },
       });
-      this.logger.log(`Level unlocked notification saved for user ${userId}, level ${levelNumber}`);
+      this.logger.log(
+        `Level unlocked notification saved for user ${userId}, level ${levelNumber}`,
+      );
     } catch (err) {
-      this.logger.error(`Failed to save level unlocked notification: ${err.message}`);
+      this.logger.error(
+        `Failed to save level unlocked notification: ${err.message}`,
+      );
     }
   }
 
   private async sendAdminNotification(data: any) {
-    const adminServiceUrl = this.configService.get('ADMIN_SERVICE_URL') || 'http://localhost:4001';
+    const adminServiceUrl =
+      this.configService.get('ADMIN_SERVICE_URL') || 'http://localhost:4001';
     try {
       await lastValueFrom(
-        this.httpService.post(`${adminServiceUrl}/notifications/internal`, data)
+        this.httpService.post(
+          `${adminServiceUrl}/notifications/internal`,
+          data,
+        ),
       );
       this.logger.log('Admin notification sent successfully');
     } catch (err) {
-      this.logger.error('Failed to send admin notification via internal API', err.message);
+      this.logger.error(
+        'Failed to send admin notification via internal API',
+        err.message,
+      );
     }
   }
 }

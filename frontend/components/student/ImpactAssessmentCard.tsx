@@ -8,11 +8,10 @@ interface ImpactStats {
 
 const Ring: React.FC<{
     value: number;
-    label: string;
     color: string;
     radius: number;
     strokeWidth: number;
-}> = ({ value, label, color, radius, strokeWidth }) => {
+}> = ({ value, color, radius, strokeWidth }) => {
     const circumference = 2 * Math.PI * radius;
     const fillRatio = Math.min(1, Math.max(0, value / 100));
     const dashArray = fillRatio * circumference;
@@ -81,7 +80,7 @@ const ImpactAssessmentCard: React.FC = () => {
                         setIsLoading(false);
                         return true;
                     }
-                    if (user.hasOwnProperty('id')) {
+                    if (Object.prototype.hasOwnProperty.call(user, 'id')) {
                         setIsLoading(false);
                         return true;
                     }
@@ -152,21 +151,18 @@ const ImpactAssessmentCard: React.FC = () => {
                         <svg viewBox="0 0 240 240" className="w-full h-full -rotate-90">
                             <Ring
                                 value={personality}
-                                label="Personality"
                                 color={colors.personality}
                                 radius={112}
                                 strokeWidth={10}
                             />
                             <Ring
                                 value={agility}
-                                label="Agility"
                                 color={colors.agility}
                                 radius={90}
                                 strokeWidth={10}
                             />
                             <Ring
                                 value={leadership}
-                                label="Leadership"
                                 color={colors.leadership}
                                 radius={68}
                                 strokeWidth={10}
