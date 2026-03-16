@@ -200,6 +200,16 @@ export class RagCacheService implements OnModuleInit {
     if (confidence < 0.5) return;
     // Don't cache very short or error answers
     if (answer.length < 20 || /error|couldn't|unable|sorry/i.test(answer.slice(0, 50))) return;
+    // ── CRITICAL: Never cache "no results" answers ──
+    // These are DB-state-dependent: a "no data" answer today could be
+    // wrong tomorrow when the same question has real data. Caching them
+    // would return stale empty answers as hits for semantically similar
+    // future questions (e.g. test Q2-Q10 returning wrong cached "no data").
+    const NO_RESULTS_PATTERN = /no (data|results?|candidates?|users?|records?|matches?|assessments?|information) (found|available|at this time)|not available|no matching|no completed|couldn't find|no (one|user|candidate|employee|affiliate|company|corporate|group|batch|role|assessment) (found|available|registered|completed)/i;
+    if (NO_RESULTS_PATTERN.test(answer.slice(0, 200))) {
+      this.logger.debug(`⏭️ Skipping cache store — answer is a no-results response`);
+      return;
+    }
 
     try {
       const hash = this.hashQuestion(question, userRole);
