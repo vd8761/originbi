@@ -21,7 +21,7 @@ const Dashboard: React.FC = () => {
                         setIsSchool(code.includes('SCHOOL'));
                         return true;
                     }
-                    if (user.hasOwnProperty('id')) return true;
+                    if (Object.prototype.hasOwnProperty.call(user, 'id')) return true;
                 } catch (e) {
                     console.error("Error parsing user from localStorage", e);
                 }

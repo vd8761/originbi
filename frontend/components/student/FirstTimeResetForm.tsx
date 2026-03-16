@@ -2,8 +2,7 @@
 
 import React, { useState, FormEvent, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { updatePassword, signOut } from 'aws-amplify/auth';
-import Link from 'next/link';
+import { updatePassword } from 'aws-amplify/auth';
 import { useRouter } from 'next/navigation';
 import { EyeIcon, EyeOffIcon } from '../icons';
 import Logo from '../ui/Logo';
