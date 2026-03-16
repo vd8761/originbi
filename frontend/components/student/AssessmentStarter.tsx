@@ -557,14 +557,23 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
       // Final Save before moving
       await submitAnswer(currentQuestion, selectedOption, timeSpent, changeCount);
 
-      // Optimistic Update: Switch to next question
-      if (currentNumber < totalQuestions) {
-        setCurrentQIndex((prev) => prev + 1);
-        // setSelectedOption handled by useEffect via 'answers' map or reset
+      const checkAnswers = { ...answers, [String(currentQuestion.assessmentAnswerId)]: selectedOption };
+      const unAnsweredCount = questions.filter(q => !checkAnswers[String(q.assessmentAnswerId)]).length;
+
+      if (unAnsweredCount === 0) {
+        setIsCompleted(true);
+      } else {
+        const nextUnansweredIndex = questions.findIndex((q, idx) => idx > currentQIndex && !checkAnswers[String(q.assessmentAnswerId)]);
+        if (nextUnansweredIndex !== -1) {
+          setCurrentQIndex(nextUnansweredIndex);
+        } else {
+          const firstUnansweredIndex = questions.findIndex((q) => !checkAnswers[String(q.assessmentAnswerId)]);
+          if (firstUnansweredIndex !== -1) {
+            setCurrentQIndex(firstUnansweredIndex);
+          }
+        }
         setChangeCount(0);
         startTimeRef.current = Date.now();
-      } else {
-        setIsCompleted(true);
       }
     } finally {
       setSubmitting(false);
@@ -671,12 +680,14 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
                       <button
                         key={option.id}
                         onClick={() => handleOptionSelect(option.id)}
+                        disabled={submitting}
                         className={`
-                        w-full p-[clamp(10px,1.2vw,18px)] rounded-xl lg:rounded-2xl text-left flex items-center gap-[clamp(10px,1.5vw,24px)] transition-all duration-200 border group relative overflow-hidden cursor-pointer
+                        w-full p-[clamp(10px,1.2vw,18px)] rounded-xl lg:rounded-2xl text-left flex items-center gap-[clamp(10px,1.5vw,24px)] transition-all duration-200 border group relative overflow-hidden
                         ${isSelected
                             ? "bg-[#1ED36A] border-[#1ED36A] shadow-[0_4px_16px_rgba(30,211,106,0.2)]"
-                            : "bg-white dark:bg-[#24272B] border-brand-light-tertiary dark:border-white/5 hover:bg-gray-50 dark:hover:bg-[#2D3136]"
+                            : "bg-white dark:bg-[#24272B] border-brand-light-tertiary dark:border-white/5 " + (!submitting ? "hover:bg-gray-50 dark:hover:bg-[#2D3136]" : "")
                           }
+                        ${submitting ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
                       `}
                       >
                         <div className="flex-shrink-0 z-10">
@@ -733,7 +744,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
                     <span>Processing...</span>
                   </>
                 ) : (
-                  currentNumber === totalQuestions
+                  (questions.length > 0 && questions.filter(q => !(String(q.assessmentAnswerId) === String(currentQuestion?.assessmentAnswerId) ? selectedOption : answers[String(q.assessmentAnswerId)])).length === 0)
                     ? "Finish Assessment"
                     : "Next Question"
                 )}
