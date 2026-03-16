@@ -2,7 +2,6 @@
 
 import React, { useState, FormEvent } from 'react';
 import Link from 'next/link';
-import Logo from '../ui/Logo';
 
 const ForgotPasswordForm: React.FC = () => {
     const [email, setEmail] = useState('');

@@ -20,6 +20,7 @@ import {
 import { CreateCorporateRegistrationDto } from './dto/create-corporate-registration.dto';
 import { getCorporateWelcomeEmailTemplate } from '../mail/templates/corporate-welcome.template';
 import * as nodemailer from 'nodemailer';
+import { NotificationService } from '../notification/notification.service';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as path from 'path'; // Actually removing this if truly unused?
@@ -44,6 +45,7 @@ export class CorporateService {
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
+    private readonly notificationService: NotificationService,
   ) {
     this.authServiceBaseUrl =
       this.configService.get<string>('AUTH_SERVICE_URL') ?? '';
@@ -417,6 +419,24 @@ export class CorporateService {
             reason: 'Manual update by admin during account edit',
           });
           await manager.save(ledger);
+
+          // Notify if credits were added
+          if (diff > 0) {
+            try {
+              await this.notificationService.createNotification({
+                userId: Number(account.userId),
+                role: 'CORPORATE',
+                type: 'CREDITS_ADDED',
+                title: 'Credits Added',
+                message: `${diff} credits have been added to your account.`,
+                metadata: { amount: diff, reason: 'Manual update by admin' },
+              });
+            } catch (err) {
+              this.logger.error(
+                `Failed to send credits added notification: ${err.message}`,
+              );
+            }
+          }
         }
       }
 
@@ -553,6 +573,22 @@ export class CorporateService {
         createdByUserId: undefined, // this.ADMIN_USER_ID,
       });
       await manager.save(ledger);
+
+      // Notify Corporate User
+      try {
+        await this.notificationService.createNotification({
+          userId: Number(account.userId),
+          role: 'CORPORATE',
+          type: 'CREDITS_ADDED',
+          title: 'Credits Added',
+          message: `${delta} credits have been added to your account.`,
+          metadata: { amount: delta, reason: reason || 'Top-up by Admin' },
+        });
+      } catch (err) {
+        this.logger.error(
+          `Failed to send credits added notification: ${err.message}`,
+        );
+      }
 
       return {
         success: true,
@@ -735,6 +771,18 @@ export class CorporateService {
           await manager.save(ledger);
         }
 
+        // D. Counselling Access
+        if (dto.counsellingAccess && Array.isArray(dto.counsellingAccess)) {
+          const accessEntities = dto.counsellingAccess.map((typeId) =>
+            manager.create(CorporateCounsellingAccess, {
+              corporateAccountId: corporateAccount.id,
+              counsellingTypeId: typeId,
+              isEnabled: true,
+            }),
+          );
+          await manager.save(accessEntities);
+        }
+
         // Send Email
         if (dto.sendEmail) {
           try {
@@ -749,18 +797,6 @@ export class CorporateService {
           } catch (e) {
             this.logger.error(`Failed to send email to ${email}`, e);
           }
-        }
-
-        // D. Counselling Access
-        if (dto.counsellingAccess && Array.isArray(dto.counsellingAccess)) {
-          const accessEntities = dto.counsellingAccess.map((typeId) =>
-            manager.create(CorporateCounsellingAccess, {
-              corporateAccountId: corporateAccount.id,
-              counsellingTypeId: typeId,
-              isEnabled: true,
-            }),
-          );
-          await manager.save(accessEntities);
         }
 
         return {

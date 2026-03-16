@@ -382,6 +382,7 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 	if totalCounts > 0 && answeredCounts == totalCounts {
 		var sessionCompleted bool
 		var completedUserID int64
+		var nextLevelNum int
 
 		// Start Transaction (Concurrency Fix)
 		err := db.Transaction(func(tx *gorm.DB) error {
@@ -397,6 +398,9 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 				fmt.Printf("[SubmitAnswer] IDEMPOTENCY HIT: Attempt %d already completed.\n", lockedAttempt.ID)
 				return nil
 			}
+
+			// Capture User ID for notification
+			completedUserID = lockedAttempt.UserID
 
 			// Fetch Level Context First
 			var currentLevel models.AssessmentLevel
@@ -603,6 +607,8 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 						"unlock_at":  unlockAt,
 						"expires_at": expiresAt,
 					})
+
+					nextLevelNum = int(nextLevel.LevelNumber)
 
 					// Generate Questions for Next Level (Trait Based for Level 2)
 					if nextLevel.LevelNumber == 2 && traitID != nil {
@@ -866,25 +872,44 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 			return err
 		}
 
-		if sessionCompleted && completedUserID > 0 {
-			go func(userID int64) {
+		if completedUserID > 0 {
+			go func(userID int64, isSessCompleted bool, nextLevelNum int) {
 				studentServiceURL := os.Getenv("STUDENT_SERVICE_URL")
 				if studentServiceURL == "" {
 					studentServiceURL = "http://localhost:4004"
 				}
-				endpoint := fmt.Sprintf("%s/student/assessment-complete", studentServiceURL)
-				payload := map[string]interface{}{"userId": userID}
-				jsonPayload, _ := json.Marshal(payload)
 
-				fmt.Printf("[SubmitAnswer] Triggering student service for user %d at %s\n", userID, endpoint)
-				resp, err := http.Post(endpoint, "application/json", bytes.NewBuffer(jsonPayload))
-				if err != nil {
-					fmt.Printf("[SubmitAnswer] ERROR HTTP Post to student service: %v\n", err)
-				} else {
-					fmt.Printf("[SubmitAnswer] Triggered student service, status: %s\n", resp.Status)
-					resp.Body.Close()
+				if isSessCompleted {
+					endpoint := fmt.Sprintf("%s/student/assessment-complete", studentServiceURL)
+					payload := map[string]interface{}{"userId": userID}
+					jsonPayload, _ := json.Marshal(payload)
+
+					fmt.Printf("[SubmitAnswer] Triggering student service for user %d at %s\n", userID, endpoint)
+					resp, err := http.Post(endpoint, "application/json", bytes.NewBuffer(jsonPayload))
+					if err != nil {
+						fmt.Printf("[SubmitAnswer] ERROR HTTP Post to student service: %v\n", err)
+					} else {
+						fmt.Printf("[SubmitAnswer] Triggered student service, status: %s\n", resp.Status)
+						resp.Body.Close()
+					}
+				} else if nextLevelNum > 0 {
+					endpoint := fmt.Sprintf("%s/student/assessment-level-unlocked", studentServiceURL)
+					payload := map[string]interface{}{
+						"userId":      userID,
+						"levelNumber": nextLevelNum,
+					}
+					jsonPayload, _ := json.Marshal(payload)
+
+					fmt.Printf("[SubmitAnswer] Triggering level unlock notification for user %d at %s\n", userID, endpoint)
+					resp, err := http.Post(endpoint, "application/json", bytes.NewBuffer(jsonPayload))
+					if err != nil {
+						fmt.Printf("[SubmitAnswer] ERROR HTTP Post to student service: %v\n", err)
+					} else {
+						fmt.Printf("[SubmitAnswer] Triggered level unlock notification, status: %s\n", resp.Status)
+						resp.Body.Close()
+					}
 				}
-			}(completedUserID)
+			}(completedUserID, sessionCompleted, nextLevelNum)
 		}
 	}
 

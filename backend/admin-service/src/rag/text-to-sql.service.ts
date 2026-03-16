@@ -877,12 +877,41 @@ The SQL validator will auto-inject affiliate_account_id filters.`;
       /\btop\b.*\bcomplete.*\band\b/,                                  // "top scorers and completion"
       /\b(then|after that|next|followed by)\b/,                       // sequential requests
     ];
-    // Only flag as complex if 2+ patterns match, or question is very long with conjunctions
+    // Flag as complex when strong signals exist; avoid over-triggering decomposition.
     const matchCount = complexPatterns.filter(p => p.test(q)).length;
-    if (matchCount >= 1) return true;
+    if (matchCount >= 2) return true;
+    if (/(\bcompare\b|\bversus\b|\bdifference\s+between\b|\bbreakdown\b.*\bby\b)/.test(q)) return true;
     // Very long questions with "and" likely need decomposition
     if (q.length > 120 && /\band\b/.test(q)) return true;
     return false;
+  }
+
+  private tryParseSubQuestionArray(raw: string): string[] | null {
+    try {
+      const cleaned = raw
+        .replace(/^```json?\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
+
+      // First, try direct JSON parse.
+      const direct = JSON.parse(cleaned);
+      if (Array.isArray(direct)) {
+        return direct.filter((x) => typeof x === 'string' && x.trim().length > 0);
+      }
+    } catch {
+      // Fall through to extraction attempt.
+    }
+
+    // Recover if model added prose around JSON.
+    const arrayMatch = raw.match(/\[[\s\S]*\]/);
+    if (!arrayMatch) return null;
+    try {
+      const parsed = JSON.parse(arrayMatch[0]);
+      if (!Array.isArray(parsed)) return null;
+      return parsed.filter((x) => typeof x === 'string' && x.trim().length > 0);
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -927,9 +956,7 @@ JSON array:`;
         new HumanMessage(decomposePrompt),
       ]);
 
-      let subQuestionsText = decomposeResp.content.toString().trim();
-      subQuestionsText = subQuestionsText.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
-      const subQuestions: string[] = JSON.parse(subQuestionsText);
+      const subQuestions = this.tryParseSubQuestionArray(decomposeResp.content.toString().trim());
 
       if (!Array.isArray(subQuestions) || subQuestions.length === 0) return null;
       if (subQuestions.length === 1) return null; // Not actually complex
@@ -941,14 +968,52 @@ JSON array:`;
 
       for (const subQ of subQuestions.slice(0, 5)) {
         try {
-          const sql = await this.generateSql(subQ, user, conversationHistory);
-          const validation = this.sqlValidator.validate(sql, user);
+          let sql = await this.generateSql(subQ, user, conversationHistory);
+          let validation = this.sqlValidator.validate(sql, user);
+
           if (!validation.isValid) {
-            subResults.push({ question: subQ, data: [], sql, error: validation.error || 'Validation failed' });
-            continue;
+            const retriedSql = await this.retryWithError(
+              subQ,
+              user,
+              sql,
+              validation.error || 'Validation failed',
+              conversationHistory,
+            );
+            if (!retriedSql) {
+              subResults.push({ question: subQ, data: [], sql, error: validation.error || 'Validation failed' });
+              continue;
+            }
+            sql = retriedSql;
+            validation = this.sqlValidator.validate(sql, user);
+            if (!validation.isValid) {
+              subResults.push({ question: subQ, data: [], sql, error: validation.error || 'Validation failed after retry' });
+              continue;
+            }
           }
-          const rows = await this.dataSource.query(validation.sanitizedSql);
-          subResults.push({ question: subQ, data: rows.slice(0, 30), sql: validation.sanitizedSql });
+
+          try {
+            const rows = await this.dataSource.query(validation.sanitizedSql);
+            subResults.push({ question: subQ, data: rows.slice(0, 30), sql: validation.sanitizedSql });
+          } catch (dbErr) {
+            const retriedSql = await this.retryWithError(
+              subQ,
+              user,
+              validation.sanitizedSql,
+              dbErr?.message || 'Execution failed',
+              conversationHistory,
+            );
+            if (!retriedSql) {
+              subResults.push({ question: subQ, data: [], sql: validation.sanitizedSql, error: dbErr?.message || 'Execution failed' });
+              continue;
+            }
+            const retryValidation = this.sqlValidator.validate(retriedSql, user);
+            if (!retryValidation.isValid) {
+              subResults.push({ question: subQ, data: [], sql: retriedSql, error: retryValidation.error || 'Retry validation failed' });
+              continue;
+            }
+            const retryRows = await this.dataSource.query(retryValidation.sanitizedSql);
+            subResults.push({ question: subQ, data: retryRows.slice(0, 30), sql: retryValidation.sanitizedSql });
+          }
         } catch (subErr) {
           subResults.push({ question: subQ, data: [], sql: '', error: subErr.message });
         }

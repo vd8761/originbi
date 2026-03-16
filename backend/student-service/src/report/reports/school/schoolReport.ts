@@ -127,7 +127,7 @@ export class SchoolReport extends BaseReport {
     // --- Branch: level-specific sections ---
     if (this.data.school_level_id === 1) {
       // SSLC (Class 10)
-      await this.generateSSLCSections();
+      this.generateSSLCSections();
     } else {
       // HSC (Class 11 / 12)
       await this.generateHSCSections();
@@ -427,7 +427,7 @@ export class SchoolReport extends BaseReport {
 
     this.ci_generateCorePersonality();
 
-    // 2. Understanding Yourself - Who I Am 
+    // 2. Understanding Yourself - Who I Am
     this.h2('Understanding Yourself - Who I Am');
     this.pHtml(content.understanding_yourself_1);
     this.pHtml(content.understanding_yourself_2);
@@ -742,7 +742,7 @@ export class SchoolReport extends BaseReport {
         norm(agile?.focus ?? 0) +
         norm(agile?.openness ?? 0) +
         norm(agile?.respect ?? 0)) /
-      5,
+        5,
     );
     const leadershipScore = this.ci_patterns.leadership;
 
@@ -914,7 +914,7 @@ export class SchoolReport extends BaseReport {
     if (p.leadership > 75) {
       this.p(
         '★ ' +
-        (TEXT_VARIATIONS['skill-leadership-high']?.[p.textVariant] ?? ''),
+          (TEXT_VARIATIONS['skill-leadership-high']?.[p.textVariant] ?? ''),
         {
           color: CI_COLORS.STRONG_GREEN,
           gap: 3,
@@ -924,7 +924,7 @@ export class SchoolReport extends BaseReport {
     if (p.collaboration < 50) {
       this.p(
         '△ ' +
-        (TEXT_VARIATIONS['skill-collaboration-low']?.[p.textVariant] ?? ''),
+          (TEXT_VARIATIONS['skill-collaboration-low']?.[p.textVariant] ?? ''),
         {
           color: CI_COLORS.MODERATE_AMBER,
           gap: 3,
@@ -997,7 +997,7 @@ export class SchoolReport extends BaseReport {
   /**
    * Orchestrates and renders SSLC specific sections such as Career Alignment, Flight Path, and Stream Odyssey.
    */
-  private async generateSSLCSections(): Promise<void> {
+  private generateSSLCSections(): void {
     // 1. Career Alignment Index
     this.ci_generateCareerAlignmentIndex();
 
@@ -1021,11 +1021,15 @@ export class SchoolReport extends BaseReport {
     // 6. Future Pathways & Stream Odyssey
     try {
       this.generateStreamSelectionIntro();
-      ['PCMB', 'PCB', 'PCM', 'PCBZ', 'Commerce', 'Humanities'].forEach((streamKey) => {
-        this.generateStreamSelectionContent(streamKey);
-        this.generateStreamOdysseyRoadmap(streamKey);
-      });
-      logger.info('[School REPORT][SSLC] Stream Selection & Odyssey Generated.');
+      ['PCMB', 'PCB', 'PCM', 'PCBZ', 'Commerce', 'Humanities'].forEach(
+        (streamKey) => {
+          this.generateStreamSelectionContent(streamKey);
+          this.generateStreamOdysseyRoadmap(streamKey);
+        },
+      );
+      logger.info(
+        '[School REPORT][SSLC] Stream Selection & Odyssey Generated.',
+      );
     } catch (err) {
       logger.warn('[School REPORT][SSLC] Stream Odyssey skipped.', err);
     }
@@ -1050,7 +1054,9 @@ export class SchoolReport extends BaseReport {
       await this.generateCourseCompatibility();
       logger.info('[School REPORT][HSC] Course Compatibility Generated.');
     } catch {
-      logger.warn('[School REPORT][HSC] Course Compatibility skipped (DB unavailable).');
+      logger.warn(
+        '[School REPORT][HSC] Course Compatibility skipped (DB unavailable).',
+      );
     }
 
     // 5. Your Reach Institutions
@@ -1058,7 +1064,10 @@ export class SchoolReport extends BaseReport {
       await this.generateReachInstitutions();
       logger.info('[School REPORT][HSC] Reach Institutions Generated.');
     } catch (err) {
-      logger.warn('[School REPORT][HSC] Reach Institutions skipped (DB unavailable).', err);
+      logger.warn(
+        '[School REPORT][HSC] Reach Institutions skipped (DB unavailable).',
+        err,
+      );
     }
 
     // 6. Career Flight Path
@@ -1077,7 +1086,7 @@ export class SchoolReport extends BaseReport {
       '5': 'Commerce',
       '6': 'Humanities',
     };
-    let streamKey = streamMap[String(this.data.school_stream_id)];
+    const streamKey = streamMap[String(this.data.school_stream_id)];
 
     // 6.5. Future Pathways
     try {
@@ -1158,21 +1167,21 @@ export class SchoolReport extends BaseReport {
 
     this.h2('It is Not Just About Subjects—It is About Your Identity');
     this.pHtml(
-      'When choosing a stream for the 11th and 12th grades, it is helpful to look beyond the immediate syllabus and ask yourself: What kind of impact do I want to make? <br/>• Do you want to build the technology of tomorrow?<br/>• Are you driven to heal people and advance medical science?<br/>• Do you enjoy the dynamics of business, finance, and leadership?<br/>• Or are you passionate about understanding human behavior, law, and creative expression?'
+      'When choosing a stream for the 11th and 12th grades, it is helpful to look beyond the immediate syllabus and ask yourself: What kind of impact do I want to make? <br/>• Do you want to build the technology of tomorrow?<br/>• Are you driven to heal people and advance medical science?<br/>• Do you enjoy the dynamics of business, finance, and leadership?<br/>• Or are you passionate about understanding human behavior, law, and creative expression?',
     );
     this.pHtml(
-      'Your natural interests and strengths are the best compass you have. When you align your studies with what you genuinely enjoy, building a highly successful career becomes a pursuit of purpose rather than just work.'
+      'Your natural interests and strengths are the best compass you have. When you align your studies with what you genuinely enjoy, building a highly successful career becomes a pursuit of purpose rather than just work.',
     );
 
     this.h2('Understanding Your Stream Options');
     this.pHtml(
-      'To help you navigate this decision, the following section breaks down the complex landscape of college degrees into clear, easy-to-understand career pathways.'
+      'To help you navigate this decision, the following section breaks down the complex landscape of college degrees into clear, easy-to-understand career pathways.',
     );
     this.pHtml(
-      'On the upcoming pages, you will find a dedicated breakdown for each major academic stream. Every page will show you the core focus of that stream and the broad professional fields it unlocks for your future. You do not need to select an exact college degree today; the goal of this section is to help you confidently choose the broad direction you want to walk in.'
+      'On the upcoming pages, you will find a dedicated breakdown for each major academic stream. Every page will show you the core focus of that stream and the broad professional fields it unlocks for your future. You do not need to select an exact college degree today; the goal of this section is to help you confidently choose the broad direction you want to walk in.',
     );
     this.pHtml(
-      'Keep an open mind and use the following breakdowns to explore what your future could look like based on the stream you select.'
+      'Keep an open mind and use the following breakdowns to explore what your future could look like based on the stream you select.',
     );
   }
 
@@ -1204,7 +1213,10 @@ export class SchoolReport extends BaseReport {
     // Icon Rendering
     const iconBaseY = margin;
     const iconBaseX = this.PAGE_WIDTH - margin - 60;
-    const iconName = streamKey === 'Humanities' ? 'humanity.png' : `${streamKey.toLowerCase()}.png`;
+    const iconName =
+      streamKey === 'Humanities'
+        ? 'humanity.png'
+        : `${streamKey.toLowerCase()}.png`;
     const iconPath = `public/assets/images/school/${iconName}`;
 
     if (fs.existsSync(iconPath)) {
@@ -1221,8 +1233,14 @@ export class SchoolReport extends BaseReport {
         .font(this.FONT_SORA_REGULAR)
         .fontSize(8)
         .fillColor('#A0A0A0')
-        .text('Icon Place-', iconBaseX, iconBaseY + 20, { width: 60, align: 'center' });
-      this.doc.text('holder', iconBaseX, iconBaseY + 30, { width: 60, align: 'center' });
+        .text('Icon Place-', iconBaseX, iconBaseY + 20, {
+          width: 60,
+          align: 'center',
+        });
+      this.doc.text('holder', iconBaseX, iconBaseY + 30, {
+        width: 60,
+        align: 'center',
+      });
       this.doc.moveDown(2.5);
     }
 
@@ -1252,7 +1270,7 @@ export class SchoolReport extends BaseReport {
     const cardWidth = (this.PAGE_WIDTH - 2 * margin - 15) / 2; // 15 gap between cols
 
     // Pre-calculate needed heights for each card to normalize row heights
-    const cardHeights = streamData.fields.map(field => {
+    const cardHeights = streamData.fields.map((field) => {
       let h = 15; // top padding
 
       this.doc.font(this.FONT_SORA_BOLD).fontSize(11);
@@ -1263,10 +1281,15 @@ export class SchoolReport extends BaseReport {
       h += this.doc.heightOfString(field.vibe, { width: cardWidth - 30 });
       h += 10; // spacing below vibe
 
-      const degreesList = field.mappedDegrees.split(',').map(d => d.trim().replace(/\.$/, ''));
-      degreesList.forEach(degree => {
+      const degreesList = field.mappedDegrees
+        .split(',')
+        .map((d) => d.trim().replace(/\.$/, ''));
+      degreesList.forEach((degree) => {
         // Bullet point text height, minimum roughly the icon height (6)
-        h += Math.max(12, this.doc.heightOfString(degree, { width: cardWidth - 42 }));
+        h += Math.max(
+          12,
+          this.doc.heightOfString(degree, { width: cardWidth - 42 }),
+        );
         h += 3; // spacing between bullets
       });
 
@@ -1276,7 +1299,7 @@ export class SchoolReport extends BaseReport {
 
     const rowHeights = [
       Math.max(cardHeights[0] || 0, cardHeights[1] || 0),
-      Math.max(cardHeights[2] || 0, cardHeights[3] || 0)
+      Math.max(cardHeights[2] || 0, cardHeights[3] || 0),
     ];
 
     streamData.fields.forEach((field, index) => {
@@ -1306,9 +1329,14 @@ export class SchoolReport extends BaseReport {
       let currentCardY = cardY + 15;
 
       // Small Icon (Top Left)
-      const fieldIconPath = field.icon ? `public/assets/images/school/${field.icon}` : null;
+      const fieldIconPath = field.icon
+        ? `public/assets/images/school/${field.icon}`
+        : null;
       if (fieldIconPath && fs.existsSync(fieldIconPath)) {
-        this.doc.image(fieldIconPath, innerX, currentCardY, { width: 14, height: 14 });
+        this.doc.image(fieldIconPath, innerX, currentCardY, {
+          width: 14,
+          height: 14,
+        });
       } else {
         // Fallback Icon Placeholder
         this.doc
@@ -1341,9 +1369,14 @@ export class SchoolReport extends BaseReport {
       currentCardY = this.doc.y + 10;
 
       // Bulleted list of mapped degrees
-      const degreesList = field.mappedDegrees.split(',').map(d => d.trim().replace(/\.$/, '')); // clean up list
+      const degreesList = field.mappedDegrees
+        .split(',')
+        .map((d) => d.trim().replace(/\.$/, '')); // clean up list
 
-      this.doc.font(this.FONT_SORA_REGULAR).fontSize(9).fillColor(this.COLOR_BLACK);
+      this.doc
+        .font(this.FONT_SORA_REGULAR)
+        .fontSize(9)
+        .fillColor(this.COLOR_BLACK);
 
       degreesList.forEach((degree) => {
         // Draw Checkmark
@@ -1380,7 +1413,9 @@ export class SchoolReport extends BaseReport {
   private generateStreamOdysseyRoadmap(streamKey: string): void {
     const streamOdyssey = STREAM_ODYSSEY_ROADMAP[streamKey];
     if (!streamOdyssey) {
-      logger.warn(`[School REPORT] No stream odyssey data found for: ${streamKey}`);
+      logger.warn(
+        `[School REPORT] No stream odyssey data found for: ${streamKey}`,
+      );
       return;
     }
 
@@ -1400,30 +1435,41 @@ export class SchoolReport extends BaseReport {
     let neededTopPadding = 0;
     let neededBottomPadding = 0;
 
-    streamOdyssey.nodes.forEach((node: { label: string; title: string; subtitle: string }, i: number) => {
-      this.doc.font(this.FONT_SORA_BOLD).fontSize(9);
-      const lH = this.doc.heightOfString(node.label, { width: 90, align: 'center' });
-      this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(8);
-      const tH = this.doc.heightOfString(node.title, { width: 110, align: 'center' });
-      this.doc.font(this.FONT_SORA_REGULAR).fontSize(7);
-      const sH = this.doc.heightOfString(node.subtitle, { width: 110, align: 'center' });
+    streamOdyssey.nodes.forEach(
+      (node: { label: string; title: string; subtitle: string }, i: number) => {
+        this.doc.font(this.FONT_SORA_BOLD).fontSize(9);
+        const lH = this.doc.heightOfString(node.label, {
+          width: 90,
+          align: 'center',
+        });
+        this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(8);
+        const tH = this.doc.heightOfString(node.title, {
+          width: 110,
+          align: 'center',
+        });
+        this.doc.font(this.FONT_SORA_REGULAR).fontSize(7);
+        const sH = this.doc.heightOfString(node.subtitle, {
+          width: 110,
+          align: 'center',
+        });
 
-      // Total extent from node center: circle radius + dashed line + gap + all text heights + spacing
-      const totalExtent = 8 + DASHED_LINE_LENGTH + 2 + lH + 2 + tH + 2 + sH;
-      const textAbove = i % 2 !== 0;
-      const progress = i / (streamOdyssey.nodes.length - 1);
-      const nodeYOff = Math.cos(progress * Math.PI * 2.5) * amplitude;
+        // Total extent from node center: circle radius + dashed line + gap + all text heights + spacing
+        const totalExtent = 8 + DASHED_LINE_LENGTH + 2 + lH + 2 + tH + 2 + sH;
+        const textAbove = i % 2 !== 0;
+        const progress = i / (streamOdyssey.nodes.length - 1);
+        const nodeYOff = Math.cos(progress * Math.PI * 2.5) * amplitude;
 
-      if (textAbove) {
-        // How much padding above the wave peak this node's text needs
-        const needed = totalExtent - (nodeYOff + amplitude);
-        neededTopPadding = Math.max(neededTopPadding, needed + 5);
-      } else {
-        // How much padding below the wave trough this node's text needs
-        const needed = totalExtent - (amplitude - nodeYOff);
-        neededBottomPadding = Math.max(neededBottomPadding, needed + 5);
-      }
-    });
+        if (textAbove) {
+          // How much padding above the wave peak this node's text needs
+          const needed = totalExtent - (nodeYOff + amplitude);
+          neededTopPadding = Math.max(neededTopPadding, needed + 5);
+        } else {
+          // How much padding below the wave trough this node's text needs
+          const needed = totalExtent - (amplitude - nodeYOff);
+          neededBottomPadding = Math.max(neededBottomPadding, needed + 5);
+        }
+      },
+    );
 
     // Use compact defaults as minimum, grow only when wrapped text demands more space
     let graphTopPadding = Math.max(35, neededTopPadding);
@@ -1447,7 +1493,8 @@ export class SchoolReport extends BaseReport {
     const maxGraphY = amplitude;
     const minGraphY = -amplitude;
 
-    const totalGraphHeight = (maxGraphY - minGraphY) + graphTopPadding + graphBottomPadding;
+    const totalGraphHeight =
+      maxGraphY - minGraphY + graphTopPadding + graphBottomPadding;
     const totalNeededSpace = headerNeededSpace + totalGraphHeight;
 
     // Ensure we have enough space for the WHOLE section, or move to next page to prevent
@@ -1508,13 +1555,25 @@ export class SchoolReport extends BaseReport {
 
       // Calculate heights of the text blocks dynamically
       this.doc.font(this.FONT_SORA_BOLD).fontSize(9);
-      const labelHeight = this.doc.heightOfString(node.label, { width: 90, align: 'center' });
+      const labelHeight = this.doc.heightOfString(node.label, {
+        width: 90,
+        align: 'center',
+      });
       this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(8);
-      const titleHeight = this.doc.heightOfString(node.title, { width: 110, align: 'center' });
+      const titleHeight = this.doc.heightOfString(node.title, {
+        width: 110,
+        align: 'center',
+      });
       this.doc.font(this.FONT_SORA_REGULAR).fontSize(7);
-      const subtitleHeight = this.doc.heightOfString(node.subtitle, { width: 110, align: 'center' });
+      const subtitleHeight = this.doc.heightOfString(node.subtitle, {
+        width: 110,
+        align: 'center',
+      });
 
-      let labelY: number, titleY: number, subtitleY: number, dashLineEndY: number;
+      let labelY: number,
+        titleY: number,
+        subtitleY: number,
+        dashLineEndY: number;
 
       if (textAbove) {
         // Fixed dashed line upward from node circle edge
@@ -1591,10 +1650,10 @@ export class SchoolReport extends BaseReport {
   private generateACI(): void {
     const contentBlock =
       ACI[
-      this.getTopTwoTraits(
-        this.data.most_answered_answer_type,
-        this.data,
-      ).join('')
+        this.getTopTwoTraits(
+          this.data.most_answered_answer_type,
+          this.data,
+        ).join('')
       ];
     const agileSum =
       this.data.agile_scores[0].commitment +
@@ -2459,7 +2518,10 @@ export class SchoolReport extends BaseReport {
         width: this.PAGE_WIDTH - 2 * this.MARGIN_STD,
       });
     this.doc.moveDown(0.2);
-    this.p("Students should embrace curiosity and futuristic learning to prepare for roles that don't yet exist", { align: 'center', font: this.FONT_ITALIC, fontSize: 9 });
+    this.p(
+      "Students should embrace curiosity and futuristic learning to prepare for roles that don't yet exist",
+      { align: 'center', font: this.FONT_ITALIC, fontSize: 9 },
+    );
     this.doc.restore();
     this.doc.y = footerY + 20 * this.MM;
   }
@@ -3248,10 +3310,30 @@ export class SchoolReport extends BaseReport {
     const C = this.data.score_C;
 
     const fits = [
-      { label: 'Engineering & Technology', score: Math.round((C + nFocus) / 2), condition: C > 65 && nFocus > 65, color: CI_COLORS.BAR_BLUE },
-      { label: 'Management & Leadership', score: Math.round((D + nCourage) / 2), condition: D > 65 && nCourage > 65, color: CI_COLORS.BAR_TEAL },
-      { label: 'Creative & Design', score: Math.round((I + nOpenness) / 2), condition: I > 65 && nOpenness > 65, color: CI_COLORS.BAR_PURPLE },
-      { label: 'People & HR', score: Math.round((S + nRespect) / 2), condition: S > 65 && nRespect > 65, color: CI_COLORS.ACCENT_GREEN },
+      {
+        label: 'Engineering & Technology',
+        score: Math.round((C + nFocus) / 2),
+        condition: C > 65 && nFocus > 65,
+        color: CI_COLORS.BAR_BLUE,
+      },
+      {
+        label: 'Management & Leadership',
+        score: Math.round((D + nCourage) / 2),
+        condition: D > 65 && nCourage > 65,
+        color: CI_COLORS.BAR_TEAL,
+      },
+      {
+        label: 'Creative & Design',
+        score: Math.round((I + nOpenness) / 2),
+        condition: I > 65 && nOpenness > 65,
+        color: CI_COLORS.BAR_PURPLE,
+      },
+      {
+        label: 'People & HR',
+        score: Math.round((S + nRespect) / 2),
+        condition: S > 65 && nRespect > 65,
+        color: CI_COLORS.ACCENT_GREEN,
+      },
     ];
 
     // --- Sort high → low ---
@@ -3262,15 +3344,14 @@ export class SchoolReport extends BaseReport {
     const barHeight = 14;
     const barRadius = barHeight / 2;
     const rowGap = 8;
-    const pctColW = 34;  // fixed width for the "XX%" label on the right
+    const pctColW = 34; // fixed width for the "XX%" label on the right
     const x = this.MARGIN_STD;
     const totalW = this.PAGE_WIDTH - 2 * this.MARGIN_STD;
 
     // Measure the widest label once so all bars share the same start edge.
     this.doc.font(this.FONT_REGULAR).fontSize(labelFontSize);
-    const labelColW = Math.max(
-      ...fits.map((f) => this.doc.widthOfString(f.label)),
-    ) + 10;  // +10pt breathing room between label and bar
+    const labelColW =
+      Math.max(...fits.map((f) => this.doc.widthOfString(f.label))) + 10; // +10pt breathing room between label and bar
 
     const barX = x + labelColW;
     const barW = totalW - labelColW - pctColW - 4;
@@ -3301,7 +3382,9 @@ export class SchoolReport extends BaseReport {
       if (fillW > 0) {
         this.doc.save();
         this.doc.roundedRect(barX, y, barW, barHeight, barRadius).clip();
-        this.doc.roundedRect(barX, y, fillW, barHeight, barRadius).fill(f.color);
+        this.doc
+          .roundedRect(barX, y, fillW, barHeight, barRadius)
+          .fill(f.color);
         this.doc.restore();
       }
 
@@ -3322,7 +3405,10 @@ export class SchoolReport extends BaseReport {
     // Strong-fit callouts
     fits.forEach((f) => {
       if (f.condition) {
-        this.p(`✓ ${f.label}: Strong Fit`, { color: CI_COLORS.STRONG_GREEN, gap: 2 });
+        this.p(`✓ ${f.label}: Strong Fit`, {
+          color: CI_COLORS.STRONG_GREEN,
+          gap: 2,
+        });
       }
     });
 
@@ -3341,40 +3427,40 @@ export class SchoolReport extends BaseReport {
     });
 
     const styleTitles: Record<string, { title: string; techniques: string[] }> =
-    {
-      structured: {
-        title: 'Structured Learning Approach',
-        techniques: [
-          'Detailed revision timetables with milestone tracking',
-          'Systematic note-taking and concept mapping',
-          'Regular self-assessment against defined benchmarks',
-        ],
-      },
-      collaborative: {
-        title: 'Collaborative Learning Approach',
-        techniques: [
-          'Group discussions and peer-teaching sessions',
-          'Presentation-based learning and debate',
-          'Interactive workshops and case study analysis',
-        ],
-      },
-      'self-paced': {
-        title: 'Self-Paced Learning Approach',
-        techniques: [
-          'Consistent daily study routines with fixed duration',
-          'Repetitive practice with familiar question formats',
-          'Incremental complexity progression over time',
-        ],
-      },
-      competitive: {
-        title: 'Competitive Learning Approach',
-        techniques: [
-          'Mock tests and timed exam simulations',
-          'Leaderboard-based study challenges',
-          'Goal-setting with visible progress metrics',
-        ],
-      },
-    };
+      {
+        structured: {
+          title: 'Structured Learning Approach',
+          techniques: [
+            'Detailed revision timetables with milestone tracking',
+            'Systematic note-taking and concept mapping',
+            'Regular self-assessment against defined benchmarks',
+          ],
+        },
+        collaborative: {
+          title: 'Collaborative Learning Approach',
+          techniques: [
+            'Group discussions and peer-teaching sessions',
+            'Presentation-based learning and debate',
+            'Interactive workshops and case study analysis',
+          ],
+        },
+        'self-paced': {
+          title: 'Self-Paced Learning Approach',
+          techniques: [
+            'Consistent daily study routines with fixed duration',
+            'Repetitive practice with familiar question formats',
+            'Incremental complexity progression over time',
+          ],
+        },
+        competitive: {
+          title: 'Competitive Learning Approach',
+          techniques: [
+            'Mock tests and timed exam simulations',
+            'Leaderboard-based study challenges',
+            'Goal-setting with visible progress metrics',
+          ],
+        },
+      };
 
     const style =
       styleTitles[this.ci_patterns.academicStyle] || styleTitles['structured'];
@@ -4324,9 +4410,9 @@ export class SchoolReport extends BaseReport {
       const labelFontSize = 6.5;
       this.doc.font(this.FONT_SORA_BOLD).fontSize(labelFontSize);
 
-      const charWidths = labelText.split('').map((ch) =>
-        this.doc.widthOfString(ch),
-      );
+      const charWidths = labelText
+        .split('')
+        .map((ch) => this.doc.widthOfString(ch));
       const totalLabelArc = charWidths.reduce((a, b) => a + b, 0);
 
       // Flip text in Q3 + Q4 (lower half of circle, sin > 0).
@@ -4345,8 +4431,8 @@ export class SchoolReport extends BaseReport {
       //                    "%" ends up displaced CCW (leftward in page coords) = reads "55%"
       const arcLabelSpanRad = totalLabelArc / radius;
       let charAnglePos = isFlipped
-        ? endRad                             // CCW from the arc tip
-        : endRad - arcLabelSpanRad;          // CW run ending at the arc tip
+        ? endRad // CCW from the arc tip
+        : endRad - arcLabelSpanRad; // CW run ending at the arc tip
       const angleDir = isFlipped ? -1 : 1;
 
       drawChars.forEach((ch, ci) => {
@@ -4365,9 +4451,12 @@ export class SchoolReport extends BaseReport {
 
         this.doc.save();
         (this.doc as any).transform(
-          Math.cos(rot), Math.sin(rot),
-          -Math.sin(rot), Math.cos(rot),
-          px, py,
+          Math.cos(rot),
+          Math.sin(rot),
+          -Math.sin(rot),
+          Math.cos(rot),
+          px,
+          py,
         );
         this.doc
           .font(this.FONT_SORA_BOLD)
@@ -4383,7 +4472,7 @@ export class SchoolReport extends BaseReport {
     // --- Horizontal legend row below the rings ---
     const legendY = y + ringDiameter + 10;
     const dotR = 4;
-    const itemGap = 32;   // gap between items
+    const itemGap = 32; // gap between items
     const dotTextGap = 6; // gap between dot and text
 
     // Measure total legend width to center it
@@ -4437,14 +4526,29 @@ export class SchoolReport extends BaseReport {
     const traitCode = topTwoTraits[0] + topTwoTraits[1];
     const primaryTrait = topTwoTraits[0];
 
-    const traitParamMap: Record<string, { primary: string; secondary: string }> = {
+    const traitParamMap: Record<
+      string,
+      { primary: string; secondary: string }
+    > = {
       D: { primary: 'Graduation Outcomes (GO)', secondary: 'Perception (PR)' },
-      I: { primary: 'Outreach & Inclusivity (OI)', secondary: 'Perception (PR)' },
-      S: { primary: 'Teaching, Learning & Resources (TLR)', secondary: 'Outreach & Inclusivity (OI)' },
-      C: { primary: 'Research & Professional Practice (RPC)', secondary: 'Teaching, Learning & Resources (TLR)' },
+      I: {
+        primary: 'Outreach & Inclusivity (OI)',
+        secondary: 'Perception (PR)',
+      },
+      S: {
+        primary: 'Teaching, Learning & Resources (TLR)',
+        secondary: 'Outreach & Inclusivity (OI)',
+      },
+      C: {
+        primary: 'Research & Professional Practice (RPC)',
+        secondary: 'Teaching, Learning & Resources (TLR)',
+      },
     };
 
-    const params = traitParamMap[primaryTrait] ?? { primary: 'Overall Score', secondary: 'Rank' };
+    const params = traitParamMap[primaryTrait] ?? {
+      primary: 'Overall Score',
+      secondary: 'Rank',
+    };
 
     const streamNames: Record<number, string> = {
       1: 'PCMB',
@@ -4461,7 +4565,7 @@ export class SchoolReport extends BaseReport {
 
     this.pHtml(
       `Based on your Personality trait, the institutions below have been selected and ranked using <b>${params.primary} </b> as the primary parameter and <b>${params.secondary} </b> as the secondary parameter. ` +
-      `Results are filtered for <b>${streamLabel} </b> and ordered by NIRF national rank after selection.`,
+        `Results are filtered for <b>${streamLabel} </b> and ordered by NIRF national rank after selection.`,
     );
 
     const colleges: UniversityData[] = await getTopCollegesForStudent(
@@ -4470,7 +4574,9 @@ export class SchoolReport extends BaseReport {
     );
 
     if (colleges.length === 0) {
-      this.p('No institution data is currently available for your stream. Please check back later.');
+      this.p(
+        'No institution data is currently available for your stream. Please check back later.',
+      );
       return;
     }
 
@@ -4481,9 +4587,20 @@ export class SchoolReport extends BaseReport {
     colleges: UniversityData[],
     _primaryTrait: string,
   ): void {
-    const headers = ['S.No', 'Institution Name', 'City', 'State', 'NIRF Score', 'NIRF Rank'];
+    const headers = [
+      'S.No',
+      'Institution Name',
+      'City',
+      'State',
+      'NIRF Score',
+      'NIRF Rank',
+    ];
     const tableOptions = {
-      colWidths: ['fit', 'fill', 'fit', 'fit', 'fit', 'fit'] as ('fit' | 'fill' | number)[],
+      colWidths: ['fit', 'fill', 'fit', 'fit', 'fit', 'fit'] as (
+        | 'fit'
+        | 'fill'
+        | number
+      )[],
       fontSize: 8,
       headerFontSize: 8,
       headerColor: '#150089',
@@ -4492,10 +4609,19 @@ export class SchoolReport extends BaseReport {
       borderWidth: 0.5,
       cellPadding: 5,
       mergeSupportedColumn: true,
-      rowAlign: ['center', 'left', 'left', 'left', 'center', 'center'] as TextAlignment[],
+      rowAlign: [
+        'center',
+        'left',
+        'left',
+        'left',
+        'center',
+        'center',
+      ] as TextAlignment[],
     };
 
-    const isSpecificStream = this.data.school_stream_id !== undefined && this.data.school_stream_id !== null;
+    const isSpecificStream =
+      this.data.school_stream_id !== undefined &&
+      this.data.school_stream_id !== null;
     let rows: ((string | number | null | undefined)[] | StyledRow)[];
 
     if (isSpecificStream) {
@@ -4511,7 +4637,7 @@ export class SchoolReport extends BaseReport {
           grouped.set(g, []);
           groupOrder.push(g);
         }
-        grouped.get(g)!.push(c);
+        grouped.get(g).push(c);
       }
 
       const numGroups = groupOrder.length;
@@ -4542,10 +4668,20 @@ export class SchoolReport extends BaseReport {
         };
         rows.push(subheader);
         group.forEach((c, idx) => {
-          rows.push([String(idx + 1), c.name, c.city, c.state, c.score ? String(c.score) : 'N/A', c.rank ? String(c.rank) : 'N/A']);
+          rows.push([
+            String(idx + 1),
+            c.name,
+            c.city,
+            c.state,
+            c.score ? String(c.score) : 'N/A',
+            c.rank ? String(c.rank) : 'N/A',
+          ]);
         });
       }
-    } else if (this.data.school_stream_id === undefined || this.data.school_stream_id === null) {
+    } else if (
+      this.data.school_stream_id === undefined ||
+      this.data.school_stream_id === null
+    ) {
       const streamGroupOrder = [1, 2, 3, 4, 5, 6];
       const streamGroupLabels: Record<number, string> = {
         1: 'PCMB Institutions',
@@ -4557,13 +4693,13 @@ export class SchoolReport extends BaseReport {
       };
       const groupedByStream = new Map<number, UniversityData[]>();
       for (const c of colleges) {
-        let sid = c.school_stream_id;
+        const sid = c.school_stream_id;
         if (sid) {
           if (!groupedByStream.has(sid)) groupedByStream.set(sid, []);
-          groupedByStream.get(sid)!.push(c);
+          groupedByStream.get(sid).push(c);
         }
       }
-      const populatedGroups = streamGroupOrder.filter(sid => {
+      const populatedGroups = streamGroupOrder.filter((sid) => {
         const g = groupedByStream.get(sid);
         return g && g.length > 0;
       });
@@ -4593,7 +4729,14 @@ export class SchoolReport extends BaseReport {
         };
         rows.push(subheader);
         group.forEach((c, idx) => {
-          rows.push([String(idx + 1), c.name, c.city, c.state, c.score ? String(c.score) : 'N/A', c.rank ? String(c.rank) : 'N/A']);
+          rows.push([
+            String(idx + 1),
+            c.name,
+            c.city,
+            c.state,
+            c.score ? String(c.score) : 'N/A',
+            c.rank ? String(c.rank) : 'N/A',
+          ]);
         });
       }
     }
@@ -4607,8 +4750,8 @@ export class SchoolReport extends BaseReport {
   }
 
   /**
-     * Converts "ENGINEERING" → "Engineering"
-     */
+   * Converts "ENGINEERING" → "Engineering"
+   */
   private riTitleCase(str: string): string {
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
   }
@@ -4623,9 +4766,13 @@ export class SchoolReport extends BaseReport {
       this.data,
     );
 
-    const agile: AgileScore =
-      this.data.agile_scores?.[0] ??
-      { focus: 0, courage: 0, respect: 0, openness: 0, commitment: 0 };
+    const agile: AgileScore = this.data.agile_scores?.[0] ?? {
+      focus: 0,
+      courage: 0,
+      respect: 0,
+      openness: 0,
+      commitment: 0,
+    };
 
     const agileKeyMap: Record<string, keyof AgileScore> = {
       Commitment: 'commitment',
@@ -4651,7 +4798,9 @@ export class SchoolReport extends BaseReport {
       group?.entries[0];
 
     if (!entry) {
-      logger.warn('[School REPORT] No DISC-Agile entry found; skipping flight path.');
+      logger.warn(
+        '[School REPORT] No DISC-Agile entry found; skipping flight path.',
+      );
       return;
     }
 
@@ -4660,14 +4809,15 @@ export class SchoolReport extends BaseReport {
 
     this.pHtml(
       `Based on your personality trait and top Agile scrum value your career trajectory has been mapped below. ` +
-      `The gauge shows how your combination accelerates your journey compared to the industry average.`,
+        `The gauge shows how your combination accelerates your journey compared to the industry average.`,
     );
 
     const parsePace = (s: string): [number, number] => {
       const nums = s.match(/\d+/g)?.map(Number) ?? [0];
       return nums.length >= 2 ? [nums[0], nums[1]] : [nums[0], nums[0]];
     };
-    const parseAvg = (s: string): number => parseInt(s.match(/\d+/)?.[0] ?? '12', 10);
+    const parseAvg = (s: string): number =>
+      parseInt(s.match(/\d+/)?.[0] ?? '12', 10);
 
     const [paceStart, paceEnd] = parsePace(entry.predictedPace);
     const industryYear = parseAvg(entry.industryAvg);
@@ -4700,8 +4850,16 @@ export class SchoolReport extends BaseReport {
     this.doc.font(this.FONT_REGULAR).fontSize(7).fillColor('#555555');
     for (const yr of tickNums) {
       const tx = toX(yr);
-      this.doc.moveTo(tx, barY + barH + 2).lineTo(tx, barY + barH + 6).strokeColor('#999999').lineWidth(0.5).stroke();
-      this.doc.text(`${yr}y`, tx - 8, barY + barH + 8, { width: 16, align: 'center' });
+      this.doc
+        .moveTo(tx, barY + barH + 2)
+        .lineTo(tx, barY + barH + 6)
+        .strokeColor('#999999')
+        .lineWidth(0.5)
+        .stroke();
+      this.doc.text(`${yr}y`, tx - 8, barY + barH + 8, {
+        width: 16,
+        align: 'center',
+      });
     }
     this.doc.restore();
 
@@ -4736,33 +4894,95 @@ export class SchoolReport extends BaseReport {
     const markerCY = barY - 2;
     const rocketPath = 'public/assets/images/rocket.png';
     if (fs.existsSync(rocketPath)) {
-      this.doc.image(rocketPath, markerX - 12, markerCY - 22, { width: 24, height: 24 });
+      this.doc.image(rocketPath, markerX - 12, markerCY - 22, {
+        width: 24,
+        height: 24,
+      });
     } else {
-      this.doc.circle(markerX, barY + barH / 2, 7).fillAndStroke('#FFFFFF', '#4DB6AC');
-      this.doc.font(this.FONT_SORA_BOLD).fontSize(5).fillColor('#004D40').text('YOU', markerX - 8, barY + barH / 2 - 3, { width: 16, align: 'center' });
+      this.doc
+        .circle(markerX, barY + barH / 2, 7)
+        .fillAndStroke('#FFFFFF', '#4DB6AC');
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(5)
+        .fillColor('#004D40')
+        .text('YOU', markerX - 8, barY + barH / 2 - 3, {
+          width: 16,
+          align: 'center',
+        });
     }
 
     const calloutBW = 130;
     const calloutBH = 30;
-    const calloutBX = Math.min(Math.max(markerX - calloutBW / 2, barX), barX + barW - calloutBW);
+    const calloutBX = Math.min(
+      Math.max(markerX - calloutBW / 2, barX),
+      barX + barW - calloutBW,
+    );
     const calloutBY = barY + barH + 24;
     const calloutBRadius = 5;
-    this.doc.roundedRect(calloutBX, calloutBY, calloutBW, calloutBH, calloutBRadius).fill('#2B6CB0');
+    this.doc
+      .roundedRect(calloutBX, calloutBY, calloutBW, calloutBH, calloutBRadius)
+      .fill('#2B6CB0');
     const tipX = markerX;
-    this.doc.moveTo(tipX - 5, calloutBY).lineTo(tipX + 5, calloutBY).lineTo(tipX, calloutBY - 6).fill('#2B6CB0');
-    this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(7).fillColor('#FFFFFF').text(`Your Predicted Pace: ${entry.predictedPace}`, calloutBX + 6, calloutBY + 5, { width: calloutBW - 12, align: 'center' });
-    this.doc.font(this.FONT_REGULAR).fontSize(7).fillColor('#DBEAFE').text('Years to Senior Management', calloutBX + 6, calloutBY + 16, { width: calloutBW - 12, align: 'center' });
+    this.doc
+      .moveTo(tipX - 5, calloutBY)
+      .lineTo(tipX + 5, calloutBY)
+      .lineTo(tipX, calloutBY - 6)
+      .fill('#2B6CB0');
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(7)
+      .fillColor('#FFFFFF')
+      .text(
+        `Your Predicted Pace: ${entry.predictedPace}`,
+        calloutBX + 6,
+        calloutBY + 5,
+        { width: calloutBW - 12, align: 'center' },
+      );
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(7)
+      .fillColor('#DBEAFE')
+      .text('Years to Senior Management', calloutBX + 6, calloutBY + 16, {
+        width: calloutBW - 12,
+        align: 'center',
+      });
 
     const industryX = toX(industryYear);
     const calloutTW = 130;
     const calloutTH = 30;
-    const calloutTX = Math.min(Math.max(industryX - calloutTW / 2, barX), barX + barW - calloutTW);
+    const calloutTX = Math.min(
+      Math.max(industryX - calloutTW / 2, barX),
+      barX + barW - calloutTW,
+    );
     const calloutTY = barY - calloutTH - 10;
-    this.doc.roundedRect(calloutTX, calloutTY, calloutTW, calloutTH, calloutBRadius).fill('#E8633A');
+    this.doc
+      .roundedRect(calloutTX, calloutTY, calloutTW, calloutTH, calloutBRadius)
+      .fill('#E8633A');
     const tipTX = industryX;
-    this.doc.moveTo(tipTX - 5, calloutTY + calloutTH).lineTo(tipTX + 5, calloutTY + calloutTH).lineTo(tipTX, calloutTY + calloutTH + 6).fill('#E8633A');
-    this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(7).fillColor('#FFFFFF').text(`Average Industry Pace: ${entry.industryAvg}`, calloutTX + 6, calloutTY + 5, { width: calloutTW - 12, align: 'center' });
-    this.doc.font(this.FONT_REGULAR).fontSize(7).fillColor('#FCE4D6').text('Years to Senior Management', calloutTX + 6, calloutTY + 16, { width: calloutTW - 12, align: 'center' });
+    this.doc
+      .moveTo(tipTX - 5, calloutTY + calloutTH)
+      .lineTo(tipTX + 5, calloutTY + calloutTH)
+      .lineTo(tipTX, calloutTY + calloutTH + 6)
+      .fill('#E8633A');
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(7)
+      .fillColor('#FFFFFF')
+      .text(
+        `Average Industry Pace: ${entry.industryAvg}`,
+        calloutTX + 6,
+        calloutTY + 5,
+        { width: calloutTW - 12, align: 'center' },
+      );
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(7)
+      .fillColor('#FCE4D6')
+      .text('Years to Senior Management', calloutTX + 6, calloutTY + 16, {
+        width: calloutTW - 12,
+        align: 'center',
+      });
 
     this.doc.y = calloutBY + calloutBH + 6;
   }
@@ -4770,9 +4990,10 @@ export class SchoolReport extends BaseReport {
   // --- CAREER ODYSSEY ROADMAP ---
 
   private generateCareerOdysseyRoadmap(): void {
-    this.ensureSpace(.4, true);
+    this.ensureSpace(0.4, true);
     const streamKey = String(this.data.school_stream_id ?? '0');
-    const streamData = CAREER_ODYSSEY_ROADMAP[streamKey] ?? CAREER_ODYSSEY_ROADMAP['0'];
+    const streamData =
+      CAREER_ODYSSEY_ROADMAP[streamKey] ?? CAREER_ODYSSEY_ROADMAP['0'];
 
     this.h1(streamData.streamTitle);
     this.h3(streamData.tagline);
@@ -4801,8 +5022,12 @@ export class SchoolReport extends BaseReport {
     const segW = usableW / (n - 1);
 
     const lerpColor = (t: number): string => {
-      const sr = 0x06, sg = 0xB6, sb = 0xD4;
-      const er = 0x7C, eg = 0x3A, eb = 0xED;
+      const sr = 0x06,
+        sg = 0xb6,
+        sb = 0xd4;
+      const er = 0x7c,
+        eg = 0x3a,
+        eb = 0xed;
       const r = Math.round(sr + (er - sr) * t);
       const g = Math.round(sg + (eg - sg) * t);
       const b = Math.round(sb + (eb - sb) * t);
@@ -4817,7 +5042,7 @@ export class SchoolReport extends BaseReport {
         yPos = midY + waveAmp;
         isAbove = null;
       } else {
-        isAbove = (i % 2 === 1);
+        isAbove = i % 2 === 1;
         yPos = isAbove ? midY - waveAmp : midY + waveAmp;
       }
       pts.push({ x: startX + i * segW, y: yPos, isAbove });
@@ -4830,7 +5055,12 @@ export class SchoolReport extends BaseReport {
       const color = lerpColor(t);
       const cpOff = segW * 0.45;
       this.doc.save();
-      this.doc.moveTo(p0.x, p0.y).bezierCurveTo(p0.x + cpOff, p0.y, p1.x - cpOff, p1.y, p1.x, p1.y).strokeColor(color).lineWidth(3).stroke();
+      this.doc
+        .moveTo(p0.x, p0.y)
+        .bezierCurveTo(p0.x + cpOff, p0.y, p1.x - cpOff, p1.y, p1.x, p1.y)
+        .strokeColor(color)
+        .lineWidth(3)
+        .stroke();
       this.doc.restore();
     }
 
@@ -4848,11 +5078,21 @@ export class SchoolReport extends BaseReport {
 
       const stubEndY = goesUp ? circleCY + circleR : circleCY - circleR;
       this.doc.save();
-      this.doc.moveTo(pt.x, pt.y).lineTo(pt.x, stubEndY).strokeColor(color).lineWidth(1.5).stroke();
+      this.doc
+        .moveTo(pt.x, pt.y)
+        .lineTo(pt.x, stubEndY)
+        .strokeColor(color)
+        .lineWidth(1.5)
+        .stroke();
       this.doc.restore();
 
       this.doc.save();
-      this.doc.circle(pt.x, circleCY, circleR).fillColor('#FFFFFF').strokeColor(color).lineWidth(2).fillAndStroke();
+      this.doc
+        .circle(pt.x, circleCY, circleR)
+        .fillColor('#FFFFFF')
+        .strokeColor(color)
+        .lineWidth(2)
+        .fillAndStroke();
       this.doc.restore();
 
       const labelFontSize = 6;
@@ -4864,13 +5104,23 @@ export class SchoolReport extends BaseReport {
       const labelStartY = circleCY - totalLabelH / 2;
 
       this.doc.save();
-      this.doc.font(this.FONT_SORA_BOLD).fontSize(labelFontSize).fillColor(color);
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(labelFontSize)
+        .fillColor(color);
       labelLines.forEach((line, li) => {
-        this.doc.text(line, pt.x - circleR + 2, labelStartY + li * lineH, { width: (circleR - 2) * 2, align: 'center', lineBreak: false });
+        this.doc.text(line, pt.x - circleR + 2, labelStartY + li * lineH, {
+          width: (circleR - 2) * 2,
+          align: 'center',
+          lineBreak: false,
+        });
       });
       this.doc.restore();
 
-      const textX = Math.max(margin, Math.min(this.PAGE_WIDTH - margin - textW, pt.x - textW / 2));
+      const textX = Math.max(
+        margin,
+        Math.min(this.PAGE_WIDTH - margin - textW, pt.x - textW / 2),
+      );
       const titleFS = 7;
       const subFS = 6;
       const titleText = nodes[i].title || '';
@@ -4879,25 +5129,48 @@ export class SchoolReport extends BaseReport {
 
       if (goesUp) {
         this.doc.font(this.FONT_REGULAR).fontSize(subFS);
-        const subH = this.doc.heightOfString(subText, { width: textW, align: 'center' });
+        const subH = this.doc.heightOfString(subText, {
+          width: textW,
+          align: 'center',
+        });
         this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(titleFS);
-        const titleH = this.doc.heightOfString(titleText, { width: textW, align: 'center' });
+        const titleH = this.doc.heightOfString(titleText, {
+          width: textW,
+          align: 'center',
+        });
         const subTop = circleCY - circleR - 4 - subH;
         const titleTop = subTop - textGap - titleH;
         this.doc.save();
         this.doc.fillColor('#1A1A2E');
-        this.doc.text(titleText, textX, titleTop, { width: textW, align: 'center' });
-        this.doc.font(this.FONT_REGULAR).fontSize(subFS).fillColor('#666666').text(subText, textX, subTop, { width: textW, align: 'center' });
+        this.doc.text(titleText, textX, titleTop, {
+          width: textW,
+          align: 'center',
+        });
+        this.doc
+          .font(this.FONT_REGULAR)
+          .fontSize(subFS)
+          .fillColor('#666666')
+          .text(subText, textX, subTop, { width: textW, align: 'center' });
         this.doc.restore();
       } else {
         this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(titleFS);
-        const titleH = this.doc.heightOfString(titleText, { width: textW, align: 'center' });
+        const titleH = this.doc.heightOfString(titleText, {
+          width: textW,
+          align: 'center',
+        });
         const titleTop = circleCY + circleR + 4;
         const subTop = titleTop + titleH + textGap;
         this.doc.save();
         this.doc.fillColor('#1A1A2E');
-        this.doc.text(titleText, textX, titleTop, { width: textW, align: 'center' });
-        this.doc.font(this.FONT_REGULAR).fontSize(subFS).fillColor('#666666').text(subText, textX, subTop, { width: textW, align: 'center' });
+        this.doc.text(titleText, textX, titleTop, {
+          width: textW,
+          align: 'center',
+        });
+        this.doc
+          .font(this.FONT_REGULAR)
+          .fontSize(subFS)
+          .fillColor('#666666')
+          .text(subText, textX, subTop, { width: textW, align: 'center' });
         this.doc.restore();
       }
     }

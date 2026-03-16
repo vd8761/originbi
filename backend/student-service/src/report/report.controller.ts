@@ -27,7 +27,7 @@ import { CxoReport } from './reports/cxo/cxoReport';
 
 @Controller('report')
 export class ReportController {
-  constructor(private readonly reportQueue: ReportQueueService) { }
+  constructor(private readonly reportQueue: ReportQueueService) {}
 
   // 1. Placement Handbook Route (PDF)
   @Get('generate/placement/:group_id/:department_degree_id')

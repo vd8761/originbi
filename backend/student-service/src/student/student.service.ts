@@ -26,6 +26,7 @@ import {
   PaymentStatus,
   AffiliateAccount,
   AffiliateReferralTransaction,
+  Notification,
 } from '@originbi/shared-entities';
 import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
@@ -70,6 +71,8 @@ export class StudentService {
     private readonly affiliateRepo: Repository<AffiliateAccount>,
     @InjectRepository(AffiliateReferralTransaction)
     private readonly affiliateTransactionRepo: Repository<AffiliateReferralTransaction>,
+    @InjectRepository(Notification)
+    private readonly notificationRepo: Repository<Notification>,
     private readonly configService: ConfigService,
   ) {}
 
@@ -299,7 +302,7 @@ export class StudentService {
     };
   }
 
-  async getProfile(email: string) {
+  async getProfile(email: string): Promise<any> {
     const user = await this.userRepo.findOne({
       where: { email: ILike(email) },
     });
@@ -322,9 +325,84 @@ export class StudentService {
     const traitResult = await this.userRepo.query(traitQuery, [user.id]);
     const trait = traitResult && traitResult.length > 0 ? traitResult[0] : null;
 
+    // Fetch program type from registration
+    const programQuery = `
+      SELECT p.code as program_code, p.id as program_id
+      FROM registrations r
+      JOIN programs p ON r.program_id = p.id
+      WHERE r.user_id = $1 AND r.is_deleted = false
+      ORDER BY r.created_at DESC
+      LIMIT 1
+    `;
+    const programResult = await this.userRepo.query(programQuery, [user.id]);
+    const programCode = programResult?.[0]?.program_code || null;
+
+    // Fetch DISC scores and agile scores for impact assessment
+    let impactData = null;
+    if (programCode) {
+      const scoresQuery = `
+        SELECT 
+          aa_disc.metadata->'disc_scores'->>'D' as score_d,
+          aa_disc.metadata->'disc_scores'->>'I' as score_i,
+          aa_disc.metadata->'disc_scores'->>'S' as score_s,
+          aa_disc.metadata->'disc_scores'->>'C' as score_c,
+          aa_agile.metadata->'agile_scores'->>'Courage' as courage,
+          aa_agile.metadata->'agile_scores'->>'Respect' as respect,
+          aa_agile.metadata->'agile_scores'->>'Focus' as focus,
+          aa_agile.metadata->'agile_scores'->>'Commitment' as commitment,
+          aa_agile.metadata->'agile_scores'->>'Openness' as openness
+        FROM assessment_sessions asess
+        JOIN assessment_attempts aa_disc ON aa_disc.assessment_session_id = asess.id AND aa_disc.assessment_level_id = 1
+        LEFT JOIN assessment_attempts aa_agile ON aa_agile.assessment_session_id = asess.id AND aa_agile.assessment_level_id = 2
+        WHERE asess.user_id = $1 AND asess.status = 'COMPLETED'
+          AND aa_disc.status = 'COMPLETED' 
+          AND aa_disc.metadata->'disc_scores' IS NOT NULL
+        ORDER BY asess.created_at DESC
+        LIMIT 1
+      `;
+      const scoresResult = await this.userRepo.query(scoresQuery, [user.id]);
+
+      if (scoresResult?.[0]) {
+        const s = scoresResult[0];
+        const D = Number(s.score_d) || 0;
+        const I = Number(s.score_i) || 0;
+        const S = Number(s.score_s) || 0;
+        const C = Number(s.score_c) || 0;
+
+        const norm = (v: number) => Math.min(100, Math.round((v / 25) * 100));
+        const courage = norm(Number(s.courage) || 0);
+        const respect = norm(Number(s.respect) || 0);
+        const focus = norm(Number(s.focus) || 0);
+        const commitment = norm(Number(s.commitment) || 0);
+        const openness = norm(Number(s.openness) || 0);
+
+        const personalityAvg = Math.round((D + I + S + C) / 4);
+        const agilityAvg = Math.round(
+          (courage + respect + focus + commitment + openness) / 5,
+        );
+        // Leadership score: same formula as CI patterns in the report
+        const leadershipScore = Math.min(
+          100,
+          Math.round(D * 0.4 + I * 0.3 + norm(Number(s.courage) || 0) * 0.3),
+        );
+
+        impactData = {
+          discScores: { D, I, S, C },
+          agileScores: { courage, respect, focus, commitment, openness },
+          impactStats: {
+            personalityAvg,
+            agilityAvg,
+            leadershipScore,
+          },
+        };
+      }
+    }
+
     return {
       ...user,
       personalityTrait: trait,
+      programCode,
+      ...(impactData || {}),
     };
   }
 
@@ -706,12 +784,17 @@ export class StudentService {
       );
 
       // Handle Affiliate Referral if code is provided
+      let registeredWithAffiliate = false;
+      let affiliateName = '';
+
       if (dto.referral_code) {
         const affiliate = await this.affiliateRepo.findOne({
           where: { referralCode: dto.referral_code, isActive: true },
         });
 
         if (affiliate) {
+          registeredWithAffiliate = true;
+          affiliateName = affiliate.name;
           this.logger.log(
             `Referral code ${dto.referral_code} found for affiliate ${affiliate.id}`,
           );
@@ -724,43 +807,134 @@ export class StudentService {
           const earnedCommission =
             (registrationAmount * commissionPercentage) / 100;
 
-          // Create the referral transaction record
-          const transactionData = {
-            affiliateAccountId: Number(affiliate.id),
-            registrationId: Number(savedReg.id),
-            registrationAmount,
-            commissionPercentage,
-            earnedCommissionAmount: earnedCommission,
-            settlementStatus: 0 as any, // 0 - Not Settled
-            metadata: {
-              studentName: dto.full_name,
-              studentEmail: dto.email,
-              referralCode: dto.referral_code,
-            },
-          };
+          let currentReferralCount = 0;
+          await this.affiliateRepo.manager.transaction(async (manager) => {
+            // Re-fetch with pessimistic write lock to prevent race conditions
+            const lockedAffiliate = await manager
+              .getRepository(AffiliateAccount)
+              .findOne({
+                where: { id: affiliate.id },
+                lock: { mode: 'pessimistic_write' },
+              });
 
-          const referralTransaction =
-            this.affiliateTransactionRepo.create(transactionData);
-          await this.affiliateTransactionRepo.save(referralTransaction);
+            if (lockedAffiliate) {
+              const transactionData = {
+                affiliateAccountId: Number(lockedAffiliate.id),
+                registrationId: Number(savedReg.id),
+                registrationAmount,
+                commissionPercentage,
+                earnedCommissionAmount: earnedCommission,
+                settlementStatus: 0 as any, // 0 - Not Settled
+                metadata: {
+                  studentName: dto.full_name,
+                  studentEmail: dto.email,
+                  referralCode: dto.referral_code,
+                },
+              };
+
+              const referralTransaction = manager
+                .getRepository(AffiliateReferralTransaction)
+                .create(transactionData);
+              await manager.save(referralTransaction);
+
+              currentReferralCount =
+                (Number(lockedAffiliate.referralCount) || 0) + 1;
+              lockedAffiliate.referralCount = currentReferralCount;
+              lockedAffiliate.totalEarnedCommission =
+                (Number(lockedAffiliate.totalEarnedCommission) || 0) +
+                earnedCommission;
+              lockedAffiliate.totalPendingCommission =
+                (Number(lockedAffiliate.totalPendingCommission) || 0) +
+                earnedCommission;
+
+              await manager.save(lockedAffiliate);
+            }
+          });
+
           this.logger.log(
-            `Affiliate referral transaction recorded for registration ${savedReg.id}`,
+            `Affiliate ${affiliate.id} aggregates updated atomically: referralCount=${currentReferralCount}, earned=${earnedCommission}`,
           );
 
-          // Update aggregate fields on AffiliateAccount
-          affiliate.referralCount = (Number(affiliate.referralCount) || 0) + 1;
-          affiliate.totalEarnedCommission =
-            (Number(affiliate.totalEarnedCommission) || 0) + earnedCommission;
-          affiliate.totalPendingCommission =
-            (Number(affiliate.totalPendingCommission) || 0) + earnedCommission;
-          await this.affiliateRepo.save(affiliate);
-          this.logger.log(
-            `Affiliate ${affiliate.id} aggregates updated: referralCount=${affiliate.referralCount}, totalEarned=${affiliate.totalEarnedCommission}, totalPending=${affiliate.totalPendingCommission}`,
-          );
+          // 1. Notify Affiliate of Successful Referral
+          try {
+            await this.notificationRepo.save({
+              userId: Number(affiliate.userId),
+              role: 'AFFILIATE',
+              type: 'AFFILIATE_NEW_REFERRAL',
+              title: 'New Registration',
+              message: `${dto.full_name} is registered using your referral link.`,
+              metadata: {
+                studentName: dto.full_name,
+                referralCode: dto.referral_code,
+              },
+            });
+          } catch (err) {
+            this.logger.error(
+              `Failed to notify affiliate of new referral: ${err.message}`,
+            );
+          }
+
+          // 2. Milestone Notification Check
+          const milestones = [10, 50, 100];
+          let isMilestone = milestones.includes(currentReferralCount);
+          if (
+            !isMilestone &&
+            currentReferralCount > 100 &&
+            currentReferralCount % 100 === 0
+          ) {
+            isMilestone = true;
+          }
+
+          if (isMilestone) {
+            try {
+              await this.notificationRepo.save({
+                userId: Number(affiliate.userId),
+                role: 'AFFILIATE',
+                type: 'AFFILIATE_MILESTONE_REACHED',
+                title: 'Referral Milestone Reached!',
+                message: `Congratulations! You've reached ${currentReferralCount} referrals.`,
+                metadata: {
+                  count: currentReferralCount,
+                },
+              });
+            } catch (err) {
+              this.logger.error(
+                `Failed to notify affiliate of milestone: ${err.message}`,
+              );
+            }
+          }
         } else {
           this.logger.warn(
             `Invalid or inactive referral code provided: ${dto.referral_code}`,
           );
         }
+      }
+
+      // Send Admin Notification
+      try {
+        const message = registeredWithAffiliate
+          ? `${dto.full_name} signed up using ${affiliateName}'s referral link.`
+          : `${dto.full_name} signed up without a referral link.`;
+
+        await this.sendAdminNotification({
+          role: 'ADMIN',
+          type: registeredWithAffiliate
+            ? 'STUDENT_REFERRAL_REGISTRATION'
+            : 'STUDENT_DIRECT_REGISTRATION',
+          title: 'New Student registration',
+          message: message,
+          metadata: {
+            studentEmail: dto.email,
+            studentName: dto.full_name,
+            referralCode: dto.referral_code,
+            affiliateName: registeredWithAffiliate ? affiliateName : undefined,
+          },
+        });
+      } catch (err) {
+        this.logger.error(
+          'Failed to send admin notification for registration',
+          err.stack,
+        );
       }
 
       // 6. Create Assessment Session with Schedule
@@ -1241,24 +1415,101 @@ export class StudentService {
     this.logger.log(`Handling assessment completion for user ${userId}`);
 
     try {
-      // 1. Verify User and Registration
+      // 1. Find the latest completed session for this user to get the correct registration
+      const session = await this.sessionRepo.findOne({
+        where: { userId: userId, status: 'COMPLETED' },
+        order: { updatedAt: 'DESC' },
+      });
+
+      if (!session) {
+        this.logger.warn(
+          `Skipping process: No completed session found for user ${userId}`,
+        );
+        return;
+      }
+
       const registration = await this.registrationRepo.findOne({
-        where: { userId: userId, registrationSource: 'SELF' },
-        relations: ['program'],
+        where: { id: session.registrationId },
       });
 
       if (!registration) {
         this.logger.warn(
-          `Skipping email: No SELF registration found for user ${userId}`,
+          `Skipping process: No registration found for user ${userId} / session ${session.id}`,
         );
         return;
       }
+
+      const program = await this.sessionRepo.manager
+        .getRepository(Program)
+        .findOne({
+          where: { id: session.programId },
+        });
 
       const user = await this.userRepo.findOne({ where: { id: userId } });
       if (!user) {
         this.logger.error(`User not found: ${userId}`);
         return;
       }
+
+      // --- 8. Notify Corporate User (MOVED UP) ---
+      if (registration.registrationSource === 'CORPORATE') {
+        let corporateNotificationUserId = registration.createdByUserId;
+
+        // If createdByUserId is missing, try to resolve from corporateAccountId
+        if (!corporateNotificationUserId && registration.corporateAccountId) {
+          const corpAccount = await this.sessionRepo.manager.query(
+            `SELECT user_id FROM corporate_accounts WHERE id = $1`,
+            [registration.corporateAccountId],
+          );
+          if (corpAccount && corpAccount.length > 0) {
+            corporateNotificationUserId = corpAccount[0].user_id;
+          }
+        }
+
+        if (corporateNotificationUserId) {
+          try {
+            // Check if already notified for this registration using JSONB path query
+            const existingNotif = await this.notificationRepo
+              .createQueryBuilder('n')
+              .where('n.user_id = :userId', {
+                userId: Number(corporateNotificationUserId),
+              })
+              .andWhere('n.type = :type', { type: 'EMPLOYEE_TEST_COMPLETED' })
+              .andWhere("n.metadata ->> 'registrationId' = :regId", {
+                regId: registration.id.toString(),
+              })
+              .getOne();
+
+            if (!existingNotif) {
+              await this.notificationRepo.save({
+                userId: Number(corporateNotificationUserId),
+                role: 'CORPORATE',
+                type: 'EMPLOYEE_TEST_COMPLETED',
+                title: 'Assessment Completed',
+                message: `${registration.fullName || 'An employee'} has successfully completed the ${program?.name || 'Employee'} assessment.`,
+                metadata: {
+                  studentId: userId,
+                  studentName: registration.fullName,
+                  programName: program?.name,
+                  registrationId: registration.id,
+                },
+              });
+              this.logger.log(
+                `Corporate notification saved for corporate user ${corporateNotificationUserId} (Student: ${userId})`,
+              );
+            } else {
+              this.logger.log(
+                `Corporate notification already exists for student ${userId}, skipping duplicate.`,
+              );
+            }
+          } catch (err) {
+            this.logger.error(
+              `Failed to handle corporate notification: ${err.message}`,
+            );
+          }
+        }
+      }
+      // --------------------------------------------
 
       // 2. Trigger Report Generation
       const port = process.env.PORT || 4004;
@@ -1325,14 +1576,7 @@ export class StudentService {
       this.logger.log(`Downloading PDF from: ${downloadUrl}`);
 
       // 5. Fetch Report Entity for Password
-      const session = await this.sessionRepo.findOne({
-        where: { userId: userId, registrationId: registration.id },
-        order: { createdAt: 'DESC' },
-      });
-
-      if (!session) {
-        throw new Error('No assessment session found');
-      }
+      // session is already fetched at the beginning of this function
 
       let password = '';
       // Quick retry for password persistence (in case report service updates DB slightly after file gen)
@@ -1368,7 +1612,44 @@ export class StudentService {
         }
       }
 
-      // 7. Send Email
+      // 9. Save in-app notification first (do not block on email delivery)
+      try {
+        const existingNotif = await this.notificationRepo
+          .createQueryBuilder('n')
+          .where('n.user_id = :userId', { userId: Number(userId) })
+          .andWhere('n.type = :type', { type: 'ASSESSMENT_REPORT_READY' })
+          .andWhere("n.metadata ->> 'registrationId' = :regId", {
+            regId: registration.id.toString(),
+          })
+          .getOne();
+
+        if (!existingNotif) {
+          await this.notificationRepo.save({
+            userId: Number(userId),
+            role: user.role || 'STUDENT',
+            type: 'ASSESSMENT_REPORT_READY',
+            title: 'Assessment Report Ready',
+            message:
+              'Your assessment report is ready. Please check it in your email.',
+            metadata: {
+              registrationId: registration.id,
+            },
+          });
+          this.logger.log(
+            `Student notification saved for user ${userId} (Assessment Report Ready)`,
+          );
+        } else {
+          this.logger.log(
+            `Assessment report-ready notification already exists for user ${userId}, skipping duplicate.`,
+          );
+        }
+      } catch (err) {
+        this.logger.error(
+          `Failed to save student notification: ${err.message}`,
+        );
+      }
+
+      // 10. Send Email
       const dateStr = new Date().toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
@@ -1390,27 +1671,30 @@ export class StudentService {
           'Self Discovery Report',
       );
 
-      // --- Transporter Setup ---
-      const transporter = this.createEmailTransporter();
-      // -------------------------
+      try {
+        const transporter = this.createEmailTransporter();
+        const mailOptions = {
+          from: `"${process.env.EMAIL_SEND_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
+          to: user.email,
+          cc: [process.env.EMAIL_CC],
+          subject: `Your Assessment Report is Ready - ${((registration as any).program?.reportTitle as string) || 'Origin BI'}`,
+          html: emailHtml,
+          attachments: [
+            {
+              filename: attachmentFileName,
+              content: pdfBuffer,
+              contentType: 'application/pdf',
+            },
+          ],
+        };
 
-      const mailOptions = {
-        from: `"${process.env.EMAIL_SEND_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
-        to: user.email,
-        cc: [process.env.EMAIL_CC],
-        subject: `Your Assessment Report is Ready - ${((registration as any).program?.reportTitle as string) || 'Origin BI'}`,
-        html: emailHtml,
-        attachments: [
-          {
-            filename: attachmentFileName,
-            content: pdfBuffer,
-            contentType: 'application/pdf',
-          },
-        ],
-      };
-
-      await transporter.sendMail(mailOptions);
-      this.logger.log(`Assessment completion email sent to ${user.email}`);
+        await transporter.sendMail(mailOptions);
+        this.logger.log(`Assessment completion email sent to ${user.email}`);
+      } catch (err) {
+        this.logger.error(
+          `Failed to send assessment completion email to ${user.email}: ${err.message}`,
+        );
+      }
 
       // Update assessment_reports to track the sent email
       if (session) {
@@ -1677,6 +1961,63 @@ export class StudentService {
     } catch (error) {
       this.logger.error('Failed to send placement report email', error);
       throw error;
+    }
+  }
+
+  async handleLevelUnlocked(
+    userId: number,
+    levelNumber: number,
+  ): Promise<void> {
+    this.logger.log(
+      `Handling level unlocked notification for user ${userId}, level ${levelNumber}`,
+    );
+    try {
+      const user = await this.userRepo.findOne({ where: { id: userId } });
+      const userRole = user?.role || 'STUDENT';
+
+      const levelNames: Record<number, string> = {
+        1: 'DISC Behavioral Insight',
+        2: 'ACI Agile Compatibility Index',
+      };
+
+      const assessmentName = levelNames[levelNumber] || `Level ${levelNumber}`;
+
+      await this.notificationRepo.save({
+        userId: Number(userId),
+        role: userRole,
+        type: 'LEVEL_UNLOCKED',
+        title: `Level ${levelNumber} Unlocked`,
+        message: `Level ${levelNumber} : ${assessmentName} Assessment is now Unlocked`,
+        metadata: {
+          levelNumber,
+        },
+      });
+      this.logger.log(
+        `Level unlocked notification saved for user ${userId}, level ${levelNumber}`,
+      );
+    } catch (err) {
+      this.logger.error(
+        `Failed to save level unlocked notification: ${err.message}`,
+      );
+    }
+  }
+
+  private async sendAdminNotification(data: any) {
+    const adminServiceUrl =
+      this.configService.get('ADMIN_SERVICE_URL') || 'http://localhost:4001';
+    try {
+      await lastValueFrom(
+        this.httpService.post(
+          `${adminServiceUrl}/notifications/internal`,
+          data,
+        ),
+      );
+      this.logger.log('Admin notification sent successfully');
+    } catch (err) {
+      this.logger.error(
+        'Failed to send admin notification via internal API',
+        err.message,
+      );
     }
   }
 }
