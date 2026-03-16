@@ -6,7 +6,7 @@ interface TechSkill {
   end: number; // e.g., 35 for 2035
 }
 
-export const SCHOOL_TOC_CONTENT = [
+export const SSLC_TOC_CONTENT = [
   'About the Origin BI Self-Discovery Report',
   'Benefits of Understanding Your Ideal Learning and Growth Paths',
   'General Characteristics for $full_name',
@@ -14,10 +14,35 @@ export const SCHOOL_TOC_CONTENT = [
   'Motivations and Needs - Insights Personalized for You',
   'Agile Compatibility Index (ACI)',
   'Your Personalized Behavioral Charts',
+  'Future Industry Glimpse (2035)',
   'Career Popularity',
   'Tech Areas That Will Matter in 2030 - 2035',
-  'Future Industry Glimpse (2035)',
+  'Behavioral Capability Profile',
   'Mapping Your Strengths to Future Academic and Career Goals',
+  'Career Alignment Index',
+  'Career Flight Path',
+  'Future Pathways: Stream Selection',
+  'Disclaimer',
+];
+
+export const HSC_TOC_CONTENT = [
+  'About the Origin BI Self-Discovery Report',
+  'Benefits of Understanding Your Ideal Learning and Growth Paths',
+  'General Characteristics for $full_name',
+  'YOUR STRENGTHS - What You Bring to Your Learning Journey',
+  'Motivations and Needs - Insights Personalized for You',
+  'Agile Compatibility Index (ACI)',
+  'Your Personalized Behavioral Charts',
+  'Future Industry Glimpse (2035)',
+  'Career Popularity',
+  'Tech Areas That Will Matter in 2030 - 2035',
+  'Behavioral Capability Profile',
+  'Mapping Your Strengths to Future Academic and Career Goals',
+  'Career Alignment Index',
+  'Future Pathways: Your Stream',
+  'Course Compatibility Matrix',
+  'Your Reach Institutions - Top Colleges for You',
+  'Career Flight Path',
   'Disclaimer',
 ];
 
@@ -2157,6 +2182,16 @@ export const TEXT_VARIATIONS: Record<string, string[]> = {
     'Your agile competencies are balanced, showing well-rounded readiness for professional environments.',
     'You maintain consistent performance across all behavioural agility dimensions.',
     'Your even distribution of agile capabilities supports adaptable career growth.',
+  ],
+  'agile-cautious-respect': [
+    'You are highly considerate of team harmony, though expressing your own ideas more boldly will increase your impact.',
+    'Your respectful approach builds deep trust. Balancing this with assertive risk-taking can accelerate your growth.',
+    'You excel at maintaining stability and consensus. Stepping out of your comfort zone will expand your influence.',
+  ],
+  'agile-steady-execution': [
+    'You show high commitment to tasks, though embracing new approaches could unlock greater efficiency.',
+    'You consistently deliver on your promises. Being open to innovative methods can further elevate your work.',
+    'Your reliability is a core strength. Blending this with creative problem-solving will make you more adaptable.',
   ],
   'stress-assertive': [
     'Under pressure, your communication may become more direct and results-focused.',

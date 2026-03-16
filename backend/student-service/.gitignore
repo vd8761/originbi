@@ -19,3 +19,4 @@ sql_logs.txt
 eslint*.txt
 eslint*.json
 server_crash_log.txt
+lint_output.txt
