@@ -60,13 +60,11 @@ export const getStudentWelcomeEmailTemplate = (
     }
 
     /* Gmail Specific Overrides */
-    [data-ogsc] table[background],
-    u + .body table[background] {
+    [data-ogsc] table[background] {
       background-image: none !important;
       background-color: #1e1e1e !important;
     }
-    [data-ogsc] h1, [data-ogsc] div, [data-ogsc] td, 
-    u + .body h1, u + .body div, u + .body td {
+    [data-ogsc] h1, [data-ogsc] div, [data-ogsc] td {
       color: #ffffff !important;
     }
   </style>
@@ -124,27 +122,26 @@ export const getStudentWelcomeEmailTemplate = (
                   </tr>
                   <tr>
                     <td style="font-size: 14px; color: #707070; padding: 5px 0;">Start Date and Time</td>
-                    <td style="font-size: 14px; color: #000000; padding: 5px 0;">${
-                      startDateTime
-                        ? new Date(startDateTime).toLocaleString('en-GB', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            timeZone: 'Asia/Kolkata',
-                            hour12: true,
-                          })
-                        : new Date().toLocaleString('en-GB', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            timeZone: 'Asia/Kolkata',
-                            hour12: true,
-                          })
-                    }</td>
+                    <td style="font-size: 14px; color: #000000; padding: 5px 0;">${startDateTime
+    ? new Date(startDateTime).toLocaleString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Kolkata',
+      hour12: true,
+    })
+    : new Date().toLocaleString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Kolkata',
+      hour12: true,
+    })
+  }</td>
                   </tr>
                   <tr>
                     <td style="font-size: 14px; color: #707070; padding: 5px 0;">Username</td>

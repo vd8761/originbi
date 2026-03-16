@@ -69,19 +69,16 @@ export const getWelcomeEmailTemplate = (
     
     /* Specific Gmail/Outlook Dark Mode Fixes */
     [data-ogsc] .email-card,
-    [data-ogsb] .email-card,
-    u + .body .email-card {
+    [data-ogsb] .email-card {
       background-color: #1e1e1e !important; 
       background-image: none !important;
     }
 
-    [data-ogsc] .text-dark, [data-ogsc] h1,
-    u + .body .text-dark, u + .body h1 {
+    [data-ogsc] .text-dark, [data-ogsc] h1 {
       color: #ffffff !important;
     }
 
-    [data-ogsc] .text-muted,
-    u + .body .text-muted {
+    [data-ogsc] .text-muted {
       color: #aaaaaa !important;
     }
   </style>

@@ -59,16 +59,13 @@ export const getRegistrationSuccessEmailTemplate = (
   }
 
   /* Gmail Specific Overrides */
-  [data-ogsc] .content-area,
-  u + .body .content-area {
+  [data-ogsc] .content-area {
     color: #ffffff !important;
   }
-  [data-ogsc] td[style*="background-image"],
-  u + .body td[style*="background-image"] {
+  [data-ogsc] td[style*="background-image"] {
     background-image: none !important;
   }
-  [data-ogsc] table[bgcolor="#ffffff"],
-  u + .body table[bgcolor="#ffffff"] {
+  [data-ogsc] table[bgcolor="#ffffff"] {
     background-color: #1e1e1e !important;
   }
 </style>

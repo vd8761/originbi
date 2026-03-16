@@ -43,16 +43,13 @@ export const getPaymentSuccessEmailTemplate = (
   }
 
   /* Gmail Specific Overrides */
-  [data-ogsc] td[style*="background-image"],
-  u + .body td[style*="background-image"] {
+  [data-ogsc] td[style*="background-image"] {
     background-image: none !important;
   }
-  [data-ogsc] table[bgcolor="#ffffff"],
-  u + .body table[bgcolor="#ffffff"] {
+  [data-ogsc] table[bgcolor="#ffffff"] {
     background-color: #1e1e1e !important;
   }
-  [data-ogsc] h1, [data-ogsc] p, [data-ogsc] td,
-  u + .body h1, u + .body p, u + .body td {
+  [data-ogsc] h1, [data-ogsc] p, [data-ogsc] td {
     color: #ffffff !important;
   }
 </style>

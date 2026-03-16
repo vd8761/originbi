@@ -63,14 +63,11 @@ export const getCorporateWelcomeEmailTemplate = (
 
   /* Gmail Specific Overrides */
   [data-ogsc] td[style*="background-image"],
-  [data-ogsc] .content-area,
-  u + .body td[style*="background-image"],
-  u + .body .content-area {
+  [data-ogsc] .content-area {
     background-image: none !important;
     color: #ffffff !important;
   }
-  [data-ogsc] table[bgcolor="#ffffff"],
-  u + .body table[bgcolor="#ffffff"] {
+  [data-ogsc] table[bgcolor="#ffffff"] {
     background-color: #1e1e1e !important;
   }
 </style>
