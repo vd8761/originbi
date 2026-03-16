@@ -1205,7 +1205,7 @@ export const WORD_SKETCH_DATA: Record<string, any> = {
 
 export interface DiscAgileEntry {
   agileValue: string;
-  industryAvg: string;   // e.g. "12 Years"
+  industryAvg: string; // e.g. "12 Years"
   predictedPace: string; // e.g. "6-8 Years"
   challengeTitle: string;
   challengeDesc: string;
@@ -1258,8 +1258,7 @@ export const DISC_AGILE_CAREER_PACE: Record<string, DiscAgileGroup> = {
         industryAvg: '11 Years',
         predictedPace: '6-9 Years',
         challengeTitle: 'Inconsistency',
-        challengeDesc:
-          'You may chase "new" ideas before finishing old ones.',
+        challengeDesc: 'You may chase "new" ideas before finishing old ones.',
         motivation:
           'Your adaptability is your edge. Mastering the "Finish" will make you a strategic powerhouse.',
       },
@@ -1268,8 +1267,7 @@ export const DISC_AGILE_CAREER_PACE: Record<string, DiscAgileGroup> = {
         industryAvg: '12 Years',
         predictedPace: '8-10 Years',
         challengeTitle: 'Internal Friction',
-        challengeDesc:
-          'Balancing power with empathy can cause "indecision".',
+        challengeDesc: 'Balancing power with empathy can cause "indecision".',
         motivation:
           'You are a "tough but fair" leader. Direct talk will clear your path to the top.',
       },
@@ -1285,8 +1283,7 @@ export const DISC_AGILE_CAREER_PACE: Record<string, DiscAgileGroup> = {
         industryAvg: '10 Years',
         predictedPace: '7-9 Years',
         challengeTitle: 'Over-Promising',
-        challengeDesc:
-          'Saying "Yes" to everyone can lead to missed deadlines.',
+        challengeDesc: 'Saying "Yes" to everyone can lead to missed deadlines.',
         motivation:
           'People trust you. Selective "Yeses" will turn your reputation into pure gold.',
       },
@@ -1295,8 +1292,7 @@ export const DISC_AGILE_CAREER_PACE: Record<string, DiscAgileGroup> = {
         industryAvg: '11 Years',
         predictedPace: '6-8 Years',
         challengeTitle: 'Attention-Seeking',
-        challengeDesc:
-          'Speaking up just to be heard rather than to add value.',
+        challengeDesc: 'Speaking up just to be heard rather than to add value.',
         motivation:
           'You are the voice of the project. Waiting for the "right" moment makes your words 10x stronger.',
       },
@@ -1305,8 +1301,7 @@ export const DISC_AGILE_CAREER_PACE: Record<string, DiscAgileGroup> = {
         industryAvg: '11 Years',
         predictedPace: '8-10 Years',
         challengeTitle: 'Distraction',
-        challengeDesc:
-          'Love for talk can eat up your "Deep Work" time.',
+        challengeDesc: 'Love for talk can eat up your "Deep Work" time.',
         motivation:
           'You make data human. Protecting your "Focus Hours" ensures you have the results to back up stories.',
       },
@@ -1315,8 +1310,7 @@ export const DISC_AGILE_CAREER_PACE: Record<string, DiscAgileGroup> = {
         industryAvg: '10 Years',
         predictedPace: '5-7 Years',
         challengeTitle: 'Disorganization',
-        challengeDesc:
-          'A dislike for "Rules" can lead to messy execution.',
+        challengeDesc: 'A dislike for "Rules" can lead to messy execution.',
         motivation:
           'You see the future first. Simple checklists ensure your big ideas actually get built.',
       },
@@ -1325,8 +1319,7 @@ export const DISC_AGILE_CAREER_PACE: Record<string, DiscAgileGroup> = {
         industryAvg: '11 Years',
         predictedPace: '9-11 Years',
         challengeTitle: 'Conflict Avoidance',
-        challengeDesc:
-          'Letting people slide just to keep the peace.',
+        challengeDesc: 'Letting people slide just to keep the peace.',
         motivation:
           'You build great teams. "Kind Candor" (honesty with care) will make you a world-class mentor.',
       },
@@ -1342,8 +1335,7 @@ export const DISC_AGILE_CAREER_PACE: Record<string, DiscAgileGroup> = {
         industryAvg: '14 Years',
         predictedPace: '10-12 Years',
         challengeTitle: 'Static Growth',
-        challengeDesc:
-          'Staying in a "safe" role too long out of loyalty.',
+        challengeDesc: 'Staying in a "safe" role too long out of loyalty.',
         motivation:
           'You are the company\'s heart. Embracing "Change" will allow you to scale your impact.',
       },
@@ -1382,8 +1374,7 @@ export const DISC_AGILE_CAREER_PACE: Record<string, DiscAgileGroup> = {
         industryAvg: '15 Years',
         predictedPace: '11-13 Years',
         challengeTitle: 'People-Pleasing',
-        challengeDesc:
-          'Prioritizing "Being Liked" over "Being Effective".',
+        challengeDesc: 'Prioritizing "Being Liked" over "Being Effective".',
         motivation:
           'You create safe spaces. Setting boundaries earns more respect than just being "nice".',
       },
@@ -1419,8 +1410,7 @@ export const DISC_AGILE_CAREER_PACE: Record<string, DiscAgileGroup> = {
         industryAvg: '12 Years',
         predictedPace: '6-8 Years',
         challengeTitle: 'Logic Gap',
-        challengeDesc:
-          'Speaking in data that others might not understand.',
+        challengeDesc: 'Speaking in data that others might not understand.',
         motivation:
           'You see what others miss. Using "Stories" instead of "Stats" helps people follow your plans.',
       },
@@ -1429,8 +1419,7 @@ export const DISC_AGILE_CAREER_PACE: Record<string, DiscAgileGroup> = {
         industryAvg: '13 Years',
         predictedPace: '7-9 Years',
         challengeTitle: 'Over-Analysis',
-        challengeDesc:
-          'Researching so much that you never pick a tool to use.',
+        challengeDesc: 'Researching so much that you never pick a tool to use.',
         motivation:
           'You bridge logic and creativity. "Decision Deadlines" turn your research into results.',
       },
@@ -1554,7 +1543,8 @@ export const CAREER_ODYSSEY_ROADMAP: Record<string, CareerOdysseyStream> = {
       {
         label: 'Start',
         title: 'Class 12 Graduate',
-        subtitle: 'Humanities stream with strengths in language, arts & society',
+        subtitle:
+          'Humanities stream with strengths in language, arts & society',
       },
       {
         label: 'Year 1–3',
@@ -1629,13 +1619,13 @@ export const CAREER_ODYSSEY_ROADMAP: Record<string, CareerOdysseyStream> = {
 
 export const CI_COLORS = {
   // Brand primaries
-  INDIGO: '#2c2a7d',       // base indigo - high values
-  INDIGO_MID: '#4e4ba6',   // medium shade
+  INDIGO: '#2c2a7d', // base indigo - high values
+  INDIGO_MID: '#4e4ba6', // medium shade
   INDIGO_LIGHT: '#9896cc', // light shade - low values / tracks
-  INDIGO_PALE: '#e8e7f5',  // very light - backgrounds / row stripes
-  GREEN: '#4cb966',        // base green - secondary / accent
-  GREEN_DARK: '#2d8a45',   // darker green
-  GREEN_LIGHT: '#a8e0b3',  // light green tint
+  INDIGO_PALE: '#e8e7f5', // very light - backgrounds / row stripes
+  GREEN: '#4cb966', // base green - secondary / accent
+  GREEN_DARK: '#2d8a45', // darker green
+  GREEN_LIGHT: '#a8e0b3', // light green tint
   // Neutrals
   LIGHT_GRAY: '#F5F5F5',
   DARK_TEXT: '#1A1A1A',
@@ -1645,15 +1635,15 @@ export const CI_COLORS = {
   MODERATE_AMBER: '#C68A00',
   DEVELOPING_RED: '#D04A4A',
   // Kept for non-bar usage only
-  SECTION_BLUE: '#2c2a7d',  // alias for INDIGO
-  ACCENT_GREEN: '#4cb966',  // alias for GREEN
-  ACCENT_TEAL: '#4e4ba6',   // remapped to indigo-mid
-  TEAL_LIGHT: '#e8e7f5',    // remapped to indigo-pale
-  TEAL_MID: '#9896cc',      // remapped to indigo-light
+  SECTION_BLUE: '#2c2a7d', // alias for INDIGO
+  ACCENT_GREEN: '#4cb966', // alias for GREEN
+  ACCENT_TEAL: '#4e4ba6', // remapped to indigo-mid
+  TEAL_LIGHT: '#e8e7f5', // remapped to indigo-pale
+  TEAL_MID: '#9896cc', // remapped to indigo-light
   TILE_BLUE: '#e8e7f5',
   TILE_TEAL: '#e8e7f5',
-  GAUGE_START: '#4cb966',   // green start
-  GAUGE_END: '#2c2a7d',     // indigo end
+  GAUGE_START: '#4cb966', // green start
+  GAUGE_END: '#2c2a7d', // indigo end
   GAUGE_BG: '#e8e7f5',
   RADAR_FILL: '#9896cc',
   RADAR_STROKE: '#2c2a7d',
@@ -1674,7 +1664,10 @@ export const BEHAVIOR_LABELS: Record<string, string> = {
 };
 
 /** Maps two-letter trait combos to professional identity titles and descriptions */
-export const IDENTITY_MAP: Record<string, { title: string; description: string }> = {
+export const IDENTITY_MAP: Record<
+  string,
+  { title: string; description: string }
+> = {
   DC: {
     title: 'Structured Strategic Performer',
     description:
@@ -1740,44 +1733,107 @@ export const IDENTITY_MAP: Record<string, { title: string; description: string }
 /** Maps each trait letter to career-relevant strength labels + short descriptions */
 export const STRENGTH_MAP: Record<string, { label: string; desc: string }[]> = {
   D: [
-    { label: 'Goal-Driven Decision Making', desc: 'You maintain focus on measurable results and defined objectives.' },
-    { label: 'Strategic Execution Authority', desc: 'You are comfortable taking ownership and driving outcomes independently.' },
-    { label: 'Rapid Problem Resolution', desc: 'You cut through ambiguity and deliver solutions under pressure.' },
+    {
+      label: 'Goal-Driven Decision Making',
+      desc: 'You maintain focus on measurable results and defined objectives.',
+    },
+    {
+      label: 'Strategic Execution Authority',
+      desc: 'You are comfortable taking ownership and driving outcomes independently.',
+    },
+    {
+      label: 'Rapid Problem Resolution',
+      desc: 'You cut through ambiguity and deliver solutions under pressure.',
+    },
   ],
   I: [
-    { label: 'Collaborative Influence', desc: 'You have a strong ability to rally teams and build consensus around ideas.' },
-    { label: 'Adaptive Communication', desc: 'You adjust your messaging instinctively to engage diverse audiences.' },
-    { label: 'Creative Solution Design', desc: 'You generate fresh approaches and inspire innovative thinking.' },
+    {
+      label: 'Collaborative Influence',
+      desc: 'You have a strong ability to rally teams and build consensus around ideas.',
+    },
+    {
+      label: 'Adaptive Communication',
+      desc: 'You adjust your messaging instinctively to engage diverse audiences.',
+    },
+    {
+      label: 'Creative Solution Design',
+      desc: 'You generate fresh approaches and inspire innovative thinking.',
+    },
   ],
   S: [
-    { label: 'Consistency & Reliability', desc: 'You demonstrate dependable performance under structured expectations.' },
-    { label: 'Team Cohesion Building', desc: 'You foster trust and psychological safety within groups.' },
-    { label: 'Sustained Task Commitment', desc: 'You maintain steady effort over extended timelines without burnout.' },
+    {
+      label: 'Consistency & Reliability',
+      desc: 'You demonstrate dependable performance under structured expectations.',
+    },
+    {
+      label: 'Team Cohesion Building',
+      desc: 'You foster trust and psychological safety within groups.',
+    },
+    {
+      label: 'Sustained Task Commitment',
+      desc: 'You maintain steady effort over extended timelines without burnout.',
+    },
   ],
   C: [
-    { label: 'Analytical Accuracy', desc: 'You evaluate information carefully and make data-driven decisions with precision.' },
-    { label: 'Structured Execution Discipline', desc: 'You perform consistently in environments that require procedure adherence.' },
-    { label: 'Strategic Planning Orientation', desc: 'You are comfortable setting goals and aligning resources for long-term outcomes.' },
+    {
+      label: 'Analytical Accuracy',
+      desc: 'You evaluate information carefully and make data-driven decisions with precision.',
+    },
+    {
+      label: 'Structured Execution Discipline',
+      desc: 'You perform consistently in environments that require procedure adherence.',
+    },
+    {
+      label: 'Strategic Planning Orientation',
+      desc: 'You are comfortable setting goals and aligning resources for long-term outcomes.',
+    },
   ],
 };
 
 /** Maps each trait letter to positive development opportunity descriptions */
-export const DEVELOPMENT_MAP: Record<string, { label: string; desc: string }[]> = {
+export const DEVELOPMENT_MAP: Record<
+  string,
+  { label: string; desc: string }[]
+> = {
   D: [
-    { label: 'Emotional Flexibility', desc: 'You may benefit from adapting your communication tone based on audience sensitivity.' },
-    { label: 'Delegation Comfort', desc: 'Gradually build your confidence in sharing control and trusting your team to execute.' },
+    {
+      label: 'Emotional Flexibility',
+      desc: 'You may benefit from adapting your communication tone based on audience sensitivity.',
+    },
+    {
+      label: 'Delegation Comfort',
+      desc: 'Gradually build your confidence in sharing control and trusting your team to execute.',
+    },
   ],
   I: [
-    { label: 'Sustained Focus Depth', desc: 'You can strengthen your performance by completing deep-work cycles without distraction.' },
-    { label: 'Detail Verification', desc: 'You may benefit from building routine checks before finalising your deliverables.' },
+    {
+      label: 'Sustained Focus Depth',
+      desc: 'You can strengthen your performance by completing deep-work cycles without distraction.',
+    },
+    {
+      label: 'Detail Verification',
+      desc: 'You may benefit from building routine checks before finalising your deliverables.',
+    },
   ],
   S: [
-    { label: 'Spontaneous Adaptability', desc: 'You can strengthen your performance in rapidly changing or ambiguous environments.' },
-    { label: 'Social Influence Confidence', desc: 'Try expressing your ideas more assertively in collaborative discussions.' },
+    {
+      label: 'Spontaneous Adaptability',
+      desc: 'You can strengthen your performance in rapidly changing or ambiguous environments.',
+    },
+    {
+      label: 'Social Influence Confidence',
+      desc: 'Try expressing your ideas more assertively in collaborative discussions.',
+    },
   ],
   C: [
-    { label: 'Pace Flexibility', desc: 'You may benefit from releasing your work incrementally rather than waiting for perfection.' },
-    { label: 'Interpersonal Warmth', desc: 'You can strengthen your impact by adding informal, empathetic elements to your communication.' },
+    {
+      label: 'Pace Flexibility',
+      desc: 'You may benefit from releasing your work incrementally rather than waiting for perfection.',
+    },
+    {
+      label: 'Interpersonal Warmth',
+      desc: 'You can strengthen your impact by adding informal, empathetic elements to your communication.',
+    },
   ],
 };
 
@@ -1794,7 +1850,8 @@ export const CAREER_DOMAIN_MAP: Record<
       { name: 'Research & Structured Technology', score: 80 },
       { name: 'Risk & Strategic Planning', score: 75 },
     ],
-    automationRisk: 'Low risk in analytical and strategic domains. Higher risk only in repetitive, low-decision roles.',
+    automationRisk:
+      'Low risk in analytical and strategic domains. Higher risk only in repetitive, low-decision roles.',
   },
   CD: {
     domains: [
@@ -1804,7 +1861,8 @@ export const CAREER_DOMAIN_MAP: Record<
       { name: 'Policy Design & Regulation', score: 80 },
       { name: 'Data Science & Machine Learning', score: 78 },
     ],
-    automationRisk: 'Low risk due to analytical depth. Roles requiring human oversight remain resilient.',
+    automationRisk:
+      'Low risk due to analytical depth. Roles requiring human oversight remain resilient.',
   },
   DI: {
     domains: [
@@ -1814,7 +1872,8 @@ export const CAREER_DOMAIN_MAP: Record<
       { name: 'Marketing Strategy', score: 82 },
       { name: 'Consulting & Advisory', score: 78 },
     ],
-    automationRisk: 'Low risk in leadership and relationship-driven roles. Higher risk only in transactional functions.',
+    automationRisk:
+      'Low risk in leadership and relationship-driven roles. Higher risk only in transactional functions.',
   },
   ID: {
     domains: [
@@ -1824,7 +1883,8 @@ export const CAREER_DOMAIN_MAP: Record<
       { name: 'Event & Experience Design', score: 80 },
       { name: 'Media Production', score: 76 },
     ],
-    automationRisk: 'Low risk in creative and people-facing domains. AI augments but does not replace persuasive leadership.',
+    automationRisk:
+      'Low risk in creative and people-facing domains. AI augments but does not replace persuasive leadership.',
   },
   DS: {
     domains: [
@@ -1834,7 +1894,8 @@ export const CAREER_DOMAIN_MAP: Record<
       { name: 'Construction & Infrastructure', score: 82 },
       { name: 'Defence Strategy', score: 78 },
     ],
-    automationRisk: 'Low risk in operational leadership. Steady execution roles remain critical.',
+    automationRisk:
+      'Low risk in operational leadership. Steady execution roles remain critical.',
   },
   SD: {
     domains: [
@@ -1844,7 +1905,8 @@ export const CAREER_DOMAIN_MAP: Record<
       { name: 'Government & Public Service', score: 80 },
       { name: 'Agricultural Management', score: 76 },
     ],
-    automationRisk: 'Low risk in service-oriented leadership. Human judgment remains indispensable.',
+    automationRisk:
+      'Low risk in service-oriented leadership. Human judgment remains indispensable.',
   },
   IS: {
     domains: [
@@ -1854,7 +1916,8 @@ export const CAREER_DOMAIN_MAP: Record<
       { name: 'Community Development', score: 82 },
       { name: 'Teaching & Academic Mentoring', score: 78 },
     ],
-    automationRisk: 'Low risk in empathy-driven roles. Human connection is irreplaceable.',
+    automationRisk:
+      'Low risk in empathy-driven roles. Human connection is irreplaceable.',
   },
   SI: {
     domains: [
@@ -1864,7 +1927,8 @@ export const CAREER_DOMAIN_MAP: Record<
       { name: 'Retail Management', score: 80 },
       { name: 'Nonprofit Program Management', score: 76 },
     ],
-    automationRisk: 'Low risk in people-first service environments. Supportive roles require human presence.',
+    automationRisk:
+      'Low risk in people-first service environments. Supportive roles require human presence.',
   },
   IC: {
     domains: [
@@ -1874,7 +1938,8 @@ export const CAREER_DOMAIN_MAP: Record<
       { name: 'Content Creation & Storytelling', score: 80 },
       { name: 'Innovation Labs & R&D', score: 76 },
     ],
-    automationRisk: 'Low risk where human creativity meets analytical rigour. AI assists but does not replace design judgment.',
+    automationRisk:
+      'Low risk where human creativity meets analytical rigour. AI assists but does not replace design judgment.',
   },
   CI: {
     domains: [
@@ -1884,7 +1949,8 @@ export const CAREER_DOMAIN_MAP: Record<
       { name: 'Data Visualisation & Analytics', score: 80 },
       { name: 'EdTech & Instructional Design', score: 76 },
     ],
-    automationRisk: 'Low risk in structured creative domains. Methodical innovation requires human oversight.',
+    automationRisk:
+      'Low risk in structured creative domains. Methodical innovation requires human oversight.',
   },
   SC: {
     domains: [
@@ -1894,7 +1960,8 @@ export const CAREER_DOMAIN_MAP: Record<
       { name: 'Accounting & Financial Planning', score: 80 },
       { name: 'Environmental Safety', score: 76 },
     ],
-    automationRisk: 'Low risk in precision-driven stability roles. Quality-focused work resists full automation.',
+    automationRisk:
+      'Low risk in precision-driven stability roles. Quality-focused work resists full automation.',
   },
   CS: {
     domains: [
@@ -1904,7 +1971,8 @@ export const CAREER_DOMAIN_MAP: Record<
       { name: 'Actuarial Science', score: 80 },
       { name: 'Clinical Data Management', score: 76 },
     ],
-    automationRisk: 'Low risk in detail-critical domains. Precision roles demand human verification.',
+    automationRisk:
+      'Low risk in detail-critical domains. Precision roles demand human verification.',
   },
 };
 
@@ -1927,8 +1995,18 @@ export interface ProfilePatterns {
 export const ARCHETYPE_DATA: Record<
   string,
   {
-    dominant: { title: string; superpower: string; risk: string; environment: string };
-    secondary: { title: string; superpower: string; risk: string; environment: string };
+    dominant: {
+      title: string;
+      superpower: string;
+      risk: string;
+      environment: string;
+    };
+    secondary: {
+      title: string;
+      superpower: string;
+      risk: string;
+      environment: string;
+    };
   }
 > = {
   D: {
@@ -1989,19 +2067,59 @@ export const ARCHETYPE_DATA: Record<
   },
 };
 
-export const DUAL_ARCHETYPE: Record<string, { title: string; description: string }> = {
-  DC: { title: 'Strategic Executor', description: 'You combine decisiveness with structured thinking - a rare blend of action and precision.' },
-  CD: { title: 'Analytical Commander', description: 'Your leadership style is analytical rather than impulsive.' },
-  DI: { title: 'Charismatic Driver', description: 'You prefer taking charge while energising those around you.' },
-  ID: { title: 'Influential Initiator', description: 'You lead through inspiration and bold action.' },
-  DS: { title: 'Resilient Operator', description: 'You drive results with patient determination.' },
-  SD: { title: 'Steadfast Director', description: 'You build systems while maintaining calm authority.' },
-  IS: { title: 'Empathetic Motivator', description: 'You combine warmth with persuasive energy.' },
-  SI: { title: 'Harmonious Facilitator', description: 'You build consensus through genuine care.' },
-  IC: { title: 'Creative Analyst', description: 'You balance imagination with methodical evaluation.' },
-  CI: { title: 'Methodical Innovator', description: 'You bring structure to creative problem-solving.' },
-  SC: { title: 'Reliable Perfectionist', description: 'You combine steady commitment with quality focus.' },
-  CS: { title: 'Careful Maintainer', description: 'You sustain high standards through disciplined patience.' },
+export const DUAL_ARCHETYPE: Record<
+  string,
+  { title: string; description: string }
+> = {
+  DC: {
+    title: 'Strategic Executor',
+    description:
+      'You combine decisiveness with structured thinking - a rare blend of action and precision.',
+  },
+  CD: {
+    title: 'Analytical Commander',
+    description: 'Your leadership style is analytical rather than impulsive.',
+  },
+  DI: {
+    title: 'Charismatic Driver',
+    description: 'You prefer taking charge while energising those around you.',
+  },
+  ID: {
+    title: 'Influential Initiator',
+    description: 'You lead through inspiration and bold action.',
+  },
+  DS: {
+    title: 'Resilient Operator',
+    description: 'You drive results with patient determination.',
+  },
+  SD: {
+    title: 'Steadfast Director',
+    description: 'You build systems while maintaining calm authority.',
+  },
+  IS: {
+    title: 'Empathetic Motivator',
+    description: 'You combine warmth with persuasive energy.',
+  },
+  SI: {
+    title: 'Harmonious Facilitator',
+    description: 'You build consensus through genuine care.',
+  },
+  IC: {
+    title: 'Creative Analyst',
+    description: 'You balance imagination with methodical evaluation.',
+  },
+  CI: {
+    title: 'Methodical Innovator',
+    description: 'You bring structure to creative problem-solving.',
+  },
+  SC: {
+    title: 'Reliable Perfectionist',
+    description: 'You combine steady commitment with quality focus.',
+  },
+  CS: {
+    title: 'Careful Maintainer',
+    description: 'You sustain high standards through disciplined patience.',
+  },
 };
 
 export const TEXT_VARIATIONS: Record<string, string[]> = {
@@ -2096,194 +2214,214 @@ export interface StreamSelectionContent {
   fields: StreamFieldContent[];
 }
 
-export const STREAM_SELECTION_CONTENT: Record<string, StreamSelectionContent> = {
-  PCMB: {
-    shortName: 'PCMB',
-    title: 'Physics, Chemistry, Maths, Biology',
-    vibe: 'The ultimate flexible pathway. Keep all doors open for an inspiring career in technology or healing. Choose based on your dual interest!',
-    fields: [
-      {
-        name: 'Medical & Allied Health Sciences',
-        vibe: 'Healers, researchers, and technologists. Use science to improve lives directly.',
-        mappedDegrees: 'MBBS, BDS, Physiotherapy (BPT), Nursing, Radiology & Medical Imaging, Cardiac Technology.',
-        icon: 'medic.png',
-      },
-      {
-        name: 'Engineering & Technology',
-        vibe: 'Builders, coders, and creators of future infrastructure, systems, and software.',
-        mappedDegrees: 'Computer Science & AI, Robotics, Aerospace Engineering, Mechanical Engineering, Civil Engineering.',
-        icon: 'engineering.png',
-      },
-      {
-        name: 'Pure & Applied Science Research',
-        vibe: 'Discoverers, theorists, and problem solvers unlocking the secrets of the world.',
-        mappedDegrees: 'Theoretical Physics, Chemical Research, Biotechnology, Genetics, Microbiology, Biochemistry.',
-        icon: 'research.png',
-      },
-      {
-        name: 'Agriculture & Environmental',
-        vibe: 'Stewards of the earth, food, and environmental sustainability.',
-        mappedDegrees: 'Modern Farming, Horticulture, Forestry, Food Science & Production, Environmental Conservation.',
-        icon: 'tea.png',
-      }
-    ]
-  },
-  PCB: {
-    shortName: 'PCB',
-    title: 'Physics, Chemistry, Biology',
-    vibe: 'The gateway to healthcare, research, and natural sciences. Perfect for those passionate about life and medicine.',
-    fields: [
-      {
-        name: 'Medical Sciences',
-        vibe: 'The traditional doctor\'s path to diagnosing and treating patients.',
-        mappedDegrees: 'MBBS, BDS, BAMS (Ayurveda), BHMS (Homeopathy), BUMS (Unani).',
-        icon: 'medic.png',
-      },
-      {
-        name: 'Allied Health Sciences',
-        vibe: 'The crucial backbone of hospital operations and patient care.',
-        mappedDegrees: 'Nursing, Physiotherapy (BPT), Optometry, Radiology, Medical Lab Technology.',
-        icon: 'health.png',
-      },
-      {
-        name: 'Life Sciences',
-        vibe: 'Deep dive into the building blocks of life, genetics, and organisms.',
-        mappedDegrees: 'Biotechnology, Microbiology, Biochemistry, Genetics, Zoology, Botany.',
-        icon: 'life.png',
-      },
-      {
-        name: 'Agriculture & Nutrition',
-        vibe: 'Cultivating resources and understanding the biology of human health.',
-        mappedDegrees: 'Agriculture, Horticulture, Forestry, Pharmacy, Food Technology, Nutrition.',
-        icon: 'agriculture.png',
-      }
-    ]
-  },
-  PCM: {
-    shortName: 'PCM',
-    title: 'Physics, Chemistry, Mathematics',
-    vibe: 'The builders, coders, and creators path. Designed for logical thinkers who want to engineer the future.',
-    fields: [
-      {
-        name: 'Engineering Fields',
-        vibe: 'Designing and building physical and digital solutions across all industries.',
-        mappedDegrees: 'Computer Science, AI & Data Science, Robotics, Mechanical, Civil, Aerospace.',
-        icon: 'engineering.png',
-      },
-      {
-        name: 'Technology & IT',
-        vibe: 'Creating the software, apps, and AI that power the modern world.',
-        mappedDegrees: 'Computer Applications (BCA), B.Sc Computer Science, B.Sc Artificial Intelligence.',
-        icon: 'tech.png',
-      },
-      {
-        name: 'Mathematical & Analytical',
-        vibe: 'Using complex numbers to predict trends, manage data, and solve puzzles.',
-        mappedDegrees: 'Mathematics, Statistics, Actuarial Science, Economics.',
-        icon: 'analytical.png',
-      },
-      {
-        name: 'Design, Architecture & Aviation',
-        vibe: 'Blending technical math with creative design, structures, or flight.',
-        mappedDegrees: 'Architecture (B.Arch), Industrial Design (B.Des), Aviation, Commercial Pilot Training.',
-        icon: 'architecture.png',
-      }
-    ]
-  },
-  PCBZ: {
-    shortName: 'PCBZ',
-    title: 'Physics, Chemistry, Botany, Zoology',
-    vibe: 'The ultimate biology specialist path. Dive deep into the specific study of plant and animal life alongside medicine.',
-    fields: [
-      {
-        name: 'Medical Degrees',
-        vibe: 'Direct patient care and exploring traditional medicine systems.',
-        mappedDegrees: 'MBBS, BDS, BAMS, BHMS.',
-        icon: 'medic.png',
-      },
-      {
-        name: 'Allied Health Degrees',
-        vibe: 'Supporting critical medical treatments and hospital infrastructure.',
-        mappedDegrees: 'Nursing, Physiotherapy (BPT), Radiology, Medical Lab Technology, Cardiac Technology.',
-        icon: 'health.png',
-      },
-      {
-        name: 'Life Science Degrees',
-        vibe: 'Specialized research and deep study into the natural world and organisms.',
-        mappedDegrees: 'Botany, Zoology, Biotechnology, Microbiology, Biochemistry.',
-        icon: 'virus.png',
-      },
-      {
-        name: 'Agriculture & Food Sciences',
-        vibe: 'Sustaining human life through food innovation and natural harmony.',
-        mappedDegrees: 'Agriculture, Horticulture, Food Technology, Dairy Technology, Fisheries.',
-        icon: 'food.png',
-      }
-    ]
-  },
-  Commerce: {
-    shortName: 'Commerce',
-    title: 'Commerce Stream',
-    vibe: 'The gateway to the corporate world. For future leaders focused on finance, business, and economics.',
-    fields: [
-      {
-        name: 'Commerce Degrees',
-        vibe: 'The foundation of corporate finance, auditing, and modern banking.',
-        mappedDegrees: 'B.Com (General), Accounting & Finance, Corporate Secretaryship, Banking & Insurance.',
-        icon: 'commerce.png',
-      },
-      {
-        name: 'Professional Certifications',
-        vibe: 'High-level, specialized financial and legal auditing and strategy.',
-        mappedDegrees: 'CA (Chartered Accountant), CMA (Cost Accountant), CS (Company Secretary).',
-        icon: 'professional.png',
-      },
-      {
-        name: 'Management Degrees',
-        vibe: 'Leading teams, running companies, and marketing products to the world.',
-        mappedDegrees: 'BBA, BMS (Management Studies), BBM (Business Management).',
-        icon: 'management.png',
-      },
-      {
-        name: 'Economics & Analytics',
-        vibe: 'Understanding global markets, human trends, and financial data.',
-        mappedDegrees: 'B.A/B.Sc Economics, Computer Applications (BCA), Data Analytics.',
-        icon: 'economics.png',
-      }
-    ]
-  },
-  Humanities: {
-    shortName: 'Humanities',
-    title: 'Humanities / Arts Stream',
-    vibe: 'The path of society, law, and expression. For those who want to understand human behavior and shape culture.',
-    fields: [
-      {
-        name: 'Social Sciences',
-        vibe: 'Studying how humans think, act, and organize globally across history.',
-        mappedDegrees: 'History, Political Science, Sociology, Psychology.',
-        icon: 'social.png',
-      },
-      {
-        name: 'Creative Fields & Media',
-        vibe: 'Storytelling, journalism, and managing public information.',
-        mappedDegrees: 'Journalism, Mass Communication, English Literature.',
-        icon: 'media.png',
-      },
-      {
-        name: 'Design Fields',
-        vibe: 'Shaping visual culture and functional aesthetics in the modern world.',
-        mappedDegrees: 'Design (B.Des), Fashion Designing.',
-        icon: 'design.png',
-      },
-      {
-        name: 'Law',
-        vibe: 'Fighting for justice, policy-making, and understanding legal frameworks.',
-        mappedDegrees: 'BA LLB.',
-        icon: 'law.png',
-      }
-    ]
-  }
-};
+export const STREAM_SELECTION_CONTENT: Record<string, StreamSelectionContent> =
+  {
+    PCMB: {
+      shortName: 'PCMB',
+      title: 'Physics, Chemistry, Maths, Biology',
+      vibe: 'The ultimate flexible pathway. Keep all doors open for an inspiring career in technology or healing. Choose based on your dual interest!',
+      fields: [
+        {
+          name: 'Medical & Allied Health Sciences',
+          vibe: 'Healers, researchers, and technologists. Use science to improve lives directly.',
+          mappedDegrees:
+            'MBBS, BDS, Physiotherapy (BPT), Nursing, Radiology & Medical Imaging, Cardiac Technology.',
+          icon: 'medic.png',
+        },
+        {
+          name: 'Engineering & Technology',
+          vibe: 'Builders, coders, and creators of future infrastructure, systems, and software.',
+          mappedDegrees:
+            'Computer Science & AI, Robotics, Aerospace Engineering, Mechanical Engineering, Civil Engineering.',
+          icon: 'engineering.png',
+        },
+        {
+          name: 'Pure & Applied Science Research',
+          vibe: 'Discoverers, theorists, and problem solvers unlocking the secrets of the world.',
+          mappedDegrees:
+            'Theoretical Physics, Chemical Research, Biotechnology, Genetics, Microbiology, Biochemistry.',
+          icon: 'research.png',
+        },
+        {
+          name: 'Agriculture & Environmental',
+          vibe: 'Stewards of the earth, food, and environmental sustainability.',
+          mappedDegrees:
+            'Modern Farming, Horticulture, Forestry, Food Science & Production, Environmental Conservation.',
+          icon: 'tea.png',
+        },
+      ],
+    },
+    PCB: {
+      shortName: 'PCB',
+      title: 'Physics, Chemistry, Biology',
+      vibe: 'The gateway to healthcare, research, and natural sciences. Perfect for those passionate about life and medicine.',
+      fields: [
+        {
+          name: 'Medical Sciences',
+          vibe: "The traditional doctor's path to diagnosing and treating patients.",
+          mappedDegrees:
+            'MBBS, BDS, BAMS (Ayurveda), BHMS (Homeopathy), BUMS (Unani).',
+          icon: 'medic.png',
+        },
+        {
+          name: 'Allied Health Sciences',
+          vibe: 'The crucial backbone of hospital operations and patient care.',
+          mappedDegrees:
+            'Nursing, Physiotherapy (BPT), Optometry, Radiology, Medical Lab Technology.',
+          icon: 'health.png',
+        },
+        {
+          name: 'Life Sciences',
+          vibe: 'Deep dive into the building blocks of life, genetics, and organisms.',
+          mappedDegrees:
+            'Biotechnology, Microbiology, Biochemistry, Genetics, Zoology, Botany.',
+          icon: 'life.png',
+        },
+        {
+          name: 'Agriculture & Nutrition',
+          vibe: 'Cultivating resources and understanding the biology of human health.',
+          mappedDegrees:
+            'Agriculture, Horticulture, Forestry, Pharmacy, Food Technology, Nutrition.',
+          icon: 'agriculture.png',
+        },
+      ],
+    },
+    PCM: {
+      shortName: 'PCM',
+      title: 'Physics, Chemistry, Mathematics',
+      vibe: 'The builders, coders, and creators path. Designed for logical thinkers who want to engineer the future.',
+      fields: [
+        {
+          name: 'Engineering Fields',
+          vibe: 'Designing and building physical and digital solutions across all industries.',
+          mappedDegrees:
+            'Computer Science, AI & Data Science, Robotics, Mechanical, Civil, Aerospace.',
+          icon: 'engineering.png',
+        },
+        {
+          name: 'Technology & IT',
+          vibe: 'Creating the software, apps, and AI that power the modern world.',
+          mappedDegrees:
+            'Computer Applications (BCA), B.Sc Computer Science, B.Sc Artificial Intelligence.',
+          icon: 'tech.png',
+        },
+        {
+          name: 'Mathematical & Analytical',
+          vibe: 'Using complex numbers to predict trends, manage data, and solve puzzles.',
+          mappedDegrees:
+            'Mathematics, Statistics, Actuarial Science, Economics.',
+          icon: 'analytical.png',
+        },
+        {
+          name: 'Design, Architecture & Aviation',
+          vibe: 'Blending technical math with creative design, structures, or flight.',
+          mappedDegrees:
+            'Architecture (B.Arch), Industrial Design (B.Des), Aviation, Commercial Pilot Training.',
+          icon: 'architecture.png',
+        },
+      ],
+    },
+    PCBZ: {
+      shortName: 'PCBZ',
+      title: 'Physics, Chemistry, Botany, Zoology',
+      vibe: 'The ultimate biology specialist path. Dive deep into the specific study of plant and animal life alongside medicine.',
+      fields: [
+        {
+          name: 'Medical Degrees',
+          vibe: 'Direct patient care and exploring traditional medicine systems.',
+          mappedDegrees: 'MBBS, BDS, BAMS, BHMS.',
+          icon: 'medic.png',
+        },
+        {
+          name: 'Allied Health Degrees',
+          vibe: 'Supporting critical medical treatments and hospital infrastructure.',
+          mappedDegrees:
+            'Nursing, Physiotherapy (BPT), Radiology, Medical Lab Technology, Cardiac Technology.',
+          icon: 'health.png',
+        },
+        {
+          name: 'Life Science Degrees',
+          vibe: 'Specialized research and deep study into the natural world and organisms.',
+          mappedDegrees:
+            'Botany, Zoology, Biotechnology, Microbiology, Biochemistry.',
+          icon: 'virus.png',
+        },
+        {
+          name: 'Agriculture & Food Sciences',
+          vibe: 'Sustaining human life through food innovation and natural harmony.',
+          mappedDegrees:
+            'Agriculture, Horticulture, Food Technology, Dairy Technology, Fisheries.',
+          icon: 'food.png',
+        },
+      ],
+    },
+    Commerce: {
+      shortName: 'Commerce',
+      title: 'Commerce Stream',
+      vibe: 'The gateway to the corporate world. For future leaders focused on finance, business, and economics.',
+      fields: [
+        {
+          name: 'Commerce Degrees',
+          vibe: 'The foundation of corporate finance, auditing, and modern banking.',
+          mappedDegrees:
+            'B.Com (General), Accounting & Finance, Corporate Secretaryship, Banking & Insurance.',
+          icon: 'commerce.png',
+        },
+        {
+          name: 'Professional Certifications',
+          vibe: 'High-level, specialized financial and legal auditing and strategy.',
+          mappedDegrees:
+            'CA (Chartered Accountant), CMA (Cost Accountant), CS (Company Secretary).',
+          icon: 'professional.png',
+        },
+        {
+          name: 'Management Degrees',
+          vibe: 'Leading teams, running companies, and marketing products to the world.',
+          mappedDegrees:
+            'BBA, BMS (Management Studies), BBM (Business Management).',
+          icon: 'management.png',
+        },
+        {
+          name: 'Economics & Analytics',
+          vibe: 'Understanding global markets, human trends, and financial data.',
+          mappedDegrees:
+            'B.A/B.Sc Economics, Computer Applications (BCA), Data Analytics.',
+          icon: 'economics.png',
+        },
+      ],
+    },
+    Humanities: {
+      shortName: 'Humanities',
+      title: 'Humanities / Arts Stream',
+      vibe: 'The path of society, law, and expression. For those who want to understand human behavior and shape culture.',
+      fields: [
+        {
+          name: 'Social Sciences',
+          vibe: 'Studying how humans think, act, and organize globally across history.',
+          mappedDegrees: 'History, Political Science, Sociology, Psychology.',
+          icon: 'social.png',
+        },
+        {
+          name: 'Creative Fields & Media',
+          vibe: 'Storytelling, journalism, and managing public information.',
+          mappedDegrees: 'Journalism, Mass Communication, English Literature.',
+          icon: 'media.png',
+        },
+        {
+          name: 'Design Fields',
+          vibe: 'Shaping visual culture and functional aesthetics in the modern world.',
+          mappedDegrees: 'Design (B.Des), Fashion Designing.',
+          icon: 'design.png',
+        },
+        {
+          name: 'Law',
+          vibe: 'Fighting for justice, policy-making, and understanding legal frameworks.',
+          mappedDegrees: 'BA LLB.',
+          icon: 'law.png',
+        },
+      ],
+    },
+  };
 
 export interface StreamOdysseyNode {
   label: string;
@@ -2302,72 +2440,216 @@ export const STREAM_ODYSSEY_ROADMAP: Record<string, StreamOdysseyData> = {
     streamTitle: 'PCMB Stream Odyssey',
     tagline: 'Healthcare & Technology - Your 10-Year Vision',
     nodes: [
-      { label: 'Start', title: 'Class 12 Graduate', subtitle: 'PCMB stream completed' },
-      { label: 'Year 1–3', title: 'Undergraduate Degree', subtitle: 'B.Tech, MBBS prep, or B.Sc entry' },
-      { label: 'Year 4–5', title: 'Specialization / Graduation', subtitle: 'Complete core medical or engineering training' },
-      { label: 'Year 5–7', title: 'Early Professional', subtitle: 'Junior Doctor, Engineer, or Researcher' },
-      { label: 'Year 7–10', title: 'Expert / Specialist', subtitle: 'Attending Physician, Tech Lead, or Scientist' },
-      { label: 'Year 10+', title: 'Leader / Innovator', subtitle: 'Leading departments or groundbreaking research' },
+      {
+        label: 'Start',
+        title: 'Class 12 Graduate',
+        subtitle: 'PCMB stream completed',
+      },
+      {
+        label: 'Year 1–3',
+        title: 'Undergraduate Degree',
+        subtitle: 'B.Tech, MBBS prep, or B.Sc entry',
+      },
+      {
+        label: 'Year 4–5',
+        title: 'Specialization / Graduation',
+        subtitle: 'Complete core medical or engineering training',
+      },
+      {
+        label: 'Year 5–7',
+        title: 'Early Professional',
+        subtitle: 'Junior Doctor, Engineer, or Researcher',
+      },
+      {
+        label: 'Year 7–10',
+        title: 'Expert / Specialist',
+        subtitle: 'Attending Physician, Tech Lead, or Scientist',
+      },
+      {
+        label: 'Year 10+',
+        title: 'Leader / Innovator',
+        subtitle: 'Leading departments or groundbreaking research',
+      },
     ],
   },
   PCB: {
     streamTitle: 'PCB Stream Odyssey',
     tagline: 'Medicine & Life Sciences - Your 10-Year Vision',
     nodes: [
-      { label: 'Start', title: 'Class 12 Graduate', subtitle: 'PCB stream completed' },
-      { label: 'Year 1–3', title: 'Undergraduate / Pre-Med', subtitle: 'MBBS prep, BDS, B.Sc or Allied Sciences' },
-      { label: 'Year 4–5', title: 'Clinical Training / Degree', subtitle: 'Internships, lab training, or final graduation' },
-      { label: 'Year 5–7', title: 'Resident / Junior Scientist', subtitle: 'Hospital residency or entry-level research' },
-      { label: 'Year 7–10', title: 'Practitioner / Specialist', subtitle: 'Licensed doctor, senior researcher' },
-      { label: 'Year 10+', title: 'Consultant / Director', subtitle: 'Specialist consultant or lab director' },
+      {
+        label: 'Start',
+        title: 'Class 12 Graduate',
+        subtitle: 'PCB stream completed',
+      },
+      {
+        label: 'Year 1–3',
+        title: 'Undergraduate / Pre-Med',
+        subtitle: 'MBBS prep, BDS, B.Sc or Allied Sciences',
+      },
+      {
+        label: 'Year 4–5',
+        title: 'Clinical Training / Degree',
+        subtitle: 'Internships, lab training, or final graduation',
+      },
+      {
+        label: 'Year 5–7',
+        title: 'Resident / Junior Scientist',
+        subtitle: 'Hospital residency or entry-level research',
+      },
+      {
+        label: 'Year 7–10',
+        title: 'Practitioner / Specialist',
+        subtitle: 'Licensed doctor, senior researcher',
+      },
+      {
+        label: 'Year 10+',
+        title: 'Consultant / Director',
+        subtitle: 'Specialist consultant or lab director',
+      },
     ],
   },
   PCM: {
     streamTitle: 'PCM Stream Odyssey',
     tagline: 'Engineering & Innovation - Your 10-Year Vision',
     nodes: [
-      { label: 'Start', title: 'Class 12 Graduate', subtitle: 'PCM stream completed' },
-      { label: 'Year 1–4', title: 'Undergraduate Degree', subtitle: 'B.Tech, B.E., or B.Arch' },
-      { label: 'Year 4', title: 'Graduate Engineer', subtitle: 'Entry-level engineering or software development' },
-      { label: 'Year 5–7', title: 'Mid-Level Professional', subtitle: 'Senior developer, project engineer' },
-      { label: 'Year 7–10', title: 'Technical Lead', subtitle: 'Leading teams, architecting solutions' },
-      { label: 'Year 10+', title: 'Principal / CTO', subtitle: 'Principal engineer or tech executive' },
+      {
+        label: 'Start',
+        title: 'Class 12 Graduate',
+        subtitle: 'PCM stream completed',
+      },
+      {
+        label: 'Year 1–4',
+        title: 'Undergraduate Degree',
+        subtitle: 'B.Tech, B.E., or B.Arch',
+      },
+      {
+        label: 'Year 4',
+        title: 'Graduate Engineer',
+        subtitle: 'Entry-level engineering or software development',
+      },
+      {
+        label: 'Year 5–7',
+        title: 'Mid-Level Professional',
+        subtitle: 'Senior developer, project engineer',
+      },
+      {
+        label: 'Year 7–10',
+        title: 'Technical Lead',
+        subtitle: 'Leading teams, architecting solutions',
+      },
+      {
+        label: 'Year 10+',
+        title: 'Principal / CTO',
+        subtitle: 'Principal engineer or tech executive',
+      },
     ],
   },
   PCBZ: {
     streamTitle: 'PCBZ Stream Odyssey',
     tagline: 'Specialized Biosciences - Your 10-Year Vision',
     nodes: [
-      { label: 'Start', title: 'Class 12 Graduate', subtitle: 'PCBZ stream completed' },
-      { label: 'Year 1–3', title: 'Undergraduate Degree', subtitle: 'B.Sc in specialized biology or pre-med' },
-      { label: 'Year 4–5', title: 'Postgrad / Research Entry', subtitle: 'M.Sc, clinical lab setup, or early research' },
-      { label: 'Year 5–7', title: 'Associate Scientist', subtitle: 'Field researcher, lab associate' },
-      { label: 'Year 7–10', title: 'Subject Expert', subtitle: 'Biotechnologist, specialized clinician' },
-      { label: 'Year 10+', title: 'Principal Investigator', subtitle: 'Directing research or environmental policy' },
+      {
+        label: 'Start',
+        title: 'Class 12 Graduate',
+        subtitle: 'PCBZ stream completed',
+      },
+      {
+        label: 'Year 1–3',
+        title: 'Undergraduate Degree',
+        subtitle: 'B.Sc in specialized biology or pre-med',
+      },
+      {
+        label: 'Year 4–5',
+        title: 'Postgrad / Research Entry',
+        subtitle: 'M.Sc, clinical lab setup, or early research',
+      },
+      {
+        label: 'Year 5–7',
+        title: 'Associate Scientist',
+        subtitle: 'Field researcher, lab associate',
+      },
+      {
+        label: 'Year 7–10',
+        title: 'Subject Expert',
+        subtitle: 'Biotechnologist, specialized clinician',
+      },
+      {
+        label: 'Year 10+',
+        title: 'Principal Investigator',
+        subtitle: 'Directing research or environmental policy',
+      },
     ],
   },
   Commerce: {
     streamTitle: 'Commerce Stream Odyssey',
     tagline: 'Business & Finance - Your 10-Year Vision',
     nodes: [
-      { label: 'Start', title: 'Class 12 Graduate', subtitle: 'Commerce stream completed' },
-      { label: 'Year 1–3', title: 'Undergraduate / Certs', subtitle: 'B.Com, BBA, CA Foundation' },
-      { label: 'Year 4–5', title: 'Articleship / Analyst', subtitle: 'CA Inter, entry-level financial analyst' },
-      { label: 'Year 5–7', title: 'Qualified Professional', subtitle: 'CA, Financial Manager, Consultant' },
-      { label: 'Year 7–10', title: 'Senior Management', subtitle: 'Senior consultant, VP of Finance' },
-      { label: 'Year 10+', title: 'CFO / Founder', subtitle: 'Chief Financial Officer or business owner' },
+      {
+        label: 'Start',
+        title: 'Class 12 Graduate',
+        subtitle: 'Commerce stream completed',
+      },
+      {
+        label: 'Year 1–3',
+        title: 'Undergraduate / Certs',
+        subtitle: 'B.Com, BBA, CA Foundation',
+      },
+      {
+        label: 'Year 4–5',
+        title: 'Articleship / Analyst',
+        subtitle: 'CA Inter, entry-level financial analyst',
+      },
+      {
+        label: 'Year 5–7',
+        title: 'Qualified Professional',
+        subtitle: 'CA, Financial Manager, Consultant',
+      },
+      {
+        label: 'Year 7–10',
+        title: 'Senior Management',
+        subtitle: 'Senior consultant, VP of Finance',
+      },
+      {
+        label: 'Year 10+',
+        title: 'CFO / Founder',
+        subtitle: 'Chief Financial Officer or business owner',
+      },
     ],
   },
   Humanities: {
     streamTitle: 'Humanities Stream Odyssey',
     tagline: 'Society & Culture - Your 10-Year Vision',
     nodes: [
-      { label: 'Start', title: 'Class 12 Graduate', subtitle: 'Humanities stream completed' },
-      { label: 'Year 1–3', title: 'Undergraduate Degree', subtitle: 'B.A., Law prep, or Design fundamentals' },
-      { label: 'Year 4–5', title: 'Postgrad / Early Practitioner', subtitle: 'M.A., Law school, early journalism' },
-      { label: 'Year 5–7', title: 'Professional Associate', subtitle: 'Junior lawyer, writer, social worker' },
-      { label: 'Year 7–10', title: 'Senior Professional', subtitle: 'Senior editor, policy analyst, advocate' },
-      { label: 'Year 10+', title: 'Leader / Change Maker', subtitle: 'Partner, published author, or director' },
+      {
+        label: 'Start',
+        title: 'Class 12 Graduate',
+        subtitle: 'Humanities stream completed',
+      },
+      {
+        label: 'Year 1–3',
+        title: 'Undergraduate Degree',
+        subtitle: 'B.A., Law prep, or Design fundamentals',
+      },
+      {
+        label: 'Year 4–5',
+        title: 'Postgrad / Early Practitioner',
+        subtitle: 'M.A., Law school, early journalism',
+      },
+      {
+        label: 'Year 5–7',
+        title: 'Professional Associate',
+        subtitle: 'Junior lawyer, writer, social worker',
+      },
+      {
+        label: 'Year 7–10',
+        title: 'Senior Professional',
+        subtitle: 'Senior editor, policy analyst, advocate',
+      },
+      {
+        label: 'Year 10+',
+        title: 'Leader / Change Maker',
+        subtitle: 'Partner, published author, or director',
+      },
     ],
   },
 };

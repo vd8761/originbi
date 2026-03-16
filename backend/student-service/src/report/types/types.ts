@@ -100,7 +100,11 @@ export interface CxoData {
   report_password?: string;
 }
 
-export type MergedReportData = CollegeData | SchoolData | EmployeeData | CxoData;
+export type MergedReportData =
+  | CollegeData
+  | SchoolData
+  | EmployeeData
+  | CxoData;
 
 // interface UniversityData extends BaseData {
 //     department_deg_id: number;
