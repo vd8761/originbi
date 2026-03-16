@@ -767,6 +767,19 @@ export class CorporateDashboardService {
         };
       });
 
+      // Notify Admins
+      this.sendAdminNotification({
+        role: 'ADMIN',
+        type: 'NEW_CORPORATE_SIGNUP',
+        title: 'New Corporate Signup',
+        message: `A registration request from "${dto.companyName}" is awaiting your approval.`,
+        metadata: {
+          email: email,
+          companyName: dto.companyName,
+          name: dto.name,
+        },
+      }).catch((err) => console.error('Admin notification failed:', err));
+
       // Send Confirmation Email after successful transaction
       this.sendRegistrationSuccessEmail(email, {
         name: dto.name,
@@ -793,6 +806,28 @@ export class CorporateDashboardService {
       }
       throw new InternalServerErrorException(
         `Database Transaction Failed: ${dbError.message}`,
+      );
+    }
+  }
+
+  private async sendAdminNotification(data: {
+    userId?: number;
+    role: string;
+    type: string;
+    title: string;
+    message: string;
+    metadata?: any;
+  }) {
+    const adminServiceUrl =
+      this.configService.get('ADMIN_SERVICE_URL') || 'http://localhost:4001';
+    try {
+      await firstValueFrom(
+        this.httpService.post(`${adminServiceUrl}/notifications/internal`, data),
+      );
+    } catch (err: any) {
+      console.error(
+        'Failed to notify admin via internal API:',
+        err.response?.data || err.message,
       );
     }
   }

@@ -42,6 +42,9 @@ export default function CorporateLayout({
             case 'jobs':
                 router.push('/corporate/jobs');
                 break;
+            case 'candidates':
+                router.push('/corporate/candidates');
+                break;
             case 'origindata':
                 router.push('/corporate/origindata');
                 break;

@@ -122,26 +122,27 @@ export const getStudentWelcomeEmailTemplate = (
                   </tr>
                   <tr>
                     <td style="font-size: 14px; color: #707070; padding: 5px 0;">Start Date and Time</td>
-                    <td style="font-size: 14px; color: #000000; padding: 5px 0;">${startDateTime
-    ? new Date(startDateTime).toLocaleString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'Asia/Kolkata',
-      hour12: true,
-    })
-    : new Date().toLocaleString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'Asia/Kolkata',
-      hour12: true,
-    })
-  }</td>
+                    <td style="font-size: 14px; color: #000000; padding: 5px 0;">${
+                      startDateTime
+                        ? new Date(startDateTime).toLocaleString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            timeZone: 'Asia/Kolkata',
+                            hour12: true,
+                          })
+                        : new Date().toLocaleString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            timeZone: 'Asia/Kolkata',
+                            hour12: true,
+                          })
+                    }</td>
                   </tr>
                   <tr>
                     <td style="font-size: 14px; color: #707070; padding: 5px 0;">Username</td>

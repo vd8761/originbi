@@ -4,7 +4,11 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  Inject,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom, lastValueFrom } from 'rxjs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In, LessThan } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -30,6 +34,7 @@ import {
   GroupAssessment,
   Department,
   DepartmentDegree,
+  Notification,
 } from '@originbi/shared-entities';
 import { CorporateRegistrationsService } from './corporate-registrations.service';
 
@@ -70,8 +75,12 @@ export class BulkCorporateRegistrationsService {
     private departmentRepo: Repository<Department>,
     @InjectRepository(DepartmentDegree)
     private departmentDegreeRepo: Repository<DepartmentDegree>,
+    @InjectRepository(Notification)
+    private notificationRepo: Repository<Notification>,
     private dataSource: DataSource,
     private readonly corporateRegistrationsService: CorporateRegistrationsService,
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
   ) { }
 
   /**
@@ -442,425 +451,425 @@ export class BulkCorporateRegistrationsService {
     await this.bulkImportRepo.save(job);
 
     try {
-    // Fetch Corporate Account
-    let corporateAccount = await this.corporateAccountRepo.findOne({
-      where: { userId: createdById },
-    });
-    // Fallback for sub-users
-    if (!corporateAccount) {
-      const user = await this.userRepo.findOne({ where: { id: createdById } });
-      if (user && user.corporateId) {
-        corporateAccount = await this.corporateAccountRepo.findOne({
-          where: { id: Number(user.corporateId) },
-        });
-      }
-    }
-    if (!corporateAccount) {
-      this.logger.error(`Corporate Account not found for user ${createdById}`);
-      job.status = 'FAILED';
-      job.completedAt = new Date();
-      await this.bulkImportRepo.save(job);
-      return;
-    }
-
-    const corporateAccountId = corporateAccount.id;
-
-    // Reload Groups for matching
-    const allGroups = await this.groupsRepo.find({
-      where: { corporateAccountId },
-    });
-    const groupMap = new Map(allGroups.map((g) => [Number(g.id), g.name]));
-    const groupMapForMatching = new Map<string, Groups>();
-    allGroups.forEach((g) => {
-      groupMapForMatching.set(this.normalizeString(g.name), g);
-      if (g.code) {
-        groupMapForMatching.set(this.normalizeString(g.code), g);
-      }
-    });
-
-    const allPrograms = await this.programRepo.find();
-    const programMap = new Map<string, Program>();
-    allPrograms.forEach((p) => {
-      programMap.set(this.normalizeString(p.code), p);
-      programMap.set(this.normalizeString(p.name), p);
-    });
-
-    const allDepartments = await this.departmentRepo.find();
-    const allDeptDegrees = await this.departmentDegreeRepo.find({
-      relations: ['department'],
-    });
-    const departmentMap = new Map<string, Department>();
-    allDepartments.forEach((d) => {
-      if (d.shortName) {
-        departmentMap.set(this.normalizeString(d.shortName), d);
-      }
-    });
-
-    const degreeMap = new Map<string, DegreeTypeRow>();
-    const deptDegreeMap = new Map<string, string>(); // Map<departmentId_degreeTypeId, departmentDegreeId>
-    try {
-      const allDegrees: DegreeTypeRow[] = await this.dataSource.query(
-        'SELECT * FROM degree_types',
-      );
-      allDegrees.forEach((d) => {
-        degreeMap.set(this.normalizeString(d.name), d);
+      // Fetch Corporate Account
+      let corporateAccount = await this.corporateAccountRepo.findOne({
+        where: { userId: createdById },
       });
-    } catch (e) {
-      this.logger.warn(
-        'Could not fetch degree_types table, skipping degree validation',
-        e,
-      );
-    }
-    allDeptDegrees.forEach((dd) => {
-      deptDegreeMap.set(`${dd.departmentId}_${dd.degreeTypeId}`, dd.id);
-    });
-
-    const rows = await this.bulkImportRowRepo.find({
-      where: { importId: jobId, status: 'READY' },
-      order: { rowIndex: 'ASC' },
-    });
-
-    // 1. Group Rows into Batches
-    const batches = new Map<
-      string,
-      {
-        key: string;
-        groupName: string;
-        programType: string;
-        examStart: string | undefined;
-        examEnd: string | undefined;
-        rows: BulkImportRow[];
-        dtos: any[];
+      // Fallback for sub-users
+      if (!corporateAccount) {
+        const user = await this.userRepo.findOne({ where: { id: createdById } });
+        if (user && user.corporateId) {
+          corporateAccount = await this.corporateAccountRepo.findOne({
+            where: { id: Number(user.corporateId) },
+          });
+        }
       }
-    >();
-
-    for (const row of rows) {
-      let effectiveGroupName = this.getValue(row.rawData, [
-        'GroupName',
-        'group_name',
-        'Corporate',
-        'corporate',
-        'Group',
-      ]);
-      if (row.matchedGroupId) {
-        const matchedName = groupMap.get(Number(row.matchedGroupId));
-        if (matchedName) effectiveGroupName = matchedName;
+      if (!corporateAccount) {
+        this.logger.error(`Corporate Account not found for user ${createdById}`);
+        job.status = 'FAILED';
+        job.completedAt = new Date();
+        await this.bulkImportRepo.save(job);
+        return;
       }
 
-      const dto = this.mapRowToDto(
-        row.rawData,
-        effectiveGroupName || '',
-        programMap,
-        departmentMap,
-        degreeMap,
-        deptDegreeMap,
-      );
+      const corporateAccountId = corporateAccount.id;
 
-      // Find Program ID for Header from original CSV value
-      const rawProgram = this.getValue(row.rawData, ['ProgramId', 'program_code']);
-      const programObj = rawProgram
-        ? programMap.get(this.normalizeString(rawProgram))
-        : null;
-      const programId = programObj ? Number(programObj.id) : null;
+      // Reload Groups for matching
+      const allGroups = await this.groupsRepo.find({
+        where: { corporateAccountId },
+      });
+      const groupMap = new Map(allGroups.map((g) => [Number(g.id), g.name]));
+      const groupMapForMatching = new Map<string, Groups>();
+      allGroups.forEach((g) => {
+        groupMapForMatching.set(this.normalizeString(g.name), g);
+        if (g.code) {
+          groupMapForMatching.set(this.normalizeString(g.code), g);
+        }
+      });
 
-      // Create Batch Key
-      const batchKey = `${this.normalizeString(effectiveGroupName || '')}|${programId || 'UNKNOWN'}`;
+      const allPrograms = await this.programRepo.find();
+      const programMap = new Map<string, Program>();
+      allPrograms.forEach((p) => {
+        programMap.set(this.normalizeString(p.code), p);
+        programMap.set(this.normalizeString(p.name), p);
+      });
 
-      if (!batches.has(batchKey)) {
-        batches.set(batchKey, {
-          key: batchKey,
-          groupName: effectiveGroupName || '',
-          programType: String(programId || ''), // store resolved Program ID
-          examStart: dto.examStart,
-          examEnd: dto.examEnd,
-          rows: [],
-          dtos: [],
+      const allDepartments = await this.departmentRepo.find();
+      const allDeptDegrees = await this.departmentDegreeRepo.find({
+        relations: ['department'],
+      });
+      const departmentMap = new Map<string, Department>();
+      allDepartments.forEach((d) => {
+        if (d.shortName) {
+          departmentMap.set(this.normalizeString(d.shortName), d);
+        }
+      });
+
+      const degreeMap = new Map<string, DegreeTypeRow>();
+      const deptDegreeMap = new Map<string, string>(); // Map<departmentId_degreeTypeId, departmentDegreeId>
+      try {
+        const allDegrees: DegreeTypeRow[] = await this.dataSource.query(
+          'SELECT * FROM degree_types',
+        );
+        allDegrees.forEach((d) => {
+          degreeMap.set(this.normalizeString(d.name), d);
         });
-      }
-      batches.get(batchKey)?.rows.push(row);
-      batches.get(batchKey)?.dtos.push(dto);
-    }
-
-    let successCount = 0;
-    let failCount = 0;
-
-    // 2. Process Batches
-    for (const batch of batches.values()) {
-      this.logger.log(
-        `Processing Batch: ${batch.groupName} - Rows: ${batch.rows.length}`,
-      );
-
-      let groupAssessmentId = null;
-
-      // A. Create/Find Group
-      let group = allGroups.find(
-        (g) =>
-          this.normalizeString(g.name) === this.normalizeString(batch.groupName) ||
-          (g.code && this.normalizeString(g.code) === this.normalizeString(batch.groupName)),
-      );
-      try {
-        // If group doesn't exist in map but was passed, Create it ONLY if we are sure?
-        // Actually corporateRegistrationsService.registerCandidate handles group creation per row.
-        // But we need Group ID for the Header.
-        // So we MUST ensure group exists HERE.
-
-        if (!group) {
-          group = this.groupsRepo.create({
-            name: batch.groupName,
-            corporateAccountId: corporateAccountId,
-            createdByUserId: createdById,
-            isActive: true,
-            // code: ... auto
-          });
-          await this.groupsRepo.save(group);
-          // Add to cache
-          allGroups.push(group);
-        }
-      } catch (err) {
-        this.logger.error(
-          `Failed to find/create group ${batch.groupName}`,
-          err,
+      } catch (e) {
+        this.logger.warn(
+          'Could not fetch degree_types table, skipping degree validation',
+          e,
         );
-        // Fail all rows in batch
-        for (const row of batch.rows) {
-          row.status = 'FAILED';
-          row.errorMessage = 'System Error: Failed to create Group';
-          row.resultType = 'FAILED_DB';
-          failCount++;
-        }
-        await this.bulkImportRowRepo.save(batch.rows);
+      }
+      allDeptDegrees.forEach((dd) => {
+        deptDegreeMap.set(`${dd.departmentId}_${dd.degreeTypeId}`, dd.id);
+      });
 
-        // Fix stuck processing issue
-        await this.bulkImportRepo.increment(
-          { id: jobId },
-          'processedCount',
-          batch.rows.length,
+      const rows = await this.bulkImportRowRepo.find({
+        where: { importId: jobId, status: 'READY' },
+        order: { rowIndex: 'ASC' },
+      });
+
+      // 1. Group Rows into Batches
+      const batches = new Map<
+        string,
+        {
+          key: string;
+          groupName: string;
+          programType: string;
+          examStart: string | undefined;
+          examEnd: string | undefined;
+          rows: BulkImportRow[];
+          dtos: any[];
+        }
+      >();
+
+      for (const row of rows) {
+        let effectiveGroupName = this.getValue(row.rawData, [
+          'GroupName',
+          'group_name',
+          'Corporate',
+          'corporate',
+          'Group',
+        ]);
+        if (row.matchedGroupId) {
+          const matchedName = groupMap.get(Number(row.matchedGroupId));
+          if (matchedName) effectiveGroupName = matchedName;
+        }
+
+        const dto = this.mapRowToDto(
+          row.rawData,
+          effectiveGroupName || '',
+          programMap,
+          departmentMap,
+          degreeMap,
+          deptDegreeMap,
         );
 
-        continue;
+        // Find Program ID for Header from original CSV value
+        const rawProgram = this.getValue(row.rawData, ['ProgramId', 'program_code']);
+        const programObj = rawProgram
+          ? programMap.get(this.normalizeString(rawProgram))
+          : null;
+        const programId = programObj ? Number(programObj.id) : null;
+
+        // Create Batch Key
+        const batchKey = `${this.normalizeString(effectiveGroupName || '')}|${programId || 'UNKNOWN'}`;
+
+        if (!batches.has(batchKey)) {
+          batches.set(batchKey, {
+            key: batchKey,
+            groupName: effectiveGroupName || '',
+            programType: String(programId || ''), // store resolved Program ID
+            examStart: dto.examStart,
+            examEnd: dto.examEnd,
+            rows: [],
+            dtos: [],
+          });
+        }
+        batches.get(batchKey)?.rows.push(row);
+        batches.get(batchKey)?.dtos.push(dto);
       }
 
-      // B. Create Header (GroupAssessment)
-      try {
-        // Determine Dates
-        const dtoTemplate = batch.dtos[0];
-        const validFrom = dtoTemplate.examStart
-          ? new Date(dtoTemplate.examStart)
-          : new Date();
-        const validTo = dtoTemplate.examEnd
-          ? new Date(dtoTemplate.examEnd)
-          : new Date();
+      let successCount = 0;
+      let failCount = 0;
 
-        const programId = Number(batch.programType);
-        if (programId > 0) {
-          this.logger.log(
-            `Creating GroupAssessment for Group: ${group.id}, Program: ${programId}`,
+      // 2. Process Batches
+      for (const batch of batches.values()) {
+        this.logger.log(
+          `Processing Batch: ${batch.groupName} - Rows: ${batch.rows.length}`,
+        );
+
+        let groupAssessmentId = null;
+
+        // A. Create/Find Group
+        let group = allGroups.find(
+          (g) =>
+            this.normalizeString(g.name) === this.normalizeString(batch.groupName) ||
+            (g.code && this.normalizeString(g.code) === this.normalizeString(batch.groupName)),
+        );
+        try {
+          // If group doesn't exist in map but was passed, Create it ONLY if we are sure?
+          // Actually corporateRegistrationsService.registerCandidate handles group creation per row.
+          // But we need Group ID for the Header.
+          // So we MUST ensure group exists HERE.
+
+          if (!group) {
+            group = this.groupsRepo.create({
+              name: batch.groupName,
+              corporateAccountId: corporateAccountId,
+              createdByUserId: createdById,
+              isActive: true,
+              // code: ... auto
+            });
+            await this.groupsRepo.save(group);
+            // Add to cache
+            allGroups.push(group);
+          }
+        } catch (err) {
+          this.logger.error(
+            `Failed to find/create group ${batch.groupName}`,
+            err,
+          );
+          // Fail all rows in batch
+          for (const row of batch.rows) {
+            row.status = 'FAILED';
+            row.errorMessage = 'System Error: Failed to create Group';
+            row.resultType = 'FAILED_DB';
+            failCount++;
+          }
+          await this.bulkImportRowRepo.save(batch.rows);
+
+          // Fix stuck processing issue
+          await this.bulkImportRepo.increment(
+            { id: jobId },
+            'processedCount',
+            batch.rows.length,
           );
 
-          const groupAssessment = this.groupAssessmentRepo.create({
-            groupId: Number(group.id),
-            programId: programId,
-            validFrom,
-            validTo,
-            totalCandidates: batch.rows.length,
-            status: 'NOT_STARTED',
-            corporateAccountId: corporateAccountId,
-            createdByUserId: createdById,
-            metadata: { importId: jobId, source: 'BULK_UPLOAD' },
-          });
+          continue;
+        }
 
-          const savedGA = await this.groupAssessmentRepo.save(groupAssessment);
-          groupAssessmentId = savedGA.id;
-        } else {
-          // Fallback: Find any active program
-          this.logger.warn(
-            `Program ID could not be resolved for batch '${batch.groupName}'. Attempting default active program.`,
-          );
-          const defaultProgram = allPrograms.find((p) => p.isActive);
+        // B. Create Header (GroupAssessment)
+        try {
+          // Determine Dates
+          const dtoTemplate = batch.dtos[0];
+          const validFrom = dtoTemplate.examStart
+            ? new Date(dtoTemplate.examStart)
+            : new Date();
+          const validTo = dtoTemplate.examEnd
+            ? new Date(dtoTemplate.examEnd)
+            : new Date();
 
-          if (defaultProgram) {
+          const programId = Number(batch.programType);
+          if (programId > 0) {
             this.logger.log(
-              `Using Default Program: ${defaultProgram.name} (ID: ${defaultProgram.id})`,
+              `Creating GroupAssessment for Group: ${group.id}, Program: ${programId}`,
             );
 
             const groupAssessment = this.groupAssessmentRepo.create({
               groupId: Number(group.id),
-              programId: Number(defaultProgram.id),
+              programId: programId,
               validFrom,
               validTo,
               totalCandidates: batch.rows.length,
               status: 'NOT_STARTED',
               corporateAccountId: corporateAccountId,
               createdByUserId: createdById,
-              metadata: {
-                importId: jobId,
-                source: 'BULK_UPLOAD',
-                note: 'Used default program',
-              },
+              metadata: { importId: jobId, source: 'BULK_UPLOAD' },
             });
+
             const savedGA = await this.groupAssessmentRepo.save(groupAssessment);
             groupAssessmentId = savedGA.id;
+          } else {
+            // Fallback: Find any active program
+            this.logger.warn(
+              `Program ID could not be resolved for batch '${batch.groupName}'. Attempting default active program.`,
+            );
+            const defaultProgram = allPrograms.find((p) => p.isActive);
 
-            // Important: Update the DTOs in this batch to use this program ID
-            for (const d of batch.dtos) {
-              if (!d.programType) {
-                d.programType = defaultProgram.code || defaultProgram.name;
+            if (defaultProgram) {
+              this.logger.log(
+                `Using Default Program: ${defaultProgram.name} (ID: ${defaultProgram.id})`,
+              );
+
+              const groupAssessment = this.groupAssessmentRepo.create({
+                groupId: Number(group.id),
+                programId: Number(defaultProgram.id),
+                validFrom,
+                validTo,
+                totalCandidates: batch.rows.length,
+                status: 'NOT_STARTED',
+                corporateAccountId: corporateAccountId,
+                createdByUserId: createdById,
+                metadata: {
+                  importId: jobId,
+                  source: 'BULK_UPLOAD',
+                  note: 'Used default program',
+                },
+              });
+              const savedGA = await this.groupAssessmentRepo.save(groupAssessment);
+              groupAssessmentId = savedGA.id;
+
+              // Important: Update the DTOs in this batch to use this program ID
+              for (const d of batch.dtos) {
+                if (!d.programType) {
+                  d.programType = defaultProgram.code || defaultProgram.name;
+                }
               }
+            } else {
+              this.logger.error(
+                `CRITICAL: No programType in CSV and no default active program found.`,
+              );
+              throw new Error(
+                'No valid program found for this batch and no default active program is available.',
+              );
             }
-          } else {
-            this.logger.error(
-              `CRITICAL: No programType in CSV and no default active program found.`,
-            );
-            throw new Error(
-              'No valid program found for this batch and no default active program is available.',
-            );
           }
-        }
-      } catch (err) {
-        this.logger.error(
-          `CRITICAL: Failed to create GroupAssessment Header for batch ${batch.groupName}`,
-          err,
-        );
-
-        for (const row of batch.rows) {
-          row.status = 'FAILED';
-          row.errorMessage = `System Error: Failed to create Group Assessment Header${err instanceof Error && err.message ? ` - ${err.message}` : ''
-            }`;
-          row.resultType = 'FAILED_DB';
-          failCount++;
-        }
-        await this.bulkImportRowRepo.save(batch.rows);
-
-        // Fix stuck processing issue
-        await this.bulkImportRepo.increment(
-          { id: jobId },
-          'processedCount',
-          batch.rows.length,
-        );
-
-        continue; // Stop processing this batch
-      }
-
-      // Pre-fetch users for this batch to avoid N+1 queries
-      const emailsForBatch = batch.rows
-        .map((r) => this.normalizeEmail(r.rawData['Email'] || r.rawData['email']))
-        .filter(Boolean);
-      const mobilesForBatch = batch.rows.map(r => r.rawData['Mobile'] || r.rawData['mobile'] || r.rawData['mobile_number'])
-        .map(m => this.normalizeMobile(String(m)))
-        .filter(Boolean);
-
-      const batchUsers = await this.userRepo
-        .createQueryBuilder('u')
-        .where(
-          emailsForBatch.length > 0 ? 'LOWER(u.email) IN (:...emails)' : '1=0',
-          { emails: emailsForBatch },
-        )
-        .orWhere(
-          mobilesForBatch.length > 0
-            ? "regexp_replace(COALESCE(u.metadata->>'mobile', ''), '\\D', '', 'g') IN (:...mobiles)"
-            : '1=0',
-          { mobiles: mobilesForBatch },
-        )
-        .getMany();
-
-      const batchUserMapByEmail = new Map(
-        batchUsers.map((u) => [this.normalizeEmail(u.email), u]),
-      );
-      // For mobiles search, since it's common in college student programs, let's also fetch them if emails empty.
-      // But to be safe and efficient, let's use the maps we already build in the loop if needed or just optimized queries.
-
-      let batchProcessedCount = 0;
-      for (let i = 0; i < batch.rows.length; i++) {
-        // Throttle to prevent Cognito 429 errors (Approx 50 req/sec)
-        await new Promise((resolve) => setTimeout(resolve, 20));
-
-        const row = batch.rows[i];
-        const dto = batch.dtos[i];
-
-        try {
-          if (!groupAssessmentId) {
-            throw new Error('Group Assessment ID missing.');
-          }
-          dto.groupAssessmentId = Number(groupAssessmentId);
-
-          const email = this.normalizeEmail(
-            row.rawData['Email'] || row.rawData['email'],
+        } catch (err) {
+          this.logger.error(
+            `CRITICAL: Failed to create GroupAssessment Header for batch ${batch.groupName}`,
+            err,
           );
-          const mobile = row.rawData['Mobile'] || row.rawData['mobile'] || row.rawData['mobile_number'];
-          const mobileNorm = this.normalizeMobile(mobile);
 
-          let existingUserId: number | null = null;
-          if (email && batchUserMapByEmail.has(email)) {
-            existingUserId = batchUserMapByEmail.get(email)!.id;
-          } else if (mobileNorm) {
-            // Secondary fallback for mobile if email didn't match
-            const u = await this.userRepo
-              .createQueryBuilder('u')
-              .where(
-                "regexp_replace(COALESCE(u.metadata->>'mobile', ''), '\\D', '', 'g') = :mobile",
-                { mobile: mobileNorm },
-              )
-              .getOne();
-            if (u) existingUserId = u.id;
+          for (const row of batch.rows) {
+            row.status = 'FAILED';
+            row.errorMessage = `System Error: Failed to create Group Assessment Header${err instanceof Error && err.message ? ` - ${err.message}` : ''
+              }`;
+            row.resultType = 'FAILED_DB';
+            failCount++;
           }
+          await this.bulkImportRowRepo.save(batch.rows);
 
-          if (existingUserId) {
-            // Free Assignment
-            await this.corporateRegistrationsService.assignAssessmentToExistingUser(
-              existingUserId,
-              dto,
-              createdById,
-            );
-            row.resultType = 'ASSIGNED'; // Specific status for existing users
-          } else {
-            // Paid Registration
-            await this.corporateRegistrationsService.registerCandidate(
-              dto,
-              createdById,
-            );
-            row.resultType = 'CREATED';
-          }
-
-          row.status = 'SUCCESS';
-          successCount++;
-          await this.bulkImportRowRepo.save(row);
-        } catch (err: any) {
-          this.logger.error(`Row ${row.rowIndex} failed`, err);
-          row.status = 'FAILED';
-          row.errorMessage = err.message || 'Unknown error'; // Could be 'Insufficient credits'
-          row.resultType = 'FAILED_DB';
-          failCount++;
-          await this.bulkImportRowRepo.save(row);
-        }
-
-        batchProcessedCount++;
-        // Update job progress incrementally every 5 rows
-        if (batchProcessedCount % 5 === 0) {
+          // Fix stuck processing issue
           await this.bulkImportRepo.increment(
             { id: jobId },
             'processedCount',
-            5,
+            batch.rows.length,
+          );
+
+          continue; // Stop processing this batch
+        }
+
+        // Pre-fetch users for this batch to avoid N+1 queries
+        const emailsForBatch = batch.rows
+          .map((r) => this.normalizeEmail(r.rawData['Email'] || r.rawData['email']))
+          .filter(Boolean);
+        const mobilesForBatch = batch.rows.map(r => r.rawData['Mobile'] || r.rawData['mobile'] || r.rawData['mobile_number'])
+          .map(m => this.normalizeMobile(String(m)))
+          .filter(Boolean);
+
+        const batchUsers = await this.userRepo
+          .createQueryBuilder('u')
+          .where(
+            emailsForBatch.length > 0 ? 'LOWER(u.email) IN (:...emails)' : '1=0',
+            { emails: emailsForBatch },
+          )
+          .orWhere(
+            mobilesForBatch.length > 0
+              ? "regexp_replace(COALESCE(u.metadata->>'mobile', ''), '\\D', '', 'g') IN (:...mobiles)"
+              : '1=0',
+            { mobiles: mobilesForBatch },
+          )
+          .getMany();
+
+        const batchUserMapByEmail = new Map(
+          batchUsers.map((u) => [this.normalizeEmail(u.email), u]),
+        );
+        // For mobiles search, since it's common in college student programs, let's also fetch them if emails empty.
+        // But to be safe and efficient, let's use the maps we already build in the loop if needed or just optimized queries.
+
+        let batchProcessedCount = 0;
+        for (let i = 0; i < batch.rows.length; i++) {
+          // Throttle to prevent Cognito 429 errors (Approx 50 req/sec)
+          await new Promise((resolve) => setTimeout(resolve, 20));
+
+          const row = batch.rows[i];
+          const dto = batch.dtos[i];
+
+          try {
+            if (!groupAssessmentId) {
+              throw new Error('Group Assessment ID missing.');
+            }
+            dto.groupAssessmentId = Number(groupAssessmentId);
+
+            const email = this.normalizeEmail(
+              row.rawData['Email'] || row.rawData['email'],
+            );
+            const mobile = row.rawData['Mobile'] || row.rawData['mobile'] || row.rawData['mobile_number'];
+            const mobileNorm = this.normalizeMobile(mobile);
+
+            let existingUserId: number | null = null;
+            if (email && batchUserMapByEmail.has(email)) {
+              existingUserId = batchUserMapByEmail.get(email)!.id;
+            } else if (mobileNorm) {
+              // Secondary fallback for mobile if email didn't match
+              const u = await this.userRepo
+                .createQueryBuilder('u')
+                .where(
+                  "regexp_replace(COALESCE(u.metadata->>'mobile', ''), '\\D', '', 'g') = :mobile",
+                  { mobile: mobileNorm },
+                )
+                .getOne();
+              if (u) existingUserId = u.id;
+            }
+
+            if (existingUserId) {
+              // Free Assignment
+              await this.corporateRegistrationsService.assignAssessmentToExistingUser(
+                existingUserId,
+                dto,
+                createdById,
+              );
+              row.resultType = 'ASSIGNED'; // Specific status for existing users
+            } else {
+              // Paid Registration
+              await this.corporateRegistrationsService.registerCandidate(
+                dto,
+                createdById,
+              );
+              row.resultType = 'CREATED';
+            }
+
+            row.status = 'SUCCESS';
+            successCount++;
+            await this.bulkImportRowRepo.save(row);
+          } catch (err: any) {
+            this.logger.error(`Row ${row.rowIndex} failed`, err);
+            row.status = 'FAILED';
+            row.errorMessage = err.message || 'Unknown error'; // Could be 'Insufficient credits'
+            row.resultType = 'FAILED_DB';
+            failCount++;
+            await this.bulkImportRowRepo.save(row);
+          }
+
+          batchProcessedCount++;
+          // Update job progress incrementally every 5 rows
+          if (batchProcessedCount % 5 === 0) {
+            await this.bulkImportRepo.increment(
+              { id: jobId },
+              'processedCount',
+              5,
+            );
+          }
+        }
+        // Update remaining progress for this batch
+        const remaining = batchProcessedCount % 5;
+        if (remaining > 0) {
+          await this.bulkImportRepo.increment(
+            { id: jobId },
+            'processedCount',
+            remaining,
           );
         }
       }
-      // Update remaining progress for this batch
-      const remaining = batchProcessedCount % 5;
-      if (remaining > 0) {
-        await this.bulkImportRepo.increment(
-          { id: jobId },
-          'processedCount',
-          remaining,
-        );
-      }
-    }
 
-    job.status = 'COMPLETED';
-    job.processedCount = successCount + failCount; // Should match total
-    job.completedAt = new Date();
-    await this.bulkImportRepo.save(job);
-    this.logger.log(
-      `Job ${jobId} Completed. Success: ${successCount}, Fail: ${failCount}`,
-    );
+      job.status = 'COMPLETED';
+      job.processedCount = successCount + failCount; // Should match total
+      job.completedAt = new Date();
+      await this.bulkImportRepo.save(job);
+      this.logger.log(
+        `Job ${jobId} Completed. Success: ${successCount}, Fail: ${failCount}`,
+      );
     } catch (error: any) {
       this.logger.error(`Critical overarching error in processing job ${jobId}`, error);
       if (job) {
@@ -894,6 +903,94 @@ export class BulkCorporateRegistrationsService {
       // Delete jobs
       const res = await this.bulkImportRepo.delete({ id: In(ids) });
       this.logger.log(`Deleted ${res.affected} old DRAFT bulk imports.`);
+    }
+  }
+
+  /**
+   * Exam Expiration Notification (1 day before)
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_9AM)
+  async notifyExpiringExams() {
+    this.logger.log('Running notifyExpiringExams cron...');
+
+    try {
+      // 1. Calculate boundaries for "Tomorrow" in IST (Assuming DB is UTC)
+      // We want session.valid_to to be within [Now + 24h - buffer, Now + 24h + buffer]
+      // Or just sessions whose validTo is tomorrow in IST calendar.
+      const tomorrow = dayjs().add(1, 'day');
+      const startOfTomorrow = tomorrow.startOf('day').toISOString();
+      const endOfTomorrow = tomorrow.endOf('day').toISOString();
+
+      // 2. Find sessions expiring tomorrow
+      const expiringSessions = await this.dataSource.query(
+        `
+        SELECT s.id, u.corporate_id, r.full_name as student_name
+        FROM assessment_sessions s
+        JOIN users u ON s.user_id = u.id
+        JOIN registrations r ON s.registration_id = r.id
+        WHERE s.status IN ('NOT_STARTED', 'IN_PROGRESS')
+          AND s.valid_to >= $1 AND s.valid_to <= $2
+          AND u.role = 'STUDENT'
+          AND u.corporate_id IS NOT NULL
+        `,
+        [startOfTomorrow, endOfTomorrow],
+      );
+
+      if (!expiringSessions || expiringSessions.length === 0) {
+        this.logger.log('No expiring exams found for tomorrow.');
+        return;
+      }
+
+      // 3. Group by Corporate ID
+      const corpMap = new Map<number, { count: number; studentNames: string[] }>();
+      for (const s of expiringSessions) {
+        const corpId = Number(s.corporate_id);
+        if (!corpId) continue;
+
+        if (!corpMap.has(corpId)) {
+          corpMap.set(corpId, { count: 0, studentNames: [] });
+        }
+        const entry = corpMap.get(corpId)!;
+        entry.count++;
+        if (s.student_name) entry.studentNames.push(s.student_name);
+      }
+
+      // 4. Send notifications
+      const adminServiceUrl =
+        this.configService.get<string>('ADMIN_SERVICE_URL') ||
+        'http://localhost:4002';
+
+      for (const [corpId, data] of corpMap.entries()) {
+        const corpAccount = await this.corporateAccountRepo.findOne({
+          where: { id: corpId },
+        });
+
+        if (!corpAccount || !corpAccount.userId) continue;
+
+        const message = `Candidate ${data.studentNames.join(', ')}'s assessment will be expired in 1 day.`;
+
+        try {
+          await this.notificationRepo.save({
+            userId: Number(corpAccount.userId),
+            role: 'CORPORATE',
+            type: 'EXAM_EXPIRATION',
+            title: 'Exam Expiry Warning',
+            message,
+            metadata: {
+              corporateAccountId: corpId,
+              count: data.count,
+              expiryDate: startOfTomorrow,
+            },
+          });
+          this.logger.log(`Expiry notification saved for Corp ID: ${corpId}`);
+        } catch (err) {
+          this.logger.error(
+            `Failed to save notification for corporate account ${corpId}: ${err.message}`,
+          );
+        }
+      }
+    } catch (error) {
+      this.logger.error('Error in notifyExpiringExams cron', error.stack);
     }
   }
 
@@ -1259,7 +1356,7 @@ export class BulkCorporateRegistrationsService {
       // Ensure the combination maps to a valid departmentDegreeId
       const key = `${dept.id}_${deg.id}`;
       if (!deptDegreeMap.has(key)) {
-         return `The combination of Department '${deptName}' and Degree '${degreeName}' is invalid or not found.`;
+        return `The combination of Department '${deptName}' and Degree '${degreeName}' is invalid or not found.`;
       }
     }
 

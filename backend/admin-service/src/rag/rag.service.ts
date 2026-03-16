@@ -393,6 +393,9 @@ export class RagService {
       'conut': 'count', 'cont': 'count',
       // Pronoun typos
       'im': 'i am', 'iam': 'i am',
+      'thies': 'their', 'ther': 'their', 'thire': 'their',
+      'educations': 'education', 'qulaification': 'qualification', 'qualificaton': 'qualification',
+      'qualifcation': 'qualification', 'qualificaion': 'qualification',
       // Gender typos
       'mal': 'male', 'femal': 'female', 'femle': 'female',
       // Project/role typos
@@ -928,6 +931,14 @@ export class RagService {
         const userId = user?.id || 0;
         const userEmail = user?.email || '';
         const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
+        // Semantic enrichment: fetch relevant career/knowledge docs from vector store
+        const careerRagChunks = await this.embeddingsService.semanticSearch(resolvedQuestion, 3).catch(() => []);
+        if (careerRagChunks.length > 0) {
+          this.logger.log(`📚 Career guidance enriched with ${careerRagChunks.length} semantic chunks`);
+          const ragCtx = `\n\n— RELEVANT KNOWLEDGE BASE —\n${careerRagChunks.map((d: any, i: number) => `[${i + 1}] ${d.content}`).join('\n---\n')}`;
+          const answer = await this.oriIntelligence.answerAnyQuestion(resolvedQuestion, userProfile, ragCtx);
+          return { answer, searchType: 'career_guidance_semantic', confidence: 0.95 };
+        }
         const answer = await this.oriIntelligence.generateCareerGuidance(question, userProfile);
         return { answer, searchType: 'career_guidance', confidence: 0.95 };
       }
@@ -1170,6 +1181,29 @@ export class RagService {
 
         // ── Enhanced role-aware context for LLM ──
         const userRole = user?.role || 'STUDENT';
+
+        // ═══════════════════════════════════════════════════════════════
+        // CORPORATE DOMAIN GUARD — Corporate users should ONLY get
+        // answers about career, talent, HR, business, and their platform
+        // data. Block random general knowledge like "what is dusk".
+        // ═══════════════════════════════════════════════════════════════
+        if (userRole === 'CORPORATE') {
+          const careerDomainPattern = /\b(career|job|role|skill|talent|hire|hiring|recruit|interview|resume|salary|promotion|performance|team|employee|resource|candidate|assessment|report|leadership|management|strategy|business|company|corporate|industry|sector|competency|development|training|analytics|data|dashboard|score|result|qualification|education|experience|department|designation|onboarding|retention|attrition|engagement|workforce|succession|pipeline|aptitude|personality|behavioral|soft\s*skill|hard\s*skill|technical|professional|human\s*resource|HR|KPI|OKR|feedback|appraisal|review|goal|objective|benchmark|productivity|efficiency|compliance|policy|diversity|inclusion|culture|compensation|benefits?|payroll|leave|attendance|probation)\b/i;
+          const isCareerDomainQuery = careerDomainPattern.test(resolvedQuestion);
+
+          // Also allow follow-ups that reference conversation context (pronouns, "them", "those", etc.)
+          const isFollowUpQuery = /\b(their|them|those|these|his|her|show|list|get|display)\b/i.test(resolvedQuestion) && conversationHistory;
+
+          if (!isCareerDomainQuery && !isFollowUpQuery) {
+            this.logger.log(`🚫 CORPORATE DOMAIN GUARD: Blocking non-domain query: "${resolvedQuestion}"`);
+            return {
+              answer: `I'm designed to help with career intelligence, talent analytics, and workforce management for your organization.\n\nTry asking about:\n- **Your candidates/employees** — "list my employees", "show top performers"\n- **Career insights** — "skills for data analyst", "career path for CFO"\n- **Assessments** — "show test results", "best candidate for [role]"\n- **Reports** — "generate career report for [name]"`,
+              searchType: 'domain_guard',
+              confidence: 0.95,
+            };
+          }
+        }
+
         const roleContext = userRole === 'ADMIN'
           ? 'The user is a platform ADMIN with full access to all candidates, users, and analytics. They may ask about platform metrics, candidate management, or hiring insights.'
           : userRole === 'CORPORATE'
@@ -1182,12 +1216,56 @@ export class RagService {
           ? `[User Role: ${userRole}] ${roleContext}\n\n${conversationHistory}`
           : `[User Role: ${userRole}] ${roleContext}`;
 
+        // ═══════════════════════════════════════════════════════════════
+        // ANTI-FABRICATION GUARD — If conversation mentions candidates/
+        // people/names and user asks about their details (education,
+        // scores, qualifications), NEVER let LLM answer. Force DB route
+        // or return "data not available" — prevents hallucinated data.
+        // ═══════════════════════════════════════════════════════════════
+        const askingAboutPeopleData = /\b(education|qualification|degree|score|marks|result|assessment|email|phone|contact|address|experience|department|designation|salary|gender|age)\b/i.test(resolvedQuestion);
+        const conversationMentionsPeople = conversationHistory && /\b(candidates?|employees?|resources?|people|names?|male|female|persons?|staff)\b/i.test(conversationHistory);
+        const isFollowUpAboutPeople = /\b(their|them|those|these|his|her|list|show)\b/i.test(resolvedQuestion) && conversationMentionsPeople;
+
+        if ((askingAboutPeopleData && conversationMentionsPeople) || (askingAboutPeopleData && isFollowUpAboutPeople)) {
+          this.logger.log('🛡️ ANTI-FABRICATION GUARD: User asking about candidate details — routing to DB, not LLM');
+          try {
+            const tsResult = await this.textToSqlService.answerQuestion(
+              resolvedQuestion, user as UserContext, conversationHistory,
+            );
+            if (tsResult.confidence > 0.3 && tsResult.rowCount > 0) {
+              return {
+                answer: tsResult.answer,
+                searchType: tsResult.searchType,
+                confidence: tsResult.confidence,
+                sources: { rows: tsResult.rowCount },
+              };
+            }
+          } catch (e) {
+            this.logger.warn(`Anti-fabrication DB route failed: ${e.message}`);
+          }
+          // If DB returned nothing, give a clear "not available" response instead of letting LLM fabricate
+          const scopeMsg = userRole === 'CORPORATE' ? ' in your organization' : '';
+          return {
+            answer: this.getContextualNoDataMessage(resolvedQuestion, scopeMsg),
+            searchType: 'data_guard_no_fabrication',
+            confidence: 0.85,
+          };
+        }
+
         this.logger.log('🧠 Using LLM directly for general knowledge');
         const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
-        const answer = await this.oriIntelligence.answerAnyQuestion(resolvedQuestion, userProfile, enrichedHistory);
+        // Semantic enrichment: pull relevant docs from vector store with Cohere reranking
+        const genKnowledgeChunks = await this.embeddingsService.semanticSearch(resolvedQuestion, 3).catch(() => []);
+        const genRagContext = genKnowledgeChunks.length > 0
+          ? `${enrichedHistory}\n\n— RELEVANT PLATFORM KNOWLEDGE (use if applicable) —\n${genKnowledgeChunks.map((d: any, i: number) => `[${i + 1}] ${d.content}`).join('\n---\n')}`
+          : enrichedHistory;
+        if (genKnowledgeChunks.length > 0) {
+          this.logger.log(`📚 General knowledge enriched with ${genKnowledgeChunks.length} semantic chunks`);
+        }
+        const answer = await this.oriIntelligence.answerAnyQuestion(resolvedQuestion, userProfile, genRagContext);
         return {
           answer,
-          searchType: 'intelligent_response',
+          searchType: genKnowledgeChunks.length > 0 ? 'semantic_enriched' : 'intelligent_response',
           confidence: 0.9,
         };
       }
@@ -1331,9 +1409,10 @@ export class RagService {
         }
 
         // Only use LLM fallback for genuinely non-DB intents (career_guidance, etc.)
-        // Even here, check that the question isn't about platform entities
-        const platformEntityCheck = /\b(companies|corporates?|company|candidates?|students?|users?|employees?|resources?|assessments?|scores?|results?|affiliates?|registrations?)\\b/i;
-        if (platformEntityCheck.test(question)) {
+        // Even here, check that the question isn't about platform entities or candidate data
+        const platformEntityCheck = /\b(companies|corporates?|company|candidates?|students?|users?|employees?|resources?|assessments?|scores?|results?|affiliates?|registrations?)\b/i;
+        const candidateDataCheck = /\b(education|qualification|degree|department|designation|salary|gender|age|email|mobile|phone|contact|address|experience|marks|board|stream)\b/i;
+        if (platformEntityCheck.test(question) || (candidateDataCheck.test(question) && conversationHistory && /\b(candidate|employee|resource|people|person|staff|male|female)\b/i.test(conversationHistory))) {
           // Platform data question — return DB-only message, don't use LLM
           return {
             answer: `No matching data found for your request. Try asking a more specific question or use commands like:\n- **"list candidates"** — see all registered candidates\n- **"list companies"** — see corporate accounts\n- **"show top performers"** — see highest scorers`,
@@ -3330,6 +3409,9 @@ JSON:`;
         'report', 'reports', 'result', 'results', 'score', 'scores',
         'assessment', 'data', 'details', 'info', 'information',
         'company', 'organization', 'department', 'performance', 'performer', 'performers',
+        'analyst', 'analysts', 'engineer', 'engineers', 'scientist', 'scientists',
+        'architect', 'architects', 'consultant', 'consultants', 'specialist', 'specialists',
+        'career', 'careers', 'path', 'paths', 'skills',
       ]);
 
       const searchWords = result.searchTerm.toLowerCase().split(/\s+/);
@@ -3381,6 +3463,45 @@ JSON:`;
       }
     }
 
+    // Advanced guardrail: role/topic phrase should not stay in person_lookup.
+    if (result.intent === 'person_lookup' && result.searchTerm && this.isLikelyRoleOrTopicPhrase(result.searchTerm)) {
+      const looksLikeCandidateMatching = /\b(candidate|candidates|people|person)\b/i.test(q) && /\b(for|suitable|fit|match)\b/i.test(q);
+      this.logger.warn(`🔄 Domain override: person_lookup searchTerm "${result.searchTerm}" looks like a role/topic phrase`);
+      if (looksLikeCandidateMatching) {
+        return {
+          ...result,
+          intent: 'jd_candidate_match',
+          searchTerm: null,
+          table: 'assessment_attempts',
+          includePersonality: true,
+        };
+      }
+      return {
+        ...result,
+        intent: 'general_knowledge',
+        searchTerm: null,
+        table: 'none',
+        includePersonality: false,
+      };
+    }
+
+    // Final guardrail: if person_lookup is triggered for a clear informational query,
+    // reroute to general_knowledge and clear searchTerm.
+    if (result.intent === 'person_lookup' &&
+      (/\bskills?\s+(for|to|needed|required|of|in)\b/.test(q) ||
+        /\bcareer\s*paths?\b/.test(q) ||
+        /\b(ask|tell)\s+me\s+about\b/.test(q)) &&
+      !/\b(my|candidate|registration|student|user|employee|resource|company|corporate|organization|score|result|assessment|test|report)\b/.test(q)) {
+      this.logger.warn('🔄 Domain override: informational career/skills query misrouted to person_lookup, correcting to general_knowledge');
+      return {
+        ...result,
+        intent: 'general_knowledge',
+        searchTerm: null,
+        table: 'none',
+        includePersonality: false,
+      };
+    }
+
     return result;
   }
 
@@ -3406,7 +3527,11 @@ JSON:`;
       || /^(give|tell)\s+(me\s+)?(all\s+)?(the\s+|those\s+)?(detail|info|data|name)s?\s*\??$/i.test(q)
       // Extended follow-ups: "show their list along with X", "list them with education", "show their details with scores"
       || /^(show|list|get|display)\s+(their|them|those|the)\s+(list|details?|info|data|names?)\b/i.test(q)
-      || /^(list|show)\s+(them|those)\b/i.test(q);
+      || /^(list|show)\s+(them|those)\b/i.test(q)
+      // Pronoun + data qualifier: "their education qualification", "their scores", "their details with education"
+      || /\btheir\b/i.test(q) && /\b(education|qualification|score|marks|assessment|personality|department|degree|experience|gender|age|email|mobile|phone|board|stream|level)s?\b/i.test(q)
+      // Standalone data qualifier as follow-up: "education qualification", "show scores"
+      || /^(show|list|get|display|tell|give)?\s*(me\s+)?(all\s+)?(the\s+|their\s+|those\s+)?(education|qualification|score|marks|assessment|department|degree|experience)s?\b/i.test(q) && q.split(/\s+/).length <= 5;
 
     if (!isGenericFollowUp) return null;
 
@@ -3518,15 +3643,23 @@ JSON:`;
     // These refer to previously mentioned candidates — route to data_query
     // so the text-to-SQL engine can include requested columns.
     // ═══════════════════════════════════════════════════════════════
-    if (/\b(show|list|get|display)\s+(their|them|those)\s+(list|details?|info|data|names?)\b/i.test(q) ||
+    // Check for data qualifiers (education, score, etc.) — these turn any pronoun follow-up into data_query
+    const hasDataQualifier = /\b(education|qualification|score|marks|assessment|personality|department|degree|experience|gender|age|email|mobile|phone|board|stream|level)s?\b/i.test(q);
+
+    if (/\b(show|list|get|display)\s+(their|them|those)\s+(list|details?|info|data|names?|education|qualification|score)s?\b/i.test(q) ||
         /\b(show|list|get|display)\s+(them|those)\b/i.test(q) ||
-        /\btheir\s+(list|details?|info|names?)\b/i.test(q)) {
-      // If extra qualifiers like "education", "score", etc. → data_query for flexible columns
-      const hasQualifier = /\b(education|qualification|score|marks|assessment|personality|department|degree|experience|gender|age|email|mobile|phone)\b/i.test(q);
-      if (hasQualifier) {
+        /\btheir\s+(list|details?|info|names?|education|qualification|score)s?\b/i.test(q) ||
+        // Standalone pronoun + data qualifier: "their education qualification", "their scores"
+        /\btheir\b/i.test(q) && hasDataQualifier) {
+      if (hasDataQualifier) {
         return { intent: 'data_query', searchTerm: null, table: 'registrations', includePersonality: true };
       }
       return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
+    }
+
+    // Standalone data qualifier as follow-up: "education qualification", "their scores", "show scores"
+    if (hasDataQualifier && /^(show|list|get|display|tell|give)?\s*(me\s+)?(all\s+)?(the\s+|their\s+|those\s+)?/i.test(q) && q.split(/\s+/).length <= 6) {
+      return { intent: 'data_query', searchTerm: null, table: 'registrations', includePersonality: true };
     }
 
     // "best candidate for [role]" → jd_candidate_match (role-specific matching, NOT generic best_performer)
@@ -4020,6 +4153,14 @@ JSON:`;
       return { intent: 'self_results', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
     }
 
+    // Guardrail: career/skills informational queries must NEVER become person lookup.
+    if ((/\bskills?\s+(for|to|needed|required|of|in)\b/.test(q) ||
+      /\bcareer\s*paths?\b/.test(q) ||
+      /\b(ask|tell)\s+me\s+about\b/.test(q)) &&
+      !/\b(my|candidate|registration|student|user|employee|resource|company|corporate|organization|score|result|assessment|test|list|show|get|count|how\s+many)\b/.test(q)) {
+      return { intent: 'general_knowledge', searchTerm: null, table: 'none', includePersonality: false };
+    }
+
     // Test results / test report for a specific person
     if (/\b(test|exam|assessment)\s*(result|score|report)s?\b/.test(q) || /\bresults?\b/.test(q)) {
       const name = this.extractName(question);
@@ -4028,7 +4169,7 @@ JSON:`;
 
     // Person lookup: "[name]'s score" or "show [name]" or "[name] report"
     const possibleName = this.extractName(question);
-    if (possibleName && /\b(score|result|detail|profile|data|report)\b/.test(q)) {
+    if (possibleName && /\b(score|result|detail|profile|report)\b/.test(q)) {
       return { intent: 'person_lookup', searchTerm: possibleName, table: 'assessment_attempts', includePersonality: true };
     }
 
@@ -4229,6 +4370,41 @@ JSON:`;
     }
   }
 
+  /**
+   * Detect role/topic phrases that can be mistaken for person names.
+   */
+  private isLikelyRoleOrTopicPhrase(text: string): boolean {
+    const value = (text || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!value) return false;
+
+    const roleIndicators = [
+      'analyst', 'engineer', 'developer', 'manager', 'architect', 'consultant',
+      'specialist', 'scientist', 'designer', 'administrator', 'officer', 'executive',
+      'lead', 'intern', 'cfo', 'ceo', 'cto', 'coo', 'hr',
+    ];
+    const domainIndicators = [
+      'data', 'business', 'financial', 'software', 'network', 'security', 'cloud',
+      'marketing', 'sales', 'operations', 'product', 'project', 'frontend', 'backend',
+      'full stack', 'devops', 'machine learning', 'artificial intelligence', 'ai',
+      'career', 'skills', 'path', 'paths', 'job', 'role', 'technology',
+    ];
+
+    const hasRoleIndicator = roleIndicators.some((k) => value.includes(k));
+    const hasDomainIndicator = domainIndicators.some((k) => value.includes(k));
+    const words = value.split(' ').filter(Boolean);
+
+    if (hasRoleIndicator && hasDomainIndicator) return true;
+    if (hasRoleIndicator && words.length <= 4) return true;
+    if (/\bcareer\s+paths?\b/.test(value) || /\bskills?\s+for\b/.test(value)) return true;
+
+    return false;
+  }
+
   private fallbackInterpretation(question: string): {
     intent: string;
     searchTerm: string | null;
@@ -4350,9 +4526,21 @@ JSON:`;
       };
     }
 
+    // Guardrail: keep informational skill/career prompts in general knowledge.
+    if (qLowerUniq.match(/\bskills?\s+(for|to|needed|required|of|in)\b/) ||
+      qLowerUniq.match(/\bcareer\s*paths?\b/) ||
+      qLowerUniq.match(/\b(ask|tell)\s+me\s+about\b/)) {
+      return {
+        intent: 'general_knowledge',
+        searchTerm: null,
+        table: 'none',
+        includePersonality: false,
+      };
+    }
+
     // Default - try to find a name
     const name = this.extractName(question);
-    if (name) {
+    if (name && !this.isLikelyRoleOrTopicPhrase(name)) {
       return {
         intent: 'person_lookup',
         searchTerm: name,
@@ -4403,6 +4591,8 @@ JSON:`;
       'corporate', 'business', 'employer', 'companies', 'corporates',
       'development', 'developer', 'engineering', 'full', 'stack',
       'frontend', 'backend', 'manager', 'lead', 'senior', 'junior',
+      'analyst', 'analysts', 'engineer', 'engineers', 'scientist', 'scientists',
+      'architect', 'architects', 'consultant', 'consultants', 'specialist', 'specialists',
       'role', 'position', 'job', 'work', 'tasks', 'skill', 'skills',
       'information', 'info', 'help', 'status', 'count',
       // Gender terms — NOT person names
@@ -4415,6 +4605,7 @@ JSON:`;
       // Follow-up / structural words — NOT person names
       'along', 'with', 'without', 'including', 'education', 'qualification',
       'qualifications', 'experience', 'details', 'detail', 'score', 'scores',
+      'path', 'paths', 'career', 'careers',
     ]);
 
     for (const pattern of patterns) {
@@ -4444,7 +4635,7 @@ JSON:`;
           return null;
         }
 
-        if (name && !stopWords.has(name.toLowerCase()) && name.length >= 2) {
+        if (name && !stopWords.has(name.toLowerCase()) && name.length >= 2 && !this.isLikelyRoleOrTopicPhrase(name)) {
           return name;
         }
       }

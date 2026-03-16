@@ -39,6 +39,7 @@ export interface CourseCompatibility {
   course_name: string;
   compatibility_percentage: number;
   notes: string;
+  department_name?: string;
 }
 
 /**
@@ -175,13 +176,35 @@ export async function getCompatibilityMatrixDetails(
     const traitId = traitResult.rows[0].id;
     logger.info(`[DB-DEBUG] ✅ Found Trait ID: ${traitId}`);
 
-    // 2. Get Career Roles (Filtered by Trait AND Department)
-    // Note: Using 'department_degree_id' matching the table schema.
+    // 2. Get Courses (Filtered by Trait, joined through school_stream_departments)
+    // trait_based_course_details.school_stream_department_id -> school_stream_departments.id
+    // school_stream_departments.school_stream_id -> the stream we filter by
     if (schoolStreamId) {
-      // --- EXISTING LOGIC (HSC - Specific Stream) ---
+      // --- HSC: Specific Stream, Top 10 per Department ---
       const rolesQuery = `
-                SELECT course_name, compatibility_percentage, notes
-                FROM trait_based_course_details WHERE trait_id = $1 and school_stream_id = $2
+                WITH RankedCourses AS (
+                    SELECT 
+                        tcd.course_name, 
+                        tcd.compatibility_percentage, 
+                        tcd.notes,
+                        ssd.name AS department_name,
+                        ssd.display_order,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY ssd.id 
+                            ORDER BY tcd.compatibility_percentage DESC, tcd.id ASC
+                        ) as rank
+                    FROM trait_based_course_details tcd
+                    JOIN school_stream_departments ssd ON tcd.school_stream_department_id = ssd.id
+                    WHERE tcd.trait_id = $1
+                      AND ssd.school_stream_id = $2
+                )
+                SELECT 
+                    course_name, 
+                    compatibility_percentage, 
+                    notes, 
+                    department_name
+                FROM RankedCourses
+                ORDER BY display_order ASC, compatibility_percentage DESC;
             `;
 
       const rolesResult = await client.query(rolesQuery, [
@@ -198,35 +221,35 @@ export async function getCompatibilityMatrixDetails(
 
       return rolesResult.rows;
     } else {
-      // --- NEW LOGIC (SSLC - All Streams, Top 5 Each) ---
-      logger.info('[DB-DEBUG] ℹ️ SSLC Case: Fetching Top 5 per stream');
-
-      // We need to fetch for streams 1 (Science), 2 (Commerce), 3 (Humanities)
-      // Union approach with ROW_NUMBER partition
+      // --- SSLC: All Streams, Top 10 per Department ---
+      logger.info('[DB-DEBUG] ℹ️ SSLC Case: Fetching Top 10 per department across streams');
 
       const multiStreamQuery = `
                 WITH RankedCourses AS (
                     SELECT 
-                        course_name, 
-                        compatibility_percentage, 
-                        notes,
-                        school_stream_id,
+                        tcd.course_name, 
+                        tcd.compatibility_percentage, 
+                        tcd.notes,
+                        ssd.name AS department_name,
+                        ssd.display_order,
+                        ssd.school_stream_id,
                         ROW_NUMBER() OVER (
-                            PARTITION BY school_stream_id 
-                            ORDER BY compatibility_percentage DESC, id ASC
+                            PARTITION BY ssd.id 
+                            ORDER BY tcd.compatibility_percentage DESC, tcd.id ASC
                         ) as rank
-                    FROM trait_based_course_details 
-                    WHERE trait_id = $1 
-                    AND school_stream_id IN (1, 2, 3, 4, 5, 6) 
+                    FROM trait_based_course_details tcd
+                    JOIN school_stream_departments ssd ON tcd.school_stream_department_id = ssd.id
+                    WHERE tcd.trait_id = $1 
+                    AND ssd.school_stream_id IN (1, 2, 3, 4, 5, 6) 
                 )
                 SELECT 
                     course_name, 
                     compatibility_percentage, 
                     notes, 
+                    department_name,
                     school_stream_id
                 FROM RankedCourses
-                WHERE rank <= 5
-                ORDER BY school_stream_id ASC, compatibility_percentage DESC;
+                ORDER BY display_order ASC, compatibility_percentage DESC;
             `;
 
       const result = await client.query(multiStreamQuery, [traitId]);
@@ -235,7 +258,7 @@ export async function getCompatibilityMatrixDetails(
         return [];
       }
 
-      // Transform: Append Stream Name
+      // Transform: Append Stream Name to department_name for SSLC context
       const streamNames: Record<number, string> = {
         1: 'PCMB',
         2: 'PCB',
@@ -246,9 +269,10 @@ export async function getCompatibilityMatrixDetails(
       };
 
       return result.rows.map((row) => ({
-        course_name: `${row.course_name} (${streamNames[row.school_stream_id] || 'General'})`,
+        course_name: row.course_name,
         compatibility_percentage: row.compatibility_percentage,
         notes: row.notes,
+        department_name: `${row.department_name} (${streamNames[row.school_stream_id] || 'General'})`,
       }));
     }
   } catch (error) {

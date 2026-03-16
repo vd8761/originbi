@@ -20,6 +20,7 @@ import {
   AssessmentSession,
   AssessmentAttempt,
   AssessmentLevel,
+  Notification,
 } from '@originbi/shared-entities';
 
 import { AssessmentGenerationService } from '../assessment/assessment-generation.service';
@@ -30,6 +31,7 @@ import { CreateCandidateDto } from './dto/create-candidate.dto';
 export class CorporateRegistrationsService {
   private readonly logger = new Logger(CorporateRegistrationsService.name);
   private authServiceBaseUrl = process.env.AUTH_SERVICE_URL;
+  private adminServiceBaseUrl = process.env.ADMIN_SERVICE_URL || 'http://localhost:4001';
 
   private normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
@@ -72,6 +74,8 @@ export class CorporateRegistrationsService {
     private readonly corpRepo: Repository<CorporateAccount>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(Notification)
+    private readonly notificationRepo: Repository<Notification>,
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
@@ -178,8 +182,31 @@ export class CorporateRegistrationsService {
     // 4. Transaction
     const result = await this.dataSource.transaction(async (manager: EntityManager) => {
       // A. Debit Credit & Ledger
+      const oldCredits = Number(corporateAccount.availableCredits);
       corporateAccount.availableCredits -= 1;
       await manager.save(corporateAccount);
+
+      this.logger.log(`Credit Update: Old=${oldCredits}, New=${corporateAccount.availableCredits}, CorporateUserId=${corporateUserId}`);
+
+      // Notify if credits just dropped below 10
+      if (oldCredits >= 10 && Number(corporateAccount.availableCredits) < 10) {
+        this.logger.log(`Triggering LOW_CREDITS notification for user ${corporateUserId}`);
+        try {
+          await manager.save(Notification, {
+            userId: corporateUserId,
+            role: 'CORPORATE',
+            type: 'LOW_CREDITS',
+            title: 'Low Credits Alert',
+            message: `Your account balance is low (${corporateAccount.availableCredits} credits remaining). Please top up now to ensure uninterrupted service.`,
+          });
+        } catch (err) {
+          this.logger.error(
+            `Failed to save low credits notification: ${err.message}`,
+          );
+        }
+      } else {
+        this.logger.log(`Notification NOT triggered. Condition (oldCredits >= 10 && newCredits < 10) not met.`);
+      }
 
       const ledger = manager.create(CorporateCreditLedger, {
         corporateAccountId: corporateAccount.id,
@@ -198,7 +225,7 @@ export class CorporateRegistrationsService {
         cognitoSub: sub,
         isActive: true,
         isBlocked: false,
-        createdByUserId: corporateAccount.id,
+        corporateId: corporateAccount.id.toString(),
         metadata: {
           fullName: dto.fullName,
           mobile: dto.mobile,
@@ -386,9 +413,9 @@ export class CorporateRegistrationsService {
         assessmentTitle,
       );
 
-      const source =
-        process.env.EMAIL_FROM ||
-        `"${process.env.EMAIL_SEND_FROM_NAME || 'Origin BI'}" <no-reply@originbi.com>`;
+      const fromName = process.env.EMAIL_SEND_FROM_NAME || 'Origin BI';
+      const fromEmail = process.env.EMAIL_FROM || 'no-reply@originbi.com';
+      const source = `"${fromName}" <${fromEmail}>`;
 
       const command = new SendEmailCommand({
         Source: source,
@@ -406,11 +433,12 @@ export class CorporateRegistrationsService {
           },
         },
       });
+      const result = await sesClient.send(command);
 
       const info = await sesClient.send(command);
 
       this.logger.log(
-        `Email sent successfully to ${to}. MessageId: ${info.MessageId}`,
+        `Email sent successfully to ${to}. MessageId: ${result.MessageId}`,
       );
     } catch (error) {
       this.logger.error(`Failed to send email to ${to}`, error);
@@ -455,6 +483,10 @@ export class CorporateRegistrationsService {
     return this.dataSource.transaction(async (manager: EntityManager) => {
       const user = await manager.findOne(User, { where: { id: userId } });
       if (!user) throw new BadRequestException('User not found');
+
+      // Link user to this corporate for notifications
+      user.corporateId = corporateAccount.id.toString();
+      await manager.save(user);
 
       // 2. Ensure Registration Exists for this Corporate
       let registration = await manager.findOne(Registration, {

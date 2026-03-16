@@ -20,6 +20,7 @@ import {
   Department,
   DepartmentDegree,
   DegreeType,
+  Notification,
 } from '@originbi/shared-entities';
 
 // Corporate-specific entities (not shared)
@@ -47,6 +48,7 @@ import { BulkCorporateRegistrationsController } from './bulk-corporate-registrat
       Department,
       DepartmentDegree,
       DegreeType,
+      Notification,
     ]),
     HttpModule,
     AssessmentModule,
