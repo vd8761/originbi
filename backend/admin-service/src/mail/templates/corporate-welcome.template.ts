@@ -14,13 +14,13 @@ export const getCorporateWelcomeEmailTemplate = (
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="color-scheme" content="light only">
-<meta name="supported-color-schemes" content="light">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
 <title>Registration Successful - OriginBI</title>
 <style>
   :root {
-    color-scheme: light only;
-    supported-color-schemes: light;
+    color-scheme: light dark;
+    supported-color-schemes: light dark;
   }
   .content-area,
   .content-area td,
@@ -30,20 +30,48 @@ export const getCorporateWelcomeEmailTemplate = (
     color: #111111 !important;
   }
   @media (prefers-color-scheme: dark) {
+    body, table[style*="background-color: #EEEEEE"] {
+      background-color: #121212 !important;
+    }
+    table[bgcolor="#ffffff"] {
+      background-color: #1e1e1e !important;
+    }
+    td[style*="background-image"] {
+      background-image: none !important;
+    }
     .content-area,
     .content-area td,
     .content-area p,
     .content-area span,
     .content-area strong {
-      color: #111111 !important;
+      color: #ffffff !important;
+    }
+    h1 {
+      color: #ffffff !important;
+    }
+    p[style*="color: #000000"] {
+      color: #dddddd !important;
+    }
+    td[style*="color: #000000"] {
+      color: #dddddd !important;
+    }
+    a[style*="background-color: #0F005E"] {
+      background-color: #1ED36A !important;
+      color: #000000 !important;
     }
   }
+
+  /* Gmail Specific Overrides */
+  [data-ogsc] td[style*="background-image"],
   [data-ogsc] .content-area,
-  [data-ogsc] .content-area td,
-  [data-ogsc] .content-area p,
-  [data-ogsc] .content-area span,
-  [data-ogsc] .content-area strong {
-    color: #111111 !important;
+  u + .body td[style*="background-image"],
+  u + .body .content-area {
+    background-image: none !important;
+    color: #ffffff !important;
+  }
+  [data-ogsc] table[bgcolor="#ffffff"],
+  u + .body table[bgcolor="#ffffff"] {
+    background-color: #1e1e1e !important;
   }
 </style>
 </head>

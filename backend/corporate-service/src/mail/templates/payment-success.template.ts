@@ -15,9 +15,49 @@ export const getPaymentSuccessEmailTemplate = (
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
 <title>Payment Successful - OriginBI</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    supported-color-schemes: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    body, table[style*="background-color: #EEEEEE"] {
+      background-color: #121212 !important;
+    }
+    table[bgcolor="#ffffff"] {
+      background-color: #1e1e1e !important;
+    }
+    td[style*="background-image"] {
+      background-image: none !important;
+    }
+    h1, p, td, span, strong {
+      color: #ffffff !important;
+    }
+    a[style*="background-color: #0F005E"] {
+      background-color: #1ED36A !important;
+      color: #000000 !important;
+    }
+  }
+
+  /* Gmail Specific Overrides */
+  [data-ogsc] td[style*="background-image"],
+  u + .body td[style*="background-image"] {
+    background-image: none !important;
+  }
+  [data-ogsc] table[bgcolor="#ffffff"],
+  u + .body table[bgcolor="#ffffff"] {
+    background-color: #1e1e1e !important;
+  }
+  [data-ogsc] h1, [data-ogsc] p, [data-ogsc] td,
+  u + .body h1, u + .body p, u + .body td {
+    color: #ffffff !important;
+  }
+</style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #EEEEEE; font-family: Tahoma, Arial, sans-serif;">
+<body class="body" style="margin: 0; padding: 0; background-color: #EEEEEE; font-family: Tahoma, Arial, sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #EEEEEE; width: 100%;">
     <tr>
       <td align="center" style="padding: 20px 0;">
