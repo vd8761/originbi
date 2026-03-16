@@ -33,6 +33,8 @@ export interface CreateRegistrationDto {
   school_level?: SchoolLevel;
   school_stream?: SchoolStream;
   department_degree_id?: string; // For college
+  department_id?: string;
+  degree_id?: string;
   current_year?: string;
   student_board?: string;
   group_name?: string;

@@ -15,7 +15,38 @@ export const getRegistrationSuccessEmailTemplate = (
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light">
 <title>Registration Successful - OriginBI</title>
+<style>
+  :root {
+    color-scheme: light only;
+    supported-color-schemes: light;
+  }
+  .content-area,
+  .content-area td,
+  .content-area p,
+  .content-area span,
+  .content-area strong {
+    color: #111111 !important;
+  }
+  @media (prefers-color-scheme: dark) {
+    .content-area,
+    .content-area td,
+    .content-area p,
+    .content-area span,
+    .content-area strong {
+      color: #111111 !important;
+    }
+  }
+  [data-ogsc] .content-area,
+  [data-ogsc] .content-area td,
+  [data-ogsc] .content-area p,
+  [data-ogsc] .content-area span,
+  [data-ogsc] .content-area strong {
+    color: #111111 !important;
+  }
+</style>
 </head>
 <body style="margin: 0; padding: 0; background-color: #EEEEEE; font-family: Tahoma, Arial, sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #EEEEEE; width: 100%;">
@@ -57,7 +88,7 @@ export const getRegistrationSuccessEmailTemplate = (
                       <!-- Inner Content Padding -->
                       <table width="100%" cellpadding="0" cellspacing="0" border="0">
                         <tr>
-                          <td style="padding: 40px;">
+                          <td class="content-area" style="padding: 40px;">
                             
                             <!-- Salutation -->
                             <p style="margin: 0 0 15px; font-family: Tahoma; font-weight: 400; font-size: 16px; line-height: 100%; letter-spacing: 0%; color: #333333;">
@@ -75,27 +106,27 @@ export const getRegistrationSuccessEmailTemplate = (
                             <!-- Details Table -->
                             <table width="100%" cellpadding="8" cellspacing="0" border="0" style="margin-bottom: 25px;">
                               <tr>
-                                <td width="35%" style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Company Name</td>
+                                <td width="35%" style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #111111; vertical-align: top;">Company Name</td>
                                 <td width="65%" style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${companyName}</td>
                               </tr>
                               <tr>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Contact Person</td>
+                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #111111; vertical-align: top;">Contact Person</td>
                                 <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${name}</td>
                               </tr>
                               <tr>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Email ID</td>
+                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #111111; vertical-align: top;">Email ID</td>
                                 <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${email}</td>
                               </tr>
                               <tr>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Mobile Number</td>
+                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #111111; vertical-align: top;">Mobile Number</td>
                                 <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${mobile}</td>
                               </tr>
                               <tr>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Password</td>
+                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #111111; vertical-align: top;">Password</td>
                                 <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${pass}</td>
                               </tr>
                                <tr>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Account Status</td>
+                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #111111; vertical-align: top;">Account Status</td>
                                 <td style="font-family: Tahoma; font-weight: 700; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #FFA000;">Pending Approval</td>
                               </tr>
                             </table>

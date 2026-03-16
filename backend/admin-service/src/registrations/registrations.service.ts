@@ -33,6 +33,14 @@ export class RegistrationsService {
 
   private readonly ADMIN_USER_ID = 1;
 
+  private normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
+  private normalizeMobile(mobile: string): string {
+    return String(mobile || '').replace(/\D/g, '');
+  }
+
   constructor(
     @InjectRepository(AdminUser)
     private readonly userRepo: Repository<AdminUser>,
@@ -157,16 +165,36 @@ export class RegistrationsService {
   // CREATE REGISTRATION
   // ---------------------------------------------------------
   async create(dto: CreateRegistrationDto) {
-    dto.email = dto.email.toLowerCase();
+    dto.email = this.normalizeEmail(dto.email);
+    const mobileDigits = this.normalizeMobile(dto.mobile);
+
+    if (!mobileDigits) {
+      throw new BadRequestException('Valid mobile number is required');
+    }
+
     this.logger.log(`[AdminRegister] Payload: ${JSON.stringify(dto)}`);
     this.logger.log(`Creating registration for ${dto.email}`);
 
     // 1. Basic Validation
-    const existingUser = await this.userRepo.findOne({
-      where: { email: dto.email },
-    });
-    if (existingUser) {
+    const [existingByEmail, existingByMobile] = await Promise.all([
+      this.userRepo
+        .createQueryBuilder('u')
+        .where('LOWER(u.email) = :email', { email: dto.email })
+        .getOne(),
+      this.userRepo
+        .createQueryBuilder('u')
+        .where(
+          "regexp_replace(COALESCE(u.metadata->>'mobile', ''), '\\D', '', 'g') = :mobile",
+          { mobile: mobileDigits },
+        )
+        .getOne(),
+    ]);
+
+    if (existingByEmail) {
       throw new BadRequestException('Email already registered locally');
+    }
+    if (existingByMobile) {
+      throw new BadRequestException('Mobile number already registered locally');
     }
 
     // 2. Cognito Creation (External Helper)
@@ -221,7 +249,7 @@ export class RegistrationsService {
           fullName: dto.name,
           countryCode: dto.countryCode ?? '+91',
           mobileNumber: dto.mobile,
-          gender: gender,
+            gender: gender,
           schoolLevel,
           schoolStream,
           departmentDegreeId,
@@ -605,10 +633,10 @@ export class RegistrationsService {
             sortCol = 'r.status';
             break;
           case 'gender':
-            sortCol = "u.metadata->>'gender'";
+            sortCol = 'r.gender';
             break;
           case 'mobile_number':
-            sortCol = "u.metadata->>'mobile'";
+            sortCol = 'r.mobileNumber';
             break;
           default:
             sortCol = 'r.createdAt';

@@ -31,6 +31,7 @@ export interface CollegeData {
   top_answered_types: any[];
   program_type: number;
   agile_scores: AgileScore[];
+  report_password?: string;
 }
 
 export interface SchoolData {
@@ -46,13 +47,60 @@ export interface SchoolData {
   score_I: number;
   score_S: number;
   score_C: number;
-  school_level_id?: number;
+  school_level_id: number;
   school_stream_id?: number;
   most_answered_answer_type: AnswerTypeCount[];
   top_answered_types: any[];
   program_type: number;
   agile_scores: AgileScore[];
+  report_password?: string;
+  dept_code?: string;
+  group_name?: string;
 }
+
+export interface EmployeeData {
+  full_name: string;
+  email_id: string;
+  exam_start: string;
+  exam_end: string;
+  bi_registration_ID: string;
+  assigned_exam_id: string;
+  exam_ref_no: string;
+  report_title: string;
+  score_D: number;
+  score_I: number;
+  score_S: number;
+  score_C: number;
+  group_name?: string;
+  most_answered_answer_type: AnswerTypeCount[];
+  top_answered_types: any[];
+  program_type: number;
+  agile_scores: AgileScore[];
+  report_password?: string;
+}
+
+export interface CxoData {
+  full_name: string;
+  email_id: string;
+  exam_start: string;
+  exam_end: string;
+  bi_registration_ID: string;
+  assigned_exam_id: string;
+  exam_ref_no: string;
+  report_title: string;
+  score_D: number;
+  score_I: number;
+  score_S: number;
+  score_C: number;
+  group_name?: string;
+  most_answered_answer_type: AnswerTypeCount[];
+  top_answered_types: any[];
+  program_type: number;
+  agile_scores: AgileScore[];
+  report_password?: string;
+}
+
+export type MergedReportData = CollegeData | SchoolData | EmployeeData | CxoData;
 
 // interface UniversityData extends BaseData {
 //     department_deg_id: number;

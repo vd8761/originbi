@@ -33,6 +33,18 @@ export class CorporateRegistrationsService {
   private authServiceBaseUrl = process.env.AUTH_SERVICE_URL;
   private adminServiceBaseUrl = process.env.ADMIN_SERVICE_URL || 'http://localhost:4001';
 
+  private normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
+  private normalizeMobile(mobile: string): string {
+    return String(mobile || '').replace(/\D/g, '');
+  }
+
+  private resolveWelcomeFrontendUrl(): string {
+    return 'https://mind.originbi.com';
+  }
+
   async withRetry<T>(
     operation: () => Promise<T>,
     retries = 5,
@@ -71,6 +83,13 @@ export class CorporateRegistrationsService {
   ) { }
 
   async registerCandidate(dto: CreateCandidateDto, corporateUserId: number) {
+    const email = this.normalizeEmail(dto.email);
+    const mobileDigits = this.normalizeMobile(dto.mobile);
+
+    if (!mobileDigits) {
+      throw new BadRequestException('Valid mobile number is required');
+    }
+
     // 0. (Optional) Verify User exists if needed, but we can trust the ID for now or just let the Corp lookup fail
 
     // 1. Fetch Corporate Account using the passed User ID
@@ -100,6 +119,29 @@ export class CorporateRegistrationsService {
       );
     }
 
+    const [existingByEmail, existingByMobile] = await Promise.all([
+      this.userRepo
+        .createQueryBuilder('u')
+        .where('LOWER(u.email) = :email', { email })
+        .getOne(),
+      this.userRepo
+        .createQueryBuilder('u')
+        .where(
+          "regexp_replace(COALESCE(u.metadata->>'mobile', ''), '\\D', '', 'g') = :mobile",
+          { mobile: mobileDigits },
+        )
+        .getOne(),
+    ]);
+
+    if (existingByEmail) {
+      throw new BadRequestException(`Email '${email}' is already registered`);
+    }
+    if (existingByMobile) {
+      throw new BadRequestException(
+        `Mobile number '${dto.mobile}' is already registered`,
+      );
+    }
+
     if (corporateAccount.availableCredits <= 0) {
       throw new BadRequestException(
         'Insufficient credits to register candidate',
@@ -120,13 +162,13 @@ export class CorporateRegistrationsService {
       const res = await this.withRetry(() =>
         firstValueFrom(
           this.http.post(`${this.authServiceBaseUrl}/internal/cognito/users`, {
-            email: dto.email,
+            email,
             password,
             groupName: 'STUDENT',
           }),
         ),
       );
-      sub = res.data.sub;
+      sub = (res as any).data.sub;
     } catch (err: any) {
       this.logger.error(
         'Error creating Cognito user',
@@ -138,7 +180,7 @@ export class CorporateRegistrationsService {
     }
 
     // 4. Transaction
-    return this.dataSource.transaction(async (manager: EntityManager) => {
+    const result = await this.dataSource.transaction(async (manager: EntityManager) => {
       // A. Debit Credit & Ledger
       const oldCredits = Number(corporateAccount.availableCredits);
       corporateAccount.availableCredits -= 1;
@@ -177,7 +219,7 @@ export class CorporateRegistrationsService {
 
       // B. Create User (Candidate)
       const user = manager.create(User, {
-        email: dto.email,
+        email,
         role: 'STUDENT',
         emailVerified: true,
         cognitoSub: sub,
@@ -225,21 +267,19 @@ export class CorporateRegistrationsService {
         gender: dto.gender,
         countryCode: '+91',
         groupId: groupId,
+        departmentDegreeId: dto.departmentId ? Number(dto.departmentId) : null,
         metadata: {
           programType: dto.programType,
           groupName: dto.groupName,
           sendEmail: true,
+          currentYear: dto.currentYear,
         },
       });
       await manager.save(registration);
 
       // E. Create Assessment Session
-      // Search for Program
-      // We expect 'Employee' or 'CXO General' sent in dto.programType
-      // We search name containing this string or exact match
-      const program = await manager.getRepository(Program).findOne({
-        where: { name: dto.programType },
-      });
+      // Search for Program (Robust lookup)
+      const program = await this.findProgram(manager, dto.programType);
 
       if (!program) {
         // Try finding by like if exact match fails, or rely on frontend sending exact name
@@ -307,19 +347,15 @@ export class CorporateRegistrationsService {
         }
       }
 
-      // G. Send Email
+      // G. Send Email (non-blocking)
       if (dto.sendEmail) {
-        try {
-          await this.sendWelcomeEmail(
-            dto.email,
-            dto.fullName,
-            password,
-            validFrom,
-            program.assessmentTitle || program.name,
-          );
-        } catch (e) {
-          this.logger.error('Failed to send welcome email', e);
-        }
+        void this.sendWelcomeEmail(
+          email,
+          dto.fullName,
+          password,
+          validFrom,
+          program.assessmentTitle || program.name,
+        );
       }
 
       return {
@@ -329,6 +365,8 @@ export class CorporateRegistrationsService {
         creditsLeft: corporateAccount.availableCredits,
       };
     });
+
+    return result;
   }
 
   private async sendWelcomeEmail(
@@ -348,12 +386,14 @@ export class CorporateRegistrationsService {
         credentials: {
           accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
           secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-          sessionToken: process.env.AWS_SESSION_TOKEN,
+          ...(process.env.AWS_SESSION_TOKEN
+            ? { sessionToken: process.env.AWS_SESSION_TOKEN }
+            : {}),
         },
       });
 
       // Use full URLs for assets ("from application itself")
-      const apiUrl = process.env.API_URL;
+      const apiUrl = process.env.API_URL || process.env.CORPORATE_SERVICE_URL || '';
 
       const assets = {
         popper: `${apiUrl}/email-assets/Popper.png`,
@@ -361,12 +401,13 @@ export class CorporateRegistrationsService {
         footer: `${apiUrl}/email-assets/Email_Vector.png`,
         logo: `${apiUrl}/email-assets/logo.png`,
       };
+      const frontendUrl = this.resolveWelcomeFrontendUrl();
 
       const html = getWelcomeEmailTemplate(
         name,
         to,
         pass,
-        process.env.FRONTEND_URL,
+        frontendUrl,
         assets,
         startDateTime,
         assessmentTitle,
@@ -374,12 +415,11 @@ export class CorporateRegistrationsService {
 
       const fromName = process.env.EMAIL_SEND_FROM_NAME || 'Origin BI';
       const fromEmail = process.env.EMAIL_FROM || 'no-reply@originbi.com';
+      const source = `"${fromName}" <${fromEmail}>`;
 
       const command = new SendEmailCommand({
-        Source: `"${fromName}" <${fromEmail}>`,
-        Destination: {
-          ToAddresses: [to],
-        },
+        Source: source,
+        Destination: { ToAddresses: [to] },
         Message: {
           Subject: {
             Data: 'Welcome to OriginBI - Assessment Invitation',
@@ -394,6 +434,8 @@ export class CorporateRegistrationsService {
         },
       });
       const result = await sesClient.send(command);
+
+      const info = await sesClient.send(command);
 
       this.logger.log(
         `Email sent successfully to ${to}. MessageId: ${result.MessageId}`,
@@ -486,23 +528,19 @@ export class CorporateRegistrationsService {
           gender: user.metadata?.gender || dto.gender || 'FEMALE',
           countryCode: '+91',
           groupId: groupId,
+          departmentDegreeId: dto.departmentId ? Number(dto.departmentId) : null,
           metadata: {
             programType: dto.programType,
             groupName: dto.groupName,
             sendEmail: true,
+            currentYear: dto.currentYear,
           },
         });
         await manager.save(registration);
       }
 
-      // 3. Find Program
-      const program = await manager
-        .getRepository(Program)
-        .findOne({ where: { name: dto.programType } });
-      if (!program)
-        throw new BadRequestException(
-          `Program '${dto.programType}' not found.`,
-        );
+      // 3. Find Program (Robust lookup)
+      const program = await this.findProgram(manager, dto.programType);
 
       // 4. Create Session (Linked to GroupAssessment Header)
       const validFrom = dto.examStart ? new Date(dto.examStart) : new Date();
@@ -547,20 +585,16 @@ export class CorporateRegistrationsService {
         }
       }
 
-      // 6. Send Email
+      // 6. Send Email (non-blocking)
       if (dto.sendEmail) {
-        try {
-          // Pass null password as we didn't create it
-          await this.sendWelcomeEmail(
-            user.email,
-            (user.metadata?.fullName as string) || dto.fullName,
-            '******', // Masked password for existing users
-            validFrom,
-            program.assessmentTitle || program.name,
-          );
-        } catch (e) {
-          this.logger.error('Failed to send welcome email', e);
-        }
+        // Pass masked password as this account already exists.
+        void this.sendWelcomeEmail(
+          user.email,
+          (user.metadata?.fullName as string) || dto.fullName,
+          '******',
+          validFrom,
+          program.assessmentTitle || program.name,
+        );
       }
 
       return {
@@ -569,5 +603,56 @@ export class CorporateRegistrationsService {
         userId: user.id,
       };
     });
+  }
+
+  private normalizeString(str: string): string {
+    return str ? str.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+  }
+
+  private async findProgram(manager: EntityManager, programType: string): Promise<Program> {
+    const programRepo = manager.getRepository(Program);
+    const normInput = this.normalizeString(programType);
+
+    // 1. Try exact match first via DB
+    let program = await programRepo.findOne({
+      where: [
+        { name: programType },
+        { code: programType },
+      ]
+    });
+
+    if (program) return program;
+
+    // 2. Case insensitive exact match or code match
+    program = await programRepo.createQueryBuilder('p')
+      .where('LOWER(p.name) = :name', { name: programType.toLowerCase() })
+      .orWhere('LOWER(p.code) = :code', { code: programType.toLowerCase() })
+      .getOne();
+
+    if (program) return program;
+
+    // 3. Normalized matching (fallback to fetching all active programs once)
+    const allPrograms = await programRepo.find({ where: { isActive: true } });
+
+    // Handle Singular/Plural mismatch (specifically for College Student/Students)
+    if (normInput === 'collegestudent') {
+      program = allPrograms.find(p => this.normalizeString(p.name) === 'collegestudents');
+    } else if (normInput === 'collegestudents') {
+      program = allPrograms.find(p => this.normalizeString(p.name) === 'collegestudent');
+    }
+
+    // 4. Partial match (last resort)
+    if (!program) {
+      program = allPrograms.find(p =>
+        this.normalizeString(p.name).includes(normInput) ||
+        normInput.includes(this.normalizeString(p.name))
+      );
+    }
+
+    if (!program) {
+      throw new BadRequestException(`Program '${programType}' not found.`);
+    }
+
+    return program;
   }
 }

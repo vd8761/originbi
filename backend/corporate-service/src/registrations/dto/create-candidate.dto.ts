@@ -42,4 +42,16 @@ export class CreateCandidateDto {
 
   @IsOptional()
   sendEmail?: boolean;
+
+  @IsString()
+  @IsOptional()
+  departmentId?: string;
+
+  @IsString()
+  @IsOptional()
+  degreeId?: string;
+
+  @IsString()
+  @IsOptional()
+  currentYear?: string;
 }
