@@ -12,13 +12,13 @@ export const getStudentWelcomeEmailTemplate = (
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="light only">
-  <meta name="supported-color-schemes" content="light">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
   <title>Welcome to OriginBI</title>
   <style>
     :root {
-      color-scheme: light only;
-      supported-color-schemes: light;
+      color-scheme: light dark;
+      supported-color-schemes: light dark;
     }
     body { 
       margin: 0; 
@@ -39,28 +39,53 @@ export const getStudentWelcomeEmailTemplate = (
       .header-title { font-size: 24px !important; padding: 40px 20px 20px 20px !important; }
       .content-padding { padding: 20px !important; }
     }
+    
+    /* Dark Mode Styles */
     @media (prefers-color-scheme: dark) {
-      .email-card,
-      .email-card td,
-      .email-card div,
-      .email-card p,
-      .text-dark,
-      .text-muted {
-        color: #111111 !important;
+      body, .wrapper, .main-table {
+        background-color: #121212 !important;
       }
-      .email-card { background-color: #ffffff !important; }
+      .email-card { 
+        background-color: #1e1e1e !important; 
+        background-image: none !important; 
+      }
+      .text-dark, h1 {
+        color: #ffffff !important;
+      }
+      .text-muted {
+        color: #aaaaaa !important;
+      }
+      .text-accent {
+        color: #1ED36A !important;
+      }
+      .email-card td, .email-card div, .email-card p {
+        color: #ffffff !important;
+      }
+      a[href*="student"] {
+        background-color: #1ED36A !important;
+        color: #000000 !important;
+      }
     }
+    
+    /* Specific Gmail/Outlook Dark Mode Fixes */
     [data-ogsc] .email-card,
-    [data-ogsc] .email-card td,
-    [data-ogsc] .email-card div,
-    [data-ogsc] .email-card p,
-    [data-ogsc] .text-dark,
-    [data-ogsc] .text-muted {
-      color: #111111 !important;
+    u + .body .email-card {
+      background-color: #1e1e1e !important; 
+      background-image: none !important;
+    }
+
+    [data-ogsc] .text-dark, [data-ogsc] h1,
+    u + .body .text-dark, u + .body h1 {
+      color: #ffffff !important;
+    }
+
+    [data-ogsc] .text-muted,
+    u + .body .text-muted {
+      color: #aaaaaa !important;
     }
   </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #E9ECEF; color: #111111; font-family: Tahoma, Arial, sans-serif;">
+<body class="body" style="margin: 0; padding: 0; background-color: #E9ECEF; color: #111111; font-family: Tahoma, Arial, sans-serif;">
   <center class="wrapper">
     <table class="main-table" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="max-width: 600px; width: 100%; color: #111111;">
       
@@ -113,23 +138,26 @@ export const getStudentWelcomeEmailTemplate = (
                   </tr>
                   <tr>
                     <td class="text-muted" style="font-size: 14px; color: #2F2F2F !important; padding: 5px 0;">Start Date and Time</td>
-                    <td class="text-dark" style="font-size: 14px; color: #111111 !important; padding: 5px 0;">${
-                      startDateTime
-                        ? new Date(startDateTime).toLocaleString('en-GB', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
-                        : new Date().toLocaleString('en-GB', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
-                    }</td>
+                    <td class="text-dark" style="font-size: 14px; color: #111111 !important; padding: 5px 0;">${startDateTime
+    ? new Date(startDateTime).toLocaleString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Kolkata',
+      hour12: true,
+    })
+    : new Date().toLocaleString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Kolkata',
+      hour12: true,
+    })
+  }</td>
                   </tr>
                   <tr>
                     <td class="text-muted" style="font-size: 14px; color: #2F2F2F !important; padding: 5px 0;">Username</td>

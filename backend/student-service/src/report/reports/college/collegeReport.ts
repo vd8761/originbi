@@ -1506,7 +1506,6 @@ export class CollegeReport extends BaseReport {
       this._useStdMargins = true;
     } else this.ensureSpace(120 * this.MM);
     if (options.addAsNewPage === false) this.doc.moveDown(1);
-    const startX = this._useStdMargins ? this.doc.x : this.MARGIN_STD;
 
     // --- TITLE ---
     this.doc

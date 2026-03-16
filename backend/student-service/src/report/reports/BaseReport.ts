@@ -590,9 +590,9 @@ export class BaseReport {
         let renderPart = part;
         if (
           firstContentSeen &&
-          isBold !== prevWasBold &&      // font is changing
-          prevPartEndsWithSpace &&        // previous segment ended with space (may be trimmed)
-          !renderPart.startsWith(' ')    // current segment has no leading space
+          isBold !== prevWasBold && // font is changing
+          prevPartEndsWithSpace && // previous segment ended with space (may be trimmed)
+          !renderPart.startsWith(' ') // current segment has no leading space
         ) {
           renderPart = ' ' + renderPart;
         }
@@ -883,7 +883,7 @@ export class BaseReport {
         (this.PAGE_WIDTH -
           2 * (this._useStdMargins ? this.MARGIN_STD : 0) -
           w) /
-        2;
+          2;
 
     this.doc.image(path, x, opts.y ?? this.doc.y, { width: w, height: h });
     if (!opts.y) this.doc.y += h + (opts.gap ?? this.DEFAULT_GAP);
@@ -1093,7 +1093,7 @@ export class BaseReport {
     const {
       x = this._useStdMargins ? this.doc.x : this.MARGIN_STD,
       width = this.PAGE_WIDTH -
-      2 * (this._useStdMargins ? this.MARGIN_STD : 15 * this.MM),
+        2 * (this._useStdMargins ? this.MARGIN_STD : 15 * this.MM),
       cellPadding = 5,
       gap = this.DEFAULT_GAP,
       headerAlign = 'left',
@@ -1839,7 +1839,7 @@ export class BaseReport {
     const {
       x = this._useStdMargins ? this.doc.x : this.MARGIN_STD,
       width = this.PAGE_WIDTH -
-      2 * (this._useStdMargins ? this.MARGIN_STD : 15 * this.MM),
+        2 * (this._useStdMargins ? this.MARGIN_STD : 15 * this.MM),
       gap = 15 * this.MM, // ~42pt
       lineColor = '#D3D3D3',
       lineWidth = 2,
@@ -1985,7 +1985,7 @@ export class BaseReport {
     const {
       x = this._useStdMargins ? this.doc.x : this.MARGIN_STD,
       width = this.PAGE_WIDTH -
-      2 * (this._useStdMargins ? this.MARGIN_STD : 15 * this.MM),
+        2 * (this._useStdMargins ? this.MARGIN_STD : 15 * this.MM),
       blockGap = 25 * this.MM,
       circleRadius = 20 * this.MM,
       showLegend = true,

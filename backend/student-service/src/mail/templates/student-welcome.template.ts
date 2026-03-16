@@ -12,8 +12,14 @@ export const getStudentWelcomeEmailTemplate = (
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
   <title>Welcome to OriginBI</title>
   <style>
+    :root {
+      color-scheme: light dark;
+      supported-color-schemes: light dark;
+    }
     body { 
       margin: 0; 
       padding: 0; 
@@ -28,9 +34,44 @@ export const getStudentWelcomeEmailTemplate = (
       .header-title { font-size: 24px !important; padding: 40px 20px 20px 20px !important; }
       .content-padding { padding: 20px !important; }
     }
+
+    /* Dark Mode Styles */
+    @media (prefers-color-scheme: dark) {
+      body, .wrapper, .main-table {
+        background-color: #121212 !important;
+      }
+      table[background] {
+        background-image: none !important;
+        background-color: #1e1e1e !important;
+      }
+      h1, div, td, p, span, strong {
+        color: #ffffff !important;
+      }
+      td[style*="color: #707070"] {
+        color: #aaaaaa !important;
+      }
+      div[style*="color: #1ED36A"] {
+        color: #1ED36A !important;
+      }
+      a[href*="student"] {
+        background-color: #1ED36A !important;
+        color: #000000 !important;
+      }
+    }
+
+    /* Gmail Specific Overrides */
+    [data-ogsc] table[background],
+    u + .body table[background] {
+      background-image: none !important;
+      background-color: #1e1e1e !important;
+    }
+    [data-ogsc] h1, [data-ogsc] div, [data-ogsc] td, 
+    u + .body h1, u + .body div, u + .body td {
+      color: #ffffff !important;
+    }
   </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #E9ECEF; font-family: Tahoma, Arial, sans-serif;">
+<body class="body" style="margin: 0; padding: 0; background-color: #E9ECEF; font-family: Tahoma, Arial, sans-serif;">
   <center class="wrapper">
     <table class="main-table" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="max-width: 600px; width: 100%;">
       
@@ -91,6 +132,8 @@ export const getStudentWelcomeEmailTemplate = (
                             year: 'numeric',
                             hour: '2-digit',
                             minute: '2-digit',
+                            timeZone: 'Asia/Kolkata',
+                            hour12: true,
                           })
                         : new Date().toLocaleString('en-GB', {
                             day: 'numeric',
@@ -98,6 +141,8 @@ export const getStudentWelcomeEmailTemplate = (
                             year: 'numeric',
                             hour: '2-digit',
                             minute: '2-digit',
+                            timeZone: 'Asia/Kolkata',
+                            hour12: true,
                           })
                     }</td>
                   </tr>

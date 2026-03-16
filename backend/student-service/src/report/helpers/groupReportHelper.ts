@@ -1,7 +1,15 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
 import { logger } from './logger';
 import { getPool } from './dbPool';
-import { AnswerTypeCount, AgileScore, MergedReportData, CollegeData, SchoolData, EmployeeData, CxoData } from '../types/types';
+import {
+  AnswerTypeCount,
+  AgileScore,
+  MergedReportData,
+  CollegeData,
+  SchoolData,
+  EmployeeData,
+  CxoData,
+} from '../types/types';
 import { SCHOOL_LEVEL_ID, SCHOOL_STREAM_ID } from '../reports/BaseConstants';
 
 export async function fetchGroupAssessmentData(
@@ -261,15 +269,15 @@ async function processSessionRows(
       email_id: session.email,
       exam_start: session.started_at
         ? new Date(session.started_at)
-          .toISOString()
-          .replace('T', ' ')
-          .split('.')[0]
+            .toISOString()
+            .replace('T', ' ')
+            .split('.')[0]
         : '',
       exam_end: session.completed_at
         ? new Date(session.completed_at)
-          .toISOString()
-          .replace('T', ' ')
-          .split('.')[0]
+            .toISOString()
+            .replace('T', ' ')
+            .split('.')[0]
         : '',
       bi_registration_ID: session.registration_id,
       assigned_exam_id: session.session_id,
@@ -291,9 +299,12 @@ async function processSessionRows(
     // --- PROGRAM LOGIC ---
     if (programId === 1) {
       // School
-      const levelId = SCHOOL_LEVEL_ID[session.school_level as keyof typeof SCHOOL_LEVEL_ID];
+      const levelId =
+        SCHOOL_LEVEL_ID[session.school_level as keyof typeof SCHOOL_LEVEL_ID];
       if (!levelId) {
-        logger.warn(`User ${session.user_id} has invalid or missing school_level: ${session.school_level}. Skipping.`);
+        logger.warn(
+          `User ${session.user_id} has invalid or missing school_level: ${session.school_level}. Skipping.`,
+        );
         continue;
       }
 
@@ -303,7 +314,10 @@ async function processSessionRows(
       };
 
       if (levelId === SCHOOL_LEVEL_ID.HSC && session.school_stream) {
-        const streamId = SCHOOL_STREAM_ID[session.school_stream.toUpperCase() as keyof typeof SCHOOL_STREAM_ID];
+        const streamId =
+          SCHOOL_STREAM_ID[
+            session.school_stream.toUpperCase() as keyof typeof SCHOOL_STREAM_ID
+          ];
         if (streamId) {
           schoolData.school_stream_id = streamId;
         }

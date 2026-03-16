@@ -812,7 +812,7 @@ export class PlacementReport extends BaseReport {
   /**
    * Transforms raw student data into a structured row for the Students List table.
    * Formats names, determines corporate readiness, and resolves edge cases (like "Product Company" tier).
-   * 
+   *
    * @param student - Raw student data object
    * @param index - Index of the student for ordering
    * @returns An array structure compatible with the PDFkit-table format
