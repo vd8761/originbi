@@ -26,7 +26,7 @@ export const getAssessmentCompletionEmailTemplate = (
         body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; }
     </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #E9ECEF; font-family: 'Tahoma', Arial, sans-serif;">
+<body style="margin: 0; padding: 0; background-color: #E9ECEF; font-family: Tahoma, Arial, sans-serif;">
 
     <table border="0" cellpadding="0" cellspacing="0" width="100%">
         <tr>
@@ -45,13 +45,13 @@ export const getAssessmentCompletionEmailTemplate = (
                             <table border="0" cellpadding="0" cellspacing="0" width="100%">
                                 <tr>
                                     <td width="60%" valign="middle" style="color: #ffffff;">
-                                        <p style="margin: 0; font-family: 'Tahoma', sans-serif; font-weight: 700; font-size: 16px; line-height: 19px; color: #1ED36A;">
+                                        <p style="margin: 0; font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 16px; line-height: 19px; color: #1ED36A;">
                                             ${year}
                                         </p>
-                                        <h1 style="margin: 10px 0; font-family: 'Tahoma', sans-serif; font-weight: 700; font-size: 28px; line-height: 34px; color: #FFFFFF;">
+                                        <h1 style="margin: 10px 0; font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 28px; line-height: 34px; color: #FFFFFF;">
                                             ${reportTitle.replace(' Report', '')} Report
                                         </h1>
-                                        <p style="margin: 0; font-family: 'Tahoma', sans-serif; font-weight: 700; font-size: 16px; line-height: 19px; color: #1ED36A;">
+                                        <p style="margin: 0; font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 16px; line-height: 19px; color: #1ED36A;">
                                             ${dateStr}
                                         </p>
                                     </td>
@@ -71,27 +71,27 @@ export const getAssessmentCompletionEmailTemplate = (
                     <tr>
                         <td bgcolor="#FFFFFF" style="background-color: #FFFFFF; padding: 40px 30px; border-radius: 0 0 4px 4px;">
                             
-                            <p style="margin: 0 0 20px 0; font-family: 'Tahoma', sans-serif; font-weight: 400; font-size: 16px; line-height: 19px; color: #000000;">
+                            <p style="margin: 0 0 20px 0; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 16px; line-height: 19px; color: #000000;">
                                 Dear <strong>${name}</strong>,
                             </p>
 
-                            <p style="margin: 0 0 15px 0; font-family: 'Tahoma', sans-serif; font-weight: 400; font-size: 14px; line-height: 20px; color: #000000;">
+                            <p style="margin: 0 0 15px 0; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 20px; color: #000000;">
                                 Thank you for completing the Origin BI <strong style="color: #150089;">Student Self-Discovery Assessment</strong>.
                             </p>
 
-                            <p style="margin: 0 0 15px 0; font-family: 'Tahoma', sans-serif; font-weight: 400; font-size: 14px; line-height: 20px; color: #000000;">
+                            <p style="margin: 0 0 15px 0; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 20px; color: #000000;">
                                 We are excited to share your personalized report summary, which highlights your unique personality and key strengths. Based on these insights, we have created a career roadmap tailored to match your strengths and interests, helping you move closer to your goals.
                             </p>
 
-                            <p style="margin: 0 0 15px 0; font-family: 'Tahoma', sans-serif; font-weight: 400; font-size: 14px; line-height: 20px; color: #000000;">
+                            <p style="margin: 0 0 15px 0; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 20px; color: #000000;">
                                 This report also gives you an overview of industry trends to help you strengthen your skills and prepare for the future. Origin BI wishes you the very best as you get ready for your future roles.
                             </p>
 
-                            <p style="margin: 0 0 30px 0; font-family: 'Tahoma', sans-serif; font-weight: 400; font-size: 14px; line-height: 20px; color: #000000;">
+                            <p style="margin: 0 0 30px 0; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 20px; color: #000000;">
                                 You can download your report from the attachment. Your password for the report is <strong>${reportPassword}</strong>.
                             </p>
 
-                            <p style="margin: 0; font-family: 'Tahoma', sans-serif; font-weight: 400; font-size: 14px; line-height: 17px; color: #000000;">
+                            <p style="margin: 0; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 17px; color: #000000;">
                                 Best regards,<br/>
                                 <strong>Origin BI</strong>
                             </p>
@@ -100,7 +100,7 @@ export const getAssessmentCompletionEmailTemplate = (
                     </tr>
 
                     <tr>
-                        <td align="center" style="padding: 20px 0; font-family: 'Tahoma', sans-serif; font-size: 12px; line-height: 22px;">
+                        <td align="center" style="padding: 20px 0; font-family: Tahoma, Arial, sans-serif; font-size: 12px; line-height: 22px;">
                             <span style="color: #808080;">© ${year}. Origin BI | All Rights Reserved</span>
                             <br/>
                             <a href="${frontendUrl}/privacy-policy" style="color: #150089; text-decoration: none;">Privacy Policy</a> 

@@ -82,7 +82,7 @@ export const getAffiliateWelcomeEmailTemplate = (
                 </tr>
                 <tr>
                   <td colspan="2" style="padding: 10px 0 30px 40px;">
-                    <h1 style="font-family: Tahoma; font-weight: 700; font-size: 28px; line-height: 100%; letter-spacing: 0%; color: #FFFFFF; margin: 0;">Welcome, Affiliate Partner!</h1>
+                    <h1 style="font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 28px; line-height: 100%; letter-spacing: 0%; color: #FFFFFF; margin: 0;">Welcome, Affiliate Partner!</h1>
                   </td>
                 </tr>
               </table>
@@ -95,7 +95,7 @@ export const getAffiliateWelcomeEmailTemplate = (
               <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color: #ffffff; border-top: 3px solid #1ED36A;">
                  <!-- Background Pattern Hack -->
                  <tr>
-                    <td style="background-image: url('${assets.pattern}'); background-repeat: no-repeat; background-position: top right; background-size: contain;">
+                    <td style="">
                       
                       <!-- Inner Content Padding -->
                       <table width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -103,50 +103,50 @@ export const getAffiliateWelcomeEmailTemplate = (
                           <td style="padding: 40px;">
                             
                             <!-- Salutation -->
-                            <p style="margin: 0 0 15px; font-family: Tahoma; font-weight: 400; font-size: 16px; line-height: 100%; letter-spacing: 0%; color: #333333;">
-                              Dear <span style="font-family: Tahoma; font-weight: 700; font-size: 16px; line-height: 100%; letter-spacing: 0%; color: #150089;">${name}</span>,
+                            <p style="margin: 0 0 15px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 16px; line-height: 100%; letter-spacing: 0%; color: #333333;">
+                              Dear <span style="font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 16px; line-height: 100%; letter-spacing: 0%; color: #150089;">${name}</span>,
                             </p>
-                            <p style="margin: 0 0 25px; font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 150%; letter-spacing: 0%; color: #000000;">
+                            <p style="margin: 0 0 25px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 150%; letter-spacing: 0%; color: #000000;">
                               Congratulations! Your affiliate partner account with <strong>OriginBI</strong> has been successfully created. We're thrilled to have you on board as a valued partner.
                             </p>
 
                             <!-- Login Details Header -->
-                            <p style="margin: 0 0 15px; font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #1ED36A;">
+                            <p style="margin: 0 0 15px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #1ED36A;">
                               Here are your login details:
                             </p>
 
                             <!-- Details Table -->
                             <table width="100%" cellpadding="8" cellspacing="0" border="0" style="margin-bottom: 25px;">
                               <tr>
-                                <td width="35%" style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Name</td>
-                                <td width="65%" style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${name}</td>
+                                <td width="35%" style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Name</td>
+                                <td width="65%" style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${name}</td>
                               </tr>
                               <tr>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Email ID</td>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${email}</td>
+                                <td style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Email ID</td>
+                                <td style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${email}</td>
                               </tr>
                               <tr>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Mobile Number</td>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${countryCode} ${mobile}</td>
+                                <td style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Mobile Number</td>
+                                <td style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${countryCode} ${mobile}</td>
                               </tr>
                               <tr>
-                                <td style="font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Temporary Password</td>
-                                <td style="font-family: Tahoma; font-weight: 700; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${pass}</td>
+                                <td style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Temporary Password</td>
+                                <td style="font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${pass}</td>
                               </tr>
                             </table>
 
                             <!-- Referral Link Section -->
-                            <p style="margin: 0 0 10px; font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #1ED36A;">
+                            <p style="margin: 0 0 10px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #1ED36A;">
                               Your Referral Link:
                             </p>
                             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 25px;">
                               <tr>
                                 <td style="background-color: #F5F5FF; border: 1px solid #E0E0FF; border-radius: 6px; padding: 14px 16px;">
-                                  <a href="${referralLink}" style="font-family: Tahoma; font-weight: 600; font-size: 13px; line-height: 150%; color: #150089; word-break: break-all; text-decoration: none;">${referralLink}</a>
+                                  <a href="${referralLink}" style="font-family: Tahoma, Arial, sans-serif; font-weight: 600; font-size: 13px; line-height: 150%; color: #150089; word-break: break-all; text-decoration: none;">${referralLink}</a>
                                 </td>
                               </tr>
                             </table>
-                            <p style="margin: 0 0 25px; font-family: Tahoma; font-weight: 400; font-size: 13px; line-height: 150%; letter-spacing: 0%; color: #707070;">
+                            <p style="margin: 0 0 25px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 13px; line-height: 150%; letter-spacing: 0%; color: #707070;">
                               Share the above referral link with potential users. When they register using your link, you'll earn a commission on every successful registration.
                             </p>
 
@@ -154,25 +154,25 @@ export const getAffiliateWelcomeEmailTemplate = (
                             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 25px;">
                               <tr>
                                 <td align="left">
-                                  <a href="${loginUrl}" style="display: inline-block; padding: 12px 30px; background-color: #0F005E; color: #ffffff; text-decoration: none; border-radius: 4px; font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%;">Login Now</a>
+                                  <a href="${loginUrl}" style="display: inline-block; padding: 12px 30px; background-color: #0F005E; color: #ffffff; text-decoration: none; border-radius: 4px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%;">Login Now</a>
                                 </td>
                               </tr>
                             </table>
 
                             <!-- Important Note -->
-                            <p style="margin: 0 0 20px; font-family: Tahoma; font-weight: 400; font-size: 13px; line-height: 150%; letter-spacing: 0%; color: #707070;">
+                            <p style="margin: 0 0 20px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 13px; line-height: 150%; letter-spacing: 0%; color: #707070;">
                               <strong style="color: #333333;">Important:</strong> Please change your password after your first login for security purposes.
                             </p>
 
                             <!-- Support Text -->
-                            <p style="margin: 0 0 20px; font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">
+                            <p style="margin: 0 0 20px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">
                               If you need any assistance, our team is here to help. Welcome aboard!
                             </p>
 
                             <!-- Sign Off -->
-                            <p style="margin: 0; font-family: Tahoma; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">
+                            <p style="margin: 0; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">
                               Best regards,<br>
-                              <strong style="font-family: Tahoma; font-weight: 700; font-size: 14px; color: #000000;">Origin BI Team</strong>
+                              <strong style="font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 14px; color: #000000;">Origin BI Team</strong>
                             </p>
 
                           </td>
@@ -187,10 +187,10 @@ export const getAffiliateWelcomeEmailTemplate = (
           <!-- Footer Section -->
            <tr>
             <td style="padding: 30px 20px 0 20px; background-color: #0F005E;">
-              <p style="margin: 0 0 5px; font-family: Tahoma; font-weight: 400; font-size: 12px; line-height: 100%; letter-spacing: 0%; color: #E9ECEF;">
+              <p style="margin: 0 0 5px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 12px; line-height: 100%; letter-spacing: 0%; color: #E9ECEF;">
                 © ${new Date().getFullYear()}. Origin BI | All Rights Reserved
               </p>
-              <p style="margin: 0 0 20px; font-family: Tahoma; font-weight: 400; font-size: 12px; line-height: 100%; letter-spacing: 0%; color: #1ED36A;">
+              <p style="margin: 0 0 20px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 12px; line-height: 100%; letter-spacing: 0%; color: #1ED36A;">
                 <a href="#" style="color: #1ED36A; text-decoration: none;">Privacy Policy</a> <span style="color: #E9ECEF;">|</span> <a href="#" style="color: #1ED36A; text-decoration: none;">Terms & Conditions</a>
               </p>
             </td>
