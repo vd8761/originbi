@@ -3,7 +3,7 @@ import { getStoredUser, getAuthHeaders } from '../auth-helpers';
 import { usePathname } from 'next/navigation';
 
 export interface Notification {
-    id: string;
+    id: number;
     userId: number;
     role: string;
     type: string;
@@ -58,7 +58,7 @@ export function useNotifications() {
         }
     }, [user.id, user.role]);
 
-    const markAsRead = async (id: string) => {
+    const markAsRead = async (id: number) => {
         try {
             const baseUrl = process.env.NEXT_PUBLIC_ADMIN_SERVICE_URL || 'http://localhost:4001';
             const response = await fetch(`${baseUrl}/notifications/${id}/read`, {
