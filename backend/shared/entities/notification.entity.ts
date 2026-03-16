@@ -10,8 +10,8 @@ import {
 @Entity('notifications')
 @Index(['userId', 'role'])
 export class Notification {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+    @PrimaryGeneratedColumn({ type: 'bigint' })
+    id: number;
 
     @Column({ name: 'user_id', type: 'bigint' })
     userId: number;

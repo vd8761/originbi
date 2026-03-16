@@ -96,7 +96,7 @@ export class NotificationService {
         };
     }
 
-    async markAsRead(id: string, userId: number) {
+    async markAsRead(id: number, userId: number) {
         return this.notificationRepo.update(
             { id, userId },
             { isRead: true },
