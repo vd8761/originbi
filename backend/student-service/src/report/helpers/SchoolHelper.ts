@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 import { getPool } from './dbPool';
 import { logger } from './logger';
 
@@ -6,23 +6,23 @@ import { logger } from './logger';
  * Represents one row from the `university_datas` table.
  */
 export interface UniversityData {
-    id: number;
-    school_stream_id: number;
-    school_stream_field_id?: number;
-    field_name?: string;
-    /** ENGINEERING | MEDICAL | RESEARCH (stream 1) or MANAGEMENT (stream 2) or LAW (stream 3) */
-    school_group?: string;
-    institute_id: string;
-    name: string;
-    city: string;
-    score: string;
-    rank: string;
-    state: string;
-    tlr: string;
-    rpc: string;
-    go: string;
-    oi: string;
-    perception: string;
+  id: number;
+  school_stream_id: number;
+  school_stream_field_id?: number;
+  field_name?: string;
+  /** ENGINEERING | MEDICAL | RESEARCH (stream 1) or MANAGEMENT (stream 2) or LAW (stream 3) */
+  school_group?: string;
+  institute_id: string;
+  name: string;
+  city: string;
+  score: string;
+  rank: string;
+  state: string;
+  tlr: string;
+  rpc: string;
+  go: string;
+  oi: string;
+  perception: string;
 }
 
 /**
@@ -35,7 +35,7 @@ export interface UniversityData {
  * gracefully handling text like "101-150" or "N/A" by returning NULL/extracting just numbers.
  */
 function safeCast(column: string): string {
-    return `CAST(NULLIF(regexp_replace(${column}, '[^0-9.]', '', 'g'), '') AS FLOAT)`;
+  return `CAST(NULLIF(regexp_replace(${column}, '[^0-9.]', '', 'g'), '') AS FLOAT)`;
 }
 
 /**
@@ -44,18 +44,18 @@ function safeCast(column: string): string {
  * Both are cast safely to allow numeric sort on string-stored values.
  */
 function getOrderByClause(primaryTrait: string): string {
-    switch (primaryTrait.toUpperCase()) {
-        case 'D':
-            return `${safeCast('go')} DESC, ${safeCast('perception')} DESC`;
-        case 'I':
-            return `${safeCast('oi')} DESC, ${safeCast('perception')} DESC`;
-        case 'S':
-            return `${safeCast('tlr')} DESC, ${safeCast('oi')} DESC`;
-        case 'C':
-            return `${safeCast('rpc')} DESC, ${safeCast('tlr')} DESC`;
-        default:
-            return `${safeCast('score')} DESC`;
-    }
+  switch (primaryTrait.toUpperCase()) {
+    case 'D':
+      return `${safeCast('go')} DESC, ${safeCast('perception')} DESC`;
+    case 'I':
+      return `${safeCast('oi')} DESC, ${safeCast('perception')} DESC`;
+    case 'S':
+      return `${safeCast('tlr')} DESC, ${safeCast('oi')} DESC`;
+    case 'C':
+      return `${safeCast('rpc')} DESC, ${safeCast('tlr')} DESC`;
+    default:
+      return `${safeCast('score')} DESC`;
+  }
 }
 
 /**
@@ -76,43 +76,43 @@ function getOrderByClause(primaryTrait: string): string {
  * @param schoolStreamId  1 | 2 | 3 | undefined
  */
 export async function getTopCollegesForStudent(
-    traitCode: string,
-    schoolStreamId: number | undefined,
+  traitCode: string,
+  schoolStreamId: number | undefined,
 ): Promise<UniversityData[]> {
-    logger.info(
-        `[SchoolHelper] Fetching colleges for trait="${traitCode}" stream=${schoolStreamId ?? 'SSLC'}`,
-    );
+  logger.info(
+    `[SchoolHelper] Fetching colleges for trait="${traitCode}" stream=${schoolStreamId ?? 'SSLC'}`,
+  );
 
-    if (process.env.MOCK_DB === 'true') {
-        logger.info('[SchoolHelper] MOCK_DB — returning empty list');
-        return [];
-    }
+  if (process.env.MOCK_DB === 'true') {
+    logger.info('[SchoolHelper] MOCK_DB — returning empty list');
+    return [];
+  }
 
-    const primaryTrait = traitCode.charAt(0).toUpperCase();
-    const orderBy = getOrderByClause(primaryTrait);
-    const client = await getPool().connect();
+  const primaryTrait = traitCode.charAt(0).toUpperCase();
+  const orderBy = getOrderByClause(primaryTrait);
+  const client = await getPool().connect();
 
-    try {
-        let query: string;
-        let params: number[];
+  try {
+    let query: string;
+    let params: number[];
 
-        if (schoolStreamId !== undefined) {
-            // First, determine how many fields this stream has.
-            const countRes = await client.query(
-                `SELECT COUNT(*) as c FROM school_stream_fields WHERE stream_id = $1`,
-                [schoolStreamId]
-            );
-            const fieldCount = parseInt(countRes.rows[0].c, 10);
+    if (schoolStreamId !== undefined) {
+      // First, determine how many fields this stream has.
+      const countRes = await client.query(
+        `SELECT COUNT(*) as c FROM school_stream_fields WHERE stream_id = $1`,
+        [schoolStreamId],
+      );
+      const fieldCount = parseInt(String(countRes.rows[0].c), 10);
 
-            // Determine dynamically the number of colleges to show per field
-            let limitPerField = 3;
-            if (fieldCount === 1) limitPerField = 10;
-            else if (fieldCount === 2) limitPerField = 5;
-            else if (fieldCount === 3) limitPerField = 5;
-            else if (fieldCount === 4) limitPerField = 4;
+      // Determine dynamically the number of colleges to show per field
+      let limitPerField = 3;
+      if (fieldCount === 1) limitPerField = 10;
+      else if (fieldCount === 2) limitPerField = 5;
+      else if (fieldCount === 3) limitPerField = 5;
+      else if (fieldCount === 4) limitPerField = 4;
 
-            // Distinct fetch: Top X colleges per field for the specific stream
-            query = `
+      // Distinct fetch: Top X colleges per field for the specific stream
+      query = `
         SELECT ud.id, ud.school_stream_id, ud.school_stream_field_id, ud.institute_id, ud.name, ud.city,
                ud.score, ud.rank, ud.state, ud.tlr, ud.rpc, ud.go, ud.oi, ud.perception,
                ssf.name as field_name, ssf.display_order
@@ -129,12 +129,12 @@ export async function getTopCollegesForStudent(
         WHERE ud.rn <= ${limitPerField}
         ORDER BY ssf.display_order ASC, ${safeCast('ud.rank')} ASC;
       `;
-            params = [schoolStreamId];
-        } else {
-            // SSLC → top 5 per stream ... leaving this as is unless specified otherwise.
-            // If they want field groupings for SSLC too, we shouldn't break the current grouping.
-            // But we can join it just in case.
-            query = `
+      params = [schoolStreamId];
+    } else {
+      // SSLC → top 5 per stream ... leaving this as is unless specified otherwise.
+      // If they want field groupings for SSLC too, we shouldn't break the current grouping.
+      // But we can join it just in case.
+      query = `
         SELECT ud.id, ud.school_stream_id, ud.institute_id, ud.name, ud.city,
                ud.score, ud.rank, ud.state, ud.tlr, ud.rpc, ud.go, ud.oi, ud.perception
         FROM (
@@ -149,18 +149,18 @@ export async function getTopCollegesForStudent(
         WHERE ud.rn <= 5
         ORDER BY ${safeCast('ud.rank')} ASC;
       `;
-            params = [];
-        }
-
-        const result = await client.query(query, params);
-        logger.info(
-            `[SchoolHelper] Found ${result.rows.length} institutions for trait=${primaryTrait}`,
-        );
-        return result.rows as UniversityData[];
-    } catch (err) {
-        logger.error('[SchoolHelper] Error fetching university data', err);
-        return [];
-    } finally {
-        client.release();
+      params = [];
     }
+
+    const result = await client.query(query, params);
+    logger.info(
+      `[SchoolHelper] Found ${result.rows.length} institutions for trait=${primaryTrait}`,
+    );
+    return result.rows as UniversityData[];
+  } catch (err) {
+    logger.error('[SchoolHelper] Error fetching university data', err);
+    return [];
+  } finally {
+    client.release();
+  }
 }

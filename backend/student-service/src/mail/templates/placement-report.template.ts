@@ -20,7 +20,7 @@ export const getPlacementReportEmailTemplate = (
         body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; }
     </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #E9ECEF; font-family: 'Tahoma', Arial, sans-serif;">
+<body style="margin: 0; padding: 0; background-color: #E9ECEF; font-family: Tahoma, Arial, sans-serif;">
 
     <table border="0" cellpadding="0" cellspacing="0" width="100%">
         <tr>
@@ -41,16 +41,16 @@ export const getPlacementReportEmailTemplate = (
                             <table border="0" cellpadding="0" cellspacing="0" width="100%">
                                 <tr>
                                     <td width="55%" valign="middle" style="color: #ffffff;">
-                                        <p style="margin: 0; font-family: 'Tahoma', sans-serif; font-weight: 700; font-size: 16px; line-height: 19px; color: #1ED36A;">
+                                        <p style="margin: 0; font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 16px; line-height: 19px; color: #1ED36A;">
                                             ${year}
                                         </p>
-                                        <h1 style="margin: 10px 0; font-family: 'Tahoma', sans-serif; font-weight: 700; font-size: 28px; line-height: 34px; color: #FFFFFF;">
+                                        <h1 style="margin: 10px 0; font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 28px; line-height: 34px; color: #FFFFFF;">
                                             Students<br/>Handbook
                                         </h1>
-                                        <p style="margin: 5px 0 0 0; font-family: 'Tahoma', sans-serif; font-weight: 700; font-size: 14px; line-height: 18px; color: #FFFFFF;">
+                                        <p style="margin: 5px 0 0 0; font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 14px; line-height: 18px; color: #FFFFFF;">
                                             ${degreeType}
                                         </p>
-                                        <p style="margin: 2px 0 0 0; font-family: 'Tahoma', sans-serif; font-weight: 700; font-size: 14px; line-height: 18px; color: #1ED36A;">
+                                        <p style="margin: 2px 0 0 0; font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 14px; line-height: 18px; color: #1ED36A;">
                                             ${departmentName}
                                         </p>
                                     </td>
@@ -66,10 +66,10 @@ export const getPlacementReportEmailTemplate = (
                     <!-- Stats Bar -->
                     <tr>
                         <td style="background-color: #E9ECEF; padding: 25px 30px; text-align: center;">
-                            <p style="margin: 0 0 5px 0; font-family: 'Tahoma', sans-serif; font-weight: 700; font-size: 22px; line-height: 28px; color: #1ED36A;">
+                            <p style="margin: 0 0 5px 0; font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 22px; line-height: 28px; color: #1ED36A;">
                                 ${studentCount} students' reports generated
                             </p>
-                            <p style="margin: 0; font-family: 'Tahoma', sans-serif; font-weight: 700; font-size: 22px; line-height: 28px; color: #150089;">
+                            <p style="margin: 0; font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 22px; line-height: 28px; color: #150089;">
                                 80-90% accuracy in role fitment
                             </p>
                         </td>
@@ -84,23 +84,23 @@ export const getPlacementReportEmailTemplate = (
                     <tr>
                         <td bgcolor="#FFFFFF" style="background-color: #FFFFFF; padding: 40px 30px; border-radius: 0 0 4px 4px;">
                             
-                            <p style="margin: 0 0 20px 0; font-family: 'Tahoma', sans-serif; font-weight: 400; font-size: 16px; line-height: 19px; color: #000000;">
+                            <p style="margin: 0 0 20px 0; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 16px; line-height: 19px; color: #000000;">
                                 Dear <strong style="color: #150089;">Placement Officer</strong>,
                             </p>
 
-                            <p style="margin: 0 0 15px 0; font-family: 'Tahoma', sans-serif; font-weight: 400; font-size: 14px; line-height: 22px; color: #000000;">
+                            <p style="margin: 0 0 15px 0; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 22px; color: #000000;">
                                 The Origin BI <strong style="color: #150089;">Self-Discovery Assessment</strong> for <strong style="color: #150089;">${degreeType} ${departmentName}</strong> students provides a detailed summary of each student's unique strengths and career role fitment insights. This handbook is a valuable resource to support your guidance work, offering personalized career roadmap suggestions and an overview of current industry trends
                             </p>
 
-                            <p style="margin: 0 0 15px 0; font-family: 'Tahoma', sans-serif; font-weight: 400; font-size: 14px; line-height: 22px; color: #000000;">
+                            <p style="margin: 0 0 15px 0; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 22px; color: #000000;">
                                 We encourage you to review and keep this handbook for future reference as you help students prepare for the right roles and opportunities.
                             </p>
 
-                            <p style="margin: 0 0 30px 0; font-family: 'Tahoma', sans-serif; font-weight: 400; font-size: 14px; line-height: 22px; color: #000000;">
+                            <p style="margin: 0 0 30px 0; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 22px; color: #000000;">
                                 Thank you for collaborating with Origin BI and believing in our approach. Let's work together to help students shape a brighter future.
                             </p>
 
-                            <p style="margin: 0; font-family: 'Tahoma', sans-serif; font-weight: 400; font-size: 14px; line-height: 17px; color: #000000;">
+                            <p style="margin: 0; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 17px; color: #000000;">
                                 Best regards,<br/>
                                 <strong>Origin BI</strong>
                             </p>
@@ -110,7 +110,7 @@ export const getPlacementReportEmailTemplate = (
 
                     <!-- Footer -->
                     <tr>
-                        <td align="center" style="padding: 20px 0; font-family: 'Tahoma', sans-serif; font-size: 12px; line-height: 22px;">
+                        <td align="center" style="padding: 20px 0; font-family: Tahoma, Arial, sans-serif; font-size: 12px; line-height: 22px;">
                             <span style="color: #808080;">\u00A9 ${year}. Origin BI | All Rights Reserved</span>
                             <br/>
                             <a href="${frontendUrl}/privacy-policy" style="color: #150089; text-decoration: none;">Privacy Policy</a> 
