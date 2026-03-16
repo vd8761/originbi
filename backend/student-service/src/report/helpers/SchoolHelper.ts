@@ -113,7 +113,11 @@ export async function getTopCollegesForStudent(
                  WHERE ssd.school_stream_id = $1`,
                 [schoolStreamId]
             );
-            const availableIds = new Set<number>(availRes.rows.map((r: any) => r.school_stream_department_id));
+            const availableIds = new Set<number>(
+                (availRes.rows as { school_stream_department_id: number }[]).map(
+                    (r) => r.school_stream_department_id
+                )
+            );
             const availableDepts = availableIds.size;
 
             // 3. Determine missing department names for the common label
