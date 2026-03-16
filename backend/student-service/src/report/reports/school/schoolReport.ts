@@ -9,7 +9,8 @@ import {
   TextAlignment,
 } from '../BaseReport';
 import {
-  SCHOOL_TOC_CONTENT,
+  SSLC_TOC_CONTENT,
+  HSC_TOC_CONTENT,
   SCHOOL_CONTENT,
   SCHOOL_DYNAMIC_CONTENT,
   SCHOOL_BLENDED_STYLE_MAPPING,
@@ -261,15 +262,17 @@ export class SchoolReport extends BaseReport {
     // Set the starting Y position for the first item
     let currentY = 45 * this.MM;
 
+    const tocContent = this.data.school_level_id === 1 ? SSLC_TOC_CONTENT : HSC_TOC_CONTENT;
+
     // TOC items gap by TOC items count
     let tocItemsGap = 10;
-    if (SCHOOL_TOC_CONTENT.length > 10 && SCHOOL_TOC_CONTENT.length < 13) {
+    if (tocContent.length > 10 && tocContent.length < 13) {
       tocItemsGap = 8;
-    } else if (SCHOOL_TOC_CONTENT.length >= 13) {
+    } else if (tocContent.length >= 13) {
       tocItemsGap = 10;
     }
 
-    SCHOOL_TOC_CONTENT.forEach((item, index) => {
+    tocContent.forEach((item, index) => {
       // 2. Check for overflow
       if (currentY > bottomLimit) {
         this.doc.addPage();
@@ -499,8 +502,8 @@ export class SchoolReport extends BaseReport {
     this.pHtml(content.unique_needs_desc);
 
     // 5. Communication - Should
-    this.h1(`Communication Tips for Connecting with ${this.data.full_name}`);
-    this.h2(`How Others Can Best Communicate With ${this.data.full_name}`);
+    this.h2(`Communication Tips for Connecting with ${this.data.full_name}`);
+    this.h3(`How Others Can Best Communicate With ${this.data.full_name}`);
     this.pHtml(content.communication_desc);
 
     // Do's List
@@ -512,7 +515,7 @@ export class SchoolReport extends BaseReport {
     this.doc.moveDown();
 
     // Communication - Should Not
-    this.h2('What Others Should Avoid');
+    this.h3('What Others Should Avoid');
     this.pHtml(content.communication_avoid_desc);
 
     // Dont's List
@@ -742,7 +745,7 @@ export class SchoolReport extends BaseReport {
         norm(agile?.focus ?? 0) +
         norm(agile?.openness ?? 0) +
         norm(agile?.respect ?? 0)) /
-        5,
+      5,
     );
     const leadershipScore = this.ci_patterns.leadership;
 
@@ -856,21 +859,21 @@ export class SchoolReport extends BaseReport {
     const p = this.ci_patterns;
     const patternTitles: Record<string, string> = {
       'assertive-risk': 'Assertive Risk Pattern',
+      'cautious-respect': 'Cautious Respect Pattern',
       'execution-engine': 'Execution Engine Profile',
+      'steady-execution': 'Steady Execution Pattern',
       'creative-instability': 'Creative Instability Pattern',
       balanced: 'Balanced Agility Profile',
     };
 
-    this.h3(patternTitles[p.agilePattern], {
-      color: CI_COLORS.ACCENT_TEAL,
-    });
+    this.h3(patternTitles[p.agilePattern]);
 
     // Draw balance scale for the key pair
-    if (p.agilePattern === 'assertive-risk') {
+    if (p.agilePattern === 'assertive-risk' || p.agilePattern === 'cautious-respect') {
       this.drawBalanceScale('Courage', courage, 'Respect', respect);
     } else if (p.agilePattern === 'execution-engine') {
       this.drawBalanceScale('Focus', focus, 'Commitment', commitment);
-    } else if (p.agilePattern === 'creative-instability') {
+    } else if (p.agilePattern === 'creative-instability' || p.agilePattern === 'steady-execution') {
       this.drawBalanceScale('Openness', openness, 'Commitment', commitment);
     } else {
       // Balanced: show the most extreme pair
@@ -911,26 +914,26 @@ export class SchoolReport extends BaseReport {
     this.drawSkillHeatmapGrid(skills);
 
     // Add contextual text for extreme scores
-    if (p.leadership > 75) {
-      this.p(
-        '★ ' +
-          (TEXT_VARIATIONS['skill-leadership-high']?.[p.textVariant] ?? ''),
-        {
-          color: CI_COLORS.STRONG_GREEN,
-          gap: 3,
-        },
-      );
-    }
-    if (p.collaboration < 50) {
-      this.p(
-        '△ ' +
-          (TEXT_VARIATIONS['skill-collaboration-low']?.[p.textVariant] ?? ''),
-        {
-          color: CI_COLORS.MODERATE_AMBER,
-          gap: 3,
-        },
-      );
-    }
+    // if (p.leadership > 75) {
+    //   this.p(
+    //     '★ ' +
+    //     (TEXT_VARIATIONS['skill-leadership-high']?.[p.textVariant] ?? ''),
+    //     {
+    //       color: CI_COLORS.STRONG_GREEN,
+    //       gap: 3,
+    //     },
+    //   );
+    // }
+    // if (p.collaboration < 50) {
+    //   this.p(
+    //     '△ ' +
+    //     (TEXT_VARIATIONS['skill-collaboration-low']?.[p.textVariant] ?? ''),
+    //     {
+    //       color: CI_COLORS.MODERATE_AMBER,
+    //       gap: 3,
+    //     },
+    //   );
+    // }
 
     this.doc.y += 4;
     // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
@@ -1018,18 +1021,95 @@ export class SchoolReport extends BaseReport {
     // 5. Development Zones
     this.ci_generateDevelopmentZones();
 
-    // 6. Future Pathways & Stream Odyssey
+    // 6. Future Pathways & Stream Odyssey (with inline top-6 course compatibility per stream)
     try {
       this.generateStreamSelectionIntro();
-      ['PCMB', 'PCB', 'PCM', 'PCBZ', 'Commerce', 'Humanities'].forEach(
-        (streamKey) => {
-          this.generateStreamSelectionContent(streamKey);
-          this.generateStreamOdysseyRoadmap(streamKey);
-        },
+
+      // Pre-compute traits for compatibility bar colouring
+      const topTwoTraits = this.getTopTwoTraits(
+        this.data.most_answered_answer_type,
+        this.data,
       );
-      logger.info(
-        '[School REPORT][SSLC] Stream Selection & Odyssey Generated.',
-      );
+      const traitCode = topTwoTraits[0] + topTwoTraits[1];
+
+      const streamIdMap: Record<string, number> = {
+        PCMB: 1, PCB: 2, PCM: 3, PCBZ: 4, Commerce: 5, Humanities: 6,
+      };
+
+      for (const streamKey of ['PCMB', 'PCB', 'PCM', 'PCBZ', 'Commerce', 'Humanities']) {
+        // Stream content page + odyssey roadmap
+        this.generateStreamSelectionContent(streamKey);
+        this.generateStreamOdysseyRoadmap(streamKey);
+
+        // Inline course compatibility — top 6 per department for this stream (SSLC threshold: 84)
+        try {
+          const SSLC_THRESHOLD = 86;
+          const streamId = streamIdMap[streamKey];
+          const allCourses = await getCompatibilityMatrixDetails(traitCode, streamId);
+
+          // Group by department_name (preserving DB order), then keep top 6 per department
+          const deptMap = new Map<string, typeof allCourses>();
+          for (const course of allCourses) {
+            const dept = course.department_name || 'General';
+            if (!deptMap.has(dept)) deptMap.set(dept, []);
+            deptMap.get(dept)!.push(course);
+          }
+
+          if (deptMap.size > 0) {
+            this.h2('Compatible Courses for This Stream');
+            this.pHtml('<b> How to read: </b>Bar colour shows trait alignment. Higher % means a stronger match - primary colour bars score ≥70%.');
+            // Compact legend — shown once above all departments
+            const DISC_COLORS: Record<string, string> = {
+              D: '#D82A29', I: '#FEDD10', S: '#4FB965', C: '#01AADB',
+            };
+            const highTrait = topTwoTraits[0].toUpperCase();
+            const lowTrait = topTwoTraits[1].toUpperCase();
+            const highColor = DISC_COLORS[highTrait] || '#808080';
+            const lowColor = DISC_COLORS[lowTrait] || '#808080';
+            const lm = this._useStdMargins ? this.MARGIN_STD : 15 * this.MM;
+            const circleR = 4;
+            const legendY = this.doc.y + 1;
+
+            // Swatch 1
+            let cx = lm;
+            this.doc.circle(cx + circleR, legendY + circleR, circleR).fillColor(highColor).fill();
+            cx += circleR * 2 + 3;
+            this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(7).fillColor('#333333')
+              .text(`Primary trait — higher match (≥${SSLC_THRESHOLD}%)`, cx, legendY + 1, { continued: false });
+            const w1 = this.doc.widthOfString(`Primary trait — higher match (≥${SSLC_THRESHOLD}%)`);
+            cx += w1 + 14;
+
+            // Swatch 2
+            this.doc.circle(cx + circleR, legendY + circleR, circleR).fillColor(lowColor).fill();
+            cx += circleR * 2 + 3;
+            this.doc.font(this.FONT_SORA_REGULAR).fontSize(7).fillColor('#333333')
+              .text(`Secondary trait — moderate match (<${SSLC_THRESHOLD}%)`, cx, legendY + 1, { continued: false });
+
+            this.doc.y = legendY + circleR * 2 + 5;
+
+            // Render each department separately with its own h3 heading
+            const gridMargin = lm;
+            for (const [deptName, deptCourses] of deptMap.entries()) {
+              const top6 = deptCourses.slice(0, 6);
+              this.h3(deptName);
+              this.generateCourseCompatibilityTable(
+                top6,
+                topTwoTraits[0],
+                topTwoTraits[1],
+                true,
+                gridMargin,
+                this.doc.y,
+                this.PAGE_WIDTH - 2 * gridMargin,
+                SSLC_THRESHOLD,
+              );
+            }
+          }
+        } catch (err) {
+          logger.warn(`[School REPORT][SSLC] Course Compatibility for ${streamKey} skipped.`, err);
+        }
+      }
+
+      logger.info('[School REPORT][SSLC] Stream Selection & Odyssey Generated.');
     } catch (err) {
       logger.warn('[School REPORT][SSLC] Stream Odyssey skipped.', err);
     }
@@ -1049,35 +1129,6 @@ export class SchoolReport extends BaseReport {
     // 3. Career Domain Table
     this.ci_generateCareerDomainTable();
 
-    // 4. Course Compatibility Matrix
-    try {
-      await this.generateCourseCompatibility();
-      logger.info('[School REPORT][HSC] Course Compatibility Generated.');
-    } catch {
-      logger.warn(
-        '[School REPORT][HSC] Course Compatibility skipped (DB unavailable).',
-      );
-    }
-
-    // 5. Your Reach Institutions
-    try {
-      await this.generateReachInstitutions();
-      logger.info('[School REPORT][HSC] Reach Institutions Generated.');
-    } catch (err) {
-      logger.warn(
-        '[School REPORT][HSC] Reach Institutions skipped (DB unavailable).',
-        err,
-      );
-    }
-
-    // 6. Career Flight Path
-    try {
-      this.generateCareerFlightPath();
-      logger.info('[School REPORT][HSC] Career Flight Path Generated.');
-    } catch (err) {
-      logger.warn('[School REPORT][HSC] Career Flight Path skipped.', err);
-    }
-
     const streamMap: Record<string, string> = {
       '1': 'PCMB',
       '2': 'PCB',
@@ -1088,7 +1139,7 @@ export class SchoolReport extends BaseReport {
     };
     const streamKey = streamMap[String(this.data.school_stream_id)];
 
-    // 6.5. Future Pathways
+    // 5 Future Pathways
     try {
       if (streamKey) {
         this.generateStreamSelectionContent(streamKey);
@@ -1098,7 +1149,7 @@ export class SchoolReport extends BaseReport {
       logger.warn('[School REPORT][HSC] Future Pathways skipped.', err);
     }
 
-    // 7. Career Odyssey Roadmap
+    // 6. Career Odyssey Roadmap
     try {
       this.generateStreamOdysseyRoadmap(streamKey);
       logger.info('[School REPORT][HSC] Career Odyssey Roadmap Generated.');
@@ -1106,7 +1157,31 @@ export class SchoolReport extends BaseReport {
       logger.warn('[School REPORT][HSC] Career Odyssey Roadmap skipped.', err);
     }
 
-    // 8. Development Zones (Moved to the end for HSC)
+    // 4. Course Compatibility Matrix
+    try {
+      await this.generateCourseCompatibility();
+      logger.info('[School REPORT][HSC] Course Compatibility Generated.');
+    } catch {
+      logger.warn('[School REPORT][HSC] Course Compatibility skipped (DB unavailable).');
+    }
+
+    // 7. Your Reach Institutions
+    try {
+      await this.generateReachInstitutions();
+      logger.info('[School REPORT][HSC] Reach Institutions Generated.');
+    } catch (err) {
+      logger.warn('[School REPORT][HSC] Reach Institutions skipped (DB unavailable).', err);
+    }
+
+    // 8. Career Flight Path
+    try {
+      this.generateCareerFlightPath();
+      logger.info('[School REPORT][HSC] Career Flight Path Generated.');
+    } catch (err) {
+      logger.warn('[School REPORT][HSC] Career Flight Path skipped.', err);
+    }
+
+    // 9. Development Zones (Moved to the end for HSC)
     this.ci_generateDevelopmentZones();
   }
 
@@ -1650,10 +1725,10 @@ export class SchoolReport extends BaseReport {
   private generateACI(): void {
     const contentBlock =
       ACI[
-        this.getTopTwoTraits(
-          this.data.most_answered_answer_type,
-          this.data,
-        ).join('')
+      this.getTopTwoTraits(
+        this.data.most_answered_answer_type,
+        this.data,
+      ).join('')
       ];
     const agileSum =
       this.data.agile_scores[0].commitment +
@@ -1787,6 +1862,12 @@ export class SchoolReport extends BaseReport {
    * Fetches compatibility data for the stream and traits, then renders a comparison chart.
    */
   private async generateCourseCompatibility(): Promise<void> {
+    // --- LAYOUT CUSTOMIZATION VARIABLES ---
+    // Adjust these values to fine-tune the spacing in the matrix
+    const GAP_BELOW_DEPT_TITLE_MM = 1; // Gap between the Department Name and its first row of courses
+    const GAP_BETWEEN_DEPTS_MM = 2;   // Gap between the end of one department and the start of the next
+    // --------------------------------------
+
     this.ensureSpace(0.5, true);
     this.h1('Course Compatibility Matrix');
     const topTwoTraits = this.getTopTwoTraits(
@@ -1794,17 +1875,169 @@ export class SchoolReport extends BaseReport {
       this.data,
     );
 
+    // --- Color Legend ---
+    // Explain what the two bar colors mean so students don't misread green as "better"
+    {
+      const DISC_COLORS: Record<string, string> = {
+        D: '#D82A29',
+        I: '#FEDD10',
+        S: '#4FB965',
+        C: '#01AADB',
+      };
+      const DISC_LABEL: Record<string, string> = {
+        D: 'Dominant',
+        I: 'Influential',
+        S: 'Steady',
+        C: 'Conscientious',
+      };
+      const highTrait = topTwoTraits[0].toUpperCase();
+      const lowTrait = topTwoTraits[1].toUpperCase();
+      const highColor = DISC_COLORS[highTrait] || '#808080';
+      const lowColor = DISC_COLORS[lowTrait] || '#808080';
+      const highLabel = DISC_LABEL[highTrait] || highTrait;
+      const lowLabel = DISC_LABEL[lowTrait] || lowTrait;
+
+      const legendMargin = this._useStdMargins ? this.MARGIN_STD : 15 * this.MM;
+      const swatchSize = 8;
+      const swatchGap = 4;    // gap between swatch and its label
+      const itemGap = 16;   // gap between the two legend items
+      const legendY = this.doc.y + 2;
+
+      // "How to read:" prefix
+      // this.doc
+      //   .font(this.FONT_SORA_SEMIBOLD)
+      //   .fontSize(7.5)
+      //   .fillColor('#555555')
+      //   .text('How to read: ', legendMargin, legendY, { continued: true })
+      //   .font(this.FONT_SORA_REGULAR)
+      //   .fillColor('#333333')
+      //   .text('Bar colour shows trait alignment. Higher % means a stronger match — primary colour bars score ≥70%.', {
+      //     continued: false,
+      //     width: this.PAGE_WIDTH - 2 * legendMargin - 4,
+      //   });
+
+      this.pHtml('<b> How to read: </b>Bar colour shows trait alignment. Higher % means a stronger match - primary colour bars score ≥70%.');
+
+      const labelY = this.doc.y + 4;
+
+      // Item 1: high-trait circle swatch
+      const circleR = swatchSize / 2; // radius
+      let curX = legendMargin;
+      this.doc
+        .circle(curX + circleR, labelY + circleR, circleR)
+        .fillColor(highColor)
+        .fill();
+      curX += swatchSize + swatchGap;
+      this.doc
+        .font(this.FONT_SORA_SEMIBOLD)
+        .fontSize(9)
+        .fillColor('#333333')
+        // .text(`${highLabel} trait — higher match (≥70%)`, curX, labelY + 1, { continued: false });
+        .text(`Primary trait — higher match (≥70%)`, curX, labelY + 1, { continued: false });
+
+      // Measure the first label width to place the second item next to it
+      const firstLabelWidth = this.doc.widthOfString(`${highLabel} trait — higher match (≥70%)`);
+      curX += firstLabelWidth + itemGap;
+
+      // Item 2: low-trait circle swatch
+      this.doc
+        .circle(curX + circleR, labelY + circleR, circleR)
+        .fillColor(lowColor)
+        .fill();
+      curX += swatchSize + swatchGap;
+      this.doc
+        .font(this.FONT_SORA_REGULAR)
+        .fontSize(9)
+        .fillColor('#333333')
+        // .text(`${lowLabel} trait — moderate match (<70%)`, curX, labelY + 1, { continued: false });
+        .text(`Secondary trait — moderate match (<70%)`, curX, labelY + 1, { continued: false });
+
+      this.doc.y = labelY + swatchSize + 6;
+    }
+    // --- End Color Legend ---
+
     const data = await getCompatibilityMatrixDetails(
       topTwoTraits[0] + topTwoTraits[1],
       this.data.school_stream_id,
     );
 
-    this.generateCourseCompatibilityTable(
-      data,
-      topTwoTraits[0],
-      topTwoTraits[1],
-    );
-    this.doc.moveDown();
+    // Group courses by department_name
+    const departmentMap = new Map<string, typeof data>();
+    for (const item of data) {
+      const dept = item.department_name || 'General';
+      if (!departmentMap.has(dept)) {
+        departmentMap.set(dept, []);
+      }
+      departmentMap.get(dept)!.push(item);
+    }
+
+    const deptEntries = Array.from(departmentMap.entries());
+
+    if (deptEntries.length > 0) {
+      this.ensureSpace(0.5, true);
+
+      const gridMargin = this._useStdMargins ? this.MARGIN_STD : 15 * this.MM;
+      let currentY = this.doc.y;
+
+      for (let i = 0; i < deptEntries.length; i++) {
+        const [deptName, courses] = deptEntries[i];
+
+        // Ensure space for header + at least one row of courses
+        this.ensureSpace(15 * this.MM, false);
+        currentY = this.doc.y;
+
+        // Draw Department Header
+        // this.doc
+        //   .font(this.FONT_SORA_BOLD)
+        //   .fontSize(11)
+        //   .fillColor(this.COLOR_DEEP_BLUE)
+        //   .text(deptName, gridMargin, currentY, { width: this.PAGE_WIDTH - 2 * gridMargin });
+        this.h3(deptName);
+
+        currentY = this.doc.y + GAP_BELOW_DEPT_TITLE_MM * this.MM;
+
+        // Render the inner chart (it will handle its own 3-column layout and page breaks)
+        this.generateCourseCompatibilityTable(
+          courses, // pass all courses
+          topTwoTraits[0],
+          topTwoTraits[1],
+          true,
+          gridMargin,
+          currentY,
+          this.PAGE_WIDTH - 2 * gridMargin // full width available for the 3 columns
+        );
+
+        // Add spacing before the next department
+        this.doc.y += GAP_BETWEEN_DEPTS_MM * this.MM;
+
+        // Update currentY for the next header loop
+        currentY = this.doc.y;
+      }
+
+      // Move cursor below the entire grid
+      this.doc.x = gridMargin;
+    }
+
+    // Render description text once after all department charts
+    this.ensureSpace(0.13, true);
+    const desc =
+      'The course compatibility chart you\u2019ve received is based on your unique personality Report results, aiming to highlight programs that align well with your strengths and traits. However, this is not a fixed or singular recommendation. Your personal interests, evolving passions, and exposure to different fields also play a crucial role in shaping the right career path for you. We\u2019ve combined your profile with real-time industry data to give you a future-oriented perspective. Please keep in mind that course trends and career opportunities can shift from year to year as the world continues to evolve-new fields emerge, and existing ones transform. Use this as a guide, not a rulebook, to explore and make informed choices about your educational journey.';
+
+    this.doc
+      .font(this.FONT_SORA_REGULAR)
+      .fontSize(9)
+      .fillColor('black')
+      .text(desc, 15 * this.MM, this.doc.y, {
+        width: this.PAGE_WIDTH - 30 * this.MM,
+        align: 'left',
+        lineGap: 2,
+      });
+
+    // this.doc.y =
+    //   this.doc.y +
+    //   this.doc.heightOfString(desc, {
+    //     width: this.PAGE_WIDTH - 30 * this.MM,
+    //   });
   }
 
   // --- Special Generators ---
@@ -2122,27 +2355,7 @@ export class SchoolReport extends BaseReport {
     dominantType: 'D' | 'I' | 'S' | 'C',
   ): void {
     const contentBlock = SCHOOL_DYNAMIC_CONTENT[dominantType];
-    const headers = [
-      'Trait',
-      'Conflict Management',
-      'Change Management',
-      'Team Dynamics',
-      'Communication',
-      'Sustainability',
-      'Social Responsibility',
-    ];
-    const totalWidth =
-      this.PAGE_WIDTH -
-      2 * (this._useStdMargins ? this.MARGIN_STD : 15 * this.MM);
-    const colWidths = [
-      totalWidth * 0.1,
-      totalWidth * 0.15,
-      totalWidth * 0.15,
-      totalWidth * 0.15,
-      totalWidth * 0.15,
-      totalWidth * 0.15,
-      totalWidth * 0.15,
-    ];
+
     const traitNames = {
       D: 'Dominance',
       I: 'Influence',
@@ -2150,16 +2363,64 @@ export class SchoolReport extends BaseReport {
       C: 'Conscientiousness',
     };
     const traitName = traitNames[dominantType];
-    const rowData = [[traitName, ...contentBlock.respond_parameter_row]];
-    this.ensureSpace(100);
-    this.table(headers, rowData, {
+
+    // --- Table 1 ---
+    const headers1 = [
+      'Trait',
+      'Conflict Management',
+      'Change Management',
+      'Team Dynamics',
+    ];
+    // contentBlock.respond_parameter_row indexes:
+    // 0: Conflict Management
+    // 1: Change Management
+    // 2: Team Dynamics
+    // 3: Communication
+    // 4: Sustainability
+    // 5: Social Responsibility
+    const rowData1 = [[
+      traitName,
+      contentBlock.respond_parameter_row[0] || '',
+      contentBlock.respond_parameter_row[1] || '',
+      contentBlock.respond_parameter_row[2] || ''
+    ]];
+
+    this.ensureSpace(60);
+    this.table(headers1, rowData1, {
       fontSize: 8,
       headerFontSize: 8,
       headerColor: '#D3D3D3',
       headerTextColor: '#000000',
       borderColor: '#000000',
       cellPadding: 5,
-      colWidths: colWidths,
+      colWidths: ['fit', 'fill', 'fill', 'fill'],
+    });
+
+    this.doc.moveDown();
+
+    // --- Table 2 ---
+    const headers2 = [
+      'Trait',
+      'Communication',
+      'Sustainability',
+      'Social Responsibility',
+    ];
+    const rowData2 = [[
+      traitName,
+      contentBlock.respond_parameter_row[3] || '',
+      contentBlock.respond_parameter_row[4] || '',
+      contentBlock.respond_parameter_row[5] || ''
+    ]];
+
+    this.ensureSpace(60);
+    this.table(headers2, rowData2, {
+      fontSize: 8,
+      headerFontSize: 8,
+      headerColor: '#D3D3D3',
+      headerTextColor: '#000000',
+      borderColor: '#000000',
+      cellPadding: 5,
+      colWidths: ['fit', 'fill', 'fill', 'fill'],
     });
   }
 
@@ -2540,25 +2801,58 @@ export class SchoolReport extends BaseReport {
     data: any[],
     traitHigh: string,
     traitLow: string,
+    skipDescription: boolean = false,
+    leftX?: number,
+    topY?: number,
+    quadrantWidth?: number,
+    colorThreshold: number = 70
   ): void {
-    // --- 1. Layout Constants (Converted from PHP to PDFKit points) ---
-    const chartLeft = 100 * this.MM; // PHP: 100
-    const chartTop = this.doc.y; // PHP: $pdf->getY() + 8
-    const barHeight = 4 * this.MM; // PHP: 4
-    const barSpace = 2 * this.MM; // PHP: 2
-    const maxBarWidth = 90 * this.MM; // PHP: 90
-    const tickLength = 2 * this.MM; // PHP: 2
+    // --- 1. Layout Constants ---
+    const isQuadrant = leftX !== undefined && topY !== undefined && quadrantWidth !== undefined;
 
-    // Calculate total height needed
-    const chartHeight = data.length * (barHeight + barSpace);
+    // Fallbacks for standard layout (if ever called without quad params)
+    const margin = this._useStdMargins ? this.MARGIN_STD : 15 * this.MM;
+    const chartLeft = leftX !== undefined ? leftX : 100 * this.MM;
+    let chartTop = topY !== undefined ? topY : this.doc.y;
+
+    const availableWidth = quadrantWidth || (this.PAGE_WIDTH - 2 * margin);
+    const chartRight = leftX !== undefined ? leftX + availableWidth : this.PAGE_WIDTH - margin;
+
+    // For Quadrant (now 3-column) mode:
+    let textHeight = 4 * this.MM;
+    let barHeight = 4 * this.MM;
+    let barSpace = 2 * this.MM;
+    let maxBarWidth = 90 * this.MM;
+
+    // We'll calculate column parameters if in 3-col mode
+    let cols = 1;
+    let colGap = 0;
+
+    if (isQuadrant) {
+      cols = 3;
+      colGap = 5 * this.MM;
+
+      textHeight = 4.5 * this.MM;
+      barHeight = 2.5 * this.MM;
+      barSpace = 2.5 * this.MM;
+
+      // Each column width
+      const colWidth = (availableWidth - colGap * (cols - 1)) / cols;
+      maxBarWidth = colWidth - 8 * this.MM; // leave room for percentage text
+    }
+
+    // Group height = text + bar + space for quadrant, or bar + space for standard
+    const groupHeight = isQuadrant ? textHeight + barHeight + barSpace : barHeight + barSpace;
+
+    // Calculate total height needed based on rows
+    const numRows = isQuadrant ? Math.ceil(data.length / cols) : data.length;
+    let chartHeight = numRows * groupHeight;
     const chartBottom = chartTop + chartHeight;
-    const chartRight = chartLeft + tickLength + maxBarWidth;
 
-    // Ensure we have space on the page
-    if (chartBottom + 50 * this.MM > this.PAGE_HEIGHT) {
+    // Ensure we have space on the page for the first row
+    if (chartTop + groupHeight > this.PAGE_HEIGHT - 15 * this.MM) {
       this.doc.addPage();
-      // Recalculate top if we added a page
-      // (You might need to reset chartTop here based on your margin logic)
+      chartTop = this.MARGIN_STD;
     }
 
     // --- 2. Define Colors (Matching PHP RGB values) ---
@@ -2579,144 +2873,207 @@ export class SchoolReport extends BaseReport {
     const colorHigh = traitHigh.toUpperCase();
     const colorLow = traitLow.toUpperCase();
 
-    // --- 3. Draw Axes ---
-    const axisWidth = 0.6; // PHP was 0.6 (likely points in FPDF default)
-    this.ensureSpace(0.4, true);
-    this.doc.save(); // Save state for line width changes
-    this.doc.lineWidth(axisWidth).strokeColor('black');
+    // --- 3. Draw Axes (Only for standard mode) ---
+    if (!isQuadrant) {
+      const axisWidth = 0.6;
+      this.ensureSpace(0.4, true);
+      this.doc.save();
+      this.doc.lineWidth(axisWidth).strokeColor('black');
 
-    // Y-Axis
-    this.doc
-      .moveTo(chartLeft, chartTop)
-      .lineTo(chartLeft, chartBottom)
-      .stroke();
-
-    // X-Axis (Adjusted slightly to join perfectly)
-    this.doc
-      .moveTo(chartLeft - axisWidth / 2, chartBottom)
-      .lineTo(chartRight, chartBottom)
-      .stroke();
-
-    // --- 4. Draw Grid and Ticks (0 to 100) ---
-    this.doc.lineWidth(0.2);
-    this.doc.font(this.FONT_SORA_REGULAR).fontSize(8).fillColor('black');
-
-    for (let i = 0; i <= 100; i += 20) {
-      const x = chartLeft + tickLength + (i * maxBarWidth) / 100;
-
-      // X-axis tick (downwards)
+      // Y-Axis
       this.doc
-        .moveTo(x, chartBottom)
-        .lineTo(x, chartBottom + 2 * this.MM) // PHP tick length was 2
-        .strokeColor('black')
+        .moveTo(chartLeft, chartTop)
+        .lineTo(chartLeft, chartBottom)
         .stroke();
 
-      // X-axis Label
-      // PHP: Cell(10, 4, "$i", 0, 0, 'C');
-      // Centered text below tick
-      this.doc.text(i.toString(), x - 5 * this.MM, chartBottom + 3 * this.MM, {
-        width: 10 * this.MM,
-        align: 'center',
-      });
+      // X-Axis
+      this.doc
+        .moveTo(chartLeft - axisWidth / 2, chartBottom)
+        .lineTo(chartRight, chartBottom)
+        .stroke();
+
+      // --- 4. Draw Grid and Ticks (50 to 100) ---
+      this.doc.lineWidth(0.2);
+      this.doc.font(this.FONT_SORA_REGULAR).fontSize(8).fillColor('black');
+
+      for (let i = 50; i <= 100; i += 10) {
+        const x = chartLeft + 2 * this.MM + ((i - 50) * maxBarWidth) / 50;
+
+        // X-axis tick
+        this.doc
+          .moveTo(x, chartBottom)
+          .lineTo(x, chartBottom + 2 * this.MM)
+          .strokeColor('black')
+          .stroke();
+
+        this.doc.text(i.toString(), x - 5 * this.MM, chartBottom + 3 * this.MM, {
+          width: 10 * this.MM,
+          align: 'center',
+        });
+      }
+      this.doc.restore();
     }
-    this.doc.restore(); // Restore line width
 
     // --- 5. Draw Bars ---
-    data.forEach((item, index) => {
-      const val = parseFloat(item.compatibility_percentage);
-      const y = chartTop + index * (barHeight + barSpace);
-      const barWidth = (maxBarWidth * val) / 100;
-      const tickY = y + barHeight / 2;
+    let currentRowTop = chartTop;
+    let maxRowHeight = 0;
 
-      // A. Draw short horizontal black tick (Axis connector)
-      this.doc.save();
-      this.doc.lineWidth(0.6).strokeColor('black');
-      this.doc
-        .moveTo(chartLeft, tickY)
-        .lineTo(chartLeft + tickLength, tickY)
-        .stroke();
-      this.doc.restore();
+    if (isQuadrant) {
+      let currentRowY = chartTop;
+      const colWidth = (availableWidth - colGap * (cols - 1)) / cols;
 
-      // B. Determine Colors
-      // PHP Logic: >= 70 uses Color 1, else Color 2
-      const useTrait = val >= 70 ? colorHigh : colorLow;
-      const barColor = DISC_COLORS[useTrait] || '#808080';
-      const textColor = DISC_TEXT_COLORS[useTrait] || '#000000';
+      for (let r = 0; r < data.length; r += cols) {
+        const rowItems = data.slice(r, r + cols);
 
-      // C. Draw Bar Rect
-      this.doc
-        .rect(chartLeft + tickLength, y, barWidth, barHeight)
-        .fillColor(barColor)
-        .fill();
+        // 1. Calculate the max text height for this row
+        let maxTextHeightInRow = textHeight;
+        this.doc.font(this.FONT_SORA_REGULAR).fontSize(7); // Must match drawing font/size
 
-      // D. Label (Left of Y Axis)
-      // PHP: Cell($chartLeft - 19, $barHeight, $label, 0, 0, 'R');
-      // Align Right, ending at (chartLeft - 4mm padding approx)
-      this.doc
-        .font(this.FONT_SORA_REGULAR)
-        .fontSize(9)
-        .fillColor('black')
-        .text(item.course_name, 15 * this.MM, y - 1, {
-          // y-1 for visual centering
-          width: chartLeft - 19 * this.MM,
-          align: 'right',
-          height: barHeight,
+        rowItems.forEach((item) => {
+          const height = this.doc.heightOfString(item.course_name, { width: colWidth });
+          if (height > maxTextHeightInRow) maxTextHeightInRow = height;
         });
 
-      // E. Value Label (Right of Bar)
-      // PHP: SetXY($chartLeft + $tickLength + $barWidth + 2, $y);
+        // Expected total height for this row = maxTextHeight + barHeight + padding
+        const expectedRowHeight = maxTextHeightInRow + barHeight + barSpace + 3 * this.MM;
+
+        // 2. Check for page break for the whole row
+        if (currentRowY + expectedRowHeight > this.PAGE_HEIGHT - 20 * this.MM) {
+          this.doc.addPage();
+          currentRowY = this.MARGIN_STD;
+        }
+
+        // 3. Draw items in this row
+        rowItems.forEach((item, cIndex) => {
+          const val = parseFloat(item.compatibility_percentage);
+          const clampedVal = Math.max(50, Math.min(100, val));
+          const barWidth = (maxBarWidth * (clampedVal - 50)) / 50;
+
+          const useTrait = val >= colorThreshold ? colorHigh : colorLow;
+          const barColor = Math.round(val) < colorThreshold ? (DISC_COLORS[colorLow] || '#808080') : (DISC_COLORS[colorHigh] || '#808080');
+
+          const xOffset = chartLeft + cIndex * (colWidth + colGap);
+          const yOffset = currentRowY;
+
+          // D. Label (Above Bar)
+          this.doc
+            .font(this.FONT_SORA_REGULAR)
+            .fontSize(7)
+            .fillColor('#333333')
+            .text(item.course_name, xOffset, yOffset, {
+              width: colWidth,
+              align: 'left',
+            });
+
+          // C. Draw Bar Rect (Below max text height of row)
+          const barY = yOffset + maxTextHeightInRow + 1 * this.MM;
+
+          if (barWidth > 0) {
+            const radius = Math.min(barHeight / 2, barWidth / 2);
+            this.doc
+              .roundedRect(xOffset, barY, barWidth, barHeight, radius)
+              .fillColor(barColor)
+              .fill();
+          }
+
+          // E. Value Label (Right of Bar)
+          this.doc
+            .font(this.FONT_SORA_REGULAR)
+            .fontSize(6)
+            .fillColor('black')
+            .text(`${val.toFixed(0)}%`, xOffset + barWidth + 2 * this.MM, barY - 0.5);
+        });
+
+        // 4. Update currentRowY for the next row
+        currentRowY += expectedRowHeight;
+      }
+      maxRowHeight = currentRowY;
+
+    } else {
+      data.forEach((item, index) => {
+        const val = parseFloat(item.compatibility_percentage);
+        const clampedVal = Math.max(50, Math.min(100, val));
+        const barWidth = (maxBarWidth * (clampedVal - 50)) / 50;
+
+        const useTrait = val >= colorThreshold ? colorHigh : colorLow;
+        const barColor = Math.round(val) < colorThreshold ? (DISC_COLORS[colorLow] || '#808080') : (DISC_COLORS[colorHigh] || '#808080');
+
+        const y = chartTop + index * (barHeight + barSpace);
+        const tickY = y + barHeight / 2;
+
+        // A. Draw short horizontal black tick
+        this.doc.save();
+        this.doc.lineWidth(0.6).strokeColor('black');
+        this.doc
+          .moveTo(chartLeft, tickY)
+          .lineTo(chartLeft + 2 * this.MM, tickY)
+          .stroke();
+        this.doc.restore();
+
+        // C. Draw Bar Rect
+        if (barWidth > 0) {
+          const radius = Math.min(barHeight / 2, barWidth / 2);
+          this.doc
+            .roundedRect(chartLeft + 2 * this.MM, y, barWidth, barHeight, radius)
+            .fillColor(barColor)
+            .fill();
+        }
+
+        // D. Label (Left of Y Axis)
+        this.doc
+          .font(this.FONT_SORA_REGULAR)
+          .fontSize(9)
+          .fillColor('black')
+          .text(item.course_name, 15 * this.MM, y - 1, {
+            width: chartLeft - 19 * this.MM,
+            align: 'right',
+            height: barHeight,
+          });
+
+        // E. Value Label (Right of Bar)
+        this.doc
+          .font(this.FONT_SORA_REGULAR)
+          .fontSize(9)
+          .fillColor('black')
+          .text(
+            `${val.toFixed(0)}%`,
+            chartLeft + 2 * this.MM + barWidth + 2 * this.MM,
+            y - 1,
+          );
+
+        maxRowHeight = y + barHeight + barSpace;
+      });
+    }
+
+    // Set the overall doc cursor past the drawn chart block
+    if (isQuadrant) {
+      this.doc.y = maxRowHeight + 5 * this.MM;
+    } else {
+      this.doc.y = maxRowHeight + 10 * this.MM;
+    }
+
+    // --- 7. Description Text (only if not skipped) ---
+    if (!skipDescription) {
+      const descY = this.doc.y + 6 * this.MM;
+      const desc =
+        'The course compatibility chart you\u2019ve received is based on your unique personality Report results, aiming to highlight programs that align well with your strengths and traits. However, this is not a fixed or singular recommendation. Your personal interests, evolving passions, and exposure to different fields also play a crucial role in shaping the right career path for you. We\u2019ve combined your profile with real-time industry data to give you a future-oriented perspective. Please keep in mind that course trends and career opportunities can shift from year to year as the world continues to evolve-new fields emerge, and existing ones transform. Use this as a guide, not a rulebook, to explore and make informed choices about your educational journey.';
+
       this.doc
         .font(this.FONT_SORA_REGULAR)
         .fontSize(9)
-        .fillColor('black') // Explicitly black as per your previous chart logic, or usage of textColor?
-        // PHP code sets TextColor based on DISC, but typically this label is outside the bar.
-        // If the label is outside, White text (DISC_TEXT_COLORS) will be invisible.
-        // Reverting to BLACK for visibility unless it's inside.
-        // Based on PHP code structure, it sets color then prints.
-        // If you strictly want PHP behavior: .fillColor(textColor)
-        // But I recommend Black for outside labels.
         .fillColor('black')
-        .text(
-          `${val.toFixed(0)}%`,
-          chartLeft + tickLength + barWidth + 2 * this.MM,
-          y - 1,
-        );
-    });
+        .text(desc, 15 * this.MM, descY, {
+          width: this.PAGE_WIDTH - 30 * this.MM,
+          align: 'left',
+          lineGap: 2,
+        });
 
-    // --- 6. Footer Label ---
-    // PHP: Cell(..., 'Compatibility (%)', ..., 'C');
-    const footerY = chartBottom + 8 * this.MM;
-    this.doc
-      .font(this.FONT_SORA_REGULAR)
-      .fontSize(10)
-      .fillColor('black')
-      .text('Compatibility (%)', 0, footerY, {
-        width: this.PAGE_WIDTH,
-        align: 'center',
-      });
-
-    // --- 7. Description Text ---
-    // PHP: SetXY(15, $pdf->getY() + 12); MultiCell...
-    const descY = footerY + 12 * this.MM;
-    const desc =
-      'The course compatibility chart you’ve received is based on your unique personality Report results, aiming to highlight programs that align well with your strengths and traits. However, this is not a fixed or singular recommendation. Your personal interests, evolving passions, and exposure to different fields also play a crucial role in shaping the right career path for you. We’ve combined your profile with real-time industry data to give you a future-oriented perspective. Please keep in mind that course trends and career opportunities can shift from year to year as the world continues to evolve-new fields emerge, and existing ones transform. Use this as a guide, not a rulebook, to explore and make informed choices about your educational journey.';
-
-    this.doc
-      .font(this.FONT_SORA_REGULAR)
-      .fontSize(9)
-      .fillColor('black')
-      .text(desc, 15 * this.MM, descY, {
-        width: this.PAGE_WIDTH - 30 * this.MM, // Approx margin
-        align: 'left',
-        lineGap: 2,
-      });
-
-    // Move doc cursor to end of this section
-    this.doc.y =
-      descY +
-      this.doc.heightOfString(desc, {
-        width: this.PAGE_WIDTH - 30 * this.MM,
-      });
+      this.doc.y =
+        descY +
+        this.doc.heightOfString(desc, {
+          width: this.PAGE_WIDTH - 30 * this.MM,
+        });
+    }
   }
 
   /**
@@ -2726,6 +3083,7 @@ export class SchoolReport extends BaseReport {
    * - Renders Icons + Labels + Plus sign in a centered row.
    */
   private renderElementCombo(trait1: string, trait2: string): void {
+    this.ensureSpace(0.13, true);
     // 1. Map codes to Labels and Image filenames
     const elementMap: { [key: string]: string } = {
       D: 'Fire',
@@ -2765,7 +3123,7 @@ export class SchoolReport extends BaseReport {
     const startX = (this.PAGE_WIDTH - totalGroupWidth) / 2;
 
     // Move down slightly from previous content
-    this.doc.moveDown(1);
+    // this.doc.moveDown(1);
     const currentY = this.doc.y;
 
     // 4. Draw First Element (Trait 1)
@@ -2878,10 +3236,12 @@ export class SchoolReport extends BaseReport {
     else discType = 'balanced';
 
     let agilePattern: string;
-    if (nCourage > 70 && nRespect < 50) agilePattern = 'assertive-risk';
+    // Difference based thresholds to determine patterns more accurately than absolute cutoffs
+    if (nCourage > nRespect + 20) agilePattern = 'assertive-risk';
+    else if (nRespect > nCourage + 20) agilePattern = 'cautious-respect';
     else if (nFocus > 70 && nCommitment > 70) agilePattern = 'execution-engine';
-    else if (nCommitment < 50 && nOpenness > 70)
-      agilePattern = 'creative-instability';
+    else if (nOpenness > nCommitment + 20) agilePattern = 'creative-instability';
+    else if (nCommitment > nOpenness + 20) agilePattern = 'steady-execution';
     else agilePattern = 'balanced';
 
     const leadership = Math.round((D + nCourage) / 2);
@@ -3310,34 +3670,18 @@ export class SchoolReport extends BaseReport {
     const C = this.data.score_C;
 
     const fits = [
-      {
-        label: 'Engineering & Technology',
-        score: Math.round((C + nFocus) / 2),
-        condition: C > 65 && nFocus > 65,
-        color: CI_COLORS.BAR_BLUE,
-      },
-      {
-        label: 'Management & Leadership',
-        score: Math.round((D + nCourage) / 2),
-        condition: D > 65 && nCourage > 65,
-        color: CI_COLORS.BAR_TEAL,
-      },
-      {
-        label: 'Creative & Design',
-        score: Math.round((I + nOpenness) / 2),
-        condition: I > 65 && nOpenness > 65,
-        color: CI_COLORS.BAR_PURPLE,
-      },
-      {
-        label: 'People & HR',
-        score: Math.round((S + nRespect) / 2),
-        condition: S > 65 && nRespect > 65,
-        color: CI_COLORS.ACCENT_GREEN,
-      },
+      { label: 'Engineering & Technology', score: Math.round((C + nFocus) / 2), condition: C > 65 && nFocus > 65, color: '' },
+      { label: 'Management & Leadership', score: Math.round((D + nCourage) / 2), condition: D > 65 && nCourage > 65, color: '' },
+      { label: 'Creative & Design', score: Math.round((I + nOpenness) / 2), condition: I > 65 && nOpenness > 65, color: '' },
+      { label: 'People & HR', score: Math.round((S + nRespect) / 2), condition: S > 65 && nRespect > 65, color: '' },
     ];
 
     // --- Sort high → low ---
     fits.sort((a, b) => b.score - a.score);
+
+    // --- Assign blue gradient: darkest for highest score, lightest for lowest ---
+    const blueGradient = ['#150089', '#3A3CB5', '#6B80D4', '#9BB8ED'];
+    fits.forEach((f, i) => { f.color = blueGradient[i]; });
 
     // --- Layout constants ---
     const labelFontSize = 9;
@@ -3427,40 +3771,40 @@ export class SchoolReport extends BaseReport {
     });
 
     const styleTitles: Record<string, { title: string; techniques: string[] }> =
-      {
-        structured: {
-          title: 'Structured Learning Approach',
-          techniques: [
-            'Detailed revision timetables with milestone tracking',
-            'Systematic note-taking and concept mapping',
-            'Regular self-assessment against defined benchmarks',
-          ],
-        },
-        collaborative: {
-          title: 'Collaborative Learning Approach',
-          techniques: [
-            'Group discussions and peer-teaching sessions',
-            'Presentation-based learning and debate',
-            'Interactive workshops and case study analysis',
-          ],
-        },
-        'self-paced': {
-          title: 'Self-Paced Learning Approach',
-          techniques: [
-            'Consistent daily study routines with fixed duration',
-            'Repetitive practice with familiar question formats',
-            'Incremental complexity progression over time',
-          ],
-        },
-        competitive: {
-          title: 'Competitive Learning Approach',
-          techniques: [
-            'Mock tests and timed exam simulations',
-            'Leaderboard-based study challenges',
-            'Goal-setting with visible progress metrics',
-          ],
-        },
-      };
+    {
+      structured: {
+        title: 'Structured Learning Approach',
+        techniques: [
+          'Detailed revision timetables with milestone tracking',
+          'Systematic note-taking and concept mapping',
+          'Regular self-assessment against defined benchmarks',
+        ],
+      },
+      collaborative: {
+        title: 'Collaborative Learning Approach',
+        techniques: [
+          'Group discussions and peer-teaching sessions',
+          'Presentation-based learning and debate',
+          'Interactive workshops and case study analysis',
+        ],
+      },
+      'self-paced': {
+        title: 'Self-Paced Learning Approach',
+        techniques: [
+          'Consistent daily study routines with fixed duration',
+          'Repetitive practice with familiar question formats',
+          'Incremental complexity progression over time',
+        ],
+      },
+      competitive: {
+        title: 'Competitive Learning Approach',
+        techniques: [
+          'Mock tests and timed exam simulations',
+          'Leaderboard-based study challenges',
+          'Goal-setting with visible progress metrics',
+        ],
+      },
+    };
 
     const style =
       styleTitles[this.ci_patterns.academicStyle] || styleTitles['structured'];
@@ -4565,7 +4909,7 @@ export class SchoolReport extends BaseReport {
 
     this.pHtml(
       `Based on your Personality trait, the institutions below have been selected and ranked using <b>${params.primary} </b> as the primary parameter and <b>${params.secondary} </b> as the secondary parameter. ` +
-        `Results are filtered for <b>${streamLabel} </b> and ordered by NIRF national rank after selection.`,
+      `Results are filtered for <b>${streamLabel} </b> and ordered by NIRF national rank after selection.`,
     );
 
     const colleges: UniversityData[] = await getTopCollegesForStudent(
@@ -4625,14 +4969,13 @@ export class SchoolReport extends BaseReport {
     let rows: ((string | number | null | undefined)[] | StyledRow)[];
 
     if (isSpecificStream) {
-      // Group by the dynamically fetched field_name from the database
+      // Group by the dynamically fetched department_name from the database
+      // SQL already handles per-department limits and common backfill
       const grouped = new Map<string, UniversityData[]>();
-      // We also want to maintain the sort order fetched from the database,
-      // so we use an array to track the order of field names
       const groupOrder: string[] = [];
 
       for (const c of colleges) {
-        const g = c.field_name || (c.school_group ?? 'OTHER').toUpperCase();
+        const g = c.department_name || (c.school_group ?? 'OTHER').toUpperCase();
         if (!grouped.has(g)) {
           grouped.set(g, []);
           groupOrder.push(g);
@@ -4640,21 +4983,12 @@ export class SchoolReport extends BaseReport {
         grouped.get(g).push(c);
       }
 
-      const numGroups = groupOrder.length;
-      let limitPerGroup = 3;
-      if (numGroups === 1) limitPerGroup = 10;
-      else if (numGroups === 2) limitPerGroup = 5;
-      else if (numGroups === 3) limitPerGroup = 5;
-      else if (numGroups === 4) limitPerGroup = 4;
-
       rows = [];
       for (const groupKey of groupOrder) {
-        let group = grouped.get(groupKey);
+        const group = grouped.get(groupKey);
         if (!group || group.length === 0) continue;
 
-        group = group.slice(0, limitPerGroup);
-
-        // The subheader label will simply be the Field name
+        // The subheader label will be the department name
         const label = groupKey;
         const subheader: StyledRow = {
           type: 'subheader',
@@ -4809,7 +5143,7 @@ export class SchoolReport extends BaseReport {
 
     this.pHtml(
       `Based on your personality trait and top Agile scrum value your career trajectory has been mapped below. ` +
-        `The gauge shows how your combination accelerates your journey compared to the industry average.`,
+      `The gauge shows how your combination accelerates your journey compared to the industry average.`,
     );
 
     const parsePace = (s: string): [number, number] => {
