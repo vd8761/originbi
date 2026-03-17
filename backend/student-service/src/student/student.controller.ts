@@ -8,11 +8,16 @@ export class StudentController {
   constructor(
     private readonly studentService: StudentService,
     private readonly boss: PgBossService,
-  ) {}
+  ) { }
 
   @Post('profile')
   async getProfile(@Body() body: { email: string }): Promise<any> {
     return this.studentService.getProfile(body.email);
+  }
+
+  @Post('streams')
+  async getSchoolStreams() {
+    return this.studentService.getSchoolStreams();
   }
 
   @Post('seed')

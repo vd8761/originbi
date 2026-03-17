@@ -24,6 +24,8 @@ import { SchoolReport } from './reports/school/schoolReport';
 import { CollegeReport } from './reports/college/collegeReport';
 import { EmployeeReport } from './reports/employee/employeeReport';
 import { CxoReport } from './reports/cxo/cxoReport';
+import { fetchUserAssessmentData } from './helpers/groupReportHelper';
+import { buildReportJSON } from './helpers/reportFactory';
 
 @Controller('report')
 export class ReportController {
@@ -121,12 +123,13 @@ export class ReportController {
     });
   }
 
-  // 4. Single Student Report Route (PDF)
+  // 4. Single Student Report Route (PDF or JSON with ?api=true)
   @Get('generate/student/:student_id')
-  generateSingleUserReport(
+  async generateSingleUserReport(
     @Param('student_id') userId: string,
+    @Query('api') apiMode: string,
     @Res() res: Response,
-  ): void {
+  ): Promise<void> {
     if (!userId) {
       res
         .status(HttpStatus.BAD_REQUEST)
@@ -134,6 +137,32 @@ export class ReportController {
       return;
     }
 
+    // ── JSON API Mode ──
+    if (apiMode === 'true') {
+      logger.info(`[API] JSON API Request for student: ${userId}`);
+      try {
+        const groupData = await fetchUserAssessmentData([userId]);
+        if (!groupData || groupData.length === 0) {
+          res.status(HttpStatus.NOT_FOUND).json({
+            success: false,
+            error: 'No completed assessment found for this student.',
+          });
+          return;
+        }
+        const user = groupData[0];
+        const reportJSON = await buildReportJSON(user);
+        res.json({ success: true, data: reportJSON });
+      } catch (error) {
+        logger.error(`[API] JSON Report Generation failed for ${userId}:`, error);
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+          success: false,
+          error: (error as Error).message,
+        });
+      }
+      return;
+    }
+
+    // ── Standard PDF Mode ──
     logger.info(`[API] Start Single Student Report: ${userId}`);
 
     const jobId = `student_${userId}_${Date.now()}`;
