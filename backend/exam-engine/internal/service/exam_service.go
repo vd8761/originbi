@@ -93,10 +93,13 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 	if len(answers) == 0 && attempt.AssessmentLevelID != nil {
 		var level models.AssessmentLevel
 		if err := db.First(&level, *attempt.AssessmentLevelID).Error; err == nil && (level.LevelNumber == 2 || level.Name == "Level 2") {
+			fmt.Printf("[GetExamQuestions - Fallback] No questions found for Attempt %d (Level 2). Attempting self-healing generation...\n", attempt.ID)
+
 			// Extract necessary metadata from session
 			var setNumber int = 1 // Default
 			var studentBoard string = ""
 			var traitID *int64 = attempt.DominantTraitID
+			var traitSource string = "attempt.DominantTraitID"
 
 			if err := db.First(&session, attempt.AssessmentSessionID).Error; err == nil {
 				if traitID == nil {
@@ -108,6 +111,7 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 								if v, ok := val.(float64); ok {
 									tId := int64(v)
 									traitID = &tId
+									traitSource = "session.metadata.personalityTraitId"
 								}
 							}
 						}
@@ -119,6 +123,16 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 					var previousAttempt models.AssessmentAttempt
 					if err := db.Where("assessment_session_id = ? AND dominant_trait_id IS NOT NULL AND status = 'COMPLETED'", attempt.AssessmentSessionID).Order("completed_at DESC").First(&previousAttempt).Error; err == nil {
 						traitID = previousAttempt.DominantTraitID
+						traitSource = fmt.Sprintf("previous_completed_attempt_%d", previousAttempt.ID)
+					}
+				}
+
+				// Fallback: Check ANY attempt in this session with a dominant_trait_id (regardless of status)
+				if traitID == nil {
+					var anyAttemptWithTrait models.AssessmentAttempt
+					if err := db.Where("assessment_session_id = ? AND dominant_trait_id IS NOT NULL AND id != ?", attempt.AssessmentSessionID, attempt.ID).Order("updated_at DESC").First(&anyAttemptWithTrait).Error; err == nil {
+						traitID = anyAttemptWithTrait.DominantTraitID
+						traitSource = fmt.Sprintf("any_attempt_%d_status_%s", anyAttemptWithTrait.ID, anyAttemptWithTrait.Status)
 					}
 				}
 
@@ -160,6 +174,8 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 				}
 
 				if traitID != nil {
+					fmt.Printf("[GetExamQuestions - Fallback] Found TraitID=%d from source: %s\n", *traitID, traitSource)
+
 					// 3. Clear existing generic answers for this attempt (just in case of dirty state)
 					db.Exec("DELETE FROM assessment_answers WHERE assessment_attempt_id = ?", attempt.ID)
 
@@ -215,7 +231,14 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 					}
 
 					fmt.Printf("[GetExamQuestions - Fallback] Generating Level 2 Questions for Attempt %d (Program: %s). Trait=%d, Board=%s, Set=%d\n", attempt.ID, program.Code, *traitID, studentBoard, setNumber)
-					db.Exec(query, args...)
+					genResult := db.Exec(query, args...)
+					if genResult.Error != nil {
+						fmt.Printf("[GetExamQuestions - Fallback ERROR] INSERT failed for Attempt %d: %v\n", attempt.ID, genResult.Error)
+					} else if genResult.RowsAffected == 0 {
+						fmt.Printf("[GetExamQuestions - Fallback WARNING] INSERT produced 0 rows for Attempt %d. No matching questions in assessment_questions for LevelID=%d, TraitID=%d, Set=%d, Board=%s\n", attempt.ID, *attempt.AssessmentLevelID, *traitID, setNumber, studentBoard)
+					} else {
+						fmt.Printf("[GetExamQuestions - Fallback SUCCESS] Generated %d questions for Attempt %d\n", genResult.RowsAffected, attempt.ID)
+					}
 
 					// Re-fetch questions after generation
 					result = db.Where("assessment_attempt_id = ?", attemptID).
@@ -231,7 +254,7 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 						return nil, result.Error
 					}
 				} else {
-					fmt.Printf("[GetExamQuestions - Fallback Error] Cannot generate questions for Attempt %d: Trait ID is nil.\n", attempt.ID)
+					fmt.Printf("[GetExamQuestions - Fallback Error] Cannot generate questions for Attempt %d: Trait ID is nil. Checked: attempt.DominantTraitID, session metadata, previous completed attempts, and any attempt in session %d.\n", attempt.ID, attempt.AssessmentSessionID)
 				}
 			}
 		}
