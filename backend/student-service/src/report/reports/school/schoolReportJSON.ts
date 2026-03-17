@@ -562,7 +562,6 @@ export async function buildSchoolReportJSON(data: SchoolData) {
   try {
     if (data.school_level_id === 1) {
       // SSLC → recommended stream
-      const whereYouFitBest = computeWhereYouFitBest(data);
       // For SSLC, pass undefined as schoolStreamId to get all streams
       courseCompatibility = await getCompatibilityMatrixDetails(dominantTrait, undefined);
     } else {
