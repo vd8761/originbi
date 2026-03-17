@@ -29,20 +29,30 @@ export default function StudentRoadmapsPage() {
 
     return (
         <RequireStudent>
-            <div className="min-h-screen bg-[url('/Background_Light_Theme.svg')] bg-cover bg-center bg-no-repeat bg-fixed dark:bg-none dark:bg-brand-dark-primary flex flex-col">
-                {/* Header */}
-                <div className="z-50">
-                    <Header
-                        onLogout={handleLogout}
-                        currentView="roadmaps"
-                        onNavigate={handleNavigate}
-                    />
+            <div className="relative min-h-screen w-full bg-transparent dark:bg-black font-sans selection:bg-brand-green/20 overflow-x-hidden">
+                {/* BACKGROUND LAYERS */}
+                <div className="fixed inset-0 pointer-events-none z-0">
+                    <div className="absolute inset-0 bg-[url('/Background_Light_Theme.svg')] bg-cover bg-center bg-no-repeat opacity-100 dark:hidden" />
+                    <div className="absolute inset-0 bg-[url('/Background_Dark_Theme.svg')] bg-cover bg-center bg-no-repeat opacity-100 hidden dark:block" />
                 </div>
 
-                {/* Content Area with Top Padding for Fixed Header */}
-                <main className="flex-1 pt-[65px] sm:pt-[68px] lg:pt-[50px]">
-                    <RoadmapsPage />
-                </main>
+                <div className="w-full min-h-screen lg:[zoom:0.85] xl:[zoom:0.9] 2xl:[zoom:1.0]">
+                    {/* Header */}
+                    <div className="fixed top-0 left-0 right-0 z-50">
+                        <Header
+                            onLogout={handleLogout}
+                            currentView="roadmaps"
+                            onNavigate={handleNavigate}
+                        />
+                    </div>
+
+                    {/* Content Area with Top Padding for Fixed Header */}
+                    <main className="relative z-10 w-full min-h-screen pt-[90px] sm:pt-[98px] lg:pt-[105px] pb-10">
+                        <div className="w-full h-full px-4 sm:px-6 lg:px-8 2xl:px-12 max-w-[2000px] mx-auto transition-all duration-300 relative">
+                            <RoadmapsPage />
+                        </div>
+                    </main>
+                </div>
             </div>
         </RequireStudent>
     );
