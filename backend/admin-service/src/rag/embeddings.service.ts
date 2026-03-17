@@ -35,30 +35,39 @@ export class EmbeddingsService implements OnModuleInit {
     { embedding: number[]; timestamp: number }
   >();
   private readonly CACHE_TTL = 1000 * 60 * 60; // 1 hour cache
-  private readonly BATCH_SIZE = 50; // Google supports up to 100 per batch
-  private readonly MAX_RETRIES = 3;
+  private BATCH_SIZE = 80; // Google supports up to 100 per batch
+  private MAX_RETRIES = 4;
 
-  // Rate limiting for free tier (15 RPM)
+  // Request pacing (configurable for free/paid tiers)
   private requestTimestamps: number[] = [];
-  private readonly RATE_LIMIT_RPM = 14; // stay just under limit
+  private RATE_LIMIT_RPM = 120;
 
   // Quota exhaustion tracking — temporarily disable when quota is hit
   private quotaExhaustedUntil: number = 0;
-  private readonly QUOTA_COOLDOWN = 30 * 1000; // 30 seconds cooldown (was 5 min — too long)
+  private QUOTA_COOLDOWN = 15 * 1000;
 
   constructor(private dataSource: DataSource) { }
 
   async onModuleInit() {
-    this.googleApiKey = process.env.GOOGLE_API_KEY || null;
+    this.googleApiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || null;
+    this.BATCH_SIZE = this.parseIntEnv('EMBEDDINGS_BATCH_SIZE', this.BATCH_SIZE, 1, 100);
+    this.MAX_RETRIES = this.parseIntEnv('EMBEDDINGS_MAX_RETRIES', this.MAX_RETRIES, 1, 8);
+    this.RATE_LIMIT_RPM = this.parseIntEnv('EMBEDDINGS_RATE_LIMIT_RPM', this.RATE_LIMIT_RPM, 1, 5000);
+    this.QUOTA_COOLDOWN = this.parseIntEnv('EMBEDDINGS_QUOTA_COOLDOWN_MS', this.QUOTA_COOLDOWN, 1000, 10 * 60 * 1000);
+
     if (this.googleApiKey) {
       this.logger.log('✅ Google Gemini API key configured');
       this.embeddingsAvailable = true;
     } else {
       this.logger.error(
-        '❌ No GOOGLE_API_KEY set — embeddings disabled. Add it to .env',
+        '❌ No GOOGLE_API_KEY/GEMINI_API_KEY set — embeddings disabled. Add it to .env.local or .env',
       );
       this.embeddingsAvailable = false;
     }
+
+    this.logger.log(
+      `⚙️ Embeddings config: batch=${this.BATCH_SIZE}, retries=${this.MAX_RETRIES}, rpm=${this.RATE_LIMIT_RPM}, cooldownMs=${this.QUOTA_COOLDOWN}`,
+    );
 
     // Init Cohere Reranker
     const cohereKey = process.env.COHERE_API_KEY || null;
@@ -221,6 +230,19 @@ export class EmbeddingsService implements OnModuleInit {
     this.requestTimestamps.push(Date.now());
   }
 
+  private parseIntEnv(
+    key: string,
+    fallback: number,
+    min: number,
+    max: number,
+  ): number {
+    const raw = process.env[key];
+    if (!raw) return fallback;
+    const parsed = Number.parseInt(raw, 10);
+    if (Number.isNaN(parsed)) return fallback;
+    return Math.max(min, Math.min(max, parsed));
+  }
+
   // ─────────────── Core: Single Embedding ───────────────
 
   /**
@@ -340,6 +362,12 @@ export class EmbeddingsService implements OnModuleInit {
       return new Array(texts.length).fill(null);
     }
 
+    // Quota exhaustion: temporarily skip API calls after rate limit hits.
+    if (Date.now() < this.quotaExhaustedUntil) {
+      this.logger.debug('⏸️ Batch embeddings skipped — API quota cooling down');
+      return new Array(texts.length).fill(null);
+    }
+
     const taskType =
       task === 'query' ? 'RETRIEVAL_QUERY' : 'RETRIEVAL_DOCUMENT';
     const results: (number[] | null)[] = new Array(texts.length).fill(null);
@@ -392,6 +420,11 @@ export class EmbeddingsService implements OnModuleInit {
 
           if (response.status === 429) {
             this.logger.warn(`⏳ Batch rate limited (attempt ${attempt}), backing off...`);
+            if (attempt === this.MAX_RETRIES) {
+              this.quotaExhaustedUntil = Date.now() + this.QUOTA_COOLDOWN;
+              this.logger.warn(`🚫 Batch API quota exhausted — disabling embeddings for ${this.QUOTA_COOLDOWN / 1000}s`);
+              break;
+            }
             await this.sleep(3000 * attempt);
             continue;
           }
@@ -717,12 +750,20 @@ export class EmbeddingsService implements OnModuleInit {
     pgvectorAvailable: boolean;
     model: string;
     dimensions: number;
+    rateLimitRpm: number;
+    batchSize: number;
+    maxRetries: number;
+    quotaCooldownMs: number;
   } {
     return {
       embeddingsAvailable: this.embeddingsAvailable,
       pgvectorAvailable: this.pgvectorAvailable,
       model: 'Google Gemini gemini-embedding-001',
       dimensions: this.EMBEDDING_DIM,
+      rateLimitRpm: this.RATE_LIMIT_RPM,
+      batchSize: this.BATCH_SIZE,
+      maxRetries: this.MAX_RETRIES,
+      quotaCooldownMs: this.QUOTA_COOLDOWN,
     };
   }
 

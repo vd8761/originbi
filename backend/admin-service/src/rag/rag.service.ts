@@ -12,6 +12,7 @@ import { OriIntelligenceService } from './ori-intelligence.service';
 import { JDMatchingService } from './jd-matching.service';
 import { TextToSqlService } from './text-to-sql.service';
 import { RagCacheService } from './rag-cache.service';
+import { AgentOrchestratorService } from './agent-orchestrator.service';
 
 // RBAC Imports
 import { AccessPolicyFactory } from './policies';
@@ -220,6 +221,7 @@ export class RagService {
     private policyFactory: AccessPolicyFactory,
     private auditLogger: AuditLoggerService,
     private ragCache: RagCacheService,
+    private agentOrchestrator: AgentOrchestratorService,
   ) {
     this.reportsDir = path.join(process.cwd(), 'reports');
     if (!fs.existsSync(this.reportsDir)) {
@@ -771,6 +773,60 @@ export class RagService {
         };
       }
 
+      // ═══════════════════════════════════════════════════════════════
+      // 🤖 AGENTIC RAG — LLM-based tool selection (v3.0)
+      // The agent dynamically selects 1-3 tools, runs them in parallel,
+      // and synthesizes a unified response. Falls back to legacy intent
+      // routing if the agent fails.
+      // ═══════════════════════════════════════════════════════════════
+      try {
+        this.logger.log('🤖 Attempting Agentic RAG tool selection...');
+        const agentResult = await this.agentOrchestrator.agentQuery(
+          resolvedQuestion,
+          user as UserContext,
+          conversationId,
+          conversationHistory,
+        );
+
+        if (agentResult && agentResult.confidence > 0.3) {
+          this.logger.log(`✅ Agentic RAG succeeded: tools=[${agentResult.toolsUsed.join('+')}] confidence=${agentResult.confidence} plan=${agentResult.planningTimeMs}ms exec=${agentResult.executionTimeMs}ms`);
+
+          // Track entities from the agent response in conversation context
+          this.conversationService.addUserMessage(
+            sessionId, question, `agent:${agentResult.toolsUsed.join('+')}`, [],
+          );
+          this.conversationService.addBiResponse(
+            sessionId, agentResult.answer.slice(0, 500), agentResult.searchType,
+          );
+
+          // Cache the result
+          try {
+            await this.ragCache.store(
+              question,
+              agentResult.answer,
+              agentResult.searchType,
+              agentResult.confidence,
+              userRole,
+            );
+          } catch { /* non-blocking */ }
+
+          return {
+            answer: agentResult.answer,
+            searchType: agentResult.searchType,
+            confidence: agentResult.confidence,
+            sources: agentResult.sources,
+          };
+        }
+
+        this.logger.log(`🔄 Agentic RAG low confidence (${agentResult?.confidence}) — falling back to legacy routing`);
+      } catch (agentError) {
+        this.logger.warn(`🔄 Agentic RAG failed: ${agentError.message} — falling back to legacy routing`);
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // LEGACY FALLBACK — Original intent-based routing (v2.0)
+      // Used when Agentic RAG fails or returns low confidence
+      // ═══════════════════════════════════════════════════════════════
       const interpretation = await this.understandQuery(resolvedQuestion, userRole, conversationHistory);
       this.logger.log(`🎯 Intent: ${interpretation.intent}`);
       this.logger.log(`🔍 Search: ${interpretation.searchTerm || 'general'}`);

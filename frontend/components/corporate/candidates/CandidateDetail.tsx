@@ -323,6 +323,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                         {/* Center: Character Image */}
                                         <div className="flex justify-center order-1 lg:order-2">
                                             <div className="relative w-[260px] h-[260px] sm:w-[300px] sm:h-[300px] flex items-center justify-center">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
                                                 <img
                                                     src="/images/template/trait-character.png"
                                                     alt="Trait Character"
@@ -345,6 +346,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                             <div className="flex gap-3 items-start w-full">
                                                 {/* Diamond Graphic */}
                                                 <div className="w-[36px] shrink-0 pt-1">
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
                                                     <img
                                                         src="/images/template/key-strength-diamond.svg"
                                                         alt="Key Strength"
