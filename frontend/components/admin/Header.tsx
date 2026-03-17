@@ -668,7 +668,7 @@ const Header: React.FC<HeaderProps> = ({
                                                 </button>
                                             </div>
 
-                                            <div className="h-px bg-gray-100 dark:bg-white/10 mb-4" />
+                                            <div className="h-px bg-gray-200 dark:bg-white/10 mb-4" />
 
                                             <div className="flex justify-between items-center flex-wrap gap-y-3 gap-x-6">
                                                 <div className="flex flex-wrap gap-2">
@@ -730,7 +730,7 @@ const Header: React.FC<HeaderProps> = ({
                                                 ))
                                             ) : (
                                                 <div className="p-8 pb-12 flex flex-col items-center justify-center text-center">
-                                                    <NoNotificationsIcon className="w-[100px] h-auto mb-4" />
+                                                    <NoNotificationsIcon className="w-[100px] h-auto mb-4 text-[#19211C] dark:text-white" />
                                                     <p className="text-gray-900 dark:text-white font-medium text-[15px]">
                                                         No Notifications Yet
                                                     </p>
