@@ -6,6 +6,7 @@ import { CxoReport } from '../reports/cxo/cxoReport';
 import { CollegeData, SchoolData, MergedReportData } from '../types/types';
 import { logger } from './logger';
 import { updateReportPassword } from './sqlHelper';
+import { buildSchoolReportJSON } from '../reports/school/schoolReportJSON';
 
 /** Program type IDs — keep in sync with the `programs` table. */
 export const ProgramType = {
@@ -129,3 +130,30 @@ export async function generateReportForUser(
 
   return userPassword;
 }
+
+/**
+ * Factory Function: buildReportJSON
+ * ----------------------------------
+ * Builds a structured JSON representation of the report content
+ * (same logic as the PDF but returns data instead of rendering).
+ *
+ * @param user - The unified user data object containing assessment results.
+ * @returns A Promise that resolves to the structured JSON object.
+ */
+export async function buildReportJSON(
+  user: MergedReportData,
+): Promise<Record<string, unknown>> {
+  logger.info(
+    `[ReportFactory] Building JSON for Type ${user.program_type} - ${user.full_name}`,
+  );
+
+  switch (user.program_type) {
+    case ProgramType.SCHOOL:
+      return await buildSchoolReportJSON(user as unknown as SchoolData);
+    default:
+      throw new Error(
+        `JSON API not yet supported for program_type: ${user.program_type}. Currently only School (1) is supported.`,
+      );
+  }
+}
+
