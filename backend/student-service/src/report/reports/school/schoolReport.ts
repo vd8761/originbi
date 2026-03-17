@@ -9,11 +9,14 @@ import {
   TextAlignment,
 } from '../BaseReport';
 import {
+  STREAM_NAMES,
+  STREAM_FULL_NAMES,
   SSLC_TOC_CONTENT,
   HSC_TOC_CONTENT,
   SCHOOL_CONTENT,
   SCHOOL_DYNAMIC_CONTENT,
   SCHOOL_BLENDED_STYLE_MAPPING,
+  STREAM_ODYSSEY_ROADMAP,
   WORD_SKETCH_DATA,
   DISCLAIMER_CONTENT,
   MAPPING,
@@ -32,7 +35,9 @@ import {
   DUAL_ARCHETYPE,
   TEXT_VARIATIONS,
   STREAM_SELECTION_CONTENT,
-  STREAM_ODYSSEY_ROADMAP,
+  TRAIT_REASONS,
+  STREAM_AGILE_COMPATIBILITY,
+  STREAM_FUTURE_DIRECTIONS,
 } from './schoolConstants';
 import {
   getCompatibilityMatrixDetails,
@@ -1021,10 +1026,16 @@ export class SchoolReport extends BaseReport {
     // 5. Development Zones
     this.ci_generateDevelopmentZones();
 
-    // 6. Future Pathways & Stream Odyssey (with inline top-6 course compatibility per stream)
+    // 6. Where You Fit Best (DISC + Agile recommended stream)
     try {
-      this.generateStreamSelectionIntro();
+      this.generateWhereYouFitBest();
+      logger.info('[School REPORT][SSLC] Where You Fit Best Generated.');
+    } catch (err) {
+      logger.warn('[School REPORT][SSLC] Where You Fit Best skipped.', err);
+    }
 
+    // 6b. Course Compatibility for the recommended stream (shown right after Where You Fit Best)
+    try {
       // Pre-compute traits for compatibility bar colouring
       const topTwoTraits = this.getTopTwoTraits(
         this.data.most_answered_answer_type,
@@ -1032,81 +1043,114 @@ export class SchoolReport extends BaseReport {
       );
       const traitCode = topTwoTraits[0] + topTwoTraits[1];
 
-      const streamIdMap: Record<string, number> = {
-        PCMB: 1, PCB: 2, PCM: 3, PCBZ: 4, Commerce: 5, Humanities: 6,
+      // Determine recommended stream (same logic as generateWhereYouFitBest)
+      const agile = this.data.agile_scores?.[0];
+      const agileScores: Record<string, number> = {
+        Focus: agile?.focus ?? 0,
+        Courage: agile?.courage ?? 0,
+        Respect: agile?.respect ?? 0,
+        Openness: agile?.openness ?? 0,
+        Commitment: agile?.commitment ?? 0,
       };
+      const topAgile = Object.entries(agileScores).sort((a, b) => b[1] - a[1])[0][0];
+      const recommendedStreamName = Object.keys(STREAM_AGILE_COMPATIBILITY)
+        .map(s => ({ name: s, compat: (STREAM_AGILE_COMPATIBILITY[s] || {})[topAgile] ?? 65 }))
+        .sort((a, b) => b.compat - a.compat)[0].name;
 
-      for (const streamKey of ['PCMB', 'PCB', 'PCM', 'PCBZ', 'Commerce', 'Humanities']) {
-        // Stream content page + odyssey roadmap
+      const SSLC_THRESHOLD = 86;
+      // Find the stream ID by value (e.g. 'PCMB' -> 1)
+      const streamId = parseInt(
+        Object.keys(STREAM_NAMES).find(key => STREAM_NAMES[Number(key)] === recommendedStreamName) ?? '0',
+        10
+      );
+      const allCourses = await getCompatibilityMatrixDetails(traitCode, streamId);
+
+      // Group by department_name (preserving DB order), then keep top 6 per department
+      const deptMap = new Map<string, typeof allCourses>();
+      for (const course of allCourses) {
+        const dept = course.department_name || 'General';
+        if (!deptMap.has(dept)) deptMap.set(dept, []);
+        deptMap.get(dept)!.push(course);
+      }
+
+      if (deptMap.size > 0) {
+        this.h2('Compatible Courses for This Stream');
+        this.pHtml('<b> How to read: </b>Bar colour shows trait alignment. Higher % means a stronger match - primary colour bars score ≥70%.');
+        // Compact legend - shown once above all departments
+        const DISC_COLORS: Record<string, string> = {
+          D: '#D82A29', I: '#FEDD10', S: '#4FB965', C: '#01AADB',
+        };
+        const highTrait = topTwoTraits[0].toUpperCase();
+        const lowTrait = topTwoTraits[1].toUpperCase();
+        const highColor = DISC_COLORS[highTrait] || '#808080';
+        const lowColor = DISC_COLORS[lowTrait] || '#808080';
+        const lm = this._useStdMargins ? this.MARGIN_STD : 15 * this.MM;
+        const circleR = 4;
+        const legendY = this.doc.y + 1;
+
+        // Swatch 1
+        let cx = lm;
+        this.doc.circle(cx + circleR, legendY + circleR, circleR).fillColor(highColor).fill();
+        cx += circleR * 2 + 3;
+        this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(7).fillColor('#333333')
+          .text(`Primary trait - higher match (≥${SSLC_THRESHOLD}%)`, cx, legendY + 1, { continued: false });
+        const w1 = this.doc.widthOfString(`Primary trait - higher match (≥${SSLC_THRESHOLD}%)`);
+        cx += w1 + 14;
+
+        // Swatch 2
+        this.doc.circle(cx + circleR, legendY + circleR, circleR).fillColor(lowColor).fill();
+        cx += circleR * 2 + 3;
+        this.doc.font(this.FONT_SORA_REGULAR).fontSize(7).fillColor('#333333')
+          .text(`Secondary trait - moderate match (<${SSLC_THRESHOLD}%)`, cx, legendY + 1, { continued: false });
+
+        this.doc.y = legendY + circleR * 2 + 5;
+
+        // Render each department separately with its own h3 heading
+        const gridMargin = lm;
+        for (const [deptName, deptCourses] of deptMap.entries()) {
+          const top6 = deptCourses.slice(0, 6);
+          this.h3(deptName);
+          this.generateCourseCompatibilityTable(
+            top6,
+            topTwoTraits[0],
+            topTwoTraits[1],
+            true,
+            gridMargin,
+            this.doc.y,
+            this.PAGE_WIDTH - 2 * gridMargin,
+            SSLC_THRESHOLD,
+          );
+        }
+      }
+
+      // Render description text once after all department charts
+      this.ensureSpace(0.13, true);
+      const courseDesc =
+        'The course compatibility you\u2019ve received is based on your unique personality Report results, aiming to highlight programs that align well with your strengths and traits. However, this is not a fixed or singular recommendation. Your personal interests, evolving passions, and exposure to different fields also play a crucial role in shaping the right career path for you. We\u2019ve combined your profile with real-time industry data to give you a future-oriented perspective. Please keep in mind that course trends and career opportunities can shift from year to year as the world continues to evolve-new fields emerge, and existing ones transform. Use this as a guide, not a rulebook, to explore and make informed choices about your educational journey.';
+
+      this.doc
+        .font(this.FONT_SORA_REGULAR)
+        .fontSize(9)
+        .fillColor('black')
+        .text(courseDesc, 15 * this.MM, this.doc.y, {
+          width: this.PAGE_WIDTH - 30 * this.MM,
+          align: 'left',
+          lineGap: 2,
+        });
+
+      logger.info('[School REPORT][SSLC] Course Compatibility Generated.');
+    } catch (err) {
+      logger.warn('[School REPORT][SSLC] Course Compatibility skipped.', err);
+    }
+
+    // 7. Future Pathways & Stream Odyssey
+    try {
+      this.generateStreamSelectionIntro();
+
+      for (const streamKey of Object.values(STREAM_NAMES)) {
+        // Stream content page + odyssey roadmap (shown for ALL streams)
         this.generateStreamSelectionContent(streamKey);
         this.generateStreamOdysseyRoadmap(streamKey);
-
-        // Inline course compatibility — top 6 per department for this stream (SSLC threshold: 84)
-        try {
-          const SSLC_THRESHOLD = 86;
-          const streamId = streamIdMap[streamKey];
-          const allCourses = await getCompatibilityMatrixDetails(traitCode, streamId);
-
-          // Group by department_name (preserving DB order), then keep top 6 per department
-          const deptMap = new Map<string, typeof allCourses>();
-          for (const course of allCourses) {
-            const dept = course.department_name || 'General';
-            if (!deptMap.has(dept)) deptMap.set(dept, []);
-            deptMap.get(dept)!.push(course);
-          }
-
-          if (deptMap.size > 0) {
-            this.h2('Compatible Courses for This Stream');
-            this.pHtml('<b> How to read: </b>Bar colour shows trait alignment. Higher % means a stronger match - primary colour bars score ≥70%.');
-            // Compact legend — shown once above all departments
-            const DISC_COLORS: Record<string, string> = {
-              D: '#D82A29', I: '#FEDD10', S: '#4FB965', C: '#01AADB',
-            };
-            const highTrait = topTwoTraits[0].toUpperCase();
-            const lowTrait = topTwoTraits[1].toUpperCase();
-            const highColor = DISC_COLORS[highTrait] || '#808080';
-            const lowColor = DISC_COLORS[lowTrait] || '#808080';
-            const lm = this._useStdMargins ? this.MARGIN_STD : 15 * this.MM;
-            const circleR = 4;
-            const legendY = this.doc.y + 1;
-
-            // Swatch 1
-            let cx = lm;
-            this.doc.circle(cx + circleR, legendY + circleR, circleR).fillColor(highColor).fill();
-            cx += circleR * 2 + 3;
-            this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(7).fillColor('#333333')
-              .text(`Primary trait — higher match (≥${SSLC_THRESHOLD}%)`, cx, legendY + 1, { continued: false });
-            const w1 = this.doc.widthOfString(`Primary trait — higher match (≥${SSLC_THRESHOLD}%)`);
-            cx += w1 + 14;
-
-            // Swatch 2
-            this.doc.circle(cx + circleR, legendY + circleR, circleR).fillColor(lowColor).fill();
-            cx += circleR * 2 + 3;
-            this.doc.font(this.FONT_SORA_REGULAR).fontSize(7).fillColor('#333333')
-              .text(`Secondary trait — moderate match (<${SSLC_THRESHOLD}%)`, cx, legendY + 1, { continued: false });
-
-            this.doc.y = legendY + circleR * 2 + 5;
-
-            // Render each department separately with its own h3 heading
-            const gridMargin = lm;
-            for (const [deptName, deptCourses] of deptMap.entries()) {
-              const top6 = deptCourses.slice(0, 6);
-              this.h3(deptName);
-              this.generateCourseCompatibilityTable(
-                top6,
-                topTwoTraits[0],
-                topTwoTraits[1],
-                true,
-                gridMargin,
-                this.doc.y,
-                this.PAGE_WIDTH - 2 * gridMargin,
-                SSLC_THRESHOLD,
-              );
-            }
-          }
-        } catch (err) {
-          logger.warn(`[School REPORT][SSLC] Course Compatibility for ${streamKey} skipped.`, err);
-        }
       }
 
       logger.info('[School REPORT][SSLC] Stream Selection & Odyssey Generated.');
@@ -1129,15 +1173,7 @@ export class SchoolReport extends BaseReport {
     // 3. Career Domain Table
     this.ci_generateCareerDomainTable();
 
-    const streamMap: Record<string, string> = {
-      '1': 'PCMB',
-      '2': 'PCB',
-      '3': 'PCM',
-      '4': 'PCBZ',
-      '5': 'Commerce',
-      '6': 'Humanities',
-    };
-    let streamKey = streamMap[String(this.data.school_stream_id)];
+    const streamKey = STREAM_NAMES[this.data.school_stream_id ?? 0];
 
     // 5 Future Pathways
     try {
@@ -1225,6 +1261,427 @@ export class SchoolReport extends BaseReport {
     this.pHtml(DISCLAIMER_CONTENT.closing_note);
   }
 
+  // --- GENERATE WHERE YOU FIT BEST ---
+  /**
+   * Renders the 'Where You Fit Best' section showing the recommended stream
+   * (highest agile compatibility), DISC-based reasons, and alternatives.
+   */
+  private generateWhereYouFitBest(): void {
+    // this.doc.addPage();
+    this._useStdMargins = true;
+    const margin = this.MARGIN_STD;
+    const pageW = this.PAGE_WIDTH - 2 * margin;
+
+    this.ensureSpace(0.26, true)
+
+    // ── Determine student data ──
+    const topTwoTraits = this.getTopTwoTraits(
+      this.data.most_answered_answer_type,
+      this.data,
+    );
+    const traitCode = topTwoTraits[0] + topTwoTraits[1]; // e.g. "SD"
+    const reasons = TRAIT_REASONS[traitCode] || ['Personality aligned'];
+
+    // Agile: find student's top agile dimension
+    const agile = this.data.agile_scores?.[0];
+    const agileScores: Record<string, number> = {
+      Focus: agile?.focus ?? 0,
+      Courage: agile?.courage ?? 0,
+      Respect: agile?.respect ?? 0,
+      Openness: agile?.openness ?? 0,
+      Commitment: agile?.commitment ?? 0,
+    };
+    const topAgile = Object.entries(agileScores).sort((a, b) => b[1] - a[1])[0][0];
+
+    // Rank ALL streams by compatibility (top agile vs each stream's matrix)
+    const rankedStreams = Object.keys(STREAM_AGILE_COMPATIBILITY)
+      .map(s => {
+        const mat = STREAM_AGILE_COMPATIBILITY[s] || {};
+        return { name: s, compat: mat[topAgile] ?? 65 };
+      })
+      .sort((a, b) => b.compat - a.compat);
+
+    const recommendedStream = rankedStreams[0].name;
+    const compatibility = rankedStreams[0].compat;
+    const altStreams = rankedStreams.slice(1, 4); // top 3 alternatives
+
+    // ── Title ──
+    this.h1('Where You Fit Best');
+    this.doc.moveDown(0.3);
+
+    // ── Recommended Stream Card ──
+    const cardH = 130;
+    const cardY = this.doc.y;
+
+    // Gradient background (light blue → light purple)
+    const grad = this.doc.linearGradient(margin, cardY, margin + pageW, cardY);
+    grad.stop(0, '#E8F0FE').stop(1, '#EDE7F6');
+    this.doc
+      .roundedRect(margin, cardY, pageW, cardH, 12)
+      .fill(grad);
+
+    // Subtle border
+    this.doc
+      .roundedRect(margin, cardY, pageW, cardH, 12)
+      .lineWidth(0.5)
+      .strokeColor('#C5CAE9')
+      .stroke();
+
+    // ── Department icons (2×2 grid, glass circles, right side) ──
+    const streamContent = STREAM_SELECTION_CONTENT[recommendedStream];
+    const iconSize = 44;
+    const iconGap = 12;
+    const iconsPerRow = 2;
+    const totalIconW = iconsPerRow * iconSize + (iconsPerRow - 1) * iconGap;
+    const iconBlockX = margin + pageW - totalIconW - 25;
+    const iconBlockY = cardY + (cardH - (2 * iconSize + iconGap)) / 2;
+
+    if (streamContent) {
+      streamContent.fields.forEach((field, idx) => {
+        const col = idx % iconsPerRow;
+        const row = Math.floor(idx / iconsPerRow);
+        const ix = iconBlockX + col * (iconSize + iconGap);
+        const iy = iconBlockY + row * (iconSize + iconGap);
+        const cx = ix + iconSize / 2;
+        const cy = iy + iconSize / 2;
+        const r = iconSize / 2;
+
+        // Glass-like circle: semi-transparent white fill + soft shadow
+        this.doc
+          .circle(cx + 1, cy + 1, r)
+          .fillOpacity(0.15)
+          .fillColor('#9E9E9E')
+          .fill();
+        this.doc.fillOpacity(1); // reset
+
+        // Glass fill - white with slight transparency
+        this.doc
+          .circle(cx, cy, r)
+          .fillOpacity(0.85)
+          .fillColor('#FFFFFF')
+          .fill();
+        this.doc.fillOpacity(1); // reset
+
+        // Glass border - light with subtle shine
+        this.doc
+          .circle(cx, cy, r)
+          .lineWidth(1)
+          .strokeOpacity(0.4)
+          .strokeColor('#B0BEC5')
+          .stroke();
+        this.doc.strokeOpacity(1); // reset
+
+        // Icon image (larger, with smaller padding)
+        const iconPath = field.icon ? `public/assets/images/school/${field.icon}` : null;
+        if (iconPath && fs.existsSync(iconPath)) {
+          const pad = 8;
+          this.doc.image(iconPath, ix + pad, iy + pad, {
+            width: iconSize - 2 * pad,
+            height: iconSize - 2 * pad,
+          });
+        }
+      });
+    }
+
+    // ── Centered text block (left portion of card, excluding icon area) ──
+    const textAreaW = iconBlockX - margin - 20; // available width for text
+    const textCenterX = margin + (textAreaW / 2);
+
+    // Measure all text to vertically center
+    this.doc.font(this.FONT_SORA_REGULAR).fontSize(11);
+    const labelH = this.doc.heightOfString('Recommended Stream:', { width: textAreaW, align: 'center' });
+    this.doc.font(this.FONT_SORA_BOLD).fontSize(28);
+    const nameH = this.doc.heightOfString(recommendedStream, { width: textAreaW, align: 'center' });
+    // Full stream title (subtitle)
+    const streamFullTitle = streamContent?.title || '';
+    this.doc.font(this.FONT_SORA_REGULAR).fontSize(10);
+    const subtitleH = streamFullTitle ? this.doc.heightOfString(streamFullTitle, { width: textAreaW, align: 'center' }) : 0;
+    // Compatibility row height: label + bar + percent text inline
+    const compatRowH = 18; // fixed height for the bar row
+
+    const totalTextH = labelH + 4 + nameH + (subtitleH > 0 ? 2 + subtitleH : 0) + 8 + compatRowH;
+    let textY = cardY + (cardH - totalTextH) / 2;
+
+    // "Recommended Stream:" label
+    this.doc
+      .font(this.FONT_SORA_REGULAR)
+      .fontSize(11)
+      .fillColor('#555555')
+      .text('Recommended Stream:', margin + 10, textY, { width: textAreaW, align: 'center' });
+    textY += labelH + 4;
+
+    // Stream name (large bold)
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(28)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text(recommendedStream, margin + 10, textY, { width: textAreaW, align: 'center' });
+    textY += nameH + 2;
+
+    // Stream full title (subtitle under the short name)
+    if (streamFullTitle) {
+      this.doc
+        .font(this.FONT_SORA_REGULAR)
+        .fontSize(10)
+        .fillColor('#777777')
+        .text(streamFullTitle, margin + 10, textY, { width: textAreaW, align: 'center' });
+      textY += subtitleH + 6;
+    } else {
+      textY += 6;
+    }
+
+    // "Compatibility: [green bar] XX%" - inline layout, centered
+    this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(11);
+    const compatLabel = 'Compatibility:';
+    const compatLabelW = this.doc.widthOfString(compatLabel);
+    const pctText = ` ${compatibility}%`;
+    const pctTextW = this.doc.widthOfString(pctText);
+    const barW = 120;
+    const barH = 8;
+    const totalRowW = compatLabelW + 8 + barW + 4 + pctTextW;
+    const rowStartX = margin + 10 + (textAreaW - totalRowW) / 2;
+
+    // Label
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(11)
+      .fillColor('#333333')
+      .text(compatLabel, rowStartX, textY + 2, { lineBreak: false });
+
+    // Green progress bar
+    const barX = rowStartX + compatLabelW + 8;
+    const barCenterY = textY + (compatRowH - barH) / 2;
+
+    // Track
+    this.doc
+      .roundedRect(barX, barCenterY, barW, barH, barH / 2)
+      .fillColor('#C8E6C9')
+      .fill();
+
+    // Fill
+    const fillW = Math.max(barH, (compatibility / 100) * barW);
+    const greenGrad = this.doc.linearGradient(barX, barCenterY, barX + fillW, barCenterY);
+    greenGrad.stop(0, '#43A047').stop(1, '#66BB6A');
+    this.doc
+      .roundedRect(barX, barCenterY, fillW, barH, barH / 2)
+      .fill(greenGrad);
+
+    // Percentage text
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(11)
+      .fillColor('#2E7D32')
+      .text(pctText, barX + barW + 4, textY + 2, { lineBreak: false });
+
+    // Move cursor below the card
+    this.doc.y = cardY + cardH + 25;
+    this.doc.x = margin;
+
+    // ── Reasons Section ──
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(14)
+      .fillColor(this.COLOR_BLACK)
+      .text('Reasons', margin, this.doc.y);
+    this.doc.moveDown(0.5);
+
+    // Pill badges - all in a STRAIGHT horizontal row (fixed Y)
+    const pillRowY = this.doc.y;
+    let pillX = margin;
+    const pillH = 26;
+    const pillPadH = 12;
+    const pillGap = 10;
+    let pillRowCount = 0; // track row for wrapping
+
+    reasons.forEach(reason => {
+      this.doc.font(this.FONT_SORA_REGULAR).fontSize(8.5);
+      const textW = this.doc.widthOfString(`✓  ${reason}`);
+      const pillW = textW + 2 * pillPadH;
+
+      // Wrap to next row if overflows
+      if (pillX + pillW > margin + pageW) {
+        pillX = margin;
+        pillRowCount++;
+      }
+      const currentPillY = pillRowY + pillRowCount * (pillH + 8);
+
+      // Pill background
+      this.doc
+        .roundedRect(pillX, currentPillY, pillW, pillH, pillH / 2)
+        .fillColor('#F5F5F5')
+        .fill();
+      this.doc
+        .roundedRect(pillX, currentPillY, pillW, pillH, pillH / 2)
+        .lineWidth(0.5)
+        .strokeColor('#E0E0E0')
+        .stroke();
+
+      // Drawn checkmark icon (green circle + white tick) instead of emoji
+      const iconR = 5;
+      const iconCx = pillX + pillPadH + iconR;
+      const iconCy = currentPillY + pillH / 2;
+      // Green circle
+      this.doc.circle(iconCx, iconCy, iconR).fillColor('#43A047').fill();
+      // White checkmark path
+      this.doc.save();
+      this.doc
+        .strokeColor('#FFFFFF')
+        .lineWidth(1.2)
+        .lineCap('round')
+        .lineJoin('round')
+        .moveTo(iconCx - 2.5, iconCy)
+        .lineTo(iconCx - 0.5, iconCy + 2.2)
+        .lineTo(iconCx + 3, iconCy - 2)
+        .stroke();
+      this.doc.restore();
+
+      // Pill text after the icon
+      this.doc
+        .font(this.FONT_SORA_REGULAR)
+        .fontSize(8.5)
+        .fillColor('#333333')
+        .text(reason, pillX + pillPadH + iconR * 2 + 4, currentPillY + (pillH - 9) / 2, {
+          width: textW - iconR * 2,
+          lineBreak: false,
+        });
+
+      pillX += pillW + pillGap;
+    });
+
+    this.doc.y = pillRowY + (pillRowCount + 1) * (pillH + 8) + 15;
+    this.doc.x = margin;
+
+    // ── Alternative Streams Section ──
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(14)
+      .fillColor(this.COLOR_BLACK)
+      .text('Alternative Streams', margin, this.doc.y);
+    this.doc.moveDown(0.5);
+
+    // Pre-measure alt card heights for each stream (dynamic based on text)
+    const altCardW = (pageW - 2 * 10) / 3;
+    const altPad = 10; // inner padding
+    const altBarH = 6;
+
+    const altHeights = altStreams.map(alt => {
+      let h = altPad; // top padding
+      this.doc.font(this.FONT_SORA_BOLD).fontSize(11);
+      h += this.doc.heightOfString(`${alt.name} - ${alt.compat}%`, { width: altCardW - 20 });
+      h += 3; // gap to title
+      const altContent = STREAM_SELECTION_CONTENT[alt.name];
+      if (altContent) {
+        this.doc.font(this.FONT_SORA_REGULAR).fontSize(7.5);
+        h += this.doc.heightOfString(altContent.title, { width: altCardW - 20 });
+      }
+      h += 8; // gap to bar
+      h += altBarH;
+      h += altPad; // bottom padding
+      return h;
+    });
+    const altCardH = Math.max(...altHeights); // uniform height = tallest card
+    const altY = this.doc.y;
+
+    altStreams.forEach((alt, idx) => {
+      const ax = margin + idx * (altCardW + 10);
+
+      // Card background
+      const altGrad = this.doc.linearGradient(ax, altY, ax + altCardW, altY);
+      altGrad.stop(0, '#EEF2FF').stop(1, '#F3E8FF');
+      this.doc
+        .roundedRect(ax, altY, altCardW, altCardH, 8)
+        .fill(altGrad);
+      this.doc
+        .roundedRect(ax, altY, altCardW, altCardH, 8)
+        .lineWidth(0.5)
+        .strokeColor('#D0D0E0')
+        .stroke();
+
+      // Stream shortName - XX%
+      let cy = altY + altPad;
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(11)
+        .fillColor('#1A1A2E')
+        .text(`${alt.name} - ${alt.compat}%`, ax + 10, cy, {
+          width: altCardW - 20,
+        });
+      cy += this.doc.heightOfString(`${alt.name} - ${alt.compat}%`, { width: altCardW - 20 }) + 3;
+
+      // Department title
+      const altContent = STREAM_SELECTION_CONTENT[alt.name];
+      if (altContent) {
+        this.doc
+          .font(this.FONT_SORA_REGULAR)
+          .fontSize(7.5)
+          .fillColor('#666666')
+          .text(altContent.title, ax + 10, cy, {
+            width: altCardW - 20,
+          });
+        cy += this.doc.heightOfString(altContent.title, { width: altCardW - 20 });
+      }
+      cy += 8; // small gap before bar
+
+      // Progress bar - positioned right after text
+      const barW = altCardW - 20;
+
+      // Background track
+      this.doc
+        .roundedRect(ax + 10, cy, barW, altBarH, altBarH / 2)
+        .fillColor('#E8E8F0')
+        .fill();
+
+      // Filled portion
+      const fillW = Math.max(altBarH, (alt.compat / 100) * barW);
+      const barGrad = this.doc.linearGradient(ax + 10, cy, ax + 10 + fillW, cy);
+      barGrad.stop(0, '#4338CA').stop(1, '#6366F1');
+      this.doc
+        .roundedRect(ax + 10, cy, fillW, altBarH, altBarH / 2)
+        .fill(barGrad);
+    });
+
+    // Move past the alt cards
+    this.doc.y = altY + altCardH + 15;
+    this.doc.x = margin;
+
+    // ── Future Direction Box ──
+    const topAlt = altStreams[0];
+    if (topAlt) {
+      const dirText = STREAM_FUTURE_DIRECTIONS[topAlt.name] || '';
+      if (dirText) {
+        const boxY = this.doc.y;
+        const boxH = 50;
+
+        this.doc
+          .roundedRect(margin, boxY, pageW, boxH, 8)
+          .fillColor('#FAFAFA')
+          .fill();
+        this.doc
+          .roundedRect(margin, boxY, pageW, boxH, 8)
+          .lineWidth(0.5)
+          .strokeColor('#E0E0E0')
+          .stroke();
+
+        this.doc
+          .font(this.FONT_SORA_BOLD)
+          .fontSize(10)
+          .fillColor('#333333')
+          .text('Future direction', margin + 15, boxY + 10);
+
+        this.doc
+          .font(this.FONT_SORA_REGULAR)
+          .fontSize(9)
+          .fillColor('#555555')
+          .text(`Possible future pathways: ${dirText}`, margin + 15, boxY + 26, {
+            width: pageW - 30,
+          });
+
+        this.doc.y = boxY + boxH + 10;
+      }
+    }
+  }
+
+
   // --- GENERATE STREAM SELECTION INTRO ---
   /**
    * Renders the introductory explanations and motivation for choosing an academic stream.
@@ -1240,7 +1697,7 @@ export class SchoolReport extends BaseReport {
       'Transitioning to higher secondary education marks a crucial crossroads in your academic journey. The stream you select now is a foundational step that will help shape your college education, your career trajectory, and your future lifestyle.',
     );
 
-    this.h2('It is Not Just About Subjects—It is About Your Identity');
+    this.h2('It is Not Just About Subjects-It is About Your Identity');
     this.pHtml(
       'When choosing a stream for the 11th and 12th grades, it is helpful to look beyond the immediate syllabus and ask yourself: What kind of impact do I want to make? <br/>• Do you want to build the technology of tomorrow?<br/>• Are you driven to heal people and advance medical science?<br/>• Do you enjoy the dynamics of business, finance, and leadership?<br/>• Or are you passionate about understanding human behavior, law, and creative expression?'
     );
@@ -1519,7 +1976,7 @@ export class SchoolReport extends BaseReport {
     // User requested rule: if at least 40% space is available, render as usual.
     // If not, reduce the scaling by 10%.
     if (availableHeight >= fortyPercentSpace) {
-      // Render as usual — paddings already accommodate dynamic text heights
+      // Render as usual - paddings already accommodate dynamic text heights
     } else {
       // Reduce scaling by 10%
       amplitude *= 0.9;
@@ -1861,7 +2318,7 @@ export class SchoolReport extends BaseReport {
       //   .text('How to read: ', legendMargin, legendY, { continued: true })
       //   .font(this.FONT_SORA_REGULAR)
       //   .fillColor('#333333')
-      //   .text('Bar colour shows trait alignment. Higher % means a stronger match — primary colour bars score ≥70%.', {
+      //   .text('Bar colour shows trait alignment. Higher % means a stronger match - primary colour bars score ≥70%.', {
       //     continued: false,
       //     width: this.PAGE_WIDTH - 2 * legendMargin - 4,
       //   });
@@ -1882,11 +2339,11 @@ export class SchoolReport extends BaseReport {
         .font(this.FONT_SORA_SEMIBOLD)
         .fontSize(9)
         .fillColor('#333333')
-        // .text(`${highLabel} trait — higher match (≥70%)`, curX, labelY + 1, { continued: false });
-        .text(`Primary trait — higher match (≥70%)`, curX, labelY + 1, { continued: false });
+        // .text(`${highLabel} trait - higher match (≥70%)`, curX, labelY + 1, { continued: false });
+        .text(`Primary trait - higher match (≥70%)`, curX, labelY + 1, { continued: false });
 
       // Measure the first label width to place the second item next to it
-      const firstLabelWidth = this.doc.widthOfString(`${highLabel} trait — higher match (≥70%)`);
+      const firstLabelWidth = this.doc.widthOfString(`${highLabel} trait - higher match (≥70%)`);
       curX += firstLabelWidth + itemGap;
 
       // Item 2: low-trait circle swatch
@@ -1899,8 +2356,8 @@ export class SchoolReport extends BaseReport {
         .font(this.FONT_SORA_REGULAR)
         .fontSize(9)
         .fillColor('#333333')
-        // .text(`${lowLabel} trait — moderate match (<70%)`, curX, labelY + 1, { continued: false });
-        .text(`Secondary trait — moderate match (<70%)`, curX, labelY + 1, { continued: false });
+        // .text(`${lowLabel} trait - moderate match (<70%)`, curX, labelY + 1, { continued: false });
+        .text(`Secondary trait - moderate match (<70%)`, curX, labelY + 1, { continued: false });
 
       this.doc.y = labelY + swatchSize + 6;
     }
@@ -1971,7 +2428,7 @@ export class SchoolReport extends BaseReport {
     // Render description text once after all department charts
     this.ensureSpace(0.13, true);
     const desc =
-      'The course compatibility chart you\u2019ve received is based on your unique personality Report results, aiming to highlight programs that align well with your strengths and traits. However, this is not a fixed or singular recommendation. Your personal interests, evolving passions, and exposure to different fields also play a crucial role in shaping the right career path for you. We\u2019ve combined your profile with real-time industry data to give you a future-oriented perspective. Please keep in mind that course trends and career opportunities can shift from year to year as the world continues to evolve-new fields emerge, and existing ones transform. Use this as a guide, not a rulebook, to explore and make informed choices about your educational journey.';
+      'The course compatibility you\u2019ve received is based on your unique personality Report results, aiming to highlight programs that align well with your strengths and traits. However, this is not a fixed or singular recommendation. Your personal interests, evolving passions, and exposure to different fields also play a crucial role in shaping the right career path for you. We\u2019ve combined your profile with real-time industry data to give you a future-oriented perspective. Please keep in mind that course trends and career opportunities can shift from year to year as the world continues to evolve-new fields emerge, and existing ones transform. Use this as a guide, not a rulebook, to explore and make informed choices about your educational journey.';
 
     this.doc
       .font(this.FONT_SORA_REGULAR)
@@ -4819,22 +5276,13 @@ export class SchoolReport extends BaseReport {
 
     const params = traitParamMap[primaryTrait] ?? { primary: 'Overall Score', secondary: 'Rank' };
 
-    const streamNames: Record<number, string> = {
-      1: 'PCMB',
-      2: 'PCB',
-      3: 'PCM',
-      4: 'PCBZ',
-      5: 'Commerce / Management',
-      6: 'Arts / Humanities',
-    };
-
     const streamLabel = this.data.school_stream_id
-      ? streamNames[this.data.school_stream_id] || 'Selected Stream'
+      ? STREAM_FULL_NAMES[this.data.school_stream_id] || 'Selected Stream'
       : 'All Streams (Science, Commerce and Arts)';
 
     this.pHtml(
-      `Based on your Personality trait, the institutions below have been selected and ranked using <b>${params.primary} </b> as the primary parameter and <b>${params.secondary} </b> as the secondary parameter. ` +
-      `Results are filtered for <b>${streamLabel} </b> and ordered by NIRF national rank after selection.`,
+      `Based on your Personality trait, the institutions below have been selected and ranked using <b>${params.primary}</b> as the primary parameter and <b>${params.secondary}</b> as the secondary parameter. ` +
+      `Results are filtered for <b>${streamLabel}</b> and ordered by NIRF national rank after selection.`,
     );
 
     const colleges: UniversityData[] = await getTopCollegesForStudent(
