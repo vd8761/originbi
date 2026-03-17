@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { studentService } from '../../lib/services/student.service';
 import PersonalityCard from './PersonalityCard';
 import PublicVisibilityCard from './PublicVisibilityCard';
 import ConsultantCallCard from './ConsultantCallCard';
@@ -9,13 +10,26 @@ import TopCollegesCard from './TopCollegesCard';
 
 const Dashboard: React.FC = () => {
     const [isSchool, setIsSchool] = useState(false);
+    const [reportData, setReportData] = useState<any>(null);
+    const [isLoadingReport, setIsLoadingReport] = useState(false);
 
     useEffect(() => {
-        const checkProgram = () => {
+        const checkProgram = async () => {
             const userStr = localStorage.getItem('user');
             if (userStr) {
                 try {
                     const user = JSON.parse(userStr);
+
+                    // Fetch report data if not already fetched
+                    if (user.id && !reportData && !isLoadingReport) {
+                        setIsLoadingReport(true);
+                        const data = await studentService.getStudentReport(user.id);
+                        if (data) {
+                            setReportData(data);
+                        }
+                        setIsLoadingReport(false);
+                    }
+
                     if (user.programCode) {
                         const code = (user.programCode || '').toUpperCase();
                         setIsSchool(code.includes('SCHOOL'));
@@ -23,23 +37,27 @@ const Dashboard: React.FC = () => {
                     }
                     if (Object.prototype.hasOwnProperty.call(user, 'id')) return true;
                 } catch (e) {
-                    console.error("Error parsing user from localStorage", e);
+                    console.error("Error parsing user or fetching report", e);
+                    setIsLoadingReport(false);
                 }
             }
             return false;
         };
 
-        if (!checkProgram()) {
-            const interval = setInterval(() => {
-                if (checkProgram()) clearInterval(interval);
-            }, 500);
-            const timeout = setTimeout(() => clearInterval(interval), 5000);
-            return () => { clearInterval(interval); clearTimeout(timeout); };
-        }
+        const init = async () => {
+            if (!(await checkProgram())) {
+                const interval = setInterval(async () => {
+                    if (await checkProgram()) clearInterval(interval);
+                }, 500);
+                const timeout = setTimeout(() => clearInterval(interval), 5000);
+                return () => { clearInterval(interval); clearTimeout(timeout); };
+            }
+        };
+        init();
     }, []);
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 lg:gap-[1.666vw] w-full auto-rows-auto lg:auto-rows-fr">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 lg:gap-[1.666vw] w-full auto-rows-auto">
             {/* 
               GRID SYSTEM (12 Columns Desktop / 2 Columns Tablet / 1 Column Mobile)
               
@@ -60,12 +78,12 @@ const Dashboard: React.FC = () => {
 
             {/* Row 1 */}
             <div className="col-span-1 md:col-span-2 lg:col-span-6 h-full">
-                <PersonalityCard />
+                <PersonalityCard reportData={reportData} isLoadingReport={isLoadingReport} />
             </div>
             {isSchool ? (
                 <>
                     <div className="col-span-1 md:col-span-1 lg:col-span-3 h-full">
-                        <ImpactAssessmentCard />
+                        <ImpactAssessmentCard reportData={reportData} isLoadingReport={isLoadingReport} />
                     </div>
                     <div className="col-span-1 md:col-span-1 lg:col-span-3 h-full">
                         <ConsultantCallCard />
@@ -89,7 +107,7 @@ const Dashboard: React.FC = () => {
 
             {isSchool ? (
                 <div className="col-span-1 md:col-span-2 lg:col-span-8 h-full">
-                    <TopCollegesCard />
+                    <TopCollegesCard reportData={reportData} isLoadingReport={isLoadingReport} />
                 </div>
             ) : (
                 <div className="col-span-1 md:col-span-2 lg:col-span-8 h-full">
