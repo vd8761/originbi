@@ -57,9 +57,12 @@ export class CognitoUniversalGuard implements CanActivate {
           );
           return true;
         } catch (err) {
-          this.logger.warn(
-            `Cognito token failed: ${err.message} — falling through`,
-          );
+          const msg = err?.message || 'UNKNOWN_AUTH_ERROR';
+          if (msg === 'EXPIRED_COGNITO_TOKEN') {
+            this.logger.debug('Cognito token expired — falling through');
+          } else {
+            this.logger.warn(`Cognito token failed: ${msg} — falling through`);
+          }
         }
       }
     }

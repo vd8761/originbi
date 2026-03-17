@@ -18,8 +18,8 @@ import { ReportModule } from './report/report.module';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const databaseUrl = config.get<string>('DATABASE_URL');
-
-        const shouldSync = config.get<string>('DB_SYNC') === 'true';
+        // Shared tables are managed via SQL migrations, not service-level synchronize.
+        const shouldSync = false;
 
         if (databaseUrl) {
           const isLocal =

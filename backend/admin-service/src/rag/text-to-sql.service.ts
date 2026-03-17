@@ -2,11 +2,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ChatGroq } from '@langchain/groq';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { SchemaIntrospectorService } from './schema-introspector.service';
 import { SqlValidatorService } from './utils/sql-validator.service';
 import { UserContext } from '../common/interfaces/user-context.interface';
 import { AuditLoggerService } from './audit';
+import { getTokenTrackerCallback } from './utils/token-tracker';
+import { invokeWithFallback } from './utils/llm-fallback';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
@@ -45,9 +48,12 @@ export interface TextToSqlResult {
 @Injectable()
 export class TextToSqlService {
   private readonly logger = new Logger('TextToSQL');
-  private llm: ChatGroq | null = null;
-  private formatterLlm: ChatGroq | null = null;
-  private synthesizerLlm: ChatGroq | null = null;
+  private llm: ChatGoogleGenerativeAI | null = null;
+  private formatterLlm: ChatGoogleGenerativeAI | null = null;
+  private synthesizerLlm: ChatGoogleGenerativeAI | null = null;
+  private sqlFallbackLlm: ChatGroq | null = null;
+  private formatterFallbackLlm: ChatGroq | null = null;
+  private synthesizerFallbackLlm: ChatGroq | null = null;
 
   // Retry state: when SQL fails, we feed the error back and retry
   private readonly MAX_SQL_RETRIES = 2;
@@ -61,46 +67,94 @@ export class TextToSqlService {
     this.logger.log('🧠 Text-to-SQL Jarvis Engine initialized');
   }
 
-  private getSqlLlm(): ChatGroq {
+  private getSqlLlm(): ChatGoogleGenerativeAI {
     if (!this.llm) {
-      const apiKey = process.env.GROQ_API_KEY;
-      if (!apiKey) throw new Error('GROQ_API_KEY not set');
-      this.llm = new ChatGroq({
+      const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+      this.llm = new ChatGoogleGenerativeAI({
         apiKey,
-        model: 'llama-3.3-70b-versatile',
+        model: 'gemini-2.5-flash',
         temperature: 0, // Deterministic SQL generation
-        maxTokens: 1024,
+        maxOutputTokens: 768,
+        callbacks: [getTokenTrackerCallback('TextToSql (SQL)')],
       });
     }
     return this.llm;
   }
 
-  private getFormatterLlm(): ChatGroq {
-    if (!this.formatterLlm) {
+  private getSqlFallbackLlm(): ChatGroq {
+    if (!this.sqlFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
-      if (!apiKey) throw new Error('GROQ_API_KEY not set');
-      this.formatterLlm = new ChatGroq({
+      if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+      this.sqlFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
+        temperature: 0,
+        maxTokens: 768,
+        callbacks: [getTokenTrackerCallback('TextToSql (SQL Groq Fallback)')],
+      });
+    }
+    return this.sqlFallbackLlm;
+  }
+
+  private getFormatterLlm(): ChatGoogleGenerativeAI {
+    if (!this.formatterLlm) {
+      const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+      this.formatterLlm = new ChatGoogleGenerativeAI({
+        apiKey,
+        model: 'gemini-2.5-flash',
         temperature: 0.4, // Slightly creative for natural phrasing
-        maxTokens: 2048,
+        maxOutputTokens: 1200,
+        callbacks: [getTokenTrackerCallback('TextToSql (Formatter)')],
       });
     }
     return this.formatterLlm;
   }
 
-  private getSynthesizerLlm(): ChatGroq {
-    if (!this.synthesizerLlm) {
+  private getFormatterFallbackLlm(): ChatGroq {
+    if (!this.formatterFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
-      if (!apiKey) throw new Error('GROQ_API_KEY not set');
-      this.synthesizerLlm = new ChatGroq({
+      if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+      this.formatterFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
+        temperature: 0.4,
+        maxTokens: 1200,
+        callbacks: [getTokenTrackerCallback('TextToSql (Formatter Groq Fallback)')],
+      });
+    }
+    return this.formatterFallbackLlm;
+  }
+
+  private getSynthesizerLlm(): ChatGoogleGenerativeAI {
+    if (!this.synthesizerLlm) {
+      const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+      this.synthesizerLlm = new ChatGoogleGenerativeAI({
+        apiKey,
+        model: 'gemini-2.5-flash',
         temperature: 0.3,
-        maxTokens: 3000,
+        maxOutputTokens: 1800,
+        callbacks: [getTokenTrackerCallback('TextToSql (Synthesizer)')],
       });
     }
     return this.synthesizerLlm;
+  }
+
+  private getSynthesizerFallbackLlm(): ChatGroq {
+    if (!this.synthesizerFallbackLlm) {
+      const apiKey = process.env.GROQ_API_KEY;
+      if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+      this.synthesizerFallbackLlm = new ChatGroq({
+        apiKey,
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.3,
+        maxTokens: 1800,
+        callbacks: [getTokenTrackerCallback('TextToSql (Synthesizer Groq Fallback)')],
+      });
+    }
+    return this.synthesizerFallbackLlm;
   }
 
   /**
@@ -374,10 +428,20 @@ ${conversationHistory ? `\n═══ CONVERSATION CONTEXT ═══\n${conversat
 
 Now generate the SQL for the following question:`;
 
-    const response = await this.getSqlLlm().invoke([
-      new SystemMessage(systemPrompt),
-      new HumanMessage(question),
-    ]);
+    const response = await invokeWithFallback({
+      logger: this.logger,
+      context: 'TextToSql SQL generation',
+      invokePrimary: () =>
+        this.getSqlLlm().invoke([
+          new SystemMessage(systemPrompt),
+          new HumanMessage(question),
+        ]),
+      invokeFallback: () =>
+        this.getSqlFallbackLlm().invoke([
+          new SystemMessage(systemPrompt),
+          new HumanMessage(question),
+        ]),
+    });
 
     let sql = response.content.toString().trim();
 
@@ -426,10 +490,20 @@ User role: ${user.role}
 Return ONLY the corrected SQL, nothing else:`;
 
     try {
-      const response = await this.getSqlLlm().invoke([
-        new SystemMessage('You are a SQL correction engine. Return ONLY the corrected PostgreSQL SELECT query. No explanation.'),
-        new HumanMessage(retryPrompt),
-      ]);
+      const response = await invokeWithFallback({
+        logger: this.logger,
+        context: 'TextToSql SQL retry',
+        invokePrimary: () =>
+          this.getSqlLlm().invoke([
+            new SystemMessage('You are a SQL correction engine. Return ONLY the corrected PostgreSQL SELECT query. No explanation.'),
+            new HumanMessage(retryPrompt),
+          ]),
+        invokeFallback: () =>
+          this.getSqlFallbackLlm().invoke([
+            new SystemMessage('You are a SQL correction engine. Return ONLY the corrected PostgreSQL SELECT query. No explanation.'),
+            new HumanMessage(retryPrompt),
+          ]),
+      });
 
       let sql = response.content.toString().trim();
       sql = sql.replace(/^```sql?\s*/i, '').replace(/\s*```$/i, '').trim();
@@ -595,9 +669,19 @@ ${dataStr}
 Response:`;
 
     try {
-      const response = await this.getFormatterLlm().invoke([
-        new SystemMessage(formatPrompt),
-      ]);
+      const response = await invokeWithFallback({
+        logger: this.logger,
+        context: 'TextToSql formatting',
+        invokePrimary: () => this.getFormatterLlm().invoke([
+          new SystemMessage(formatPrompt),
+          new HumanMessage('Format the response now.'),
+        ]),
+        invokeFallback: () =>
+          this.getFormatterFallbackLlm().invoke([
+            new SystemMessage(formatPrompt),
+            new HumanMessage('Format the response now.'),
+          ]),
+      });
       return response.content.toString().trim();
     } catch (formatError) {
       this.logger.warn(`LLM formatting failed, using fallback: ${formatError.message}`);
@@ -951,10 +1035,20 @@ Output: ["What is the average score and completion rate for batch KIOT IT?", "Wh
 
 JSON array:`;
 
-      const decomposeResp = await this.getSqlLlm().invoke([
-        new SystemMessage('Return ONLY a JSON array of sub-questions. No explanation.'),
-        new HumanMessage(decomposePrompt),
-      ]);
+      const decomposeResp = await invokeWithFallback({
+        logger: this.logger,
+        context: 'TextToSql decomposition',
+        invokePrimary: () =>
+          this.getSqlLlm().invoke([
+            new SystemMessage('Return ONLY a JSON array of sub-questions. No explanation.'),
+            new HumanMessage(decomposePrompt),
+          ]),
+        invokeFallback: () =>
+          this.getSqlFallbackLlm().invoke([
+            new SystemMessage('Return ONLY a JSON array of sub-questions. No explanation.'),
+            new HumanMessage(decomposePrompt),
+          ]),
+      });
 
       const subQuestions = this.tryParseSubQuestionArray(decomposeResp.content.toString().trim());
 
@@ -1068,9 +1162,20 @@ SYNTHESIS RULES:
 
 Synthesized response:`;
 
-      const synthResp = await this.getSynthesizerLlm().invoke([
-        new SystemMessage(synthesisPrompt),
-      ]);
+      const synthResp = await invokeWithFallback({
+        logger: this.logger,
+        context: 'TextToSql synthesis',
+        invokePrimary: () =>
+          this.getSynthesizerLlm().invoke([
+            new SystemMessage(synthesisPrompt),
+            new HumanMessage('Synthesize the final response now.'),
+          ]),
+        invokeFallback: () =>
+          this.getSynthesizerFallbackLlm().invoke([
+            new SystemMessage(synthesisPrompt),
+            new HumanMessage('Synthesize the final response now.'),
+          ]),
+      });
       const answer = synthResp.content.toString().trim();
 
       return {

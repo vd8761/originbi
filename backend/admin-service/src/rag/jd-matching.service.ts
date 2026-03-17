@@ -2,7 +2,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ChatGroq } from '@langchain/groq';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
+import { getTokenTrackerCallback } from './utils/token-tracker';
+import { invokeWithFallback } from './utils/llm-fallback';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
@@ -281,24 +284,42 @@ const TIER_THRESHOLDS = {
 @Injectable()
 export class JDMatchingService {
   private readonly logger = new Logger('JD-MatchEngine');
-  private llm: ChatGroq | null = null;
+  private llm: ChatGoogleGenerativeAI | null = null;
+  private fallbackLlm: ChatGroq | null = null;
 
   constructor(private dataSource: DataSource) {
     this.logger.log('🎯 JD Matching Engine v1.0 initialized');
   }
 
-  private getLlm(): ChatGroq {
+  private getLlm(): ChatGoogleGenerativeAI {
     if (!this.llm) {
-      const apiKey = process.env.GROQ_API_KEY;
-      if (!apiKey) throw new Error('GROQ_API_KEY not set');
-      this.llm = new ChatGroq({
+      const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+      this.llm = new ChatGoogleGenerativeAI({
         apiKey,
-        model: 'llama-3.3-70b-versatile',
+        model: 'gemini-2.5-flash',
         temperature: 0.1, // Very low temp for deterministic extraction
-        timeout: 20000,
+        maxOutputTokens: 1024,
+        callbacks: [getTokenTrackerCallback('JD Matching')],
       });
     }
     return this.llm;
+  }
+
+  private getFallbackLlm(): ChatGroq {
+    if (!this.fallbackLlm) {
+      const apiKey = process.env.GROQ_API_KEY;
+      if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+      this.fallbackLlm = new ChatGroq({
+        apiKey,
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.1,
+        timeout: 20000,
+        maxTokens: 1024,
+        callbacks: [getTokenTrackerCallback('JD Matching (Groq Fallback)')],
+      });
+    }
+    return this.fallbackLlm;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -468,7 +489,20 @@ RULES:
 7. For leadership roles, set leadershipRequired=true and include dominance/influence traits`;
 
     try {
-      const response = await this.getLlm().invoke([new SystemMessage(prompt), new HumanMessage('Parse the job description above.')]);
+      const response = await invokeWithFallback({
+        logger: this.logger,
+        context: 'JD parsing',
+        invokePrimary: () =>
+          this.getLlm().invoke([
+            new SystemMessage(prompt),
+            new HumanMessage('Parse the job description above.'),
+          ]),
+        invokeFallback: () =>
+          this.getFallbackLlm().invoke([
+            new SystemMessage(prompt),
+            new HumanMessage('Parse the job description above.'),
+          ]),
+      });
       const jsonStr = response.content.toString().trim();
       const cleanJson = jsonStr.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
       const parsed = JSON.parse(cleanJson) as JDRequirements;
@@ -1408,7 +1442,12 @@ Output ONLY a JSON array:
 [{"rank": 1, "insight": "...", "recommendation": "..."}, ...]`;
 
     try {
-      const response = await this.getLlm().invoke([new SystemMessage(prompt)]);
+      const response = await invokeWithFallback({
+        logger: this.logger,
+        context: 'JD insight generation',
+        invokePrimary: () => this.getLlm().invoke([new SystemMessage(prompt)]),
+        invokeFallback: () => this.getFallbackLlm().invoke([new SystemMessage(prompt)]),
+      });
       const jsonStr = response.content.toString().trim();
       const cleanJson = jsonStr.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
       const insights = JSON.parse(cleanJson) as { rank: number; insight: string; recommendation: string }[];

@@ -2,7 +2,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ChatGroq } from '@langchain/groq';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
+import { getTokenTrackerCallback } from './utils/token-tracker';
+import { invokeWithFallback } from './utils/llm-fallback';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
@@ -52,7 +55,8 @@ interface UserMemory {
 @Injectable()
 export class OriIntelligenceService {
     private readonly logger = new Logger('BI-Intelligence');
-    private llm: ChatGroq | null = null;
+    private llm: ChatGoogleGenerativeAI | null = null;
+    private groqFallbackLlm: ChatGroq | null = null;
     private userMemories: Map<number, UserMemory> = new Map();
 
     // Career roles mapped to personality types
@@ -129,18 +133,34 @@ export class OriIntelligenceService {
         this.logger.log('🧠 BI Intelligence Service activated');
     }
 
-    private getLlm(): ChatGroq {
+    private getLlm(): ChatGoogleGenerativeAI {
         if (!this.llm) {
-            const apiKey = process.env.GROQ_API_KEY;
-            if (!apiKey) throw new Error('GROQ_API_KEY not set');
-            this.llm = new ChatGroq({
+            const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+            if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+            this.llm = new ChatGoogleGenerativeAI({
                 apiKey,
-                model: 'llama-3.3-70b-versatile',
+                model: 'gemini-2.5-flash',
                 temperature: 0.6, // Balanced: creative yet focused responses
-                maxTokens: 4096, // Allow comprehensive answers
+                maxOutputTokens: 2048, // Lower cap to reduce token consumption
+                callbacks: [getTokenTrackerCallback('KnowledgeAI (OriIntelligence)')],
             });
         }
         return this.llm;
+    }
+
+    private getGroqFallbackLlm(): ChatGroq {
+        if (!this.groqFallbackLlm) {
+            const apiKey = process.env.GROQ_API_KEY;
+            if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+            this.groqFallbackLlm = new ChatGroq({
+                apiKey,
+                model: 'llama-3.3-70b-versatile',
+                temperature: 0.6,
+                maxTokens: 2048,
+                callbacks: [getTokenTrackerCallback('KnowledgeAI (Groq Fallback)')],
+            });
+        }
+        return this.groqFallbackLlm;
     }
 
     /**
@@ -412,7 +432,12 @@ Keep response under 200 words. Be specific and actionable. Do not use excessive 
 `;
 
         try {
-            const response = await this.getLlm().invoke([new SystemMessage(prompt)]);
+            const response = await invokeWithFallback({
+                logger: this.logger,
+                context: 'OriIntelligence canTryJob',
+                invokePrimary: () => this.getLlm().invoke([new SystemMessage(prompt)]),
+                invokeFallback: () => this.getGroqFallbackLlm().invoke([new SystemMessage(prompt)]),
+            });
             return {
                 eligible: true, // Always encouraging
                 score: 65,
@@ -433,7 +458,8 @@ Keep response under 200 words. Be specific and actionable. Do not use excessive 
     async answerAnyQuestion(
         question: string,
         profile: UserProfile | null,
-        conversationContext: string
+        conversationContext: string,
+        userRole: string = 'STUDENT'
     ): Promise<string> {
         const userName = profile?.name || 'there';
         const personality = profile?.personalityStyle || 'not yet assessed';
@@ -480,6 +506,32 @@ RESPONSE STANDARDS
 8. **No filler**: Skip pleasantries, skip unnecessary disclaimers, skip "Here's what I found" openers.
 9. **Crisp answers**: For simple questions, give short answers. For complex questions, give structured detailed answers. Match response length to question complexity.
 10. **No looping**: Never repeat the same information. Make every sentence count.
+
+═══════════════════════════════════════════════════
+═══════════════════════════════════════════════════
+\${['STUDENT', 'INDIVIDUAL', 'COUNSELLOR', 'COUNSELOR'].includes((userRole || '').toUpperCase()) ? \`**INDIVIDUAL/STUDENT/COUNSELLOR MODE** (CRITICAL — follow strictly):
+- STRICT RULE: Answer EXACTLY what the user asked. DO NOT add extra advice, suggestions, or "Next Steps" unless explicitly requested.
+- If it's a small/simple question, answer in 1-2 sentences maximum. No fluff.
+- Use SIMPLE language that is easy to understand.
+- NEVER mention: LPA, salary packages, company names (TCS, Infosys, etc.), market rates, placement stats, industry comparisons.
+- NEVER mention other companies, organizations, or corporate data.
+- NEVER give "overall reports" about other people, batches, or organizations unless specifically asked.
+- Focus ONLY on: the individual's own profile, their skills, strengths, and career direction.
+- Tone: Direct, friendly mentor. Keep it concise and necessary.
+- If the individual asks about "report" or "my report", provide ONLY their personal assessment report data.
+\` : userRole === 'CORPORATE' ? \`**CORPORATE MODE** (ADVANCED):
+- Transform the raw data into highly advanced, strategic talent intelligence intended for C-suite and HR leaders.
+- Provide detailed, executive-level responses with data and analytics.
+- Include metrics, percentages, comparative analysis, and trend insights.
+- Use tables when presenting structured data (candidates, scores, etc.).
+- Add strategic insights: talent pool health, skill gaps, hiring recommendations, retention risks.
+- Cross-reference behavioral data with performance metrics when available.
+- Tone: Expert HR Intelligence Analyst — confident, analytical, and highly professional.
+- Suggest data-driven next actions based on the insights.
+\` : \`**ADMIN MODE**:
+- Provide complete system-level data with full context.
+- Include all available metrics and administrative details.
+\`}
 
 ═══════════════════════════════════════════════════
 BLOCKED CONTENT — NEVER INCLUDE
@@ -532,39 +584,23 @@ CRITICAL: ZERO TOLERANCE ON PLATFORM DATA FROM GENERAL KNOWLEDGE
 Answer the user's question now:`;
 
         try {
-            const response = await this.getLlm().invoke([
-                new SystemMessage(systemPrompt),
-                new HumanMessage(question)
-            ]);
+            const response = await invokeWithFallback({
+                logger: this.logger,
+                context: 'OriIntelligence answerAnyQuestion',
+                invokePrimary: () =>
+                    this.getLlm().invoke([
+                        new SystemMessage(systemPrompt),
+                        new HumanMessage(question),
+                    ]),
+                invokeFallback: () =>
+                    this.getGroqFallbackLlm().invoke([
+                        new SystemMessage(systemPrompt),
+                        new HumanMessage(question),
+                    ]),
+            });
             return response.content.toString();
         } catch (error) {
-            this.logger.warn(`Groq LLM error: ${error.message} — trying Gemini fallback...`);
-
-            // ── Gemini fallback ──
-            try {
-                const googleApiKey = process.env.GOOGLE_API_KEY;
-                if (googleApiKey) {
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${googleApiKey}`;
-                    const resp = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Referer': 'https://originbi.com' },
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: `system: ${systemPrompt}\n\nuser: ${question}` }] }],
-                            generationConfig: { temperature: 0.6, maxOutputTokens: 4096 },
-                        }),
-                    });
-                    if (resp.ok) {
-                        const data = await resp.json();
-                        const geminiAnswer = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-                        if (geminiAnswer) {
-                            this.logger.log('✅ Gemini fallback succeeded');
-                            return geminiAnswer;
-                        }
-                    }
-                }
-            } catch (geminiErr) {
-                this.logger.warn(`Gemini fallback also failed: ${geminiErr.message}`);
-            }
+            this.logger.warn(`LLM request failed in answerAnyQuestion: ${error.message}`);
 
             return `I'm experiencing high demand at the moment. Please try again in a minute — I'll be ready to help with your question then.`;
         }
@@ -836,39 +872,23 @@ ${conversationContext || `This is your first interaction with ${name.split(' ')[
 Now respond with the depth, warmth, accuracy, and brilliance of the world's best career counsellor. Remember: anchor every career recommendation to this student's actual assessed personality and matched roles.`;
 
         try {
-            const response = await this.getLlm().invoke([
-                new SystemMessage(counsellorPrompt),
-                new HumanMessage(question),
-            ]);
+            const response = await invokeWithFallback({
+                logger: this.logger,
+                context: 'OriIntelligence counsellor',
+                invokePrimary: () =>
+                    this.getLlm().invoke([
+                        new SystemMessage(counsellorPrompt),
+                        new HumanMessage(question),
+                    ]),
+                invokeFallback: () =>
+                    this.getGroqFallbackLlm().invoke([
+                        new SystemMessage(counsellorPrompt),
+                        new HumanMessage(question),
+                    ]),
+            });
             return response.content.toString();
         } catch (error) {
-            this.logger.warn(`Groq LLM error in counsellor mode: ${error.message} — trying Gemini fallback...`);
-
-            // Gemini fallback
-            try {
-                const googleApiKey = process.env.GOOGLE_API_KEY;
-                if (googleApiKey) {
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${googleApiKey}`;
-                    const resp = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Referer': 'https://originbi.com' },
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: `system: ${counsellorPrompt}\n\nuser: ${question}` }] }],
-                            generationConfig: { temperature: 0.65, maxOutputTokens: 4096 },
-                        }),
-                    });
-                    if (resp.ok) {
-                        const data = await resp.json();
-                        const geminiAnswer = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-                        if (geminiAnswer) {
-                            this.logger.log('AI Counsellor: Gemini fallback succeeded');
-                            return geminiAnswer;
-                        }
-                    }
-                }
-            } catch (geminiErr) {
-                this.logger.warn(`Gemini fallback also failed: ${geminiErr.message}`);
-            }
+            this.logger.warn(`LLM request failed in counsellor mode: ${error.message}`);
 
             return `I'm experiencing a momentary pause, ${name.split(' ')[0]}. Please try asking again in a moment — I'm here to help you navigate your career path.`;
         }

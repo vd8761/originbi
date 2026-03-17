@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-base-to-string, @typescript-eslint/no-unused-vars */
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { getTokenTrackerCallback } from './utils/token-tracker';
 import { ChatGroq } from '@langchain/groq';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { EmbeddingsService } from './embeddings.service';
 import { FutureRoleReportService } from './future-role-report.service';
@@ -20,6 +22,7 @@ import { AuditLoggerService } from './audit';
 import { UserContext } from '../common/interfaces/user-context.interface';
 
 import { BI_PERSONA, getRandomResponse, getSignOff } from './ori-persona';
+import { invokeWithFallback } from './utils/llm-fallback';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -173,7 +176,8 @@ const AGILE_LEVELS = {
 @Injectable()
 export class RagService {
   private readonly logger = new Logger('BI');
-  private llm: ChatGroq | null = null;
+  private llm: ChatGoogleGenerativeAI | null = null;
+  private fallbackLlm: ChatGroq | null = null;
   private reportsDir: string;
 
   // Simple cache for query understanding to improve performance
@@ -308,18 +312,35 @@ export class RagService {
     return msg;
   }
 
-  private getLlm(): ChatGroq {
+  private getLlm(): ChatGoogleGenerativeAI {
     if (!this.llm) {
-      const apiKey = process.env.GROQ_API_KEY;
-      if (!apiKey) throw new Error('GROQ_API_KEY not set');
-      this.llm = new ChatGroq({
+      const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+      this.llm = new ChatGoogleGenerativeAI({
         apiKey,
-        model: 'llama-3.3-70b-versatile',
+        model: 'gemini-2.5-flash',
         temperature: 0,
-        timeout: 15000, // 15 second timeout for LLM calls
+        maxOutputTokens: 600,
+        callbacks: [getTokenTrackerCallback('RAG Service')],
       });
     }
     return this.llm;
+  }
+
+  private getFallbackLlm(): ChatGroq {
+    if (!this.fallbackLlm) {
+      const apiKey = process.env.GROQ_API_KEY;
+      if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+      this.fallbackLlm = new ChatGroq({
+        apiKey,
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0,
+        timeout: 15000,
+        maxTokens: 600,
+        callbacks: [getTokenTrackerCallback('RAG Service (Groq Fallback)')],
+      });
+    }
+    return this.fallbackLlm;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -674,18 +695,23 @@ export class RagService {
       // SEMANTIC CACHE — Check if a similar question was answered recently
       // ═══════════════════════════════════════════════════════════════
       const userRole = (user?.role || 'STUDENT').toUpperCase();
-      try {
-        const cached = await this.ragCache.lookup(question, userRole);
-        if (cached) {
-          this.logger.log(`⚡ Cache HIT — returning cached response (similarity ≥ 0.92)`);
-          return {
-            answer: cached.answer,
-            searchType: cached.searchType || 'cached',
-            confidence: cached.confidence || 0.95,
-          };
+      const bypassResponseCache = this.shouldBypassResponseCache(question);
+      if (bypassResponseCache) {
+        this.logger.debug(`⏭️ Cache bypass for dynamic/personal query: "${question.slice(0, 60)}"`);
+      } else {
+        try {
+          const cached = await this.ragCache.lookup(question, userRole);
+          if (cached) {
+            this.logger.log(`⚡ Cache HIT — returning cached response (similarity ≥ 0.92)`);
+            return {
+              answer: cached.answer,
+              searchType: cached.searchType || 'cached',
+              confidence: cached.confidence || 0.95,
+            };
+          }
+        } catch (cacheErr) {
+          this.logger.warn(`Cache lookup failed (non-blocking): ${cacheErr}`);
         }
-      } catch (cacheErr) {
-        this.logger.warn(`Cache lookup failed (non-blocking): ${cacheErr}`);
       }
 
       // ═══════════════════════════════════════════════════════════════
@@ -791,24 +817,31 @@ export class RagService {
         if (agentResult && agentResult.confidence > 0.3) {
           this.logger.log(`✅ Agentic RAG succeeded: tools=[${agentResult.toolsUsed.join('+')}] confidence=${agentResult.confidence} plan=${agentResult.planningTimeMs}ms exec=${agentResult.executionTimeMs}ms`);
 
-          // Track entities from the agent response in conversation context
+          // Track intent/entities from the agent response for stronger follow-up memory.
+          const primaryIntent = agentResult.toolsUsed?.find(t => t !== 'conversation_context') || agentResult.searchType;
+          const entityName = this.extractName(resolvedQuestion) || this.extractName(question) || '';
           this.conversationService.addUserMessage(
-            sessionId, question, `agent:${agentResult.toolsUsed.join('+')}`, [],
+            sessionId,
+            question,
+            primaryIntent,
+            entityName ? [entityName] : [],
           );
           this.conversationService.addBiResponse(
             sessionId, agentResult.answer.slice(0, 500), agentResult.searchType,
           );
 
           // Cache the result
-          try {
-            await this.ragCache.store(
-              question,
-              agentResult.answer,
-              agentResult.searchType,
-              agentResult.confidence,
-              userRole,
-            );
-          } catch { /* non-blocking */ }
+          if (!this.shouldBypassResponseCache(question)) {
+            try {
+              await this.ragCache.store(
+                question,
+                agentResult.answer,
+                agentResult.searchType,
+                agentResult.confidence,
+                userRole,
+              );
+            } catch { /* non-blocking */ }
+          }
 
           return {
             answer: agentResult.answer,
@@ -992,7 +1025,7 @@ export class RagService {
         if (careerRagChunks.length > 0) {
           this.logger.log(`📚 Career guidance enriched with ${careerRagChunks.length} semantic chunks`);
           const ragCtx = `\n\n— RELEVANT KNOWLEDGE BASE —\n${careerRagChunks.map((d: any, i: number) => `[${i + 1}] ${d.content}`).join('\n---\n')}`;
-          const answer = await this.oriIntelligence.answerAnyQuestion(resolvedQuestion, userProfile, ragCtx);
+          const answer = await this.oriIntelligence.answerAnyQuestion(resolvedQuestion, userProfile, ragCtx, userRole);
           return { answer, searchType: 'career_guidance_semantic', confidence: 0.95 };
         }
         const answer = await this.oriIntelligence.generateCareerGuidance(question, userProfile);
@@ -1009,7 +1042,7 @@ export class RagService {
           return { answer: personalAnswer, searchType: 'personal_info', confidence: 0.98 };
         }
         // Fallback to LLM if no structured answer available
-        const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, conversationHistory);
+        const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, conversationHistory, userRole);
         return { answer, searchType: 'personal_info', confidence: 0.9 };
       }
 
@@ -1144,8 +1177,10 @@ export class RagService {
             resolvedQuestion, user as UserContext, conversationHistory,
           );
           if (tsResult.confidence > 0.3) {
-            // Store in semantic cache (fire-and-forget)
-            this.ragCache.store(resolvedQuestion, tsResult.answer, tsResult.searchType, tsResult.confidence, userRole).catch(() => {});
+            // Store in semantic cache (fire-and-forget) unless query is dynamic/personal
+            if (!this.shouldBypassResponseCache(resolvedQuestion)) {
+              this.ragCache.store(resolvedQuestion, tsResult.answer, tsResult.searchType, tsResult.confidence, userRole).catch(() => {});
+            }
             return {
               answer: tsResult.answer,
               searchType: tsResult.searchType,
@@ -1318,7 +1353,7 @@ export class RagService {
         if (genKnowledgeChunks.length > 0) {
           this.logger.log(`📚 General knowledge enriched with ${genKnowledgeChunks.length} semantic chunks`);
         }
-        const answer = await this.oriIntelligence.answerAnyQuestion(resolvedQuestion, userProfile, genRagContext);
+        const answer = await this.oriIntelligence.answerAnyQuestion(resolvedQuestion, userProfile, genRagContext, userRole);
         return {
           answer,
           searchType: genKnowledgeChunks.length > 0 ? 'semantic_enriched' : 'intelligent_response',
@@ -1477,7 +1512,7 @@ export class RagService {
           };
         }
         const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
-        const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, conversationHistory);
+        const answer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, conversationHistory, userRole);
         return {
           answer,
           searchType: 'intelligent_response',
@@ -1533,7 +1568,7 @@ export class RagService {
           const userId = user?.id || 0;
           const userEmail = user?.email || '';
           const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
-          const llmAnswer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, '');
+          const llmAnswer = await this.oriIntelligence.answerAnyQuestion(question, userProfile, '', (user?.role || 'STUDENT').toUpperCase());
           if (llmAnswer && !llmAnswer.includes('experiencing high demand')) {
             return {
               answer: llmAnswer,
@@ -3304,7 +3339,12 @@ JSON:`;
 
     try {
       const startTime = Date.now();
-      const response = await this.getLlm().invoke([new SystemMessage(prompt)]);
+      const response = await invokeWithFallback({
+        logger: this.logger,
+        context: 'RAG query understanding',
+        invokePrimary: () => this.getLlm().invoke([new SystemMessage(prompt)]),
+        invokeFallback: () => this.getFallbackLlm().invoke([new SystemMessage(prompt)]),
+      });
       const elapsed = Date.now() - startTime;
       this.logger.log(`🤖 LLM query understanding took ${elapsed}ms`);
 
@@ -3329,67 +3369,34 @@ JSON:`;
       if (this.queryCache.size > 200) this.cleanCache();
       return result;
     } catch (error) {
-      this.logger.warn(`Query interpretation failed: ${error.message}, trying Gemini fallback...`);
-
-      // ── Gemini fallback for query understanding ──
-      try {
-        const googleApiKey = process.env.GOOGLE_API_KEY;
-        if (googleApiKey) {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${googleApiKey}`;
-          const resp = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Referer': 'https://originbi.com' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0, maxOutputTokens: 200 },
-            }),
-          });
-          if (resp.ok) {
-            const data = await resp.json();
-            const geminiText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-            if (geminiText) {
-              const cleanJson = geminiText.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
-              const parsed = JSON.parse(cleanJson);
-              let result = {
-                intent: parsed.intent || 'general_knowledge',
-                searchTerm: parsed.searchTerm || null,
-                table: parsed.table || 'none',
-                includePersonality: parsed.includePersonality || false,
-              };
-              result = this.applyDomainOverrides(question, result);
-              this.logger.log('✅ Gemini query understanding fallback succeeded');
-              this.queryCache.set(cacheKey, { result, timestamp: Date.now() });
-              return result;
-            }
-          }
-        }
-      } catch (geminiErr) {
-        this.logger.warn(`Gemini fallback also failed: ${geminiErr.message}`);
-      }
-
-      this.logger.warn('Using keyword-based fallback interpretation');
-      return this.fallbackInterpretation(question);
+      this.logger.warn(`Query interpretation failed: ${error.message}`);
+      const fallback = this.fastLocalMatch(question) || {
+        intent: 'general_knowledge',
+        searchTerm: null,
+        table: 'none',
+        includePersonality: false,
+      };
+      return this.applyDomainOverrides(question, fallback);
     }
   }
 
-  /**
-   * Post-classification safety net: overrides obviously wrong LLM intent classification
-   * based on domain-specific keyword presence in the original query.
-   */
   private applyDomainOverrides(
     question: string,
-    result: { intent: string; searchTerm: string | null; table: string; includePersonality: boolean },
-  ): { intent: string; searchTerm: string | null; table: string; includePersonality: boolean } {
+    result: {
+      intent: string;
+      searchTerm: string | null;
+      table: string;
+      includePersonality: boolean;
+    },
+  ): {
+    intent: string;
+    searchTerm: string | null;
+    table: string;
+    includePersonality: boolean;
+  } {
     const q = question.toLowerCase();
-    const affiliateKeywords = /\b(affiliate|referral|commission|settlement|payout)\b/;
-    const nonAffiliateIntents = ['list_users', 'list_candidates', 'general_knowledge', 'person_lookup'];
 
-    // If query has affiliate keywords but LLM returned a non-affiliate intent → correct it
-    if (affiliateKeywords.test(q) && nonAffiliateIntents.includes(result.intent)) {
-      this.logger.warn(
-        `🔄 Domain override: LLM returned "${result.intent}" for affiliate query, correcting...`,
-      );
-
+    if (result.intent.startsWith('affiliate_') || /\baffiliate|referral|commission|settlement|payout\b/.test(q)) {
       // Determine the best affiliate sub-intent
       if (/\bstudents?\b/.test(q)) {
         return { ...result, intent: 'affiliate_students', table: 'affiliate_referral_transactions' };
@@ -4424,6 +4431,20 @@ JSON:`;
         this.queryCache.delete(key);
       }
     }
+  }
+
+  private shouldBypassResponseCache(question: string): boolean {
+    const q = (question || '').toLowerCase().trim();
+    if (!q) return true;
+    if (q.length <= 3) return true;
+    if (q.includes('@')) return true;
+
+    // Personal/self and person-specific report queries should not be cached,
+    // because they are identity/context-sensitive and stale cache causes wrong answers.
+    if (/\bwhat is my name\b|\bwho am i\b|\bmy email\b|\bmy profile\b|\bmy account\b/.test(q)) return true;
+    if (/\breport\b|\bprofile\b|\bdetails\b|\bresults\b/.test(q) && /\b(my|for|about)\b|^[a-z][a-z\s.'-]{1,40}\s+report\b/.test(q)) return true;
+
+    return false;
   }
 
   /**

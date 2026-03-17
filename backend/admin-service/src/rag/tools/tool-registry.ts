@@ -61,6 +61,19 @@ export interface ToolCall {
  */
 export const TOOL_DEFINITIONS = [
   {
+    name: 'personal_info',
+    description: `Answer personal questions about the currently logged-in user (e.g., "what is my name", "what is my email", "what is my profile"). Use this when the user asks about THEMSELVES directly using first-person pronouns (I, me, my).`,
+    whenToUse: [
+      'User asks "what is my name", "who am I"',
+      'User asks "what is my email", "show my account"',
+      'User asks "tell me about myself", "what is my profile"',
+      'User asks "what is my personality", "what is my style"',
+    ],
+    params: {
+      question: 'The question about the user',
+    },
+  },
+  {
     name: 'text_to_sql',
     description: `Query the OriginBI database using natural language → SQL translation. Use this for ANY question that needs data from the database: counts, lists, aggregations, comparisons, filtering, statistics, trends, or specific records. This is the most powerful and flexible data tool.`,
     whenToUse: [
