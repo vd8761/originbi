@@ -572,7 +572,6 @@ export async function buildSchoolReportJSON(data: SchoolData) {
   try {
     if (data.school_level_id === 1) {
       // SSLC → recommended stream
-      const whereYouFitBest = computeWhereYouFitBest(data);
       // For SSLC, pass undefined as schoolStreamId to get all streams
       courseCompatibility = await getCompatibilityMatrixDetails(dominantTrait, undefined);
     } else {
@@ -734,6 +733,7 @@ export async function buildSchoolReportJSON(data: SchoolData) {
       workReadiness: buildWorkReadiness(data),
 
       // ── Blended Style / Academic Career Goals ──
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
       academicCareerGoals: blendedContent
         ? {
             styleName: blendedContent.style_name,
@@ -744,6 +744,7 @@ export async function buildSchoolReportJSON(data: SchoolData) {
             traitMapping: blendedContent.trait_mapping1,
           }
         : null,
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 
       // ── Level-specific sections ──
       ...(data.school_level_id === 1
