@@ -295,7 +295,7 @@ function buildCorePersonality(patterns: ProfilePatterns, textVariant: number) {
 
 // ─── Helper: Career Fit ──────────────────────────────────────────────────────
 
-function buildCareerFit(data: SchoolData, patterns: ProfilePatterns) {
+function buildCareerFit(data: SchoolData) {
   const norm = (v: number) => Math.min(100, Math.round((v / 25) * 100));
   const agile = data.agile_scores?.[0];
   const nFocus = norm(agile?.focus ?? 0);
@@ -485,15 +485,26 @@ function buildSkillHeatmap(patterns: ProfilePatterns) {
 // ─── Helper: Stream Selection Content ────────────────────────────────────────
 
 function buildStreamSelectionContent() {
-  const streams: any[] = [];
+  const streams: Array<{
+    shortName: string;
+    title: string;
+    vibe: string;
+    fields: Array<{
+      name: string;
+      vibe: string;
+      mappedDegrees: string[];
+    }>;
+  }> = [];
   for (const [, streamShortName] of Object.entries(STREAM_NAMES)) {
-    const content = STREAM_SELECTION_CONTENT[streamShortName];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const content = STREAM_SELECTION_CONTENT[streamShortName as keyof typeof STREAM_SELECTION_CONTENT] as any;
     if (!content) continue;
     streams.push({
       shortName: content.shortName,
       title: content.title,
       vibe: content.vibe,
-      fields: content.fields.map((f) => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call
+      fields: (content.fields as any[]).map((f: any) => ({
         name: f.name,
         vibe: f.vibe,
         mappedDegrees: f.mappedDegrees,
@@ -562,7 +573,6 @@ export async function buildSchoolReportJSON(data: SchoolData) {
     if (data.school_level_id === 1) {
       // SSLC → recommended stream
       const whereYouFitBest = computeWhereYouFitBest(data);
-      const recommendedStreamKey = whereYouFitBest?.recommendedStream.shortName;
       // For SSLC, pass undefined as schoolStreamId to get all streams
       courseCompatibility = await getCompatibilityMatrixDetails(dominantTrait, undefined);
     } else {
@@ -713,7 +723,7 @@ export async function buildSchoolReportJSON(data: SchoolData) {
 
       skillHeatmap: buildSkillHeatmap(patterns),
 
-      careerFit: buildCareerFit(data, patterns),
+      careerFit: buildCareerFit(data),
 
       careerDomainTable: buildCareerDomainTable(topTwo),
 
