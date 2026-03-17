@@ -96,7 +96,6 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 			fmt.Printf("[GetExamQuestions - Fallback] No questions found for Attempt %d (Level 2). Attempting self-healing generation...\n", attempt.ID)
 
 			// Extract necessary metadata from session
-			var setNumber int = 1 // Default
 			var studentBoard string = ""
 			var traitID *int64 = attempt.DominantTraitID
 			var traitSource string = "attempt.DominantTraitID"
@@ -136,18 +135,10 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 					}
 				}
 
-				// Extract board and set info
+				// Extract board info from session metadata
 				var meta map[string]interface{}
 				if session.Metadata != "" && session.Metadata != "{}" {
 					if err := json.Unmarshal([]byte(session.Metadata), &meta); err == nil {
-						if val, ok := meta["setNumber"]; ok {
-							if v, ok := val.(float64); ok {
-								setNumber = int(v)
-							} else if v, ok := val.(int); ok {
-								setNumber = v
-							}
-						}
-						// If board is in session meta (less likely but possible)
 						if val, ok := meta["studentBoard"]; ok {
 							if v, ok := val.(string); ok {
 								studentBoard = v
@@ -179,36 +170,15 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 					// 3. Clear existing generic answers for this attempt (just in case of dirty state)
 					db.Exec("DELETE FROM assessment_answers WHERE assessment_attempt_id = ?", attempt.ID)
 
-					// 4. Generate questions based on constraints
+					// 4. Generate questions based on constraints (matching admin-service logic: NO set_number for Level 2)
 					var program models.Program
 					db.First(&program, attempt.ProgramID)
 
 					var query string
 					var args []interface{}
 
-					if program.Code == "SCHOOL_STUDENT" {
-						query = `
-							INSERT INTO assessment_answers (
-								assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
-								main_question_id, question_source, status, question_sequence, created_at, updated_at
-							)
-							SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY (board = ?) DESC, (board IS NULL) DESC, RANDOM()), NOW(), NOW()
-							FROM assessment_questions 
-							WHERE assessment_level_id = ? 
-								AND personality_trait_id = ?
-								AND set_number = ?
-								AND is_active = true 
-								AND is_deleted = false
-							ORDER BY (board = ?) DESC, (board IS NULL) DESC, RANDOM()
-							LIMIT 25
-						`
-						args = []interface{}{
-							attempt.ID, attempt.AssessmentSessionID, attempt.UserID, attempt.RegistrationID, attempt.ProgramID, *attempt.AssessmentLevelID,
-							studentBoard,
-							*attempt.AssessmentLevelID, *traitID, setNumber,
-							studentBoard,
-						}
-					} else {
+					if program.Code == "SCHOOL_STUDENT" && studentBoard != "" {
+						// School program with board: prioritize board-matching questions
 						query = `
 							INSERT INTO assessment_answers (
 								assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
@@ -218,7 +188,7 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 							FROM assessment_questions 
 							WHERE assessment_level_id = ? 
 								AND personality_trait_id = ?
-								AND set_number = ?
+								AND board = ?
 								AND is_active = true 
 								AND is_deleted = false
 							ORDER BY RANDOM()
@@ -226,16 +196,62 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 						`
 						args = []interface{}{
 							attempt.ID, attempt.AssessmentSessionID, attempt.UserID, attempt.RegistrationID, attempt.ProgramID, *attempt.AssessmentLevelID,
-							*attempt.AssessmentLevelID, *traitID, setNumber,
+							*attempt.AssessmentLevelID, *traitID,
+							studentBoard,
+						}
+					} else {
+						// Non-school or no board: just trait + level
+						query = `
+							INSERT INTO assessment_answers (
+								assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
+								main_question_id, question_source, status, question_sequence, created_at, updated_at
+							)
+							SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
+							FROM assessment_questions 
+							WHERE assessment_level_id = ? 
+								AND personality_trait_id = ?
+								AND is_active = true 
+								AND is_deleted = false
+							ORDER BY RANDOM()
+							LIMIT 25
+						`
+						args = []interface{}{
+							attempt.ID, attempt.AssessmentSessionID, attempt.UserID, attempt.RegistrationID, attempt.ProgramID, *attempt.AssessmentLevelID,
+							*attempt.AssessmentLevelID, *traitID,
 						}
 					}
 
-					fmt.Printf("[GetExamQuestions - Fallback] Generating Level 2 Questions for Attempt %d (Program: %s). Trait=%d, Board=%s, Set=%d\n", attempt.ID, program.Code, *traitID, studentBoard, setNumber)
+					fmt.Printf("[GetExamQuestions - Fallback] Generating Level 2 Questions for Attempt %d (Program: %s). Trait=%d, Board=%s\n", attempt.ID, program.Code, *traitID, studentBoard)
 					genResult := db.Exec(query, args...)
+
+					// Fallback: If school board-specific query returned 0, retry without board filter
+					if genResult.Error == nil && genResult.RowsAffected == 0 && program.Code == "SCHOOL_STUDENT" && studentBoard != "" {
+						fmt.Printf("[GetExamQuestions - Fallback] Board-specific query returned 0 rows. Retrying without board filter...\n")
+						query = `
+							INSERT INTO assessment_answers (
+								assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
+								main_question_id, question_source, status, question_sequence, created_at, updated_at
+							)
+							SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
+							FROM assessment_questions 
+							WHERE assessment_level_id = ? 
+								AND personality_trait_id = ?
+								AND is_active = true 
+								AND is_deleted = false
+							ORDER BY RANDOM()
+							LIMIT 25
+						`
+						args = []interface{}{
+							attempt.ID, attempt.AssessmentSessionID, attempt.UserID, attempt.RegistrationID, attempt.ProgramID, *attempt.AssessmentLevelID,
+							*attempt.AssessmentLevelID, *traitID,
+						}
+						genResult = db.Exec(query, args...)
+					}
+
 					if genResult.Error != nil {
 						fmt.Printf("[GetExamQuestions - Fallback ERROR] INSERT failed for Attempt %d: %v\n", attempt.ID, genResult.Error)
 					} else if genResult.RowsAffected == 0 {
-						fmt.Printf("[GetExamQuestions - Fallback WARNING] INSERT produced 0 rows for Attempt %d. No matching questions in assessment_questions for LevelID=%d, TraitID=%d, Set=%d, Board=%s\n", attempt.ID, *attempt.AssessmentLevelID, *traitID, setNumber, studentBoard)
+						fmt.Printf("[GetExamQuestions - Fallback WARNING] INSERT produced 0 rows for Attempt %d. No matching questions in assessment_questions for LevelID=%d, TraitID=%d\n", attempt.ID, *attempt.AssessmentLevelID, *traitID)
 					} else {
 						fmt.Printf("[GetExamQuestions - Fallback SUCCESS] Generated %d questions for Attempt %d\n", genResult.RowsAffected, attempt.ID)
 					}
@@ -635,23 +651,14 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 
 					// Generate Questions for Next Level (Trait Based for Level 2)
 					if nextLevel.LevelNumber == 2 && traitID != nil {
-						// 1. Fetch Session Metadata for constraints (Board, Set)
+						// 1. Fetch Session/Registration Metadata for board info
 						var session models.AssessmentSession
-						var setNumber int = 1 // Default
 						var studentBoard string = ""
 
 						if err := tx.First(&session, nextAttempt.AssessmentSessionID).Error; err == nil {
 							var meta map[string]interface{}
 							if session.Metadata != "" && session.Metadata != "{}" {
 								if err := json.Unmarshal([]byte(session.Metadata), &meta); err == nil {
-									if val, ok := meta["setNumber"]; ok {
-										// JSON numbers are often float64
-										if v, ok := val.(float64); ok {
-											setNumber = int(v)
-										} else if v, ok := val.(int); ok {
-											setNumber = v
-										}
-									}
 									if val, ok := meta["studentBoard"]; ok {
 										if v, ok := val.(string); ok {
 											studentBoard = v
@@ -681,36 +688,15 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 						// 2. Clear existing generic questions (if any)
 						tx.Exec("DELETE FROM assessment_answers WHERE assessment_attempt_id = ?", nextAttempt.ID)
 
-						// 3. Insert new questions based on Trait + Constraints
+						// 3. Insert new questions based on Trait (NO set_number for Level 2, matching admin-service)
 						var program models.Program
 						tx.First(&program, nextAttempt.ProgramID)
 
 						var query string
 						var args []interface{}
 
-						if program.Code == "SCHOOL_STUDENT" {
-							query = `
-								INSERT INTO assessment_answers (
-									assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
-									main_question_id, question_source, status, question_sequence, created_at, updated_at
-								)
-								SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY (board = ?) DESC, (board IS NULL) DESC, RANDOM()), NOW(), NOW()
-								FROM assessment_questions 
-								WHERE assessment_level_id = ? 
-								  AND personality_trait_id = ?
-								  AND set_number = ?
-								  AND is_active = true 
-								  AND is_deleted = false
-								ORDER BY (board = ?) DESC, (board IS NULL) DESC, RANDOM()
-								LIMIT 25
-							`
-							args = []interface{}{
-								nextAttempt.ID, nextAttempt.AssessmentSessionID, nextAttempt.UserID, nextAttempt.RegistrationID, nextAttempt.ProgramID, nextLevel.ID,
-								studentBoard,
-								nextLevel.ID, *traitID, setNumber,
-								studentBoard,
-							}
-						} else {
+						if program.Code == "SCHOOL_STUDENT" && studentBoard != "" {
+							// School program with board filter
 							query = `
 								INSERT INTO assessment_answers (
 									assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
@@ -720,7 +706,7 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 								FROM assessment_questions 
 								WHERE assessment_level_id = ? 
 								  AND personality_trait_id = ?
-								  AND set_number = ?
+								  AND board = ?
 								  AND is_active = true 
 								  AND is_deleted = false
 								ORDER BY RANDOM()
@@ -728,11 +714,63 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 							`
 							args = []interface{}{
 								nextAttempt.ID, nextAttempt.AssessmentSessionID, nextAttempt.UserID, nextAttempt.RegistrationID, nextAttempt.ProgramID, nextLevel.ID,
-								nextLevel.ID, *traitID, setNumber,
+								nextLevel.ID, *traitID,
+								studentBoard,
+							}
+						} else {
+							// Non-school or no board: just trait + level
+							query = `
+								INSERT INTO assessment_answers (
+									assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
+									main_question_id, question_source, status, question_sequence, created_at, updated_at
+								)
+								SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
+								FROM assessment_questions 
+								WHERE assessment_level_id = ? 
+								  AND personality_trait_id = ?
+								  AND is_active = true 
+								  AND is_deleted = false
+								ORDER BY RANDOM()
+								LIMIT 25
+							`
+							args = []interface{}{
+								nextAttempt.ID, nextAttempt.AssessmentSessionID, nextAttempt.UserID, nextAttempt.RegistrationID, nextAttempt.ProgramID, nextLevel.ID,
+								nextLevel.ID, *traitID,
 							}
 						}
 
-						tx.Exec(query, args...)
+						fmt.Printf("[SubmitAnswer] Generating Level 2 Questions for Next Attempt %d (Program: %s). Trait=%d, Board=%s\n", nextAttempt.ID, program.Code, *traitID, studentBoard)
+						genResult := tx.Exec(query, args...)
+
+						// Fallback: If school board-specific query returned 0, retry without board filter
+						if genResult.Error == nil && genResult.RowsAffected == 0 && program.Code == "SCHOOL_STUDENT" && studentBoard != "" {
+							fmt.Printf("[SubmitAnswer] Board-specific query returned 0 rows. Retrying without board filter...\n")
+							query = `
+								INSERT INTO assessment_answers (
+									assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
+									main_question_id, question_source, status, question_sequence, created_at, updated_at
+								)
+								SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
+								FROM assessment_questions 
+								WHERE assessment_level_id = ? 
+								  AND personality_trait_id = ?
+								  AND is_active = true 
+								  AND is_deleted = false
+								ORDER BY RANDOM()
+								LIMIT 25
+							`
+							args = []interface{}{
+								nextAttempt.ID, nextAttempt.AssessmentSessionID, nextAttempt.UserID, nextAttempt.RegistrationID, nextAttempt.ProgramID, nextLevel.ID,
+								nextLevel.ID, *traitID,
+							}
+							genResult = tx.Exec(query, args...)
+						}
+
+						if genResult.Error != nil {
+							fmt.Printf("[SubmitAnswer] Level 2 Generation ERROR for Attempt %d: %v\n", nextAttempt.ID, genResult.Error)
+						} else {
+							fmt.Printf("[SubmitAnswer] Level 2 Generation: %d questions generated for Attempt %d\n", genResult.RowsAffected, nextAttempt.ID)
+						}
 					}
 				}
 			}
