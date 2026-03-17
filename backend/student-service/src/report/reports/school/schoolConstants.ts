@@ -21,6 +21,7 @@ export const SSLC_TOC_CONTENT = [
   'Mapping Your Strengths to Future Academic and Career Goals',
   'Career Alignment Index',
   'Career Flight Path',
+  'Where You Fit Best',
   'Future Pathways: Stream Selection',
   'Disclaimer',
 ];
@@ -2705,4 +2706,94 @@ export const STREAM_ODYSSEY_ROADMAP: Record<string, StreamOdysseyData> = {
       },
     ],
   },
+};
+
+// ─── WHERE YOU FIT BEST ──────────────────────────────────────────
+
+/** Maps each 2-letter DISC trait combination to a recommended academic stream. */
+export const TRAIT_STREAM: Record<string, string> = {
+  DI: 'Commerce',
+  ID: 'Commerce',
+  DC: 'PCM',
+  CD: 'PCM',
+  DS: 'PCMB',
+  SD: 'PCMB',
+  IC: 'Commerce',
+  CI: 'Commerce',
+  IS: 'Humanities',
+  SI: 'Humanities',
+  SC: 'PCB',
+  CS: 'PCBZ',
+};
+
+/** Reasons why each DISC trait maps to its stream — shown as pill badges. */
+export const TRAIT_REASONS: Record<string, string[]> = {
+  DI: ['Decision oriented', 'Persuasive', 'Business comfort', 'Leadership natural'],
+  ID: ['Influence driven', 'Initiative oriented', 'People-focused business mind'],
+  DC: ['Analytical', 'Technical', 'Precise problem solving'],
+  CD: ['Logic driven', 'Structured thinker', 'Technical precision'],
+  DS: ['Ambitious', 'Stable workload handling', 'Broad syllabus comfort'],
+  SD: ['Consistent learner', 'Handles broad syllabus', 'Stable under academic pressure'],
+  IC: ['Communication skills', 'Structured finance aptitude', 'Collaborative approach'],
+  CI: ['Organized', 'Business logic orientation', 'Disciplined and social'],
+  IS: ['Expressive', 'Social', 'Idea-driven'],
+  SI: ['Patient', 'Social understanding', 'Emotionally perceptive'],
+  SC: ['Patient', 'Careful', 'Detail oriented'],
+  CS: ['Biological precision', 'Discipline', 'Structured observation'],
+};
+
+/** Full agile compatibility matrix — each stream's agile dimension → compatibility %. */
+export const STREAM_AGILE_COMPATIBILITY: Record<string, Record<string, number>> = {
+  Commerce: {
+    Courage: 95,
+    Openness: 85,
+    Focus: 80,
+    Commitment: 75,
+    Respect: 70,
+  },
+  PCM: {
+    Focus: 95,
+    Commitment: 85,
+    Courage: 75,
+    Respect: 75,
+    Openness: 65,
+  },
+  PCB: {
+    Commitment: 95,
+    Focus: 85,
+    Respect: 85,
+    Courage: 75,
+    Openness: 65,
+  },
+  PCBZ: {
+    Respect: 95,
+    Commitment: 85,
+    Focus: 80,
+    Openness: 75,
+    Courage: 70,
+  },
+  PCMB: {
+    Commitment: 95,
+    Focus: 90,
+    Courage: 85,
+    Respect: 80,
+    Openness: 70,
+  },
+  Humanities: {
+    Openness: 95,
+    Respect: 85,
+    Commitment: 80,
+    Focus: 75,
+    Courage: 70,
+  },
+};
+
+/** Short future-direction text for each stream, used in the alternate streams section. */
+export const STREAM_FUTURE_DIRECTIONS: Record<string, string> = {
+  Commerce: 'Finance, Business, Economics, Management',
+  PCM: 'Engineering, Technology, Analytics',
+  PCB: 'Medicine, Research, Allied Health',
+  PCBZ: 'Biological Research, Zoology, Botany',
+  PCMB: 'Medicine, Engineering, Research',
+  Humanities: 'Law, Media, Social Sciences, Design',
 };
