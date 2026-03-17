@@ -19,6 +19,7 @@ import { AssessmentLevel } from '../entities/assessment_level.entity';
 import { AssessmentAnswer } from '../entities/assessment_answer.entity';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { Program } from '../entities/program.entity';
+import { SchoolStream } from '../entities/school-stream.entity';
 import {
   Registration,
   Gender,
@@ -73,8 +74,10 @@ export class StudentService {
     private readonly affiliateTransactionRepo: Repository<AffiliateReferralTransaction>,
     @InjectRepository(Notification)
     private readonly notificationRepo: Repository<Notification>,
+    @InjectRepository(SchoolStream)
+    private readonly schoolStreamRepo: Repository<SchoolStream>,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * Creates a configured nodemailer transporter backed by AWS SES v2.
@@ -544,8 +547,8 @@ export class StudentService {
           totalCount > 0
             ? totalCount
             : level?.levelNumber === 2 ||
-                level?.name.includes('ACI') ||
-                level?.patternType === 'ACI'
+              level?.name.includes('ACI') ||
+              level?.patternType === 'ACI'
               ? 25
               : 60,
         unlockTime: unlockTime,
@@ -758,7 +761,7 @@ export class StudentService {
       // 5. Create Registration (Force TS Check)
       const registration = this.sessionRepo.manager.create(Registration, {
         userId: user.id,
-        registrationSource: 'SELF',
+        registrationSource: dto.referral_code ? 'AFFILIATE' : 'SELF',
         fullName: dto.full_name,
         mobileNumber: dto.mobile_number,
         countryCode: dto.country_code ?? '+91',
@@ -1041,6 +1044,13 @@ export class StudentService {
       );
       throw new BadRequestException(`Registration failed: ${error.message}`);
     }
+  }
+
+  async getSchoolStreams() {
+    return this.schoolStreamRepo.find({
+      where: { isActive: true },
+      order: { id: 'ASC' },
+    });
   }
 
   // Helper to generate questions locally (simplified version of admin-service logic)
@@ -1668,7 +1678,7 @@ export class StudentService {
         assets,
         dateStr,
         ((registration as any).program?.reportTitle as string) ||
-          'Self Discovery Report',
+        'Self Discovery Report',
       );
 
       try {
@@ -1828,15 +1838,15 @@ export class StudentService {
       // 6. Build exam date from session
       const examDate = session.updatedAt
         ? new Date(session.updatedAt).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          })
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })
         : new Date().toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          });
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
 
       const reportTitle =
         ((registration as any).program?.reportTitle as string) ||

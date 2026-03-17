@@ -11,7 +11,7 @@ import { User } from './user.entity';
 import type { Groups } from './groups.entity';
 import { Program } from './program.entity';
 
-export type RegistrationSource = 'SELF' | 'ADMIN' | 'CORPORATE' | 'RESELLER';
+export type RegistrationSource = 'SELF' | 'ADMIN' | 'CORPORATE' | 'RESELLER' | 'AFFILIATE';
 export type RegistrationStatus = 'INCOMPLETE' | 'COMPLETED' | 'CANCELLED';
 export type PaymentStatus =
     | 'NOT_REQUIRED'
