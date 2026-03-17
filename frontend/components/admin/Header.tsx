@@ -21,6 +21,8 @@ import {
     HistoryIcon,
     CheckCircleIcon,
     CompletedStepIcon,
+    MarkAllReadIcon,
+    NoNotificationsIcon,
 } from "../icons";
 import Script from "next/script";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -76,7 +78,7 @@ const NavItem: React.FC<NavItemProps> = ({
                 // LG/XL: Ultra-Compact Mode (h-8, px-2.5) to fit 5 items on laptop
                 // 2XL: Robust Mode (h-10, px-6) for large screens
                 className={`flex items-center ${spacingClass} rounded-full transition-all duration-200 w-full ${isMobile ? "py-3.5" : "lg:h-8 2xl:h-8"} cursor-pointer ${active
-                    ? "bg-brand-green text-white shadow-[0_4px_14px_0_rgba(30,211,106,0.3)] border border-transparent px-2.5 2xl:px-3"
+                    ? "bg-brand-green text-white border border-transparent px-2.5 2xl:px-3"
                     : "bg-white border border-gray-200 text-[#19211C] hover:bg-gray-50 hover:text-black hover:border-gray-300 dark:bg-transparent dark:border-white/10 dark:text-white/80 dark:hover:bg-white/5 dark:hover:text-white px-2.5 2xl:px-3"
                     }`}
             >
@@ -115,7 +117,7 @@ const NotificationItem: React.FC<{
 }> = ({ icon, title, message, time, isNew, onClick }) => (
     <div
         onClick={onClick}
-        className="flex items-start justify-between p-4 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors duration-200 cursor-pointer border-b border-gray-100 dark:border-white/5 last:border-0"
+        className="flex items-start justify-between p-3 px-1.5 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors duration-200 cursor-pointer border-b border-gray-100 dark:border-white/5 last:border-0"
     >
         <div className="flex items-start space-x-3 min-w-0 pr-4 w-full">
             {icon && (
@@ -124,10 +126,10 @@ const NotificationItem: React.FC<{
                 </div>
             )}
             <div className="flex-grow min-w-0 flex flex-col pt-0.5">
-                <div className="text-[14px] font-semibold text-gray-900 dark:text-white truncate w-full">
+                <div className="text-[14px] font-semibold text-gray-900 dark:text-white w-full">
                     {title}
                 </div>
-                <div className="text-[13px] text-gray-500 dark:text-gray-400 mt-1 truncate w-full">
+                <div className="text-[13px] text-gray-500 dark:text-gray-400 mt-1 w-full">
                     {message}
                 </div>
             </div>
@@ -546,7 +548,7 @@ const Header: React.FC<HeaderProps> = ({
     );
 
     return (
-        <header className="fixed top-0 left-0 right-0 w-full bg-white dark:bg-brand-dark-secondary z-50 border-b border-gray-200 dark:border-transparent shadow-sm dark:shadow-none transition-all duration-300">
+        <header className="fixed top-0 left-0 right-0 w-full z-50 transition-all duration-300 bg-transparent dark:bg-white/[0.08] backdrop-blur-xl border-b border-[#E0E0E0] dark:border-white/10 shadow-none">
             <div className="w-full max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 2xl:px-12 py-3 sm:py-4 flex items-center justify-between h-full">
                 <div className="flex items-center gap-2 lg:gap-2 2xl:gap-4">
                     {!hideNav && (
@@ -625,34 +627,48 @@ const Header: React.FC<HeaderProps> = ({
                             <div className="relative" ref={notificationsMenuRef}>
                                 <button
                                     onClick={handleNotificationClick}
-                                    className="bg-white border border-gray-200 text-[#150089] hover:bg-gray-50 hover:border-gray-300 dark:bg-brand-dark-tertiary dark:border-transparent dark:text-white dark:hover:bg-gray-800 w-8 h-8 2xl:w-8.5 2xl:h-8.5 rounded-full flex items-center justify-center transition-all relative cursor-pointer"
+                                    className={`w-8 h-8 2xl:w-8.5 2xl:h-8.5 rounded-full flex items-center justify-center transition-all relative cursor-pointer ${isNotificationsOpen
+                                        ? "bg-[#1ED36A] text-white border-transparent"
+                                        : "bg-white border border-gray-200 text-[#150089] hover:bg-gray-50 hover:border-gray-300 dark:bg-brand-dark-tertiary dark:border-transparent dark:text-white dark:hover:bg-gray-800"
+                                        }`}
                                 >
-                                    <NotificationIcon className="w-4 h-4 2xl:w-5 2xl:h-5 fill-current" />
+                                    <NotificationIcon className="w-[15px] h-[15px] 2xl:w-[19px] 2xl:h-[19px] fill-current" />
                                     {unreadCount > 0 && (
-                                        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center bg-brand-green text-white text-[10px] font-bold rounded-full border-2 border-white dark:border-brand-dark-secondary px-1">
+                                        <span className={`absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center ${isNotificationsOpen ? "bg-white text-[#1ED36A] border-transparent" : "bg-brand-green text-white border-white dark:border-brand-dark-secondary"} border-2 text-[10px] font-bold rounded-full px-1`}>
                                             {unreadCount > 9 ? "9+" : unreadCount}
                                         </span>
                                     )}
                                 </button>
                                 {isNotificationsOpen && (
-                                    <div className="absolute right-0 top-full mt-4 w-[340px] sm:w-[480px] md:w-[540px] bg-white dark:bg-brand-dark-secondary rounded-2xl shadow-2xl p-0 z-50 border border-gray-100 dark:border-white/5 animate-slide-down overflow-hidden text-gray-900 dark:text-white cursor-default">
+                                    <div className="absolute right-0 top-full mt-6 w-[340px] sm:w-[480px] md:w-[540px] bg-white dark:bg-[#111814] rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.5)] p-0 z-50 border border-gray-100 dark:border-white/10 animate-slide-down overflow-hidden text-gray-900 dark:text-white cursor-default">
                                         <div className="p-5 pb-4">
-                                            <div className="flex justify-between items-center mb-6">
+                                            <div className="flex justify-between items-center mb-4">
                                                 <h3 className="text-[17px] font-semibold tracking-wide text-gray-900 dark:text-white">
                                                     Notifications
                                                 </h3>
                                                 <button
                                                     onClick={() => setNotificationsOpen(false)}
-                                                    className="w-8 h-8 bg-gray-100 dark:bg-white/10 rounded-full flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
+                                                    className="w-[27px] h-[27px] bg-gray-100 dark:bg-white/10 rounded-full flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
                                                 >
-                                                    <span className="text-lg text-gray-500 dark:text-gray-300 leading-none">
-                                                        &times;
-                                                    </span>
+                                                    <svg
+                                                        className="w-3.5 h-3.5 text-brand-green"
+                                                        viewBox="0 0 24 24"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        strokeWidth="3.5"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                    >
+                                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                                    </svg>
                                                 </button>
                                             </div>
 
-                                            <div className="flex justify-between items-center flex-wrap gap-y-3">
-                                                <div className="flex space-x-2">
+                                            <div className="h-px bg-gray-100 dark:bg-white/10 mb-4" />
+
+                                            <div className="flex justify-between items-center flex-wrap gap-y-3 gap-x-6">
+                                                <div className="flex flex-wrap gap-2">
                                                     {(portalMode === "admin"
                                                         ? ["All", "Registrations", "Settlement", "History"]
                                                         : ["All", "Job", "Assessment", "Unread"]
@@ -663,7 +679,7 @@ const Header: React.FC<HeaderProps> = ({
                                                                 e.stopPropagation();
                                                                 setActiveTab(tab);
                                                             }}
-                                                            className={`px-4 py-1 rounded-full text-[13px] transition-colors shadow-sm ${activeTab === tab
+                                                            className={`px-4 py-1 rounded-full text-[13px] transition-colors ${activeTab === tab
                                                                 ? "bg-brand-green text-white font-semibold"
                                                                 : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 font-medium"
                                                                 }`}
@@ -679,32 +695,9 @@ const Header: React.FC<HeaderProps> = ({
                                                         e.stopPropagation();
                                                         markAllAsRead();
                                                     }}
-                                                    className="flex items-center gap-1 text-brand-green text-[13px] hover:text-green-400 transition-colors bg-transparent border-none flex-shrink-0"
+                                                    className="flex items-center gap-1.5 text-brand-green text-[13px] hover:text-green-400 transition-colors bg-transparent border-none flex-shrink-0"
                                                 >
-                                                    <div className="relative w-4 h-4">
-                                                        <svg
-                                                            className="absolute inset-0 w-4 h-4"
-                                                            viewBox="0 0 24 24"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            strokeWidth="2.5"
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                        >
-                                                            <polyline points="20 6 9 17 4 12" />
-                                                        </svg>
-                                                        <svg
-                                                            className="absolute inset-0 w-4 h-4 -left-1"
-                                                            viewBox="0 0 24 24"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            strokeWidth="2.5"
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                        >
-                                                            <polyline points="20 6 9 17 4 12" />
-                                                        </svg>
-                                                    </div>
+                                                    <MarkAllReadIcon />
                                                     <span className="font-medium tracking-wide">
                                                         Mark as all Read
                                                     </span>
@@ -712,7 +705,7 @@ const Header: React.FC<HeaderProps> = ({
                                             </div>
                                         </div>
 
-                                        <div className="max-h-[440px] overflow-y-auto px-4 pb-4 custom-scrollbar">
+                                        <div className="max-h-[440px] overflow-y-auto px-2 pb-4 custom-scrollbar">
                                             {groupedNotifications.length > 0 ? (
                                                 groupedNotifications.map((group, gIdx) => (
                                                     <div key={gIdx} className="mb-4 last:mb-0">
@@ -733,8 +726,11 @@ const Header: React.FC<HeaderProps> = ({
                                                     </div>
                                                 ))
                                             ) : (
-                                                <div className="p-8 pb-16 text-center text-gray-500 text-sm">
-                                                    No new notifications
+                                                <div className="p-8 pb-12 flex flex-col items-center justify-center text-center">
+                                                    <NoNotificationsIcon className="w-[100px] h-auto mb-4" />
+                                                    <p className="text-gray-900 dark:text-white font-medium text-[15px]">
+                                                        No Notifications Yet
+                                                    </p>
                                                 </div>
                                             )}
                                         </div>
