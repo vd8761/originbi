@@ -44,7 +44,7 @@ export class CounsellingService {
     private traitRepo: Repository<PersonalityTrait>,
     private httpService: HttpService,
     private configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * Handles the Enquiry Webhook.
@@ -527,11 +527,11 @@ export class CounsellingService {
         results: session.results,
         personality_trait: personalityTrait
           ? {
-              id: personalityTrait.id,
-              code: personalityTrait.code,
-              name: personalityTrait.blendedStyleName,
-              description: personalityTrait.blendedStyleDesc,
-            }
+            id: personalityTrait.id,
+            code: personalityTrait.code,
+            name: personalityTrait.blendedStyleName,
+            description: personalityTrait.blendedStyleDesc,
+          }
           : null,
         report_data: session.reportData,
 

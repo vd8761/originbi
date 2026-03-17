@@ -80,7 +80,7 @@ const CounsellingReportView: React.FC<Props> = ({ onBack }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    
+
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
@@ -104,7 +104,7 @@ const CounsellingReportView: React.FC<Props> = ({ onBack }) => {
                 `${baseUrl}/admin/counselling/sessions?page=${currentPage}&limit=${entriesPerPage}&status=COMPLETED`,
                 { headers: { 'Authorization': `Bearer ${token}` } }
             );
-            
+
             if (response.ok) {
                 const result = await response.json();
                 setSessions(result.data || []);
@@ -130,7 +130,7 @@ const CounsellingReportView: React.FC<Props> = ({ onBack }) => {
                 `${baseUrl}/admin/counselling/sessions/${sessionId}/report`,
                 { headers: { 'Authorization': `Bearer ${token}` } }
             );
-            
+
             if (response.ok) {
                 const result = await response.json();
                 return result.data;
@@ -151,12 +151,12 @@ const CounsellingReportView: React.FC<Props> = ({ onBack }) => {
             const token = localStorage.getItem('token');
             const response = await fetch(
                 `${baseUrl}/admin/counselling/sessions/${sessionId}/report/generate`,
-                { 
+                {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` } 
+                    headers: { 'Authorization': `Bearer ${token}` }
                 }
             );
-            
+
             if (response.ok) {
                 const result = await response.json();
                 setReportData(result.data);
@@ -178,7 +178,7 @@ const CounsellingReportView: React.FC<Props> = ({ onBack }) => {
     const handleViewReport = async (session: CounsellingSession) => {
         setSelectedSession(session);
         setViewMode('report');
-        
+
         if (session.hasReport) {
             const report = await fetchReport(session.id);
             setReportData(report);
@@ -241,7 +241,7 @@ const CounsellingReportView: React.FC<Props> = ({ onBack }) => {
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                     Showing completed counselling sessions. Click on a session to view or generate report.
                 </div>
-                
+
                 {/* Entries Dropdown */}
                 <div className="flex items-center gap-3">
                     <span className="text-sm text-[#19211C] dark:text-brand-text-secondary font-[300]">Showing</span>
@@ -324,13 +324,12 @@ const CounsellingReportView: React.FC<Props> = ({ onBack }) => {
                                         {session.discScores && (
                                             <div className="flex gap-1">
                                                 {['D', 'I', 'S', 'C'].map((trait) => (
-                                                    <span 
+                                                    <span
                                                         key={trait}
-                                                        className={`px-2 py-0.5 text-xs rounded ${
-                                                            session.dominantTrait?.includes(trait) 
-                                                                ? 'bg-brand-green text-white font-semibold' 
+                                                        className={`px-2 py-0.5 text-xs rounded ${session.dominantTrait?.includes(trait)
+                                                                ? 'bg-brand-green text-white font-semibold'
                                                                 : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                                                        }`}
+                                                            }`}
                                                     >
                                                         {trait}: {session.discScores[trait as keyof typeof session.discScores] || 0}
                                                     </span>
@@ -389,11 +388,10 @@ const CounsellingReportView: React.FC<Props> = ({ onBack }) => {
                         <button
                             key={i + 1}
                             onClick={() => setCurrentPage(i + 1)}
-                            className={`min-w-[32px] h-8 px-1 rounded-md text-sm ${
-                                currentPage === i + 1
+                            className={`min-w-[32px] h-8 px-1 rounded-md text-sm ${currentPage === i + 1
                                     ? "bg-brand-green text-white"
                                     : "bg-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5"
-                            }`}
+                                }`}
                         >
                             {i + 1}
                         </button>
@@ -497,8 +495,8 @@ const CounsellingReportView: React.FC<Props> = ({ onBack }) => {
                         <div className="bg-gradient-to-r from-[#150089] to-[#2a0fd6] text-white p-6">
                             <h2 className="text-2xl font-bold mb-2">Career Fitment & Course Recommendation Report</h2>
                             <p className="text-white/80 text-sm">
-                                Generated on {new Date(reportData.generated_at).toLocaleDateString('en-IN', { 
-                                    day: 'numeric', month: 'long', year: 'numeric' 
+                                Generated on {new Date(reportData.generated_at).toLocaleDateString('en-IN', {
+                                    day: 'numeric', month: 'long', year: 'numeric'
                                 })}
                             </p>
                         </div>
