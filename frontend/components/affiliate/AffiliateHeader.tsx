@@ -63,7 +63,7 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, active, isMobile, onClic
             <button
                 onClick={onClick}
                 className={`flex items-center ${spacingClass} rounded-full transition-all duration-200 w-full lg:h-8 2xl:h-9 cursor-pointer ${isMobile ? "py-3 min-h-[44px]" : ""} ${active
-                    ? `bg-brand-green text-white shadow-[0_4px_14px_0_rgba(30,211,106,0.3)] border border-transparent ${isMobile ? "px-4" : "px-2.5 2xl:px-4"}`
+                    ? `bg-brand-green text-white shadow-none border border-transparent ${isMobile ? "px-4" : "px-2.5 2xl:px-4"}`
                     : `bg-white border border-gray-200 text-[#19211C] hover:bg-gray-50 hover:text-black hover:border-gray-300 dark:bg-transparent dark:border-white/10 dark:text-white/80 dark:hover:bg-white/5 dark:hover:text-white ${isMobile ? "px-4" : "px-2.5 2xl:px-4"}`
                     }`}
             >

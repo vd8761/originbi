@@ -66,7 +66,7 @@ const NavItem: React.FC<NavItemProps> = ({
                 // LG/XL: Compact (h-7, px-2) 
                 // 2XL: Regular (h-8, px-3)
                 className={`flex items-center ${spacingClass} rounded-full transition-all duration-200 w-full ${isMobile ? "py-3.5" : "lg:h-7 2xl:h-7"} cursor-pointer ${active
-                    ? "bg-[#1ED36A] text-white shadow-[0_4px_14px_0_rgba(30,211,106,0.3)] border border-transparent px-2.5 2xl:px-3"
+                    ? "bg-[#1ED36A] text-white shadow-none border border-transparent px-2.5 2xl:px-3"
                     : "bg-white border border-gray-200 text-[#19211C] hover:bg-gray-50 hover:text-black hover:border-gray-300 dark:bg-transparent dark:border-white/10 dark:text-white/80 dark:hover:bg-white/5 dark:hover:text-white px-2.5 2xl:px-3"
                     }`}
             >
@@ -757,7 +757,7 @@ const Header: React.FC<HeaderProps> = ({
                                     <button
                                         onClick={() => setLanguage("ENG")}
                                         className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${language === "ENG"
-                                            ? "bg-brand-green text-white shadow-sm"
+                                            ? "bg-brand-green text-white shadow-none"
                                             : "text-brand-text-light-secondary dark:text-brand-text-secondary hover:text-brand-text-primary dark:hover:text-white"
                                             }`}
                                     >
@@ -766,7 +766,7 @@ const Header: React.FC<HeaderProps> = ({
                                     <button
                                         onClick={() => setLanguage("TAM")}
                                         className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${language === "TAM"
-                                            ? "bg-brand-green text-white shadow-sm"
+                                            ? "bg-brand-green text-white shadow-none"
                                             : "text-brand-text-light-secondary dark:text-brand-text-secondary hover:text-brand-text-primary dark:hover:text-white"
                                             }`}
                                     >
