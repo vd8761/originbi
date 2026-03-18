@@ -93,9 +93,9 @@ export default function AdminLayout({
                             />
                         </div>
 
-                        {/* Content Layer with Top Padding */}
+                        {/* Content Layer with Top Padding (matches corporate background setup) */}
                         <div className="relative z-10 w-full min-h-screen pt-[clamp(70px,7.6vh,100px)] bg-[url('/Background_Light_Theme.svg')] dark:bg-[url('/Background_Dark_Theme.svg')] bg-cover bg-top bg-no-repeat">
-                            <div className="w-full h-full max-w-[2000px] mx-auto transition-all duration-300 relative">
+                            <div className="w-full h-full px-4 sm:px-6 lg:px-8 2xl:px-12 pt-4 sm:pt-5 max-w-[2000px] mx-auto transition-all duration-300 relative">
                                 {/* --- DEV GRID OVERLAY --- */}
                                 <div className="absolute inset-x-4 sm:inset-x-6 lg:inset-x-8 2xl:inset-x-12 top-0 bottom-0 grid grid-cols-4 lg:grid-cols-12 gap-4 lg:gap-6 pointer-events-none z-0 opacity-0" aria-hidden="true">
                                     {[...Array(12)].map((_, i) => (

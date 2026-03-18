@@ -79,11 +79,11 @@ const NavItem: React.FC<NavItemProps> = ({
                 // 2XL: Robust Mode (h-10, px-6) for large screens
                 className={`flex items-center ${spacingClass} rounded-full transition-all duration-200 w-full ${isMobile ? "py-3.5" : "lg:h-10 2xl:h-10"} cursor-pointer ${active
                     ? "bg-brand-green text-white border border-transparent shadow-none px-2.5 2xl:px-3"
-                    : "bg-white border border-gray-200 text-[#19211C] hover:bg-gray-50 hover:text-black hover:border-gray-300 dark:bg-transparent dark:border-white/10 dark:text-white/80 dark:hover:bg-white/5 dark:hover:text-white px-2.5 2xl:px-3"
+                    : "bg-white border border-gray-200 text-black hover:bg-gray-50 hover:text-black hover:border-gray-300 dark:bg-transparent dark:border-white/10 dark:text-white/80 dark:hover:bg-white/5 dark:hover:text-white px-2.5 2xl:px-3"
                     }`}
             >
                 <div
-                    className={`${active ? "text-white" : "text-brand-purple dark:text-white"}`}
+                    className={`${active ? "text-white" : "text-brand-green dark:text-brand-green"}`}
                 >
                     {icon}
                 </div>
