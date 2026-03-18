@@ -120,6 +120,11 @@
   .dashboard-glass-card {
     @apply glass-card dark:bg-white/[0.08] dark:border-white/[0.08] shadow-none;
   }
+
+  /* Softer glass only for header notification dropdowns */
+  .notification-glass-card {
+    @apply glass-card bg-white/95 dark:bg-[#1A241F]/95 border-white/20 dark:border-white/[0.08] backdrop-blur-none shadow-none;
+  }
 }
 
 /* Custom Fonts */
