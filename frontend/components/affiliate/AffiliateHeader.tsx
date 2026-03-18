@@ -319,7 +319,7 @@ const AffiliateHeader: React.FC<AffiliateHeaderProps> = ({ onLogout, onNavigate 
     );
 
     return (
-        <header className={`fixed top-0 left-0 right-0 w-full z-50 transition-all ${isNotificationsOpen ? "duration-150" : "duration-300"} bg-[#19211C]/40 ${isNotificationsOpen ? "" : "backdrop-blur-[200px]"} border-b border-white/[0.08] shadow-none`}>
+        <header className={`fixed top-0 left-0 right-0 w-full z-50 transition-all ${isNotificationsOpen ? "duration-150" : "duration-300"} bg-transparent dark:bg-[#19211C]/40 ${isNotificationsOpen ? "" : "backdrop-blur-xl dark:backdrop-blur-[200px]"} border-b border-[#E0E0E0] dark:border-white/[0.08] shadow-none`}>
             {isNotificationsOpen && (
                 <div className="absolute top-full left-0 w-full h-[100vh] bg-black/20 dark:bg-black/40 z-[-1] animate-fade-in-fast" />
             )}
@@ -522,7 +522,7 @@ const AffiliateHeader: React.FC<AffiliateHeaderProps> = ({ onLogout, onNavigate 
                         <div
                             id="affiliate-mobile-menu"
                             ref={mobileMenuRef}
-                            className="md:hidden absolute top-full left-0 w-full bg-[#19211C]/40 backdrop-blur-[200px] shadow-none z-40 border-t border-white/[0.08] animate-fade-in max-h-[85vh] overflow-y-auto"
+                            className="md:hidden absolute top-full left-0 w-full bg-brand-light-secondary dark:bg-[#19211C]/40 dark:backdrop-blur-[200px] shadow-none z-40 border-t border-brand-light-tertiary dark:border-white/[0.08] animate-fade-in max-h-[85vh] overflow-y-auto"
                         >
                             <nav className="flex flex-col p-4 space-y-2">
                                 {renderNavItems(true)}

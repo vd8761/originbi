@@ -86,14 +86,8 @@ export default function StudentCounsellorPage() {
 
     return (
         <RequireStudent>
-            <div className="relative min-h-screen w-full bg-transparent dark:bg-black font-sans selection:bg-brand-green/20 overflow-x-hidden">
-                {/* BACKGROUND LAYERS */}
-                <div className="fixed inset-0 pointer-events-none z-0">
-                    <div className="absolute inset-0 bg-[url('/Background_Light_Theme.svg')] bg-cover bg-center bg-no-repeat opacity-100 dark:hidden" />
-                    <div className="absolute inset-0 bg-[url('/Background_Dark_Theme.svg')] bg-cover bg-center bg-no-repeat opacity-100 hidden dark:block" />
-                </div>
-
-                <div className="w-full min-h-screen lg:[zoom:0.85] xl:[zoom:0.9] 2xl:[zoom:1.0]">
+            <div className="relative min-h-screen w-full bg-transparent dark:bg-[#19211C] font-sans selection:bg-brand-green/20 overflow-x-hidden">
+                <div className="w-full min-h-screen lg:[zoom:0.85] xl:[zoom:0.9] 2xl:[zoom:1.0] bg-[url('/Background_Light_Theme.svg')] dark:bg-[url('/Background_Dark_Theme.svg')] bg-cover bg-top bg-no-repeat">
                     {/* Header */}
                     <div className="fixed top-0 left-0 right-0 z-50">
                         <Header
