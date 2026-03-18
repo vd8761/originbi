@@ -49,7 +49,7 @@ const PublicVisibilityCard: React.FC = () => {
     };
 
     return (
-        <div className="bg-white/20 border border-[#19211C]/12 dark:bg-brand-dark-secondary dark:border-transparent rounded-2xl h-full flex flex-col backdrop-blur-sm">
+        <div className="glass-card h-full flex flex-col">
             <div className="px-6 pt-6 pb-2 lg:px-[1.25vw] lg:pt-[1.25vw] lg:pb-[0.4vw]">
                 <h3 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-lg lg:text-[1.25vw] mb-2 leading-tight">
                     Public Visibility

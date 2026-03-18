@@ -83,7 +83,7 @@ const AiCounsellorCard: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="bg-white/20 border border-[#19211C]/12 dark:bg-brand-dark-secondary dark:border-transparent rounded-2xl h-full flex items-center justify-center backdrop-blur-sm">
+            <div className="glass-card h-full flex items-center justify-center">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-green"></div>
             </div>
         );
@@ -133,10 +133,10 @@ const AiCounsellorCard: React.FC = () => {
 
     // ── LOCKED: No Access — Show Purchase CTA ──
     return (
-        <div className="bg-white/20 border border-[#19211C]/12 dark:bg-brand-dark-secondary dark:border-transparent rounded-2xl h-full flex flex-col backdrop-blur-sm relative overflow-hidden group">
+        <div className="glass-card h-full flex flex-col relative overflow-hidden group">
             {/* Decorative gradient overlay */}
             <div className="absolute inset-0 bg-gradient-to-br from-brand-green/5 via-transparent to-purple-500/5 pointer-events-none" />
-            
+
             <div className="px-6 pt-6 pb-3 lg:px-[1.25vw] lg:pt-[1.25vw] lg:pb-[0.625vw] relative z-10">
                 <div className="flex items-center gap-2 mb-2">
                     <div className="w-8 h-8 lg:w-[1.66vw] lg:h-[1.66vw] rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center">
