@@ -331,147 +331,148 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
   }, [currentQIndex, questions, answers]);
 
   // Fetch Questions
+  const fetchQuestions = async () => {
+    console.log(`[AssessmentRunner] Fetching questions for attempt: ${attemptId}`);
+    setLoading(true);
+    setError(null);
+
+    try {
+      // 1. Get User Email
+      const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
+      if (!email) {
+        throw new Error("User not logged in (email missing)");
+      }
+
+      // 2. Fetch Profile to get numeric Student ID
+      const profile = await studentService.getProfile(email);
+      if (!profile || !profile.id) {
+        throw new Error("Failed to fetch user profile or ID invalid");
+      }
+
+      const studentId = Number(profile.id);
+      const examId = Number(attemptId) || 0;
+
+      const payload = {
+        student_id: studentId, // Real User ID
+        exam_id: examId,
+      };
+
+      const examApiUrl = process.env.NEXT_PUBLIC_EXAM_ENGINE_API_URL;
+      const response = await fetch(`${examApiUrl}/api/v1/exam/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.message || `Failed to load assessment. Status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const apiAnswers: APIAssessmentAnswer[] = data.data || [];
+
+      if (apiAnswers.length === 0) {
+        throw new Error("No questions returned from the server.");
+      }
+
+      // Initialize Answers Map from API Data
+      const initialAnswers: Record<string, string> = {};
+
+      // Calculate if Last Level (Heuristic based on ID or Name)
+      // Check if Last Level (Backend Flag preferred, Fallback to Heuristic)
+      if (typeof data.is_last_level === 'boolean') {
+        setIsLastLevel(data.is_last_level);
+      } else {
+        // Heuristic Fallback
+        const aTitle = (data.title || data.name || data.exam_name || '').toLowerCase();
+        const aLevel = Number(data.level_number || data.id || 0);
+        if (aLevel >= 4 || aTitle.includes('level 4') || aTitle.includes('final')) {
+          setIsLastLevel(true);
+        }
+      }
+
+      // Map API response to UI Question format
+      const mappedQuestions: Question[] = apiAnswers.map((ans) => {
+        const qData = ans.main_question || ans.open_question;
+
+        if (!qData) {
+          return {
+            id: ans.id,
+            textEn: "Error loading question",
+            options: [],
+            assessmentAnswerId: ans.id,
+            source: "MAIN"
+          };
+        }
+
+        const qId = String(qData.id);
+        const ansAtomicId = String(ans.id); // Unique ID for this answer slot
+
+        // Check if already answered in DB (Only if Status is Confirm ANSWERED)
+        const isAnswered = ans.status && String(ans.status).toUpperCase() === 'ANSWERED';
+
+        if (isAnswered) {
+          // Store using Unique ID, not Question ID
+          if (ans.main_option_id) {
+            initialAnswers[ansAtomicId] = String(ans.main_option_id);
+          } else if (ans.open_option_id) {
+            initialAnswers[ansAtomicId] = String(ans.open_option_id);
+          }
+        }
+
+        return {
+          id: qId,
+          textEn: qData.question_text_en || qData.question,
+          textTa: qData.question_text_ta,
+          contextTextEn: qData.context_text_en,
+          contextTextTa: qData.context_text_ta,
+          options: qData.options?.map((opt) => ({
+            id: String(opt.id),
+            textEn: opt.option_text_en || opt.option_text,
+            textTa: opt.option_text_ta,
+          })) || [],
+          assessmentAnswerId: ans.id,
+          source: ans.question_source || (ans.open_question_id ? "OPEN" : "MAIN") // Map Source
+        };
+      });
+
+      setAnswers(initialAnswers);
+      setQuestions(mappedQuestions);
+
+      // Find first unanswered question ROBUSTLY
+      console.log("Answers Data for Resume:", apiAnswers);
+
+      const firstUnansweredIndex = mappedQuestions.findIndex((_, index) => {
+        const ans = apiAnswers[index];
+        if (!ans) return true;
+
+        // Check Status (Case Insensitive)
+        const statusUpper = ans.status ? String(ans.status).toUpperCase() : '';
+        const isConfirmedAnswered = statusUpper === 'ANSWERED';
+
+        // We return true if NOT answered (so we find the *first* unanswered)
+        return !isConfirmedAnswered;
+      });
+
+      // If -1 (all answered), set to length (fully complete). Else index.
+      const resumeIndex = firstUnansweredIndex >= 0 ? firstUnansweredIndex : mappedQuestions.length;
+      console.log("Calculated Resume Index:", resumeIndex);
+
+      setCurrentQIndex(resumeIndex);
+      setLoading(false);
+
+      startTimeRef.current = Date.now();
+    } catch (err: any) {
+      console.error("[AssessmentRunner] error:", err);
+      setError(err.message || "Something went wrong");
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (initialLoadRef.current) return;
     initialLoadRef.current = true;
-
-    const fetchQuestions = async () => {
-      console.log(`[AssessmentRunner] Fetching questions for attempt: ${attemptId}`);
-
-      try {
-        // 1. Get User Email
-        const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
-        if (!email) {
-          throw new Error("User not logged in (email missing)");
-        }
-
-        // 2. Fetch Profile to get numeric Student ID
-        const profile = await studentService.getProfile(email);
-        if (!profile || !profile.id) {
-          throw new Error("Failed to fetch user profile or ID invalid");
-        }
-
-        const studentId = Number(profile.id);
-        const examId = Number(attemptId) || 0;
-
-        const payload = {
-          student_id: studentId, // Real User ID
-          exam_id: examId,
-        };
-
-        const examApiUrl = process.env.NEXT_PUBLIC_EXAM_ENGINE_API_URL;
-        const response = await fetch(`${examApiUrl}/api/v1/exam/start`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData.message || `Failed to load assessment. Status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        const apiAnswers: APIAssessmentAnswer[] = data.data || [];
-
-        if (apiAnswers.length === 0) {
-          throw new Error("No questions returned from the server.");
-        }
-
-        // Initialize Answers Map from API Data
-        const initialAnswers: Record<string, string> = {};
-
-        // Calculate if Last Level (Heuristic based on ID or Name)
-        // Check if Last Level (Backend Flag preferred, Fallback to Heuristic)
-        if (typeof data.is_last_level === 'boolean') {
-          setIsLastLevel(data.is_last_level);
-        } else {
-          // Heuristic Fallback
-          const aTitle = (data.title || data.name || data.exam_name || '').toLowerCase();
-          const aLevel = Number(data.level_number || data.id || 0);
-          if (aLevel >= 4 || aTitle.includes('level 4') || aTitle.includes('final')) {
-            setIsLastLevel(true);
-          }
-        }
-
-        // Map API response to UI Question format
-        const mappedQuestions: Question[] = apiAnswers.map((ans) => {
-          const qData = ans.main_question || ans.open_question;
-
-          if (!qData) {
-            return {
-              id: ans.id,
-              textEn: "Error loading question",
-              options: [],
-              assessmentAnswerId: ans.id,
-              source: "MAIN"
-            };
-          }
-
-          const qId = String(qData.id);
-          const ansAtomicId = String(ans.id); // Unique ID for this answer slot
-
-          // Check if already answered in DB (Only if Status is Confirm ANSWERED)
-          const isAnswered = ans.status && String(ans.status).toUpperCase() === 'ANSWERED';
-
-          if (isAnswered) {
-            // Store using Unique ID, not Question ID
-            if (ans.main_option_id) {
-              initialAnswers[ansAtomicId] = String(ans.main_option_id);
-            } else if (ans.open_option_id) {
-              initialAnswers[ansAtomicId] = String(ans.open_option_id);
-            }
-          }
-
-          return {
-            id: qId,
-            textEn: qData.question_text_en || qData.question,
-            textTa: qData.question_text_ta,
-            contextTextEn: qData.context_text_en,
-            contextTextTa: qData.context_text_ta,
-            options: qData.options?.map((opt) => ({
-              id: String(opt.id),
-              textEn: opt.option_text_en || opt.option_text,
-              textTa: opt.option_text_ta,
-            })) || [],
-            assessmentAnswerId: ans.id,
-            source: ans.question_source || (ans.open_question_id ? "OPEN" : "MAIN") // Map Source
-          };
-        });
-
-        setAnswers(initialAnswers);
-        setQuestions(mappedQuestions);
-
-        // Find first unanswered question ROBUSTLY
-        console.log("Answers Data for Resume:", apiAnswers);
-
-        const firstUnansweredIndex = mappedQuestions.findIndex((_, index) => {
-          const ans = apiAnswers[index];
-          if (!ans) return true;
-
-          // Check Status (Case Insensitive)
-          const statusUpper = ans.status ? String(ans.status).toUpperCase() : '';
-          const isConfirmedAnswered = statusUpper === 'ANSWERED';
-
-          // We return true if NOT answered (so we find the *first* unanswered)
-          return !isConfirmedAnswered;
-        });
-
-        // If -1 (all answered), set to length (fully complete). Else index.
-        const resumeIndex = firstUnansweredIndex >= 0 ? firstUnansweredIndex : mappedQuestions.length;
-        console.log("Calculated Resume Index:", resumeIndex);
-
-        setCurrentQIndex(resumeIndex);
-        setLoading(false);
-
-        startTimeRef.current = Date.now();
-      } catch (err: any) {
-        console.error("[AssessmentRunner] error:", err);
-        setError(err.message || "Something went wrong");
-        setLoading(false);
-      }
-    };
-
     fetchQuestions();
   }, [attemptId]);
 
@@ -609,7 +610,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
           {/* <p className="text-xs text-gray-500">Attempt ID: {attemptId}</p> */}
         </div>
         <div className="flex gap-4">
-          <button onClick={() => window.location.reload()} className="px-6 py-2 bg-brand-green text-white rounded-full hover:bg-brand-green/90">Retry</button>
+          <button onClick={() => fetchQuestions()} className="px-6 py-2 bg-brand-green text-white rounded-full hover:bg-brand-green/90">Retry</button>
           <button onClick={onBack} className="px-6 py-2 border border-brand-light-tertiary text-gray-600 rounded-full hover:bg-gray-100">Back</button>
         </div>
       </div>
