@@ -455,7 +455,7 @@ const Header: React.FC<HeaderProps> = ({
     };
 
     return (
-        <header className={`fixed top-0 left-0 right-0 w-full z-50 transition-all ${isNotificationsOpen ? "duration-150" : "duration-300"} bg-transparent dark:bg-white/[0.08] ${isNotificationsOpen ? "" : "backdrop-blur-xl"} border-b border-[#E0E0E0] dark:border-white/10 shadow-none`}>
+        <header className={`fixed top-0 left-0 right-0 w-full z-50 transition-all ${isNotificationsOpen ? "duration-150" : "duration-300"} bg-[#19211C]/40 ${isNotificationsOpen ? "" : "backdrop-blur-[200px]"} border-b border-white/[0.08] shadow-none`}>
             {isNotificationsOpen && (
                 <div className="absolute top-full left-0 w-full h-[100vh] bg-black/20 dark:bg-black/40 z-[-1] animate-fade-in-fast" />
             )}
@@ -737,7 +737,7 @@ const Header: React.FC<HeaderProps> = ({
                 <div
                     id="mobile-menu"
                     ref={mobileMenuRef}
-                    className="md:hidden absolute top-full left-0 w-full bg-brand-light-secondary dark:bg-brand-dark-secondary shadow-lg z-40 border-t border-brand-light-tertiary dark:border-brand-dark-tertiary animate-fade-in"
+                    className="md:hidden absolute top-full left-0 w-full bg-[#19211C]/40 backdrop-blur-[200px] shadow-none z-40 border-t border-white/[0.08] animate-fade-in"
                 >
                     <nav className="flex flex-col p-4 space-y-2">
                         {renderNavItems(true)}
