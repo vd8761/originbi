@@ -148,7 +148,7 @@ const ImpactAssessmentCard: React.FC<ImpactAssessmentCardProps> = ({ reportData,
     const isAnyLoading = !stats && (isLoading || isLoadingReport);
 
     return (
-        <div className="glass-card h-full flex flex-col p-6 lg:p-[1.25vw]">
+        <div className="dashboard-glass-card h-full flex flex-col p-6 lg:p-[1.25vw]">
             {/* Header */}
             <div className="mb-6 lg:mb-[1.5vw] text-center">
                 <h3 className="font-semibold font-sans text-[#19211C] dark:text-white text-lg lg:text-[1.25vw] leading-tight">

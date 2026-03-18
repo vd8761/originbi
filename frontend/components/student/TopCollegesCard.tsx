@@ -24,7 +24,7 @@ const TopCollegesCard: React.FC<TopCollegesCardProps> = ({ reportData, isLoading
     const hasData = isSSLC ? !!recommendedStream : (colleges.length > 0 || courses.length > 0);
 
     return (
-        <div className="relative glass-card h-full flex flex-col overflow-hidden">
+        <div className="relative dashboard-glass-card h-full flex flex-col overflow-hidden">
             {/* Content */}
             <div className="relative z-10 p-6 lg:p-[1.25vw] flex flex-col h-full">
                 {/* Header with Badge */}

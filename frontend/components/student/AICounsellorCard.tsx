@@ -83,7 +83,7 @@ const AiCounsellorCard: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="glass-card h-full flex items-center justify-center">
+            <div className="dashboard-glass-card h-full flex items-center justify-center">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-green"></div>
             </div>
         );
@@ -133,7 +133,7 @@ const AiCounsellorCard: React.FC = () => {
 
     // ── LOCKED: No Access — Show Purchase CTA ──
     return (
-        <div className="glass-card h-full flex flex-col relative overflow-hidden group">
+        <div className="dashboard-glass-card h-full flex flex-col relative overflow-hidden group">
             {/* Decorative gradient overlay */}
             <div className="absolute inset-0 bg-gradient-to-br from-brand-green/5 via-transparent to-purple-500/5 pointer-events-none" />
 

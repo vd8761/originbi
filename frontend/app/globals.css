@@ -115,6 +115,11 @@
   .glass-card {
     @apply bg-white/80 dark:bg-[#111814]/80 backdrop-blur-xl border border-white/20 dark:border-white/5 shadow-[0_8px_30px_rgb(0,0,0,0.08)] dark:shadow-[0_8px_32px_rgb(0,0,0,0.5)] rounded-2xl;
   }
+
+  /* Dashboard-specific glass style (aligned with corporate dashboard cards) */
+  .dashboard-glass-card {
+    @apply glass-card dark:bg-white/[0.08] dark:border-white/[0.08] shadow-none;
+  }
 }
 
 /* Custom Fonts */

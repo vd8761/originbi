@@ -126,7 +126,7 @@ const ConsultantCallCard: React.FC = () => {
 
     return (
         <>
-            <div className="glass-card p-6 lg:p-[1.25vw] h-auto lg:h-full flex flex-col">
+            <div className="dashboard-glass-card p-6 lg:p-[1.25vw] h-auto lg:h-full flex flex-col">
                 <h3 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-lg lg:text-[1.25vw] mb-4 lg:mb-[0.8vw]">
                     Consultant Call
                 </h3>

@@ -56,7 +56,7 @@ const RoadmapsCard: React.FC = () => {
     ];
 
     return (
-        <div className="glass-card h-full flex flex-col">
+        <div className="dashboard-glass-card h-full flex flex-col">
             <div className="px-6 pt-6 pb-4 lg:px-[1.25vw] lg:pt-[1.25vw] lg:pb-[0.833vw] flex justify-between items-center">
                 <h3 className="font-semibold font-sans text-[#19211C] dark:text-white text-[18px]">
                     Your Roadmaps 2027-2035

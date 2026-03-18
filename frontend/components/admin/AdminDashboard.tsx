@@ -21,7 +21,7 @@ const StatCard: React.FC<StatCardProps> = ({
   isPositive,
   isLoading
 }) => (
-  <div className="glass-card p-6 relative overflow-hidden">
+  <div className="dashboard-glass-card p-6 relative overflow-hidden">
     {isLoading && (
       <div className="absolute inset-0 bg-white/50 dark:bg-black/50 z-10 animate-pulse" />
     )}
@@ -171,7 +171,7 @@ const AdminDashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Side: Affiliate Settlements - Compact Roadmap Style */}
         <div className="lg:col-span-4 h-full">
-          <div className="glass-card h-full flex flex-col overflow-hidden min-h-[400px]">
+          <div className="dashboard-glass-card h-full flex flex-col overflow-hidden min-h-[400px]">
             {/* Card Header */}
             <div className="px-6 pt-6 pb-4 flex justify-between items-center">
               <h3 className="font-semibold text-[#19211C] dark:text-white text-lg font-sans">
@@ -252,7 +252,7 @@ const AdminDashboard: React.FC = () => {
 
         {/* Right Side: Coming Soon (Simplified) */}
         <div className="lg:col-span-8 h-full">
-          <div className="glass-card p-8 flex flex-col justify-center items-center h-full min-h-[400px] text-center">
+          <div className="dashboard-glass-card p-8 flex flex-col justify-center items-center h-full min-h-[400px] text-center">
             <div className="max-w-md mx-auto">
               <div className="w-12 h-12 bg-gray-100 dark:bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <svg className="w-6 h-6 text-gray-400 dark:text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
