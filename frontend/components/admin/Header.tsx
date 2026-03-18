@@ -643,7 +643,7 @@ const Header: React.FC<HeaderProps> = ({
                                     )}
                                 </button>
                                 {isNotificationsOpen && (
-                                    <div className="absolute right-0 top-full mt-6 w-[340px] sm:w-[480px] md:w-[540px] bg-white/80 dark:bg-[#111814]/80 backdrop-blur-xl rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.5)] p-0 z-50 border border-gray-100 dark:border-white/10 animate-slide-down overflow-hidden text-gray-900 dark:text-white cursor-default">
+                                    <div className="absolute right-0 top-full mt-6 w-[340px] sm:w-[480px] md:w-[540px] glass-card p-0 z-50 animate-slide-down overflow-hidden text-gray-900 dark:text-white cursor-default">
                                         <div className="p-5 pb-4">
                                             <div className="flex justify-between items-center mb-4">
                                                 <h3 className="text-[17px] font-semibold tracking-wide text-gray-900 dark:text-white">
