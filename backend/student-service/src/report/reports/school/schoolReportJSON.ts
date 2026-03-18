@@ -33,6 +33,7 @@ import {
   getCompatibilityMatrixDetails,
   CourseCompatibility,
 } from '../../helpers/sqlHelper';
+import { getTopCollegesForStudent } from '../../helpers/SchoolHelper';
 
 // ─── Helper: Top-Two DISC Traits ─────────────────────────────────────────────
 
@@ -259,11 +260,11 @@ function buildCorePersonality(patterns: ProfilePatterns, textVariant: number) {
       type: 'dominant',
       archetype: archetype
         ? {
-            title: archetype.title,
-            superpower: archetype.superpower,
-            risk: archetype.risk,
-            environment: archetype.environment,
-          }
+          title: archetype.title,
+          superpower: archetype.superpower,
+          risk: archetype.risk,
+          environment: archetype.environment,
+        }
         : null,
       description: tv('disc-dominant', textVariant),
     };
@@ -559,6 +560,7 @@ export async function buildSchoolReportJSON(data: SchoolData) {
 
   // ── 7. Course Compatibility (DB call) ──
   let courseCompatibility: CourseCompatibility[] = [];
+  let topColleges: any[] = [];
   try {
     if (data.school_level_id === 1) {
       // SSLC → recommended stream
@@ -567,9 +569,11 @@ export async function buildSchoolReportJSON(data: SchoolData) {
     } else {
       // HSC → specific stream
       courseCompatibility = await getCompatibilityMatrixDetails(dominantTrait, data.school_stream_id);
+      // Fetch top colleges for HSC
+      topColleges = await getTopCollegesForStudent(dominantTrait, data.school_stream_id);
     }
   } catch (err) {
-    logger.warn('[SchoolReportJSON] Course Compatibility fetch failed.', err);
+    logger.warn('[SchoolReportJSON] Course Compatibility/Colleges fetch failed.', err);
   }
 
   // ── 8. Agile Scores normalized ──
@@ -610,21 +614,21 @@ export async function buildSchoolReportJSON(data: SchoolData) {
     agileProfile: {
       raw: agile
         ? {
-            focus: agile.focus,
-            courage: agile.courage,
-            respect: agile.respect,
-            openness: agile.openness,
-            commitment: agile.commitment,
-          }
+          focus: agile.focus,
+          courage: agile.courage,
+          respect: agile.respect,
+          openness: agile.openness,
+          commitment: agile.commitment,
+        }
         : null,
       normalized: agile
         ? {
-            focus: normAgile(agile.focus),
-            courage: normAgile(agile.courage),
-            respect: normAgile(agile.respect),
-            openness: normAgile(agile.openness),
-            commitment: normAgile(agile.commitment),
-          }
+          focus: normAgile(agile.focus),
+          courage: normAgile(agile.courage),
+          respect: normAgile(agile.respect),
+          openness: normAgile(agile.openness),
+          commitment: normAgile(agile.commitment),
+        }
         : null,
     },
 
@@ -641,57 +645,57 @@ export async function buildSchoolReportJSON(data: SchoolData) {
       // ── Personalized Insights ──
       generalCharacteristics: content
         ? {
-            title: `General Characteristics for ${data.full_name}`,
-            content1: content.general_characteristics_1,
-            content2: content.general_characteristics_2,
-          }
+          title: `General Characteristics for ${data.full_name}`,
+          content1: content.general_characteristics_1,
+          content2: content.general_characteristics_2,
+        }
         : null,
 
       corePersonality: buildCorePersonality(patterns, patterns.textVariant),
 
       understandingYourself: content
         ? {
-            content1: content.understanding_yourself_1,
-            content2: content.understanding_yourself_2,
-          }
+          content1: content.understanding_yourself_1,
+          content2: content.understanding_yourself_2,
+        }
         : null,
 
       strengths: content
         ? {
-            intro: content.strengths_intro,
-            list: content.strengths_list,
-          }
+          intro: content.strengths_intro,
+          list: content.strengths_list,
+        }
         : null,
 
       motivations: content
         ? {
-            intro: String(content.motivations_intro).replace('$full_name', data.full_name),
-            whatDrives: content.what_drives_desc,
-            uniqueNeeds: content.unique_needs_desc,
-          }
+          intro: String(content.motivations_intro).replace('$full_name', data.full_name),
+          whatDrives: content.what_drives_desc,
+          uniqueNeeds: content.unique_needs_desc,
+        }
         : null,
 
       communication: content
         ? {
-            description: content.communication_desc,
-            dos: content.communication_dos_list,
-            donts: content.communication_donts_list,
-            avoidDescription: content.communication_avoid_desc,
-          }
+          description: content.communication_desc,
+          dos: content.communication_dos_list,
+          donts: content.communication_donts_list,
+          avoidDescription: content.communication_avoid_desc,
+        }
         : null,
 
       growthAreas: content
         ? {
-            html: content.growth_areas_html,
-          }
+          html: content.growth_areas_html,
+        }
         : null,
 
       behavioralCharts: content
         ? {
-            intro: content.behavioral_snapshot_intro,
-            understandingGraphs: content.understanding_graphs_list,
-            keyInsights: content.key_insights_list,
-          }
+          intro: content.behavioral_snapshot_intro,
+          understandingGraphs: content.understanding_graphs_list,
+          keyInsights: content.key_insights_list,
+        }
         : null,
 
       // ── Career Intelligence (CI) Sections ──
@@ -725,30 +729,32 @@ export async function buildSchoolReportJSON(data: SchoolData) {
       // ── Blended Style / Academic Career Goals ──
       academicCareerGoals: blendedContent
         ? {
-            styleName: blendedContent.style_name,
-            styleDescription: blendedContent.style_desc,
-            suggestions: blendedContent.nature_suggestions,
-            keyBehaviours: blendedContent.key_behaviours,
-            typicalScenarios: blendedContent.typical_scenarios,
-            traitMapping: blendedContent.trait_mapping1,
-          }
+          styleName: blendedContent.style_name,
+          styleDescription: blendedContent.style_desc,
+          suggestions: blendedContent.nature_suggestions,
+          keyBehaviours: blendedContent.key_behaviours,
+          typicalScenarios: blendedContent.typical_scenarios,
+          traitMapping: blendedContent.trait_mapping1,
+        }
         : null,
 
       // ── Level-specific sections ──
       ...(data.school_level_id === 1
         ? {
-            // SSLC sections
-            whereYouFitBest: computeWhereYouFitBest(data),
-          }
+          // SSLC sections
+          whereYouFitBest: computeWhereYouFitBest(data),
+        }
         : {}),
 
       courseCompatibility: courseCompatibility.length > 0
         ? {
-            courses: courseCompatibility,
-            description:
-              'The course compatibility you\u2019ve received is based on your unique personality Report results, aiming to highlight programs that align well with your strengths and traits. However, this is not a fixed or singular recommendation. Your personal interests, evolving passions, and exposure to different fields also play a crucial role in shaping the right career path for you. We\u2019ve combined your profile with real-time industry data to give you a future-oriented perspective. Please keep in mind that course trends and career opportunities can shift from year to year as the world continues to evolve-new fields emerge, and existing ones transform. Use this as a guide, not a rulebook, to explore and make informed choices about your educational journey.',
-          }
+          courses: courseCompatibility,
+          description:
+            'The course compatibility you\u2019ve received is based on your unique personality Report results, aiming to highlight programs that align well with your strengths and traits. However, this is not a fixed or singular recommendation. Your personal interests, evolving passions, and exposure to different fields also play a crucial role in shaping the right career path for you. We\u2019ve combined your profile with real-time industry data to give you a future-oriented perspective. Please keep in mind that course trends and career opportunities can shift from year to year as the world continues to evolve-new fields emerge, and existing ones transform. Use this as a guide, not a rulebook, to explore and make informed choices about your educational journey.',
+        }
         : null,
+
+      topColleges: topColleges.length > 0 ? topColleges : null,
 
       streamSelectionContent: data.school_level_id === 1
         ? buildStreamSelectionContent()
