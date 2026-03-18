@@ -68,8 +68,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, currentView
                 </div>
 
                 {/* Content Area with Top Padding for Fixed Header */}
-                <main className="relative z-10 w-full min-h-screen pt-[90px] sm:pt-[98px] lg:pt-[105px] pb-10 bg-[url('/Background_Light_Theme.svg')] dark:bg-[url('/Background_Dark_Theme.svg')] bg-cover bg-top bg-no-repeat">
-                    <div className="w-full h-full px-4 sm:px-6 lg:px-8 2xl:px-12 max-w-[2000px] mx-auto transition-all duration-300 relative">
+                <main className="relative z-10 w-full min-h-screen pt-[clamp(70px,7.6vh,100px)] bg-[url('/Background_Light_Theme.svg')] dark:bg-[url('/Background_Dark_Theme.svg')] bg-cover bg-top bg-no-repeat">
+                    <div className="w-full h-full max-w-[2000px] mx-auto transition-all duration-300 relative">
                         {children ? children : <Dashboard />}
                     </div>
                 </main>

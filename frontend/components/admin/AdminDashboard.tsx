@@ -146,7 +146,7 @@ const AdminDashboard: React.FC = () => {
   ];
 
   return (
-    <div className="flex flex-col gap-6 pb-12">
+    <div className="relative min-h-screen bg-transparent dark:bg-[#19211C] font-sans transition-colors duration-300 overflow-hidden p-4 sm:p-6 lg:p-8 flex flex-col gap-6 pb-12">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
