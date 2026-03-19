@@ -36,9 +36,9 @@ const EmployeePreview: React.FC<EmployeePreviewProps> = ({ registration, onBack,
     const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
 
     // Filters
-    const [dateRangeLabel, setDateRangeLabel] = useState<string>("Today");
-    const [startDate, setStartDate] = useState<Date | null>(new Date());
-    const [endDate, setEndDate] = useState<Date | null>(new Date());
+    const [dateRangeLabel, setDateRangeLabel] = useState<string>("All");
+    const [startDate, setStartDate] = useState<Date | null>(null);
+    const [endDate, setEndDate] = useState<Date | null>(null);
     const [isDateModalOpen, setIsDateModalOpen] = useState(false);
     const [statusFilter, setStatusFilter] = useState<string | null>(null);
     const [showStatusDropdown, setShowStatusDropdown] = useState(false);
