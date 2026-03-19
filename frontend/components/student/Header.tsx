@@ -66,8 +66,8 @@ const NavItem: React.FC<NavItemProps> = ({
                 // LG/XL: Compact (h-7, px-2) 
                 // 2XL: Regular (h-8, px-3)
                 className={`flex items-center ${spacingClass} rounded-full transition-all duration-200 w-full ${isMobile ? "py-3.5" : "lg:h-10 2xl:h-10"} cursor-pointer ${active
-                    ? "bg-[#1ED36A] text-white shadow-none border border-transparent px-2.5 2xl:px-3"
-                    : "bg-white border border-gray-200 text-[#19211C] hover:bg-gray-50 hover:text-black hover:border-gray-300 dark:bg-transparent dark:border-white/10 dark:text-white/80 dark:hover:bg-white/5 dark:hover:text-white px-2.5 2xl:px-3"
+                    ? "bg-[#1ED36A] text-white shadow-none border border-transparent px-3 2xl:px-3.5"
+                    : "bg-white border border-gray-200 text-[#19211C] hover:bg-gray-50 hover:text-black hover:border-gray-300 dark:bg-transparent dark:border-white/10 dark:text-white/80 dark:hover:bg-white/5 dark:hover:text-white px-3 2xl:px-3.5"
                     }`}
             >
                 <div className={`${active ? "text-white" : "text-[#1ED36A] dark:text-white"}`}>
