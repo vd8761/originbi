@@ -83,7 +83,7 @@ const NavItem: React.FC<NavItemProps> = ({
                     }`}
             >
                 <div
-                    className={`${active ? "text-white" : "text-brand-green dark:text-brand-green"}`}
+                    className={`${active ? "text-white" : "text-brand-green dark:text-white"}`}
                 >
                     {icon}
                 </div>
