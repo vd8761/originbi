@@ -1,11 +1,27 @@
 import React, { useEffect, useState } from 'react';
 
-const PersonalityCard: React.FC = () => {
+interface PersonalityCardProps {
+    reportData?: any;
+    isLoadingReport?: boolean;
+}
+
+const PersonalityCard: React.FC<PersonalityCardProps> = ({ reportData, isLoadingReport }) => {
     const [trait, setTrait] = useState<{ id: number; name: string; code: string; colorRgb: string } | null>(null);
     const [isLoadingUser, setIsLoadingUser] = useState(true);
     const [isImageLoading, setIsImageLoading] = useState(true);
 
     useEffect(() => {
+        if (reportData) {
+            setTrait({
+                id: 0,
+                name: reportData.sections?.corePersonality?.archetype?.title || reportData.coreIdentity?.title || "Analytical Leader",
+                code: reportData.discProfile?.primaryType || "D",
+                colorRgb: "0,0,0"
+            });
+            setIsLoadingUser(false);
+            return;
+        }
+
         const checkUser = () => {
             const userStr = localStorage.getItem('user');
             if (userStr) {
@@ -55,12 +71,12 @@ const PersonalityCard: React.FC = () => {
     const firstName = nameWords[0] || "";
     const remainingName = nameWords.slice(1).join(' ');
 
-    const showLoading = isLoadingUser || isImageLoading;
+    const showLoading = !trait && (isLoadingUser || isLoadingReport);
 
     return (
         <div className="rounded-2xl relative w-full h-full min-h-[220px] md:min-h-[300px] overflow-hidden group bg-gradient-to-br from-[#150089] to-[#0D0055]">
             {showLoading && (
-                <div className="absolute inset-0 z-30 flex items-center justify-center bg-gradient-to-br from-[#150089] to-[#0D0055]">
+                <div className="absolute inset-0 z-30 flex items-center justify-center bg-transparent">
                     <div className="animate-spin rounded-full h-8 w-8 lg:h-12 lg:w-12 border-b-2 border-[#1ED36A]"></div>
                 </div>
             )}
@@ -77,7 +93,7 @@ const PersonalityCard: React.FC = () => {
             <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-transparent to-transparent z-15 pointer-events-none" />
 
             {/* Trait Image */}
-            <div className={`absolute inset-0 z-10 flex items-end justify-end transition-opacity duration-300 ${isImageLoading ? 'opacity-0' : 'opacity-100'}`}>
+            <div className="absolute inset-0 z-10 flex items-end justify-end transition-opacity duration-300">
                 <img
                     src={imageSrc}
                     alt={traitName}
@@ -91,7 +107,7 @@ const PersonalityCard: React.FC = () => {
             </div>
 
             {/* Content Overlay */}
-            <div className={`absolute inset-0 p-4 md:p-6 lg:p-[1.25vw] flex flex-col justify-start z-20 transition-opacity duration-500 ${showLoading ? 'opacity-0' : 'opacity-100'}`}>
+            <div className="absolute inset-0 p-4 md:p-6 lg:p-[1.25vw] flex flex-col justify-start z-20 transition-opacity duration-500">
                 {/* Your Personality */}
                 <h4 className="text-white/90 font-sans font-normal text-sm lg:text-[0.833vw] mb-[0.5em] lg:mb-[0.4vw] tracking-wide leading-none drop-shadow-sm">
                     Your Personality

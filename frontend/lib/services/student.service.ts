@@ -125,4 +125,23 @@ export const studentService = {
             throw error;
         }
     },
+
+    async getStudentReport(studentId: string | number) {
+        try {
+            // Use the student-service URL or proxy if needed. 
+            // Based on user request, the URL is student-service.sriharan.me
+            // But we should use the configured API_URL if possible.
+            // For now, I will use a path relative to API_URL if it's the same service, 
+            // otherwise I'll use the user provided one as a fallback or if API_URL is not set for reports.
+
+            const url = `${API_URL}/report/generate/student/${studentId}?api=true`;
+            const res = await fetch(url);
+            if (!res.ok) return null;
+            const result = await res.json();
+            return result.success ? result.data : null;
+        } catch (error) {
+            console.error("Failed to fetch student report", error);
+            return null;
+        }
+    }
 };
