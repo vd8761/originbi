@@ -52,6 +52,23 @@ import { logger } from '../../helpers/logger';
 
 export class SchoolReport extends BaseReport {
   private data: SchoolData;
+  private ci_careerFitScores: {
+    label: string;
+    score: number;
+    readiness: number;
+    confidenceSignal: boolean;
+  }[] = [];
+  private ci_careerAlignmentSummary: {
+    bestFit: string;
+    secondaryFit: string;
+    confidence: 'High' | 'Moderate' | 'Exploratory';
+    topGap: number;
+  } = {
+    bestFit: '',
+    secondaryFit: '',
+    confidence: 'Exploratory',
+    topGap: 0,
+  };
 
   constructor(data: SchoolData, options?: PDFKit.PDFDocumentOptions) {
     super(options);
@@ -400,11 +417,132 @@ export class SchoolReport extends BaseReport {
 
     this.ci_sortedTraits = scores;
     this.ci_topTwo = scores[0].type + scores[1].type;
-    this.ci_careerAlignmentIntensity = Math.min(
-      15,
-      Math.round((scores[0].val + scores[1].val) / 10),
-    );
     this.ci_detectPatterns();
+    this.ci_computeCareerAlignment();
+  }
+
+  private ci_normalizeAgileScore(value: number): number {
+    return Math.min(100, Math.round((value / 25) * 100));
+  }
+
+  private ci_getCareerFitScores(): {
+    label: string;
+    score: number;
+    readiness: number;
+    confidenceSignal: boolean;
+  }[] {
+    const agile = this.data.agile_scores?.[0];
+    const profile = {
+      D: this.data.score_D,
+      I: this.data.score_I,
+      S: this.data.score_S,
+      C: this.data.score_C,
+      Courage: this.ci_normalizeAgileScore(agile?.courage ?? 0),
+      Respect: this.ci_normalizeAgileScore(agile?.respect ?? 0),
+      Focus: this.ci_normalizeAgileScore(agile?.focus ?? 0),
+      Commitment: this.ci_normalizeAgileScore(agile?.commitment ?? 0),
+      Openness: this.ci_normalizeAgileScore(agile?.openness ?? 0),
+    };
+
+    const models: {
+      label: string;
+      targets: { key: keyof typeof profile; target: number; weight: number }[];
+      readinessKeys: (keyof typeof profile)[];
+    }[] = [
+      {
+        label: 'Engineering & Technology',
+        targets: [
+          { key: 'C', target: 88, weight: 0.22 },
+          { key: 'Focus', target: 85, weight: 0.2 },
+          { key: 'Commitment', target: 72, weight: 0.16 },
+          { key: 'D', target: 52, weight: 0.12 },
+          { key: 'Openness', target: 48, weight: 0.1 },
+          { key: 'S', target: 46, weight: 0.1 },
+          { key: 'Courage', target: 58, weight: 0.1 },
+        ],
+        readinessKeys: ['Focus', 'Commitment', 'C'],
+      },
+      {
+        label: 'Management & Leadership',
+        targets: [
+          { key: 'D', target: 86, weight: 0.22 },
+          { key: 'Courage', target: 82, weight: 0.18 },
+          { key: 'Commitment', target: 72, weight: 0.16 },
+          { key: 'I', target: 62, weight: 0.14 },
+          { key: 'Focus', target: 60, weight: 0.1 },
+          { key: 'Openness', target: 56, weight: 0.08 },
+          { key: 'Respect', target: 52, weight: 0.06 },
+          { key: 'C', target: 48, weight: 0.06 },
+        ],
+        readinessKeys: ['Courage', 'Commitment', 'Focus'],
+      },
+      {
+        label: 'Creative & Design',
+        targets: [
+          { key: 'I', target: 84, weight: 0.22 },
+          { key: 'Openness', target: 86, weight: 0.22 },
+          { key: 'Courage', target: 60, weight: 0.12 },
+          { key: 'Commitment', target: 50, weight: 0.1 },
+          { key: 'Focus', target: 52, weight: 0.1 },
+          { key: 'D', target: 48, weight: 0.08 },
+          { key: 'Respect', target: 58, weight: 0.08 },
+          { key: 'C', target: 42, weight: 0.08 },
+        ],
+        readinessKeys: ['Openness', 'Courage', 'I'],
+      },
+      {
+        label: 'People & HR',
+        targets: [
+          { key: 'S', target: 84, weight: 0.22 },
+          { key: 'Respect', target: 84, weight: 0.22 },
+          { key: 'I', target: 66, weight: 0.14 },
+          { key: 'Commitment', target: 70, weight: 0.14 },
+          { key: 'Openness', target: 58, weight: 0.1 },
+          { key: 'Focus', target: 56, weight: 0.08 },
+          { key: 'Courage', target: 46, weight: 0.05 },
+          { key: 'D', target: 40, weight: 0.05 },
+        ],
+        readinessKeys: ['Respect', 'Commitment', 'S'],
+      },
+    ];
+
+    return models
+      .map((model) => {
+        const weightedScore = model.targets.reduce((sum, dim) => {
+          const closeness = Math.max(
+            0,
+            100 - Math.abs(profile[dim.key] - dim.target),
+          );
+          return sum + closeness * dim.weight;
+        }, 0);
+        const readiness = Math.round(
+          model.readinessKeys.reduce((sum, key) => sum + profile[key], 0) /
+            model.readinessKeys.length,
+        );
+
+        return {
+          label: model.label,
+          score: Math.round(weightedScore),
+          readiness,
+          confidenceSignal: readiness >= 70,
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+  }
+
+  private ci_computeCareerAlignment(): void {
+    this.ci_careerFitScores = this.ci_getCareerFitScores();
+    const [bestFit, secondFit] = this.ci_careerFitScores;
+    const gap = Math.max(0, (bestFit?.score ?? 0) - (secondFit?.score ?? 0));
+
+    this.ci_careerAlignmentIntensity = bestFit?.score ?? 0;
+    this.ci_careerAlignmentSummary = {
+      bestFit: bestFit?.label ?? 'Exploratory pathways',
+      secondaryFit: secondFit?.label ?? 'Multiple emerging options',
+      confidence:
+        gap >= 8 ? 'High' : gap >= 4 ? 'Moderate' : 'Exploratory',
+      topGap: gap,
+    };
   }
 
   // --- GENERATE PERSONALIZED INSIGHTS ---
@@ -3696,32 +3834,42 @@ export class SchoolReport extends BaseReport {
   // --- S1: Career Alignment Index with Gauge ---
 
   private ci_generateCareerAlignmentIndex(): void {
-    this.ensureSpace(0.12, true);
+    this.ensureSpace(0.2, true);
 
     this.h1('Career Alignment Index');
 
-    // Draw the visual gauge
     this.drawProgressGauge(
       this.ci_careerAlignmentIntensity,
-      15,
-      `${this.ci_careerAlignmentIntensity} / 15`,
+      100,
+      `${this.ci_careerAlignmentIntensity} / 100`,
     );
 
     this.doc.y += 8;
 
-    // Interpretation text
+    const { bestFit, secondaryFit, confidence, topGap } =
+      this.ci_careerAlignmentSummary;
+
     let interpretation: string;
-    if (this.ci_careerAlignmentIntensity >= 12) {
+    if (this.ci_careerAlignmentIntensity >= 80) {
       interpretation =
-        'This student demonstrates strong compatibility across structured, analytical, and strategic career pathways. The profile indicates multi-domain adaptability with particular strength in precision-oriented environments.';
-    } else if (this.ci_careerAlignmentIntensity >= 8) {
+        `Your profile shows strong alignment with ${bestFit}. The signals are consistent enough to suggest a clear direction, with ${secondaryFit} as a credible secondary pathway.`;
+    } else if (this.ci_careerAlignmentIntensity >= 70) {
       interpretation =
-        'This student shows solid career alignment across multiple professional domains. With focused development, the profile indicates strong potential for growth in both collaborative and independent work environments.';
+        `Your profile currently aligns best with ${bestFit}, while ${secondaryFit} remains a nearby alternative. Additional exposure and skill-building will help clarify which direction should lead.`;
     } else {
       interpretation =
-        "This student's career profile is still developing across key domains. Targeted exposure to structured learning experiences and mentorship will accelerate alignment with high-impact career pathways.";
+        `Your profile is still exploratory across career pathways. ${bestFit} is the strongest current direction, but more practical exposure will be useful before narrowing your path.`;
     }
 
+    this.p(
+      `Best-fit direction: ${bestFit} | Secondary direction: ${secondaryFit} | Confidence: ${confidence} (${topGap}% separation)`,
+      {
+        font: this.FONT_SEMIBOLD,
+        fontSize: 9,
+        color: CI_COLORS.DARK_TEXT,
+        gap: 4,
+      },
+    );
     this.p(interpretation, { gap: 6 });
     // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
@@ -4256,7 +4404,10 @@ export class SchoolReport extends BaseReport {
     const barHeight = 22;
     const y = this.doc.y;
     const fillRatio = Math.min(1, Math.max(0, value / max));
-    const fillWidth = width * fillRatio;
+    const visualTickCount = 20;
+    const snappedRatio =
+      Math.round(fillRatio * visualTickCount) / visualTickCount;
+    const fillWidth = width * snappedRatio;
 
     // Background track
     this.doc.roundedRect(x, y, width, barHeight, 4).fill(CI_COLORS.GAUGE_BG);
@@ -4270,7 +4421,7 @@ export class SchoolReport extends BaseReport {
     }
 
     // Tick marks
-    const tickCount = max;
+    const tickCount = visualTickCount;
     for (let i = 1; i < tickCount; i++) {
       const tickX = x + (width * i) / tickCount;
       this.doc
