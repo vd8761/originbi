@@ -434,14 +434,22 @@ const RegistrationManagement: React.FC = () => {
             <button
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className="w-8 h-8 rounded-full bg-brand-light-tertiary dark:bg-[#303438] flex items-center justify-center text-brand-text-light-secondary dark:text-gray-400 hover:text-brand-text-light-primary dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                currentPage === 1
+                  ? "bg-brand-light-tertiary dark:bg-[#303438] text-brand-text-light-secondary dark:text-gray-400 border border-transparent dark:border-[#FFFFFF1F]"
+                  : "bg-brand-green text-white shadow-lg shadow-brand-green/20 hover:bg-brand-green/90"
+              }`}
             >
               <ArrowLeftWithoutLineIcon className="w-3 h-3" />
             </button>
             <button
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="w-8 h-8 rounded-full bg-brand-green flex items-center justify-center text-white shadow-lg shadow-brand-green/20 transition-colors hover:bg-brand-green/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                currentPage === totalPages
+                  ? "bg-brand-light-tertiary dark:bg-[#303438] text-brand-text-light-secondary dark:text-gray-400 border border-transparent dark:border-[#FFFFFF1F]"
+                  : "bg-brand-green text-white shadow-lg shadow-brand-green/20 hover:bg-brand-green/90"
+              }`}
             >
               <ArrowRightWithoutLineIcon className="w-3 h-3" />
             </button>
