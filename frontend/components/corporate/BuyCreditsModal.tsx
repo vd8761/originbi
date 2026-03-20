@@ -113,7 +113,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                 </div>
 
                 {/* Price Display */}
-                <div className="text-center pt-3 pb-1 px-3">
+                <div className="text-center pt-3 pb-4 px-3">
                     <div className="text-[11px] sm:text-[12px] text-[#19211C] dark:text-gray-400 font-medium mb-0.5">
                         <span className="font-bold text-[#150089] dark:text-white line-clamp-1">₹{PER_CREDIT_COST} Per Credit (Taxes Extra, If Applicable)</span>
                     </div>
@@ -241,7 +241,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                     </div>
 
                     {/* Pricing Summary - Accordion Style */}
-                    <div className="bg-[#F8F9FB] dark:bg-white/5 rounded-[14px] px-3 py-2.5 cursor-pointer transition-all border border-transparent hover:border-gray-200 dark:hover:border-white/10" onClick={() => setIsPricingExpanded(!isPricingExpanded)}>
+                    <div className="bg-[#F8F9FB] dark:bg-white/5 rounded-[14px] px-3 pt-2.5 pb-3 cursor-pointer transition-all border border-transparent hover:border-gray-200 dark:hover:border-white/10" onClick={() => setIsPricingExpanded(!isPricingExpanded)}>
                         <div className="flex justify-between items-center">
                             <h4 className="font-bold text-[13px] text-[#19211C] dark:text-white">Pricing Summary</h4>
                             <svg

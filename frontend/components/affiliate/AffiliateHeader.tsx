@@ -56,21 +56,21 @@ interface NavItemProps {
 
 const NavItem: React.FC<NavItemProps> = ({ icon, label, active, isMobile, onClick }) => {
     const showDesktopText = "hidden lg:inline";
-    const spacingClass = isMobile ? "gap-3" : "justify-center gap-0 lg:gap-1 2xl:gap-2";
+    const spacingClass = isMobile ? "gap-3" : "justify-center gap-2";
 
     return (
         <div className="relative group">
             <button
                 onClick={onClick}
-                className={`flex items-center ${spacingClass} rounded-full transition-all duration-200 w-full lg:h-8 2xl:h-9 cursor-pointer ${isMobile ? "py-3 min-h-[44px]" : ""} ${active
-                    ? `bg-brand-green text-white shadow-none border border-transparent ${isMobile ? "px-4" : "px-2.5 2xl:px-4"}`
-                    : `bg-white border border-gray-200 text-[#19211C] hover:bg-gray-50 hover:text-black hover:border-gray-300 dark:bg-transparent dark:border-white/10 dark:text-white/80 dark:hover:bg-white/5 dark:hover:text-white ${isMobile ? "px-4" : "px-2.5 2xl:px-4"}`
+                className={`flex items-center ${spacingClass} rounded-full transition-all duration-200 w-full ${isMobile ? "py-3.5" : "lg:h-10 2xl:h-10"} cursor-pointer ${active
+                    ? `bg-brand-green text-white border border-transparent shadow-none ${isMobile ? "px-4.5" : "px-3 2xl:px-3.5"}`
+                    : `bg-gray-50 border border-gray-200 text-[#19211C] hover:bg-gray-100 hover:text-black hover:border-gray-300 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white ${isMobile ? "px-4.5" : "px-3 2xl:px-3.5"}`
                     }`}
             >
                 <div className={`${active ? "text-white" : "text-brand-green dark:text-white"}`}>
                     {icon}
                 </div>
-                <span className={`font-medium text-xs 2xl:text-sm whitespace-nowrap ml-1.5 2xl:ml-2 ${isMobile ? "inline" : showDesktopText}`}>
+                <span className={`font-medium ${isMobile ? "text-sm" : "text-[10.5px] 2xl:text-[11.5px]"} whitespace-nowrap ${isMobile ? "inline" : showDesktopText}`}>
                     {label}
                 </span>
             </button>
@@ -335,13 +335,7 @@ const AffiliateHeader: React.FC<AffiliateHeaderProps> = ({ onLogout, onNavigate 
 
                     <img src="/Origin-BI-Logo-01.png" alt="OriginBI Logo" className="h-5 lg:h-5.5 2xl:h-6 w-auto dark:hidden" />
                     <img src="/Origin-BI-white-logo.png" alt="OriginBI Logo" className="h-5 lg:h-5.5 2xl:h-6 w-auto hidden dark:block" />
-
-                    {/* Affiliate Badge */}
-                    <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] 2xl:text-xs font-bold bg-brand-green/10 text-brand-green border border-brand-green/20 tracking-wider uppercase">
-                        Affiliate
-                    </span>
-
-                    <nav className="hidden md:flex items-center space-x-1 lg:space-x-1 2xl:space-x-2 ml-2 lg:ml-2 2xl:ml-6">
+                    <nav className="hidden md:flex items-center space-x-1 lg:space-x-1 2xl:space-x-1.5 ml-1.5 lg:ml-1.5 2xl:ml-3">
                         {renderNavItems(false)}
                     </nav>
                 </div>
@@ -357,7 +351,7 @@ const AffiliateHeader: React.FC<AffiliateHeaderProps> = ({ onLogout, onNavigate 
                     <div className="relative" ref={notificationsMenuRef}>
                         <button
                             onClick={handleNotificationClick}
-                            className={`w-8 h-8 2xl:w-8.5 2xl:h-8.5 rounded-full flex items-center justify-center transition-all relative cursor-pointer ${isNotificationsOpen
+                            className={`w-8 h-8 2xl:w-8 2xl:h-8 rounded-full flex items-center justify-center transition-all relative cursor-pointer ${isNotificationsOpen
                                 ? "bg-[#1ED36A] text-white border-transparent"
                                 : "bg-white border border-gray-200 text-[#150089] hover:bg-gray-50 hover:border-gray-300 dark:bg-brand-dark-tertiary dark:border-transparent dark:text-white dark:hover:bg-gray-800"
                                 }`}
@@ -469,7 +463,7 @@ const AffiliateHeader: React.FC<AffiliateHeaderProps> = ({ onLogout, onNavigate 
                         )}
                     </div>
 
-                    <div className="w-px h-6 lg:h-6 2xl:h-8 bg-gray-300 dark:bg-brand-dark-tertiary hidden lg:block mx-2 2xl:mx-3"></div>
+                    <div className="w-px h-6 lg:h-6 2xl:h-7 bg-gray-300 dark:bg-brand-dark-tertiary hidden lg:block mx-1 2xl:mx-2"></div>
 
                     {/* User Profile Section */}
                     <div className="relative" ref={profileMenuRef}>
@@ -480,7 +474,7 @@ const AffiliateHeader: React.FC<AffiliateHeaderProps> = ({ onLogout, onNavigate 
                             <img
                                 src={`https://ui-avatars.com/api/?name=${encodeURIComponent(affiliateData?.full_name || 'Affiliate User')}&background=150089&color=fff`}
                                 alt="User Avatar"
-                                className="w-9 h-9 2xl:w-10 2xl:h-10 rounded-full border border-brand-light-tertiary dark:border-transparent"
+                                className="w-9 h-9 2xl:w-9 2xl:h-9 rounded-full border border-brand-light-tertiary dark:border-transparent"
                             />
                             <div className="hidden xl:block">
                                 <p className="font-semibold text-sm 2xl:text-sm leading-tight text-[#19211C] dark:text-brand-text-primary">
