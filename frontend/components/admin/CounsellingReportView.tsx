@@ -285,7 +285,7 @@ const CounsellingReportView: React.FC<Props> = ({ onBack }) => {
             )}
 
             {/* Table */}
-            <div className="flex-1 overflow-auto bg-white dark:bg-brand-dark-secondary rounded-xl border border-gray-200 dark:border-brand-dark-tertiary">
+            <div className="flex-1 overflow-auto bg-white dark:bg-[#19211C]/90 backdrop-blur-sm rounded-xl border border-gray-200 dark:border-brand-dark-tertiary shadow-xl">
                 {isLoading ? (
                     <div className="flex items-center justify-center h-64">
                         <div className="animate-spin w-8 h-8 border-4 border-brand-green border-t-transparent rounded-full"></div>
@@ -299,26 +299,26 @@ const CounsellingReportView: React.FC<Props> = ({ onBack }) => {
                     </div>
                 ) : (
                     <table className="w-full">
-                        <thead className="bg-gray-50 dark:bg-brand-dark-tertiary">
+                        <thead className="sticky top-0 z-20 bg-[#19211C]/4 dark:bg-[#FFFFFF1F] shadow-sm">
                             <tr>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Student</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Contact</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">DISC Profile</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Personality</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Report</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Actions</th>
+                                <th className="px-4 py-3 text-left text-xs font-normal text-gray-600 dark:text-brand-text-secondary uppercase">Student</th>
+                                <th className="px-4 py-3 text-left text-xs font-normal text-gray-600 dark:text-brand-text-secondary uppercase">Contact</th>
+                                <th className="px-4 py-3 text-left text-xs font-normal text-gray-600 dark:text-brand-text-secondary uppercase">DISC Profile</th>
+                                <th className="px-4 py-3 text-left text-xs font-normal text-gray-600 dark:text-brand-text-secondary uppercase">Personality</th>
+                                <th className="px-4 py-3 text-center text-xs font-normal text-gray-600 dark:text-brand-text-secondary uppercase">Report</th>
+                                <th className="px-4 py-3 text-center text-xs font-normal text-gray-600 dark:text-brand-text-secondary uppercase">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200 dark:divide-brand-dark-tertiary">
+                        <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                             {sessions.map((session) => (
-                                <tr key={session.id} className="hover:bg-gray-50 dark:hover:bg-brand-dark-tertiary/50 transition-colors">
+                                <tr key={session.id} className="border-b border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                                     <td className="px-4 py-4">
                                         <div className="font-medium text-gray-900 dark:text-white">{session.studentName || 'Unknown'}</div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400">{session.counsellingType}</div>
+                                        <div className="text-xs text-gray-500 dark:text-brand-text-secondary">{session.counsellingType}</div>
                                     </td>
                                     <td className="px-4 py-4">
-                                        <div className="text-sm text-gray-700 dark:text-gray-300">{session.mobileNumber}</div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400">{session.email || '-'}</div>
+                                        <div className="text-sm text-gray-700 dark:text-brand-text-primary">{session.mobileNumber}</div>
+                                        <div className="text-xs text-gray-500 dark:text-brand-text-secondary">{session.email || '-'}</div>
                                     </td>
                                     <td className="px-4 py-4">
                                         {session.discScores && (
@@ -338,7 +338,7 @@ const CounsellingReportView: React.FC<Props> = ({ onBack }) => {
                                         )}
                                     </td>
                                     <td className="px-4 py-4">
-                                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                                        <span className="text-sm text-gray-700 dark:text-brand-text-primary">
                                             {session.personalityTraitName || session.dominantTrait || '-'}
                                         </span>
                                     </td>
@@ -380,9 +380,13 @@ const CounsellingReportView: React.FC<Props> = ({ onBack }) => {
                     <button
                         onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                         disabled={currentPage === 1}
-                        className="p-2 text-gray-600 dark:text-white hover:text-brand-green disabled:opacity-30"
+                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                            currentPage === 1
+                                ? "bg-white dark:bg-[#FFFFFF1F] text-[#19211C] dark:text-white border border-transparent dark:border-[#FFFFFF1F]"
+                                : "bg-brand-green text-white shadow-lg shadow-brand-green/20 hover:bg-brand-green/90"
+                        }`}
                     >
-                        <ArrowLeftWithoutLineIcon className="w-4 h-4" />
+                        <ArrowLeftWithoutLineIcon className="w-3 h-3" />
                     </button>
                     {[...Array(totalPages)].map((_, i) => (
                         <button
@@ -399,9 +403,13 @@ const CounsellingReportView: React.FC<Props> = ({ onBack }) => {
                     <button
                         onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                         disabled={currentPage === totalPages}
-                        className="p-2 text-gray-600 dark:text-white hover:text-brand-green disabled:opacity-30"
+                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                            currentPage === totalPages
+                                ? "bg-white dark:bg-[#FFFFFF1F] text-[#19211C] dark:text-white border border-transparent dark:border-[#FFFFFF1F]"
+                                : "bg-brand-green text-white shadow-lg shadow-brand-green/20 hover:bg-brand-green/90"
+                        }`}
                     >
-                        <ArrowRightWithoutLineIcon className="w-4 h-4" />
+                        <ArrowRightWithoutLineIcon className="w-3 h-3" />
                     </button>
                 </div>
             </div>

@@ -42,6 +42,7 @@ const config: Config = {
                 "slide-in-right": "slide-in-right 0.3s ease-out forwards",
                 "slide-down": "slide-down 0.2s ease-out forwards",
                 "slide-in-left": "slide-in-left 0.3s ease-out forwards",
+                "fade-in-fast": "fade-in-fast 0.2s ease-out forwards",
             },
             keyframes: {
                 "slide-down": {
@@ -59,6 +60,10 @@ const config: Config = {
                 "fade-in": {
                     "0%": { opacity: "0.5", transform: "scale(1.05)" },
                     "100%": { opacity: "1", transform: "scale(1)" },
+                },
+                "fade-in-fast": {
+                    "0%": { opacity: "0" },
+                    "100%": { opacity: "1" },
                 },
                 blob: {
                     "0%": { transform: "translate(0px, 0px) scale(1)" },

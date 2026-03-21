@@ -65,11 +65,29 @@ const StatRow: React.FC<{
     </div>
 );
 
-const ImpactAssessmentCard: React.FC = () => {
+interface ImpactAssessmentCardProps {
+    reportData?: any;
+    isLoadingReport?: boolean;
+}
+
+const ImpactAssessmentCard: React.FC<ImpactAssessmentCardProps> = ({ reportData, isLoadingReport }) => {
     const [stats, setStats] = useState<ImpactStats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        if (reportData) {
+            const heatmap = reportData.sections?.skillHeatmap || [];
+            const getSkillValue = (label: string) => heatmap.find((h: any) => h.label === label)?.value || 0;
+
+            setStats({
+                personalityAvg: getSkillValue('Adaptability') || 70, // Fallback to Adaptability
+                agilityAvg: getSkillValue('Innovation') || 65,     // Fallback to Innovation
+                leadershipScore: getSkillValue('Leadership') || 60 // Fallback to Leadership
+            });
+            setIsLoading(false);
+            return;
+        }
+
         const checkUser = () => {
             const userStr = localStorage.getItem('user');
             if (userStr) {
@@ -113,7 +131,12 @@ const ImpactAssessmentCard: React.FC = () => {
     const personality = stats?.personalityAvg ?? 0;
     const agility = stats?.agilityAvg ?? 0;
     const leadership = stats?.leadershipScore ?? 0;
-    const overallScore = stats ? Math.round((personality + agility + leadership) / 3) : 0;
+
+    // Overall score from careerAlignmentIndex if available
+    const careerAlignment = reportData?.sections?.careerAlignmentIndex;
+    const overallScore = careerAlignment?.score
+        ? Math.round((careerAlignment.score / (careerAlignment.maxScore || 100)) * 100)
+        : (stats ? Math.round((personality + agility + leadership) / 3) : 0);
 
     // Updated Executive Professional colors
     const colors = {
@@ -122,8 +145,10 @@ const ImpactAssessmentCard: React.FC = () => {
         leadership: '#2DD4BF',  // Energy & Growth (Turquoise)
     };
 
+    const isAnyLoading = !stats && (isLoading || isLoadingReport);
+
     return (
-        <div className="bg-white/20 border border-[#19211C]/12 dark:bg-brand-dark-secondary dark:border-transparent rounded-2xl h-full flex flex-col p-6 lg:p-[1.25vw]">
+        <div className="dashboard-glass-card h-full flex flex-col p-6 lg:p-[1.25vw]">
             {/* Header */}
             <div className="mb-6 lg:mb-[1.5vw] text-center">
                 <h3 className="font-semibold font-sans text-[#19211C] dark:text-white text-lg lg:text-[1.25vw] leading-tight">
@@ -134,7 +159,7 @@ const ImpactAssessmentCard: React.FC = () => {
                 </p>
             </div>
 
-            {isLoading ? (
+            {isAnyLoading ? (
                 <div className="flex-1 flex items-center justify-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-green"></div>
                 </div>

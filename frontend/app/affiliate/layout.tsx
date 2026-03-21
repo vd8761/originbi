@@ -67,15 +67,9 @@ export default function AffiliateLayout({
     };
 
     return (
-        <div className="relative min-h-screen w-full bg-transparent dark:bg-black font-sans selection:bg-brand-green/20 overflow-x-hidden">
+        <div className="relative min-h-screen w-full bg-transparent dark:bg-[#19211C] font-sans selection:bg-brand-green/20 overflow-x-hidden">
 
-            {/* BACKGROUND LAYERS - Only Show on Protected Pages */}
-            {showHeader && (
-                <div className="fixed inset-0 pointer-events-none z-0">
-                    <div className="absolute inset-0 bg-[url('/Background_Light_Theme.svg')] bg-cover bg-center bg-no-repeat opacity-100 dark:hidden" />
-                    <div className="absolute inset-0 bg-[url('/Background_Dark_Theme.svg')] bg-cover bg-center bg-no-repeat opacity-100 hidden dark:block" />
-                </div>
-            )}
+
 
             {/* Zoom Wrapper */}
             <div className={`w-full min-h-screen ${showHeader ? 'lg:[zoom:0.85] xl:[zoom:0.9] 2xl:[zoom:1.0]' : ''}`}>
@@ -90,7 +84,7 @@ export default function AffiliateLayout({
                             />
                         </div>
 
-                        <div className="relative z-10 w-full min-h-screen pt-[clamp(70px,7.6vh,100px)]">
+                        <div className="relative z-10 w-full min-h-screen pt-[clamp(70px,7.6vh,100px)] portal-bg">
                             <div className="w-full h-full max-w-[2000px] mx-auto transition-all duration-300 relative">
                                 {children}
                             </div>
