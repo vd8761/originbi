@@ -190,7 +190,12 @@ export class RagService {
 
   // Disambiguation follow-up cache: remembers the search term when multiple candidates are shown
   // so that a bare number reply ("1", "#2") re-routes to the correct handler.
-  private disambiguationCache = new Map<string, { searchTerm: string; timestamp: number; handler?: string }>();
+  private disambiguationCache = new Map<string, {
+    searchTerm: string;
+    timestamp: number;
+    handler?: string;
+    options?: string[];
+  }>();
   private readonly DISAMBIG_EXPIRY = 5 * 60 * 1000; // 5 minutes
 
   // ── PAGINATION STATE ──
@@ -682,12 +687,25 @@ export class RagService {
         const ctx = this.disambiguationCache.get(disambigKey);
         if (ctx && Date.now() - ctx.timestamp < this.DISAMBIG_EXPIRY) {
           this.logger.log(`🔢 Bare number "${normalizedQ}" detected — resuming disambiguation for "${ctx.searchTerm}" (handler=${ctx.handler || 'career_report'})`);
+          const selectedIndex = parseInt(bareNumberMatch[1], 10) - 1;
+          if (ctx.options?.length && (selectedIndex < 0 || selectedIndex >= ctx.options.length)) {
+            return {
+              answer: `**❌ Invalid selection.** Please use a number between 1 and ${ctx.options.length}.`,
+              searchType: 'disambiguation',
+              confidence: 0.4,
+            };
+          }
+
+          const selectedName = ctx.options?.[selectedIndex];
           this.disambiguationCache.delete(disambigKey);
+
+          const targetTerm = selectedName || `${ctx.searchTerm} #${bareNumberMatch[1]}`;
+
           // Route to the correct handler based on what created the disambiguation
           if (ctx.handler === 'person_lookup') {
-            return await this.handlePersonLookup(`${ctx.searchTerm} #${bareNumberMatch[1]}`, user);
+            return await this.handlePersonLookup(targetTerm, user);
           }
-          return await this.handleCareerReport(`${ctx.searchTerm} #${bareNumberMatch[1]}`, user);
+          return await this.handleCareerReport(targetTerm, user);
         }
       }
 
@@ -816,6 +834,17 @@ export class RagService {
 
         if (agentResult && agentResult.confidence > 0.3) {
           this.logger.log(`✅ Agentic RAG succeeded: tools=[${agentResult.toolsUsed.join('+')}] confidence=${agentResult.confidence} plan=${agentResult.planningTimeMs}ms exec=${agentResult.executionTimeMs}ms`);
+
+          // Persist disambiguation context produced by Agentic person lookup so bare-number follow-ups work.
+          const disambiguation = agentResult.sources?.disambiguation;
+          if (agentResult.searchType === 'disambiguation' && disambiguation?.searchTerm && Array.isArray(disambiguation?.options)) {
+            this.disambiguationCache.set(this.getDisambiguationKey(user), {
+              searchTerm: disambiguation.searchTerm,
+              timestamp: Date.now(),
+              handler: disambiguation.handler || 'person_lookup',
+              options: disambiguation.options,
+            });
+          }
 
           // Track intent/entities from the agent response for stronger follow-up memory.
           const primaryIntent = agentResult.toolsUsed?.find(t => t !== 'conversation_context') || agentResult.searchType;
@@ -2267,6 +2296,8 @@ export class RagService {
         this.disambiguationCache.set(this.getDisambiguationKey(user), {
           searchTerm: cleanSearchTerm,
           timestamp: Date.now(),
+          handler: 'career_report',
+          options: personData.slice(0, 10).map((p: any) => p.full_name),
         });
 
         return {
@@ -2491,6 +2522,7 @@ export class RagService {
           searchTerm: cleanSearch,
           timestamp: Date.now(),
           handler: 'person_lookup',
+          options: uniquePersons.map((entry: any) => entry.person.full_name),
         });
 
         return {

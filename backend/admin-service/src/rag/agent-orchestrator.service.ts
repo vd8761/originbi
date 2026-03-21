@@ -140,8 +140,8 @@ export class AgentOrchestratorService {
       this.synthesizerLlm = new ChatGoogleGenerativeAI({
         apiKey,
         model: 'gemini-2.5-flash',
-        temperature: 0.3,
-        maxOutputTokens: 1800,
+        temperature: 0.2,
+        maxOutputTokens: 900,
         callbacks: [getTokenTrackerCallback('Agent Synthesizer')],
       });
     }
@@ -155,8 +155,8 @@ export class AgentOrchestratorService {
       this.synthesizerFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
-        temperature: 0.3,
-        maxTokens: 1800,
+        temperature: 0.2,
+        maxTokens: 900,
         timeout: 15000,
         callbacks: [getTokenTrackerCallback('Agent Synthesizer (Groq Fallback)')],
       });
@@ -172,7 +172,7 @@ export class AgentOrchestratorService {
         apiKey,
         model: 'gemini-2.5-flash',
         temperature: 0,
-        maxOutputTokens: 256, // Reflections are very compact
+        maxOutputTokens: 160, // Reflections are very compact
         callbacks: [getTokenTrackerCallback('Agent Reflector')],
       });
     }
@@ -187,7 +187,7 @@ export class AgentOrchestratorService {
         apiKey,
         model: 'llama-3.3-70b-versatile',
         temperature: 0,
-        maxTokens: 256,
+        maxTokens: 160,
         timeout: 8000,
         callbacks: [getTokenTrackerCallback('Agent Reflector (Groq Fallback)')],
       });
@@ -227,6 +227,36 @@ export class AgentOrchestratorService {
       let results = await this.execute(plan, question, user, conversationId, conversationHistory);
       const executionTimeMs = Date.now() - execStart;
       this.logger.log(`⚡ Executed ${results.length} tools in ${executionTimeMs}ms`);
+
+      const disambiguationResult = results.find(
+        (r) => r.toolName === 'person_lookup' && r.success && r.data?.disambiguationNeeded,
+      );
+      if (disambiguationResult) {
+        const matches = Array.isArray(disambiguationResult.data?.allMatches)
+          ? disambiguationResult.data.allMatches
+          : [];
+        const options = matches
+          .map((m: any) => m?.full_name)
+          .filter((n: any) => typeof n === 'string' && n.trim().length > 0)
+          .slice(0, 10);
+
+        return {
+          answer: disambiguationResult.summary,
+          searchType: 'disambiguation',
+          confidence: 0.7,
+          sources: {
+            disambiguation: {
+              handler: 'person_lookup',
+              searchTerm: disambiguationResult.data?.queryName || this.extractNameFromQuestion(question) || question,
+              options,
+            },
+          },
+          toolsUsed: ['person_lookup'],
+          planningTimeMs,
+          executionTimeMs,
+          complexityScore: complexity.score,
+        };
+      }
 
       // Record telemetry for executed tools
       for (const r of results) {
@@ -279,7 +309,7 @@ export class AgentOrchestratorService {
 
       // ── STEP 4: ReAct SELF-REFLECTION — Validate answer quality ──
       let reflectionApplied = false;
-      if (complexity.score >= 5 && answer.length > 20) {
+      if (complexity.score >= 7 && answer.length > 120) {
         const reflection = await this.reflectOnAnswer(question, answer, results);
         if (reflection.needsImprovement && reflection.improvedAnswer) {
           this.logger.log(`🔄 ReAct reflection applied: ${reflection.reason}`);
@@ -1241,47 +1271,44 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
     results: ToolResult[],
     user: UserContext,
   ): Promise<string> {
+    const role = (user?.role || 'STUDENT').toUpperCase();
+    const roleRules = ['STUDENT', 'INDIVIDUAL', 'COUNSELLOR', 'COUNSELOR'].includes(role)
+      ? `STUDENT RULES:
+- Answer only what was asked.
+- Keep simple requests to 1-2 short sentences.
+- Skip salary/company comparisons unless explicitly asked.`
+      : role === 'CORPORATE'
+        ? `CORPORATE RULES:
+- Keep output executive, concise, and data-first.
+- Prioritize metrics, trends, and actions.`
+        : `ADMIN RULES:
+- Be precise and complete without unnecessary prose.`;
+
     const toolOutputs = results.map(r => {
       return `── ${r.toolName.toUpperCase()} RESULT ──
 ${r.summary}
 ${r.data?.answer ? `\nDetailed Answer:\n${r.data.answer?.slice(0, 2000)}` : ''}`;
     }).join('\n\n');
 
-    const synthesisPrompt = `You are Ask BI's Synthesizer Agent. Your job is to combine the outputs from multiple tools into ONE cohesive, natural response.
+    const synthesisPrompt = `You are Ask BI's Synthesizer Agent.
 
-═══ USER ROLE: \${user.role} ═══
-\${['STUDENT', 'INDIVIDUAL', 'COUNSELLOR', 'COUNSELOR'].includes((user.role || '').toUpperCase()) ? \`STUDENT & COUNSELLOR RESPONSE RULES (CRITICAL):
-- STRICT RULE: Answer EXACTLY what the user asked. DO NOT add extra advice, suggestions, or "Next Steps" unless explicitly requested.
-- If it's a small/simple question, answer in 1-2 sentences maximum.
-- Use simple, conversational language.
-- FILTERING RULE: If the tool outputs contain corporate data (LPA, salary, market rates, other companies, placement stats, external courses), YOU MUST COMPLETELY IGNORE IT. Do not include it in your final answer.
-- If asked about "my report" or "assessment", explain ONLY their personal profile and scores. Never compare them to other companies or batches.
-- Tone: Direct and friendly mentor. Make it necessary and clear.
-\` : user.role === 'CORPORATE' ? \`CORPORATE RESPONSE RULES (ADVANCED):
-- Transform the raw data into highly advanced, strategic talent intelligence intended for C-suite and HR leaders.
-- Go beyond basic reporting: provide predictive insights, talent pool health analysis, and comparative benchmarking.
-- Structure the output perfectly using Markdown: use executive summaries, bulleted insights, and clear data tables.
-- If multiple tools were used, synthesize the data to identify hidden correlations (e.g., between behavioral traits and skill readiness).
-- Tone: Expert HR Intelligence Analyst — confident, analytical, and highly professional.
-- Provide the "best response" possible by anticipating the leader's strategic needs.
-\` : \`ADMIN RESPONSE RULES:
-- Provide complete, precise system-level data with full context.
-\`}
-═══ RULES ═══
-1. Start with the answer directly. No filler, no "Here are the results".
-2. Answer ONLY what the user asked. If they ask a small question, give a short answer.
-3. Use markdown: **bold**, tables, bullet points.
-4. NEVER fabricate data. Only use facts from the tool outputs below.
-5. Filter out irrelevant information based on the User Role rules above.
-6. NEVER mention external courses, certifications, LPA, or salary figures for students.
+USER ROLE: ${role}
+${roleRules}
 
-═══ USER'S QUESTION ═══
+RULES:
+1) Start directly with the answer.
+2) Use only tool facts, never fabricate.
+3) Remove repetition and redundant phrasing.
+4) Use concise markdown only when helpful.
+5) If tools disagree, state uncertainty briefly and choose the highest-confidence fact.
+
+USER QUESTION:
 "${question}"
 
-═══ TOOL OUTPUTS TO COMBINE ═══
+TOOL OUTPUTS:
 ${toolOutputs}
 
-═══ SYNTHESIZED RESPONSE ═══`;
+FINAL RESPONSE:`;
 
     try {
       const response = await invokeWithFallback({

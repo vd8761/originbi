@@ -634,7 +634,34 @@ export class EmbeddingsService implements OnModuleInit {
 
     try {
       const queryEmbedding = await this.generateEmbedding(query, 'query');
-      if (!queryEmbedding) return [];
+      if (!queryEmbedding) {
+        this.logger.warn('⚠️ Embedding unavailable for semantic search; using lexical fallback only');
+        let lexicalSql = `
+          SELECT
+              d.id,
+              d.content,
+              d.metadata,
+              d.category,
+              d.source_table,
+              d.source_id,
+              ts_rank_cd(to_tsvector('english', d.content), plainto_tsquery('english', $1)) AS lexical_score
+          FROM rag_documents d
+          WHERE to_tsvector('english', d.content) @@ plainto_tsquery('english', $1)
+        `;
+        const lexicalParams: any[] = [query];
+        if (category) {
+          lexicalSql += ` AND d.category = $2`;
+          lexicalParams.push(category);
+        }
+        lexicalSql += ` ORDER BY lexical_score DESC LIMIT $${lexicalParams.length + 1}`;
+        lexicalParams.push(limit);
+        try {
+          return await this.dataSource.query(lexicalSql, lexicalParams);
+        } catch (lexErr) {
+          this.logger.warn(`⚠️ Lexical fallback failed: ${lexErr?.message || lexErr}`);
+          return [];
+        }
+      }
 
       const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
