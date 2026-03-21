@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unused-vars, no-empty, no-useless-escape */
 import * as fs from 'fs';
 import * as path from 'path';
-import archiver from 'archiver';
+import archiver = require('archiver');
 import {
   fetchGroupAssessmentData,
   fetchUserAssessmentData,

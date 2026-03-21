@@ -125,15 +125,6 @@ export class CollegeReport extends BaseReport {
     const totalWidth =
       this.PAGE_WIDTH -
       2 * (this._useStdMargins ? this.MARGIN_STD : 15 * this.MM);
-    const colWidths = [
-      totalWidth * 0.1,
-      totalWidth * 0.15,
-      totalWidth * 0.15,
-      totalWidth * 0.15,
-      totalWidth * 0.15,
-      totalWidth * 0.15,
-      totalWidth * 0.15,
-    ];
     const traitNames = {
       D: 'Dominance',
       I: 'Influence',
@@ -150,7 +141,7 @@ export class CollegeReport extends BaseReport {
       headerTextColor: '#000000',
       borderColor: '#000000',
       cellPadding: 5,
-      colWidths: colWidths,
+      colWidths: ['fit', 'fill', 'fill', 'fill', 'fill', 'fill', 'fill'],
     });
   }
 
@@ -639,16 +630,10 @@ export class CollegeReport extends BaseReport {
     const tableWidth =
       this.PAGE_WIDTH -
       2 * (this._useStdMargins ? this.MARGIN_STD : 15 * this.MM);
-    const colWidths = [
-      tableWidth * 0.2,
-      tableWidth * 0.3,
-      tableWidth * 0.25,
-      tableWidth * 0.25,
-    ];
     this.table(headers, contentBlock.trait_mapping1, {
       fontSize: 8,
       headerFontSize: 8,
-      colWidths: colWidths,
+      colWidths: ['fit', 'fill', 'fill', 'fill'],
     });
     this.generateRespondParameterTable(dominantType);
   }
@@ -685,7 +670,7 @@ export class CollegeReport extends BaseReport {
 
     const awbtHeaders = [
       'Agile Value',
-      'Score (Out of 25)',
+      'Score',
       'Behavioural Note',
     ];
 

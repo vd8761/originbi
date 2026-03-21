@@ -1144,27 +1144,7 @@ export class SchoolReport extends BaseReport {
    * Orchestrates and renders SSLC specific sections such as Career Alignment, Flight Path, and Stream Odyssey.
    */
   private async generateSSLCSections(): Promise<void> {
-    // 1. Career Alignment Index
-    this.ci_generateCareerAlignmentIndex();
-
-    // 2. Career Fit
-    this.ci_generateCareerFit();
-
-    // 3. Career Domain Table
-    this.ci_generateCareerDomainTable();
-
-    // 4. Career Flight Path
-    try {
-      this.generateCareerFlightPath();
-      logger.info('[School REPORT][SSLC] Career Flight Path Generated.');
-    } catch (err) {
-      logger.warn('[School REPORT][SSLC] Career Flight Path skipped.', err);
-    }
-
-    // 5. Development Zones
-    this.ci_generateDevelopmentZones();
-
-    // 6. Where You Fit Best (DISC + Agile recommended stream)
+    // 1. Where You Fit Best (DISC + Agile recommended stream)
     try {
       this.generateWhereYouFitBest();
       logger.info('[School REPORT][SSLC] Where You Fit Best Generated.');
@@ -1172,7 +1152,7 @@ export class SchoolReport extends BaseReport {
       logger.warn('[School REPORT][SSLC] Where You Fit Best skipped.', err);
     }
 
-    // 6b. Course Compatibility for the recommended stream (shown right after Where You Fit Best)
+    // 2. Course Compatibility for the recommended stream
     try {
       // Pre-compute traits for compatibility bar colouring
       const topTwoTraits = this.getTopTwoTraits(
@@ -1281,7 +1261,7 @@ export class SchoolReport extends BaseReport {
       logger.warn('[School REPORT][SSLC] Course Compatibility skipped.', err);
     }
 
-    // 7. Future Pathways & Stream Odyssey
+    // 3. Future Pathways & Stream Odyssey
     try {
       this.generateStreamSelectionIntro();
 
@@ -1295,6 +1275,26 @@ export class SchoolReport extends BaseReport {
     } catch (err) {
       logger.warn('[School REPORT][SSLC] Stream Odyssey skipped.', err);
     }
+
+    // 4. Career Alignment Index
+    this.ci_generateCareerAlignmentIndex();
+
+    // 5. Career Fit
+    this.ci_generateCareerFit();
+
+    // 6. Career Domain Table
+    this.ci_generateCareerDomainTable();
+
+    // 7. Career Flight Path
+    try {
+      this.generateCareerFlightPath();
+      logger.info('[School REPORT][SSLC] Career Flight Path Generated.');
+    } catch (err) {
+      logger.warn('[School REPORT][SSLC] Career Flight Path skipped.', err);
+    }
+
+    // 8. Development Zones
+    this.ci_generateDevelopmentZones();
   }
 
   // --- GENERATE HSC SECTIONS ---
@@ -3693,17 +3693,20 @@ export class SchoolReport extends BaseReport {
     }
 
     // 5. Draw the Plus Sign ("+")
-    const plusX = startX + imgSize + gap;
-    const plusY = currentY + labelHeight + imgSize / 2 - 6 / 2; // vertical center adjustment
+    this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(18).fillColor('black');
+    const plusText = '+';
+    const plusGlyphWidth = this.doc.widthOfString(plusText);
+    const plusGlyphHeight = this.doc.heightOfString(plusText);
+    const plusCenterX = startX + imgSize + gap + plusWidth / 2;
+    const plusCenterY = currentY + labelHeight + imgSize / 2;
+    const plusX = plusCenterX - plusGlyphWidth / 2;
+    const plusY = plusCenterY - plusGlyphHeight / 2;
 
-    this.doc
-      .font(this.FONT_SORA_SEMIBOLD)
-      .fontSize(18)
-      .fillColor('black')
-      .text('+', plusX, plusY, {
-        width: plusWidth,
-        align: 'center',
-      });
+    this.doc.text(plusText, plusX, plusY, {
+      width: plusGlyphWidth,
+      align: 'center',
+      lineBreak: false,
+    });
 
     // 6. Draw Second Element (Trait 2)
     const startX2 = plusX + plusWidth + gap;
@@ -5440,13 +5443,29 @@ export class SchoolReport extends BaseReport {
       traitCode,
       this.data.school_stream_id,
     );
+    const uniqueColleges = this.dedupeReachInstitutionsByName(colleges);
 
-    if (colleges.length === 0) {
+    if (uniqueColleges.length === 0) {
       this.p('No institution data is currently available for your stream. Please check back later.');
       return;
     }
 
-    this.renderReachInstitutionsTable(colleges, primaryTrait);
+    this.renderReachInstitutionsTable(uniqueColleges, primaryTrait);
+  }
+
+  private dedupeReachInstitutionsByName(
+    colleges: UniversityData[],
+  ): UniversityData[] {
+    const seen = new Set<string>();
+
+    return colleges.filter((college) => {
+      const normalizedName = college.name.trim().toLowerCase().replace(/\s+/g, ' ');
+      if (!normalizedName || seen.has(normalizedName)) {
+        return false;
+      }
+      seen.add(normalizedName);
+      return true;
+    });
   }
 
   private renderReachInstitutionsTable(

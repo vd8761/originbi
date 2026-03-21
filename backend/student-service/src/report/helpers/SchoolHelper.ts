@@ -38,6 +38,33 @@ function safeCast(column: string): string {
     return `CAST(NULLIF(regexp_replace(${column}, '[^0-9.]', '', 'g'), '') AS FLOAT)`;
 }
 
+function normalizeCollegeName(name: string | undefined): string {
+    return (name ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function takeUniqueColleges(
+    colleges: UniversityData[],
+    limit: number,
+    seenNames: Set<string>,
+): UniversityData[] {
+    const picked: UniversityData[] = [];
+
+    for (const college of colleges) {
+        const normalizedName = normalizeCollegeName(college.name);
+        if (!normalizedName || seenNames.has(normalizedName)) {
+            continue;
+        }
+        seenNames.add(normalizedName);
+        picked.push(college);
+
+        if (picked.length >= limit) {
+            break;
+        }
+    }
+
+    return picked;
+}
+
 /**
  * Maps a primary DISC trait letter to the SQL ORDER BY clause.
  * Priority parameter comes first, secondary parameter second.
@@ -133,10 +160,11 @@ export async function getTopCollegesForStudent(
             );
 
             const LIMIT_PER_DEPT = 3;
+            const OVERFETCH_MULTIPLIER = 3;
             const commonNeeded = (totalDepts - availableDepts) * LIMIT_PER_DEPT;
 
-            // 4. Fetch top 3 from each available department
-            const deptQuery = `
+             // 4. Fetch extra rows from each available department so duplicates can be skipped
+             const deptQuery = `
         SELECT ud.id, ud.school_stream_id, ud.school_stream_department_id, ud.institute_id, ud.name, ud.city,
                ud.score, ud.rank, ud.state, ud.tlr, ud.rpc, ud.go, ud.oi, ud.perception,
                ssd.name as department_name, ssd.display_order
@@ -148,11 +176,11 @@ export async function getTopCollegesForStudent(
             ) AS rn
           FROM university_datas
           WHERE school_stream_id = $1
-        ) AS ud
-        JOIN school_stream_departments ssd ON ud.school_stream_department_id = ssd.id
-        WHERE ud.rn <= ${LIMIT_PER_DEPT}
-        ORDER BY ssd.display_order ASC, ${safeCast('ud.rank')} ASC;
-      `;
+         ) AS ud
+         JOIN school_stream_departments ssd ON ud.school_stream_department_id = ssd.id
+         WHERE ud.rn <= ${LIMIT_PER_DEPT * OVERFETCH_MULTIPLIER}
+         ORDER BY ssd.display_order ASC, ${safeCast('ud.rank')} ASC;
+       `;
             const deptResult = await client.query(deptQuery, [schoolStreamId]);
             let deptRows: UniversityData[] = deptResult.rows as UniversityData[];
 
@@ -174,25 +202,48 @@ export async function getTopCollegesForStudent(
             FROM university_datas
             WHERE school_stream_department_id = 0
           ) AS ud
-          WHERE ud.rn <= ${commonNeeded}
-          ORDER BY ${safeCast('ud.rank')} ASC;
-        `;
+           WHERE ud.rn <= ${commonNeeded * OVERFETCH_MULTIPLIER}
+           ORDER BY ${safeCast('ud.rank')} ASC;
+         `;
                 const commonResult = await client.query(commonQuery);
                 commonRows = commonResult.rows as UniversityData[];
             }
 
-            // 5. Combine results — when only 1 real dept, show common first
-            let combined: UniversityData[];
+            // 6. Fill each department with the next unique college by name.
+            const seenNames = new Set<string>();
+            const dedupedRows: UniversityData[] = [];
+            const deptGrouped = new Map<string, UniversityData[]>();
+            const deptOrder: string[] = [];
+
+            for (const row of deptRows) {
+                const deptName = row.department_name ?? 'Common';
+                if (!deptGrouped.has(deptName)) {
+                    deptGrouped.set(deptName, []);
+                    deptOrder.push(deptName);
+                }
+                deptGrouped.get(deptName)!.push(row);
+            }
+
+            const appendGroup = (groupRows: UniversityData[], limit: number) => {
+                dedupedRows.push(...takeUniqueColleges(groupRows, limit, seenNames));
+            };
+
             if (availableDepts <= 1 && commonRows.length > 0) {
-                combined = [...commonRows, ...deptRows];
-            } else {
-                combined = [...deptRows, ...commonRows];
+                appendGroup(commonRows, commonNeeded);
+            }
+
+            for (const deptName of deptOrder) {
+                appendGroup(deptGrouped.get(deptName) ?? [], LIMIT_PER_DEPT);
+            }
+
+            if (availableDepts > 1 && commonRows.length > 0) {
+                appendGroup(commonRows, commonNeeded);
             }
 
             logger.info(
-                `[SchoolHelper] Total institutions: ${combined.length} (${deptRows.length} from depts + ${commonRows.length} from common)`,
+                `[SchoolHelper] Total unique institutions: ${dedupedRows.length} (${deptRows.length} ranked dept rows + ${commonRows.length} common rows fetched)`,
             );
-            return combined;
+            return dedupedRows;
         } else {
             // SSLC → top 5 per stream ... leaving this as is unless specified otherwise.
             // If they want field groupings for SSLC too, we shouldn't break the current grouping.
