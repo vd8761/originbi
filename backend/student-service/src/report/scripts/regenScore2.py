@@ -5,7 +5,8 @@ import json
 # ==========================================
 # CONFIGURATION
 # ==========================================
-DB_DSN = "postgres://postgres:postgres@localhost:5432/obidatanew"
+# DB_DSN = "postgres://postgres:postgres@localhost:5432/obidatanew"
+DB_DSN = "postgresql://neondb_owner:npg_Tj5ChLpNn9rP@ep-young-cherry-a48v28qx-pooler.us-east-1.aws.neon.tech/origin_neon?sslmode=require&channel_binding=require"
 
 def get_db_connection():
     return psycopg2.connect(DB_DSN)
