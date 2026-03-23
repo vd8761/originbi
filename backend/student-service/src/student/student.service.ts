@@ -1759,12 +1759,10 @@ export class StudentService {
         throw new Error(`No completed session found for user ${userId}`);
       }
 
-      // 4. Get report entity for password
-      const reportEntity = await this.assessmentReportRepository.findOne({
+      // 4. Get report entity to update later
+      let reportEntity = await this.assessmentReportRepository.findOne({
         where: { assessmentSessionId: session.id },
       });
-
-      const password = reportEntity?.reportPassword || 'Please contact support';
 
       // 5. Generate + download PDF
       const port = this.configService.get<number>('PORT') || 4004;
@@ -1817,6 +1815,12 @@ export class StudentService {
           `Report generation timed out. Final Status: ${jobStatus}`,
         );
       }
+
+      // Re-fetch report entity for password since generation creates it if missing
+      reportEntity = await this.assessmentReportRepository.findOne({
+        where: { assessmentSessionId: session.id },
+      });
+      const password = reportEntity?.reportPassword || 'Please contact support';
 
       // Download PDF
       const downloadUrl = `${reportServiceUrl}/download/status/${jobId}`;
