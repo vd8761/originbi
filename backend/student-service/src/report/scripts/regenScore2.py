@@ -9,7 +9,22 @@ import json
 DB_DSN = "postgresql://neondb_owner:npg_Tj5ChLpNn9rP@ep-young-cherry-a48v28qx-pooler.us-east-1.aws.neon.tech/origin_neon?sslmode=require&channel_binding=require"
 
 def get_db_connection():
-    return psycopg2.connect(DB_DSN)
+    conn = psycopg2.connect(DB_DSN)
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        # Print connection resolution once so we can distinguish
+        # wrong-database issues from search_path issues.
+        cur.execute("""
+            SELECT
+                current_database() AS db,
+                current_user AS usr,
+                current_schema() AS schema,
+                current_setting('search_path') AS search_path,
+                to_regclass('assessment_answers') AS unqualified,
+                to_regclass('public.assessment_answers') AS qualified
+        """)
+        print(f"DB connection check: {dict(cur.fetchone())}")
+        cur.execute("SET search_path TO public")
+    return conn
 
 def get_completed_attempts(cur):
     """Fetches all users who have their assessment completed for level 2."""
@@ -19,7 +34,7 @@ def get_completed_attempts(cur):
                 user_id,
                 assessment_session_id,
                 metadata
-            FROM assessment_attempts
+            FROM public.assessment_attempts
             WHERE assessment_level_id = 2
               AND status = 'COMPLETED' \
             """
@@ -36,7 +51,7 @@ def process_attempt(conn, attempt):
         # ---------------------------------------------------------
         # 1. FIND THE NUMBER OF ROWS AND DETERMINE THE FACTOR
         # ---------------------------------------------------------
-        cur.execute("SELECT COUNT(*) as row_count FROM assessment_answers WHERE assessment_attempt_id = %s", (attempt_id,))
+        cur.execute("SELECT COUNT(*) as row_count FROM public.assessment_answers WHERE assessment_attempt_id = %s", (attempt_id,))
         row_count = cur.fetchone()['row_count']
 
         if row_count == 0:
@@ -52,9 +67,9 @@ def process_attempt(conn, attempt):
         # Raw Agile Scores
         query_agile = """
                       SELECT q.category, COALESCE(SUM(o.score_value), 0) as raw_total
-                      FROM assessment_answers a
-                               JOIN assessment_questions q ON a.main_question_id = q.id
-                               LEFT JOIN assessment_question_options o ON a.main_option_id = o.id
+                      FROM public.assessment_answers a
+                               JOIN public.assessment_questions q ON a.main_question_id = q.id
+                               LEFT JOIN public.assessment_question_options o ON a.main_option_id = o.id
                       WHERE a.assessment_attempt_id = %s
                       GROUP BY q.category \
                       """
@@ -66,7 +81,7 @@ def process_attempt(conn, attempt):
                           SELECT
                               COUNT(*) FILTER (WHERE is_attention_fail = true) as raw_attention_fails,
                               COUNT(*) FILTER (WHERE is_distraction_chosen = true) as raw_distractions
-                          FROM assessment_answers
+                          FROM public.assessment_answers
                           WHERE assessment_attempt_id = %s \
                           """
         cur.execute(query_sincerity, (attempt_id,))
@@ -133,7 +148,7 @@ def process_attempt(conn, attempt):
 
         # Update assessment_attempts
         update_attempt_query = """
-                               UPDATE assessment_attempts
+                               UPDATE public.assessment_attempts
                                SET metadata = %s,
                                    total_score = %s,
                                    sincerity_index = %s,
@@ -147,7 +162,7 @@ def process_attempt(conn, attempt):
 
         # Update assessment_reports (if it exists for this session)
         update_report_query = """
-                              UPDATE assessment_reports
+                              UPDATE public.assessment_reports
                               SET agile_scores = %s,
                                   overall_sincerity = %s,
                                   updated_at = NOW()
