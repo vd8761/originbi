@@ -642,7 +642,17 @@ Keep response under 200 words. Be specific and actionable. Do not use excessive 
             else agileLevel = `Agile Resistant (${agile}/125) — prefers structure, benefits from gradual flexibility`;
         }
 
-           const counsellorPrompt = this.buildCounsellorPrompt({
+          const learningIntent = /\b(teach|learn|learning|step\s*by\s*step|roadmap|explain|understand|beginner|start from|practice)\b/i.test(question);
+
+              const counsellorPrompt = learningIntent
+                  ? this.buildLearningCoachPrompt({
+                        name,
+                        personality,
+                        agileLevel,
+                        question,
+                        conversationContext: (conversationContext || '').slice(-900),
+                  })
+                  : this.buildCounsellorPrompt({
               name,
               personality,
               personalityDesc,
@@ -650,7 +660,7 @@ Keep response under 200 words. Be specific and actionable. Do not use excessive 
               assessmentDone,
               careerList,
                   conversationContext: (conversationContext || '').slice(-900),
-           });
+              });
 
         try {
             const response = await invokeWithFallback({
@@ -755,12 +765,49 @@ Counsellor rules:
 4) Do not over-provide unrelated information.
 5) Use India-first context unless user asks otherwise.
 6) Avoid repetitive encouragement phrases.
-7) For short questions, respond in 2-4 lines.
+7) For short questions, respond in 2-4 lines, unless the user asks to learn/teach step-by-step.
 8) Do not mention course providers, websites, documentation portals, or external learning brands.
 9) Give structured guidance using only role-aligned skills, practice plan, and milestones.
 
 Context:
 ${args.conversationContext || `First interaction with ${firstName}.`}
+
+Respond now.`;
+    }
+
+    private buildLearningCoachPrompt(args: {
+        name: string;
+        personality: string;
+        agileLevel: string;
+        question: string;
+        conversationContext: string;
+    }): string {
+        return `You are OriginBI AI Learning Coach.
+
+Student profile:
+- Name: ${args.name}
+- Personality style: ${args.personality}
+- Agile level: ${args.agileLevel}
+
+User request:
+${args.question}
+
+Teaching rules (MANDATORY):
+1) Teach directly, clearly, and in simple language.
+2) Use this exact structure:
+   - Goal (1 line)
+   - Step-by-step plan (5-8 steps)
+   - Tiny example (short and concrete)
+   - Practice task (one small task)
+   - Check understanding (2 quick questions)
+3) Keep each step short and actionable.
+4) Do not mention external websites, brands, or course providers.
+5) Do not mention backend/platform/database/SQL internals.
+6) If the topic is broad (e.g., "teach me Java"), start with Day 1 fundamentals and ask if they want Day 2.
+7) Keep response practical and easy for beginners.
+
+Context:
+${args.conversationContext || 'First learning interaction.'}
 
 Respond now.`;
     }
@@ -773,6 +820,10 @@ Respond now.`;
 
         // Remove explicit backend/internal wording if the model leaks it.
         cleaned = cleaned.replace(/\b(database|sql|table|originbi platform data|backend)\b/gi, 'system data');
+
+        // Clean frequent awkward phrasing artifacts.
+        cleaned = cleaned.replace(/\bit need to\b/gi, 'You should');
+        cleaned = cleaned.replace(/\bcorrect wise\b/gi, 'correctly');
 
         return cleaned;
     }

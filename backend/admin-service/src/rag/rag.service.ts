@@ -6179,9 +6179,9 @@ JSON:`;
           suggestions.push('How can I improve my weak areas?');
           suggestions.push('Which careers match my assessment profile?');
         } else if (talkedAboutSkills) {
-          suggestions.push('Show me a learning roadmap');
-          suggestions.push('Which online platforms do you recommend?');
-          suggestions.push('How can I practice these skills?');
+          suggestions.push('Teach me step by step');
+          suggestions.push('Give me a 7-day learning plan');
+          suggestions.push('Give me one practice task now');
         } else if (talkedAboutSalary) {
           suggestions.push('Which skills command higher salaries?');
           suggestions.push('How do I negotiate a better offer?');
@@ -6222,15 +6222,15 @@ JSON:`;
         break;
       case 'career_guidance':
         suggestions.push('What skills should I develop?');
-        suggestions.push('Show recommended courses');
-        suggestions.push('What certifications are valuable?');
+        suggestions.push('Give me a step-by-step roadmap');
+        suggestions.push('What should I learn first?');
         break;
       case 'intelligent_response':
       case 'general_knowledge':
         if (q.includes('skill') || q.includes('learn') || q.includes('course')) {
-          suggestions.push('Show me a learning roadmap');
-          suggestions.push('What certifications should I get?');
-          suggestions.push('Compare online learning platforms');
+          suggestions.push('Teach me step by step');
+          suggestions.push('Give me a learning roadmap');
+          suggestions.push('Give me one beginner exercise');
         } else if (q.includes('career') || q.includes('job') || q.includes('role')) {
           suggestions.push('What skills are needed?');
           suggestions.push('Show salary ranges');
