@@ -4211,7 +4211,6 @@ export class SchoolReport extends BaseReport {
 
     this.h2('Career Fit Analysis');
 
-    const p = this.ci_patterns;
     const norm = (v: number) => Math.min(100, Math.round((v / 25) * 100));
     const agile = this.data.agile_scores?.[0];
     const nFocus = norm(agile?.focus ?? 0);
@@ -4225,10 +4224,10 @@ export class SchoolReport extends BaseReport {
     const C = this.data.score_C;
 
     const fits = [
-      { label: 'Engineering & Technology', score: Math.round((C + nFocus) / 2), condition: C > 65 && nFocus > 65, color: '' },
-      { label: 'Management & Leadership', score: Math.round((D + nCourage) / 2), condition: D > 65 && nCourage > 65, color: '' },
-      { label: 'Creative & Design', score: Math.round((I + nOpenness) / 2), condition: I > 65 && nOpenness > 65, color: '' },
-      { label: 'People & HR', score: Math.round((S + nRespect) / 2), condition: S > 65 && nRespect > 65, color: '' },
+      { label: 'Engineering & Technology', score: Math.round((C + nFocus) / 2), color: '' },
+      { label: 'Management & Leadership', score: Math.round((D + nCourage) / 2), color: '' },
+      { label: 'Creative & Design', score: Math.round((I + nOpenness) / 2), color: '' },
+      { label: 'People & HR', score: Math.round((S + nRespect) / 2), color: '' },
     ];
 
     // --- Sort high → low ---
@@ -4236,79 +4235,152 @@ export class SchoolReport extends BaseReport {
 
     // --- Assign blue gradient: darkest for highest score, lightest for lowest ---
     const blueGradient = ['#150089', '#3A3CB5', '#6B80D4', '#9BB8ED'];
-    fits.forEach((f, i) => { f.color = blueGradient[i]; });
+    fits.forEach((fit, index) => {
+      fit.color = blueGradient[index % blueGradient.length];
+    });
 
     // --- Layout constants ---
-    const labelFontSize = 9;
-    const barHeight = 14;
-    const barRadius = barHeight / 2;
-    const rowGap = 8;
-    const pctColW = 34;  // fixed width for the "XX%" label on the right
-    const x = this.MARGIN_STD;
-    const totalW = this.PAGE_WIDTH - 2 * this.MARGIN_STD;
+    this.drawCareerFitCircleRow(
+      fits.map((fit) => ({
+        label: fit.label,
+        value: fit.score,
+        color: fit.color,
+      })),
+    );
 
-    // Measure the widest label once so all bars share the same start edge.
-    this.doc.font(this.FONT_REGULAR).fontSize(labelFontSize);
-    const labelColW = Math.max(
-      ...fits.map((f) => this.doc.widthOfString(f.label)),
-    ) + 10;  // +10pt breathing room between label and bar
-
-    const barX = x + labelColW;
-    const barW = totalW - labelColW - pctColW - 4;
-
-    this.ensureSpace(fits.length * (barHeight + rowGap) + 8);
-
-    fits.forEach((f) => {
-      const y = this.doc.y;
-      const fillW = Math.max(0, barW * Math.min(1, f.score / 100));
-
-      // Label - right-flush to the bar's left edge, single line
-      this.doc
-        .font(this.FONT_REGULAR)
-        .fontSize(labelFontSize)
-        .fillColor(CI_COLORS.DARK_TEXT)
-        .text(f.label, x, y + 2, {
-          width: labelColW - 10,
-          align: 'right',
-          lineBreak: false,
-        });
-
-      // Track (background capsule)
-      this.doc
-        .roundedRect(barX, y, barW, barHeight, barRadius)
-        .fill(CI_COLORS.GAUGE_BG);
-
-      // Filled portion - clipped so left edge stays rounded
-      if (fillW > 0) {
-        this.doc.save();
-        this.doc.roundedRect(barX, y, barW, barHeight, barRadius).clip();
-        this.doc.roundedRect(barX, y, fillW, barHeight, barRadius).fill(f.color);
-        this.doc.restore();
-      }
-
-      // Percentage label right of bar
-      this.doc
-        .font(this.FONT_SEMIBOLD)
-        .fontSize(8)
-        .fillColor(CI_COLORS.DARK_TEXT)
-        .text(`${Math.round(f.score)}%`, barX + barW + 4, y + 3, {
-          width: pctColW,
-          align: 'left',
-          lineBreak: false,
-        });
-
-      this.doc.y = y + barHeight + rowGap;
-    });
-
-    // Strong-fit callouts
-    fits.forEach((f) => {
-      if (f.condition) {
-        this.p(`✓ ${f.label}: Strong Fit`, { color: CI_COLORS.STRONG_GREEN, gap: 2 });
-      }
-    });
-
+    //     this.p(`✓ ${f.label}: Strong Fit`, { color: CI_COLORS.STRONG_GREEN, gap: 2 });
     this.doc.y += 4;
     // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
+  }
+
+  private drawCareerFitCircleRow(
+    items: { label: string; value: number; color: string }[],
+  ): void {
+    if (items.length === 0) return;
+
+    const x = this.MARGIN_STD;
+    const totalW = this.PAGE_WIDTH - 2 * this.MARGIN_STD;
+    const itemCount = items.length;
+    const gap =
+      itemCount <= 1
+        ? 0
+        : Math.max(6, Math.min(12, Math.floor(totalW / (itemCount * 10))));
+    const cellW = (totalW - gap * Math.max(0, itemCount - 1)) / itemCount;
+    const ringRadius = Math.max(16, Math.min(30, Math.floor(cellW * 0.24)));
+    const ringThickness = Math.max(5, Math.min(9, Math.floor(ringRadius * 0.28)));
+    const labelFontSize = cellW < 92 ? 7 : 8.5;
+    const scoreFontSize = ringRadius >= 24 ? 11 : 9;
+    const labelGap = 8;
+    const labelW = Math.max(36, cellW - 6);
+
+    this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(labelFontSize);
+    const labelHeights = items.map((item) =>
+      this.doc.heightOfString(item.label, {
+        width: labelW,
+        align: 'center',
+      }),
+    );
+    const maxLabelH = Math.max(...labelHeights);
+    const totalH = ringRadius * 2 + labelGap + maxLabelH + 8;
+    this.ensureSpace(totalH + 4);
+
+    const startY = this.doc.y;
+    const centerY = startY + ringRadius;
+
+    items.forEach((item, index) => {
+      const cellX = x + index * (cellW + gap);
+      const centerX = cellX + cellW / 2;
+      const pct = Math.max(0, Math.min(100, Math.round(item.value)));
+
+      this.drawCircularProgressRing(
+        centerX,
+        centerY,
+        ringRadius,
+        ringThickness,
+        pct,
+        item.color,
+        CI_COLORS.GAUGE_BG,
+      );
+
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(scoreFontSize)
+        .fillColor(CI_COLORS.DARK_TEXT)
+        .text(`${pct}%`, cellX, centerY - scoreFontSize / 2 - 2, {
+          width: cellW,
+          align: 'center',
+          lineBreak: false,
+        });
+
+      this.doc
+        .font(this.FONT_SORA_SEMIBOLD)
+        .fontSize(labelFontSize)
+        .fillColor(CI_COLORS.DARK_TEXT)
+        .text(item.label, cellX + (cellW - labelW) / 2, startY + ringRadius * 2 + labelGap, {
+          width: labelW,
+          align: 'center',
+        });
+    });
+
+    this.doc.y = startY + totalH;
+  }
+
+  private drawCircularProgressRing(
+    centerX: number,
+    centerY: number,
+    radius: number,
+    thickness: number,
+    value: number,
+    color: string,
+    trackColor: string,
+  ): void {
+    const pct = Math.max(0, Math.min(100, value));
+
+    this.doc
+      .circle(centerX, centerY, radius)
+      .lineWidth(thickness)
+      .strokeColor(trackColor)
+      .stroke();
+
+    if (pct <= 0) return;
+
+    if (pct >= 100) {
+      this.doc
+        .circle(centerX, centerY, radius)
+        .lineWidth(thickness)
+        .strokeColor(color)
+        .stroke();
+      return;
+    }
+
+    const startAngle = -90;
+    const endAngle = startAngle + (pct / 100) * 360;
+    const startRad = (startAngle * Math.PI) / 180;
+    const endRad = (endAngle * Math.PI) / 180;
+    const segments = Math.max(18, Math.round((endAngle - startAngle) / 4));
+
+    this.doc.save();
+    this.doc
+      .lineWidth(thickness)
+      .lineCap('round')
+      .lineJoin('round')
+      .strokeColor(color)
+      .moveTo(
+        centerX + radius * Math.cos(startRad),
+        centerY + radius * Math.sin(startRad),
+      );
+
+    for (let s = 1; s <= segments; s++) {
+      const t = s / segments;
+      const angle = startRad + (endRad - startRad) * t;
+      this.doc.lineTo(
+        centerX + radius * Math.cos(angle),
+        centerY + radius * Math.sin(angle),
+      );
+    }
+
+    this.doc.stroke();
+    this.doc.restore();
   }
 
   // --- S6: Academic Strategy ---
