@@ -47,6 +47,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [activeField, setActiveField] = useState<string | null>(null);
+  const [openField, setOpenField] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [departments, setDepartments] = useState<any[]>([]);
   const [isLoadingDept, setIsLoadingDept] = useState(false);
@@ -123,6 +124,16 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     return Object.keys(errors).length === 0;
   };
 
+  const handleOpenStatus = (field: string, isOpen: boolean) => {
+    setOpenField(isOpen ? field : null);
+  };
+
+  const getZIndex = (field: string) => {
+    if (openField === field) return "z-[60]";
+    if (activeField === field) return "z-50";
+    return "z-0";
+  };
+
   const handleSubmit = async () => {
     if (!validateForm()) {
       setError("Please fill in all required fields.");
@@ -168,7 +179,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
 
   // === Styles ===
   const baseInputClasses =
-    "w-full h-[50px] bg-gray-50 dark:bg-white/10 border border-transparent dark:border-transparent rounded-xl px-4 text-sm text-black dark:text-white placeholder-black/40 dark:placeholder-white/60 focus:border-brand-green focus:outline-none transition-all";
+    "w-full h-[50px] bg-gray-50 dark:bg-white/10 border border-transparent dark:border-transparent rounded-xl px-4 text-sm text-black dark:text-white placeholder-black/40 dark:placeholder-white/70 focus:border-brand-green focus:outline-none transition-all";
   const baseLabelClasses =
     "text-xs text-black/70 dark:text-white font-semibold ml-1";
   const baseSectionTitleClasses =
@@ -229,7 +240,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
       </div>
 
       {/* Form Card */}
-      <div className="bg-white dark:bg-white/10 border border-gray-200 dark:border-[#24272B] rounded-3xl p-5 sm:p-8 shadow-sm dark:shadow-xl transition-colors duration-300 relative">
+      <div className="bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 rounded-3xl p-5 sm:p-8 shadow-sm dark:shadow-xl transition-colors duration-300 relative">
         {error && (
           <div className="mb-6 text-red-500 dark:text-red-400 text-sm bg-red-50 dark:bg-red-500/10 p-3 rounded-lg border border-red-100 dark:border-red-500/20">
             {error}
@@ -290,7 +301,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
 
             {/* Mobile */}
             <div
-              className={`space-y-2 relative ${activeField === "mobile" ? "z-50" : "z-0"}`}
+              className={`space-y-2 relative ${getZIndex("mobile")}`}
               onMouseEnter={() => setActiveField("mobile")}
               onMouseLeave={() => setActiveField(null)}
             >
@@ -299,6 +310,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                 phoneNumber={formData.mobile_number}
                 onCountryChange={(code) => handleInputChange("country_code", code)}
                 onPhoneChange={(num) => handleInputChange("mobile_number", num)}
+                onOpenChange={(isOpen) => handleOpenStatus("mobile", isOpen)}
                 label="Mobile Number (without +91)"
                 required
                 error={formErrors.mobile_number}
@@ -357,7 +369,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
 
             {/* Program Type */}
             <div
-              className={`relative ${activeField === "program" ? "z-50" : "z-auto"}`}
+              className={`relative ${getZIndex("program")}`}
               onMouseEnter={() => setActiveField("program")}
               onMouseLeave={() => setActiveField(null)}
             >
@@ -367,6 +379,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                 options={CORPORATE_PROGRAMS}
                 value={formData.program_id}
                 onChange={(val) => handleInputChange("program_id", val)}
+                onOpenChange={(isOpen) => handleOpenStatus("program", isOpen)}
                 placeholder="Choose Program Type"
               />
               {formErrors.program_id && (
@@ -383,7 +396,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
               <>
                 {/* Department */}
                 <div
-                  className={`relative ${activeField === "dept" ? "z-50" : "z-auto"}`}
+                  className={`relative ${getZIndex("dept")}`}
                   onMouseEnter={() => setActiveField("dept")}
                   onMouseLeave={() => setActiveField(null)}
                 >
@@ -400,6 +413,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                       // Set both as the same ID for simplicity in backend mapping
                       handleInputChange("degree_id", val);
                     }}
+                    onOpenChange={(isOpen) => handleOpenStatus("dept", isOpen)}
                     placeholder={isLoadingDept ? "Loading..." : "Select Department"}
                   />
                   {formErrors.department_id && (
@@ -474,7 +488,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
 
             {/* Schedule Exam */}
             <div
-              className={`space-y-2 relative lg:col-span-2 ${activeField === "exam" ? "z-50" : "z-auto"}`}
+              className={`space-y-2 relative lg:col-span-2 ${getZIndex("exam")}`}
               onMouseEnter={() => setActiveField("exam")}
               onMouseLeave={() => setActiveField(null)}
             >
