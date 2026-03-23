@@ -141,7 +141,7 @@ export class AgentOrchestratorService {
         apiKey,
         model: 'gemini-2.5-flash',
         temperature: 0.2,
-        maxOutputTokens: 900,
+        maxOutputTokens: 650,
         callbacks: [getTokenTrackerCallback('Agent Synthesizer')],
       });
     }
@@ -156,7 +156,7 @@ export class AgentOrchestratorService {
         apiKey,
         model: 'llama-3.3-70b-versatile',
         temperature: 0.2,
-        maxTokens: 900,
+        maxTokens: 650,
         timeout: 15000,
         callbacks: [getTokenTrackerCallback('Agent Synthesizer (Groq Fallback)')],
       });
@@ -309,7 +309,7 @@ export class AgentOrchestratorService {
 
       // ── STEP 4: ReAct SELF-REFLECTION — Validate answer quality ──
       let reflectionApplied = false;
-      if (complexity.score >= 7 && answer.length > 120) {
+      if (complexity.score >= 8 && answer.length > 140 && results.length > 1) {
         const reflection = await this.reflectOnAnswer(question, answer, results);
         if (reflection.needsImprovement && reflection.improvedAnswer) {
           this.logger.log(`🔄 ReAct reflection applied: ${reflection.reason}`);
@@ -802,7 +802,7 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
         toolName: 'text_to_sql',
         success: false,
         data: null,
-        summary: `Database query failed: ${error.message}`,
+        summary: 'I could not process that request right now.',
         confidence: 0,
       };
     }
@@ -1287,7 +1287,7 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
     const toolOutputs = results.map(r => {
       return `── ${r.toolName.toUpperCase()} RESULT ──
 ${r.summary}
-${r.data?.answer ? `\nDetailed Answer:\n${r.data.answer?.slice(0, 2000)}` : ''}`;
+${r.data?.answer ? `\nDetailed Answer:\n${r.data.answer?.slice(0, 700)}` : ''}`;
     }).join('\n\n');
 
     const synthesisPrompt = `You are Ask BI's Synthesizer Agent.
@@ -1414,7 +1414,7 @@ FINAL RESPONSE:`;
 
     const merged = deduped.join('\n').trim();
     if (/^conversation context loaded\.?$/i.test(merged)) {
-      return 'Please specify what you want me to list, for example: **list corporate candidates** or **show company-wise candidate details**.';
+      return 'No users found.';
     }
     return merged;
   }

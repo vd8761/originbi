@@ -141,7 +141,7 @@ export class OriIntelligenceService {
                 apiKey,
                 model: 'gemini-2.5-flash',
                 temperature: 0.35,
-                maxOutputTokens: 1024,
+                maxOutputTokens: 720,
                 callbacks: [getTokenTrackerCallback('KnowledgeAI (OriIntelligence)')],
             });
         }
@@ -156,7 +156,7 @@ export class OriIntelligenceService {
                 apiKey,
                 model: 'llama-3.3-70b-versatile',
                 temperature: 0.35,
-                maxTokens: 1024,
+                maxTokens: 720,
                 callbacks: [getTokenTrackerCallback('KnowledgeAI (Groq Fallback)')],
             });
         }
@@ -463,7 +463,7 @@ Keep response under 200 words. Be specific and actionable. Do not use excessive 
     ): Promise<string> {
         const userName = profile?.name || 'there';
         const personality = profile?.personalityStyle || 'not yet assessed';
-        const compactContext = (conversationContext || 'No previous context.').slice(-1200);
+        const compactContext = (conversationContext || 'No previous context.').slice(-800);
         const systemPrompt = this.buildGeneralAssistantPrompt({
             userName,
             personality,
@@ -649,7 +649,7 @@ Keep response under 200 words. Be specific and actionable. Do not use excessive 
               agileLevel,
               assessmentDone,
               careerList,
-              conversationContext: (conversationContext || '').slice(-1400),
+                  conversationContext: (conversationContext || '').slice(-900),
            });
 
         try {
@@ -667,7 +667,7 @@ Keep response under 200 words. Be specific and actionable. Do not use excessive 
                         new HumanMessage(question),
                     ]),
             });
-            return response.content.toString();
+            return this.sanitizeCounsellorResponse(response.content.toString());
         } catch (error) {
             this.logger.warn(`LLM request failed in counsellor mode: ${error.message}`);
 
@@ -710,10 +710,11 @@ ${roleBlock}
 Hard rules:
 1) Use direct, clear language and avoid repetition.
 2) Never fabricate candidate/company/platform data.
-3) For platform-specific person/company/score data, state that it must come from OriginBI database.
+3) For person/company/score requests: provide the result directly if available, otherwise say "No users found.".
 4) Never mention internal SQL/tables/system architecture.
 5) Keep answer length proportional to question complexity.
 6) No external links/courses/certification recommendations.
+7) Do not mention databases, platform internals, or technical backend details.
 
 Conversation context:
 ${args.conversationContext || 'No previous context.'}
@@ -755,10 +756,24 @@ Counsellor rules:
 5) Use India-first context unless user asks otherwise.
 6) Avoid repetitive encouragement phrases.
 7) For short questions, respond in 2-4 lines.
+8) Do not mention course providers, websites, documentation portals, or external learning brands.
+9) Give structured guidance using only role-aligned skills, practice plan, and milestones.
 
 Context:
 ${args.conversationContext || `First interaction with ${firstName}.`}
 
 Respond now.`;
+    }
+
+    private sanitizeCounsellorResponse(answer: string): string {
+        if (!answer) return answer;
+
+        // Remove external learning-brand mentions to keep counsellor responses domain-focused.
+        let cleaned = answer.replace(/\b(Coursera|Udemy|edX|W3Schools|Codecademy|Khan Academy|GeeksforGeeks)\b/gi, 'structured learning resources');
+
+        // Remove explicit backend/internal wording if the model leaks it.
+        cleaned = cleaned.replace(/\b(database|sql|table|originbi platform data|backend)\b/gi, 'system data');
+
+        return cleaned;
     }
 }

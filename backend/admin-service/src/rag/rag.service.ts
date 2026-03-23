@@ -179,6 +179,9 @@ export class RagService {
   private llm: ChatGoogleGenerativeAI | null = null;
   private fallbackLlm: ChatGroq | null = null;
   private reportsDir: string;
+  private readonly ROUTING_HISTORY_MAX_CHARS = 900;
+  private readonly GENERAL_KNOWLEDGE_CHUNK_LIMIT = 2;
+  private readonly GENERAL_KNOWLEDGE_CHUNK_MAX_CHARS = 380;
 
   // Simple cache for query understanding to improve performance
   private queryCache = new Map<string, any>();
@@ -293,10 +296,10 @@ export class RagService {
     const msg = error?.message || 'An unexpected error occurred';
     // Strip SQL internals
     if (/column.*does not exist/i.test(msg)) {
-      return 'A database schema mismatch was detected. Please contact your administrator.';
+      return 'A system configuration issue was detected. Please contact your administrator.';
     }
     if (/relation.*does not exist/i.test(msg)) {
-      return 'A required database table is missing. Please contact your administrator.';
+      return 'A required system resource is missing. Please contact your administrator.';
     }
     if (/permission denied/i.test(msg)) {
       return 'You do not have permission to access this data.';
@@ -308,13 +311,39 @@ export class RagService {
       return 'There was a problem processing your request. Please try rephrasing your question.';
     }
     if (/connect|connection/i.test(msg)) {
-      return 'Unable to connect to the database. Please try again in a moment.';
+      return 'Unable to process the request right now. Please try again in a moment.';
     }
     // For any other DB errors, return generic message
     if (/ECONNREFUSED|ENOTFOUND|ERROR/i.test(msg)) {
       return 'A system error occurred. Please try again or contact support.';
     }
     return msg;
+  }
+
+  private compactRoutingHistory(history: string): string {
+    if (!history) return '';
+    const normalized = history
+      .replace(/---\s*CONVERSATION HISTORY\s*---/gi, '')
+      .replace(/---\s*CURRENT INTERACTION\s*---/gi, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    return normalized.length > this.ROUTING_HISTORY_MAX_CHARS
+      ? normalized.slice(-this.ROUTING_HISTORY_MAX_CHARS)
+      : normalized;
+  }
+
+  private buildCompactKnowledgeContext(chunks: any[]): string {
+    if (!Array.isArray(chunks) || chunks.length === 0) return '';
+    return chunks
+      .slice(0, this.GENERAL_KNOWLEDGE_CHUNK_LIMIT)
+      .map((d: any, i: number) => {
+        const text = String(d?.content || '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, this.GENERAL_KNOWLEDGE_CHUNK_MAX_CHARS);
+        return `[${i + 1}] ${text}`;
+      })
+      .join('\n---\n');
   }
 
   private getLlm(): ChatGoogleGenerativeAI {
@@ -541,48 +570,57 @@ export class RagService {
     // the advanced counsellor prompt engine.
     // ═══════════════════════════════════════════════════════════════
     if (mode === 'counsellor') {
-      this.logger.log('🎓 AI Counsellor mode activated — premium career guidance');
-      try {
-        const userId = user?.id || 0;
-        const userEmail = user?.email || user?.sub || '';
-        this.logger.log(`🎓 Counsellor: userId=${userId}, email=${userEmail}`);
+      const normalizedCounsellorQ = this.normalizeQuery(question).toLowerCase();
+      const isCounsellorDataRequest =
+        /\b(list|show|get|count|how many|total|top|best|who)\b/i.test(normalizedCounsellorQ) &&
+        /\b(user|users|candidate|candidates|resource|resources|employee|employees|staff|member|members|result|results|score|scores|assessment|assessments|company|companies|corporate|group|groups|batch|batches)\b/i.test(normalizedCounsellorQ);
 
-        let userProfile: any = null;
+      if (!isCounsellorDataRequest) {
+        this.logger.log('🎓 AI Counsellor mode activated — premium career guidance');
         try {
-          userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
-          this.logger.log(`🎓 Counsellor: profile found = ${!!userProfile}`);
-        } catch (profileErr) {
-          this.logger.warn(`🎓 Profile lookup failed (non-blocking): ${profileErr.message}`);
-        }
+          const userId = user?.id || 0;
+          const userEmail = user?.email || user?.sub || '';
+          this.logger.log(`🎓 Counsellor: userId=${userId}, email=${userEmail}`);
 
-        // Build conversation context from memory + chat history
-        let conversationHistory = '';
-        if (userId > 0) {
+          let userProfile: any = null;
           try {
-            this.oriIntelligence.extractAndStoreFacts(userId, question);
-            conversationHistory = this.oriIntelligence.getConversationContext(userId);
-          } catch { /* non-blocking */ }
-        }
-        if (conversationId > 0) {
-          try {
-            const history = await this.chatMemory.buildLlmHistory(conversationId);
-            if (history) conversationHistory += '\n' + history;
-          } catch { /* non-blocking */ }
-        }
+            userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
+            this.logger.log(`🎓 Counsellor: profile found = ${!!userProfile}`);
+          } catch (profileErr) {
+            this.logger.warn(`🎓 Profile lookup failed (non-blocking): ${profileErr.message}`);
+          }
 
-        const answer = await this.oriIntelligence.answerCounsellorQuestion(
-          question, userProfile, conversationHistory,
-        );
-        this.logger.log(`🎓 Counsellor answer generated (${answer.length} chars)`);
-        return { answer, searchType: 'ai_counsellor', confidence: 0.97 };
-      } catch (counsellorError) {
-        this.logger.error(`🎓 AI Counsellor error: ${counsellorError.message}`, counsellorError.stack);
-        return {
-          answer: 'I apologize for the inconvenience. The AI Counsellor is experiencing a temporary issue. Please try again in a moment.',
-          searchType: 'ai_counsellor',
-          confidence: 0,
-        };
+          // Build conversation context from memory + chat history
+          let conversationHistory = '';
+          if (userId > 0) {
+            try {
+              this.oriIntelligence.extractAndStoreFacts(userId, question);
+              conversationHistory = this.oriIntelligence.getConversationContext(userId);
+            } catch { /* non-blocking */ }
+          }
+          if (conversationId > 0) {
+            try {
+              const history = await this.chatMemory.buildLlmHistory(conversationId);
+              if (history) conversationHistory += '\n' + history;
+            } catch { /* non-blocking */ }
+          }
+
+          const answer = await this.oriIntelligence.answerCounsellorQuestion(
+            question, userProfile, conversationHistory,
+          );
+          this.logger.log(`🎓 Counsellor answer generated (${answer.length} chars)`);
+          return { answer, searchType: 'ai_counsellor', confidence: 0.97 };
+        } catch (counsellorError) {
+          this.logger.error(`🎓 AI Counsellor error: ${counsellorError.message}`, counsellorError.stack);
+          return {
+            answer: 'I am having a temporary issue right now. Please try again in a moment.',
+            searchType: 'ai_counsellor',
+            confidence: 0,
+          };
+        }
       }
+
+      this.logger.log('🎓 Counsellor data request detected — routing to standard data query pipeline');
     }
 
     this.logger.log(`\n${'═'.repeat(70)}`);
@@ -765,6 +803,8 @@ export class RagService {
         conversationHistory = entityContext + conversationHistory;
       }
 
+      const routingHistory = this.compactRoutingHistory(conversationHistory);
+
       // ── Smart Pronoun Resolution & Entity Tracking ──
       // Resolve "him", "her", "that person" → actual name from conversation context
       let resolvedQuestion = question;
@@ -829,7 +869,7 @@ export class RagService {
           resolvedQuestion,
           user as UserContext,
           conversationId,
-          conversationHistory,
+          routingHistory,
         );
 
         if (agentResult && agentResult.confidence > 0.3) {
@@ -889,7 +929,7 @@ export class RagService {
       // LEGACY FALLBACK — Original intent-based routing (v2.0)
       // Used when Agentic RAG fails or returns low confidence
       // ═══════════════════════════════════════════════════════════════
-      const interpretation = await this.understandQuery(resolvedQuestion, userRole, conversationHistory);
+      const interpretation = await this.understandQuery(resolvedQuestion, userRole, routingHistory);
       this.logger.log(`🎯 Intent: ${interpretation.intent}`);
       this.logger.log(`🔍 Search: ${interpretation.searchTerm || 'general'}`);
 
@@ -1214,20 +1254,20 @@ export class RagService {
               answer: tsResult.answer,
               searchType: tsResult.searchType,
               confidence: tsResult.confidence,
-              sources: { rows: tsResult.rowCount, sql: tsResult.sql },
+              sources: { rows: tsResult.rowCount },
             };
           }
           // Low confidence — return a clear DB-only response, NEVER fallback to LLM general knowledge
           this.logger.log('🔄 Text-to-SQL low confidence — returning DB-only response');
           return {
-            answer: `I couldn't find matching data in the platform database for that query. All my responses are based exclusively on OriginBI platform data.\n\nTry rephrasing your question, for example:\n- **"list companies"** — see all corporate accounts\n- **"list candidates"** — see all registered candidates\n- **"how many users"** — get user counts\n- **"show top performers"** — see highest scorers`,
+            answer: `No matching users found for that request.\n\nTry asking:\n- **"list users"**\n- **"list candidates"**\n- **"show top performers"**`,
             searchType: 'data_query_no_results',
             confidence: 0.6,
           };
         } catch (tsError) {
           this.logger.warn(`Text-to-SQL data_query failed: ${tsError.message}`);
           return {
-            answer: `I encountered an issue querying the database. Please try rephrasing your question or try a simpler query.`,
+            answer: `I couldn't process that request right now. Please try again.`,
             searchType: 'data_query_error',
             confidence: 0.4,
           };
@@ -1262,7 +1302,7 @@ export class RagService {
             // If Text-to-SQL returned low confidence with 0 rows, give a clear DB-only answer
             if (tsResult.rowCount === 0) {
               return {
-                answer: `No matching data found for your request. I can help with questions about candidates, assessments, companies, and more.\n\nTry asking:\n- **"list candidates"** — see registered candidates\n- **"how many users"** — get user counts\n- **"show top performers"** — see highest scorers`,
+                answer: `No users found for that request.`,
                 searchType: 'data_guard_no_results',
                 confidence: 0.8,
               };
@@ -1270,7 +1310,7 @@ export class RagService {
           } catch (tsErr) {
             this.logger.warn(`Text-to-SQL data guard failed: ${tsErr.message}`);
             return {
-              answer: `I couldn't retrieve that data from the platform database right now. Please try rephrasing your question.\n\nFor example, try: **"list companies"**, **"list candidates"**, **"show top performers"**, or **"how many users"**.`,
+              answer: `I couldn't process that request right now. Please try again.`,
               searchType: 'data_guard_error',
               confidence: 0.6,
             };
@@ -1376,8 +1416,9 @@ export class RagService {
         const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
         // Semantic enrichment: pull relevant docs from vector store with Cohere reranking
         const genKnowledgeChunks = await this.embeddingsService.semanticSearch(resolvedQuestion, 3).catch(() => []);
-        const genRagContext = genKnowledgeChunks.length > 0
-          ? `${enrichedHistory}\n\n— RELEVANT PLATFORM KNOWLEDGE (use if applicable) —\n${genKnowledgeChunks.map((d: any, i: number) => `[${i + 1}] ${d.content}`).join('\n---\n')}`
+        const compactKnowledge = this.buildCompactKnowledgeContext(genKnowledgeChunks);
+        const genRagContext = compactKnowledge
+          ? `${enrichedHistory}\n\n— RELEVANT PLATFORM KNOWLEDGE (use if applicable) —\n${compactKnowledge}`
           : enrichedHistory;
         if (genKnowledgeChunks.length > 0) {
           this.logger.log(`📚 General knowledge enriched with ${genKnowledgeChunks.length} semantic chunks`);
@@ -1507,11 +1548,11 @@ export class RagService {
           const noDataMessages: Record<string, string> = {
             person_lookup: BI_PERSONA.errors.notFound(interpretation.searchTerm || 'that person'),
             self_results: `You don't have any completed assessments yet. Complete an assessment to see your results here.`,
-            list_candidates: `No candidates found${scopeMsg}.`,
+            list_candidates: `No users found${scopeMsg}.`,
             list_users: `No users found.`,
             test_results: `No completed assessment results found${scopeMsg}.`,
             best_performer: `No candidates or completed assessments found${scopeMsg}.`,
-            career_roles: `No career roles found in the database.`,
+            career_roles: `No career roles found.`,
             count: `**Total: 0**`,
             count_by_role: `No accounts found.`,
             corporate_details: `No corporate accounts found${scopeMsg}.`,
@@ -1535,7 +1576,7 @@ export class RagService {
         if (platformEntityCheck.test(question) || (candidateDataCheck.test(question) && conversationHistory && /\b(candidate|employee|resource|people|person|staff|male|female)\b/i.test(conversationHistory))) {
           // Platform data question — return DB-only message, don't use LLM
           return {
-            answer: `No matching data found for your request. Try asking a more specific question or use commands like:\n- **"list candidates"** — see all registered candidates\n- **"list companies"** — see corporate accounts\n- **"show top performers"** — see highest scorers`,
+            answer: `No users found for that request.`,
             searchType: 'data_guard_no_results',
             confidence: 0.7,
           };
@@ -2337,8 +2378,8 @@ export class RagService {
         name: person.full_name || searchTerm,
         currentRole,
         currentJobDescription: isStudent
-          ? `Pursuing ${deptInfo || schoolInfo || 'academics'}. Completed behavioral and skill assessments through the OriginBI platform.`
-          : `Working at ${person.company_name || 'organization'}. Completed behavioral and skill assessments through the OriginBI platform.`,
+          ? `Pursuing ${deptInfo || schoolInfo || 'academics'}. Completed behavioral and skill assessments.`
+          : `Working at ${person.company_name || 'organization'}. Completed behavioral and skill assessments.`,
         yearsOfExperience: isStudent ? 0 : 0,
         relevantExperience: isStudent ? '' : '',
         currentIndustry,
@@ -3003,10 +3044,10 @@ export class RagService {
       }
 
       if (!dbCheck || dbCheck.length === 0) {
-        const scopeMsg = profileUserRole === 'CORPORATE' ? ' within your organization' : ' in our database';
+        const scopeMsg = profileUserRole === 'CORPORATE' ? ' within your organization' : '';
         this.logger.warn(`❌ Chat profile report: "${profileData.name}" not found${scopeMsg}`);
         return {
-          answer: `**⚠️ "${profileData.name}" was not found${scopeMsg}.**\n\nI can only generate Career Fitment Reports for candidates who are registered on the OriginBI platform${profileUserRole === 'CORPORATE' ? ' and belong to your organization' : ''}.\n\n**What you can do:**\n• Check if the name is spelled correctly\n• Ask me to **"list candidates"** to see registered users\n• The person needs to register and complete an assessment first\n\nAll reports are based exclusively on real assessment data from our platform.`,
+          answer: `**⚠️ "${profileData.name}" was not found${scopeMsg}.**\n\nTry this:\n• Check the spelling\n• Ask **"list candidates"**\n• Ask the person to complete assessment before report generation`,
           searchType: 'person_not_found',
           confidence: 0.95,
         };
@@ -3024,7 +3065,7 @@ export class RagService {
         const names = dbCheck.map((r: any) => r.full_name).join(', ');
         this.logger.warn(`❌ Chat profile report: "${profileData.name}" found but no completed assessments`);
         return {
-          answer: `**⚠️ Found "${names}" in our database, but they have not completed any assessments yet.**\n\nA Career Fitment Report requires completed assessment data (DISC personality profiling + Agile scoring) to generate meaningful career recommendations.\n\n**The candidate needs to:**\n1. Complete the behavioral assessment\n2. Complete the aptitude/agile assessment\n\nOnce the assessment is completed, I can generate a comprehensive report with career path recommendations, role fitment scores, and skill gap analysis.`,
+          answer: `**⚠️ Found "${names}", but no completed assessments yet.**\n\nCareer Fitment Report is available after assessment completion.\n\n**Next steps:**\n1. Complete behavioral assessment\n2. Complete aptitude/agile assessment`,
           searchType: 'no_assessment_data',
           confidence: 0.95,
         };

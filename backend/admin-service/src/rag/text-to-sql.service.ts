@@ -75,7 +75,7 @@ export class TextToSqlService {
         apiKey,
         model: 'gemini-2.5-flash',
         temperature: 0, // Deterministic SQL generation
-        maxOutputTokens: 768,
+        maxOutputTokens: 640,
         callbacks: [getTokenTrackerCallback('TextToSql (SQL)')],
       });
     }
@@ -90,7 +90,7 @@ export class TextToSqlService {
         apiKey,
         model: 'llama-3.3-70b-versatile',
         temperature: 0,
-        maxTokens: 768,
+        maxTokens: 640,
         callbacks: [getTokenTrackerCallback('TextToSql (SQL Groq Fallback)')],
       });
     }
@@ -105,7 +105,7 @@ export class TextToSqlService {
         apiKey,
         model: 'gemini-2.5-flash',
         temperature: 0.4, // Slightly creative for natural phrasing
-        maxOutputTokens: 1200,
+        maxOutputTokens: 700,
         callbacks: [getTokenTrackerCallback('TextToSql (Formatter)')],
       });
     }
@@ -120,7 +120,7 @@ export class TextToSqlService {
         apiKey,
         model: 'llama-3.3-70b-versatile',
         temperature: 0.4,
-        maxTokens: 1200,
+        maxTokens: 700,
         callbacks: [getTokenTrackerCallback('TextToSql (Formatter Groq Fallback)')],
       });
     }
@@ -135,7 +135,7 @@ export class TextToSqlService {
         apiKey,
         model: 'gemini-2.5-flash',
         temperature: 0.3,
-        maxOutputTokens: 1800,
+        maxOutputTokens: 1000,
         callbacks: [getTokenTrackerCallback('TextToSql (Synthesizer)')],
       });
     }
@@ -150,7 +150,7 @@ export class TextToSqlService {
         apiKey,
         model: 'llama-3.3-70b-versatile',
         temperature: 0.3,
-        maxTokens: 1800,
+        maxTokens: 1000,
         callbacks: [getTokenTrackerCallback('TextToSql (Synthesizer Groq Fallback)')],
       });
     }
@@ -613,14 +613,14 @@ Return ONLY the corrected SQL, nothing else:`;
       return this.formatCountAnswer(question, countValue);
     }
 
-    // For small result sets (1-3 rows) or aggregations, use compact formatting
-    if (data.length <= 3 || this.sqlValidator.isAggregationQuery(sql)) {
+    // For small/medium result sets or aggregations, avoid extra LLM call.
+    if (data.length <= 12 || this.sqlValidator.isAggregationQuery(sql)) {
       return this.formatCompactResults(question, data);
     }
 
     // For larger result sets, use LLM to create a rich summary
-    const truncatedData = data.slice(0, 30); // Limit context window
-    const dataStr = JSON.stringify(truncatedData, null, 2);
+    const truncatedData = data.slice(0, 15); // Keep prompt lean for formatter
+    const dataStr = JSON.stringify(truncatedData);
     const totalRows = data.length;
 
     const formatPrompt = `You are Ask BI — OriginBI's intelligent data analyst. Transform raw database results into a professional, insightful response that reads like a top-tier analytics dashboard.
@@ -735,8 +735,12 @@ Response:`;
       return lines.join('\n');
     }
 
-    // 2-3 rows — create a neat table
-    return this.buildMarkdownTable(data);
+    // 2+ rows — create a neat table
+    const table = this.buildMarkdownTable(data.slice(0, 12));
+    if (data.length > 12) {
+      return `${table}\n\n*Showing 12 of ${data.length} total results.*`;
+    }
+    return table;
   }
 
   /**
@@ -760,7 +764,7 @@ Response:`;
     const q = question.toLowerCase();
 
     if (/\b(who|find|search|show|list)\b/i.test(q) && /\b(name|person|candidate)\b/i.test(q)) {
-      return `No matching candidates found. You can try asking **"list all candidates"** to see who's available.`;
+      return `No users found.`;
     }
 
     // Contextual messages based on what the user asked about
@@ -774,7 +778,7 @@ Response:`;
       return `The requested contact details are not available for these candidates.`;
     }
 
-    return `No matching data found for your request. Please try a different question or ask **"what can you do"** for help.`;
+    return `No users found.`;
   }
 
   /**
@@ -1137,7 +1141,7 @@ JSON array:`;
       const synthesisInput = subResults.map((r, i) => {
         if (r.error) return `Sub-question ${i + 1}: "${r.question}"\nResult: Error — ${r.error}`;
         if (r.data.length === 0) return `Sub-question ${i + 1}: "${r.question}"\nResult: No data found`;
-        return `Sub-question ${i + 1}: "${r.question}"\nData (${r.data.length} rows):\n${JSON.stringify(r.data.slice(0, 15), null, 2)}`;
+        return `Sub-question ${i + 1}: "${r.question}"\nData (${r.data.length} rows):\n${JSON.stringify(r.data.slice(0, 8))}`;
       }).join('\n\n');
 
       const synthesisPrompt = `You are Ask BI, an advanced data intelligence assistant. The user asked a complex question that was broken into sub-queries. Now synthesize ALL the sub-results into a single, coherent, insightful response.
