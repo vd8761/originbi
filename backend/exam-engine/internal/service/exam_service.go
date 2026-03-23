@@ -491,11 +491,11 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 				}
 				var agileScores []AgileScoreResult
 				tx.Raw(`
-					SELECT q.category, SUM(a.answer_score) as total
+					SELECT UPPER(q.category) as category, SUM(a.answer_score) as total
 					FROM assessment_answers a
 					JOIN assessment_questions q ON a.main_question_id = q.id
 					WHERE a.assessment_attempt_id = ?
-					GROUP BY q.category
+					GROUP BY UPPER(q.category)
 				`, answerRecord.AssessmentAttemptID).Scan(&agileScores)
 
 				// Define struct with specific field order (Total last)
@@ -512,20 +512,25 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 					totalScore += s.Total
 					// Populate struct fields
 					switch s.Category {
-					case "Commitment":
+					case "COMMITMENT":
 						orderedAgile.Commitment = s.Total
-					case "Courage":
+						scoreMap["Commitment"] = s.Total
+					case "COURAGE":
 						orderedAgile.Courage = s.Total
-					case "Focus":
+						scoreMap["Courage"] = s.Total
+					case "FOCUS":
 						orderedAgile.Focus = s.Total
-					case "Openness":
+						scoreMap["Focus"] = s.Total
+					case "OPENNESS":
 						orderedAgile.Openness = s.Total
-					case "Respect":
+						scoreMap["Openness"] = s.Total
+					case "RESPECT":
 						orderedAgile.Respect = s.Total
-					}
-					// Also populate map for legacy/fallback (excluding total here to avoid duplicate if needed, but scoreMap['total'] is added later anyway)
-					if s.Category != "" {
-						scoreMap[s.Category] = s.Total
+						scoreMap["Respect"] = s.Total
+					default:
+						if s.Category != "" {
+							scoreMap[s.Category] = s.Total
+						}
 					}
 				}
 				orderedAgile.Total = totalScore
