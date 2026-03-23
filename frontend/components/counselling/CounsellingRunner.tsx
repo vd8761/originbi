@@ -205,7 +205,6 @@ export default function CounsellingRunner() {
                 e.preventDefault();
                 // Prevent Finish Assessment with arrow key
                 if (currentQuestionIndex < questions.length - 1 && selectedOptionId) {
-                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
                     handleNext();
                 }
             } else if (e.key === 'ArrowUp') {
@@ -213,7 +212,6 @@ export default function CounsellingRunner() {
                 if (currentQuestion.options.length > 0) {
                     const currentIndex = currentQuestion.options.findIndex(opt => opt.id === selectedOptionId);
                     const nextIndex = currentIndex <= 0 ? currentQuestion.options.length - 1 : currentIndex - 1;
-                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
                     handleOptionSelect(currentQuestion.id, currentQuestion.options[nextIndex].id);
                 }
             } else if (e.key === 'ArrowDown') {
@@ -221,13 +219,11 @@ export default function CounsellingRunner() {
                 if (currentQuestion.options.length > 0) {
                     const currentIndex = currentQuestion.options.findIndex(opt => opt.id === selectedOptionId);
                     const nextIndex = currentIndex === -1 || currentIndex === currentQuestion.options.length - 1 ? 0 : currentIndex + 1;
-                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
                     handleOptionSelect(currentQuestion.id, currentQuestion.options[nextIndex].id);
                 }
             } else {
                 const num = parseInt(e.key, 10);
                 if (!isNaN(num) && num > 0 && num <= currentQuestion.options.length) {
-                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
                     handleOptionSelect(currentQuestion.id, currentQuestion.options[num - 1].id);
                 }
             }
@@ -235,7 +231,6 @@ export default function CounsellingRunner() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [loading, verifying, isVerified, completed, currentQuestionIndex, questions, answers]);
 
 

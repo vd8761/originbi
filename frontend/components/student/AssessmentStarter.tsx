@@ -606,7 +606,6 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
         e.preventDefault();
         const isFinishing = questions.length > 0 && questions.filter(q => !(String(q.assessmentAnswerId) === String(currentQuestion?.assessmentAnswerId) ? selectedOption : answers[String(q.assessmentAnswerId)])).length === 0;
         if (!isFinishing && selectedOption) {
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           handleNext();
         }
       } else if (e.key === 'ArrowUp') {
@@ -633,7 +632,6 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, error, isCompleted, currentQuestion, submitting, selectedOption, answers, questions]);
 
 
