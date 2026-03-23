@@ -97,7 +97,7 @@ const MoodCard: React.FC = () => {
     ];
 
     return (
-        <div className="bg-white/20 border border-[#19211C]/12 dark:bg-brand-dark-secondary dark:border-transparent rounded-2xl h-full flex flex-col backdrop-blur-sm p-6 lg:p-[1.25vw]">
+        <div className="dashboard-glass-card h-full flex flex-col p-6 lg:p-[1.25vw]">
             <div className="grid grid-cols-1 lg:grid-cols-8 gap-6 lg:gap-[1.25vw] h-full">
                 {/* Left Side - Image (3 columns) */}
                 <div className="lg:col-span-3 relative w-full h-full min-h-[240px] lg:min-h-0 rounded-2xl overflow-hidden group">

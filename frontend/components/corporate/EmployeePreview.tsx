@@ -7,6 +7,7 @@ import { ArrowLeftWithoutLineIcon, PlusIcon, ChevronDownIcon, ArrowRightWithoutL
 import ExcelExportButton from '../ui/ExcelExportButton';
 import DateRangeFilter, { DateRangeOption } from '../ui/DateRangeFilter';
 import DateRangePickerModal from '../ui/DateRangePickerModal';
+import GroupCandidateAssessmentPreview from './GroupCandidateAssessmentPreview';
 
 interface EmployeePreviewProps {
     registration: Registration;
@@ -36,12 +37,16 @@ const EmployeePreview: React.FC<EmployeePreviewProps> = ({ registration, onBack,
     const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
 
     // Filters
-    const [dateRangeLabel, setDateRangeLabel] = useState<string>("Today");
-    const [startDate, setStartDate] = useState<Date | null>(new Date());
-    const [endDate, setEndDate] = useState<Date | null>(new Date());
+    const [dateRangeLabel, setDateRangeLabel] = useState<string>("All");
+    const [startDate, setStartDate] = useState<Date | null>(null);
+    const [endDate, setEndDate] = useState<Date | null>(null);
     const [isDateModalOpen, setIsDateModalOpen] = useState(false);
     const [statusFilter, setStatusFilter] = useState<string | null>(null);
     const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+
+    // Selected View for Assessments
+    const [view, setView] = useState<'list' | 'assessment-preview'>('list');
+    const [selectedSession, setSelectedSession] = useState<AssessmentSession | null>(null);
 
     const fetchSessions = useCallback(async () => {
         // Handle mismatched property names (backend sends userId, type expects user_id)
@@ -157,6 +162,15 @@ const EmployeePreview: React.FC<EmployeePreviewProps> = ({ registration, onBack,
     };
 
     const totalPages = Math.ceil(total / limit) || 1;
+
+    if (view === 'assessment-preview' && selectedSession) {
+        return (
+            <GroupCandidateAssessmentPreview
+                session={selectedSession}
+                onBack={() => setView('list')}
+            />
+        );
+    }
 
     return (
         <div className="flex flex-col gap-6 font-sans h-full p-4 sm:p-6 lg:p-8">
@@ -320,6 +334,13 @@ const EmployeePreview: React.FC<EmployeePreviewProps> = ({ registration, onBack,
                         sortColumn={sortCol}
                         sortOrder={sortOrder}
                         onSort={handleSort}
+                        onView={(id) => {
+                            const sess = sessions.find(s => String(s.id) === String(id));
+                            if (sess) {
+                                setSelectedSession(sess);
+                                setView('assessment-preview');
+                            }
+                        }}
                     />
                 </div>
 

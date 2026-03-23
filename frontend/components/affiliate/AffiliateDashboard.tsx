@@ -43,10 +43,7 @@ const CircleArrowUpRightFilled = ({ className = "w-6 h-6" }: { className?: strin
 const MiniStat = ({ label, sublabel, value, trend, isPositive }: { label: string, sublabel?: string, value: string, trend?: string, isPositive?: boolean }) => (
     <div className="flex flex-col pr-6 pl-0 sm:px-6 sm:first:pl-0 w-full sm:w-auto flex-1 border-b sm:border-b-0 sm:border-r border-[#E0E0E0] dark:border-white/10 last:border-0 sm:last:border-r-0 h-full justify-between py-4 sm:py-1">
         <div className="flex justify-between items-start gap-3">
-            <div className="flex flex-row items-baseline gap-1">
-                <span className="text-xs text-[#19211C]/60 dark:text-white/60 font-normal whitespace-nowrap">{label}</span>
-                {sublabel && <span className="text-[9px] text-[#9CA3AF] dark:text-white/35 font-normal whitespace-nowrap">({sublabel})</span>}
-            </div>
+            <span className="text-[clamp(14px,1vw,16px)] text-[#19211C] dark:text-white font-normal whitespace-nowrap">{label}</span>
             <CircleArrowUpRightFilled className="w-6 h-6" />
         </div>
         <div className="flex flex-row items-baseline gap-3">
@@ -97,7 +94,7 @@ const EarningsCard = ({ earnings }: { earnings: number }) => {
                 <div className="flex justify-center">
                     <button
                         onClick={() => router.push('/affiliate/earnings')}
-                        className="font-['Haskoy'] font-semibold text-[clamp(15px,1vw,18px)] text-white bg-gradient-to-r from-[#1ED36A] to-[#16b058] hover:from-[#16b058] hover:to-[#1ED36A] px-14 py-4 rounded-full shadow-[0_8px_24px_-4px_rgba(30,211,106,0.4)] hover:shadow-[0_12px_32px_-4px_rgba(30,211,106,0.5)] transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]"
+                        className="font-['Haskoy'] font-medium text-[clamp(16px,1vw,18px)] text-white bg-[#1ED36A] hover:bg-[#16b058] px-12 py-3.5 rounded-full shadow-lg shadow-[#1ED36A]/20 transition-all"
                     >
                         View
                     </button>
@@ -628,7 +625,7 @@ Scan the QR code in the image or register here: ${referralLink}`;
                             <button
                                 onClick={() => shareVia('native')}
                                 disabled={isGenerating}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm transition-all bg-gradient-to-r from-[#1ED36A] to-[#16b058] text-white hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-50"
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm transition-all bg-[#1ED36A] hover:bg-[#16b058] text-white shadow-lg shadow-[#1ED36A]/20"
                             >
                                 {isGenerating ? (
                                     <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" /></svg>
@@ -781,7 +778,7 @@ const AffiliateDashboard: React.FC = () => {
     const userName = affiliateUser?.name || "Affiliate Partner";
 
     return (
-        <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-hidden p-4 sm:p-6 lg:p-8">
+        <div className="relative min-h-screen bg-transparent dark:bg-[#19211C] font-sans transition-colors duration-300 overflow-hidden p-4 sm:p-6 lg:p-8">
             {/* 1. Header Section */}
             <div className="flex flex-col xl:flex-row justify-between items-start mb-10 gap-6">
                 <div>

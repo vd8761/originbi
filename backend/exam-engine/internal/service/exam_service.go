@@ -177,83 +177,67 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 					var query string
 					var args []interface{}
 
-					if program.Code == "SCHOOL_STUDENT" && studentBoard != "" {
-						// School program with board: prioritize board-matching questions
-						query = `
-							INSERT INTO assessment_answers (
-								assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
-								main_question_id, question_source, status, question_sequence, created_at, updated_at
-							)
-							SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
-							FROM assessment_questions 
-							WHERE assessment_level_id = ? 
-								AND personality_trait_id = ?
-								AND board = ?
-								AND is_active = true 
-								AND is_deleted = false
-							ORDER BY RANDOM()
-							LIMIT 25
-						`
-						args = []interface{}{
-							attempt.ID, attempt.AssessmentSessionID, attempt.UserID, attempt.RegistrationID, attempt.ProgramID, *attempt.AssessmentLevelID,
-							*attempt.AssessmentLevelID, *traitID,
-							studentBoard,
+						if program.Code == "SCHOOL_STUDENT" && studentBoard != "" {
+							// Balanced Category Selection with Board Priority
+							query = `
+								INSERT INTO assessment_answers (
+									assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
+									main_question_id, question_source, status, question_sequence, created_at, updated_at
+								)
+								SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
+								FROM (
+									WITH CombinedQuestions AS (
+										SELECT id, category, 1 as priority
+										FROM assessment_questions 
+										WHERE assessment_level_id = ? AND personality_trait_id = ? AND board = ? AND is_active = true AND is_deleted = false
+										UNION ALL
+										SELECT id, category, 2 as priority
+										FROM assessment_questions 
+										WHERE assessment_level_id = ? AND personality_trait_id = ? AND is_active = true AND is_deleted = false
+									)
+									SELECT id, ROW_NUMBER() OVER (PARTITION BY UPPER(category) ORDER BY priority, RANDOM()) as rnk
+									FROM CombinedQuestions
+									WHERE UPPER(category) IN ('COMMITMENT', 'COURAGE', 'FOCUS', 'OPENNESS', 'RESPECT')
+								) t
+								WHERE rnk <= 5
+							`
+							args = []interface{}{
+								attempt.ID, attempt.AssessmentSessionID, attempt.UserID, attempt.RegistrationID, attempt.ProgramID, *attempt.AssessmentLevelID,
+								*attempt.AssessmentLevelID, *traitID, studentBoard,
+								*attempt.AssessmentLevelID, *traitID,
+							}
+						} else {
+							// Balanced Category Selection (Generic Trait)
+							query = `
+								INSERT INTO assessment_answers (
+									assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
+									main_question_id, question_source, status, question_sequence, created_at, updated_at
+								)
+								SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
+								FROM (
+									SELECT id, ROW_NUMBER() OVER (PARTITION BY UPPER(category) ORDER BY RANDOM()) as rnk
+									FROM assessment_questions 
+									WHERE assessment_level_id = ? 
+									  AND personality_trait_id = ?
+									  AND is_active = true 
+									  AND is_deleted = false
+									  AND UPPER(category) IN ('COMMITMENT', 'COURAGE', 'FOCUS', 'OPENNESS', 'RESPECT')
+								) t
+								WHERE rnk <= 5
+							`
+							args = []interface{}{
+								attempt.ID, attempt.AssessmentSessionID, attempt.UserID, attempt.RegistrationID, attempt.ProgramID, *attempt.AssessmentLevelID,
+								*attempt.AssessmentLevelID, *traitID,
+							}
 						}
-					} else {
-						// Non-school or no board: just trait + level
-						query = `
-							INSERT INTO assessment_answers (
-								assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
-								main_question_id, question_source, status, question_sequence, created_at, updated_at
-							)
-							SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
-							FROM assessment_questions 
-							WHERE assessment_level_id = ? 
-								AND personality_trait_id = ?
-								AND is_active = true 
-								AND is_deleted = false
-							ORDER BY RANDOM()
-							LIMIT 25
-						`
-						args = []interface{}{
-							attempt.ID, attempt.AssessmentSessionID, attempt.UserID, attempt.RegistrationID, attempt.ProgramID, *attempt.AssessmentLevelID,
-							*attempt.AssessmentLevelID, *traitID,
-						}
-					}
 
-					fmt.Printf("[GetExamQuestions - Fallback] Generating Level 2 Questions for Attempt %d (Program: %s). Trait=%d, Board=%s\n", attempt.ID, program.Code, *traitID, studentBoard)
+					fmt.Printf("[GetExamQuestions - Fallback] Generating Balanced Category Questions for Attempt %d. Trait=%d, Board=%s\n", attempt.ID, *traitID, studentBoard)
 					genResult := db.Exec(query, args...)
-
-					// Fallback: If school board-specific query returned 0, retry without board filter
-					if genResult.Error == nil && genResult.RowsAffected == 0 && program.Code == "SCHOOL_STUDENT" && studentBoard != "" {
-						fmt.Printf("[GetExamQuestions - Fallback] Board-specific query returned 0 rows. Retrying without board filter...\n")
-						query = `
-							INSERT INTO assessment_answers (
-								assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
-								main_question_id, question_source, status, question_sequence, created_at, updated_at
-							)
-							SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
-							FROM assessment_questions 
-							WHERE assessment_level_id = ? 
-								AND personality_trait_id = ?
-								AND is_active = true 
-								AND is_deleted = false
-							ORDER BY RANDOM()
-							LIMIT 25
-						`
-						args = []interface{}{
-							attempt.ID, attempt.AssessmentSessionID, attempt.UserID, attempt.RegistrationID, attempt.ProgramID, *attempt.AssessmentLevelID,
-							*attempt.AssessmentLevelID, *traitID,
-						}
-						genResult = db.Exec(query, args...)
-					}
 
 					if genResult.Error != nil {
 						fmt.Printf("[GetExamQuestions - Fallback ERROR] INSERT failed for Attempt %d: %v\n", attempt.ID, genResult.Error)
-					} else if genResult.RowsAffected == 0 {
-						fmt.Printf("[GetExamQuestions - Fallback WARNING] INSERT produced 0 rows for Attempt %d. No matching questions in assessment_questions for LevelID=%d, TraitID=%d\n", attempt.ID, *attempt.AssessmentLevelID, *traitID)
 					} else {
-						fmt.Printf("[GetExamQuestions - Fallback SUCCESS] Generated %d questions for Attempt %d\n", genResult.RowsAffected, attempt.ID)
+						fmt.Printf("[GetExamQuestions - Fallback SUCCESS] Generated %d balanced questions for Attempt %d\n", genResult.RowsAffected, attempt.ID)
 					}
 
 					// Re-fetch questions after generation
@@ -507,11 +491,11 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 				}
 				var agileScores []AgileScoreResult
 				tx.Raw(`
-					SELECT q.category, SUM(a.answer_score) as total
+					SELECT UPPER(q.category) as category, SUM(a.answer_score) as total
 					FROM assessment_answers a
 					JOIN assessment_questions q ON a.main_question_id = q.id
 					WHERE a.assessment_attempt_id = ?
-					GROUP BY q.category
+					GROUP BY UPPER(q.category)
 				`, answerRecord.AssessmentAttemptID).Scan(&agileScores)
 
 				// Define struct with specific field order (Total last)
@@ -528,20 +512,25 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 					totalScore += s.Total
 					// Populate struct fields
 					switch s.Category {
-					case "Commitment":
+					case "COMMITMENT":
 						orderedAgile.Commitment = s.Total
-					case "Courage":
+						scoreMap["Commitment"] = s.Total
+					case "COURAGE":
 						orderedAgile.Courage = s.Total
-					case "Focus":
+						scoreMap["Courage"] = s.Total
+					case "FOCUS":
 						orderedAgile.Focus = s.Total
-					case "Openness":
+						scoreMap["Focus"] = s.Total
+					case "OPENNESS":
 						orderedAgile.Openness = s.Total
-					case "Respect":
+						scoreMap["Openness"] = s.Total
+					case "RESPECT":
 						orderedAgile.Respect = s.Total
-					}
-					// Also populate map for legacy/fallback (excluding total here to avoid duplicate if needed, but scoreMap['total'] is added later anyway)
-					if s.Category != "" {
-						scoreMap[s.Category] = s.Total
+						scoreMap["Respect"] = s.Total
+					default:
+						if s.Category != "" {
+							scoreMap[s.Category] = s.Total
+						}
 					}
 				}
 				orderedAgile.Total = totalScore
@@ -696,42 +685,52 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 						var args []interface{}
 
 						if program.Code == "SCHOOL_STUDENT" && studentBoard != "" {
-							// School program with board filter
+							// Balanced Category Selection with Board Priority
 							query = `
 								INSERT INTO assessment_answers (
 									assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
 									main_question_id, question_source, status, question_sequence, created_at, updated_at
 								)
 								SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
-								FROM assessment_questions 
-								WHERE assessment_level_id = ? 
-								  AND personality_trait_id = ?
-								  AND board = ?
-								  AND is_active = true 
-								  AND is_deleted = false
-								ORDER BY RANDOM()
-								LIMIT 25
+								FROM (
+									WITH CombinedQuestions AS (
+										SELECT id, category, 1 as priority
+										FROM assessment_questions 
+										WHERE assessment_level_id = ? AND personality_trait_id = ? AND board = ? AND is_active = true AND is_deleted = false
+										UNION ALL
+										SELECT id, category, 2 as priority
+										FROM assessment_questions 
+										WHERE assessment_level_id = ? AND personality_trait_id = ? AND is_active = true AND is_deleted = false
+									)
+									SELECT id, ROW_NUMBER() OVER (PARTITION BY UPPER(category) ORDER BY priority, RANDOM()) as rnk
+									FROM CombinedQuestions
+									WHERE UPPER(category) IN ('COMMITMENT', 'COURAGE', 'FOCUS', 'OPENNESS', 'RESPECT')
+								) t
+								WHERE rnk <= 5
 							`
 							args = []interface{}{
 								nextAttempt.ID, nextAttempt.AssessmentSessionID, nextAttempt.UserID, nextAttempt.RegistrationID, nextAttempt.ProgramID, nextLevel.ID,
+								nextLevel.ID, *traitID, studentBoard,
 								nextLevel.ID, *traitID,
-								studentBoard,
 							}
 						} else {
-							// Non-school or no board: just trait + level
+							// Balanced Category Selection (Generic Trait)
 							query = `
 								INSERT INTO assessment_answers (
 									assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
 									main_question_id, question_source, status, question_sequence, created_at, updated_at
 								)
 								SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
-								FROM assessment_questions 
-								WHERE assessment_level_id = ? 
-								  AND personality_trait_id = ?
-								  AND is_active = true 
-								  AND is_deleted = false
-								ORDER BY RANDOM()
-								LIMIT 25
+								FROM (
+									SELECT id, ROW_NUMBER() OVER (PARTITION BY UPPER(category) ORDER BY RANDOM()) as rnk
+									FROM assessment_questions 
+									WHERE assessment_level_id = ? 
+									  AND personality_trait_id = ?
+									  AND is_active = true 
+									  AND is_deleted = false
+									  AND UPPER(category) IN ('COMMITMENT', 'COURAGE', 'FOCUS', 'OPENNESS', 'RESPECT')
+								) t
+								WHERE rnk <= 5
 							`
 							args = []interface{}{
 								nextAttempt.ID, nextAttempt.AssessmentSessionID, nextAttempt.UserID, nextAttempt.RegistrationID, nextAttempt.ProgramID, nextLevel.ID,
@@ -739,32 +738,8 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 							}
 						}
 
-						fmt.Printf("[SubmitAnswer] Generating Level 2 Questions for Next Attempt %d (Program: %s). Trait=%d, Board=%s\n", nextAttempt.ID, program.Code, *traitID, studentBoard)
+						fmt.Printf("[SubmitAnswer] Generating Balanced Level 2 Questions for Attempt %d. Trait=%d, Board=%s\n", nextAttempt.ID, *traitID, studentBoard)
 						genResult := tx.Exec(query, args...)
-
-						// Fallback: If school board-specific query returned 0, retry without board filter
-						if genResult.Error == nil && genResult.RowsAffected == 0 && program.Code == "SCHOOL_STUDENT" && studentBoard != "" {
-							fmt.Printf("[SubmitAnswer] Board-specific query returned 0 rows. Retrying without board filter...\n")
-							query = `
-								INSERT INTO assessment_answers (
-									assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
-									main_question_id, question_source, status, question_sequence, created_at, updated_at
-								)
-								SELECT ?, ?, ?, ?, ?, ?, id, 'MAIN', 'NOT_ANSWERED', ROW_NUMBER() OVER (ORDER BY RANDOM()), NOW(), NOW()
-								FROM assessment_questions 
-								WHERE assessment_level_id = ? 
-								  AND personality_trait_id = ?
-								  AND is_active = true 
-								  AND is_deleted = false
-								ORDER BY RANDOM()
-								LIMIT 25
-							`
-							args = []interface{}{
-								nextAttempt.ID, nextAttempt.AssessmentSessionID, nextAttempt.UserID, nextAttempt.RegistrationID, nextAttempt.ProgramID, nextLevel.ID,
-								nextLevel.ID, *traitID,
-							}
-							genResult = tx.Exec(query, args...)
-						}
 
 						if genResult.Error != nil {
 							fmt.Printf("[SubmitAnswer] Level 2 Generation ERROR for Attempt %d: %v\n", nextAttempt.ID, genResult.Error)

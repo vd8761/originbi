@@ -107,7 +107,7 @@ const MiniStat = ({ label, value, trend, isPositive }: { label: string, value: s
 );
 
 const CreditsCard = ({ credits, onBuy }: { credits: number, onBuy: () => void }) => (
-    <div className="relative overflow-hidden rounded-[32px] p-8 h-full bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] border border-[#E0E0E0] dark:border-white/10 flex flex-col items-center justify-between shadow-sm">
+    <div className="glass-card shadow-none dark:bg-white/[0.08] relative overflow-hidden rounded-[32px] p-8 h-full flex flex-col items-center justify-between">
         {/* Bottom Gradient - CSS Based for Better Visibilty */}
         <div
             className="absolute -bottom-[30%] -left-[10%] -right-[10%] h-[180px] blur-[50px] pointer-events-none opacity-100"
@@ -169,7 +169,7 @@ const AssessmentBarChart = ({ insights }: { insights: AssessmentInsight[] }) => 
     const yLabels = Array.from({ length: 4 }, (_, i) => max - (i * max / 4));
 
     return (
-        <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-8 border border-[#E0E0E0] dark:border-white/10 h-full flex flex-col font-['Haskoy'] overflow-visible shadow-sm">
+        <div className="glass-card shadow-none dark:bg-white/[0.08] rounded-[32px] p-8 h-full flex flex-col font-['Haskoy'] overflow-visible">
             <div className="flex justify-between items-center mb-8">
                 <h3 className="text-[clamp(18px,1.2vw,22px)] font-semibold text-[#19211C] dark:text-white leading-none">Assessment Insights</h3>
                 <div className="flex gap-4 text-[clamp(12px,0.8vw,14px)] font-medium text-[#19211C] dark:text-white">
@@ -304,7 +304,7 @@ const RecruitmentOverview = ({
     ];
 
     return (
-        <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-8 border border-[#E0E0E0] dark:border-white/10 h-full font-['Haskoy'] flex flex-col shadow-sm">
+        <div className="glass-card shadow-none dark:bg-white/[0.08] rounded-[32px] p-8 h-full font-['Haskoy'] flex flex-col">
             {/* Header */}
             <div className="flex justify-between items-center mb-8">
                 <h3 className="text-[clamp(18px,1.2vw,22px)] font-semibold text-[#19211C] dark:text-white leading-none">
@@ -425,7 +425,7 @@ const DonutChart = ({ total, traits }: { total: number; traits: TraitData[] }) =
 const PersonalityDistribution = ({ data }: { data: PersonalityDistributionData }) => {
     const traits = data.topTraits.length > 0 ? data.topTraits : [];
     return (
-        <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-6 border border-[#E0E0E0] dark:border-white/10 h-full font-['Haskoy'] flex flex-col justify-between shadow-sm">
+        <div className="glass-card shadow-none dark:bg-white/[0.08] rounded-[32px] p-6 h-full font-['Haskoy'] flex flex-col justify-between">
             {/* Header */}
             <div className="flex justify-between items-start mb-4">
                 <div className="space-y-3">
@@ -494,7 +494,7 @@ const ParticipantsTable = ({
     }));
 
     return (
-        <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] border border-[#E0E0E0] dark:border-white/10 h-full overflow-hidden flex flex-col font-['Haskoy'] shadow-sm">
+        <div className="glass-card shadow-none dark:bg-white/[0.08] rounded-[32px] h-full overflow-hidden flex flex-col font-['Haskoy']">
             {/* Header */}
             <div className="flex justify-between items-center p-6">
                 <h3 className="font-semibold text-[clamp(16px,1.04vw,20px)] text-[#19211C] dark:text-white leading-none">
@@ -886,7 +886,7 @@ const CorporateDashboard: React.FC = () => {
     const companyName = stats?.companyName || "Monishwar Rajasekaran";
 
     return (
-        <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-hidden p-4 sm:p-6 lg:p-8">
+        <div className="relative min-h-screen bg-transparent dark:bg-[#19211C] font-sans transition-colors duration-300 overflow-hidden p-4 sm:p-6 lg:p-8">
             {/* 1. Header Section */}
             <Script
                 id="razorpay-checkout-js"
@@ -955,7 +955,7 @@ const CorporateDashboard: React.FC = () => {
 
             {/* 4. Search & Report Section */}
             <div>
-                <div className="bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] p-6 sm:p-10 border border-[#E0E0E0] dark:border-white/10 shadow-sm text-center font-['Haskoy'] mb-8">
+                <div className="glass-card shadow-none dark:bg-white/[0.08] rounded-[32px] p-6 sm:p-10 text-center font-['Haskoy'] mb-8">
                     <h2 className="text-[clamp(26px,1.8vw,34px)] font-semibold text-[#150089] dark:text-white leading-none mb-4">
                         Search Student Report
                     </h2>

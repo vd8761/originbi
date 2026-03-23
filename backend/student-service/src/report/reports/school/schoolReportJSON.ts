@@ -33,12 +33,18 @@ import {
   getCompatibilityMatrixDetails,
   CourseCompatibility,
 } from '../../helpers/sqlHelper';
+import { getTopCollegesForStudent } from '../../helpers/SchoolHelper';
 
 // ─── Helper: Top-Two DISC Traits ─────────────────────────────────────────────
 
 function getTopTwoTraits(
   mostAnswered: { ANSWER_TYPE: string; COUNT: number }[],
-  scores: { score_D: number; score_I: number; score_S: number; score_C: number },
+  scores: {
+    score_D: number;
+    score_I: number;
+    score_S: number;
+    score_C: number;
+  },
 ): [string, string] {
   let traitScores: { type: string; val: number }[];
 
@@ -212,7 +218,9 @@ function computeWhereYouFitBest(data: SchoolData) {
     Openness: agile.openness ?? 0,
     Commitment: agile.commitment ?? 0,
   };
-  const topAgile = Object.entries(agileScores).sort((a, b) => b[1] - a[1])[0][0];
+  const topAgile = Object.entries(agileScores).sort(
+    (a, b) => b[1] - a[1],
+  )[0][0];
 
   // Rank ALL streams by compatibility (top agile vs each stream's matrix)
   const rankedStreams = Object.keys(STREAM_AGILE_COMPATIBILITY)
@@ -277,10 +285,10 @@ function buildCorePersonality(patterns: ProfilePatterns, textVariant: number) {
       title: dual.title,
       description: dual.description,
       archetypes: [arch1, arch2].filter(Boolean).map((a) => ({
-        title: a!.title,
-        superpower: a!.superpower,
-        risk: a!.risk,
-        environment: a!.environment,
+        title: a.title,
+        superpower: a.superpower,
+        risk: a.risk,
+        environment: a.environment,
       })),
       additionalDescription: tv('disc-dual', textVariant),
     };
@@ -309,10 +317,26 @@ function buildCareerFit(data: SchoolData) {
   const C = data.score_C;
 
   const fits = [
-    { label: 'Engineering & Technology', score: Math.round((C + nFocus) / 2), strongFit: C > 65 && nFocus > 65 },
-    { label: 'Management & Leadership', score: Math.round((D + nCourage) / 2), strongFit: D > 65 && nCourage > 65 },
-    { label: 'Creative & Design', score: Math.round((I + nOpenness) / 2), strongFit: I > 65 && nOpenness > 65 },
-    { label: 'People & HR', score: Math.round((S + nRespect) / 2), strongFit: S > 65 && nRespect > 65 },
+    {
+      label: 'Engineering & Technology',
+      score: Math.round((C + nFocus) / 2),
+      strongFit: C > 65 && nFocus > 65,
+    },
+    {
+      label: 'Management & Leadership',
+      score: Math.round((D + nCourage) / 2),
+      strongFit: D > 65 && nCourage > 65,
+    },
+    {
+      label: 'Creative & Design',
+      score: Math.round((I + nOpenness) / 2),
+      strongFit: I > 65 && nOpenness > 65,
+    },
+    {
+      label: 'People & HR',
+      score: Math.round((S + nRespect) / 2),
+      strongFit: S > 65 && nRespect > 65,
+    },
   ];
 
   fits.sort((a, b) => b.score - a.score);
@@ -328,11 +352,7 @@ function buildCareerDomainTable(topTwo: string) {
   const domains = careerData.domains.map((d) => {
     const filledDots = Math.round(d.score / 20);
     const outlook =
-      d.score >= 85
-        ? 'Strong Fit'
-        : d.score >= 75
-          ? 'Good Fit'
-          : 'Developing';
+      d.score >= 85 ? 'Strong Fit' : d.score >= 75 ? 'Good Fit' : 'Developing';
     return {
       name: d.name,
       score: d.score,
@@ -385,7 +405,8 @@ function buildAcademicStrategy(patterns: ProfilePatterns) {
     },
   };
 
-  const style = styleTitles[patterns.academicStyle] || styleTitles['structured'];
+  const style =
+    styleTitles[patterns.academicStyle] || styleTitles['structured'];
   return {
     style: patterns.academicStyle,
     title: style.title,
@@ -399,13 +420,25 @@ function buildAcademicStrategy(patterns: ProfilePatterns) {
 function buildStressResponse(patterns: ProfilePatterns) {
   const stressLabels: Record<string, { stages: [string, string, string] }> = {
     assertive: {
-      stages: ['Focused & Direct', 'Assertive & Impatient', 'Aggressive & Dismissive'],
+      stages: [
+        'Focused & Direct',
+        'Assertive & Impatient',
+        'Aggressive & Dismissive',
+      ],
     },
     overthink: {
-      stages: ['Analytical & Careful', 'Cautious & Hesitant', 'Paralysed by Detail'],
+      stages: [
+        'Analytical & Careful',
+        'Cautious & Hesitant',
+        'Paralysed by Detail',
+      ],
     },
     withdrawal: {
-      stages: ['Quiet & Observant', 'Reserved & Passive', 'Withdrawn & Disengaged'],
+      stages: [
+        'Quiet & Observant',
+        'Reserved & Passive',
+        'Withdrawn & Disengaged',
+      ],
     },
     balanced: {
       stages: ['Calm & Steady', 'Mildly Reactive', 'Moderately Affected'],
@@ -432,11 +465,31 @@ function buildWorkReadiness(data: SchoolData) {
   const total = commitment + focus + openness + respect + courage;
 
   const indicators = [
-    { label: 'Completion Reliability', score: commitment, radarScore: Math.round((commitment / 25) * 10) },
-    { label: 'Task Focus Stability', score: focus, radarScore: Math.round((focus / 25) * 10) },
-    { label: 'Adaptability to Change', score: openness, radarScore: Math.round((openness / 25) * 10) },
-    { label: 'Team Sensitivity', score: respect, radarScore: Math.round((respect / 25) * 10) },
-    { label: 'Decision Courage', score: courage, radarScore: Math.round((courage / 25) * 10) },
+    {
+      label: 'Completion Reliability',
+      score: commitment,
+      radarScore: Math.round((commitment / 25) * 10),
+    },
+    {
+      label: 'Task Focus Stability',
+      score: focus,
+      radarScore: Math.round((focus / 25) * 10),
+    },
+    {
+      label: 'Adaptability to Change',
+      score: openness,
+      radarScore: Math.round((openness / 25) * 10),
+    },
+    {
+      label: 'Team Sensitivity',
+      score: respect,
+      radarScore: Math.round((respect / 25) * 10),
+    },
+    {
+      label: 'Decision Courage',
+      score: courage,
+      radarScore: Math.round((courage / 25) * 10),
+    },
   ];
 
   const THRESHOLD = 17;
@@ -510,7 +563,8 @@ export async function buildSchoolReportJSON(data: SchoolData) {
   logger.info('[SchoolReportJSON] Building JSON report...');
 
   // ── 1. DISC Computation ──
-  const { sortedTraits, topTwo, careerAlignmentIntensity } = computeSortedTraits(data);
+  const { sortedTraits, topTwo, careerAlignmentIntensity } =
+    computeSortedTraits(data);
   const patterns = detectPatterns(data, sortedTraits);
 
   const [primaryType, secondaryType] = getTopTwoTraits(
@@ -553,23 +607,44 @@ export async function buildSchoolReportJSON(data: SchoolData) {
   const bottom1 = sortedTraits[2];
   const bottom2 = sortedTraits[3];
   const developmentAreas = [
-    ...(DEVELOPMENT_MAP[bottom1.type] || []).map((d) => ({ ...d, currentVal: bottom1.val })),
-    ...(DEVELOPMENT_MAP[bottom2.type] || []).map((d) => ({ ...d, currentVal: bottom2.val })),
+    ...(DEVELOPMENT_MAP[bottom1.type] || []).map((d) => ({
+      ...d,
+      currentVal: bottom1.val,
+    })),
+    ...(DEVELOPMENT_MAP[bottom2.type] || []).map((d) => ({
+      ...d,
+      currentVal: bottom2.val,
+    })),
   ];
 
   // ── 7. Course Compatibility (DB call) ──
   let courseCompatibility: CourseCompatibility[] = [];
+  let topColleges: any[] = [];
   try {
     if (data.school_level_id === 1) {
       // SSLC → recommended stream
       // For SSLC, pass undefined as schoolStreamId to get all streams
-      courseCompatibility = await getCompatibilityMatrixDetails(dominantTrait, undefined);
+      courseCompatibility = await getCompatibilityMatrixDetails(
+        dominantTrait,
+        undefined,
+      );
     } else {
       // HSC → specific stream
-      courseCompatibility = await getCompatibilityMatrixDetails(dominantTrait, data.school_stream_id);
+      courseCompatibility = await getCompatibilityMatrixDetails(
+        dominantTrait,
+        data.school_stream_id,
+      );
+      // Fetch top colleges for HSC
+      topColleges = await getTopCollegesForStudent(
+        dominantTrait,
+        data.school_stream_id,
+      );
     }
   } catch (err) {
-    logger.warn('[SchoolReportJSON] Course Compatibility fetch failed.', err);
+    logger.warn(
+      '[SchoolReportJSON] Course Compatibility/Colleges fetch failed.',
+      err,
+    );
   }
 
   // ── 8. Agile Scores normalized ──
@@ -665,7 +740,10 @@ export async function buildSchoolReportJSON(data: SchoolData) {
 
       motivations: content
         ? {
-            intro: String(content.motivations_intro).replace('$full_name', data.full_name),
+            intro: String(content.motivations_intro).replace(
+              '$full_name',
+              data.full_name,
+            ),
             whatDrives: content.what_drives_desc,
             uniqueNeeds: content.unique_needs_desc,
           }
@@ -742,17 +820,19 @@ export async function buildSchoolReportJSON(data: SchoolData) {
           }
         : {}),
 
-      courseCompatibility: courseCompatibility.length > 0
-        ? {
-            courses: courseCompatibility,
-            description:
-              'The course compatibility you\u2019ve received is based on your unique personality Report results, aiming to highlight programs that align well with your strengths and traits. However, this is not a fixed or singular recommendation. Your personal interests, evolving passions, and exposure to different fields also play a crucial role in shaping the right career path for you. We\u2019ve combined your profile with real-time industry data to give you a future-oriented perspective. Please keep in mind that course trends and career opportunities can shift from year to year as the world continues to evolve-new fields emerge, and existing ones transform. Use this as a guide, not a rulebook, to explore and make informed choices about your educational journey.',
-          }
-        : null,
+      courseCompatibility:
+        courseCompatibility.length > 0
+          ? {
+              courses: courseCompatibility,
+              description:
+                'The course compatibility you\u2019ve received is based on your unique personality Report results, aiming to highlight programs that align well with your strengths and traits. However, this is not a fixed or singular recommendation. Your personal interests, evolving passions, and exposure to different fields also play a crucial role in shaping the right career path for you. We\u2019ve combined your profile with real-time industry data to give you a future-oriented perspective. Please keep in mind that course trends and career opportunities can shift from year to year as the world continues to evolve-new fields emerge, and existing ones transform. Use this as a guide, not a rulebook, to explore and make informed choices about your educational journey.',
+            }
+          : null,
 
-      streamSelectionContent: data.school_level_id === 1
-        ? buildStreamSelectionContent()
-        : null,
+      topColleges: topColleges.length > 0 ? topColleges : null,
+
+      streamSelectionContent:
+        data.school_level_id === 1 ? buildStreamSelectionContent() : null,
     },
   };
 

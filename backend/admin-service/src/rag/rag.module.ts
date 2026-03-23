@@ -16,6 +16,7 @@ import { SchemaIntrospectorService } from './schema-introspector.service';
 import { TextToSqlService } from './text-to-sql.service';
 import { SqlValidatorService } from './utils/sql-validator.service';
 import { RagCacheService } from './rag-cache.service';
+import { AgentOrchestratorService } from './agent-orchestrator.service';
 
 // RBAC Services
 import { AccessPolicyFactory } from './policies';
@@ -67,6 +68,8 @@ import { PdfModule } from '../common/pdf/pdf.module';
     TextToSqlService,
     SqlValidatorService,
     RagCacheService,
+    // Agentic RAG Orchestrator
+    AgentOrchestratorService,
     // RBAC Providers
     AccessPolicyFactory,
     SecureQueryExecutor,
@@ -87,6 +90,8 @@ import { PdfModule } from '../common/pdf/pdf.module';
     TextToSqlService,
     SqlValidatorService,
     RagCacheService,
+    // Agentic RAG Export
+    AgentOrchestratorService,
     // RBAC Exports
     AccessPolicyFactory,
     SecureQueryExecutor,

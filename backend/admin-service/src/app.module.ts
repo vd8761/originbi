@@ -31,7 +31,7 @@ import { NotificationModule } from './notification/notification.module';
       envFilePath:
         process.env.NODE_ENV === 'production'
           ? '.env.production'
-          : '.env.local',
+          : ['.env.local', '.env'],
     }),
 
     TypeOrmModule.forRootAsync({
