@@ -1873,11 +1873,15 @@ export class StudentService {
       // 7. Send email
       const transporter = this.createEmailTransporter();
 
+      const subject = isThirdParty 
+        ? `${registration.fullName || 'Student'}'s Assessment Report – ${reportTitle}`
+        : `Your Assessment Report – ${reportTitle}`;
+
       const mailOptions = {
         from: `"${this.configService.get('EMAIL_SEND_FROM_NAME') || 'Origin BI Mind Works'}" <${this.configService.get('EMAIL_FROM') || 'no-reply@originbi.com'}>`,
         to: recipientEmail,
         cc: [this.configService.get('EMAIL_CC') || ''],
-        subject: `Your Assessment Report – ${reportTitle}`,
+        subject,
         html: emailHtml,
         attachments: [
           {
