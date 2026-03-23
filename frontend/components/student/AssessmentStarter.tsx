@@ -592,6 +592,51 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (loading || error || isCompleted || !currentQuestion || submitting) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if filling out an input or textarea
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handlePrevious();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        const isFinishing = questions.length > 0 && questions.filter(q => !(String(q.assessmentAnswerId) === String(currentQuestion?.assessmentAnswerId) ? selectedOption : answers[String(q.assessmentAnswerId)])).length === 0;
+        if (!isFinishing && selectedOption) {
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          handleNext();
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (currentQuestion.options.length > 0) {
+          const currentIndex = currentQuestion.options.findIndex(opt => String(opt.id) === String(selectedOption));
+          const nextIndex = currentIndex <= 0 ? currentQuestion.options.length - 1 : currentIndex - 1;
+          handleOptionSelect(currentQuestion.options[nextIndex].id);
+        }
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (currentQuestion.options.length > 0) {
+          const currentIndex = currentQuestion.options.findIndex(opt => String(opt.id) === String(selectedOption));
+          const nextIndex = currentIndex === -1 || currentIndex === currentQuestion.options.length - 1 ? 0 : currentIndex + 1;
+          handleOptionSelect(currentQuestion.options[nextIndex].id);
+        }
+      } else {
+        const num = parseInt(e.key, 10);
+        if (!isNaN(num) && num > 0 && num <= currentQuestion.options.length) {
+          handleOptionSelect(currentQuestion.options[num - 1].id);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, error, isCompleted, currentQuestion, submitting, selectedOption, answers, questions]);
+
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
