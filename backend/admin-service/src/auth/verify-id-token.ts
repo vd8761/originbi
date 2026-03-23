@@ -32,7 +32,11 @@ export async function verifyCognitoIdToken(
     const payload = await getVerifier(config).verify(token);
     return payload as { sub: string; email?: string; [key: string]: any };
   } catch (err) {
-    console.error('Cognito token verification failed', err);
+    const name = (err as any)?.name || '';
+    const message = ((err as any)?.message || '').toLowerCase();
+    if (name === 'JwtExpiredError' || message.includes('token expired')) {
+      throw new Error('EXPIRED_COGNITO_TOKEN');
+    }
     throw new Error('INVALID_COGNITO_TOKEN');
   }
 }

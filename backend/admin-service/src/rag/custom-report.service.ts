@@ -10,8 +10,7 @@ import {
 import Groq from 'groq-sdk';
 
 // ─── Resilient LLM Helper ────────────────────────────────────────────────
-// Tries Groq first, falls back to Google Gemini on rate-limit (429) or error.
-// Uses the GOOGLE_API_KEY already in .env for Gemini.
+// Tries Google Gemini first, falls back to Groq on error.
 async function resilientLLMCall(
     groqClient: Groq,
     messages: { role: string; content: string }[],
@@ -19,7 +18,39 @@ async function resilientLLMCall(
 ): Promise<string> {
     const { maxTokens = 1000, temperature = 0, logger } = opts;
 
-    // ── Attempt 1: Groq ──
+    // ── Attempt 1: Google Gemini ──
+    const googleApiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+    if (googleApiKey) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${googleApiKey}`;
+        const geminiBody = {
+            contents: [{ parts: [{ text: messages.map(m => `${m.role}: ${m.content}`).join('\n') }] }],
+            generationConfig: { temperature, maxOutputTokens: maxTokens },
+        };
+
+        try {
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Referer': 'https://originbi.com',
+                },
+                body: JSON.stringify(geminiBody),
+            });
+
+            if (resp.ok) {
+                const data = await resp.json();
+                const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                if (text) return text;
+            } else {
+                const errText = await resp.text().catch(() => '');
+                logger?.warn(`⚠️ Gemini failed (${resp.status}), trying Groq fallback: ${errText.slice(0, 120)}`);
+            }
+        } catch (err: any) {
+            logger?.warn(`⚠️ Gemini failed (${err?.message || 'unknown'}), trying Groq fallback...`);
+        }
+    }
+
+    // ── Attempt 2: Groq fallback ──
     for (let attempt = 1; attempt <= 2; attempt++) {
         try {
             const res = await groqClient.chat.completions.create({
@@ -31,54 +62,16 @@ async function resilientLLMCall(
             return res.choices[0]?.message?.content || '';
         } catch (err: any) {
             const isRateLimit = err?.status === 429 || err?.error?.error?.code === 'rate_limit_exceeded';
-            if (isRateLimit && attempt === 1) {
-                logger?.warn('⚠️ Groq rate-limited, falling back to Gemini...');
-                break; // fall through to Gemini
-            }
-            if (attempt === 2) throw err;
-            // Transient error — wait and retry once
-            await new Promise(r => setTimeout(r, 2000));
-        }
-    }
-
-    // ── Attempt 2: Google Gemini fallback ──
-    const googleApiKey = process.env.GOOGLE_API_KEY;
-    if (!googleApiKey) {
-        throw new Error('Groq rate-limited and no GOOGLE_API_KEY for fallback');
-    }
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${googleApiKey}`;
-    const geminiBody = {
-        contents: [{ parts: [{ text: messages.map(m => `${m.role}: ${m.content}`).join('\n') }] }],
-        generationConfig: { temperature, maxOutputTokens: maxTokens },
-    };
-
-    for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-            const resp = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Referer': 'https://originbi.com',
-                },
-                body: JSON.stringify(geminiBody),
-            });
-            if (resp.status === 429) {
-                logger?.warn('⏳ Gemini also rate-limited, waiting 5s...');
-                await new Promise(r => setTimeout(r, 5000));
+            if (isRateLimit && attempt < 2) {
+                await new Promise(r => setTimeout(r, 2000));
                 continue;
             }
-            if (!resp.ok) {
-                const errText = await resp.text().catch(() => '');
-                throw new Error(`Gemini ${resp.status}: ${errText.slice(0, 200)}`);
-            }
-            const data = await resp.json();
-            return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        } catch (err) {
             if (attempt === 2) throw err;
-            await new Promise(r => setTimeout(r, 2000));
+            await new Promise(r => setTimeout(r, 1000));
         }
     }
-    return '';
+
+    throw new Error('Both Gemini primary and Groq fallback failed');
 }
 
 // Agile ACI Score Interpretation (0-125 scale from totalScore)
@@ -1328,14 +1321,13 @@ IMPORTANT RULES:
 Write in third person, professional tone. No bullet points, just flowing paragraphs.`;
 
         try {
-            const response = await this.groqClient.chat.completions.create({
-                model: 'llama-3.3-70b-versatile',
-                messages: [{ role: 'user', content: prompt }],
-                max_tokens: 500,
-                temperature: 0.7,
-            });
+            const response = await resilientLLMCall(
+                this.groqClient,
+                [{ role: 'user', content: prompt }],
+                { maxTokens: 500, temperature: 0.7, logger: this.logger },
+            );
 
-            return response.choices[0]?.message?.content || this.getDefaultAssessedBehavioralSummary(profile, discProfile, agileProfile);
+            return response || this.getDefaultAssessedBehavioralSummary(profile, discProfile, agileProfile);
         } catch (error) {
             this.logger.error(`Failed to generate behavioral summary: ${error.message}`);
             return this.getDefaultAssessedBehavioralSummary(profile, discProfile, agileProfile);

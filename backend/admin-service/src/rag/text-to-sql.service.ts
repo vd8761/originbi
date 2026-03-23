@@ -2,11 +2,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ChatGroq } from '@langchain/groq';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { SchemaIntrospectorService } from './schema-introspector.service';
 import { SqlValidatorService } from './utils/sql-validator.service';
 import { UserContext } from '../common/interfaces/user-context.interface';
 import { AuditLoggerService } from './audit';
+import { getTokenTrackerCallback } from './utils/token-tracker';
+import { invokeWithFallback } from './utils/llm-fallback';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
@@ -45,9 +48,12 @@ export interface TextToSqlResult {
 @Injectable()
 export class TextToSqlService {
   private readonly logger = new Logger('TextToSQL');
-  private llm: ChatGroq | null = null;
-  private formatterLlm: ChatGroq | null = null;
-  private synthesizerLlm: ChatGroq | null = null;
+  private llm: ChatGoogleGenerativeAI | null = null;
+  private formatterLlm: ChatGoogleGenerativeAI | null = null;
+  private synthesizerLlm: ChatGoogleGenerativeAI | null = null;
+  private sqlFallbackLlm: ChatGroq | null = null;
+  private formatterFallbackLlm: ChatGroq | null = null;
+  private synthesizerFallbackLlm: ChatGroq | null = null;
 
   // Retry state: when SQL fails, we feed the error back and retry
   private readonly MAX_SQL_RETRIES = 2;
@@ -61,46 +67,94 @@ export class TextToSqlService {
     this.logger.log('🧠 Text-to-SQL Jarvis Engine initialized');
   }
 
-  private getSqlLlm(): ChatGroq {
+  private getSqlLlm(): ChatGoogleGenerativeAI {
     if (!this.llm) {
-      const apiKey = process.env.GROQ_API_KEY;
-      if (!apiKey) throw new Error('GROQ_API_KEY not set');
-      this.llm = new ChatGroq({
+      const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+      this.llm = new ChatGoogleGenerativeAI({
         apiKey,
-        model: 'llama-3.3-70b-versatile',
+        model: 'gemini-2.5-flash',
         temperature: 0, // Deterministic SQL generation
-        maxTokens: 1024,
+        maxOutputTokens: 640,
+        callbacks: [getTokenTrackerCallback('TextToSql (SQL)')],
       });
     }
     return this.llm;
   }
 
-  private getFormatterLlm(): ChatGroq {
-    if (!this.formatterLlm) {
+  private getSqlFallbackLlm(): ChatGroq {
+    if (!this.sqlFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
-      if (!apiKey) throw new Error('GROQ_API_KEY not set');
-      this.formatterLlm = new ChatGroq({
+      if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+      this.sqlFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
+        temperature: 0,
+        maxTokens: 640,
+        callbacks: [getTokenTrackerCallback('TextToSql (SQL Groq Fallback)')],
+      });
+    }
+    return this.sqlFallbackLlm;
+  }
+
+  private getFormatterLlm(): ChatGoogleGenerativeAI {
+    if (!this.formatterLlm) {
+      const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+      this.formatterLlm = new ChatGoogleGenerativeAI({
+        apiKey,
+        model: 'gemini-2.5-flash',
         temperature: 0.4, // Slightly creative for natural phrasing
-        maxTokens: 2048,
+        maxOutputTokens: 700,
+        callbacks: [getTokenTrackerCallback('TextToSql (Formatter)')],
       });
     }
     return this.formatterLlm;
   }
 
-  private getSynthesizerLlm(): ChatGroq {
-    if (!this.synthesizerLlm) {
+  private getFormatterFallbackLlm(): ChatGroq {
+    if (!this.formatterFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
-      if (!apiKey) throw new Error('GROQ_API_KEY not set');
-      this.synthesizerLlm = new ChatGroq({
+      if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+      this.formatterFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
+        temperature: 0.4,
+        maxTokens: 700,
+        callbacks: [getTokenTrackerCallback('TextToSql (Formatter Groq Fallback)')],
+      });
+    }
+    return this.formatterFallbackLlm;
+  }
+
+  private getSynthesizerLlm(): ChatGoogleGenerativeAI {
+    if (!this.synthesizerLlm) {
+      const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+      this.synthesizerLlm = new ChatGoogleGenerativeAI({
+        apiKey,
+        model: 'gemini-2.5-flash',
         temperature: 0.3,
-        maxTokens: 3000,
+        maxOutputTokens: 1000,
+        callbacks: [getTokenTrackerCallback('TextToSql (Synthesizer)')],
       });
     }
     return this.synthesizerLlm;
+  }
+
+  private getSynthesizerFallbackLlm(): ChatGroq {
+    if (!this.synthesizerFallbackLlm) {
+      const apiKey = process.env.GROQ_API_KEY;
+      if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+      this.synthesizerFallbackLlm = new ChatGroq({
+        apiKey,
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.3,
+        maxTokens: 1000,
+        callbacks: [getTokenTrackerCallback('TextToSql (Synthesizer Groq Fallback)')],
+      });
+    }
+    return this.synthesizerFallbackLlm;
   }
 
   /**
@@ -374,10 +428,20 @@ ${conversationHistory ? `\n═══ CONVERSATION CONTEXT ═══\n${conversat
 
 Now generate the SQL for the following question:`;
 
-    const response = await this.getSqlLlm().invoke([
-      new SystemMessage(systemPrompt),
-      new HumanMessage(question),
-    ]);
+    const response = await invokeWithFallback({
+      logger: this.logger,
+      context: 'TextToSql SQL generation',
+      invokePrimary: () =>
+        this.getSqlLlm().invoke([
+          new SystemMessage(systemPrompt),
+          new HumanMessage(question),
+        ]),
+      invokeFallback: () =>
+        this.getSqlFallbackLlm().invoke([
+          new SystemMessage(systemPrompt),
+          new HumanMessage(question),
+        ]),
+    });
 
     let sql = response.content.toString().trim();
 
@@ -426,10 +490,20 @@ User role: ${user.role}
 Return ONLY the corrected SQL, nothing else:`;
 
     try {
-      const response = await this.getSqlLlm().invoke([
-        new SystemMessage('You are a SQL correction engine. Return ONLY the corrected PostgreSQL SELECT query. No explanation.'),
-        new HumanMessage(retryPrompt),
-      ]);
+      const response = await invokeWithFallback({
+        logger: this.logger,
+        context: 'TextToSql SQL retry',
+        invokePrimary: () =>
+          this.getSqlLlm().invoke([
+            new SystemMessage('You are a SQL correction engine. Return ONLY the corrected PostgreSQL SELECT query. No explanation.'),
+            new HumanMessage(retryPrompt),
+          ]),
+        invokeFallback: () =>
+          this.getSqlFallbackLlm().invoke([
+            new SystemMessage('You are a SQL correction engine. Return ONLY the corrected PostgreSQL SELECT query. No explanation.'),
+            new HumanMessage(retryPrompt),
+          ]),
+      });
 
       let sql = response.content.toString().trim();
       sql = sql.replace(/^```sql?\s*/i, '').replace(/\s*```$/i, '').trim();
@@ -539,14 +613,14 @@ Return ONLY the corrected SQL, nothing else:`;
       return this.formatCountAnswer(question, countValue);
     }
 
-    // For small result sets (1-3 rows) or aggregations, use compact formatting
-    if (data.length <= 3 || this.sqlValidator.isAggregationQuery(sql)) {
+    // For small/medium result sets or aggregations, avoid extra LLM call.
+    if (data.length <= 12 || this.sqlValidator.isAggregationQuery(sql)) {
       return this.formatCompactResults(question, data);
     }
 
     // For larger result sets, use LLM to create a rich summary
-    const truncatedData = data.slice(0, 30); // Limit context window
-    const dataStr = JSON.stringify(truncatedData, null, 2);
+    const truncatedData = data.slice(0, 15); // Keep prompt lean for formatter
+    const dataStr = JSON.stringify(truncatedData);
     const totalRows = data.length;
 
     const formatPrompt = `You are Ask BI — OriginBI's intelligent data analyst. Transform raw database results into a professional, insightful response that reads like a top-tier analytics dashboard.
@@ -595,9 +669,19 @@ ${dataStr}
 Response:`;
 
     try {
-      const response = await this.getFormatterLlm().invoke([
-        new SystemMessage(formatPrompt),
-      ]);
+      const response = await invokeWithFallback({
+        logger: this.logger,
+        context: 'TextToSql formatting',
+        invokePrimary: () => this.getFormatterLlm().invoke([
+          new SystemMessage(formatPrompt),
+          new HumanMessage('Format the response now.'),
+        ]),
+        invokeFallback: () =>
+          this.getFormatterFallbackLlm().invoke([
+            new SystemMessage(formatPrompt),
+            new HumanMessage('Format the response now.'),
+          ]),
+      });
       return response.content.toString().trim();
     } catch (formatError) {
       this.logger.warn(`LLM formatting failed, using fallback: ${formatError.message}`);
@@ -651,8 +735,12 @@ Response:`;
       return lines.join('\n');
     }
 
-    // 2-3 rows — create a neat table
-    return this.buildMarkdownTable(data);
+    // 2+ rows — create a neat table
+    const table = this.buildMarkdownTable(data.slice(0, 12));
+    if (data.length > 12) {
+      return `${table}\n\n*Showing 12 of ${data.length} total results.*`;
+    }
+    return table;
   }
 
   /**
@@ -676,7 +764,7 @@ Response:`;
     const q = question.toLowerCase();
 
     if (/\b(who|find|search|show|list)\b/i.test(q) && /\b(name|person|candidate)\b/i.test(q)) {
-      return `No matching candidates found. You can try asking **"list all candidates"** to see who's available.`;
+      return `No users found.`;
     }
 
     // Contextual messages based on what the user asked about
@@ -690,7 +778,7 @@ Response:`;
       return `The requested contact details are not available for these candidates.`;
     }
 
-    return `No matching data found for your request. Please try a different question or ask **"what can you do"** for help.`;
+    return `No users found.`;
   }
 
   /**
@@ -951,10 +1039,20 @@ Output: ["What is the average score and completion rate for batch KIOT IT?", "Wh
 
 JSON array:`;
 
-      const decomposeResp = await this.getSqlLlm().invoke([
-        new SystemMessage('Return ONLY a JSON array of sub-questions. No explanation.'),
-        new HumanMessage(decomposePrompt),
-      ]);
+      const decomposeResp = await invokeWithFallback({
+        logger: this.logger,
+        context: 'TextToSql decomposition',
+        invokePrimary: () =>
+          this.getSqlLlm().invoke([
+            new SystemMessage('Return ONLY a JSON array of sub-questions. No explanation.'),
+            new HumanMessage(decomposePrompt),
+          ]),
+        invokeFallback: () =>
+          this.getSqlFallbackLlm().invoke([
+            new SystemMessage('Return ONLY a JSON array of sub-questions. No explanation.'),
+            new HumanMessage(decomposePrompt),
+          ]),
+      });
 
       const subQuestions = this.tryParseSubQuestionArray(decomposeResp.content.toString().trim());
 
@@ -1043,7 +1141,7 @@ JSON array:`;
       const synthesisInput = subResults.map((r, i) => {
         if (r.error) return `Sub-question ${i + 1}: "${r.question}"\nResult: Error — ${r.error}`;
         if (r.data.length === 0) return `Sub-question ${i + 1}: "${r.question}"\nResult: No data found`;
-        return `Sub-question ${i + 1}: "${r.question}"\nData (${r.data.length} rows):\n${JSON.stringify(r.data.slice(0, 15), null, 2)}`;
+        return `Sub-question ${i + 1}: "${r.question}"\nData (${r.data.length} rows):\n${JSON.stringify(r.data.slice(0, 8))}`;
       }).join('\n\n');
 
       const synthesisPrompt = `You are Ask BI, an advanced data intelligence assistant. The user asked a complex question that was broken into sub-queries. Now synthesize ALL the sub-results into a single, coherent, insightful response.
@@ -1068,9 +1166,20 @@ SYNTHESIS RULES:
 
 Synthesized response:`;
 
-      const synthResp = await this.getSynthesizerLlm().invoke([
-        new SystemMessage(synthesisPrompt),
-      ]);
+      const synthResp = await invokeWithFallback({
+        logger: this.logger,
+        context: 'TextToSql synthesis',
+        invokePrimary: () =>
+          this.getSynthesizerLlm().invoke([
+            new SystemMessage(synthesisPrompt),
+            new HumanMessage('Synthesize the final response now.'),
+          ]),
+        invokeFallback: () =>
+          this.getSynthesizerFallbackLlm().invoke([
+            new SystemMessage(synthesisPrompt),
+            new HumanMessage('Synthesize the final response now.'),
+          ]),
+      });
       const answer = synthResp.content.toString().trim();
 
       return {
