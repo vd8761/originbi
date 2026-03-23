@@ -25,6 +25,7 @@ import {
   PersonalityTrait,
   Department,
   DepartmentDegree,
+  DegreeType,
 } from '@originbi/shared-entities';
 
 @Module({
@@ -48,6 +49,7 @@ import {
       PersonalityTrait,
       Department,
       DepartmentDegree,
+      DegreeType,
     ]),
     HttpModule,
   ],

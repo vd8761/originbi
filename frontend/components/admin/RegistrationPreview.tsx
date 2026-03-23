@@ -262,7 +262,7 @@ const RegistrationPreview: React.FC<RegistrationPreviewProps> = ({ registration,
                 </div>
 
                 {/* Role Specific Details Row */}
-                {(registration.school_level || registration.department_degree_id || registration.current_year) && (
+                {(registration.school_level || registration.department_degree_id || registration.current_year || registration.program_code || (registration as any).program_name) && (
                     <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6 mt-6 pt-6 border-t border-gray-100 dark:border-white/5 animate-in fade-in slide-in-from-top-2 duration-300">
                         {registration.program_code === 'SCHOOL_STUDENT' && (
                             <>
@@ -290,13 +290,14 @@ const RegistrationPreview: React.FC<RegistrationPreviewProps> = ({ registration,
                                         {registration.current_year ? `${registration.current_year}${registration.current_year === '1' ? 'st' : registration.current_year === '2' ? 'nd' : registration.current_year === '3' ? 'rd' : 'th'} Year` : 'N/A'}
                                     </p>
                                 </div>
-                                {/* TODO: Map department_degree_id to Name if possible, for now show relevant metadata */}
-                                {registration.department_name && (
-                                    <div>
-                                        <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Department</p>
-                                        <p className="text-sm font-medium text-gray-900 dark:text-white">{registration.department_name}</p>
-                                    </div>
-                                )}
+                                <div>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Degree</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white">{registration.degree_name || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Department</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white">{registration.department_name || 'N/A'}</p>
+                                </div>
                             </>
                         )}
                     </div>

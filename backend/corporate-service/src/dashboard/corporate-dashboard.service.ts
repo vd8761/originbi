@@ -23,7 +23,7 @@ import { Program } from '@originbi/shared-entities';
 import { GroupAssessment } from '@originbi/shared-entities';
 import { Groups } from '@originbi/shared-entities';
 import { CorporateCounsellingAccess } from '@originbi/shared-entities';
-import { Department, DepartmentDegree } from '@originbi/shared-entities';
+import { Department, DepartmentDegree, DegreeType } from '@originbi/shared-entities';
 import { CounsellingType } from '@originbi/shared-entities';
 import { CounsellingSession } from '@originbi/shared-entities';
 import { CounsellingResponse } from '@originbi/shared-entities';
@@ -1316,6 +1316,7 @@ export class CorporateDashboardService {
       .leftJoinAndSelect('registration.program', 'program')
       .leftJoin('DepartmentDegree', 'dd', 'registration.departmentDegreeId = dd.id')
       .leftJoinAndMapOne('registration.deptRaw', 'Department', 'dept', 'dd.departmentId = dept.id')
+      .leftJoinAndMapOne('registration.degRaw', 'DegreeType', 'deg', 'dd.degreeTypeId = deg.id')
       .where('registration.corporateAccountId = :corpId', {
         corpId: corporate.id,
       });

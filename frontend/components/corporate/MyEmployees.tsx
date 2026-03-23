@@ -146,13 +146,21 @@ const MyEmployeesContent: React.FC = () => {
                             corporate_account_id: r.corporateAccountId,
                             gender: r.gender,
                             groupName: r.group?.name || undefined,
-                            program_code: r.program?.code || r.metadata?.program_code,
+                            program_code: r.program?.code || r.metadata?.program_code ||
+                                (r.program?.name?.toLowerCase().includes('college') ? 'COLLEGE_STUDENT' :
+                                 r.metadata?.programType?.toLowerCase().includes('college') ? 'COLLEGE_STUDENT' :
+                                 r.program?.name?.toLowerCase().includes('school') ? 'SCHOOL_STUDENT' :
+                                 r.metadata?.programType?.toLowerCase().includes('school') ? 'SCHOOL_STUDENT' :
+                                 r.program?.name?.toLowerCase().includes('employee') ? 'EMPLOYEE' :
+                                 r.metadata?.programType?.toLowerCase().includes('employee') ? 'EMPLOYEE' : undefined),
+                            program_name: r.program?.name || r.metadata?.program_name || r.metadata?.programType,
                             school_level: r.schoolLevel,
                             school_stream: r.schoolStream,
                             student_board: r.studentBoard,
                             current_year: r.metadata?.currentYear,
                             department_degree_id: r.departmentDegreeId,
                             department_name: r.deptRaw?.name,
+                            degree_name: r.degRaw?.name,
                         };
                         setSelectedEmployee(mapped);
                         setView("preview");
@@ -254,13 +262,21 @@ const MyEmployeesContent: React.FC = () => {
                     corporate_account_id: r.corporateAccountId,
                     gender: r.gender,
                     groupName: r.group?.name || undefined,
-                    program_code: r.program?.code || r.metadata?.program_code,
+                    program_code: r.program?.code || r.metadata?.program_code ||
+                        (r.program?.name?.toLowerCase().includes('college') ? 'COLLEGE_STUDENT' :
+                         r.metadata?.programType?.toLowerCase().includes('college') ? 'COLLEGE_STUDENT' :
+                         r.program?.name?.toLowerCase().includes('school') ? 'SCHOOL_STUDENT' :
+                         r.metadata?.programType?.toLowerCase().includes('school') ? 'SCHOOL_STUDENT' :
+                         r.program?.name?.toLowerCase().includes('employee') ? 'EMPLOYEE' :
+                         r.metadata?.programType?.toLowerCase().includes('employee') ? 'EMPLOYEE' : undefined),
+                    program_name: r.program?.name || r.metadata?.program_name || r.metadata?.programType,
                     school_level: r.schoolLevel,
                     school_stream: r.schoolStream,
                     student_board: r.studentBoard,
                     current_year: r.metadata?.currentYear,
                     department_degree_id: r.departmentDegreeId,
                     department_name: r.deptRaw?.name,
+                    degree_name: r.degRaw?.name,
                 }));
                 setUsers(mappedRegistrations);
                 total = empRes.total;

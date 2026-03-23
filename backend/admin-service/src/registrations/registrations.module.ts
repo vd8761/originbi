@@ -20,6 +20,7 @@ import { BulkImport } from './entities/bulk-import.entity';
 import { BulkImportRow } from './entities/bulk-import-row.entity';
 import { Department } from '../departments/department.entity';
 import { DepartmentDegree } from '../departments/department-degree.entity';
+import { DegreeType } from '../departments/degree-type.entity';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { DepartmentDegree } from '../departments/department-degree.entity';
       Program,
       Department,
       DepartmentDegree,
+      DegreeType,
       Groups,
       GroupAssessment,
     ]),

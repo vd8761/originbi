@@ -18,6 +18,7 @@ import {
   AssessmentLevel,
   Department,
   DepartmentDegree,
+  DegreeType,
 } from '@originbi/shared-entities';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { GroupsService } from '../groups/groups.service';
@@ -242,37 +243,10 @@ export class RegistrationsService {
           groupId = group.id;
         }
 
-        // C. Create Registration (INCOMPLETE)
-        const registration = manager.create(Registration, {
-          userId: user.id,
-          registrationSource: 'ADMIN',
-          createdByUserId: this.ADMIN_USER_ID,
-          status: 'INCOMPLETE',
-          fullName: dto.name,
-          countryCode: dto.countryCode ?? '+91',
-          mobileNumber: dto.mobile,
-            gender: gender,
-          schoolLevel,
-          schoolStream,
-          departmentDegreeId,
-          group: groupId ? { id: groupId } : undefined, // Assign relation object, or undefined
-          studentBoard: dto.studentBoard,
-          metadata: {
-            programType: dto.programType,
-            groupName: dto.groupName,
-            sendEmail: dto.sendEmail,
-            currentYear: dto.currentYear,
-            examStart: dto.examStart,
-            examEnd: dto.examEnd,
-            departmentId: dto.departmentId ?? null,
-            studentBoard: dto.studentBoard, // Keep in metadata too
-          },
-        });
-        await manager.save(registration);
-
-        // D. Create Assessment Session
+        // C. Determine Program
         let programId: number;
         let programTitle: string;
+        let selectedProgram: Program | null = null;
 
         if (dto.programType) {
           // Strict lookup for selected program (by ID or Name)
@@ -280,7 +254,7 @@ export class RegistrationsService {
             !isNaN(Number(dto.programType)) &&
             String(dto.programType).trim() !== '';
 
-          const selectedProgram = await manager.getRepository(Program).findOne({
+          selectedProgram = await manager.getRepository(Program).findOne({
             where: isNumericId
               ? { id: Number(dto.programType) }
               : { name: dto.programType },
@@ -302,19 +276,50 @@ export class RegistrationsService {
             selectedProgram.assessmentTitle || selectedProgram.name;
         } else {
           // Fallback: Pick any active program (Legacy / Default)
-          const defaultProgram = await manager
+          selectedProgram = await manager
             .getRepository(Program)
             .findOne({ where: { isActive: true } });
 
-          if (!defaultProgram) {
+          if (!selectedProgram) {
             throw new BadRequestException(
               'No active Program found in the system. Please create a Program first.',
             );
           }
 
-          programId = Number(defaultProgram.id);
-          programTitle = defaultProgram.assessmentTitle || defaultProgram.name;
+          programId = Number(selectedProgram.id);
+          programTitle = selectedProgram.assessmentTitle || selectedProgram.name;
         }
+
+        // D. Create Registration (INCOMPLETE)
+        const registration = manager.create(Registration, {
+          userId: user.id,
+          registrationSource: 'ADMIN',
+          createdByUserId: this.ADMIN_USER_ID,
+          status: 'INCOMPLETE',
+          fullName: dto.name,
+          countryCode: dto.countryCode ?? '+91',
+          mobileNumber: dto.mobile,
+          gender: gender,
+          schoolLevel,
+          schoolStream,
+          departmentDegreeId,
+          program: { id: programId } as any, // Link to selected program
+          group: groupId ? { id: groupId } : undefined,
+          studentBoard: dto.studentBoard,
+          metadata: {
+            programType: dto.programType,
+            groupName: dto.groupName,
+            sendEmail: dto.sendEmail,
+            currentYear: dto.currentYear,
+            examStart: dto.examStart,
+            examEnd: dto.examEnd,
+            departmentId: dto.departmentId ?? null,
+            studentBoard: dto.studentBoard,
+          },
+        });
+        await manager.save(registration);
+
+        // E. Create Assessment Session
 
         const validFrom = dto.examStart ? new Date(dto.examStart) : new Date();
         const validTo = dto.examEnd
@@ -604,6 +609,7 @@ export class RegistrationsService {
         .leftJoinAndSelect('r.program', 'p')
         .leftJoin('DepartmentDegree', 'dd', 'r.departmentDegreeId = dd.id')
         .leftJoinAndMapOne('r.deptRaw', 'Department', 'dept', 'dd.departmentId = dept.id')
+        .leftJoinAndMapOne('r.degRaw', 'DegreeType', 'deg', 'dd.degreeTypeId = deg.id')
         .where('r.isDeleted = false');
 
       if (search) {
@@ -666,8 +672,11 @@ export class RegistrationsService {
         mobile_number: r.mobileNumber,
         gender: r.gender,
         programType: r.metadata?.programType || r.program?.name,
-        program_name: r.program?.name,
-        program_code: r.program?.code,
+        program_name: r.program?.name || r.metadata?.programType,
+        program_code: r.program?.code || 
+          (r.metadata?.programType?.toLowerCase().includes('college') ? 'COLLEGE_STUDENT' : 
+           r.metadata?.programType?.toLowerCase().includes('school') ? 'SCHOOL_STUDENT' : 
+           r.metadata?.programType?.toLowerCase().includes('employee') ? 'EMPLOYEE' : undefined),
         groupName: r.group?.name || r.metadata?.groupName,
         status: r.status,
         school_level: r.schoolLevel,
@@ -676,6 +685,7 @@ export class RegistrationsService {
         current_year: r.metadata?.currentYear,
         department_degree_id: r.departmentDegreeId,
         department_name: (r as any).deptRaw?.name,
+        degree_name: (r as any).degRaw?.name,
         examStart: r.metadata?.examStart,
         examEnd: r.metadata?.examEnd,
         createdAt: r.createdAt,
