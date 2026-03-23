@@ -234,7 +234,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                     {downloading ? (
                          <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10">
                             <LoadingIcon className="w-3 h-3 text-brand-green animate-spin" />
-                            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{downloadProgress}</span>
+                            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{downloadProgress || 'Generating...'}</span>
                          </div>
                     ) : (
                         <button
@@ -319,7 +319,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                     {sendingEmail ? (
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10">
                             <LoadingIcon className="w-3 h-3 text-brand-green animate-spin" />
-                            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Sending...</span>
+                            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{downloadProgress || 'Sending...'}</span>
                         </div>
                     ) : emailSent ? (
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-brand-green/10 rounded-lg border border-brand-green/20">
@@ -337,6 +337,33 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                     }
                                     try {
                                         setSendingEmail(true);
+
+                                        if (!displayData.isReportReady) {
+                                            setDownloadProgress('Generating...');
+                                            const startData = await assessmentService.generateStudentReport(session.userId);
+                                            if (!startData.success || !startData.jobId) {
+                                                throw new Error("Failed to start report generation");
+                                            }
+                                            const jobId = startData.jobId;
+                                            let isComplete = false;
+                                            while (!isComplete) {
+                                                const statusData = await assessmentService.getDownloadStatus(jobId);
+                                                if (statusData.status === 'COMPLETED') {
+                                                    isComplete = true;
+                                                    const extendedData = statusData as any;
+                                                    if (extendedData.password) {
+                                                        setGeneratedPassword(extendedData.password);
+                                                    }
+                                                } else if (statusData.status === 'ERROR') {
+                                                    throw new Error(statusData.error || 'Generation failed');
+                                                } else {
+                                                    setDownloadProgress(statusData.progress || 'Generating...');
+                                                    await new Promise(resolve => setTimeout(resolve, 1000));
+                                                }
+                                            }
+                                        }
+
+                                        setDownloadProgress('');
                                         await assessmentService.sendReportEmail(session.userId);
                                         setEmailSent(true);
                                         setTimeout(() => setEmailSent(false), 5000);
@@ -345,6 +372,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                         alert("Failed to send email. Please try again.");
                                     } finally {
                                         setSendingEmail(false);
+                                        setDownloadProgress('');
                                     }
                                 }}
                                 className={`flex items-center gap-2 px-3 py-1.5 rounded-l-lg text-xs font-medium transition-colors ${
@@ -759,6 +787,33 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                     try {
                                         setShowEmailPopup(false);
                                         setSendingEmail(true);
+
+                                        if (!displayData.isReportReady) {
+                                            setDownloadProgress('Generating...');
+                                            const startData = await assessmentService.generateStudentReport(session.userId);
+                                            if (!startData.success || !startData.jobId) {
+                                                throw new Error("Failed to start report generation");
+                                            }
+                                            const jobId = startData.jobId;
+                                            let isComplete = false;
+                                            while (!isComplete) {
+                                                const statusData = await assessmentService.getDownloadStatus(jobId);
+                                                if (statusData.status === 'COMPLETED') {
+                                                    isComplete = true;
+                                                    const extendedData = statusData as any;
+                                                    if (extendedData.password) {
+                                                        setGeneratedPassword(extendedData.password);
+                                                    }
+                                                } else if (statusData.status === 'ERROR') {
+                                                    throw new Error(statusData.error || 'Generation failed');
+                                                } else {
+                                                    setDownloadProgress(statusData.progress || 'Generating...');
+                                                    await new Promise(resolve => setTimeout(resolve, 1000));
+                                                }
+                                            }
+                                        }
+
+                                        setDownloadProgress('');
                                         await assessmentService.sendReportEmail(session.userId, customEmail);
                                         setCustomEmail('');
                                         setEmailSent(true);
@@ -768,6 +823,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                         alert("Failed to send email. Please try again.");
                                     } finally {
                                         setSendingEmail(false);
+                                        setDownloadProgress('');
                                     }
                                 }}
                                 className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-green hover:bg-brand-green/90 text-black transition-colors"
