@@ -16,6 +16,8 @@ import {
   AssessmentSession,
   AssessmentAttempt,
   AssessmentLevel,
+  Department,
+  DepartmentDegree,
 } from '@originbi/shared-entities';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { GroupsService } from '../groups/groups.service';
@@ -599,6 +601,9 @@ export class RegistrationsService {
         .createQueryBuilder('r')
         .leftJoinAndSelect('r.user', 'u')
         .leftJoinAndSelect('r.group', 'g')
+        .leftJoinAndSelect('r.program', 'p')
+        .leftJoin('DepartmentDegree', 'dd', 'r.departmentDegreeId = dd.id')
+        .leftJoinAndMapOne('r.deptRaw', 'Department', 'dept', 'dd.departmentId = dept.id')
         .where('r.isDeleted = false');
 
       if (search) {
@@ -660,9 +665,17 @@ export class RegistrationsService {
         country_code: r.countryCode,
         mobile_number: r.mobileNumber,
         gender: r.gender,
-        programType: r.metadata?.programType,
+        programType: r.metadata?.programType || r.program?.name,
+        program_name: r.program?.name,
+        program_code: r.program?.code,
         groupName: r.group?.name || r.metadata?.groupName,
         status: r.status,
+        school_level: r.schoolLevel,
+        school_stream: r.schoolStream,
+        student_board: r.studentBoard,
+        current_year: r.metadata?.currentYear,
+        department_degree_id: r.departmentDegreeId,
+        department_name: (r as any).deptRaw?.name,
         examStart: r.metadata?.examStart,
         examEnd: r.metadata?.examEnd,
         createdAt: r.createdAt,

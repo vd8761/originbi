@@ -146,6 +146,13 @@ const MyEmployeesContent: React.FC = () => {
                             corporate_account_id: r.corporateAccountId,
                             gender: r.gender,
                             groupName: r.group?.name || undefined,
+                            program_code: r.program?.code || r.metadata?.program_code,
+                            school_level: r.schoolLevel,
+                            school_stream: r.schoolStream,
+                            student_board: r.studentBoard,
+                            current_year: r.metadata?.currentYear,
+                            department_degree_id: r.departmentDegreeId,
+                            department_name: r.deptRaw?.name,
                         };
                         setSelectedEmployee(mapped);
                         setView("preview");
@@ -247,6 +254,13 @@ const MyEmployeesContent: React.FC = () => {
                     corporate_account_id: r.corporateAccountId,
                     gender: r.gender,
                     groupName: r.group?.name || undefined,
+                    program_code: r.program?.code || r.metadata?.program_code,
+                    school_level: r.schoolLevel,
+                    school_stream: r.schoolStream,
+                    student_board: r.studentBoard,
+                    current_year: r.metadata?.currentYear,
+                    department_degree_id: r.departmentDegreeId,
+                    department_name: r.deptRaw?.name,
                 }));
                 setUsers(mappedRegistrations);
                 total = empRes.total;

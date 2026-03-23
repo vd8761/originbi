@@ -101,15 +101,22 @@ export interface Registration {
   country_code: string;
 
   // School/College Specifics
-  school_level?: SchoolLevel;
-  school_stream?: SchoolStream;
+  school_level?: SchoolLevel | string;
+  school_stream?: SchoolStream | string;
+  student_board?: string;
+  current_year?: string;
   department_degree_id?: string; // Links to department_degrees
+  department_name?: string; // For display
+  degree_name?: string; // For display
 
   // Org links
   corporate_account_id?: string;
   reseller_account_id?: string;
   group_id?: string;
   groupName?: string; // For display purposes
+  program_id?: string;
+  program_name?: string;
+  program_code?: string;
 
   // Payment
   payment_required: boolean;

@@ -23,6 +23,8 @@ import {
   CounsellingSession,
   CounsellingResponse,
   PersonalityTrait,
+  Department,
+  DepartmentDegree,
 } from '@originbi/shared-entities';
 
 @Module({
@@ -44,6 +46,8 @@ import {
       CounsellingSession,
       CounsellingResponse,
       PersonalityTrait,
+      Department,
+      DepartmentDegree,
     ]),
     HttpModule,
   ],

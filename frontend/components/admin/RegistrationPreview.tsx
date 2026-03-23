@@ -260,6 +260,47 @@ const RegistrationPreview: React.FC<RegistrationPreviewProps> = ({ registration,
                         </span>
                     </div>
                 </div>
+
+                {/* Role Specific Details Row */}
+                {(registration.school_level || registration.department_degree_id || registration.current_year) && (
+                    <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6 mt-6 pt-6 border-t border-gray-100 dark:border-white/5 animate-in fade-in slide-in-from-top-2 duration-300">
+                        {registration.program_code === 'SCHOOL_STUDENT' && (
+                            <>
+                                <div>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">School Level</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white capitalize">{registration.school_level?.toLowerCase() || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Board</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white uppercase">{registration.student_board || 'N/A'}</p>
+                                </div>
+                                {registration.school_level === 'HSC' && (
+                                    <div>
+                                        <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Stream</p>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white capitalize">{registration.school_stream?.toLowerCase() || 'N/A'}</p>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                        {registration.program_code === 'COLLEGE_STUDENT' && (
+                            <>
+                                <div>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Year</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                        {registration.current_year ? `${registration.current_year}${registration.current_year === '1' ? 'st' : registration.current_year === '2' ? 'nd' : registration.current_year === '3' ? 'rd' : 'th'} Year` : 'N/A'}
+                                    </p>
+                                </div>
+                                {/* TODO: Map department_degree_id to Name if possible, for now show relevant metadata */}
+                                {registration.department_name && (
+                                    <div>
+                                        <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Department</p>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white">{registration.department_name}</p>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Assessments List Section */}
