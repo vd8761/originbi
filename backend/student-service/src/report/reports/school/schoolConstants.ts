@@ -2728,13 +2728,30 @@ export const TRAIT_STREAM: Record<string, string> = {
 
 /** Reasons why each DISC trait maps to its stream — shown as pill badges. */
 export const TRAIT_REASONS: Record<string, string[]> = {
-  DI: ['Decision oriented', 'Persuasive', 'Business comfort', 'Leadership natural'],
-  ID: ['Influence driven', 'Initiative oriented', 'People-focused business mind'],
+  DI: [
+    'Decision oriented',
+    'Persuasive',
+    'Business comfort',
+    'Leadership natural',
+  ],
+  ID: [
+    'Influence driven',
+    'Initiative oriented',
+    'People-focused business mind',
+  ],
   DC: ['Analytical', 'Technical', 'Precise problem solving'],
   CD: ['Logic driven', 'Structured thinker', 'Technical precision'],
   DS: ['Ambitious', 'Stable workload handling', 'Broad syllabus comfort'],
-  SD: ['Consistent learner', 'Handles broad syllabus', 'Stable under academic pressure'],
-  IC: ['Communication skills', 'Structured finance aptitude', 'Collaborative approach'],
+  SD: [
+    'Consistent learner',
+    'Handles broad syllabus',
+    'Stable under academic pressure',
+  ],
+  IC: [
+    'Communication skills',
+    'Structured finance aptitude',
+    'Collaborative approach',
+  ],
   CI: ['Organized', 'Business logic orientation', 'Disciplined and social'],
   IS: ['Expressive', 'Social', 'Idea-driven'],
   SI: ['Patient', 'Social understanding', 'Emotionally perceptive'],
@@ -2743,7 +2760,10 @@ export const TRAIT_REASONS: Record<string, string[]> = {
 };
 
 /** Full agile compatibility matrix — each stream's agile dimension → compatibility %. */
-export const STREAM_AGILE_COMPATIBILITY: Record<string, Record<string, number>> = {
+export const STREAM_AGILE_COMPATIBILITY: Record<
+  string,
+  Record<string, number>
+> = {
   Commerce: {
     Courage: 95,
     Openness: 85,

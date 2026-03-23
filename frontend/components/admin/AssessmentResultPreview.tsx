@@ -194,7 +194,12 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
         );
     };
 
-    const renderBasicInfoCards = () => (
+    const renderBasicInfoCards = () => {
+        const isSentToUser = session?.metadata?.emailSentTo === displayData.email;
+        const emailStatusText = session?.metadata?.emailSent 
+            ? (isSentToUser ? 'Sent' : `Sent to ${session?.metadata?.emailSentTo}`)
+            : 'Not Sent';
+        return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             {/* Assessment Details */}
             <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-6 flex flex-col gap-4">
@@ -396,9 +401,9 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                                     </div>
                                 </div>
                                 <div>
-                                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Sent via Email?</p>
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${displayData.reportSent === 'Yes' ? 'bg-brand-green text-black' : 'bg-gray-600 text-gray-200'}`}>
-                                        {displayData.reportSent}
+                                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Email Status</p>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${session?.metadata?.emailSent ? 'bg-brand-green text-black' : 'bg-gray-600 text-gray-200'}`}>
+                                        {emailStatusText}
                                     </span>
                                 </div>
                             </div>
@@ -407,7 +412,8 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                 </div>
             </div>
         </div>
-    );
+        );
+    };
 
     const renderLevelReport = (title: string, breakdown: any[], compatibility: any, levelAttempt?: any, levelData?: any, hideStats: boolean = false) => {
         // Use status from levelAttempt if available, otherwise fallback to session status

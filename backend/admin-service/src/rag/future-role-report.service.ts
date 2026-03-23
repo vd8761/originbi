@@ -1,7 +1,10 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Injectable, Logger } from '@nestjs/common';
 import { ChatGroq } from '@langchain/groq';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
+import { getTokenTrackerCallback } from './utils/token-tracker';
+import { invokeWithFallback } from './utils/llm-fallback';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
@@ -87,19 +90,37 @@ interface IndustrySuitability {
 @Injectable()
 export class FutureRoleReportService {
   private readonly logger = new Logger(FutureRoleReportService.name);
-  private llm: ChatGroq | null = null;
+  private llm: ChatGoogleGenerativeAI | null = null;
+  private fallbackLlm: ChatGroq | null = null;
 
-  private getLlm(): ChatGroq {
+  private getLlm(): ChatGoogleGenerativeAI {
     if (!this.llm) {
-      const apiKey = process.env.GROQ_API_KEY;
-      if (!apiKey) throw new Error('GROQ_API_KEY not set');
-      this.llm = new ChatGroq({
+      const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+      this.llm = new ChatGoogleGenerativeAI({
         apiKey,
-        model: 'llama-3.3-70b-versatile',
+        model: 'gemini-2.5-flash',
         temperature: 0.3,
+        maxOutputTokens: 2200,
+        callbacks: [getTokenTrackerCallback('Future Role Report')],
       });
     }
     return this.llm;
+  }
+
+  private getFallbackLlm(): ChatGroq {
+    if (!this.fallbackLlm) {
+      const apiKey = process.env.GROQ_API_KEY;
+      if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+      this.fallbackLlm = new ChatGroq({
+        apiKey,
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.3,
+        maxTokens: 2200,
+        callbacks: [getTokenTrackerCallback('Future Role Report (Groq Fallback)')],
+      });
+    }
+    return this.fallbackLlm;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -371,10 +392,20 @@ ${assessmentLines.length > 0 ? `\n**ASSESSMENT DATA:**\n${assessmentLines.map(l 
 Generate the COMPLETE report now using Markdown tables (pipe format). Do NOT use ASCII box-drawing characters.`;
 
     try {
-      const response = await this.getLlm().invoke([
-        new SystemMessage(systemPrompt),
-        new HumanMessage(userPrompt),
-      ]);
+      const response = await invokeWithFallback({
+        logger: this.logger,
+        context: 'Future role report generation',
+        invokePrimary: () =>
+          this.getLlm().invoke([
+            new SystemMessage(systemPrompt),
+            new HumanMessage(userPrompt),
+          ]),
+        invokeFallback: () =>
+          this.getFallbackLlm().invoke([
+            new SystemMessage(systemPrompt),
+            new HumanMessage(userPrompt),
+          ]),
+      });
 
       return response.content.toString();
     } catch (error) {

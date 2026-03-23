@@ -50,4 +50,4 @@ import {
   providers: [StudentService, SubscriptionService, StudentProcessor],
   exports: [StudentService, SubscriptionService],
 })
-export class StudentModule { }
+export class StudentModule {}

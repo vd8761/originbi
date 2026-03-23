@@ -42,10 +42,10 @@ export class ChatMemoryService {
   private readonly logger = new Logger('ChatMemory');
 
   /** How many past messages to include in the LLM context window */
-  private readonly LLM_HISTORY_WINDOW = 20;
+  private readonly LLM_HISTORY_WINDOW = 14;
 
   /** Max character length per message for the LLM context (to keep prompt lean) */
-  private readonly MSG_TRUNCATE_LEN = 600;
+  private readonly MSG_TRUNCATE_LEN = 420;
 
   private tablesExist = false;
 
@@ -241,7 +241,7 @@ export class ChatMemoryService {
     // Reverse to chronological order
     rows.reverse();
 
-    const RECENT_WINDOW = 6; // Keep last 6 messages verbatim
+    const RECENT_WINDOW = 5; // Keep last 5 messages verbatim
 
     let history = '--- CONVERSATION HISTORY ---\n';
 

@@ -24,7 +24,7 @@ export const BI_PERSONA = {
     ],
 
     // Help responses (concise)
-    help: `**Ask BI — Quick Reference**\n\n• "[Name]'s results" — Assessment profile\n• "Career report for [Name]" — Detailed analysis\n• "List candidates" / "Top performers"\n• "How many candidates?" — Counts\n• "Find candidates for [role]" — Job matching\n• "Overall report" — Placement guidance\n\nAll data comes from your platform database.`,
+    help: `**Ask BI — Quick Reference**\n\n• "[Name]'s results" — Assessment profile\n• "Career report for [Name]" — Detailed analysis\n• "List candidates" / "Top performers"\n• "How many candidates?" — Counts\n• "Find candidates for [role]" — Job matching\n• "Overall report" — Placement guidance`,
 
     // Thinking responses - shown while processing
     thinking: [

@@ -11,12 +11,13 @@ interface CustomSelectProps {
     options: Option[];
     value: string;
     onChange: (value: string) => void;
+    onOpenChange?: (isOpen: boolean) => void;
     placeholder?: string;
     label?: string;
     required?: boolean;
 }
 
-const CustomSelect: React.FC<CustomSelectProps> = ({ options, value, onChange, placeholder = "Select", label, required }) => {
+const CustomSelect: React.FC<CustomSelectProps> = ({ options, value, onChange, onOpenChange, placeholder = "Select", label, required }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -26,15 +27,23 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ options, value, onChange, p
         const handleClickOutside = (event: MouseEvent) => {
             if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
+                onOpenChange?.(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+    }, [onOpenChange]);
 
     const handleSelect = (val: string) => {
         onChange(val);
         setIsOpen(false);
+        onOpenChange?.(false);
+    };
+
+    const toggleOpen = () => {
+        const next = !isOpen;
+        setIsOpen(next);
+        onOpenChange?.(next);
     };
 
     return (
@@ -47,17 +56,17 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ options, value, onChange, p
             <div className="relative">
                 <button
                     type="button"
-                    onClick={() => setIsOpen(!isOpen)}
-                    className={`w-full flex items-center justify-between bg-gray-50 dark:bg-[#24272B] border border-transparent rounded-xl px-4 py-3.5 text-sm transition-all duration-200 focus:outline-none ${isOpen ? 'border-brand-green ring-1 ring-brand-green/20' : ''}`}
+                    onClick={toggleOpen}
+                    className={`w-full flex items-center justify-between bg-gray-50 dark:bg-white/10 border border-transparent rounded-xl px-4 py-3.5 text-sm transition-all duration-200 focus:outline-none ${isOpen ? 'border-brand-green ring-1 ring-brand-green/20' : ''}`}
                 >
-                    <span className={selectedOption ? "text-brand-text-light-primary dark:text-white font-medium" : "text-gray-400 dark:text-gray-500"}>
+                    <span className={selectedOption ? "text-brand-text-light-primary dark:text-white font-medium" : "text-gray-400 dark:text-white/70"}>
                         {selectedOption ? selectedOption.label : placeholder}
                     </span>
                     <ChevronDownIcon className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {isOpen && (
-                    <div className="absolute top-full left-0 mt-2 w-full bg-white dark:bg-[#24272B] border border-gray-200 dark:border-white/5 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in max-h-60 overflow-y-auto custom-scrollbar">
+                    <div className="absolute top-full left-0 mt-2 w-full bg-white dark:bg-[#2D312E] backdrop-blur-2xl border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in max-h-60 overflow-y-auto custom-scrollbar">
                         {options.map((option) => (
                             <button
                                 key={option.value}

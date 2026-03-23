@@ -222,7 +222,9 @@ export async function getCompatibilityMatrixDetails(
       return rolesResult.rows;
     } else {
       // --- SSLC: All Streams, Top 10 per Department ---
-      logger.info('[DB-DEBUG] ℹ️ SSLC Case: Fetching Top 10 per department across streams');
+      logger.info(
+        '[DB-DEBUG] ℹ️ SSLC Case: Fetching Top 10 per department across streams',
+      );
 
       const multiStreamQuery = `
                 WITH RankedCourses AS (

@@ -55,6 +55,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
 
   // Track active field for Z-Index management
   const [activeField, setActiveField] = useState<string | null>(null);
+  const [openField, setOpenField] = useState<string | null>(null);
 
   // Static Options
   const schoolLevels = [
@@ -113,6 +114,16 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
       });
     }
     setError(null);
+  };
+
+  const handleOpenStatus = (field: string, isOpen: boolean) => {
+    setOpenField(isOpen ? field : null);
+  };
+
+  const getZIndex = (field: string) => {
+    if (openField === field) return "z-[60]";
+    if (activeField === field) return "z-50";
+    return "z-0";
   };
 
   const validateForm = () => {
@@ -204,7 +215,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
 
   // === Shared style tokens (MATCH corporate form) ===
   const baseInputClasses =
-    "w-full h-[50px] bg-gray-50 dark:bg-white/10 border border-transparent dark:border-transparent rounded-xl px-4 text-sm text-black dark:text-white placeholder-black/40 dark:placeholder-white/60 focus:border-brand-green focus:outline-none transition-all";
+    "w-full h-[50px] bg-gray-50 dark:bg-white/10 border border-transparent dark:border-transparent rounded-xl px-4 text-sm text-black dark:text-white placeholder-black/40 dark:placeholder-white/70 focus:border-brand-green focus:outline-none transition-all";
 
   const baseLabelClasses =
     "text-xs text-black/70 dark:text-white font-semibold ml-1";
@@ -269,7 +280,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
       </div>
 
       {/* Form Card */}
-      <div className="bg-white dark:bg-white/10 border border-gray-200 dark:border-[#24272B] rounded-3xl p-5 sm:p-8 shadow-sm dark:shadow-xl transition-colors duration-300 relative">
+      <div className="bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 rounded-3xl p-5 sm:p-8 shadow-sm dark:shadow-xl transition-colors duration-300 relative">
         {error && (
           <div className="mb-6 text-red-500 dark:text-red-400 text-sm bg-red-50 dark:bg-red-500/10 p-3 rounded-lg border border-red-100 dark:border-red-500/20">
             {error}
@@ -335,8 +346,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
 
             {/* Mobile */}
             <div
-              className={`space-y-2 relative ${activeField === "mobile" ? "z-50" : "z-0"
-                }`}
+              className={`space-y-2 relative ${getZIndex("mobile")}`}
               onMouseEnter={() => setActiveField("mobile")}
               onMouseLeave={() => setActiveField(null)}
             >
@@ -347,6 +357,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                   handleInputChange("country_code", code)
                 }
                 onPhoneChange={(num) => handleInputChange("mobile_number", num)}
+                onOpenChange={(isOpen) => handleOpenStatus("mobile", isOpen)}
                 label="Mobile Number (without +91)"
                 required
                 error={formErrors.mobile_number}
@@ -403,8 +414,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
             {/* Program Type */}
             <div
-              className={`relative ${activeField === "program" ? "z-50" : "z-auto"
-                }`}
+              className={`relative ${getZIndex("program")}`}
               onMouseEnter={() => setActiveField("program")}
               onMouseLeave={() => setActiveField(null)}
             >
@@ -421,6 +431,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                   handleInputChange("department_degree_id", "");
                   handleInputChange("student_board", "");
                 }}
+                onOpenChange={(isOpen) => handleOpenStatus("program", isOpen)}
                 placeholder="Choose Program Type"
               />
               {formErrors.program_id && (
@@ -448,6 +459,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                     handleInputChange("school_stream", "");
                     handleInputChange("current_year", "");
                   }}
+                  onOpenChange={(isOpen) => handleOpenStatus("schoolLevel", isOpen)}
                   placeholder="Select Level"
                 />
                 {formErrors.school_level && (
@@ -472,6 +484,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                   options={boardOptions}
                   value={formData.student_board || ""}
                   onChange={(val) => handleInputChange("student_board", val)}
+                  onOpenChange={(isOpen) => handleOpenStatus("board", isOpen)}
                   placeholder="Select Board"
                 />
                 {formErrors.student_board && (
@@ -496,6 +509,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                   options={schoolStreams}
                   value={formData.school_stream || ""}
                   onChange={(val) => handleInputChange("school_stream", val)}
+                  onOpenChange={(isOpen) => handleOpenStatus("stream", isOpen)}
                   placeholder="Select Stream"
                 />
                 {formErrors.school_stream && (
@@ -549,6 +563,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                   options={departmentOptions}
                   value={formData.department_degree_id || ""}
                   onChange={(val) => handleInputChange("department_degree_id", val)}
+                  onOpenChange={(isOpen) => handleOpenStatus("dept", isOpen)}
                   placeholder="Select Department"
                 />
                 {formErrors.department_degree_id && (
@@ -631,8 +646,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
 
             {/* Schedule Exam */}
             <div
-              className={`space-y-2 relative lg:col-span-2 ${activeField === "exam" ? "z-50" : "z-auto"
-                }`}
+              className={`space-y-2 relative lg:col-span-2 ${getZIndex("exam")}`}
               onMouseEnter={() => setActiveField("exam")}
               onMouseLeave={() => setActiveField(null)}
             >
