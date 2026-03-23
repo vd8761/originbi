@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unused-vars, no-empty, no-useless-escape */
 import * as fs from 'fs';
 import * as path from 'path';
+// `archiver` is CommonJS-only here; keep the runtime-compatible import local to this file.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 import archiver = require('archiver');
 import {
   fetchGroupAssessmentData,

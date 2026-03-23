@@ -77,7 +77,7 @@ export class StudentService {
     @InjectRepository(SchoolStream)
     private readonly schoolStreamRepo: Repository<SchoolStream>,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   /**
    * Creates a configured nodemailer transporter backed by AWS SES v2.
@@ -547,8 +547,8 @@ export class StudentService {
           totalCount > 0
             ? totalCount
             : level?.levelNumber === 2 ||
-              level?.name.includes('ACI') ||
-              level?.patternType === 'ACI'
+                level?.name.includes('ACI') ||
+                level?.patternType === 'ACI'
               ? 25
               : 60,
         unlockTime: unlockTime,
@@ -1678,7 +1678,7 @@ export class StudentService {
         assets,
         dateStr,
         ((registration as any).program?.reportTitle as string) ||
-        'Self Discovery Report',
+          'Self Discovery Report',
       );
 
       try {
@@ -1838,15 +1838,15 @@ export class StudentService {
       // 6. Build exam date from session
       const examDate = session.updatedAt
         ? new Date(session.updatedAt).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        })
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          })
         : new Date().toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        });
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          });
 
       const reportTitle =
         ((registration as any).program?.reportTitle as string) ||

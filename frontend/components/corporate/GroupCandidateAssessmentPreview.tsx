@@ -196,7 +196,13 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
         );
     };
 
-    const renderBasicInfoCards = () => (
+    const renderBasicInfoCards = () => {
+        const isSentToUser = session?.metadata?.emailSentTo === displayData.email;
+        const emailStatusText = session?.metadata?.emailSent 
+            ? (isSentToUser ? 'Sent' : `Sent to ${session?.metadata?.emailSentTo}`)
+            : 'Not Sent';
+
+        return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             {/* Assessment Details */}
             <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-6 flex flex-col gap-4">
@@ -380,8 +386,9 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                         <InfoItem icon={EmailIcon} label="Email" value={displayData.email} />
                         <InfoItem icon={ProfileIcon} label="Mobile" value={displayData.mobile} />
                     </div>
-                    <div className="grid grid-cols-1 gap-3">
+                    <div className="grid grid-cols-2 gap-3">
                         <InfoItem icon={LockIcon} label="Report Password" value={displayData.reportPassword} />
+                        <InfoItem icon={EmailIcon} label="Email Status" value={emailStatusText} />
                     </div>
                     {displayData.isReportReady && (
                         <div className="p-4 rounded-xl bg-gradient-to-r from-gray-100 dark:from-[#19211C] to-brand-green/5 border border-brand-green/20 mt-2">
@@ -409,7 +416,8 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                 </div>
             </div>
         </div>
-    );
+        );
+    };
 
     const renderLevelReport = (title: string, breakdown: any[], compatibility: any, levelAttempt?: any, levelData?: any, hideStats: boolean = false) => (
         <div className={`grid grid-cols-1 ${hideStats ? '' : 'xl:grid-cols-[1fr_300px]'} gap-6`}>

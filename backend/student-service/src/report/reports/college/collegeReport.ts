@@ -122,9 +122,6 @@ export class CollegeReport extends BaseReport {
       'Sustainability',
       'Social Responsibility',
     ];
-    const totalWidth =
-      this.PAGE_WIDTH -
-      2 * (this._useStdMargins ? this.MARGIN_STD : 15 * this.MM);
     const traitNames = {
       D: 'Dominance',
       I: 'Influence',
@@ -627,9 +624,6 @@ export class CollegeReport extends BaseReport {
       'Stress Areas',
       'Recommended Focus Areas',
     ];
-    const tableWidth =
-      this.PAGE_WIDTH -
-      2 * (this._useStdMargins ? this.MARGIN_STD : 15 * this.MM);
     this.table(headers, contentBlock.trait_mapping1, {
       fontSize: 8,
       headerFontSize: 8,
@@ -668,11 +662,7 @@ export class CollegeReport extends BaseReport {
 
     this.h2('Agile Value-Wise Breakdown Table');
 
-    const awbtHeaders = [
-      'Agile Value',
-      'Score',
-      'Behavioural Note',
-    ];
+    const awbtHeaders = ['Agile Value', 'Score', 'Behavioural Note'];
 
     const awbtRows = [
       [
