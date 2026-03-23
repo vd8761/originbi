@@ -8,7 +8,7 @@ export class StudentController {
   constructor(
     private readonly studentService: StudentService,
     private readonly boss: PgBossService,
-  ) { }
+  ) {}
 
   @Post('profile')
   async getProfile(@Body() body: { email: string }): Promise<any> {

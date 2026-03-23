@@ -311,15 +311,20 @@ export class AssessmentService {
       let reportAgileScores: any = null;
       try {
         const report = await this.sessionRepo.manager.query(
-          `SELECT report_password as "reportPassword", agile_scores as "agileScores" FROM assessment_reports WHERE assessment_session_id = $1 LIMIT 1`,
+          `SELECT report_password as "reportPassword", agile_scores as "agileScores", email_sent as "emailSent", email_sent_at as "emailSentAt", email_sent_to as "emailSentTo" FROM assessment_reports WHERE assessment_session_id = $1 LIMIT 1`,
           [id],
         );
         if (report && report.length > 0) {
+          if (!session.metadata) {
+            session.metadata = {};
+          }
           if (report[0].reportPassword) {
-            if (!session.metadata) {
-              session.metadata = {};
-            }
             session.metadata.reportPassword = report[0].reportPassword;
+          }
+          if (report[0].emailSent !== undefined) {
+             session.metadata.emailSent = report[0].emailSent;
+             session.metadata.emailSentAt = report[0].emailSentAt;
+             session.metadata.emailSentTo = report[0].emailSentTo;
           }
           if (report[0].agileScores) {
             reportAgileScores = report[0].agileScores;

@@ -153,7 +153,10 @@ export class ReportController {
         const reportJSON = await buildReportJSON(user);
         res.json({ success: true, data: reportJSON });
       } catch (error) {
-        logger.error(`[API] JSON Report Generation failed for ${userId}:`, error);
+        logger.error(
+          `[API] JSON Report Generation failed for ${userId}:`,
+          error,
+        );
         res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
           success: false,
           error: (error as Error).message,
