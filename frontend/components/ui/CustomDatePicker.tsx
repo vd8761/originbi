@@ -238,7 +238,7 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
     onChange: (v: number) => void;
     max: number;
   }) => (
-    <div className="flex bg-brand-light-secondary dark:bg-[#24272B] rounded-lg border border-gray-200 dark:border-white/5 w-[52px] h-[42px] relative shrink-0 overflow-hidden group hover:border-brand-green/30 transition-colors">
+    <div className="flex bg-brand-light-secondary dark:bg-white/10 rounded-lg border border-gray-200 dark:border-white/5 w-[52px] h-[42px] relative shrink-0 overflow-hidden group hover:border-brand-green/30 transition-colors">
       <input
         type="text"
         value={value.toString().padStart(2, "0")}
@@ -270,7 +270,7 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
   );
 
   const DateDropdown = ({ date }: { date: Date }) => (
-    <div className="bg-brand-light-secondary dark:bg-[#24272B] rounded-lg border border-gray-200 dark:border-white/5 px-3 h-[42px] flex justify-between items-center text-sm text-brand-text-light-primary dark:text-gray-200 min-w-[120px] flex-grow cursor-pointer hover:border-brand-green/30 transition-colors">
+    <div className="bg-brand-light-secondary dark:bg-white/10 rounded-lg border border-gray-200 dark:border-white/5 px-3 h-[42px] flex justify-between items-center text-sm text-brand-text-light-primary dark:text-gray-200 min-w-[120px] flex-grow cursor-pointer hover:border-brand-green/30 transition-colors">
       <span className="font-medium">{date.toLocaleDateString("en-GB")}</span>
       <ChevronDownIcon className="w-3 h-3 text-gray-500 shrink-0" />
     </div>
@@ -283,7 +283,7 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
     period: string;
     onChange: (p: string) => void;
   }) => (
-    <div className="flex bg-brand-light-secondary dark:bg-[#24272B] rounded-lg border border-gray-200 dark:border-white/5 overflow-hidden h-[42px] shrink-0">
+    <div className="flex bg-brand-light-secondary dark:bg-white/10 rounded-lg border border-gray-200 dark:border-white/5 overflow-hidden h-[42px] shrink-0">
       <button
         type="button"
         onClick={() => onChange("AM")}
@@ -313,7 +313,7 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
       <button
         type="button"
         onClick={toggleOpen}
-        className="w-full flex items-center justify-between bg-brand-light-secondary dark:bg-[#24272B] border border-transparent rounded-xl px-4 py-3.5 text-sm text-brand-text-light-primary dark:text-white hover:border-brand-light-tertiary dark:hover:border-[#3E4247] transition-all"
+        className="w-full flex items-center justify-between bg-brand-light-secondary dark:bg-white/10 border border-transparent rounded-xl px-4 py-3.5 text-sm text-brand-text-light-primary dark:text-white hover:border-brand-light-tertiary dark:hover:border-[#3E4247] transition-all"
       >
         <div className="flex items-center gap-3 overflow-hidden">
           <CalendarIcon className="w-4 h-4 text-brand-green shrink-0" />
@@ -348,7 +348,7 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
 
             <div className="flex flex-col md:flex-row overflow-y-auto custom-scrollbar">
               <div className="p-4 sm:p-6 md:border-r border-gray-200 dark:border-white/5 flex-1 bg-white dark:bg-[#19211C] min-w-[320px]">
-                <div className="flex justify-between items-center mb-6 bg-brand-light-secondary dark:bg-[#24272B] p-1.5 rounded-lg border border-gray-200 dark:border-white/5">
+                <div className="flex justify-between items-center mb-6 bg-brand-light-secondary dark:bg-white/10 p-1.5 rounded-lg border border-gray-200 dark:border-white/5">
                   <button
                     type="button"
                     onClick={() =>

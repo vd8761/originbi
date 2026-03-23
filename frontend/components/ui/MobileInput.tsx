@@ -8,6 +8,7 @@ interface MobileInputProps {
   phoneNumber: string;
   onCountryChange: (code: string) => void;
   onPhoneChange: (number: string) => void;
+  onOpenChange?: (isOpen: boolean) => void;
   error?: string;
   label?: string;
   required?: boolean;
@@ -18,6 +19,7 @@ const MobileInput: React.FC<MobileInputProps> = ({
   phoneNumber,
   onCountryChange,
   onPhoneChange,
+  onOpenChange,
   error,
   label,
   required,
@@ -40,11 +42,12 @@ const MobileInput: React.FC<MobileInputProps> = ({
         !dropdownRef.current.contains(event.target as Node)
       ) {
         setIsDropdownOpen(false);
+        onOpenChange?.(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [onOpenChange]);
 
   useEffect(() => {
     if (isDropdownOpen && searchInputRef.current) {
@@ -61,6 +64,12 @@ const MobileInput: React.FC<MobileInputProps> = ({
     if (val.length <= max) {
       onPhoneChange(val);
     }
+  };
+
+  const toggleDropdown = () => {
+    const next = !isDropdownOpen;
+    setIsDropdownOpen(next);
+    onOpenChange?.(next);
   };
 
   const filteredCountries = useMemo(() => {
@@ -92,7 +101,7 @@ const MobileInput: React.FC<MobileInputProps> = ({
         <div className="relative w-[110px] shrink-0 h-full" ref={dropdownRef}>
           <button
             type="button"
-            onClick={() => setIsDropdownOpen((p) => !p)}
+            onClick={toggleDropdown}
             className="
               w-full h-full flex items-center justify-between
               bg-gray-50 dark:bg-white/10
@@ -126,9 +135,9 @@ const MobileInput: React.FC<MobileInputProps> = ({
           </button>
 
           {isDropdownOpen && (
-            <div className="absolute top-full left-0 mt-2 w-72 bg-white dark:bg-[#24272B] border border-gray-200 dark:border-white/5 rounded-xl shadow-xl z-50 overflow-hidden flex flex-col max-h-60">
+            <div className="absolute top-full left-0 mt-2 w-72 bg-white dark:bg-[#2D312E] backdrop-blur-2xl border border-gray-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden flex flex-col max-h-60">
               {/* Search Bar */}
-              <div className="p-2 border-b border-gray-100 dark:border-white/5 sticky top-0 bg-white dark:bg-[#24272B] z-10">
+              <div className="p-2 border-b border-gray-100 dark:border-white/5 sticky top-0 bg-white dark:bg-[#2D312E]/80 backdrop-blur z-10">
                 <input
                   ref={searchInputRef}
                   type="text"
