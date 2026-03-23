@@ -136,57 +136,67 @@ export class AssessmentGenerationService {
       }
 
       this.logger.log(
-        `Generating Level 2 Questions for Trait ID: ${traitId} (Limit 25)`,
+        `Generating Level 2 Questions for Trait ID: ${traitId} (5 questions per category)`,
       );
 
-      let aciQuery = manager
-        .createQueryBuilder(AssessmentQuestion, 'q')
-        .where('q.assessment_level_id = :levelId', {
-          levelId: attempt.assessmentLevelId,
-        })
-        .andWhere('q.personality_trait_id = :traitId', { traitId })
-        .andWhere('q.is_active = true')
-        .andWhere('q.is_deleted = false');
+      const categories = [
+        'Commitment',
+        'Courage',
+        'Focus',
+        'Openness',
+        'Respect',
+      ];
+      const aciQuestions: AssessmentQuestion[] = [];
 
-      // Board Filtering strictly for School Programs
-      if (isSchool) {
-        if (studentBoard) {
-          this.logger.log(
-            `[Assessment] Applying Board Filter for School Program: ${studentBoard}`,
-          );
-          aciQuery = aciQuery.andWhere('q.board = :board', {
-            board: studentBoard,
-          });
-        } else {
-          this.logger.warn(
-            `[Assessment] School Program detected but no Student Board found in metadata. Generating without board filter.`,
-          );
-        }
-      }
-
-      let aciQuestions = await aciQuery.orderBy('RANDOM()').limit(25).getMany();
-
-      // Fallback: If School Board specific questions are missing, try generic
-      if (aciQuestions.length === 0 && isSchool && studentBoard) {
-        this.logger.warn(
-          `No Level 2 questions found for Board ${studentBoard}. Falling back to generic questions.`,
-        );
-        aciQuery = manager
+      for (const category of categories) {
+        let categoryQuery = manager
           .createQueryBuilder(AssessmentQuestion, 'q')
           .where('q.assessment_level_id = :levelId', {
             levelId: attempt.assessmentLevelId,
           })
           .andWhere('q.personality_trait_id = :traitId', { traitId })
+          .andWhere('UPPER(q.category) = :category', { category: category.toUpperCase() })
           .andWhere('q.is_active = true')
           .andWhere('q.is_deleted = false');
 
-        // Strict Program Filter (if applicable/desired, user said "Level 2 only trait id based", but let's keep it safe if we added it before?
-        // User said: "Level 2 Question Selection: Based on the Level 1 Result Trait ID to Pick the 25 question. In case of School Program Addtionally want to Check the Board".
-        // They didn't explicitly say "Check Program", but usually we should?
-        // Actually, user said "level 2 only trait id based" in previous turn.
-        // I will stick to Trait ID + Board (optional). So for fallback, just Trait ID.
+        if (isSchool && studentBoard) {
+          categoryQuery = categoryQuery.andWhere('q.board = :board', {
+            board: studentBoard,
+          });
+        }
 
-        aciQuestions = await aciQuery.orderBy('RANDOM()').limit(25).getMany();
+        let catQuestions = await categoryQuery
+          .orderBy('RANDOM()')
+          .limit(5)
+          .getMany();
+
+        // Fallback: If board-specific questions are missing for this category, try generic trait-based ones
+        if (catQuestions.length < 5 && isSchool && studentBoard) {
+          this.logger.warn(
+            `Found only ${catQuestions.length}/5 questions for category ${category} with board ${studentBoard}. Falling back to generic trait questions.`,
+          );
+          const fallbackQuery = manager
+            .createQueryBuilder(AssessmentQuestion, 'q')
+            .where('q.assessment_level_id = :levelId', {
+              levelId: attempt.assessmentLevelId,
+            })
+            .andWhere('q.personality_trait_id = :traitId', { traitId })
+            .andWhere('UPPER(q.category) = :category', { category: category.toUpperCase() })
+            .andWhere('q.is_active = true')
+            .andWhere('q.is_deleted = false')
+            .orderBy('RANDOM()')
+            .limit(5);
+
+          catQuestions = await fallbackQuery.getMany();
+        }
+
+        if (catQuestions.length === 0) {
+          this.logger.error(
+            `CRITICAL: No questions found for category ${category} and Trait ${traitId}. Assessment may be incomplete.`,
+          );
+        }
+
+        aciQuestions.push(...catQuestions);
       }
 
       const answersToInsert: Partial<AssessmentAnswer>[] = [];

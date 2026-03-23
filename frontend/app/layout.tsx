@@ -3,9 +3,9 @@ import './globals.css';
 import ClientProviders from './ClientProvider';
 
 export const metadata: Metadata = {
-  title: 'OriginBI Login',
+  title: 'OriginBI Mind | Personalized Career Guidance',
   description:
-    'A modern, visually appealing login screen with a testimonial carousel, designed to showcase a professional and engaging user authentication experience.',
+    'Navigate your future with OriginBI Mind. Get expert advice from our AI Counsellor, take psychological assessments, and map out your personalized career roadmap for success.',
   icons: {
     icon: '/icon.svg',
   },

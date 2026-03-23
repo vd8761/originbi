@@ -1,6 +1,9 @@
 import React from 'react';
 import { AssessmentSession } from '../../lib/services/assessment.service';
 import { EyeSolidIcon, SortIcon } from '../icons';
+import ReactCountryFlag from "react-country-flag";
+import { COUNTRY_CODES } from '../../lib/countryCodes';
+import { capitalizeWords } from "../../lib/utils";
 
 interface AssessmentSessionsTableProps {
     sessions: AssessmentSession[];
@@ -146,9 +149,22 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                                     <SortIcon sort={sortColumn === 'exam_status' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
                                 </div>
                             </th>
-                            <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider text-center w-[8%] min-w-[80px]">
-                                Exam Type
-                            </th>
+                            {!isGroupView && (
+                                <th
+                                    className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors w-[15%] min-w-[170px]"
+                                    onClick={() => onSort?.('mobile_number')}
+                                >
+                                    <div className="flex items-center gap-1">
+                                        Mobile Number
+                                        <SortIcon sort={sortColumn === 'mobile_number' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
+                                    </div>
+                                </th>
+                            )}
+                            {isGroupView && (
+                                <th className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider text-center w-[8%] min-w-[80px]">
+                                    Exam Type
+                                </th>
+                            )}
                             <th
                                 className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors w-[15%] min-w-[140px]"
                                 onClick={() => onSort?.('program_name')}
@@ -226,12 +242,12 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                                             <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-primary font-medium whitespace-nowrap">
                                                 <div className="flex items-center gap-3">
                                                     <img
-                                                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(session.registration?.fullName || session.user?.email || 'User')}&background=${getAvatarColor(session.registration?.fullName || session.user?.email || 'User')}&color=fff&font-size=0.4`}
+                                                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(capitalizeWords(session.registration?.fullName || session.user?.email || 'User'))}&background=${getAvatarColor(session.registration?.fullName || session.user?.email || 'User')}&color=fff&font-size=0.4`}
                                                         alt=""
                                                         className="w-9 h-9 rounded-full object-cover border border-brand-light-tertiary dark:border-brand-dark-tertiary"
                                                     />
                                                     <span className="text-sm font-medium text-brand-text-light-primary dark:text-white">
-                                                        {session.registration?.fullName || session.user?.email || '-'}
+                                                        {capitalizeWords(session.registration?.fullName || session.user?.email || '-')}
                                                     </span>
                                                 </div>
                                             </td>
@@ -252,9 +268,32 @@ const AssessmentSessionsTable: React.FC<AssessmentSessionsTableProps> = ({
                                                 {status.label}
                                             </span>
                                         </td>
-                                        <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-secondary text-center">
-                                            WebApp
-                                        </td>
+                                        {!isGroupView && (
+                                            <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-primary">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex items-center gap-2" title={session.registration?.countryCode || 'IN'}>
+                                                        <ReactCountryFlag
+                                                            countryCode={COUNTRY_CODES.find(c => c.dial_code === session.registration?.countryCode)?.code || 'IN'}
+                                                            svg
+                                                            style={{
+                                                                width: '1.4em',
+                                                                height: '1.4em',
+                                                                borderRadius: '2px',
+                                                            }}
+                                                        />
+                                                        <span className="text-brand-text-light-secondary dark:text-gray-500 font-medium">
+                                                            {session.registration?.countryCode || '+91'}
+                                                        </span>
+                                                    </div>
+                                                    <span>{session.registration?.mobileNumber || '-'}</span>
+                                                </div>
+                                            </td>
+                                        )}
+                                        {isGroupView && (
+                                            <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-secondary text-center">
+                                                WebApp
+                                            </td>
+                                        )}
                                         <td className="p-4 text-sm text-[#19211C] dark:text-brand-text-primary">
                                             {session.program?.name || '-'}
                                         </td>

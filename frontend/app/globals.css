@@ -110,6 +110,26 @@
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: rgba(30, 211, 106, 0.5);
   }
+
+  /* --- GLASSMORPHIC CARD --- */
+  .glass-card {
+    @apply bg-white/80 dark:bg-[#111814]/80 backdrop-blur-xl border border-white/20 dark:border-white/5 shadow-[0_4px_12px_rgba(0,0,0,0.02)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.15)] rounded-2xl;
+  }
+
+  /* Dashboard-specific glass style (aligned with corporate dashboard cards) */
+  .dashboard-glass-card {
+    @apply glass-card dark:bg-white/[0.08] dark:border-white/[0.08] shadow-none dark:shadow-none;
+  }
+
+  /* Softer glass only for header notification dropdowns */
+  .notification-glass-card {
+    @apply glass-card bg-white/95 dark:bg-[#1A241F]/95 border-white/20 dark:border-white/[0.08] backdrop-blur-none shadow-none dark:shadow-none;
+  }
+
+  /* --- PORTAL BACKGROUND --- */
+  .portal-bg {
+    @apply bg-[url('/Background_Light_Theme.svg')] bg-cover bg-top bg-no-repeat dark:bg-none dark:bg-[#19211C];
+  }
 }
 
 /* Custom Fonts */
