@@ -70,7 +70,7 @@ const RegistrationForm: React.FC = () => {
     };
 
     // --- Validation Logic ---
-    const validateField = (name: string, value: string) => {
+    const validateField = (name: string, value: string, overrideCountryCode?: string) => {
         let error = '';
         switch (name) {
             case 'name':
@@ -85,7 +85,7 @@ const RegistrationForm: React.FC = () => {
             case 'mobile':
                 if (!value.trim()) error = 'Mobile Number is required.';
                 else {
-                    const country = getSelectedCountry(formData.countryCode);
+                    const country = getSelectedCountry(overrideCountryCode || formData.countryCode);
                     const cleanNumber = value.replace(/\D/g, '');
                     // Validate against strict length from CountryCode definition
                     if (country.maxLength && cleanNumber.length !== country.maxLength) {
@@ -155,7 +155,13 @@ const RegistrationForm: React.FC = () => {
     };
 
     const handleMobileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value.replace(/\D/g, "");
+        let val = e.target.value.replace(/\D/g, "");
+        
+        // Enforce max length based on selected country
+        if (selectedCountry.maxLength && val.length > selectedCountry.maxLength) {
+            val = val.slice(0, selectedCountry.maxLength);
+        }
+
         setFormData(prev => ({ ...prev, mobile: val }));
 
         // Immediate validation feedback for mobile length
@@ -390,7 +396,25 @@ const RegistrationForm: React.FC = () => {
                                             key={`${country.code}-${country.dial_code}`}
                                             type="button"
                                             onClick={() => {
-                                                setFormData(prev => ({ ...prev, countryCode: country.dial_code }));
+                                                const newCountryCode = country.dial_code;
+                                                // Truncate existing mobile if it exceeds new country's limit
+                                                let newMobile = formData.mobile;
+                                                if (country.maxLength && newMobile.length > country.maxLength) {
+                                                    newMobile = newMobile.slice(0, country.maxLength);
+                                                }
+                                                
+                                                setFormData(prev => ({ 
+                                                    ...prev, 
+                                                    countryCode: newCountryCode,
+                                                    mobile: newMobile
+                                                }));
+                                                
+                                                if (touched.mobile) {
+                                                    setErrors(prev => ({ 
+                                                        ...prev, 
+                                                        mobile: validateField('mobile', newMobile, newCountryCode) 
+                                                    }));
+                                                }
                                                 setIsCountryOpen(false);
                                             }}
                                             className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${formData.countryCode === country.dial_code ? "bg-brand-green/10 text-brand-green" : "text-black dark:text-gray-200"}`}
@@ -415,7 +439,8 @@ const RegistrationForm: React.FC = () => {
                         value={formData.mobile}
                         onChange={handleMobileChange}
                         onBlur={handleBlur}
-                        placeholder="9876543210"
+                        maxLength={selectedCountry.maxLength}
+                        placeholder={selectedCountry.maxLength === 10 ? "9876543210" : "Number"}
                         className="bg-transparent border-none focus:ring-0 flex-1 h-full pl-2 pr-5 rounded-r-full text-brand-text-light-primary dark:text-brand-text-primary placeholder:text-brand-text-light-secondary dark:placeholder:text-brand-text-secondary font-sans text-[clamp(14px,0.83vw,16px)] outline-none"
                     />
                 </div>
