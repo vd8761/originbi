@@ -1764,6 +1764,7 @@ export class CorporateDashboardService {
       LEFT JOIN degree_types dt ON dd.degree_type_id = dt.id
       WHERE ar.report_number = $1
         AND r.corporate_account_id = $2
+      ORDER BY aa.dominant_trait_id DESC NULLS LAST
       LIMIT 1
     `;
 
