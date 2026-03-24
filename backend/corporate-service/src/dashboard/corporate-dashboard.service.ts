@@ -1714,7 +1714,20 @@ export class CorporateDashboardService {
   // ========================================================================
   // SEARCH BY REPORT NUMBER
   // ========================================================================
-  async searchByReportNumber(reportNumber: string, corporateAccountId: number) {
+  async searchByReportNumber(reportNumberInput: string, corporateAccountId: number) {
+    let reportNumber = reportNumberInput.toUpperCase();
+    
+    // Reverse the abbreviations used in the generated report PDFs
+    if (reportNumber.includes('-CS-')) {
+      reportNumber = reportNumber.replace('-CS-', '-COLLEGE_STUDENT-');
+    } else if (reportNumber.includes('-SS-')) {
+      reportNumber = reportNumber.replace('-SS-', '-SCHOOL_STUDENT-');
+    } else if (reportNumber.includes('-E-')) {
+      reportNumber = reportNumber.replace('-E-', '-EMPLOYEE-');
+    } else if (reportNumber.includes('-CG-')) {
+      reportNumber = reportNumber.replace('-CG-', '-CXO_GENERAL-');
+    }
+
     const query = `
       SELECT
         ar.report_number,
@@ -1777,8 +1790,17 @@ export class CorporateDashboardService {
     const traitName = (row.blended_style_name || '').trim();
     const traitImageKey = traitName.replace(/\s+/g, '_');
 
+    const formatReportRef = (ref: string | null) => {
+      if (!ref) return 'Nil';
+      return ref
+        .replace('COLLEGE_STUDENT', 'CS')
+        .replace('SCHOOL_STUDENT', 'SS')
+        .replace('EMPLOYEE', 'E')
+        .replace('CXO_GENERAL', 'CG');
+    };
+
     return {
-      reportNumber: row.report_number,
+      reportNumber: formatReportRef(row.report_number),
       generatedAt: row.generated_at,
       candidateName: row.full_name,
       email: row.email,
