@@ -8,7 +8,7 @@ export default function RootPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/admin/login');
+    router.replace('/admin/dashboard');
   }, [router]);
 
   return null;
