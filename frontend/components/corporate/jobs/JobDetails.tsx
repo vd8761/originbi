@@ -21,7 +21,7 @@ const mockJobDetail = {
     experienceLevel: "Fresher",
     annualCTC: "3,50,000 - 4,00,000",
     postedDate: "27 December 2025",
-    closingDate: "28 February 2025",
+    closingDate: "28 February 2026",
     jobDescription: "We are looking for creative and passionate students or recent graduates to join our team as UX/UI Designers.\nThis role is ideal for freshers who want to learn, gain practical experience, and build a strong portfolio while working on real projects.",
     responsibilities: [
         "Design wireframes, UI screens, and simple prototypes",
@@ -147,7 +147,7 @@ const mockCandidates: Candidate[] = [
 type TabKey = "job_details" | "all" | "new" | "shortlisted" | "hired" | "rejected";
 
 export default function JobDetails({ jobId, onBack }: JobDetailsProps) {
-    const [activeTab, setActiveTab] = useState<TabKey>("shortlisted");
+    const [activeTab, setActiveTab] = useState<TabKey>("job_details");
     const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
 
     // TODO: Fetch data from backend using jobId

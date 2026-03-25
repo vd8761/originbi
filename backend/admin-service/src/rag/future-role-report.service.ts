@@ -99,7 +99,7 @@ export class FutureRoleReportService {
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
       this.llm = new ChatGoogleGenerativeAI({
         apiKey,
-        model: 'gemini-2.5-flash',
+          model: process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash',
         temperature: 0.3,
         maxOutputTokens: 2200,
         callbacks: [getTokenTrackerCallback('Future Role Report')],

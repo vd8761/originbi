@@ -28,7 +28,7 @@ export default function CorporateLayout({
 
     // Check if current path starts with any of the hide routes (to cover subpaths if any)
     // Or simpler exact match if routes are exact.
-    const showHeader = !hideHeaderRoutes.some(route => pathname.includes(route));
+    const showHeader = !hideHeaderRoutes.some(route => pathname === route || pathname.startsWith(`${route}/`));
 
     const handleNavigate = (view: string) => {
         // Map view ID to route
