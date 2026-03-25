@@ -6,6 +6,9 @@ import {
   GroupAssessment,
   CorporateAccount,
   AssessmentSession,
+  CorporateCreditLedger,
+  Registration,
+  AffiliateSettlementTransaction,
 } from '@originbi/shared-entities';
 import { AffiliatesService } from '../affiliates/affiliates.service';
 
@@ -30,6 +33,18 @@ describe('AdminService', () => {
         },
         {
           provide: getRepositoryToken(AssessmentSession),
+          useValue: { count: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(CorporateCreditLedger),
+          useValue: { count: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(Registration),
+          useValue: { count: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(AffiliateSettlementTransaction),
           useValue: { count: jest.fn() },
         },
         {
