@@ -42,6 +42,7 @@ interface AgentResult {
   searchType: string;
   confidence: number;
   sources?: any;
+  evidence?: Record<string, any>;
   toolsUsed: string[];
   planningTimeMs: number;
   executionTimeMs: number;
@@ -106,11 +107,13 @@ export class AgentOrchestratorService {
     if (!this.plannerLlm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+      const plannerModel = process.env.GEMINI_PLANNER_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
+      const plannerMaxTokens = Math.max(128, Number(process.env.AGENT_PLANNER_MAX_OUTPUT_TOKENS || 320));
       this.plannerLlm = new ChatGoogleGenerativeAI({
         apiKey,
-        model: 'gemini-2.5-flash',
+        model: plannerModel,
         temperature: 0,       // Deterministic planning
-        maxOutputTokens: 512, // Plans are compact JSON
+        maxOutputTokens: plannerMaxTokens, // Plans are compact JSON
         callbacks: [getTokenTrackerCallback('Agent Planner')],
       });
     }
@@ -121,11 +124,12 @@ export class AgentOrchestratorService {
     if (!this.plannerFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+      const plannerMaxTokens = Math.max(128, Number(process.env.AGENT_PLANNER_MAX_OUTPUT_TOKENS || 320));
       this.plannerFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
         temperature: 0,
-        maxTokens: 512,
+        maxTokens: plannerMaxTokens,
         timeout: 10000,
         callbacks: [getTokenTrackerCallback('Agent Planner (Groq Fallback)')],
       });
@@ -137,11 +141,13 @@ export class AgentOrchestratorService {
     if (!this.synthesizerLlm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+      const synthesizerModel = process.env.GEMINI_SYNTH_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
+      const synthesizerMaxTokens = Math.max(180, Number(process.env.AGENT_SYNTH_MAX_OUTPUT_TOKENS || 420));
       this.synthesizerLlm = new ChatGoogleGenerativeAI({
         apiKey,
-        model: 'gemini-2.5-flash',
+        model: synthesizerModel,
         temperature: 0.2,
-        maxOutputTokens: 650,
+        maxOutputTokens: synthesizerMaxTokens,
         callbacks: [getTokenTrackerCallback('Agent Synthesizer')],
       });
     }
@@ -152,11 +158,12 @@ export class AgentOrchestratorService {
     if (!this.synthesizerFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+      const synthesizerMaxTokens = Math.max(180, Number(process.env.AGENT_SYNTH_MAX_OUTPUT_TOKENS || 420));
       this.synthesizerFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
         temperature: 0.2,
-        maxTokens: 650,
+        maxTokens: synthesizerMaxTokens,
         timeout: 15000,
         callbacks: [getTokenTrackerCallback('Agent Synthesizer (Groq Fallback)')],
       });
@@ -168,11 +175,13 @@ export class AgentOrchestratorService {
     if (!this.reflectorLlm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+      const reflectorModel = process.env.GEMINI_REFLECTOR_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
+      const reflectorMaxTokens = Math.max(96, Number(process.env.AGENT_REFLECTOR_MAX_OUTPUT_TOKENS || 140));
       this.reflectorLlm = new ChatGoogleGenerativeAI({
         apiKey,
-        model: 'gemini-2.5-flash',
+        model: reflectorModel,
         temperature: 0,
-        maxOutputTokens: 160, // Reflections are very compact
+        maxOutputTokens: reflectorMaxTokens, // Reflections are very compact
         callbacks: [getTokenTrackerCallback('Agent Reflector')],
       });
     }
@@ -183,11 +192,12 @@ export class AgentOrchestratorService {
     if (!this.reflectorFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+      const reflectorMaxTokens = Math.max(96, Number(process.env.AGENT_REFLECTOR_MAX_OUTPUT_TOKENS || 140));
       this.reflectorFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
         temperature: 0,
-        maxTokens: 160,
+        maxTokens: reflectorMaxTokens,
         timeout: 8000,
         callbacks: [getTokenTrackerCallback('Agent Reflector (Groq Fallback)')],
       });
@@ -322,6 +332,7 @@ export class AgentOrchestratorService {
 
       const toolsUsed = results.map(r => r.toolName);
       const maxConfidence = Math.max(...results.map(r => r.confidence), 0.5);
+      const evidence = this.buildEvidence(results, toolsUsed, planningTimeMs, executionTimeMs);
 
       // Record telemetry
       this.recordTelemetry(question, telemetryEntries, Date.now() - startTime);
@@ -334,6 +345,7 @@ export class AgentOrchestratorService {
         searchType: `agent:${toolsUsed.join('+')}`,
         confidence: maxConfidence,
         sources: this.extractSources(results),
+        evidence,
         toolsUsed,
         planningTimeMs,
         executionTimeMs,
@@ -416,10 +428,11 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
 
       const rawOutput = response.content.toString().trim();
       const plan = this.parsePlannerOutput(rawOutput, question);
-      return plan;
+      return this.optimizePlanForComplexity(plan, question, complexity);
     } catch (error) {
       this.logger.warn(`Planner LLM failed: ${error.message} — using fallback plan`);
-      return this.getFallbackPlan(question, user);
+      const fallbackPlan = this.getFallbackPlan(question, user);
+      return this.optimizePlanForComplexity(fallbackPlan, question, complexity);
     }
   }
 
@@ -544,6 +557,88 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
       reasoning: 'Recovered malformed planner output using tool-name extraction',
       requiresSynthesis: detectedSteps.length > 1,
     };
+  }
+
+  private optimizePlanForComplexity(
+    plan: ExecutionPlan,
+    question: string,
+    complexity?: ComplexityAssessment,
+  ): ExecutionPlan {
+    if (!complexity) {
+      return plan;
+    }
+
+    const steps = [...plan.steps];
+    const hasTool = (tool: ToolCall['tool']) => steps.some(s => s.tool === tool);
+    const addStep = (step: ToolCall) => {
+      if (!hasTool(step.tool) && steps.length < 3) {
+        steps.push(step);
+      }
+    };
+
+    // Force data grounding for data-heavy or multi-part questions.
+    if (complexity.needsData && !hasTool('text_to_sql')) {
+      addStep({
+        tool: 'text_to_sql',
+        params: { question },
+        reason: 'Complexity optimizer: requires deterministic data grounding',
+      });
+    }
+
+    // Add analysis for mixed ask (data + guidance) so synthesis can produce an actionable answer.
+    if ((complexity.needsAnalysis || complexity.isMultiPart) && !hasTool('knowledge_ai')) {
+      addStep({
+        tool: 'knowledge_ai',
+        params: { question },
+        reason: 'Complexity optimizer: requires analytical layer for multi-intent query',
+      });
+    }
+
+    const extractedName = this.extractNameFromQuestion(question);
+    if (complexity.needsPersonLookup && extractedName && !hasTool('person_lookup')) {
+      addStep({
+        tool: 'person_lookup',
+        params: { name: extractedName },
+        reason: 'Complexity optimizer: explicit person lookup detected',
+      });
+    }
+
+    // Add lightweight context resolution for clear follow-up pronouns.
+    if (this.shouldUseConversationContext(question) && !hasTool('conversation_context')) {
+      addStep({
+        tool: 'conversation_context',
+        params: { question },
+        reason: 'Complexity optimizer: pronoun-based follow-up context required',
+      });
+    }
+
+    const priority: Record<ToolCall['tool'], number> = {
+      conversation_context: 1,
+      person_lookup: 2,
+      personal_info: 3,
+      text_to_sql: 4,
+      semantic_search: 5,
+      knowledge_ai: 6,
+      career_report: 7,
+    };
+
+    const sorted = steps
+      .sort((a, b) => (priority[a.tool] ?? 99) - (priority[b.tool] ?? 99))
+      .slice(0, 3);
+
+    const dataToolUsed = sorted.some(s => s.tool === 'text_to_sql' || s.tool === 'person_lookup' || s.tool === 'personal_info');
+    const analysisToolUsed = sorted.some(s => s.tool === 'knowledge_ai' || s.tool === 'semantic_search' || s.tool === 'career_report');
+    const requiresSynthesis = sorted.length > 1 && (analysisToolUsed || dataToolUsed);
+
+    return {
+      steps: sorted,
+      reasoning: plan.reasoning,
+      requiresSynthesis,
+    };
+  }
+
+  private shouldUseConversationContext(question: string): boolean {
+    return /\b(him|her|them|those|that one|that person|same person|previous|above|earlier)\b/i.test(question);
   }
 
   /**
@@ -1256,6 +1351,24 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
         return primary.data.formattedProfile;
       }
 
+      // For semantic_search-only flows, synthesize a direct answer from retrieved context
+      // instead of returning generic "Found N documents" summaries.
+      if (primary.toolName === 'semantic_search' && primary.data?.contextChunks) {
+        try {
+          const semanticAnswer = await this.oriIntelligence.answerAnyQuestion(
+            question,
+            await this.oriIntelligence.getUserProfile(user.id, user.email),
+            primary.data.contextChunks,
+            user?.role || 'STUDENT',
+          );
+          if (semanticAnswer?.trim()) {
+            return semanticAnswer;
+          }
+        } catch {
+          // fall through to summary fallback
+        }
+      }
+
       return primary.summary;
     }
 
@@ -1287,20 +1400,25 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
     const toolOutputs = results.map(r => {
       return `── ${r.toolName.toUpperCase()} RESULT ──
 ${r.summary}
-${r.data?.answer ? `\nDetailed Answer:\n${r.data.answer?.slice(0, 700)}` : ''}`;
+${r.data?.answer ? `\nDetailed Answer:\n${r.data.answer?.slice(0, 320)}` : ''}`;
     }).join('\n\n');
 
-    const synthesisPrompt = `You are Ask BI's Synthesizer Agent.
+    const synthesisPrompt = `Answer from tool outputs only. Be concise and complete.
 
 USER ROLE: ${role}
 ${roleRules}
 
 RULES:
-1) Start directly with the answer.
-2) Use only tool facts, never fabricate.
-3) Remove repetition and redundant phrasing.
-4) Use concise markdown only when helpful.
-5) If tools disagree, state uncertainty briefly and choose the highest-confidence fact.
+1) Use only tool facts; no fabrication.
+2) Start with direct answer.
+3) If multi-part ask, answer each part explicitly.
+4) Keep wording tight; avoid repetition.
+5) If tools conflict, mention uncertainty briefly and pick highest-confidence result.
+6) Use this structure when useful:
+  - Quick Answer
+  - Key Findings
+  - Recommended Next Action
+7) For missing data, say "No users found." and provide one practical next step.
 
 USER QUESTION:
 "${question}"
@@ -1392,6 +1510,36 @@ FINAL RESPONSE:`;
       }
     }
     return sources;
+  }
+
+  private buildEvidence(
+    results: ToolResult[],
+    toolsUsed: string[],
+    planningTimeMs: number,
+    executionTimeMs: number,
+  ): Record<string, any> {
+    const successful = results.filter(r => r.success);
+    const failed = results.filter(r => !r.success);
+
+    return {
+      plan: {
+        toolsUsed,
+        planningTimeMs,
+        executionTimeMs,
+      },
+      quality: {
+        successfulTools: successful.length,
+        failedTools: failed.map(r => r.toolName),
+        avgToolConfidence: successful.length
+          ? Math.round((successful.reduce((sum, r) => sum + (r.confidence || 0), 0) / successful.length) * 100) / 100
+          : 0,
+      },
+      toolConfidence: results.map(r => ({
+        tool: r.toolName,
+        confidence: r.confidence,
+        success: r.success,
+      })),
+    };
   }
 
   private postProcessAnswer(answer: string): string {

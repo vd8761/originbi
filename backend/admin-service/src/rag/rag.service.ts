@@ -45,10 +45,13 @@ interface QueryResult {
   answer: string;
   searchType: string;
   sources?: any;
+  evidence?: any;
   confidence: number;
   reportUrl?: string;
   reportId?: string;
   suggestions?: string[];
+  needsClarification?: boolean;
+  clarifyingQuestion?: string;
 }
 
 // Complete Database Schema
@@ -182,6 +185,8 @@ export class RagService {
   private readonly ROUTING_HISTORY_MAX_CHARS = 900;
   private readonly GENERAL_KNOWLEDGE_CHUNK_LIMIT = 2;
   private readonly GENERAL_KNOWLEDGE_CHUNK_MAX_CHARS = 380;
+  private readonly AGENT_ACCEPT_CONFIDENCE = 0.62;
+  private readonly AGENT_CLARIFY_CONFIDENCE = 0.42;
 
   // Simple cache for query understanding to improve performance
   private queryCache = new Map<string, any>();
@@ -320,6 +325,52 @@ export class RagService {
     return msg;
   }
 
+  private isSensitiveInternalRequest(question: string): boolean {
+    const q = (question || '').toLowerCase();
+    if (!q) return false;
+    return /\b(secret|internal|system\s*prompt|database\s*schema|db\s*schema|query\s*logic|sql\s*logic|table\s*structure|ignore\s+previous|bypass\s+rules|hidden\s+rules)\b/.test(q);
+  }
+
+  private isStudentSelfAssessmentQuestion(question: string, userRole: string): boolean {
+    if ((userRole || '').toUpperCase() !== 'STUDENT') return false;
+    const q = (question || '').toLowerCase();
+    if (!q) return false;
+
+    const hasSelfRef = /\b(my|me|mine|i\s+am|for\s+me)\b/.test(q);
+    const hasAssessmentRef = /\b(assessment|score|result|personality|trait|style|latest|agile)\b/.test(q);
+    return hasSelfRef && hasAssessmentRef;
+  }
+
+  private shouldPromptClarification(question: string, confidence: number): boolean {
+    if (confidence < this.AGENT_CLARIFY_CONFIDENCE || confidence >= this.AGENT_ACCEPT_CONFIDENCE) return false;
+    const q = (question || '').toLowerCase().trim();
+    const tokenCount = q.split(/\s+/).filter(Boolean).length;
+    if (tokenCount <= 4) return true;
+    if (/\b(it|this|that|them|those|their|these|details|info|data)\b/.test(q)) return true;
+    if (/\?$/.test(q) && tokenCount <= 7) return true;
+    return false;
+  }
+
+  private buildClarificationResult(question: string): QueryResult {
+    return {
+      answer: 'I can help with that. Please clarify exactly what you want so I can return precise results.',
+      searchType: 'clarification_required',
+      confidence: 0.55,
+      needsClarification: true,
+      clarifyingQuestion: 'Do you want a count, a list, a specific person profile, or a summary report?',
+      suggestions: [
+        'Show count of candidates',
+        'List top 10 candidates',
+        'Show profile for [full name]',
+        'Generate report for [full name]',
+      ],
+      sources: {
+        reason: 'Agent confidence was moderate and query looked ambiguous',
+        originalQuestion: question,
+      },
+    };
+  }
+
   private compactRoutingHistory(history: string): string {
     if (!history) return '';
     const normalized = history
@@ -350,11 +401,13 @@ export class RagService {
     if (!this.llm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+      const ragModel = process.env.GEMINI_RAG_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
+      const ragMaxTokens = Math.max(180, Number(process.env.RAG_MAX_OUTPUT_TOKENS || 500));
       this.llm = new ChatGoogleGenerativeAI({
         apiKey,
-        model: 'gemini-2.5-flash',
+        model: ragModel,
         temperature: 0,
-        maxOutputTokens: 600,
+        maxOutputTokens: ragMaxTokens,
         callbacks: [getTokenTrackerCallback('RAG Service')],
       });
     }
@@ -365,12 +418,13 @@ export class RagService {
     if (!this.fallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+      const ragMaxTokens = Math.max(180, Number(process.env.RAG_MAX_OUTPUT_TOKENS || 500));
       this.fallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
         temperature: 0,
         timeout: 15000,
-        maxTokens: 600,
+        maxTokens: ragMaxTokens,
         callbacks: [getTokenTrackerCallback('RAG Service (Groq Fallback)')],
       });
     }
@@ -571,9 +625,15 @@ export class RagService {
     // ═══════════════════════════════════════════════════════════════
     if (mode === 'counsellor') {
       const normalizedCounsellorQ = this.normalizeQuery(question).toLowerCase();
+      if (this.isLikelyJDCandidateMatchingQuery(question)) {
+        this.logger.log('🎯 Counsellor override: routing JD prompt to candidate matching');
+        return await this.handleJDCandidateMatch(question, user);
+      }
+
       const isCounsellorDataRequest =
-        /\b(list|show|get|count|how many|total|top|best|who)\b/i.test(normalizedCounsellorQ) &&
-        /\b(user|users|candidate|candidates|resource|resources|employee|employees|staff|member|members|result|results|score|scores|assessment|assessments|company|companies|corporate|group|groups|batch|batches)\b/i.test(normalizedCounsellorQ);
+        (/\b(list|show|get|count|how many|total|top|best|who|find|match|identify|suggest|recommend)\b/i.test(normalizedCounsellorQ) ||
+          /\b(suitable|suited|fit|eligible|matching)\b/i.test(normalizedCounsellorQ)) &&
+        /\b(user|users|candidate|candidates|resource|resources|employee|employees|staff|member|members|result|results|score|scores|assessment|assessments|company|companies|corporate|group|groups|batch|batches|role|roles|job|position|jd|description)\b/i.test(normalizedCounsellorQ);
 
       if (!isCounsellorDataRequest) {
         this.logger.log('🎓 AI Counsellor mode activated — premium career guidance');
@@ -655,6 +715,32 @@ export class RagService {
       // This runs BEFORE intent classification to fix user input
       // ═══════════════════════════════════════════════════════════════
       question = this.normalizeQuery(question);
+
+      if (this.isExplicitListAllCandidatesQuery(question)) {
+        this.logger.log('🎯 Direct routing: list all candidates (deterministic full list)');
+        const interpretation = {
+          intent: 'list_candidates',
+          searchTerm: null,
+          table: 'registrations',
+          includePersonality: false,
+          includeAll: true,
+        };
+        const totalCount = await this.getTotalCount(interpretation, user as UserContext);
+        const data = await this.executeQuery(interpretation, user as UserContext, 0);
+        const answer = this.formatResponse(interpretation, data, 0, totalCount);
+        return {
+          answer,
+          searchType: 'list_candidates',
+          sources: { rows: data.length, total: totalCount },
+          confidence: 0.99,
+        };
+      }
+
+      // Direct JD routing avoids agentic generic advice and returns ranked candidate format.
+      if (this.isLikelyJDCandidateMatchingQuery(question)) {
+        this.logger.log('🎯 Direct routing: jd_candidate_match (pre-agent)');
+        return await this.handleJDCandidateMatch(question, user);
+      }
 
       this.logger.log('🔄 No bypass match, proceeding to LLM understanding...');
 
@@ -857,6 +943,42 @@ export class RagService {
         };
       }
 
+      // Security guard: never disclose internal schema/prompt/query-logic instructions.
+      if (this.isSensitiveInternalRequest(resolvedQuestion)) {
+        return {
+          answer: 'I cannot share internal system details. I can help with allowed business and career questions using your permitted data scope.',
+          searchType: 'security_refusal',
+          confidence: 0.98,
+        };
+      }
+
+      // Force student self-assessment questions to self_results path to avoid person-lookup misrouting.
+      if (this.isStudentSelfAssessmentQuestion(resolvedQuestion, userRole)) {
+        const selfInterpretation = {
+          intent: 'self_results',
+          searchTerm: null,
+          table: 'assessment_attempts',
+          includePersonality: true,
+        };
+
+        const selfData = await this.executeQuery(selfInterpretation, user as UserContext, 0);
+        if (!selfData || (Array.isArray(selfData) && selfData.length === 0)) {
+          return {
+            answer: `You don't have any completed assessments yet. Complete an assessment to see your results here.`,
+            searchType: 'self_results',
+            confidence: 0.9,
+          };
+        }
+
+        const selfAnswer = this.formatResponse(selfInterpretation, selfData, 0);
+        return {
+          answer: selfAnswer,
+          searchType: 'self_results',
+          sources: { rows: Array.isArray(selfData) ? selfData.length : 1 },
+          confidence: 0.95,
+        };
+      }
+
       // ═══════════════════════════════════════════════════════════════
       // 🤖 AGENTIC RAG — LLM-based tool selection (v3.0)
       // The agent dynamically selects 1-3 tools, runs them in parallel,
@@ -872,7 +994,7 @@ export class RagService {
           routingHistory,
         );
 
-        if (agentResult && agentResult.confidence > 0.3) {
+        if (agentResult && agentResult.confidence >= this.AGENT_ACCEPT_CONFIDENCE) {
           this.logger.log(`✅ Agentic RAG succeeded: tools=[${agentResult.toolsUsed.join('+')}] confidence=${agentResult.confidence} plan=${agentResult.planningTimeMs}ms exec=${agentResult.executionTimeMs}ms`);
 
           // Persist disambiguation context produced by Agentic person lookup so bare-number follow-ups work.
@@ -917,7 +1039,13 @@ export class RagService {
             searchType: agentResult.searchType,
             confidence: agentResult.confidence,
             sources: agentResult.sources,
+            evidence: agentResult.evidence,
           };
+        }
+
+        if (agentResult && this.shouldPromptClarification(resolvedQuestion, agentResult.confidence)) {
+          this.logger.log(`🧭 Agentic RAG moderate confidence (${agentResult.confidence}) — asking clarification`);
+          return this.buildClarificationResult(resolvedQuestion);
         }
 
         this.logger.log(`🔄 Agentic RAG low confidence (${agentResult?.confidence}) — falling back to legacy routing`);
@@ -3254,9 +3382,9 @@ export class RagService {
     const shortRolePattern = /(?:best|top|ideal)\s+(?:candidates?|performer|person|employee|resource|member)s?\s+(?:for|to)\s*[:\-]?\s*([\s\S]+)/i;
     const shortMatch = message.match(shortRolePattern);
     if (shortMatch && shortMatch[1] && shortMatch[1].trim().length > 3) {
-      // Return the role name as a JD prompt for the LLM to understand
+      // Preserve explicit user preferences instead of collapsing to generic leadership defaults.
       const role = shortMatch[1].trim();
-      return `Find the best candidate for the role: ${role}. Required: strong behavioral traits, leadership potential, and personality fit for ${role}.`;
+      return `Role target: ${role}\nSelection preferences: ${message}\nUse explicitly stated behavioral traits, soft skills, and constraints from the request.`;
     }
 
     // Try to extract JD after common prefixes
@@ -3271,8 +3399,17 @@ export class RagService {
 
     for (const pattern of prefixPatterns) {
       const match = message.match(pattern);
-      if (match && match[1] && match[1].trim().length > 15) {
-        return match[1].trim();
+      if (match && match[1] && match[1].trim().length > 2) {
+        const extracted = match[1].trim();
+        const cleanedRole = extracted.replace(/^(the|a|an)\s+/i, '').trim();
+        const tokenCount = cleanedRole.split(/\s+/).filter(Boolean).length;
+
+        // If user gave a short role phrase, keep it as explicit role target.
+        if (tokenCount <= 8 && cleanedRole.length <= 80 && !/[\n]/.test(cleanedRole)) {
+          return `Role target: ${cleanedRole}\nSelection preferences: ${message}\nUse explicitly stated behavioral traits, soft skills, and constraints from the request.`;
+        }
+
+        return extracted;
       }
     }
 
@@ -3283,6 +3420,22 @@ export class RagService {
     }
 
     return message;
+  }
+
+  private isLikelyJDCandidateMatchingQuery(message: string): boolean {
+    const q = this.normalizeQuery(message).toLowerCase();
+    return (
+      /\b(find|match|identify|list|show|get|who)\b.*\b(candidates?|cnadidates?|canditates?|people|students?|employees?|resources?)\b.*\b(for|matching|suitable|suited|suit|suits|sute|sutes|fit|eligible)\b/.test(q) ||
+      /\b(candidates?|cnadidates?|canditates?|people|students?|employees?|resources?)\b\s+(for|matching|suitable\s+for|suited\s+for|fit\s+for|sute\s+for|sutes\s+for)\b/.test(q) ||
+      /\b(job\s*description|\bjd\b)\b/.test(q) ||
+      /\b(best|top|ideal)\s+(candidates?|people|students?|employees?|resources?)\s+(for|to)\b/.test(q)
+    );
+  }
+
+  private isExplicitListAllCandidatesQuery(message: string): boolean {
+    const q = this.normalizeQuery(message).toLowerCase();
+    return /\b(list|show|get|display)\b\s+\b(all|complete|entire)\b\s+\b(candidates?|students?|employees?|resources?)\b/.test(q) ||
+      /^\s*all\s+(candidates?|students?|employees?|resources?)\s*\??\s*$/.test(q);
   }
 
   private async executeDatabaseQuery(sql: string, params: any[] = []): Promise<any[]> {
@@ -3333,82 +3486,38 @@ export class RagService {
       : userRole === 'CORPORATE' ? 'CORPORATE(company-scoped)'
         : 'STUDENT(personal only)';
 
-    const prompt = `You are the intent classifier for Ask BI (OriginBI's AI talent intelligence assistant). Classify user questions into the correct intent for routing.
+    const prompt = `Classify Ask BI user query to one intent.
 
-User role: ${roleHint}
-${conversationHistory ? `\n${conversationHistory}\n` : ''}
-Output JSON: {"intent":"...","searchTerm":"...or null","table":"...","includePersonality":bool}
+  User role: ${roleHint}
+  ${conversationHistory ? `Conversation context: ${conversationHistory}\n` : ''}
 
-AUTO-CORRECTION (CRITICAL):
-Before classifying, mentally correct obvious misspellings and interpret user intent:
-- "candiate"/"candidte"/"canidate" = candidate
-- "employe"/"emploee"/"emplyee" = employee (which means candidate in this platform)
-- "fir" in context like "fir for" = "fit for"
-- "resourse" = resource (which means candidate)
-- In corporate context: employee = resource = staff = member = worker = candidate (all refer to registrations table)
-- "my employee" / "my resource" / "my staff" = asking about their candidates → list_candidates
-- "know about my employee" = list_candidates (NOT person_lookup)
-- "list of [misspelled word similar to candidate]" = list_candidates
+  Return STRICT JSON only:
+  {"intent":"...","searchTerm":null|"name","table":"...","includePersonality":true|false}
 
-INTENTS (choose the MOST SPECIFIC one):
-- data_query: **USE THIS for ANY complex, analytical, or flexible data question** that doesn't fit a specific intent below. Examples: "female candidates who scored above 80", "average score by personality type", "candidates who completed last week", "gender distribution", "score range breakdown", "which departments have the most candidates", "compare scores between groups". This intent powers dynamic SQL generation and can answer virtually ANY database question.
-- general_knowledge: ANY question about skills, technologies, career advice, how-to guides, courses, learning, salaries, job markets, comparisons, explanations, tips, tutorials, roadmaps, programming concepts, or general world knowledge. This is the DEFAULT for any question that does NOT require looking up specific platform data.
-- career_guidance: Personal career advice ("what jobs suit ME", "am I eligible", "should I try X")
-- personal_info: "my name", "my profile", "who am I" (user asking about their own stored data)
-- self_results: User asking about THEIR OWN results/scores/data ("my results", "my score", "show my test", "my details", "my assessment")
-- jd_candidate_match: User provides a job description, role description, or hiring criteria and wants to find/match/identify suitable candidates from the platform's assessment data.
-- greeting: hi, hello, hey
-- help: what can you do
-- list_users: ONLY for listing platform users from the "users" table (NOT affiliates, NOT candidates)
-- list_candidates: For listing candidates/students/registrations OR when user asks about "my employees"/"my resources"/"my staff"/"my team"/"my people" — these ALL mean candidates in the registrations table
-- test_results: ONLY when asking for assessment scores/exam results from the platform
-- person_lookup: ONLY when asking about a SPECIFIC named person's data in the system (e.g. "show John's score"). The searchTerm MUST be an actual human name, NEVER a domain word like "employee", "candidate", "development", etc.
-- best_performer: "top performer", "highest score", "best candidates"
-- career_roles: ONLY for listing job roles stored in the platform database
-- career_report: generate career report for someone
-- overall_report: overall/placement/group report
-- custom_report: career fitment report (with user profile data)
-- chat_profile_report: message contains structured fields like "Name:", "Current Role:", "Experience:"
-- count: "how many users/candidates"
-- count_by_role: "how many corporate/admin/student accounts" (role-based user breakdown)
-- corporate_details: Listing corporate/company accounts, corporate details, company info, "list corporates", "show corporate accounts", "corporate details", "list those details" (when conversation context is about corporates). If user is CORPORATE, show ONLY their own company details.
-- affiliate_dashboard: Affiliate program overview/stats
-- affiliate_referrals: Referral transactions
-- affiliate_earnings: Affiliate commissions/earnings
-- affiliate_payments: Affiliate settlements/payment history
-- affiliate_list: List all affiliate accounts
-- affiliate_lookup: Look up a specific affiliate by name
-- affiliate_students: Students referred by affiliate(s)
+  Intents:
+  - data_query (filters, comparisons, aggregates, trends, multi-criteria DB questions)
+  - general_knowledge (skills, careers, explanations, tutorials, non-platform info)
+  - career_guidance, personal_info, self_results, jd_candidate_match
+  - greeting, help, list_users, list_candidates, test_results, person_lookup, best_performer
+  - career_roles, career_report, overall_report, custom_report, chat_profile_report
+  - count, count_by_role, corporate_details
+  - affiliate_dashboard, affiliate_referrals, affiliate_earnings, affiliate_payments, affiliate_list, affiliate_lookup, affiliate_students
 
-Tables: users|registrations|assessment_attempts|career_roles|corporate_accounts|affiliate_accounts|affiliate_referral_transactions|affiliate_settlement_transactions|groups|group_assessments|programs|none
+  Tables:
+  users|registrations|assessment_attempts|career_roles|corporate_accounts|affiliate_accounts|affiliate_referral_transactions|affiliate_settlement_transactions|groups|group_assessments|programs|none
 
-DOMAIN SYNONYMS:
-- "batch" = group (groups table). A batch/group contains candidates.
-- "program" = assessment program (programs table). Groups are assigned to programs via group_assessments.
-- "summarize batch X" / "batch summary" / "group report" → data_query with table=groups
-- "list programs" / "program overview" → data_query with table=programs
-- "School Students Program" is a PROGRAM NAME, not a person name
+  Hard rules:
+  1) Misspellings/synonyms: employees/resources/staff/team/people/candidates/students -> registrations context.
+  2) Any analytical DB ask -> data_query.
+  3) Learning/how-to/explain/skills/career-market ask -> general_knowledge.
+  4) person_lookup only for a real human name; otherwise searchTerm=null.
+  5) includePersonality=true for self_results, person_lookup, test_results, best_performer, career_report, overall_report, custom_report, jd_candidate_match, data_query.
+  6) Affiliate keywords (affiliate/referral/commission/settlement/payout) -> affiliate_* intent.
+  7) Batch/group/program summaries -> data_query (never person_lookup).
+  8) Corporate/company account listings/details -> corporate_details.
 
-CRITICAL RULES:
-1. If someone asks "what are the skills to become X" or "how to become X" or "best courses for X" or "explain X" → general_knowledge (NOT list_users, NOT career_roles)
-2. general_knowledge should be used for ANY educational, informational, or advisory question
-3. **DOMAIN PRIORITY**: If the query mentions "affiliate", "referral", "commission", "settlement", or "payout", it MUST route to an affiliate_* intent
-4. **DATA QUERY PRIORITY**: If the question involves filtering, comparing, aggregating, or analyzing data from the platform (scores, dates, gender, personality types, etc.), use data_query to leverage dynamic SQL generation. Examples that MUST be data_query: "female candidates above 80 score", "average score", "personality distribution", "candidates completed this month", "score comparison between personality types"
-5. list_users/list_candidates should ONLY be used when the user EXPLICITLY asks to list platform users/candidates WITHOUT filtering, analysis, or specific criteria
-6. career_roles should ONLY be used when asking to list the career roles stored in the DATABASE
-7. If the question is analytical or requires combining multiple filters → data_query
-8. If the question is purely educational/advisory with no DB data needed → general_knowledge
-9. **searchTerm MUST be null unless the query mentions a specific human person's name (first name + optional last name). NEVER put domain words like "employee", "candidate", "resource", "full stack development", "my employee" as searchTerm.**
-10. includePersonality=true for: test_results, self_results, person_lookup, best_performer, career_report, overall_report, custom_report, jd_candidate_match, data_query
-11. If conversation history is provided, use it to resolve follow-up references like "her", "him", "that person", "their report"
-12. All affiliate_* intents are ADMIN-ONLY
-13. **"candidates for [role]" or "candidate's for [role]" = the user wants to find/match candidates for that role → jd_candidate_match or list_candidates, NEVER person_lookup**
-14. **CORPORATE DATA**: "list corporates", "corporate details", "company accounts", "show companies" → corporate_details. If conversation previously mentioned corporates/companies and user says "list those details" or "show details" → corporate_details
-15. **FOLLOW-UP CONTEXT**: When conversation history mentions a topic (e.g., corporate accounts, candidates), follow-up like "list those", "show details", "tell me more" should route to the same topic's intent
-16. **BATCH/GROUP/PROGRAM queries**: "summarize batch X", "group summary", "strengths of batch X", "readiness levels for group", "list groups/batches", "program summary", "principal version report for program X", "School Students Program" → data_query. NEVER treat program/batch/group names like "School Students Program" or "KIOTstudents" as person names.
-
-Query: "${question}"
-JSON:`;
+  Query: "${question}"
+  JSON:`;
 
     try {
       const startTime = Date.now();
@@ -4516,6 +4625,11 @@ JSON:`;
     // because they are identity/context-sensitive and stale cache causes wrong answers.
     if (/\bwhat is my name\b|\bwho am i\b|\bmy email\b|\bmy profile\b|\bmy account\b/.test(q)) return true;
     if (/\breport\b|\bprofile\b|\bdetails\b|\bresults\b/.test(q) && /\b(my|for|about)\b|^[a-z][a-z\s.'-]{1,40}\s+report\b/.test(q)) return true;
+    if (/\bmy organization\b|\bmy team\b|\bmy assessment\b|\bmy score\b|\bmy results\b|\blatest\b/.test(q)) return true;
+    if (/\b(secret|internal|schema|query logic|system prompt|bypass)\b/.test(q)) return true;
+    if (/\b(also|and)\b/.test(q) && /\b(my|their|those|these|him|her|team|organization)\b/.test(q)) return true;
+    if (/\band\s+also\b|\balso\b/.test(q)) return true;
+    if (/\bcompare\b/.test(q) && /\bsuggest|recommend|improve\b/.test(q)) return true;
 
     return false;
   }
@@ -5028,6 +5142,7 @@ JSON:`;
       searchTerm: string | null;
       table: string;
       includePersonality: boolean;
+      includeAll?: boolean;
     },
     user?: UserContext,
     offset: number = 0
@@ -5038,7 +5153,7 @@ JSON:`;
     const userRole = user?.role || 'STUDENT';
     const corporateId = user?.corporateId;
     const userId = user?.id;
-    const limit = this.PAGE_SIZE;
+    const limit = interpretation.includeAll ? 5000 : this.PAGE_SIZE;
 
     this.logger.log(`🔒 RBAC: role=${userRole}, corporateId=${corporateId || 'N/A'}, userId=${userId} | page offset=${offset}`);
 
@@ -5120,10 +5235,10 @@ JSON:`;
             personality_traits.blended_style_desc as behavior_description,
             programs.name as program_name,
             (SELECT COUNT(*) FROM assessment_answers WHERE assessment_attempt_id = assessment_attempts.id) as total_questions,
-            (SELECT COUNT(*) FROM assessment_answers WHERE assessment_attempt_id = assessment_attempts.id AND status = 'ANSWERED') as answered_questions,
-            (SELECT COALESCE(SUM(answer_score), 0) FROM assessment_answers WHERE assessment_attempt_id = assessment_attempts.id) as total_answer_score,
+            (SELECT COUNT(*) FROM assessment_answers WHERE assessment_attempt_id = assessment_attempts.id) as answered_questions,
+            NULL::numeric as total_answer_score,
             (SELECT COALESCE(SUM(time_spent_seconds), 0) FROM assessment_answers WHERE assessment_attempt_id = assessment_attempts.id) as total_time_spent_seconds,
-            (SELECT COUNT(*) FROM assessment_answers WHERE assessment_attempt_id = assessment_attempts.id AND answer_score > 0) as correct_answers
+            NULL::int as correct_answers
           FROM assessment_attempts
           JOIN registrations ON assessment_attempts.registration_id = registrations.id
           LEFT JOIN personality_traits ON assessment_attempts.dominant_trait_id = personality_traits.id

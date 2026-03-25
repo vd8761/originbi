@@ -229,6 +229,9 @@ export interface RagResponse {
   sql?: string;
   confidence?: number;
   suggestions?: string[];
+  evidence?: any;
+  needsClarification?: boolean;
+  clarifyingQuestion?: string;
   reportId?: string;
 }
 

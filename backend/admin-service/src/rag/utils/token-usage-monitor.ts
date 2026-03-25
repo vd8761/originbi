@@ -28,7 +28,7 @@ export class TokenUsageMonitor implements OnModuleInit {
     CONTEXT_WINDOW: 1000000,
     MAX_OUTPUT_TOKENS: 8192,
     EMBEDDINGS_MODEL: 'gemini-embedding-001',
-    LLM_MODEL: 'gemini-2.5-flash',
+    LLM_MODEL: process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash',
   };
 
   // ═══════════════════════════════════════════════════════════════
