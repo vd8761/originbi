@@ -31,6 +31,11 @@ export class SyncService implements OnModuleInit, OnModuleDestroy {
   ) { }
 
   async onModuleInit() {
+    if (process.env.DISABLE_RAG_AUTO_SYNC === 'true') {
+      this.logger.log('⏸️ Auto-sync disabled by DISABLE_RAG_AUTO_SYNC=true');
+      return;
+    }
+
     // Initial sync after 1 minute (let app fully start)
     setTimeout(() => this.runSync(), 60000);
 
