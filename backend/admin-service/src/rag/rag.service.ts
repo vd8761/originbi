@@ -863,6 +863,20 @@ export class RagService {
       // and synthesizes a unified response. Falls back to legacy intent
       // routing if the agent fails.
       // ═══════════════════════════════════════════════════════════════
+      if (this.isJDCandidateMatchRequest(resolvedQuestion)) {
+        this.logger.log('JD candidate match detected before agent routing');
+        const jdResult = await this.handleJDCandidateMatch(resolvedQuestion, user);
+
+        this.conversationService.addUserMessage(sessionId, question, 'jd_candidate_match', []);
+        this.conversationService.addBiResponse(
+          sessionId,
+          jdResult.answer.slice(0, 500),
+          jdResult.searchType,
+        );
+
+        return jdResult;
+      }
+
       try {
         this.logger.log('🤖 Attempting Agentic RAG tool selection...');
         const agentResult = await this.agentOrchestrator.agentQuery(
@@ -4516,8 +4530,24 @@ JSON:`;
     // because they are identity/context-sensitive and stale cache causes wrong answers.
     if (/\bwhat is my name\b|\bwho am i\b|\bmy email\b|\bmy profile\b|\bmy account\b/.test(q)) return true;
     if (/\breport\b|\bprofile\b|\bdetails\b|\bresults\b/.test(q) && /\b(my|for|about)\b|^[a-z][a-z\s.'-]{1,40}\s+report\b/.test(q)) return true;
+    if (this.isJDCandidateMatchRequest(q)) return true;
 
     return false;
+  }
+
+  private isJDCandidateMatchRequest(question: string): boolean {
+    const q = this.normalizeQuery(question || '').toLowerCase().trim();
+    if (!q || q.length < 12) return false;
+
+    return (
+      /\b(find|match|search|identify|list|show|get|recommend)\b.*\b(candidates?|profiles?|people|users?|students?|resources?|employees?)\b.*\b(for|matching|suited\s+for|fit\s+for|based\s+on)\b/i.test(q) ||
+      /\b(suitable|best|ideal|right|matching)\s+(candidates?|profiles?|people|users?|students?|resources?|employees?)\s+(for|to)\b/i.test(q) ||
+      /\bwho\s+(is|are)\s+(best\s+)?(suitable|fit|suited|right|ideal)\s+(for|candidate)\b/i.test(q) ||
+      /\b(match|find)\s+(candidates?|profiles?|people|users?|students?|resources?|employees?)\s+(for|to|based\s+on)\s+.*\b(role|position|job|description|skills?)\b/i.test(q) ||
+      /\b(job\s*description|jd)\b/i.test(q) ||
+      /\bcandidates?\s+(for|matching|suited\s+for)\s*[:\-]?\s*.{15,}/i.test(q) ||
+      /\bprofiles?\s+(for|matching|suited\s+for)\s*[:\-]?\s*.{15,}/i.test(q)
+    );
   }
 
   /**

@@ -1515,6 +1515,9 @@ Output ONLY a JSON array:
       response += `🔑 **Core Competencies:** ${competencies.join(' · ')}\n\n`;
     }
 
+    response += `📐 **Evaluation Basis:** Behavioral alignment (35%) · Agile readiness (25%) · Trait-role fit (25%) · Reliability/sincerity (15%)\n`;
+    response += `Uses completed student assessments, DISC personality style, agile score, team-fit signals, and role-level calibration.\n\n`;
+
     // ── Summary Stats ──
     response += `📊 **${result.totalCandidatesEvaluated}** candidates evaluated → **${result.matchedCandidates.length}** top matches\n`;
     const tierSummary: string[] = [];
