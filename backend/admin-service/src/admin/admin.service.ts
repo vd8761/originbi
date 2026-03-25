@@ -115,15 +115,6 @@ export class AdminService {
       .startOf('month')
       .toDate();
 
-    const corporateRevenue = await this.creditLedgerRepo
-      .createQueryBuilder('l')
-      .select("DATE_TRUNC('month', l.paid_on)", 'month')
-      .addSelect('SUM(l.total_amount)', 'amount')
-      .where("l.payment_status IN ('PAID', 'SUCCESS')")
-      .andWhere('l.paid_on >= :twelveMonthsAgo', { twelveMonthsAgo })
-      .groupBy('month')
-      .getRawMany();
-
     const individualRevenue = await this.registrationRepo
       .createQueryBuilder('r')
       .select("DATE_TRUNC('month', r.paid_at)", 'month')
@@ -140,16 +131,6 @@ export class AdminService {
 
     const trendMap = new Map<string, number>();
     months.forEach((m) => trendMap.set(m, 0));
-
-    corporateRevenue.forEach((item) => {
-      const monthLabel = dayjs(item.month).format('MMM YYYY');
-      if (trendMap.has(monthLabel)) {
-        trendMap.set(
-          monthLabel,
-          trendMap.get(monthLabel)! + (parseFloat(item.amount) || 0),
-        );
-      }
-    });
 
     individualRevenue.forEach((item) => {
       const monthLabel = dayjs(item.month).format('MMM YYYY');

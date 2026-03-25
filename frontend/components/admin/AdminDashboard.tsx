@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { AffiliateSettlementModal } from "./AffiliateSettlementModal";
 import { capitalizeWords } from "../../lib/utils";
 import { api } from "../../lib/api";
+import { useTheme } from "../../contexts/ThemeContext";
 import {
   LineChart,
   Line,
@@ -81,7 +82,7 @@ const UserDistributionDonut = ({ data }: { data: UserDistributionData }) => {
               <span className="w-2.5 h-6 rounded-full" style={{ backgroundColor: trait.colorRgb || FALLBACK_COLORS[i] }}></span>
               <span className="font-bold text-2xl text-[#19211C] dark:text-white leading-none">{trait.count}</span>
             </div>
-            <span className="text-[13px] font-bold text-[#111812] dark:text-white opacity-60 pl-6 leading-tight whitespace-nowrap tracking-wide uppercase">{trait.traitName}</span>
+            <span className="text-[15px] font-bold text-[#111812] dark:text-white/90 pl-6 leading-tight whitespace-nowrap tracking-wide uppercase">{trait.traitName}</span>
           </div>
         ))}
       </div>
@@ -148,6 +149,8 @@ const AdminDashboard: React.FC = () => {
   // Settlement Modal State
   const [settlementModalOpen, setSettlementModalOpen] = useState(false);
   const [selectedAffiliate, setSelectedAffiliate] = useState<any | null>(null);
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
 
   const fetchStats = async () => {
     try {
@@ -298,8 +301,8 @@ const AdminDashboard: React.FC = () => {
                               {capitalizeWords(aff.name)}
                             </h4>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Ready:</span>
-                              <span className="text-[#1ED36A] font-bold text-xs tracking-tight">
+                              <span className="text-[12px] text-gray-500 dark:text-gray-400 font-medium">Ready:</span>
+                              <span className="text-[#1ED36A] font-bold text-sm tracking-tight">
                                 {formatCurrency(aff.amount)}
                               </span>
                             </div>
@@ -343,25 +346,45 @@ const AdminDashboard: React.FC = () => {
                           <stop offset="95%" stopColor="#1ED36A" stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" opacity={0.5} />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "rgba(255, 255, 255, 0.05)" : "#E0E0E0"} />
                       <XAxis
                         dataKey="month"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: '#19211C', fontSize: 10, opacity: 0.6 }}
+                        tick={{ fill: isDark ? "#FFFFFF" : "#19211C", fontSize: 13, fontWeight: 500 }}
+                        dy={10}
                       />
                       <YAxis
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: '#19211C', fontSize: 10, opacity: 0.6 }}
-                        tickFormatter={(val) => `₹${val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val}`}
+                        tick={{ fill: isDark ? "#FFFFFF" : "#19211C", fontSize: 13, fontWeight: 500 }}
+                        tickFormatter={(val) => {
+                          if (val >= 100000) return `₹${(val / 100000).toFixed(val % 100000 === 0 ? 0 : 1)}L`;
+                          if (val >= 1000) return `₹${(val / 1000).toFixed(0)}k`;
+                          return `₹${val}`;
+                        }}
                       />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                          borderRadius: '12px',
-                          border: 'none',
-                          boxShadow: '0 8px 16px rgba(0,0,0,0.1)'
+                          backgroundColor: isDark ? "#242C27" : "rgba(255, 255, 255, 0.95)",
+                          borderRadius: '16px',
+                          border: isDark ? "1px solid rgba(255, 255, 255, 0.1)" : "none",
+                          boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+                          padding: '12px 16px',
+                          backdropFilter: 'blur(8px)',
+                        }}
+                        itemStyle={{
+                          color: "#1ED36A",
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                          padding: '0'
+                        }}
+                        labelStyle={{
+                          color: isDark ? "#FFFFFF" : "#19211C",
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          marginBottom: '6px',
+                          opacity: 0.8
                         }}
                         formatter={(val: any) => [formatCurrency(val || 0), 'Revenue']}
                       />
