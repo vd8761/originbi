@@ -297,7 +297,7 @@ export class JDMatchingService {
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
       this.llm = new ChatGoogleGenerativeAI({
         apiKey,
-        model: 'gemini-2.5-flash',
+          model: process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash',
         temperature: 0.1, // Very low temp for deterministic extraction
         maxOutputTokens: 1024,
         callbacks: [getTokenTrackerCallback('JD Matching')],
@@ -357,9 +357,12 @@ export class JDMatchingService {
       options.corporateId,
       options.groupId,
     );
-    this.logger.log(`   ✅ Found ${candidates.length} candidates with assessment data`);
+    const uniqueCandidates = Array.from(
+      new Map(candidates.map((c) => [c.registrationId, c])).values(),
+    );
+    this.logger.log(`   ✅ Found ${uniqueCandidates.length} candidates with assessment data`);
 
-    if (candidates.length === 0) {
+    if (uniqueCandidates.length === 0) {
       return {
         jobDescription,
         parsedRequirements: requirements,
@@ -374,7 +377,7 @@ export class JDMatchingService {
     this.logger.log('🧮 Layer 3: Scoring candidates...');
     const scoredCandidates: ScoredCandidate[] = [];
 
-    for (const candidate of candidates) {
+    for (const candidate of uniqueCandidates) {
       const scored = this.scoreCandidate(candidate, requirements);
       if (scored.compositeScore >= minScore) {
         scoredCandidates.push(scored);
@@ -407,7 +410,7 @@ export class JDMatchingService {
     return {
       jobDescription,
       parsedRequirements: requirements,
-      totalCandidatesEvaluated: candidates.length,
+      totalCandidatesEvaluated: uniqueCandidates.length,
       matchedCandidates: topCandidates,
       executionTimeMs,
       algorithmVersion: '1.0.0-alpha',
@@ -506,12 +509,16 @@ RULES:
       const jsonStr = response.content.toString().trim();
       const cleanJson = jsonStr.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
       const parsed = JSON.parse(cleanJson) as JDRequirements;
+      const fallback = this.fallbackJDParsing(jd);
+      const normalizedTraits = this.normalizeTraitRequirements(parsed.requiredTraits || []);
+      const inferredRole = this.inferRoleTitleFromText(jd);
+      const normalizedRole = this.normalizeRoleTitle(parsed.roleTitle);
 
       // Validate and fill defaults
       return {
-        roleTitle: parsed.roleTitle || 'Unknown Role',
+        roleTitle: inferredRole || normalizedRole || fallback.roleTitle,
         seniorityLevel: parsed.seniorityLevel || 'mid',
-        requiredTraits: parsed.requiredTraits || [],
+        requiredTraits: normalizedTraits.length > 0 ? normalizedTraits : fallback.requiredTraits,
         behavioralPatterns: parsed.behavioralPatterns || [],
         agileRequirement: parsed.agileRequirement || { minScore: 50, idealScore: 80, adaptabilityWeight: 0.5 },
         softSkills: parsed.softSkills || [],
@@ -528,6 +535,135 @@ RULES:
       // Fallback: basic extraction
       return this.fallbackJDParsing(jd);
     }
+  }
+
+  private normalizeRoleTitle(input?: string | null): string | null {
+    const raw = (input || '').trim();
+    if (!raw) return null;
+    if (/^unknown\s*role$/i.test(raw)) return null;
+    if (/^extracted\s*role$/i.test(raw)) return null;
+    return raw;
+  }
+
+  private inferRoleTitleFromText(jd: string): string | null {
+    const text = (jd || '').trim();
+    if (!text) return null;
+
+    const sanitizeRole = (raw: string): string | null => {
+      let role = (raw || '').trim();
+      role = role.replace(/^role\s*target\s*:\s*/i, '').trim();
+      role = role.replace(/^selection\s*preferences\s*:\s*/i, '').trim();
+      role = role.replace(/^(the|a|an)\s+/i, '').trim();
+      role = role.replace(/[.\-:;]+$/, '').trim();
+      role = role.replace(/^(list|show|get|find|match|identify|suggest|recommend)\b/i, '').trim();
+      role = role.replace(/^(candidates?|cnadidates?|canditates?|people|students?|employees?|resources?)\b/i, '').trim();
+      role = role.replace(/^(who\s+(?:suits?|fits?|is\s+suitable)\s+for\s+)/i, '').trim();
+      role = role.replace(/^(suitable|suited|fit|eligible)\s+for\s+/i, '').trim();
+      role = role.replace(/^(for|to)\s+/i, '').trim();
+      role = role.replace(/\s+/g, ' ').trim();
+      const wc = role.split(/\s+/).filter(Boolean).length;
+      if (!role || role.length < 2 || wc > 8) return null;
+      return role;
+    };
+
+    const patterns = [
+      /role\s*target\s*:\s*([^\n]+)/i,
+      /job\s*title\s*:\s*([^\n]+)/i,
+      /position\s*:\s*([^\n]+)/i,
+      /for\s+([^\n,.]+?)\s+(?:role|position)\b/i,
+      /\b(?:for|to)\s+([a-z0-9/&\-\s]{2,80})$/i,
+      /selection\s*preferences\s*:\s*([^\n]+)/i,
+    ];
+
+    for (const pattern of patterns) {
+      const m = text.match(pattern);
+      if (m && m[1]) {
+        const role = sanitizeRole(m[1]);
+        if (role) return role;
+      }
+    }
+
+    // Handle direct short role prompts such as "UI/UX" or "Data Analyst".
+    const compact = text.replace(/\s+/g, ' ').trim();
+    if (compact.length >= 2 && compact.length <= 80 && !/[\n]/.test(compact)) {
+      const role = sanitizeRole(compact);
+      if (role) return role;
+    }
+
+    return null;
+  }
+
+  private normalizeTraitRequirements(traits: TraitRequirement[]): TraitRequirement[] {
+    const byTrait = new Map<string, TraitRequirement>();
+
+    for (const trait of traits) {
+      const traitName = this.normalizeTraitName(trait?.traitName || '');
+      if (!traitName) continue;
+
+      const normalized: TraitRequirement = {
+        traitName,
+        importance: this.normalizeImportance(trait?.importance),
+        minLevel: this.normalizeLevel(trait?.minLevel),
+        description: trait?.description || `${traitName} is relevant for this role`,
+      };
+
+      const existing = byTrait.get(traitName);
+      if (!existing) {
+        byTrait.set(traitName, normalized);
+        continue;
+      }
+
+      const importanceRank: Record<TraitRequirement['importance'], number> = {
+        critical: 3,
+        important: 2,
+        nice_to_have: 1,
+      };
+      const levelRank: Record<TraitRequirement['minLevel'], number> = {
+        very_high: 4,
+        high: 3,
+        moderate: 2,
+        low: 1,
+      };
+
+      if (importanceRank[normalized.importance] > importanceRank[existing.importance]) {
+        existing.importance = normalized.importance;
+      }
+      if (levelRank[normalized.minLevel] > levelRank[existing.minLevel]) {
+        existing.minLevel = normalized.minLevel;
+      }
+      if (!existing.description && normalized.description) {
+        existing.description = normalized.description;
+      }
+    }
+
+    return Array.from(byTrait.values()).slice(0, 4);
+  }
+
+  private normalizeTraitName(input: string): TraitRequirement['traitName'] | null {
+    const value = (input || '').trim().toLowerCase();
+    if (!value) return null;
+
+    if (/\b(d|dominance|dominant|assertive|decisive|results[-\s]?driven|drive)\b/.test(value)) return 'Dominance';
+    if (/\b(i|influence|influential|persuasive|communication|communicator|networking)\b/.test(value)) return 'Influence';
+    if (/\b(s|steadiness|steady|supportive|patient|collaborative|stability)\b/.test(value)) return 'Steadiness';
+    if (/\b(c|compliance|compliant|analytical|detail[-\s]?oriented|precision|quality)\b/.test(value)) return 'Compliance';
+
+    return null;
+  }
+
+  private normalizeImportance(value?: string): TraitRequirement['importance'] {
+    const v = (value || '').toLowerCase();
+    if (/critical|must|mandatory|required|deal/.test(v)) return 'critical';
+    if (/nice|optional|bonus/.test(v)) return 'nice_to_have';
+    return 'important';
+  }
+
+  private normalizeLevel(value?: string): TraitRequirement['minLevel'] {
+    const v = (value || '').toLowerCase();
+    if (/very[_\s-]?high|extreme|expert/.test(v)) return 'very_high';
+    if (/high|strong/.test(v)) return 'high';
+    if (/low|basic/.test(v)) return 'low';
+    return 'moderate';
   }
 
   /** Fallback JD parsing when LLM fails */
@@ -559,7 +695,7 @@ RULES:
     }
 
     return {
-      roleTitle: 'Extracted Role',
+      roleTitle: this.inferRoleTitleFromText(jd) || 'Requested Role',
       seniorityLevel: /\b(senior|sr|lead|principal|director|vp|chief|head)\b/i.test(jd) ? 'senior' : 'mid',
       requiredTraits: traits,
       behavioralPatterns: [],
@@ -842,6 +978,7 @@ RULES:
 
     // Map DISC trait requirements to vector dimensions
     for (const trait of requirements.requiredTraits) {
+      const traitName = this.normalizeTraitName(trait.traitName) || trait.traitName;
       const levelValue = trait.minLevel === 'very_high' ? 95
         : trait.minLevel === 'high' ? 80
           : trait.minLevel === 'moderate' ? 60
@@ -853,7 +990,7 @@ RULES:
 
       const scaledValue = Math.min(100, Math.round(levelValue * importanceMultiplier));
 
-      switch (trait.traitName.toLowerCase()) {
+      switch (traitName.toLowerCase()) {
         case 'dominance':
           ideal.dominance = scaledValue;
           ideal.independence = Math.round(scaledValue * 0.85);
@@ -1103,21 +1240,26 @@ RULES:
    * Penalizes candidates with incomplete data to prevent false positives.
    */
   private calculateConfidenceMultiplier(candidate: CandidateProfile): number {
-    let confidence = 0.6; // Base confidence for having completed assessment
+    let confidence = 0.55; // Base confidence for having completed assessment
 
     // Has personality style = major boost
-    if (candidate.personalityStyle) confidence += 0.2;
+    if (candidate.personalityStyle) confidence += 0.15;
 
     // Has agile score
     if (candidate.totalScore !== null) confidence += 0.1;
 
     // Has sincerity data
-    if (candidate.sincerityIndex !== null || candidate.sincerityClass) confidence += 0.05;
+    if (candidate.sincerityIndex !== null || candidate.sincerityClass) confidence += 0.1;
+
+    // More attempts improve confidence in profile stability
+    if (candidate.attemptCount >= 3) confidence += 0.1;
+    else if (candidate.attemptCount >= 2) confidence += 0.07;
+    else if (candidate.attemptCount >= 1) confidence += 0.04;
 
     // Has name (completeness)
-    if (candidate.fullName && candidate.fullName !== 'Unknown') confidence += 0.05;
+    if (candidate.fullName && candidate.fullName !== 'Unknown') confidence += 0.04;
 
-    return Math.min(1.0, confidence);
+    return Math.min(0.98, confidence);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1361,7 +1503,7 @@ RULES:
 
   /** Helper: Get vector dimension by trait name */
   private getVectorDimension(vector: typeof DEFAULT_VECTOR, traitName: string): number {
-    const trait = traitName.toLowerCase();
+    const trait = (this.normalizeTraitName(traitName) || traitName).toLowerCase();
     if (trait.includes('dominance')) return vector.dominance;
     if (trait.includes('influence')) return vector.influence;
     if (trait.includes('steadiness')) return vector.steadiness;
@@ -1419,9 +1561,6 @@ RULES:
       rank: i + 1,
       name: sc.candidate.fullName,
       style: sc.candidate.personalityStyle || 'Unknown',
-      score: sc.compositeScore,
-      tier: sc.tier,
-      agileScore: sc.candidate.bestScore || sc.candidate.totalScore || 0,
       strengths: sc.matchReasons.join('; '),
       gaps: sc.developmentAreas.join('; '),
     }));
@@ -1433,7 +1572,7 @@ Key Requirements: ${requirements.softSkills.join(', ')}
 Industry: ${requirements.industryContext}
 
 CANDIDATES:
-${candidateSummaries.map(c => `${c.rank}. ${c.name} | Style: ${c.style} | Score: ${c.score}/100 | Tier: ${c.tier} | Agile: ${c.agileScore}/125
+${candidateSummaries.map(c => `${c.rank}. ${c.name} | Style: ${c.style}
    Strengths: ${c.strengths}
    Gaps: ${c.gaps}`).join('\n')}
 
@@ -1471,37 +1610,19 @@ Output ONLY a JSON array:
   // RESPONSE FORMATTING — Professional report for chat display
   // ═══════════════════════════════════════════════════════════════════════════
   formatMatchResultForChat(result: JDMatchResult): string {
-    if (result.matchedCandidates.length === 0) {
-      return `🎯 **Candidate Matching Report — ${result.parsedRequirements.roleTitle}**\n\n` +
-        `No candidates with completed assessments matched the specified criteria.\n\n` +
-        `**Position Details:**\n` +
-        `• Seniority: ${result.parsedRequirements.seniorityLevel}\n` +
-        `• Industry: ${result.parsedRequirements.industryContext}\n` +
-        `• Team: ${result.parsedRequirements.teamDynamic.replace(/_/g, ' ')}\n\n` +
-        `*Please ensure candidates have completed their behavioral assessments before running a match.*`;
-    }
-
     const req = result.parsedRequirements;
-    const strongCount = result.matchedCandidates.filter(c => c.tier === 'STRONG_FIT').length;
-    const goodCount = result.matchedCandidates.filter(c => c.tier === 'GOOD_FIT').length;
-    const moderateCount = result.matchedCandidates.filter(c => c.tier === 'MODERATE_FIT').length;
 
-    let response = `🎯 **Candidate Matching Report**\n`;
-    response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    if (result.matchedCandidates.length === 0) {
+      return `**Candidate Matching Report**\n\n` +
+        `**Role:** ${req.roleTitle}\n` +
+        `**Candidates Evaluated:** ${result.totalCandidatesEvaluated}\n\n` +
+        `No candidates with completed assessments matched the requested role criteria.`;
+    }
 
-    // ── Role Overview (only show known fields) ──
-    const isUnknown = (val: string) => !val || /^unknown$/i.test(val.trim());
-    if (!isUnknown(req.roleTitle)) {
-      const levelStr = !isUnknown(req.seniorityLevel) ? ` *(${req.seniorityLevel} level)*` : '';
-      response += `🏢 **Role:** ${req.roleTitle}${levelStr}\n`;
-    }
-    if (!isUnknown(req.industryContext)) {
-      response += `📍 **Industry:** ${req.industryContext}\n`;
-    }
-    if (!isUnknown(req.teamDynamic)) {
-      response += `👥 **Team:** ${req.teamDynamic.replace(/_/g, ' ')}\n`;
-    }
-    response += `\n`;
+    let response = `**Candidate Matching Report**\n\n`;
+    response += `**Role:** ${req.roleTitle}\n`;
+    response += `**Candidates Evaluated:** ${result.totalCandidatesEvaluated}\n`;
+    response += `**Top Matches Returned:** ${result.matchedCandidates.length}\n\n`;
 
     // ── Core Competencies ──
     const competencies: string[] = [];
@@ -1512,90 +1633,47 @@ Output ONLY a JSON array:
     if (req.softSkills.length > 0) competencies.push(...req.softSkills.slice(0, 3));
 
     if (competencies.length > 0) {
-      response += `🔑 **Core Competencies:** ${competencies.join(' · ')}\n\n`;
+      response += `**Core Competencies:** ${competencies.join(' · ')}\n\n`;
     }
-
-    // ── Summary Stats ──
-    response += `📊 **${result.totalCandidatesEvaluated}** candidates evaluated → **${result.matchedCandidates.length}** top matches\n`;
-    const tierSummary: string[] = [];
-    if (strongCount > 0) tierSummary.push(`🟢 ${strongCount} Strong`);
-    if (goodCount > 0) tierSummary.push(`🔵 ${goodCount} Good`);
-    if (moderateCount > 0) tierSummary.push(`🟡 ${moderateCount} Moderate`);
-    if (tierSummary.length > 0) response += `${tierSummary.join('  •  ')}\n`;
-
-    response += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
 
     // ── Candidate Results ──
     result.matchedCandidates.forEach((sc, index) => {
-      const tierDot = sc.tier === 'STRONG_FIT' ? '🟢'
-        : sc.tier === 'GOOD_FIT' ? '🔵'
-          : sc.tier === 'MODERATE_FIT' ? '🟡'
-            : '🟠';
-
-      const tierLabel = sc.tier === 'STRONG_FIT' ? 'Strong Fit'
-        : sc.tier === 'GOOD_FIT' ? 'Good Fit'
-          : sc.tier === 'MODERATE_FIT' ? 'Moderate Fit'
-            : 'Developing';
-
       const rank = index + 1;
-      const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
-
-      response += `\n${medal} **${sc.candidate.fullName}** ${tierDot} *${tierLabel}*\n\n`;
-
-      // Core metrics
-      response += `**Match Score: ${sc.compositeScore}/100** · Confidence: ${sc.confidenceLevel}%\n`;
+      response += `**${rank}. ${sc.candidate.fullName}**\n`;
+      response += `   Registration ID: ${sc.candidate.registrationId}\n`;
 
       if (sc.candidate.personalityStyle) {
-        response += `**Behavioral Profile:** ${sc.candidate.personalityStyle}\n`;
-      }
-
-      // Predictions
-      if (sc.successPrediction !== undefined || sc.teamFitScore !== undefined) {
-        response += `\n**Predictions:**\n`;
-        if (sc.successPrediction !== undefined) {
-          response += `• Success Rate — **${sc.successPrediction}%**`;
-          if (sc.retentionRisk) {
-            const riskIcon = sc.retentionRisk === 'LOW' ? '✅' : sc.retentionRisk === 'MEDIUM' ? '⚠️' : '🔴';
-            response += `  ·  Retention Risk — ${riskIcon} ${sc.retentionRisk}`;
-          }
-          response += '\n';
-        }
-        if (sc.teamFitScore !== undefined) {
-          response += `• Team Compatibility — **${sc.teamFitScore}**/100\n`;
-        }
+        response += `   Behavioral Profile: ${sc.candidate.personalityStyle}\n`;
       }
 
       // Match strengths
       if (sc.matchReasons.length > 0) {
-        response += `\n**Key Strengths:**\n`;
+        response += `   Key Strengths:\n`;
         sc.matchReasons.slice(0, 3).forEach(reason => {
-          response += `✓ ${reason}\n`;
+          response += `   - ${reason}\n`;
         });
       }
 
       // AI Insights
       if (sc.insights.length > 0) {
-        response += `\n💡 *${sc.insights[0]}*\n`;
+        response += `   Recommendation: ${sc.insights[0]}\n`;
         if (sc.insights.length > 1) {
-          response += `📌 *${sc.insights[1]}*\n`;
+          response += `   Next Step: ${sc.insights[1]}\n`;
         }
       }
 
       // Development areas
-      if (sc.developmentAreas.length > 0 && sc.tier !== 'STRONG_FIT') {
-        response += `\n**Areas for Growth:**\n`;
+      if (sc.developmentAreas.length > 0) {
+        response += `   Development Focus:\n`;
         sc.developmentAreas.slice(0, 2).forEach(area => {
-          response += `→ ${area}\n`;
+          response += `   - ${area}\n`;
         });
       }
 
       if (index < result.matchedCandidates.length - 1) {
-        response += `\n──────────────────────────\n`;
+        response += `\n`;
       }
     });
-
-    response += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    response += `*Multi-dimensional analysis of ${result.totalCandidatesEvaluated} candidates*\n`;
 
     return response;
   }

@@ -71,11 +71,13 @@ export class TextToSqlService {
     if (!this.llm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+      const sqlModel = process.env.GEMINI_SQL_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
+      const sqlMaxTokens = Math.max(180, Number(process.env.SQL_MAX_OUTPUT_TOKENS || 520));
       this.llm = new ChatGoogleGenerativeAI({
         apiKey,
-        model: 'gemini-2.5-flash',
+        model: sqlModel,
         temperature: 0, // Deterministic SQL generation
-        maxOutputTokens: 640,
+        maxOutputTokens: sqlMaxTokens,
         callbacks: [getTokenTrackerCallback('TextToSql (SQL)')],
       });
     }
@@ -86,11 +88,12 @@ export class TextToSqlService {
     if (!this.sqlFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+      const sqlMaxTokens = Math.max(180, Number(process.env.SQL_MAX_OUTPUT_TOKENS || 520));
       this.sqlFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
         temperature: 0,
-        maxTokens: 640,
+        maxTokens: sqlMaxTokens,
         callbacks: [getTokenTrackerCallback('TextToSql (SQL Groq Fallback)')],
       });
     }
@@ -101,11 +104,13 @@ export class TextToSqlService {
     if (!this.formatterLlm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+      const formatterModel = process.env.GEMINI_FORMATTER_MODEL || process.env.GEMINI_SQL_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
+      const formatterMaxTokens = Math.max(160, Number(process.env.FORMATTER_MAX_OUTPUT_TOKENS || 480));
       this.formatterLlm = new ChatGoogleGenerativeAI({
         apiKey,
-        model: 'gemini-2.5-flash',
+        model: formatterModel,
         temperature: 0.4, // Slightly creative for natural phrasing
-        maxOutputTokens: 700,
+        maxOutputTokens: formatterMaxTokens,
         callbacks: [getTokenTrackerCallback('TextToSql (Formatter)')],
       });
     }
@@ -116,11 +121,12 @@ export class TextToSqlService {
     if (!this.formatterFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+      const formatterMaxTokens = Math.max(160, Number(process.env.FORMATTER_MAX_OUTPUT_TOKENS || 480));
       this.formatterFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
         temperature: 0.4,
-        maxTokens: 700,
+        maxTokens: formatterMaxTokens,
         callbacks: [getTokenTrackerCallback('TextToSql (Formatter Groq Fallback)')],
       });
     }
@@ -131,11 +137,13 @@ export class TextToSqlService {
     if (!this.synthesizerLlm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+      const synthesizerModel = process.env.GEMINI_SQL_SYNTH_MODEL || process.env.GEMINI_SQL_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
+      const synthMaxTokens = Math.max(180, Number(process.env.SQL_SYNTH_MAX_OUTPUT_TOKENS || 620));
       this.synthesizerLlm = new ChatGoogleGenerativeAI({
         apiKey,
-        model: 'gemini-2.5-flash',
+        model: synthesizerModel,
         temperature: 0.3,
-        maxOutputTokens: 1000,
+        maxOutputTokens: synthMaxTokens,
         callbacks: [getTokenTrackerCallback('TextToSql (Synthesizer)')],
       });
     }
@@ -146,11 +154,12 @@ export class TextToSqlService {
     if (!this.synthesizerFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+      const synthMaxTokens = Math.max(180, Number(process.env.SQL_SYNTH_MAX_OUTPUT_TOKENS || 620));
       this.synthesizerFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
         temperature: 0.3,
-        maxTokens: 1000,
+        maxTokens: synthMaxTokens,
         callbacks: [getTokenTrackerCallback('TextToSql (Synthesizer Groq Fallback)')],
       });
     }
@@ -218,215 +227,48 @@ export class TextToSqlService {
     user: UserContext,
     conversationHistory: string = '',
   ): Promise<string> {
-    const schema = this.schemaIntrospector.getSchemaText();
+    const schema = this.schemaIntrospector.getCompactSchemaText();
 
     // Build role-specific context
     const roleContext = this.buildRoleContext(user);
 
-    const systemPrompt = `You are Ask BI's SQL generation engine — the Jarvis brain behind OriginBI's talent intelligence platform.
-Your ONLY job is to convert a user's natural language question into a single, precise PostgreSQL SELECT query.
+    const systemPrompt = `Task: write ONE PostgreSQL SELECT query for Ask BI.
 
-═══ DATABASE SCHEMA ═══
+Return format:
+- SQL only
+- no markdown
+- no explanation
+
+Constraints:
+- SELECT/WITH only (read-only)
+- use exact schema column names
+- prefer explicit columns (avoid SELECT *)
+- apply role context and scoping rules
+- add sensible LIMIT for list/search queries
+
+Key mappings:
+- candidates/students/employees/resources/staff -> registrations
+- personality/style/DISC -> personality_traits via assessment_attempts
+- score/marks/result -> assessment_attempts.total_score
+- batch/group -> groups
+- program -> programs
+
+High-signal rules:
+- registrations/career_roles/career_role_tools/trait_based_course_details/groups/departments: filter is_deleted=false when present
+- active lists: use is_active=true when present
+- fuzzy text lookup: ILIKE '%term%'
+- top/best: ORDER BY metric DESC LIMIT N
+- count/avg/min/max queries: aggregate correctly and GROUP BY non-aggregates
+
+Schema:
 ${schema}
 
-═══ YOUR ROLE CONTEXT ═══
+Role context:
 ${roleContext}
 
-═══ SQL GENERATION RULES (MANDATORY) ═══
+${conversationHistory ? `Conversation context:\n${conversationHistory}\n` : ''}
 
-1. OUTPUT FORMAT: Return ONLY the raw SQL query. No markdown, no explanation, no code fences. Just the SQL.
-
-2. ONLY SELECT: You may ONLY generate SELECT statements. Never INSERT, UPDATE, DELETE, DROP, CREATE, or ALTER.
-
-3. COLUMN NAMING PRECISION:
-   - career_roles table: use "career_role_name" (NOT "name"), "short_description" (NOT "description")
-   - registrations table: use "full_name" for names (NOT "name")
-   - Always use exact column names from the schema above
-   - When selecting columns, prefer explicit column names over SELECT *
-
-4. TEXT SEARCH PATTERNS:
-   - For name searches: use ILIKE '%term%' for fuzzy matching
-   - For exact value matches (status, gender, role): use = with exact values from the schema's enum values
-   - Never use LIKE when ILIKE is appropriate (case-insensitive search is default)
-
-5. JOIN PATTERNS:
-   - Candidate with assessment: registrations r JOIN assessment_attempts aa ON aa.registration_id = r.id
-   - Assessment with personality: LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
-   - Assessment with program: LEFT JOIN programs p ON aa.program_id = p.id
-   - Career role with tools: career_roles cr JOIN career_role_tools crt ON crt.career_role_id = cr.id
-   - Courses with traits: trait_based_course_details tcd LEFT JOIN personality_traits pt ON tcd.trait_id = pt.id
-
-6. SOFT DELETE: Most tables have is_deleted column. Always add is_deleted = false in WHERE for:
-   registrations, career_roles, career_role_tools, trait_based_course_details, groups, departments
-
-7. ACTIVE FILTER: Tables with is_active column — add is_active = true when listing active records:
-   career_roles, programs, personality_traits, users
-
-8. AGGREGATION: When user asks "how many", "count", "total", "average", "highest", "lowest":
-   - Use COUNT(*), SUM(), AVG(), MAX(), MIN() as appropriate
-   - Always add GROUP BY when using aggregations with non-aggregated columns
-   - For "top N" or "best N": use ORDER BY ... DESC LIMIT N
-
-9. DATE/TIME QUERIES:
-   - Use PostgreSQL date functions: NOW(), CURRENT_DATE, INTERVAL
-   - "last week": WHERE created_at >= NOW() - INTERVAL '7 days'
-   - "last month": WHERE created_at >= NOW() - INTERVAL '30 days'
-   - "this year": WHERE EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM NOW())
-
-10. ROW LIMITS: Always include a sensible LIMIT:
-    - List queries: LIMIT 20
-    - Count/aggregation queries: no LIMIT needed
-    - Search queries: LIMIT 10
-    - "Show all" explicitly: LIMIT 100
-
-11. SORTING: Add meaningful ORDER BY:
-    - Scores: ORDER BY total_score DESC
-    - Dates: ORDER BY created_at DESC
-    - Names: ORDER BY full_name ASC
-    - Counts: ORDER BY count DESC
-
-12. NULL SAFETY: For LEFT JOINs, use COALESCE for nullable fields in display:
-    - COALESCE(pt.blended_style_name, 'Not assessed') as personality_style
-    - COALESCE(aa.total_score, 0) as score
-
-13. DOMAIN SYNONYMS (the user may use these interchangeably):
-    - "candidates" = "students" = "registrations" = "employees" = "resources" = "staff" = "people"
-    - "personality" = "behavioral style" = "DISC profile" = "dominant trait"
-    - "test" = "assessment" = "exam"
-    - "score" = "total_score" = "marks" = "result"
-    - "job role" = "career role" = "career_roles"
-    - "tools" = "technologies" = "tech stack" = "skills" (from career_role_tools)
-    - "courses" = "programs" = "degree" (context-dependent: trait_based_course_details or programs)
-
-═══ COMPLEX QUERY PATTERNS ═══
-
--- Candidates with their personality and score:
-SELECT r.full_name, r.gender, aa.total_score, pt.blended_style_name AS personality
-FROM registrations r
-JOIN assessment_attempts aa ON aa.registration_id = r.id
-LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
-WHERE aa.status = 'COMPLETED' AND r.is_deleted = false
-ORDER BY aa.total_score DESC LIMIT 20
-
--- Gender distribution:
-SELECT r.gender, COUNT(*) as count
-FROM registrations r WHERE r.is_deleted = false
-GROUP BY r.gender
-
--- Career roles with tool count:
-SELECT cr.career_role_name, COUNT(crt.id) as tool_count
-FROM career_roles cr
-LEFT JOIN career_role_tools crt ON crt.career_role_id = cr.id AND crt.is_deleted = false
-WHERE cr.is_deleted = false AND cr.is_active = true
-GROUP BY cr.id, cr.career_role_name
-ORDER BY tool_count DESC LIMIT 20
-
--- Candidates who completed assessment in last 7 days:
-SELECT r.full_name, aa.total_score, aa.completed_at
-FROM registrations r
-JOIN assessment_attempts aa ON aa.registration_id = r.id
-WHERE aa.status = 'COMPLETED' AND aa.completed_at >= NOW() - INTERVAL '7 days' AND r.is_deleted = false
-ORDER BY aa.completed_at DESC
-
--- Average score by personality type:
-SELECT pt.blended_style_name, ROUND(AVG(aa.total_score), 1) as avg_score, COUNT(*) as count
-FROM assessment_attempts aa
-JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
-WHERE aa.status = 'COMPLETED'
-GROUP BY pt.id, pt.blended_style_name
-ORDER BY avg_score DESC
-
--- List all corporate accounts with details:
-SELECT ca.company_name, ca.full_name, ca.sector_code, ca.job_title, ca.gender,
-  ca.country_code, ca.mobile_number, ca.business_locations,
-  ca.total_credits, ca.available_credits, ca.is_active, ca.created_at
-FROM corporate_accounts ca
-WHERE ca.is_active = true
-ORDER BY ca.created_at DESC
-
--- Corporate account with candidate count:
-SELECT ca.company_name, ca.full_name, ca.sector_code, ca.total_credits, ca.available_credits,
-  COUNT(r.id) AS candidate_count
-FROM corporate_accounts ca
-LEFT JOIN users u ON u.corporate_account_id = ca.id AND u.role = 'CORPORATE'
-LEFT JOIN registrations r ON r.corporate_account_id = ca.id AND r.is_deleted = false
-WHERE ca.is_active = true
-GROUP BY ca.id, ca.company_name, ca.full_name, ca.sector_code, ca.total_credits, ca.available_credits
-ORDER BY candidate_count DESC
-
--- Candidates belonging to a specific corporate:
-SELECT r.full_name, r.email, r.gender, aa.total_score, aa.status
-FROM registrations r
-LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id
-WHERE r.corporate_account_id = (SELECT id FROM corporate_accounts WHERE company_name ILIKE '%CompanyName%' LIMIT 1)
-  AND r.is_deleted = false
-ORDER BY r.created_at DESC
-
--- Group/Batch summary with assessment stats (IMPORTANT: groups table = batches):
-SELECT g.name AS group_name, g.code AS group_code,
-  COUNT(DISTINCT r.id) AS total_candidates,
-  COUNT(DISTINCT CASE WHEN aa.status = 'COMPLETED' THEN aa.id END) AS completed_assessments,
-  COUNT(DISTINCT CASE WHEN aa.status = 'NOT_STARTED' THEN aa.id END) AS not_started,
-  ROUND(AVG(CASE WHEN aa.status = 'COMPLETED' THEN aa.total_score END), 1) AS avg_score,
-  MAX(CASE WHEN aa.status = 'COMPLETED' THEN aa.total_score END) AS highest_score,
-  MIN(CASE WHEN aa.status = 'COMPLETED' THEN aa.total_score END) AS lowest_score
-FROM groups g
-LEFT JOIN registrations r ON r.group_id = g.id AND r.is_deleted = false
-LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id
-WHERE g.is_deleted = false AND g.name ILIKE '%BatchName%'
-GROUP BY g.id, g.name, g.code
-
--- Group/Batch with personality distribution (strengths analysis):
-SELECT g.name AS group_name, pt.blended_style_name AS personality_type,
-  COUNT(*) AS candidate_count,
-  ROUND(AVG(aa.total_score), 1) AS avg_score
-FROM groups g
-JOIN registrations r ON r.group_id = g.id AND r.is_deleted = false
-JOIN assessment_attempts aa ON aa.registration_id = r.id AND aa.status = 'COMPLETED'
-LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
-WHERE g.is_deleted = false AND g.name ILIKE '%BatchName%'
-GROUP BY g.id, g.name, pt.id, pt.blended_style_name
-ORDER BY candidate_count DESC
-
--- Program summary with assessment stats:
-SELECT p.name AS program_name, p.code AS program_code,
-  COUNT(DISTINCT r.id) AS total_registrations,
-  COUNT(DISTINCT CASE WHEN aa.status = 'COMPLETED' THEN aa.id END) AS completed,
-  COUNT(DISTINCT CASE WHEN aa.status = 'NOT_STARTED' THEN aa.id END) AS not_started,
-  ROUND(AVG(CASE WHEN aa.status = 'COMPLETED' THEN aa.total_score END), 1) AS avg_score
-FROM programs p
-LEFT JOIN registrations r ON r.program_id = p.id AND r.is_deleted = false
-LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id
-WHERE p.is_active = true AND p.name ILIKE '%ProgramName%'
-GROUP BY p.id, p.name, p.code
-
--- List all groups/batches:
-SELECT g.name AS group_name, g.code AS group_code,
-  COUNT(r.id) AS candidate_count, g.is_active, g.created_at
-FROM groups g
-LEFT JOIN registrations r ON r.group_id = g.id AND r.is_deleted = false
-WHERE g.is_deleted = false
-GROUP BY g.id, g.name, g.code, g.is_active, g.created_at
-ORDER BY g.created_at DESC LIMIT 20
-
--- Group assessments (programs assigned to groups):
-SELECT g.name AS group_name, p.name AS program_name,
-  ga.total_candidates, ga.status, ga.valid_from, ga.valid_to
-FROM group_assessments ga
-JOIN groups g ON ga.group_id = g.id
-JOIN programs p ON ga.program_id = p.id
-WHERE g.name ILIKE '%GroupName%'
-ORDER BY ga.created_at DESC
-
-═══ DOMAIN SYNONYMS FOR GROUPS/BATCHES/PROGRAMS ═══
-- "batch" = "group" = "groups" table. The user may say "KIOTstudents batch" meaning the groups table with name ILIKE '%KIOTstudents%'
-- "program" = "assessment program" = "programs" table. E.g. "School Students Program" → programs WHERE name ILIKE '%School Students%'
-- "summarize batch" = query groups + registrations + assessment_attempts for aggregate stats
-- "strengths" = personality_traits distribution. "risks" = low scores / not started. "readiness" = completed vs not started ratio.
-
-${conversationHistory ? `\n═══ CONVERSATION CONTEXT ═══\n${conversationHistory}\nUse this to resolve references like "those candidates", "that group", "them", etc.\n` : ''}
-
-Now generate the SQL for the following question:`;
+Generate SQL for this user question:`;
 
     const response = await invokeWithFallback({
       logger: this.logger,
@@ -623,50 +465,21 @@ Return ONLY the corrected SQL, nothing else:`;
     const dataStr = JSON.stringify(truncatedData);
     const totalRows = data.length;
 
-    const formatPrompt = `You are Ask BI — OriginBI's intelligent data analyst. Transform raw database results into a professional, insightful response that reads like a top-tier analytics dashboard.
+    const formatPrompt = `Answer from data only. Be concise and insightful.
 
-═══ ABSOLUTE RULES ═══
-1. ONLY use data from the "Data" section. ZERO tolerance for fabrication — every name, number, and fact must come from the provided data.
-2. Never add companies, candidates, or statistics from general knowledge or the web.
+Rules:
+1) Never fabricate names, values, or trends.
+2) Start with the direct answer.
+3) Use markdown table only when it improves readability.
+4) Add at most 1 short insight line from the provided numbers.
+5) No filler, no methodology, no external references.
 
-═══ FORMATTING STYLE ═══
-- Start with the answer immediately. No "Here are the results", no "Based on the data".
-- Use **bold** for key values: counts, names, scores, percentages.
-- Use markdown tables for tabular data (3+ rows with multiple columns).
-- Use numbered lists for rankings or ordered items.
-- Use bullet points for summaries (1-2 items).
-- For single values: "There are **415** candidates registered." — clean and direct.
+Question: ${question}
+Role: ${user.role}
+Rows: ${totalRows}${totalRows > 30 ? ` (showing first 30)` : ''}
+Data: ${dataStr}
 
-═══ ANALYTICAL QUALITY ═══
-- Don't just list data — INTERPRET it. Add a 1-2 line insight when the data tells a story:
-  - "**Expressive Communicators** dominate at 34%, suggesting the cohort is strong in interpersonal skills."
-  - "Completion rate is **67%** — above average, but **22 candidates** still haven't started."
-  - "**3 of the top 5 scorers** are female, indicating strong performance from female candidates."
-- Compare values when relevant: "**KIOT IT** (avg 78.3) outperforms **KIOT CSE** (avg 63.1) by **24%**."
-- Flag risks or notable patterns: "⚠️ **12 candidates** scored below 30 — they may need additional support."
-
-═══ STRUCTURE ═══
-- For 1 result: single sentence or bullet list
-- For 2-5 results: compact bullet list or small table
-- For 6+ results: markdown table + 1-line summary insight
-- For aggregations: bold the key metric, add context
-- If results truncated, note: "Showing **30 of ${totalRows}** total results."
-
-═══ NEVER DO THIS ═══
-- No disclaimers, tips, or "Try asking:" suggestions
-- No "I hope this helps" or similar filler
-- No making up data not in the results
-- No explaining the SQL or methodology
-
-User's question: "${question}"
-User's role: ${user.role}
-Total rows: ${totalRows}
-${totalRows > 30 ? `(Showing first 30 of ${totalRows})` : ''}
-
-Data:
-${dataStr}
-
-Response:`;
+Final answer:`;
 
     try {
       const response = await invokeWithFallback({

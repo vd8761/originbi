@@ -390,7 +390,7 @@ export default function CreateJob({ onBack }: CreateJobProps) {
                 >
                     {/* Modal Container */}
                     <div 
-                        className="bg-white dark:bg-[#1F2320] w-full max-w-4xl max-h-[85vh] rounded-2xl shadow-2xl overflow-y-auto flex flex-col relative animate-in fade-in zoom-in duration-200 hide-scrollbar" 
+                        className="bg-white dark:bg-[#1F2320] w-full max-w-4xl max-h-[85vh] rounded-2xl shadow-2xl overflow-y-auto flex flex-col relative animate-in fade-in zoom-in duration-200 scrollbar-hide" 
                         style={{ msOverflowStyle: 'none', scrollbarWidth: 'none' }}
                         onClick={(e) => e.stopPropagation()}
                     >

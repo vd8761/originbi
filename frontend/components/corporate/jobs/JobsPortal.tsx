@@ -22,6 +22,7 @@ interface Job {
     title: string;
     company: string;
     location: string;
+    workMode: string;
     employmentType: string;
     postedDate: string;
     closingDate: string;
@@ -71,6 +72,12 @@ const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
     { value: "last_30_days", label: "Last 30 Days" },
 ];
 
+function parseDisplayDate(dateValue: string): Date {
+    // Supports existing human-readable dates while keeping parsing deterministic.
+    const parsed = new Date(dateValue);
+    return Number.isNaN(parsed.getTime()) ? new Date("1970-01-01") : parsed;
+}
+
 function generateMockJobs(): Job[] {
     const jobs: Job[] = [];
     const statuses: JobStatus[] = [];
@@ -85,9 +92,10 @@ function generateMockJobs(): Job[] {
             title: "UI/UX Designer",
             company: "Google Inc",
             location: "Chennai",
+            workMode: i % 2 === 0 ? "Onsite" : "Remote",
             employmentType: "Full Time",
             postedDate: "27 December 2025",
-            closingDate: "28 February 2025",
+            closingDate: "28 February 2026",
             status: statuses[i],
             expiresIn: i === 1 ? 3 : undefined,
             totalApplicants: 300,
@@ -636,13 +644,16 @@ export default function JobsPortal() {
         if (filters.employmentTypes.length > 0) {
             result = result.filter((j) => filters.employmentTypes.includes(j.employmentType));
         }
+        if (filters.workModes.length > 0) {
+            result = result.filter((j) => filters.workModes.includes(j.workMode));
+        }
 
         // Date filter
         if (dateFilter !== "all") {
             const now = new Date();
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             result = result.filter((j) => {
-                const posted = new Date(j.postedDate);
+                const posted = parseDisplayDate(j.postedDate);
                 switch (dateFilter) {
                     case "today":
                         return posted >= today;
@@ -677,11 +688,11 @@ export default function JobsPortal() {
                 case "title_asc":
                     return a.title.localeCompare(b.title);
                 case "posted_newest":
-                    return new Date(b.postedDate).getTime() - new Date(a.postedDate).getTime();
+                    return parseDisplayDate(b.postedDate).getTime() - parseDisplayDate(a.postedDate).getTime();
                 case "posted_oldest":
-                    return new Date(a.postedDate).getTime() - new Date(b.postedDate).getTime();
+                    return parseDisplayDate(a.postedDate).getTime() - parseDisplayDate(b.postedDate).getTime();
                 case "closing_soon":
-                    return new Date(a.closingDate).getTime() - new Date(b.closingDate).getTime();
+                    return parseDisplayDate(a.closingDate).getTime() - parseDisplayDate(b.closingDate).getTime();
                 case "applicants_high":
                     return b.totalApplicants - a.totalApplicants;
                 case "applicants_low":
@@ -743,8 +754,6 @@ export default function JobsPortal() {
         }
         return pages;
     };
-
-    const selectedSortLabel = SORT_OPTIONS.find((o) => o.value === sortBy)?.label || "Job Title";
 
     if (isCreatingJob) {
         return <CreateJob onBack={() => setIsCreatingJob(false)} />;
@@ -855,7 +864,7 @@ export default function JobsPortal() {
                                 <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                 <path d="M16 2V6M8 2V6M3 10H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
-                            {dateFilter === "all" ? "Today" : DATE_FILTER_OPTIONS.find(o => o.value === dateFilter)?.label}
+                            {dateFilter === "all" ? "All Time" : DATE_FILTER_OPTIONS.find(o => o.value === dateFilter)?.label}
                             <ChevronDownIcon className="w-2.5 h-2.5 text-gray-500 dark:text-white/60" />
                         </button>
                         {showDateDropdown && (
@@ -913,7 +922,7 @@ export default function JobsPortal() {
                                 type="text"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Search By Job Title or Description..."
+                                placeholder="Search by job title, company, or Job ID..."
                                 className="w-full bg-white dark:bg-transparent border border-gray-300 dark:border-white/35 rounded-xl py-2.5 pl-4 pr-10 text-[14px] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35 placeholder:font-normal focus:outline-none hover:border-gray-400 dark:hover:border-white/55 focus:border-brand-green transition-colors shadow-sm dark:shadow-none"
                             />
                             <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-white/40">
