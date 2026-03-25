@@ -9,6 +9,9 @@ import {
   GroupAssessment,
   CorporateAccount,
   AssessmentSession,
+  CorporateCreditLedger,
+  Registration,
+  AffiliateSettlementTransaction,
 } from '@originbi/shared-entities';
 
 @Module({
@@ -19,6 +22,9 @@ import {
       GroupAssessment,
       CorporateAccount,
       AssessmentSession,
+      CorporateCreditLedger,
+      Registration,
+      AffiliateSettlementTransaction,
     ]),
     AffiliatesModule,
   ],

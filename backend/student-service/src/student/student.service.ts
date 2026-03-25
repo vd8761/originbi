@@ -758,7 +758,11 @@ export class StudentService {
         throw new Error(`Program ${programCode} not found`);
       }
 
-      // 5. Create Registration (Force TS Check)
+      // 5. Calculate Registration Amount
+      const configAmount = this.configService.get('REGISTRATION_COST') || 500;
+      const registrationAmountStr = (dto.payment_amount || configAmount).toString();
+
+      // 6. Create Registration (Force TS Check)
       const registration = this.sessionRepo.manager.create(Registration, {
         userId: user.id,
         registrationSource: dto.referral_code ? 'AFFILIATE' : 'SELF',
@@ -772,7 +776,11 @@ export class StudentService {
         studentBoard: dto.student_board || dto.studentBoard, // Explicit assignment
         // metadata: { ... } below also stores it
         status: 'COMPLETED' as RegistrationStatus,
-        paymentStatus: 'NOT_REQUIRED' as PaymentStatus,
+        paymentStatus: 'PAID' as PaymentStatus,
+        paymentAmount: registrationAmountStr,
+        paymentProvider: dto.payment_provider || 'RAZORPAY',
+        paymentReference: dto.payment_reference,
+        paidAt: new Date(),
         metadata: {
           groupCode: dto.group_code,
           studentBoard: dto.student_board || dto.studentBoard, // Store in metadata as well
@@ -803,9 +811,7 @@ export class StudentService {
           );
 
           // Determine commission
-          const registrationAmount = Number(
-            this.configService.get('REGISTRATION_COST') || 500,
-          );
+          const registrationAmount = Number(registrationAmountStr);
           const commissionPercentage = affiliate.commissionPercentage || 0;
           const earnedCommission =
             (registrationAmount * commissionPercentage) / 100;
