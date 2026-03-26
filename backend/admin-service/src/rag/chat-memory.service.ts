@@ -45,7 +45,7 @@ export class ChatMemoryService {
   private readonly LLM_HISTORY_WINDOW = 14;
 
   /** Max character length per message for the LLM context (to keep prompt lean) */
-  private readonly MSG_TRUNCATE_LEN = 420;
+  private readonly MSG_TRUNCATE_LEN = 300;
 
   private tablesExist = false;
 

@@ -244,6 +244,13 @@ Completed: ${r.completed_count}`,
 
     // Process each table
     for (const source of tableSources) {
+      const quota = this.embeddingsService.getQuotaStatus();
+      if (quota.coolingDown) {
+        const sec = Math.ceil(quota.remainingMs / 1000);
+        this.logger.warn(`⏸️ Pausing sync early: embeddings API cooling down (${sec}s remaining)`);
+        break;
+      }
+
       try {
         const rows = await this.dataSource.query(source.query);
 
