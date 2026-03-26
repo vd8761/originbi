@@ -195,6 +195,8 @@ export class RagService {
   // Column safety: tracks which optional columns exist in the DB
   private safeColumnsChecked = false;
   private hasSincerityColumns = true; // assume true, checked on first query
+  private reportAgileColumnChecked = false;
+  private reportAgileColumn: { name: string; type: string } | null = null;
 
   // Disambiguation follow-up cache: remembers the search term when multiple candidates are shown
   // so that a bare number reply ("1", "#2") re-routes to the correct handler.
@@ -270,6 +272,44 @@ export class RagService {
     }
   }
 
+
+  private async ensureReportAgileColumn(): Promise<void> {
+    if (this.reportAgileColumnChecked) return;
+    try {
+      const rows = await this.dataSource.query(`
+        SELECT column_name, data_type, udt_name
+        FROM information_schema.columns
+        WHERE table_name = 'assessment_reports'
+          AND table_schema IN (current_schema(), 'public')
+      `);
+      const candidates = ['agile_scores', 'agile_score', 'report_agile_scores', 'agility_scores', 'metadata', 'report_data', 'data'];
+      const found = candidates
+        .map(name => rows.find((r: any) => r.column_name === name))
+        .find(Boolean);
+      if (found) {
+        const type = (found.data_type || found.udt_name || '').toLowerCase();
+        this.reportAgileColumn = { name: found.column_name, type };
+        this.logger.log(`✅ assessment_reports column resolved: ${found.column_name} (${type || 'unknown'})`);
+      } else {
+        this.reportAgileColumn = null;
+        this.logger.warn('⚠️ assessment_reports has no agile score column; trait leader output will be skipped.');
+      }
+    } catch (err) {
+      this.logger.warn(`assessment_reports column check failed: ${err.message}`);
+      this.reportAgileColumn = null;
+    } finally {
+      this.reportAgileColumnChecked = true;
+    }
+  }
+
+  private async getReportAgileScoresExpr(alias: string): Promise<string> {
+    await this.ensureReportAgileColumn();
+    if (!this.reportAgileColumn) return 'NULL::jsonb';
+    const col = `${alias}.${this.reportAgileColumn.name}`;
+    const type = this.reportAgileColumn.type;
+    if (type.includes('json')) return col;
+    return `to_jsonb(${col})`;
+  }
   /** Returns sincerity SELECT fields if columns exist, or NULL aliases */
   private getSinceritySelectFields(alias: string = 'aa'): string {
     if (this.hasSincerityColumns) {
@@ -338,7 +378,20 @@ export class RagService {
       return '0 users found.';
     }
 
-    return answer;
+    let sanitized = answer;
+    // Strip accidental debug/DB leakage from model outputs.
+    sanitized = sanitized.replace(/```sql[\s\S]*?```/gi, '');
+    sanitized = sanitized.replace(/^\s*(user\s*question|query|sql\s*query|table\s*name|table\s*names|tables?|database\s*schema)\s*:\s*.*$/gim, '');
+    sanitized = sanitized.replace(/\n{3,}/g, '\n\n').trim();
+
+    const q = (question || '').toLowerCase();
+    if (/\bhigh\s*score\b|\bhighest\b|\btop\b|\bbest\b/.test(q)
+      && !/score\s*basis:/i.test(raw)
+      && (/\|\s*total[_\s]?score\s*\|/i.test(raw) || /\*\*🏆\s*Top Performers:/i.test(raw))) {
+      return `${sanitized}\n\n**Score Basis:** Values are from each candidate's completed assessment results.`;
+    }
+
+    return sanitized;
   }
 
   private resolveDirectRoleScopedInterpretation(
@@ -347,12 +400,37 @@ export class RagService {
   ): { intent: string; searchTerm: string | null; table: string; includePersonality: boolean; includeAll?: boolean } | null {
     const q = this.normalizeQuery(message).toLowerCase();
 
+    if (/(\bhow\s+many\b|\bcount\b|\btotal\b)/.test(q)) {
+      if (/\b(employee|employees|resource|resources|staff|member|members)\b/.test(q)) {
+        return { intent: 'count', searchTerm: 'employees', table: 'registrations', includePersonality: false };
+      }
+      if (/\b(candidate|candidates|student|students)\b/.test(q)) {
+        return { intent: 'count', searchTerm: 'candidates', table: 'registrations', includePersonality: false };
+      }
+      if (/\b(user|users|account|accounts)\b/.test(q)) {
+        return { intent: 'count', searchTerm: 'users', table: 'users', includePersonality: false };
+      }
+    }
+
+    if (/\b(career\s*report|future\s*role|role\s*readiness)\b/.test(q) ||
+      (/\breport\b/.test(q) && /\b(for|of|about)\b/.test(q))) {
+      const name = this.extractName(message);
+      return { intent: 'career_report', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    if (/\b(career\s*fitment|custom\s*report|my\s*fitment|personalized\s*report)\b/.test(q)) {
+      const name = this.extractName(message);
+      return { intent: 'custom_report', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
+    }
+
     if (/\b(list|show|get|display|view)\b\s+(my|our)?\s*\b(candidates?|students?|employees?|resources?|staff|members?)\b/.test(q)) {
       return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
     }
 
-    if (/\b(which|who)\b.*\b(best|top|highest)\b.*\b(employee|employees|candidate|candidates|student|students|resource|resources|performer)\b/.test(q) ||
-      /\b(best|top|highest)\b\s+\b(employee|employees|candidate|candidates|student|students|resource|resources|performer)\b/.test(q)) {
+    if (/\bwhich\s+candidate\s+has\s+high\s+score\b/.test(q) ||
+      /\bhigh\s+score\b/.test(q) ||
+      /\b(which|who)\b.*\b(best|top|highest)\b.*\b(employee|employees|candidate|candidates|student|students|resource|resources|performer|performers)\b/.test(q) ||
+      /\b(best|top|highest)\b\s+\b(employee|employees|candidate|candidates|student|students|resource|resources|performer|performers)\b/.test(q)) {
       return { intent: 'best_performer', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
     }
 
@@ -363,6 +441,28 @@ export class RagService {
     }
 
     return null;
+  }
+
+  private shouldForceDbAnswer(question: string, userRole: string): boolean {
+    const q = this.normalizeQuery(question).toLowerCase();
+    const role = (userRole || 'STUDENT').toUpperCase();
+
+    const hasDataVerb = /\b(list|show|get|count|how many|total|compare|breakdown|top|best|highest|lowest|average)\b/.test(q);
+    const hasPlatformEntity = /\b(user|users|candidate|candidates|student|students|employee|employees|resource|resources|registration|registrations|assessment|assessments|score|scores|result|results|corporate|company|companies|affiliate|affiliates|referral|referrals|group|groups|batch|batches|program|programs)\b/.test(q);
+
+    // Prefer strict DB route for admin/corporate operational questions.
+    if ((role === 'ADMIN' || role === 'CORPORATE') && hasDataVerb && hasPlatformEntity) {
+      return true;
+    }
+
+    // Students asking about their own measured data should stay DB-grounded.
+    if ((role === 'STUDENT' || role === 'INDIVIDUAL')
+      && /\b(my|me|mine)\b/.test(q)
+      && /\b(score|scores|result|results|assessment|assessments|personality|style)\b/.test(q)) {
+      return true;
+    }
+
+    return false;
   }
 
   private async resolveEffectiveCorporateId(user?: UserContext): Promise<number | null> {
@@ -452,6 +552,11 @@ export class RagService {
   private shouldPromptClarification(question: string, confidence: number): boolean {
     if (confidence < this.AGENT_CLARIFY_CONFIDENCE || confidence >= this.AGENT_ACCEPT_CONFIDENCE) return false;
     const q = (question || '').toLowerCase().trim();
+
+    // Deterministic actionable intents should not be blocked by clarification.
+    if (/\b(report|career\s*report|fitment|future\s*role|role\s*readiness)\b/.test(q)) return false;
+    if (/\b(high\s*score|highest|top|best\s*performer|list|show|get|count|how\s*many|total)\b/.test(q)) return false;
+
     const tokenCount = q.split(/\s+/).filter(Boolean).length;
     if (tokenCount <= 4) return true;
     if (/\b(it|this|that|them|those|their|these|details|info|data)\b/.test(q)) return true;
@@ -821,11 +926,46 @@ export class RagService {
         };
       }
 
+      if (this.isQuestionHistoryQuery(normalizedQ)) {
+        this.logger.log('🎯 Intent: question_history (bypassed LLM)');
+        return await this.handleQuestionHistory(user, conversationId);
+      }
+
       // ═══════════════════════════════════════════════════════════════
       // SMART NORMALIZATION: Auto-correct typos + map synonyms
       // This runs BEFORE intent classification to fix user input
       // ═══════════════════════════════════════════════════════════════
       question = this.normalizeQuery(question);
+
+      // Deterministic count path for admin/corporate employee/candidate/user totals.
+      // Prevents ambiguous Text-to-SQL interpretations such as generic "records found".
+      {
+        const q = question.toLowerCase();
+        const wantsCount = /\bhow\s+many\b|\bcount\b|\btotal\b/.test(q);
+        const roleNow = (user?.role || 'STUDENT').toUpperCase();
+        if (wantsCount && (roleNow === 'ADMIN' || roleNow === 'CORPORATE')) {
+          let deterministic: { intent: string; searchTerm: string | null; table: string; includePersonality: boolean } | null = null;
+          if (/\b(employee|employees|resource|resources|staff|member|members)\b/.test(q)) {
+            deterministic = { intent: 'count', searchTerm: 'employees', table: 'registrations', includePersonality: false };
+          } else if (/\b(candidate|candidates|student|students)\b/.test(q)) {
+            deterministic = { intent: 'count', searchTerm: 'candidates', table: 'registrations', includePersonality: false };
+          } else if (/\b(user|users|account|accounts)\b/.test(q)) {
+            deterministic = { intent: 'count', searchTerm: 'users', table: 'users', includePersonality: false };
+          }
+
+          if (deterministic) {
+            this.logger.log(`🎯 Deterministic count routing: ${deterministic.searchTerm}`);
+            const totalCount = await this.getTotalCount(deterministic, user as UserContext);
+            const countData = [{ count: totalCount }];
+            return {
+              answer: this.formatResponse(deterministic, countData, 0, totalCount),
+              searchType: 'count',
+              sources: { rows: 1, total: totalCount },
+              confidence: 0.99,
+            };
+          }
+        }
+      }
 
       const sessionId = conversationId > 0 ? `conv_${conversationId}` : `user_${user?.id || 0}`;
       const explicitListAllInterpretation = this.resolveExplicitListAllInterpretation(question, sessionId);
@@ -850,6 +990,15 @@ export class RagService {
       const roleAwareDirectInterpretation = this.resolveDirectRoleScopedInterpretation(question, currentUserRole);
       if (roleAwareDirectInterpretation) {
         this.logger.log(`🎯 Direct role-aware routing: ${roleAwareDirectInterpretation.intent}`);
+
+        if (roleAwareDirectInterpretation.intent === 'career_report') {
+          return await this.handleCareerReport(roleAwareDirectInterpretation.searchTerm, user);
+        }
+
+        if (roleAwareDirectInterpretation.intent === 'custom_report') {
+          return await this.handleCustomReport(user, roleAwareDirectInterpretation.searchTerm, question);
+        }
+
         const totalCount = await this.getTotalCount(roleAwareDirectInterpretation, user as UserContext);
         const data = await this.executeQuery(roleAwareDirectInterpretation, user as UserContext, 0);
 
@@ -942,8 +1091,10 @@ export class RagService {
       if (bareNumberMatch) {
         const disambigKey = this.getDisambiguationKey(user);
         const ctx = this.disambiguationCache.get(disambigKey);
+        this.logger.log(`🔢 Bare number "${normalizedQ}" detected | cache exists: ${!!ctx} | handler: ${ctx?.handler || 'none'} | options: ${ctx?.options?.length || 0}`);
+        
         if (ctx && Date.now() - ctx.timestamp < this.DISAMBIG_EXPIRY) {
-          this.logger.log(`🔢 Bare number "${normalizedQ}" detected — resuming disambiguation for "${ctx.searchTerm}" (handler=${ctx.handler || 'career_report'})`);
+          this.logger.log(`🔢 Resuming disambiguation for "${ctx.searchTerm}" (handler=${ctx.handler || 'career_report'})`);
           const selectedIndex = parseInt(bareNumberMatch[1], 10) - 1;
           if (ctx.options?.length && (selectedIndex < 0 || selectedIndex >= ctx.options.length)) {
             return {
@@ -954,6 +1105,14 @@ export class RagService {
           }
 
           const selectedName = ctx.options?.[selectedIndex];
+          this.logger.log(`🔢 Selected: "${selectedName}" (index ${selectedIndex})`);
+          
+          // Update conversation context with the selected person
+          if (selectedName) {
+            this.conversationService.addUserMessage(sessionId, `Selected: ${selectedName}`, ctx.handler || 'disambiguation', [selectedName]);
+            this.conversationService.addBiResponse(sessionId, `Selected ${selectedName}`, 'disambiguation_resolved');
+          }
+          
           this.disambiguationCache.delete(disambigKey);
 
           const targetTerm = selectedName || `${ctx.searchTerm} #${bareNumberMatch[1]}`;
@@ -963,6 +1122,24 @@ export class RagService {
             return await this.handlePersonLookup(targetTerm, user);
           }
           return await this.handleCareerReport(targetTerm, user);
+        } else {
+          // No disambiguation context found - check if user might be selecting from a previous list
+          const session = this.conversationService.getSession(sessionId);
+          const lastPerson = session?.currentContext?.lastPersonMentioned;
+          if (lastPerson) {
+            this.logger.log(`🔢 No disambiguation cache, but found last person "${lastPerson}" in conversation`);
+            // The user might be responding to a previous list - try the last mentioned person
+            return {
+              answer: `I don't have a numbered list to select from. If you're asking about **${lastPerson}**, just say "tell me about ${lastPerson}" or "show ${lastPerson}'s report".`,
+              searchType: 'disambiguation',
+              confidence: 0.5,
+            };
+          }
+          return {
+            answer: `I don't have a numbered list to select from. Please provide more details about what you're looking for.`,
+            searchType: 'disambiguation',
+            confidence: 0.4,
+          };
         }
       }
 
@@ -1116,6 +1293,34 @@ export class RagService {
       // and synthesizes a unified response. Falls back to legacy intent
       // routing if the agent fails.
       // ═══════════════════════════════════════════════════════════════
+      if (this.shouldForceDbAnswer(resolvedQuestion, userRole)) {
+        this.logger.log('🛡️ Strict DB route enabled for data-critical query');
+        try {
+          const tsResult = await this.textToSqlService.answerQuestion(
+            resolvedQuestion,
+            user as UserContext,
+            routingHistory,
+          );
+
+          if (tsResult.confidence > 0.3) {
+            return {
+              answer: this.postProcessRoleAwareAnswer(tsResult.answer, user, resolvedQuestion),
+              searchType: tsResult.searchType || 'text_to_sql',
+              confidence: tsResult.confidence,
+              sources: { rows: tsResult.rowCount },
+            };
+          }
+
+          return {
+            answer: this.getRoleScopedNoDataMessage('data_query', userRole, resolvedQuestion),
+            searchType: 'strict_db_no_results',
+            confidence: 0.75,
+          };
+        } catch (strictDbError) {
+          this.logger.warn(`Strict DB route failed: ${strictDbError.message} — continuing with agentic routing`);
+        }
+      }
+
       try {
         this.logger.log('🤖 Attempting Agentic RAG tool selection...');
         const agentResult = await this.agentOrchestrator.agentQuery(
@@ -1131,12 +1336,26 @@ export class RagService {
           // Persist disambiguation context produced by Agentic person lookup so bare-number follow-ups work.
           const disambiguation = agentResult.sources?.disambiguation;
           if (agentResult.searchType === 'disambiguation' && disambiguation?.searchTerm && Array.isArray(disambiguation?.options)) {
+            const searchTerm = disambiguation.searchTerm;
+            const handler = disambiguation.handler || 'person_lookup';
+            const options = disambiguation.options;
+            
             this.disambiguationCache.set(this.getDisambiguationKey(user), {
-              searchTerm: disambiguation.searchTerm,
+              searchTerm,
               timestamp: Date.now(),
-              handler: disambiguation.handler || 'person_lookup',
-              options: disambiguation.options,
+              handler,
+              options,
             });
+            
+            // Update conversation context with the search term for future reference
+            this.conversationService.addUserMessage(
+              sessionId,
+              `Searching for: ${searchTerm}`,
+              'disambiguation_initiated',
+              [searchTerm],
+            );
+            
+            this.logger.log(`🔢 Disambiguation cached: searchTerm="${searchTerm}" handler=${handler} options=${options.length}`);
           }
 
           // Track intent/entities from the agent response for stronger follow-up memory.
@@ -2496,7 +2715,7 @@ export class RagService {
                 FROM registrations r
                 LEFT JOIN users u ON r.user_id = u.id
                 LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id 
-                    AND aa.id = (SELECT id FROM assessment_attempts WHERE registration_id = r.id ORDER BY completed_at DESC LIMIT 1)
+                  AND aa.id = (SELECT id FROM assessment_attempts WHERE registration_id = r.id AND status = 'COMPLETED' ORDER BY completed_at DESC NULLS LAST, id DESC LIMIT 1)
                 LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
                 LEFT JOIN programs p ON COALESCE(aa.program_id, r.program_id) = p.id
                 LEFT JOIN groups g ON r.group_id = g.id
@@ -2543,7 +2762,7 @@ export class RagService {
                 FROM registrations r
                 LEFT JOIN users u ON r.user_id = u.id
                 LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id 
-                    AND aa.id = (SELECT id FROM assessment_attempts WHERE registration_id = r.id ORDER BY completed_at DESC LIMIT 1)
+                  AND aa.id = (SELECT id FROM assessment_attempts WHERE registration_id = r.id AND status = 'COMPLETED' ORDER BY completed_at DESC NULLS LAST, id DESC LIMIT 1)
                 LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
                 LEFT JOIN programs p ON COALESCE(aa.program_id, r.program_id) = p.id
                 LEFT JOIN groups g ON r.group_id = g.id
@@ -2618,6 +2837,15 @@ export class RagService {
       }
 
       const person = personData[targetIndex];
+
+      const completedAttempts = parseInt(person.attempt_count || '0');
+      if (!completedAttempts || completedAttempts <= 0) {
+        return {
+          answer: `**${person.full_name || cleanSearchTerm} has not completed the assessment yet.**\n\nCareer Fitment Report can be generated only after assessment completion. Please ask the user to complete the assessment first.`,
+          searchType: 'career_report_pending_assessment',
+          confidence: 0.95,
+        };
+      }
 
       // Use best_score for report generation if available
       const scoreToUse = person.best_score || person.total_score;
@@ -4413,7 +4641,7 @@ export class RagService {
     }
 
     // Best/top performer (generic, no specific role)
-    if (/\b(best|top|highest)\s*(performer|score|candidate|student|result|employee|resource|member)s?\b/i.test(q) ||
+    if (/\b(high\s*score|best|top|highest)\s*(performer|score|candidate|student|result|employee|resource|member)?s?\b/i.test(q) ||
       /\b(show|list|get)\s*(top|best)\b/i.test(q) ||
       /\b(best|top)\s*(employee|resource|member)s?\b/i.test(q) ||
       /\btop\s*\d+\b/.test(q)) {
@@ -4804,6 +5032,11 @@ export class RagService {
     if (q.length <= 3) return true;
     if (q.includes('@')) return true;
 
+    // Never cache operational count questions for people entities.
+    if (/\b(how\s+many|count|total)\b/.test(q) && /\b(employee|employees|candidate|candidates|student|students|user|users|resource|resources|staff|member|members)\b/.test(q)) {
+      return true;
+    }
+
     // Personal/self and person-specific report queries should not be cached,
     // because they are identity/context-sensitive and stale cache causes wrong answers.
     if (/\bwhat is my name\b|\bwho am i\b|\bmy email\b|\bmy profile\b|\bmy account\b/.test(q)) return true;
@@ -5107,6 +5340,70 @@ export class RagService {
     return results.some(r => regex.test(r[nameField]));
   }
 
+  private isQuestionHistoryQuery(question: string): boolean {
+    return /\b(questions?|question)\b.*\b(i\s*have\s*asked|i\s*asked|my\s*questions|asked\s+me|asked)\b/i.test(question) ||
+      /\bwhat\s+are\s+the\s+questions\s+i\s+have\s+asked\b/i.test(question) ||
+      /\bshow\s+my\s+questions\b/i.test(question);
+  }
+
+  private async handleQuestionHistory(user: any, conversationId: number): Promise<QueryResult> {
+    const userId = user?.id || 0;
+    if (!userId) {
+      return {
+        answer: 'Please sign in to see your question history.',
+        searchType: 'question_history',
+        confidence: 0.4,
+      };
+    }
+
+    const questions: string[] = [];
+    const seen = new Set<string>();
+
+    const pushQuestion = (q: string) => {
+      const trimmed = (q || '').trim();
+      if (!trimmed) return;
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      questions.push(trimmed);
+    };
+
+    try {
+      if (conversationId > 0) {
+        const messages = await this.chatMemory.getMessages(conversationId, userId);
+        messages.filter(m => m.role === 'user').forEach(m => pushQuestion(m.content));
+      } else {
+        const conversations = await this.chatMemory.listConversations(userId, user?.role, 3, false);
+        for (const conv of conversations) {
+          const messages = await this.chatMemory.getMessages(conv.id, userId);
+          messages.filter(m => m.role === 'user').forEach(m => pushQuestion(m.content));
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`Question history lookup failed: ${err.message}`);
+    }
+
+    if (questions.length === 0) {
+      return {
+        answer: "I couldn't find any questions from your recent chats yet.",
+        searchType: 'question_history',
+        confidence: 0.6,
+      };
+    }
+
+    const top = questions.slice(0, 20);
+    const lines = top.map((q, i) => `${i + 1}. ${q}`);
+    const suffix = questions.length > top.length
+      ? `\n\nShowing ${top.length} of ${questions.length} recent questions.`
+      : '';
+
+    return {
+      answer: `**Your recent questions:**\n\n${lines.join('\n')}${suffix}`,
+      searchType: 'question_history',
+      confidence: 0.92,
+    };
+  }
+
   /**
    * Build a "Did you mean?" disambiguation response for fuzzy ILIKE matches.
    */
@@ -5274,11 +5571,60 @@ export class RagService {
         case 'test_results':
         case 'best_performer':
         case 'self_results':
+          const registrationId = (user as any)?.registrationId;
           if (userRole === 'ADMIN') {
-            sql = `SELECT COUNT(*) as count FROM assessment_attempts aa JOIN registrations r ON aa.registration_id = r.id WHERE aa.status = 'COMPLETED' AND r.is_deleted = false`;
+            sql = `SELECT COUNT(*) as count
+                   FROM assessment_attempts aa
+                   LEFT JOIN registrations r ON aa.registration_id = r.id
+                   WHERE (
+                     TRIM(UPPER(aa.status)) IN ('COMPLETED', 'COMPLETE', 'FINISHED', 'SUBMITTED')
+                     OR aa.completed_at IS NOT NULL
+                   )
+                     AND COALESCE(r.is_deleted, false) = false`;
           } else if (userRole === 'CORPORATE' && corporateId) {
-            sql = `SELECT COUNT(*) as count FROM assessment_attempts aa JOIN registrations r ON aa.registration_id = r.id WHERE aa.status = 'COMPLETED' AND r.is_deleted = false AND r.corporate_account_id = $1`;
+            sql = `SELECT COUNT(*) as count
+                   FROM assessment_attempts aa
+                   LEFT JOIN registrations r ON aa.registration_id = r.id
+                   WHERE (
+                     TRIM(UPPER(aa.status)) IN ('COMPLETED', 'COMPLETE', 'FINISHED', 'SUBMITTED')
+                     OR aa.completed_at IS NOT NULL
+                   )
+                     AND COALESCE(r.is_deleted, false) = false
+                     AND r.corporate_account_id = $1`;
             params.push(corporateId);
+          } else if (interpretation.intent === 'self_results') {
+            const countBase =
+              "SELECT COUNT(*) as count FROM assessment_attempts aa JOIN registrations r ON aa.registration_id = r.id WHERE (TRIM(UPPER(aa.status)) IN ('COMPLETED', 'COMPLETE', 'FINISHED', 'SUBMITTED') OR aa.completed_at IS NOT NULL) AND r.is_deleted = false";
+
+            const countFallbackQueries: Array<{ sql: string; params: any[] }> = [];
+            if (registrationId && Number(registrationId) > 0) {
+              countFallbackQueries.push({
+                sql: `${countBase} AND r.id = $1`,
+                params: [Number(registrationId)],
+              });
+            }
+            if (userId && userId > 0) {
+              countFallbackQueries.push({
+                sql: `${countBase} AND r.user_id = $1`,
+                params: [userId],
+              });
+            }
+            if (user?.email) {
+              countFallbackQueries.push({
+                sql: `${countBase} AND r.user_id = (SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1)`,
+                params: [user.email],
+              });
+            }
+
+            for (const candidate of countFallbackQueries) {
+              const countResult = await this.executeDatabaseQuery(candidate.sql, candidate.params);
+              const count = parseInt(countResult[0]?.count || '0');
+              if (count > 0) {
+                return count;
+              }
+            }
+
+            return 0;
           } else {
             sql = `SELECT COUNT(*) as count FROM assessment_attempts WHERE status = 'COMPLETED' AND user_id = $1`;
             params.push(userId);
@@ -5316,7 +5662,45 @@ export class RagService {
           return 0;
       }
       const result = await this.executeDatabaseQuery(sql, params);
-      return parseInt(result[0]?.count || '0');
+      let count = parseInt(result[0]?.count || '0');
+
+      if (count === 0 && (interpretation.intent === 'test_results' || interpretation.intent === 'best_performer')) {
+        const fallbackParams: any[] = [];
+        let fallbackCountSql = `
+          WITH latest_reports AS (
+            SELECT DISTINCT ON (ar.assessment_session_id)
+              ar.assessment_session_id
+            FROM assessment_reports ar
+            ORDER BY ar.assessment_session_id, ar.created_at DESC NULLS LAST, ar.id DESC
+          )
+          SELECT COUNT(*) as count
+          FROM latest_reports lr
+          LEFT JOIN registrations r ON r.assessment_session_id = lr.assessment_session_id
+          LEFT JOIN assessment_attempts aa ON aa.assessment_session_id = lr.assessment_session_id
+          WHERE COALESCE(r.is_deleted, false) = false`;
+
+        if (userRole === 'CORPORATE' && corporateId) {
+          fallbackParams.push(corporateId);
+          fallbackCountSql += ` AND r.corporate_account_id = $${fallbackParams.length}`;
+        } else if (userRole !== 'ADMIN') {
+          if (userId && userId > 0) {
+            fallbackParams.push(userId);
+            fallbackCountSql += ` AND COALESCE(r.user_id, aa.user_id) = $${fallbackParams.length}`;
+          } else if (user?.email) {
+            fallbackParams.push(user.email);
+            fallbackCountSql += ` AND COALESCE(r.user_id, aa.user_id) = (SELECT id FROM users WHERE LOWER(email) = LOWER($${fallbackParams.length}) LIMIT 1)`;
+          }
+        }
+
+        try {
+          const fallbackCountResult = await this.executeDatabaseQuery(fallbackCountSql, fallbackParams);
+          count = parseInt(fallbackCountResult[0]?.count || '0');
+        } catch (fallbackErr) {
+          this.logger.warn(`Fallback count query failed for ${interpretation.intent}: ${fallbackErr.message}`);
+        }
+      }
+
+      return count;
     } catch {
       return 0;
     }
@@ -5339,10 +5723,9 @@ export class RagService {
   ): Promise<any[]> {
     let sql = '';
     const params: any[] = [];
-
     const userRole = user?.role || 'STUDENT';
-    const corporateId = await this.resolveEffectiveCorporateId(user);
     const userId = user?.id;
+    const corporateId = await this.resolveEffectiveCorporateId(user);
     const limit = interpretation.includeAll ? 5000 : this.PAGE_SIZE;
 
     this.logger.log(`🔒 RBAC: role=${userRole}, corporateId=${corporateId || 'N/A'}, userId=${userId} | page offset=${offset}`);
@@ -5385,17 +5768,25 @@ export class RagService {
       case 'best_performer': {
         const baseTestSql = `
           SELECT 
-            registrations.full_name,
+            COALESCE(registrations.id, 0) as registration_id,
+            COALESCE(registrations.full_name, split_part(users.email, '@', 1), 'Candidate') as full_name,
+            users.email,
             assessment_attempts.total_score,
             assessment_attempts.status,
             personality_traits.blended_style_name as behavioral_style,
             personality_traits.blended_style_desc as behavior_description,
-            programs.name as program_name
+            programs.name as program_name,
+            NULL::jsonb as trait_scores_json
           FROM assessment_attempts
-          JOIN registrations ON assessment_attempts.registration_id = registrations.id
+          LEFT JOIN registrations ON assessment_attempts.registration_id = registrations.id
+          LEFT JOIN users ON users.id = COALESCE(registrations.user_id, assessment_attempts.user_id)
           LEFT JOIN personality_traits ON assessment_attempts.dominant_trait_id = personality_traits.id
           LEFT JOIN programs ON assessment_attempts.program_id = programs.id
-          WHERE assessment_attempts.status = 'COMPLETED' AND registrations.is_deleted = false`;
+          WHERE (
+            TRIM(UPPER(assessment_attempts.status)) IN ('COMPLETED', 'COMPLETE', 'FINISHED', 'SUBMITTED')
+            OR assessment_attempts.completed_at IS NOT NULL
+          )
+            AND COALESCE(registrations.is_deleted, false) = false`;
 
         if (userRole === 'ADMIN') {
           sql = `${baseTestSql} ORDER BY assessment_attempts.total_score DESC LIMIT ${limit} OFFSET ${offset}`;
@@ -5420,6 +5811,7 @@ export class RagService {
         // Dedicated intent for "my results" / "my score" — always user-scoped
         // Joins assessment_answers for detailed per-question stats
         const selfSincFields = this.getSinceritySelectFields('assessment_attempts');
+        const registrationId = (user as any)?.registrationId;
         const selfResultSql = `
           SELECT 
             registrations.full_name,
@@ -5434,10 +5826,10 @@ export class RagService {
             personality_traits.blended_style_name as behavioral_style,
             personality_traits.blended_style_desc as behavior_description,
             programs.name as program_name,
-            (SELECT COUNT(*) FROM assessment_answers WHERE assessment_attempt_id = assessment_attempts.id) as total_questions,
-            (SELECT COUNT(*) FROM assessment_answers WHERE assessment_attempt_id = assessment_attempts.id) as answered_questions,
+            NULL::int as total_questions,
+            NULL::int as answered_questions,
             NULL::numeric as total_answer_score,
-            (SELECT COALESCE(SUM(time_spent_seconds), 0) FROM assessment_answers WHERE assessment_attempt_id = assessment_attempts.id) as total_time_spent_seconds,
+            NULL::int as total_time_spent_seconds,
             NULL::int as correct_answers
           FROM assessment_attempts
           JOIN registrations ON assessment_attempts.registration_id = registrations.id
@@ -5445,18 +5837,50 @@ export class RagService {
           LEFT JOIN programs ON assessment_attempts.program_id = programs.id
           WHERE assessment_attempts.status = 'COMPLETED' AND registrations.is_deleted = false`;
 
+        const selfFallbackQueries: Array<{ sql: string; params: any[]; note: string }> = [];
+
+        if (registrationId && Number(registrationId) > 0) {
+          selfFallbackQueries.push({
+            sql: `${selfResultSql} AND registrations.id = $1 ORDER BY assessment_attempts.completed_at DESC LIMIT 5`,
+            params: [Number(registrationId)],
+            note: 'registration_id',
+          });
+        }
+
         if (userId && userId > 0) {
-          sql = `${selfResultSql} AND registrations.user_id = $1 ORDER BY assessment_attempts.completed_at DESC LIMIT 5`;
-          params.push(userId);
-        } else if (user?.email) {
-          // Fallback: use email when userId is 0
-          sql = `${selfResultSql} AND registrations.user_id = (SELECT id FROM users WHERE email = $1 LIMIT 1) ORDER BY assessment_attempts.completed_at DESC LIMIT 5`;
-          params.push(user.email);
-        } else {
-          this.logger.log('⚠️ self_results: No userId or email — cannot scope');
+          selfFallbackQueries.push({
+            sql: `${selfResultSql} AND registrations.user_id = $1 ORDER BY assessment_attempts.completed_at DESC LIMIT 5`,
+            params: [userId],
+            note: 'user_id',
+          });
+        }
+
+        if (user?.email) {
+          selfFallbackQueries.push({
+            sql: `${selfResultSql} AND registrations.user_id = (SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1) ORDER BY assessment_attempts.completed_at DESC LIMIT 5`,
+            params: [user.email],
+            note: 'email_to_user_id',
+          });
+        }
+
+        if (selfFallbackQueries.length === 0) {
+          this.logger.log('⚠️ self_results: No registrationId/userId/email — cannot scope');
           return [];
         }
-        break;
+
+        for (const candidate of selfFallbackQueries) {
+          try {
+            const scoped = await this.executeDatabaseQuery(candidate.sql, candidate.params);
+            if (scoped.length > 0) {
+              this.logger.log(`✅ self_results resolved via ${candidate.note}`);
+              return scoped;
+            }
+          } catch (e) {
+            this.logger.warn(`self_results query failed via ${candidate.note}: ${e.message}`);
+          }
+        }
+
+        return [];
       }
 
       case 'person_lookup': {
@@ -5851,10 +6275,159 @@ export class RagService {
 
     try {
       this.logger.log(`🔍 SQL: ${sql.substring(0, 100)}... | params: [${params.join(', ')}]`);
-      return await this.executeDatabaseQuery(sql, params);
+      const rows = await this.executeDatabaseQuery(sql, params);
+
+      if (
+        rows.length === 0 &&
+        (interpretation.intent === 'test_results' || interpretation.intent === 'best_performer')
+      ) {
+        const fallbackParams: any[] = [];
+        const reportAgileExpr = await this.getReportAgileScoresExpr('ar');
+        let fallbackSql = `
+          WITH latest_reports AS (
+            SELECT DISTINCT ON (ar.assessment_session_id)
+              ar.assessment_session_id,
+              ${reportAgileExpr} as agile_scores
+            FROM assessment_reports ar
+            ORDER BY ar.assessment_session_id, ar.created_at DESC NULLS LAST, ar.id DESC
+          )
+          SELECT
+            COALESCE(r.id, 0) as registration_id,
+            COALESCE(r.full_name, split_part(u.email, '@', 1), 'Candidate') as full_name,
+            u.email,
+            COALESCE(
+              aa.total_score,
+              NULLIF(
+                regexp_replace(
+                  COALESCE(
+                    latest_reports.agile_scores->>'total_score',
+                    latest_reports.agile_scores->>'overall_score',
+                    latest_reports.agile_scores->>'overall',
+                    ''
+                  ),
+                  '[^0-9\\.-]',
+                  '',
+                  'g'
+                ),
+                ''
+              )::numeric
+            ) as total_score,
+            COALESCE(aa.status, 'COMPLETED') as status,
+            personality_traits.blended_style_name as behavioral_style,
+            personality_traits.blended_style_desc as behavior_description,
+            programs.name as program_name,
+            latest_reports.agile_scores as trait_scores_json
+          FROM latest_reports
+          LEFT JOIN registrations r ON r.assessment_session_id = latest_reports.assessment_session_id
+          LEFT JOIN assessment_attempts aa ON aa.assessment_session_id = latest_reports.assessment_session_id
+            AND (
+              TRIM(UPPER(aa.status)) IN ('COMPLETED', 'COMPLETE', 'FINISHED', 'SUBMITTED')
+              OR aa.completed_at IS NOT NULL
+            )
+          LEFT JOIN users u ON u.id = COALESCE(r.user_id, aa.user_id)
+          LEFT JOIN personality_traits ON aa.dominant_trait_id = personality_traits.id
+          LEFT JOIN programs ON aa.program_id = programs.id
+          WHERE COALESCE(r.is_deleted, false) = false`;
+
+        if (userRole === 'CORPORATE' && corporateId) {
+          fallbackParams.push(corporateId);
+          fallbackSql += ` AND r.corporate_account_id = $${fallbackParams.length}`;
+        } else if (userRole !== 'ADMIN') {
+          if (userId && userId > 0) {
+            fallbackParams.push(userId);
+            fallbackSql += ` AND COALESCE(r.user_id, aa.user_id) = $${fallbackParams.length}`;
+          } else if (user?.email) {
+            fallbackParams.push(user.email);
+            fallbackSql += ` AND COALESCE(r.user_id, aa.user_id) = (SELECT id FROM users WHERE LOWER(email) = LOWER($${fallbackParams.length}) LIMIT 1)`;
+          }
+        }
+
+        fallbackSql += ` ORDER BY total_score DESC NULLS LAST LIMIT ${limit} OFFSET ${offset}`;
+
+        try {
+          const fallbackRows = await this.executeDatabaseQuery(fallbackSql, fallbackParams);
+          if (fallbackRows.length > 0) {
+            this.logger.log(`✅ ${interpretation.intent} fallback resolved via assessment_reports (${fallbackRows.length} rows)`);
+            return fallbackRows;
+          }
+        } catch (fallbackErr) {
+          this.logger.warn(`${interpretation.intent} fallback query failed: ${fallbackErr.message}`);
+        }
+
+        if (interpretation.intent === 'best_performer') {
+          await this.logBestPerformerDiagnostics(userRole, userId, corporateId);
+        }
+      }
+
+      return rows;
     } catch (error) {
       this.logger.error(`SQL Error: ${error.message}`);
       return [];
+    }
+  }
+
+  private async logBestPerformerDiagnostics(
+    userRole: string,
+    userId?: number,
+    corporateId?: number | null,
+  ): Promise<void> {
+    try {
+      const scopeLabel = userRole === 'CORPORATE'
+        ? `corporate:${corporateId ?? 'none'}`
+        : userRole === 'ADMIN'
+          ? 'admin'
+          : `user:${userId ?? 'none'}`;
+
+      let attemptSql = `
+        SELECT COUNT(*)::int as count
+        FROM assessment_attempts aa
+        LEFT JOIN registrations r ON aa.registration_id = r.id
+        WHERE (TRIM(UPPER(aa.status)) IN ('COMPLETED', 'COMPLETE', 'FINISHED', 'SUBMITTED') OR aa.completed_at IS NOT NULL)
+          AND COALESCE(r.is_deleted, false) = false`;
+      const attemptParams: any[] = [];
+
+      if (userRole === 'CORPORATE' && corporateId) {
+        attemptParams.push(corporateId);
+        attemptSql += ` AND r.corporate_account_id = $${attemptParams.length}`;
+      } else if (userRole !== 'ADMIN') {
+        if (userId && userId > 0) {
+          attemptParams.push(userId);
+          attemptSql += ` AND COALESCE(r.user_id, aa.user_id) = $${attemptParams.length}`;
+        }
+      }
+
+      const attemptCount = await this.executeDatabaseQuery(attemptSql, attemptParams);
+
+      let reportSql = `
+        WITH latest_reports AS (
+          SELECT DISTINCT ON (ar.assessment_session_id) ar.assessment_session_id
+          FROM assessment_reports ar
+          ORDER BY ar.assessment_session_id, ar.created_at DESC NULLS LAST, ar.id DESC
+        )
+        SELECT COUNT(*)::int as count
+        FROM latest_reports lr
+        LEFT JOIN registrations r ON r.assessment_session_id = lr.assessment_session_id
+        LEFT JOIN assessment_attempts aa ON aa.assessment_session_id = lr.assessment_session_id
+        WHERE COALESCE(r.is_deleted, false) = false`;
+      const reportParams: any[] = [];
+
+      if (userRole === 'CORPORATE' && corporateId) {
+        reportParams.push(corporateId);
+        reportSql += ` AND r.corporate_account_id = $${reportParams.length}`;
+      } else if (userRole !== 'ADMIN') {
+        if (userId && userId > 0) {
+          reportParams.push(userId);
+          reportSql += ` AND COALESCE(r.user_id, aa.user_id) = $${reportParams.length}`;
+        }
+      }
+
+      const reportCount = await this.executeDatabaseQuery(reportSql, reportParams);
+
+      const attempts = parseInt(attemptCount?.[0]?.count || '0');
+      const reports = parseInt(reportCount?.[0]?.count || '0');
+      this.logger.warn(`📉 best_performer diagnostics | scope=${scopeLabel} | attempts=${attempts} | reports=${reports}`);
+    } catch (err) {
+      this.logger.warn(`best_performer diagnostics failed: ${err.message}`);
     }
   }
 
@@ -5922,9 +6495,12 @@ export class RagService {
           return gBody;
         }
         const cnt = data[0]?.count || 0;
+        const requested = (interpretation.searchTerm || '').toLowerCase();
         const gLabel = (interpretation as any).gender;
         if (gLabel === 'MALE') return `👨 **Male: ${cnt}**`;
         if (gLabel === 'FEMALE') return `👩 **Female: ${cnt}**`;
+        if (requested === 'employees') return `**${cnt} employees total.**`;
+        if (requested === 'users') return `**${cnt} users total.**`;
         return `**${cnt} candidates total.**`;
       }
 
@@ -6100,6 +6676,10 @@ export class RagService {
       ? '**🏆 Top Performers:**\n\n'
       : '**📊 Assessment Results:**\n\n';
 
+    if (isBestPerformer) {
+      response += '_Score basis: completed assessment scores._\n\n';
+    }
+
     data.forEach((row, i) => {
       const name = row.full_name || 'Unknown';
       const num = offset + i + 1;
@@ -6118,6 +6698,7 @@ export class RagService {
       // Agile Compatibility
       const scoreNum = row.total_score ? parseFloat(row.total_score) : NaN;
       if (!isNaN(scoreNum)) {
+        response += `   📈 **Total Score:** ${scoreNum.toFixed(2)}\n`;
         const agile = this.getAgileLevel(scoreNum);
         response += `   🎯 **${agile.name}**: ${agile.desc}\n`;
       }
@@ -6125,7 +6706,89 @@ export class RagService {
       response += '\n';
     });
 
+    if (isBestPerformer) {
+      const traitLeaders = this.buildBestPerformerTraitLeaders(data);
+      if (traitLeaders) {
+        response += `\n${traitLeaders}`;
+      }
+    }
+
     return response.trim();
+  }
+
+  private parseTraitScores(raw: any): Record<string, number> {
+    try {
+      if (!raw) return {};
+      let obj: any = typeof raw === 'string' ? JSON.parse(raw) : raw;
+
+      // Some payloads come as an array with one scores object.
+      if (Array.isArray(obj)) {
+        obj = obj.find((x: any) => x && typeof x === 'object') || obj[0];
+      }
+
+      // Some payloads wrap scores under known keys.
+      if (obj && typeof obj === 'object') {
+        if (obj.scores && typeof obj.scores === 'object') obj = obj.scores;
+        else if (obj.agile_scores && typeof obj.agile_scores === 'object') obj = obj.agile_scores;
+        else if (obj.traits && typeof obj.traits === 'object') obj = obj.traits;
+      }
+
+      if (!obj || typeof obj !== 'object') return {};
+
+      const out: Record<string, number> = {};
+      for (const [k, v] of Object.entries(obj)) {
+        const value = typeof v === 'string' ? v.replace(/%/g, '').trim() : v;
+        const n = Number(value);
+        if (!Number.isNaN(n) && Number.isFinite(n)) {
+          out[k] = n;
+        }
+      }
+      return out;
+    } catch {
+      return {};
+    }
+  }
+
+  private prettifyTraitName(rawKey: string): string {
+    return rawKey
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\b\w/g, (m) => m.toUpperCase());
+  }
+
+  private buildBestPerformerTraitLeaders(data: any[]): string {
+    const leaders = new Map<string, { name: string; traitScore: number; totalScore: number }>();
+
+    for (const row of data) {
+      const name = row?.full_name || row?.email || 'Unknown';
+      const totalScore = Number(row?.total_score || 0);
+      const traitScores = this.parseTraitScores(row?.trait_scores_json);
+
+      for (const [traitKey, traitValue] of Object.entries(traitScores)) {
+        const existing = leaders.get(traitKey);
+        if (!existing || traitValue > existing.traitScore) {
+          leaders.set(traitKey, {
+            name,
+            traitScore: traitValue,
+            totalScore,
+          });
+        }
+      }
+    }
+
+    if (leaders.size === 0) return '';
+
+    let section = '**🏅 Best Candidate Per Trait:**\n\n';
+    section += '| Trait | Best Candidate | Trait Score | Overall Score |\n';
+    section += '|---|---|---:|---:|\n';
+
+    const sortedTraits = Array.from(leaders.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    for (const [traitKey, leader] of sortedTraits) {
+      section += `| ${this.prettifyTraitName(traitKey)} | ${leader.name} | ${leader.traitScore.toFixed(2)} | ${leader.totalScore.toFixed(2)} |\n`;
+    }
+
+    return section;
   }
 
   private getAgileLevel(score: number): { name: string; desc: string } {
