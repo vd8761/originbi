@@ -44,7 +44,7 @@ const FALLBACK_COLORS = ['#150089', '#1ED36A', '#FF5457', '#FBC02D'];
 const DonutChartSimple = ({ total, traits }: { total: number; traits: TraitData[] }) => {
   const maxCount = Math.max(...traits.map(t => t.count), 1);
   return (
-    <div className="relative w-[260px] h-[260px] flex items-center justify-center">
+    <div className="relative w-[180px] h-[180px] md:w-[220px] md:h-[220px] flex items-center justify-center">
       <svg viewBox="0 0 200 200" className="w-full h-full rotate-[-90deg]">
         {traits.map((trait, i) => {
           const r = RING_RADII[i] || 45;
@@ -71,18 +71,18 @@ const DonutChartSimple = ({ total, traits }: { total: number; traits: TraitData[
 const UserDistributionDonut = ({ data }: { data: UserDistributionData }) => {
   const traits = data.topTraits || [];
   return (
-    <div className="w-full h-full flex flex-row items-center justify-between px-10">
+    <div className="w-full h-full flex flex-col md:flex-row items-center justify-center gap-8 md:gap-x-10 px-4 md:px-6">
       <div className="flex-shrink-0">
         <DonutChartSimple total={data.totalWithTraits} traits={traits} />
       </div>
-      <div className="flex flex-col gap-6 pr-4">
+      <div className="grid grid-cols-2 md:flex md:flex-col gap-x-6 gap-y-4 md:gap-6">
         {traits.map((trait, i) => (
-          <div key={i} className="flex flex-col gap-1 min-w-[160px]">
-            <div className="flex items-center gap-3">
-              <span className="w-2.5 h-6 rounded-full" style={{ backgroundColor: trait.colorRgb || FALLBACK_COLORS[i] }}></span>
-              <span className="font-bold text-2xl text-[#19211C] dark:text-white leading-none">{trait.count}</span>
+          <div key={i} className="flex flex-col gap-0.5 md:gap-1 min-w-[120px] md:min-w-[160px]">
+            <div className="flex items-center gap-2 md:gap-3">
+              <span className="w-2 md:w-2.5 h-5 md:h-6 rounded-full" style={{ backgroundColor: trait.colorRgb || FALLBACK_COLORS[i] }}></span>
+              <span className="font-bold text-xl md:text-2xl text-[#19211C] dark:text-white leading-none">{trait.count}</span>
             </div>
-            <span className="text-[15px] font-bold text-[#111812] dark:text-white/90 pl-6 leading-tight whitespace-nowrap tracking-wide uppercase">{trait.traitName}</span>
+            <span className="text-[12px] md:text-[15px] font-bold text-[#111812] dark:text-white/80 md:dark:text-white/90 pl-4 md:pl-6 leading-tight whitespace-nowrap tracking-wide uppercase">{trait.traitName}</span>
           </div>
         ))}
       </div>
