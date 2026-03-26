@@ -138,7 +138,7 @@ export class OriIntelligenceService {
             const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
             if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
             const knowledgeModel = process.env.GEMINI_KNOWLEDGE_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
-            const knowledgeMaxTokens = Math.max(180, Number(process.env.KNOWLEDGE_MAX_OUTPUT_TOKENS || 560));
+            const knowledgeMaxTokens = Math.max(260, Number(process.env.KNOWLEDGE_MAX_OUTPUT_TOKENS || 860));
             this.llm = new ChatGoogleGenerativeAI({
                 apiKey,
                 model: knowledgeModel,
@@ -154,7 +154,7 @@ export class OriIntelligenceService {
         if (!this.groqFallbackLlm) {
             const apiKey = process.env.GROQ_API_KEY;
             if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
-            const knowledgeMaxTokens = Math.max(180, Number(process.env.KNOWLEDGE_MAX_OUTPUT_TOKENS || 560));
+            const knowledgeMaxTokens = Math.max(260, Number(process.env.KNOWLEDGE_MAX_OUTPUT_TOKENS || 860));
             this.groqFallbackLlm = new ChatGroq({
                 apiKey,
                 model: 'llama-3.3-70b-versatile',

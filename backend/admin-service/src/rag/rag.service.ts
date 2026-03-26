@@ -296,6 +296,114 @@ export class RagService {
     return `No matching data found${scopeMsg}. Try asking a more specific question or use **"list candidates"** to see available data.`;
   }
 
+  private getRoleScopedNoDataMessage(intent: string, role: string, question: string): string {
+    const normalizedRole = (role || 'STUDENT').toUpperCase();
+    const inCorporateScope = normalizedRole === 'CORPORATE';
+    const scopeMsg = inCorporateScope ? ' under your corporate account' : '';
+
+    const byIntent: Record<string, string> = {
+      list_candidates: inCorporateScope ? `0 users found${scopeMsg}.` : '0 users found.',
+      list_users: '0 users found.',
+      test_results: inCorporateScope ? `0 completed assessment results found${scopeMsg}.` : '0 completed assessment results found.',
+      best_performer: inCorporateScope ? `0 candidates with completed assessments found${scopeMsg}.` : '0 candidates with completed assessments found.',
+      self_results: "You don't have any completed assessments yet. Complete an assessment to see your results.",
+      corporate_details: inCorporateScope ? `No corporate profile data found${scopeMsg}.` : 'No corporate accounts found.',
+      count: inCorporateScope ? `**Total: 0**${scopeMsg}.` : '**Total: 0**',
+      data_query: this.getContextualNoDataMessage(question, inCorporateScope ? ' in your organization' : ''),
+    };
+
+    return byIntent[intent] || (inCorporateScope ? `No matching data found${scopeMsg}.` : 'No matching data found.');
+  }
+
+  private postProcessRoleAwareAnswer(answer: string, user: any, question: string): string {
+    if (!answer) return answer;
+
+    const raw = answer.trim();
+    const role = (user?.role || 'STUDENT').toUpperCase();
+
+    if (/^no users found\.?$/i.test(raw)) {
+      if (role === 'CORPORATE') {
+        if (/\b(candidate|candidates|employee|employees|resource|resources|staff|team)\b/i.test(question)) {
+          return '0 users found under your corporate account.';
+        }
+        return 'No matching records found under your corporate account.';
+      }
+
+      if (role === 'STUDENT' || role === 'INDIVIDUAL') {
+        if (/\b(score|result|assessment|test|personality)\b/i.test(question)) {
+          return "You don't have completed assessment results yet.";
+        }
+      }
+
+      return '0 users found.';
+    }
+
+    return answer;
+  }
+
+  private resolveDirectRoleScopedInterpretation(
+    message: string,
+    userRole: string,
+  ): { intent: string; searchTerm: string | null; table: string; includePersonality: boolean; includeAll?: boolean } | null {
+    const q = this.normalizeQuery(message).toLowerCase();
+
+    if (/\b(list|show|get|display|view)\b\s+(my|our)?\s*\b(candidates?|students?|employees?|resources?|staff|members?)\b/.test(q)) {
+      return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
+    }
+
+    if (/\b(which|who)\b.*\b(best|top|highest)\b.*\b(employee|employees|candidate|candidates|student|students|resource|resources|performer)\b/.test(q) ||
+      /\b(best|top|highest)\b\s+\b(employee|employees|candidate|candidates|student|students|resource|resources|performer)\b/.test(q)) {
+      return { intent: 'best_performer', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    if ((userRole === 'STUDENT' || userRole === 'INDIVIDUAL') &&
+      /\b(my|me|mine)\b/.test(q) &&
+      /\b(score|scores|result|results|assessment|test|personality|style|agile)\b/.test(q)) {
+      return { intent: 'self_results', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    return null;
+  }
+
+  private async resolveEffectiveCorporateId(user?: UserContext): Promise<number | null> {
+    if (!user) return null;
+    const role = (user.role || 'STUDENT').toUpperCase();
+    if (role !== 'CORPORATE') return user.corporateId || null;
+    if (user.corporateId) return user.corporateId;
+
+    try {
+      if (user.id) {
+        const corpByUserId = await this.dataSource.query(
+          'SELECT id FROM corporate_accounts WHERE user_id = $1 LIMIT 1',
+          [user.id],
+        );
+        if (corpByUserId?.length > 0) {
+          const resolved = Number(corpByUserId[0].id);
+          if (resolved > 0) return resolved;
+        }
+      }
+
+      if (user.email) {
+        const corpByEmail = await this.dataSource.query(
+          `SELECT ca.id
+           FROM corporate_accounts ca
+           JOIN users u ON ca.user_id = u.id
+           WHERE LOWER(u.email) = LOWER($1)
+           LIMIT 1`,
+          [user.email],
+        );
+        if (corpByEmail?.length > 0) {
+          const resolved = Number(corpByEmail[0].id);
+          if (resolved > 0) return resolved;
+        }
+      }
+    } catch (e) {
+      this.logger.warn(`Unable to resolve corporateId from user context: ${e.message}`);
+    }
+
+    return null;
+  }
+
   /** Sanitize error messages — never expose raw SQL/DB internals to users */
   private sanitizeErrorForUser(error: any): string {
     const msg = error?.message || 'An unexpected error occurred';
@@ -402,7 +510,7 @@ export class RagService {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
       const ragModel = process.env.GEMINI_RAG_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
-      const ragMaxTokens = Math.max(180, Number(process.env.RAG_MAX_OUTPUT_TOKENS || 500));
+      const ragMaxTokens = Math.max(260, Number(process.env.RAG_MAX_OUTPUT_TOKENS || 720));
       this.llm = new ChatGoogleGenerativeAI({
         apiKey,
         model: ragModel,
@@ -418,7 +526,7 @@ export class RagService {
     if (!this.fallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
-      const ragMaxTokens = Math.max(180, Number(process.env.RAG_MAX_OUTPUT_TOKENS || 500));
+      const ragMaxTokens = Math.max(260, Number(process.env.RAG_MAX_OUTPUT_TOKENS || 720));
       this.fallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
@@ -452,6 +560,7 @@ export class RagService {
       // Candidate variations
       'candiate': 'candidate', 'candadate': 'candidate', 'candidte': 'candidate',
       'candiates': 'candidates', 'candidtes': 'candidates', 'candadates': 'candidates',
+      'candiodate': 'candidate', 'candiodates': 'candidates',
       'canidate': 'candidate', 'canidates': 'candidates', 'candidat': 'candidate',
       'candidats': 'candidates', 'canditae': 'candidate', 'canditaes': 'candidates',
       'canditare': 'candidate', 'canditares': 'candidates', 'canditate': 'candidate',
@@ -460,6 +569,7 @@ export class RagService {
       // Employee variations
       'employe': 'employee', 'employes': 'employees', 'employeee': 'employee',
       'emplyee': 'employee', 'emplyees': 'employees', 'emploee': 'employee',
+      'emploeye': 'employee', 'emploeyee': 'employee',
       'emploees': 'employees', 'employi': 'employee', 'employess': 'employees',
       // Resource variations
       'resourse': 'resource', 'resourses': 'resources', 'resorce': 'resource',
@@ -632,6 +742,7 @@ export class RagService {
 
       const isCounsellorDataRequest =
         (/\b(list|show|get|count|how many|total|top|best|who|find|match|identify|suggest|recommend)\b/i.test(normalizedCounsellorQ) ||
+          (/\b(what|which)\b/i.test(normalizedCounsellorQ) && /\b(my|me|mine)\b/i.test(normalizedCounsellorQ)) ||
           /\b(suitable|suited|fit|eligible|matching)\b/i.test(normalizedCounsellorQ)) &&
         /\b(user|users|candidate|candidates|resource|resources|employee|employees|staff|member|members|result|results|score|scores|assessment|assessments|company|companies|corporate|group|groups|batch|batches|role|roles|job|position|jd|description)\b/i.test(normalizedCounsellorQ);
 
@@ -716,13 +827,12 @@ export class RagService {
       // ═══════════════════════════════════════════════════════════════
       question = this.normalizeQuery(question);
 
-      if (this.isExplicitListAllCandidatesQuery(question)) {
-        this.logger.log('🎯 Direct routing: list all candidates (deterministic full list)');
+      const sessionId = conversationId > 0 ? `conv_${conversationId}` : `user_${user?.id || 0}`;
+      const explicitListAllInterpretation = this.resolveExplicitListAllInterpretation(question, sessionId);
+      if (explicitListAllInterpretation) {
+        this.logger.log(`🎯 Direct routing: ${explicitListAllInterpretation.intent} (deterministic full list)`);
         const interpretation = {
-          intent: 'list_candidates',
-          searchTerm: null,
-          table: 'registrations',
-          includePersonality: false,
+          ...explicitListAllInterpretation,
           includeAll: true,
         };
         const totalCount = await this.getTotalCount(interpretation, user as UserContext);
@@ -730,9 +840,32 @@ export class RagService {
         const answer = this.formatResponse(interpretation, data, 0, totalCount);
         return {
           answer,
-          searchType: 'list_candidates',
+          searchType: interpretation.intent,
           sources: { rows: data.length, total: totalCount },
           confidence: 0.99,
+        };
+      }
+
+      const currentUserRole = (user?.role || 'STUDENT').toUpperCase();
+      const roleAwareDirectInterpretation = this.resolveDirectRoleScopedInterpretation(question, currentUserRole);
+      if (roleAwareDirectInterpretation) {
+        this.logger.log(`🎯 Direct role-aware routing: ${roleAwareDirectInterpretation.intent}`);
+        const totalCount = await this.getTotalCount(roleAwareDirectInterpretation, user as UserContext);
+        const data = await this.executeQuery(roleAwareDirectInterpretation, user as UserContext, 0);
+
+        if (!data || data.length === 0) {
+          return {
+            answer: this.getRoleScopedNoDataMessage(roleAwareDirectInterpretation.intent, currentUserRole, question),
+            searchType: roleAwareDirectInterpretation.intent,
+            confidence: 0.88,
+          };
+        }
+
+        return {
+          answer: this.formatResponse(roleAwareDirectInterpretation, data, 0, totalCount),
+          searchType: roleAwareDirectInterpretation.intent,
+          sources: { rows: data.length, total: totalCount },
+          confidence: 0.97,
         };
       }
 
@@ -859,8 +992,6 @@ export class RagService {
       // ═══════════════════════════════════════════════════════════════
       // STEP 1: CONVERSATION CONTEXT + QUERY UNDERSTANDING
       // ═══════════════════════════════════════════════════════════════
-      const sessionId = conversationId > 0 ? `conv_${conversationId}` : `user_${user?.id || 0}`;
-
       // Build conversation history for context-aware intent classification
       let conversationHistory = '';
       if (conversationId > 0) {
@@ -1035,7 +1166,7 @@ export class RagService {
           }
 
           return {
-            answer: agentResult.answer,
+            answer: this.postProcessRoleAwareAnswer(agentResult.answer, user, resolvedQuestion),
             searchType: agentResult.searchType,
             confidence: agentResult.confidence,
             sources: agentResult.sources,
@@ -1387,8 +1518,9 @@ export class RagService {
           }
           // Low confidence — return a clear DB-only response, NEVER fallback to LLM general knowledge
           this.logger.log('🔄 Text-to-SQL low confidence — returning DB-only response');
+          const fallbackRole = (user?.role || 'STUDENT').toUpperCase();
           return {
-            answer: `No matching users found for that request.\n\nTry asking:\n- **"list users"**\n- **"list candidates"**\n- **"show top performers"**`,
+            answer: `${this.getRoleScopedNoDataMessage('data_query', fallbackRole, question)}\n\nTry asking:\n- **"list users"**\n- **"list candidates"**\n- **"show top performers"**`,
             searchType: 'data_query_no_results',
             confidence: 0.6,
           };
@@ -1430,7 +1562,7 @@ export class RagService {
             // If Text-to-SQL returned low confidence with 0 rows, give a clear DB-only answer
             if (tsResult.rowCount === 0) {
               return {
-                answer: `No users found for that request.`,
+                answer: this.getRoleScopedNoDataMessage('data_query', (user?.role || 'STUDENT').toUpperCase(), question),
                 searchType: 'data_guard_no_results',
                 confidence: 0.8,
               };
@@ -1675,16 +1807,16 @@ export class RagService {
           // Specific messages per intent
           const noDataMessages: Record<string, string> = {
             person_lookup: BI_PERSONA.errors.notFound(interpretation.searchTerm || 'that person'),
-            self_results: `You don't have any completed assessments yet. Complete an assessment to see your results here.`,
-            list_candidates: `No users found${scopeMsg}.`,
-            list_users: `No users found.`,
-            test_results: `No completed assessment results found${scopeMsg}.`,
-            best_performer: `No candidates or completed assessments found${scopeMsg}.`,
+            self_results: this.getRoleScopedNoDataMessage('self_results', curRole, question),
+            list_candidates: this.getRoleScopedNoDataMessage('list_candidates', curRole, question),
+            list_users: this.getRoleScopedNoDataMessage('list_users', curRole, question),
+            test_results: this.getRoleScopedNoDataMessage('test_results', curRole, question),
+            best_performer: this.getRoleScopedNoDataMessage('best_performer', curRole, question),
             career_roles: `No career roles found.`,
-            count: `**Total: 0**`,
+            count: this.getRoleScopedNoDataMessage('count', curRole, question),
             count_by_role: `No accounts found.`,
-            corporate_details: `No corporate accounts found${scopeMsg}.`,
-            data_query: this.getContextualNoDataMessage(question, scopeMsg),
+            corporate_details: this.getRoleScopedNoDataMessage('corporate_details', curRole, question),
+            data_query: this.getRoleScopedNoDataMessage('data_query', curRole, question),
           };
 
           const answer = noDataMessages[interpretation.intent]
@@ -1704,7 +1836,7 @@ export class RagService {
         if (platformEntityCheck.test(question) || (candidateDataCheck.test(question) && conversationHistory && /\b(candidate|employee|resource|people|person|staff|male|female)\b/i.test(conversationHistory))) {
           // Platform data question — return DB-only message, don't use LLM
           return {
-            answer: `No users found for that request.`,
+            answer: this.getRoleScopedNoDataMessage('data_query', curRole, question),
             searchType: 'data_guard_no_results',
             confidence: 0.7,
           };
@@ -3438,6 +3570,57 @@ export class RagService {
       /^\s*all\s+(candidates?|students?|employees?|resources?)\s*\??\s*$/.test(q);
   }
 
+  private resolveExplicitListAllInterpretation(
+    message: string,
+    sessionId: string,
+  ): { intent: string; searchTerm: string | null; table: string; includePersonality: boolean; roles?: string[] } | null {
+    const q = this.normalizeQuery(message).toLowerCase();
+    const isExplicitListAll =
+      /\b(list|show|get|display)\b\s+\b(all|complete|entire)\b/.test(q) ||
+      /^\s*(list|show|get|display)?\s*all\s*\??\s*$/.test(q);
+
+    if (!isExplicitListAll) {
+      return null;
+    }
+
+    // Direct entity routing has highest priority.
+    if (/\badmins?\b/.test(q)) {
+      return { intent: 'list_users', searchTerm: null, table: 'users', includePersonality: false, roles: ['ADMIN'] };
+    }
+    if (/\b(users?|logins?|accounts?)\b/.test(q)) {
+      return { intent: 'list_users', searchTerm: null, table: 'users', includePersonality: false };
+    }
+    if (/\b(corporates?|companies|organizations|businesses)\b/.test(q)) {
+      return { intent: 'corporate_details', searchTerm: null, table: 'corporate_accounts', includePersonality: false };
+    }
+    if (/\b(candidates?|students?|employees?|resources?|registrations?)\b/.test(q)) {
+      return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
+    }
+    if (/\b(career\s*roles?|job\s*roles?)\b/.test(q)) {
+      return { intent: 'career_roles', searchTerm: null, table: 'career_roles', includePersonality: false };
+    }
+    if (/\baffiliates?\b/.test(q)) {
+      return { intent: 'affiliate_list', searchTerm: null, table: 'affiliate_accounts', includePersonality: false };
+    }
+
+    // Bare "list all" follow-up: infer from previous conversational intent.
+    const session = this.conversationService.getSession(sessionId);
+    const lastIntent = session?.currentContext?.lastIntent || '';
+    const lastMessages = session?.messages?.slice(-4).map(m => (m.content || '').toLowerCase()).join(' ') || '';
+
+    if (lastIntent === 'list_users' || /\buser|admin\b/.test(lastMessages)) {
+      return { intent: 'list_users', searchTerm: null, table: 'users', includePersonality: false };
+    }
+    if (lastIntent === 'corporate_details' || /\bcorporate|company|organization\b/.test(lastMessages)) {
+      return { intent: 'corporate_details', searchTerm: null, table: 'corporate_accounts', includePersonality: false };
+    }
+    if (lastIntent === 'list_candidates' || lastIntent === 'test_results' || lastIntent === 'best_performer' || /\bcandidate|student|resource|employee|registration\b/.test(lastMessages)) {
+      return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
+    }
+
+    return null;
+  }
+
   private async executeDatabaseQuery(sql: string, params: any[] = []): Promise<any[]> {
     const startTime = Date.now();
     try {
@@ -3913,7 +4096,7 @@ export class RagService {
     }
 
     // "best employee" / "best candidate" / "top performer" / "best performer" (generic, no role specified)
-    if (/\b(best|top|highest)\s+(candidate|performer|student|person|scorer)\b/.test(q)) {
+    if (/\b(best|top|highest)\s+(candidate|performer|student|person|scorer|employee|resource)\b/.test(q)) {
       return { intent: 'best_performer', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
     }
 
@@ -5056,11 +5239,11 @@ export class RagService {
   // TOTAL COUNT FOR PAGINATION
   // ═══════════════════════════════════════════════════════════════════════════
   private async getTotalCount(
-    interpretation: { intent: string; table: string; searchTerm?: string | null },
+    interpretation: { intent: string; table: string; searchTerm?: string | null; roles?: string[] },
     user?: UserContext
   ): Promise<number> {
     const userRole = user?.role || 'STUDENT';
-    const corporateId = user?.corporateId;
+    const corporateId = await this.resolveEffectiveCorporateId(user);
     const userId = user?.id;
     let sql = '';
     const params: any[] = [];
@@ -5069,7 +5252,13 @@ export class RagService {
       switch (interpretation.intent) {
         case 'list_users':
           if (userRole !== 'ADMIN') return 0;
-          sql = `SELECT COUNT(*) as count FROM users`;
+          if (interpretation.roles?.length) {
+            const rolePlaceholders = interpretation.roles.map((_: string, i: number) => `$${i + 1}`).join(', ');
+            sql = `SELECT COUNT(*) as count FROM users WHERE role IN (${rolePlaceholders})`;
+            params.push(...interpretation.roles);
+          } else {
+            sql = `SELECT COUNT(*) as count FROM users`;
+          }
           break;
         case 'list_candidates':
           if (userRole === 'ADMIN') {
@@ -5143,6 +5332,7 @@ export class RagService {
       table: string;
       includePersonality: boolean;
       includeAll?: boolean;
+      roles?: string[];
     },
     user?: UserContext,
     offset: number = 0
@@ -5151,7 +5341,7 @@ export class RagService {
     const params: any[] = [];
 
     const userRole = user?.role || 'STUDENT';
-    const corporateId = user?.corporateId;
+    const corporateId = await this.resolveEffectiveCorporateId(user);
     const userId = user?.id;
     const limit = interpretation.includeAll ? 5000 : this.PAGE_SIZE;
 
@@ -5163,10 +5353,20 @@ export class RagService {
         if (userRole !== 'ADMIN') {
           return [];
         }
-        sql = `SELECT u.email, u.role, COALESCE(r.full_name, split_part(u.email, '@', 1)) as full_name
-               FROM users u
-               LEFT JOIN registrations r ON r.user_id = u.id AND r.is_deleted = false
-               ORDER BY u.email ASC LIMIT ${limit} OFFSET ${offset}`;
+        if (interpretation.roles?.length) {
+          const rolePlaceholders = interpretation.roles.map((_: string, i: number) => `$${i + 1}`).join(', ');
+          params.push(...interpretation.roles);
+          sql = `SELECT u.email, u.role, COALESCE(r.full_name, split_part(u.email, '@', 1)) as full_name
+                 FROM users u
+                 LEFT JOIN registrations r ON r.user_id = u.id AND r.is_deleted = false
+                 WHERE u.role IN (${rolePlaceholders})
+                 ORDER BY u.email ASC LIMIT ${limit} OFFSET ${offset}`;
+        } else {
+          sql = `SELECT u.email, u.role, COALESCE(r.full_name, split_part(u.email, '@', 1)) as full_name
+                 FROM users u
+                 LEFT JOIN registrations r ON r.user_id = u.id AND r.is_deleted = false
+                 ORDER BY u.email ASC LIMIT ${limit} OFFSET ${offset}`;
+        }
         break;
 
       case 'list_candidates':
@@ -5359,7 +5559,8 @@ export class RagService {
           if (userRole !== 'ADMIN') {
             return [{ count: 0 }];
           }
-          sql = `SELECT COUNT(*) as count FROM users`;
+          // Keep total user count aligned with role-wise dashboard counts.
+          sql = `SELECT COUNT(*) as count FROM users WHERE role IN ('ADMIN','CORPORATE','STUDENT')`;
         } else if (interpretation.table === 'registrations') {
           if (userRole === 'ADMIN') {
             sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false${genderClause}`;
@@ -5728,12 +5929,14 @@ export class RagService {
       }
 
       case 'count_by_role': {
-        let roleBody = '**Account Breakdown:**\n\n';
         let total = 0;
+        let roleBody = '**Account Breakdown:**\n\n';
+        roleBody += '| ROLE | TOTAL COUNT |\n';
+        roleBody += '|------|-------------|\n';
         for (const row of data) {
           const count = parseInt(row.count) || 0;
           total += count;
-          roleBody += `• **${row.role}**: ${count}\n`;
+          roleBody += `| ${row.role} | ${count} |\n`;
         }
         roleBody += `\n**Total: ${total}**`;
         return roleBody;
@@ -5948,11 +6151,13 @@ export class RagService {
   }
 
   private formatUserList(data: any[], offset: number = 0): string {
-    let response = '**👥 Users:**\n\n';
+    let response = `**👥 Users (${data.length}):**\n\n`;
+    response += '| # | NAME | EMAIL | ROLE |\n';
+    response += '|---|------|-------|------|\n';
     data.forEach((row, i) => {
       const num = offset + i + 1;
-      const name = row.full_name || row.email.split('@')[0];
-      response += `**${num}.** ${name} | ${row.email} | ${row.role}\n`;
+      const name = row.full_name || row.email?.split('@')?.[0] || 'N/A';
+      response += `| ${num} | ${name} | ${row.email || 'N/A'} | ${row.role || 'N/A'} |\n`;
     });
     return response;
   }
