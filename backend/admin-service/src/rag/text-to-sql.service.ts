@@ -72,7 +72,7 @@ export class TextToSqlService {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
       const sqlModel = process.env.GEMINI_SQL_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
-      const sqlMaxTokens = Math.max(180, Number(process.env.SQL_MAX_OUTPUT_TOKENS || 520));
+      const sqlMaxTokens = Math.max(240, Number(process.env.SQL_MAX_OUTPUT_TOKENS || 680));
       this.llm = new ChatGoogleGenerativeAI({
         apiKey,
         model: sqlModel,
@@ -88,7 +88,7 @@ export class TextToSqlService {
     if (!this.sqlFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
-      const sqlMaxTokens = Math.max(180, Number(process.env.SQL_MAX_OUTPUT_TOKENS || 520));
+      const sqlMaxTokens = Math.max(240, Number(process.env.SQL_MAX_OUTPUT_TOKENS || 680));
       this.sqlFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
@@ -105,7 +105,7 @@ export class TextToSqlService {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
       const formatterModel = process.env.GEMINI_FORMATTER_MODEL || process.env.GEMINI_SQL_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
-      const formatterMaxTokens = Math.max(160, Number(process.env.FORMATTER_MAX_OUTPUT_TOKENS || 480));
+      const formatterMaxTokens = Math.max(220, Number(process.env.FORMATTER_MAX_OUTPUT_TOKENS || 620));
       this.formatterLlm = new ChatGoogleGenerativeAI({
         apiKey,
         model: formatterModel,
@@ -121,7 +121,7 @@ export class TextToSqlService {
     if (!this.formatterFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
-      const formatterMaxTokens = Math.max(160, Number(process.env.FORMATTER_MAX_OUTPUT_TOKENS || 480));
+      const formatterMaxTokens = Math.max(220, Number(process.env.FORMATTER_MAX_OUTPUT_TOKENS || 620));
       this.formatterFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
@@ -138,7 +138,7 @@ export class TextToSqlService {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
       const synthesizerModel = process.env.GEMINI_SQL_SYNTH_MODEL || process.env.GEMINI_SQL_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
-      const synthMaxTokens = Math.max(180, Number(process.env.SQL_SYNTH_MAX_OUTPUT_TOKENS || 620));
+      const synthMaxTokens = Math.max(260, Number(process.env.SQL_SYNTH_MAX_OUTPUT_TOKENS || 860));
       this.synthesizerLlm = new ChatGoogleGenerativeAI({
         apiKey,
         model: synthesizerModel,
@@ -154,7 +154,7 @@ export class TextToSqlService {
     if (!this.synthesizerFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
-      const synthMaxTokens = Math.max(180, Number(process.env.SQL_SYNTH_MAX_OUTPUT_TOKENS || 620));
+      const synthMaxTokens = Math.max(260, Number(process.env.SQL_SYNTH_MAX_OUTPUT_TOKENS || 860));
       this.synthesizerFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
@@ -470,7 +470,7 @@ Return ONLY the corrected SQL, nothing else:`;
 Rules:
 1) Never fabricate names, values, or trends.
 2) Start with the direct answer.
-3) Use markdown table only when it improves readability.
+  3) If result is tabular (2+ columns), ALWAYS use a markdown table for the primary data.
 4) Add at most 1 short insight line from the provided numbers.
 5) No filler, no methodology, no external references.
 
@@ -540,12 +540,8 @@ Final answer:`;
         return `**${entries[0][1]}**`;
       }
 
-      // Single row with multiple fields — bullet list
-      const lines = entries.map(([key, value]) => {
-        const label = this.humanizeColumnName(key);
-        return `- **${label}**: ${value}`;
-      });
-      return lines.join('\n');
+      // Single row with multiple fields — table format for consistency in UI.
+      return this.buildMarkdownTable([row]);
     }
 
     // 2+ rows — create a neat table

@@ -108,7 +108,7 @@ export class AgentOrchestratorService {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
       const plannerModel = process.env.GEMINI_PLANNER_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
-      const plannerMaxTokens = Math.max(128, Number(process.env.AGENT_PLANNER_MAX_OUTPUT_TOKENS || 320));
+      const plannerMaxTokens = Math.max(180, Number(process.env.AGENT_PLANNER_MAX_OUTPUT_TOKENS || 420));
       this.plannerLlm = new ChatGoogleGenerativeAI({
         apiKey,
         model: plannerModel,
@@ -124,7 +124,7 @@ export class AgentOrchestratorService {
     if (!this.plannerFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
-      const plannerMaxTokens = Math.max(128, Number(process.env.AGENT_PLANNER_MAX_OUTPUT_TOKENS || 320));
+      const plannerMaxTokens = Math.max(180, Number(process.env.AGENT_PLANNER_MAX_OUTPUT_TOKENS || 420));
       this.plannerFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
@@ -142,7 +142,7 @@ export class AgentOrchestratorService {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
       const synthesizerModel = process.env.GEMINI_SYNTH_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
-      const synthesizerMaxTokens = Math.max(180, Number(process.env.AGENT_SYNTH_MAX_OUTPUT_TOKENS || 420));
+      const synthesizerMaxTokens = Math.max(260, Number(process.env.AGENT_SYNTH_MAX_OUTPUT_TOKENS || 700));
       this.synthesizerLlm = new ChatGoogleGenerativeAI({
         apiKey,
         model: synthesizerModel,
@@ -158,7 +158,7 @@ export class AgentOrchestratorService {
     if (!this.synthesizerFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
-      const synthesizerMaxTokens = Math.max(180, Number(process.env.AGENT_SYNTH_MAX_OUTPUT_TOKENS || 420));
+      const synthesizerMaxTokens = Math.max(260, Number(process.env.AGENT_SYNTH_MAX_OUTPUT_TOKENS || 700));
       this.synthesizerFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
@@ -176,7 +176,7 @@ export class AgentOrchestratorService {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
       const reflectorModel = process.env.GEMINI_REFLECTOR_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
-      const reflectorMaxTokens = Math.max(96, Number(process.env.AGENT_REFLECTOR_MAX_OUTPUT_TOKENS || 140));
+      const reflectorMaxTokens = Math.max(120, Number(process.env.AGENT_REFLECTOR_MAX_OUTPUT_TOKENS || 180));
       this.reflectorLlm = new ChatGoogleGenerativeAI({
         apiKey,
         model: reflectorModel,
@@ -192,7 +192,7 @@ export class AgentOrchestratorService {
     if (!this.reflectorFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
-      const reflectorMaxTokens = Math.max(96, Number(process.env.AGENT_REFLECTOR_MAX_OUTPUT_TOKENS || 140));
+      const reflectorMaxTokens = Math.max(120, Number(process.env.AGENT_REFLECTOR_MAX_OUTPUT_TOKENS || 180));
       this.reflectorFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',

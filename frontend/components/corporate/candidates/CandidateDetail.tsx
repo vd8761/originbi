@@ -200,6 +200,10 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
     const [selectedStatus, setSelectedStatus] = useState<string>("All Status");
     const [selectedDateRange, setSelectedDateRange] = useState<string>("Any Time");
     const [selectedAlignmentRange, setSelectedAlignmentRange] = useState<string>("All Alignment");
+    const [calendarPreset, setCalendarPreset] = useState<string>("Custom Range");
+    const [rangeStart, setRangeStart] = useState<Date | null>(new Date(2025, 9, 9));
+    const [rangeEnd, setRangeEnd] = useState<Date | null>(new Date(2025, 10, 17));
+    const [leftCalendarMonth, setLeftCalendarMonth] = useState<Date>(new Date(2025, 9, 1));
     const [searchQuery, setSearchQuery] = useState("");
     const [sortColumn, setSortColumn] = useState<SortColumn>("posted_date");
     const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -343,6 +347,219 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
         isSelected
             ? "flex items-center gap-2 h-[44px] bg-[#E7F8EE] dark:bg-[#1ED36A]/20 border border-[#1ED36A]/50 dark:border-[#1ED36A]/45 hover:bg-[#DDF4E7] dark:hover:bg-[#1ED36A]/25 text-[#1F3B2A] dark:text-white px-4 rounded-xl text-[13px] leading-[18px] font-medium transition-colors whitespace-nowrap cursor-pointer shrink-0"
             : "flex items-center gap-2 h-[44px] bg-transparent border border-gray-300 dark:border-white/[0.24] hover:bg-black/[0.04] dark:hover:bg-white/5 text-[#33413B] dark:text-white/85 px-4 rounded-xl text-[13px] leading-[18px] font-medium transition-colors whitespace-nowrap cursor-pointer shrink-0";
+
+    const calendarPresets = ["All", "Today", "Yesterday", "Last 7 Days", "Last 30 Days", "This Month", "Last Month", "Custom Range"];
+    const weekDays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+
+    const normalizeDate = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    const addMonths = (date: Date, months: number) => new Date(date.getFullYear(), date.getMonth() + months, 1);
+    const getMonthLabel = (date: Date) => date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    const formatShortNumericDate = (date: Date) => {
+        const day = `${date.getDate()}`.padStart(2, "0");
+        const month = `${date.getMonth() + 1}`.padStart(2, "0");
+        const year = `${date.getFullYear()}`.slice(-2);
+        return `${day}/${month}/${year}`;
+    };
+    const formatFilterRangeLabel = (start: Date, end: Date) => {
+        const startDay = `${start.getDate()}`.padStart(2, "0");
+        const endDay = `${end.getDate()}`.padStart(2, "0");
+        const startMonth = start.toLocaleDateString("en-US", { month: "short" });
+        const endMonth = end.toLocaleDateString("en-US", { month: "short" });
+        const endYear = end.getFullYear();
+        return `${startDay} ${startMonth} to ${endDay} ${endMonth} ${endYear}`;
+    };
+
+    const buildMonthGrid = (year: number, month: number) => {
+        const firstDay = new Date(year, month, 1);
+        const startDayIndex = (firstDay.getDay() + 6) % 7;
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const daysInPrevMonth = new Date(year, month, 0).getDate();
+        const cells: { date: Date; inCurrentMonth: boolean }[] = [];
+
+        for (let i = 0; i < startDayIndex; i += 1) {
+            const day = daysInPrevMonth - startDayIndex + i + 1;
+            cells.push({ date: new Date(year, month - 1, day), inCurrentMonth: false });
+        }
+
+        for (let day = 1; day <= daysInMonth; day += 1) {
+            cells.push({ date: new Date(year, month, day), inCurrentMonth: true });
+        }
+
+        while (cells.length < 42) {
+            const nextDay = cells.length - (startDayIndex + daysInMonth) + 1;
+            cells.push({ date: new Date(year, month + 1, nextDay), inCurrentMonth: false });
+        }
+
+        return cells;
+    };
+
+    const startTime = rangeStart ? normalizeDate(rangeStart) : null;
+    const endTime = rangeEnd ? normalizeDate(rangeEnd) : null;
+    const selectedRangeText = rangeStart && rangeEnd
+        ? `${formatShortNumericDate(rangeStart)} - ${formatShortNumericDate(rangeEnd)}`
+        : "No range selected";
+
+    const applyPresetRange = (preset: string) => {
+        const today = new Date();
+        const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+        if (preset === "All") {
+            setRangeStart(null);
+            setRangeEnd(null);
+            return;
+        }
+
+        if (preset === "Today") {
+            setRangeStart(todayDate);
+            setRangeEnd(todayDate);
+            setLeftCalendarMonth(new Date(todayDate.getFullYear(), todayDate.getMonth(), 1));
+            return;
+        }
+
+        if (preset === "Yesterday") {
+            const yesterday = new Date(todayDate);
+            yesterday.setDate(yesterday.getDate() - 1);
+            setRangeStart(yesterday);
+            setRangeEnd(yesterday);
+            setLeftCalendarMonth(new Date(yesterday.getFullYear(), yesterday.getMonth(), 1));
+            return;
+        }
+
+        if (preset === "Last 7 Days") {
+            const start = new Date(todayDate);
+            start.setDate(start.getDate() - 6);
+            setRangeStart(start);
+            setRangeEnd(todayDate);
+            setLeftCalendarMonth(new Date(start.getFullYear(), start.getMonth(), 1));
+            return;
+        }
+
+        if (preset === "Last 30 Days") {
+            const start = new Date(todayDate);
+            start.setDate(start.getDate() - 29);
+            setRangeStart(start);
+            setRangeEnd(todayDate);
+            setLeftCalendarMonth(new Date(start.getFullYear(), start.getMonth(), 1));
+            return;
+        }
+
+        if (preset === "This Month") {
+            const start = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1);
+            const end = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0);
+            setRangeStart(start);
+            setRangeEnd(end);
+            setLeftCalendarMonth(new Date(start.getFullYear(), start.getMonth(), 1));
+            return;
+        }
+
+        if (preset === "Last Month") {
+            const start = new Date(todayDate.getFullYear(), todayDate.getMonth() - 1, 1);
+            const end = new Date(todayDate.getFullYear(), todayDate.getMonth(), 0);
+            setRangeStart(start);
+            setRangeEnd(end);
+            setLeftCalendarMonth(new Date(start.getFullYear(), start.getMonth(), 1));
+            return;
+        }
+
+        if (preset === "Custom Range" && !rangeStart && !rangeEnd) {
+            const defaultStart = new Date(2025, 9, 9);
+            const defaultEnd = new Date(2025, 10, 17);
+            setRangeStart(defaultStart);
+            setRangeEnd(defaultEnd);
+            setLeftCalendarMonth(new Date(2025, 9, 1));
+        }
+    };
+
+    const handleDateCellClick = (date: Date) => {
+        setCalendarPreset("Custom Range");
+
+        if (!rangeStart || (rangeStart && rangeEnd)) {
+            setRangeStart(date);
+            setRangeEnd(null);
+            return;
+        }
+
+        if (normalizeDate(date) < normalizeDate(rangeStart)) {
+            setRangeEnd(rangeStart);
+            setRangeStart(date);
+            return;
+        }
+
+        setRangeEnd(date);
+    };
+
+    const isInRange = (date: Date) => {
+        if (!startTime) {
+            return false;
+        }
+
+        const time = normalizeDate(date);
+        if (!endTime) {
+            return time === startTime;
+        }
+
+        return time >= startTime && time <= endTime;
+    };
+
+    const isRangeStart = (date: Date) => startTime !== null && normalizeDate(date) === startTime;
+    const isRangeEnd = (date: Date) => endTime !== null && normalizeDate(date) === endTime;
+
+    const renderCalendarMonth = (year: number, month: number, title: string, monthOffset: number) => {
+        const cells = buildMonthGrid(year, month);
+
+        return (
+            <div className="w-[380px] h-[334px] rounded-[12px] bg-white/[0.08] border border-white/[0.12] px-6 py-4">
+                <div className="flex items-center justify-between mb-4 text-white/90 pb-4 border-b border-white/[0.12]">
+                    <button
+                        type="button"
+                        onClick={() => setLeftCalendarMonth((prev) => addMonths(prev, -1))}
+                        className="p-1 text-white/60 hover:text-white transition-colors"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 12 12" fill="none"><path d="M7.5 2L3.5 6L7.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    </button>
+                    <p className="text-[16px] leading-[21px] font-semibold text-[#E7EFEB]">{title}</p>
+                    <button
+                        type="button"
+                        onClick={() => setLeftCalendarMonth((prev) => addMonths(prev, 1))}
+                        className="p-1 text-white/60 hover:text-white transition-colors"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 12 12" fill="none"><path d="M4.5 2L8.5 6L4.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-7 gap-y-3 mb-3">
+                    {weekDays.map((day) => (
+                        <span key={`${title}-${day}`} className="text-center text-[16px] leading-[21px] font-normal text-white/80">{day}</span>
+                    ))}
+                </div>
+
+                <div className="grid grid-cols-7 gap-y-2">
+                    {cells.map((cell) => {
+                        const day = cell.date.getDate();
+                        const inRange = isInRange(cell.date);
+                        const start = isRangeStart(cell.date);
+                        const end = isRangeEnd(cell.date);
+                        const isMuted = !cell.inCurrentMonth;
+                        const rangePillClass = inRange
+                            ? `${start ? "rounded-l-full" : ""} ${end ? "rounded-r-full" : ""} ${!start && !end ? "rounded-none" : ""}`
+                            : "";
+
+                        return (
+                            <div key={`${title}-${cell.date.toISOString()}-${monthOffset}`} className={`h-[31px] flex items-center justify-center text-[16px] leading-[21px] ${inRange ? "bg-[#1ED36A]/[0.16]" : ""} ${rangePillClass}`}>
+                                <button
+                                    type="button"
+                                    onClick={() => handleDateCellClick(new Date(cell.date.getFullYear(), cell.date.getMonth(), cell.date.getDate()))}
+                                    className={`h-10 w-10 flex items-center justify-center font-normal ${start || end ? "rounded-full bg-[#1ED36A] text-white shadow-[0px_4px_6.7px_rgba(0,0,0,0.4),0px_2px_17.9px_rgba(30,211,106,0.4)]" : ""} ${!start && !end && inRange ? "text-white" : ""} ${!inRange && !isMuted ? "text-white" : ""} ${isMuted ? "text-white/40" : ""}`}
+                                >
+                                    {day}
+                                </button>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
 
     return (
         <div className="relative flex flex-col w-full max-w-[1920px] min-h-screen xl:min-h-[1281px] mx-auto gap-4 font-sans p-3 sm:p-5 lg:p-6 bg-[#F7FAF8] dark:bg-[#19211C]">
@@ -761,19 +978,89 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                 })()}
 
                                                 {activeFilterMenu === 'date' && (
-                                                    <div className="absolute left-0 top-full mt-2 w-48 bg-white dark:bg-[#29322D] border border-gray-200 dark:border-white/10 rounded-lg shadow-lg z-50 overflow-hidden py-1">
-                                                        {['Any Time', '09 Oct to 17 Nov 2025', 'Past Week', 'Past Month', 'Custom Range'].map((range) => (
-                                                            <button
-                                                                key={range}
-                                                                onClick={() => {
-                                                                    setSelectedDateRange(range);
-                                                                    setActiveFilterMenu(null);
-                                                                }}
-                                                                className="w-full text-left px-4 py-2.5 text-[12px] text-[#33413B] dark:text-white/85 hover:bg-black/[0.04] dark:hover:bg-white/5 transition-colors cursor-pointer"
-                                                            >
-                                                                {range}
-                                                            </button>
-                                                        ))}
+                                                    <div
+                                                        className="fixed inset-0 z-[80] bg-[#08120E]/80 backdrop-blur-[1.5px] flex items-center justify-center px-3"
+                                                        onClick={() => setActiveFilterMenu(null)}
+                                                    >
+                                                        <div
+                                                            className="w-[990px] h-[538px] max-w-[95vw] rounded-[24px] border border-white/[0.2] bg-[#19211C]/40 shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-6"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            <div className="flex items-center justify-between pb-4 border-b border-white/[0.12]">
+                                                                <p className="text-[18px] leading-[23px] font-semibold text-white">Select Date Range</p>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setActiveFilterMenu(null)}
+                                                                    className="w-8 h-8 rounded-full bg-white/[0.12] text-[#1ED36A] hover:bg-[#1ED36A]/30 hover:text-white transition-colors flex items-center justify-center"
+                                                                >
+                                                                    <X size={16} />
+                                                                </button>
+                                                            </div>
+
+                                                            <div className="pt-4 flex gap-5 h-[356px]">
+                                                                <div className="w-[142px] shrink-0 border-r border-white/[0.12] pr-3">
+                                                                    {calendarPresets.map((preset) => {
+                                                                        const isActivePreset = calendarPreset === preset;
+
+                                                                        return (
+                                                                            <button
+                                                                                key={preset}
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    setCalendarPreset(preset);
+                                                                                    applyPresetRange(preset);
+                                                                                }}
+                                                                                className={`w-full text-left px-3 py-2 rounded-r-[4px] text-[16px] leading-[21px] transition-colors mb-[2px] font-normal ${isActivePreset ? "bg-[#1ED36A] text-white" : "text-white/60 hover:bg-white/[0.08] hover:text-white"}`}
+                                                                            >
+                                                                                {preset}
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
+
+                                                                <div className="flex-1">
+                                                                    <div className="flex gap-3.5">
+                                                                        {renderCalendarMonth(leftCalendarMonth.getFullYear(), leftCalendarMonth.getMonth(), getMonthLabel(leftCalendarMonth), 0)}
+                                                                        {renderCalendarMonth(addMonths(leftCalendarMonth, 1).getFullYear(), addMonths(leftCalendarMonth, 1).getMonth(), getMonthLabel(addMonths(leftCalendarMonth, 1)), 1)}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="pt-4 mt-4 border-t border-white/[0.12] flex items-center justify-between gap-3">
+                                                                <p className="text-[14px] leading-[18px] font-normal text-white">Selected Range : {selectedRangeText}</p>
+                                                                <div className="flex items-center gap-2">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setCalendarPreset("All");
+                                                                            setRangeStart(null);
+                                                                            setRangeEnd(null);
+                                                                            setSelectedDateRange("Any Time");
+                                                                            setActiveFilterMenu(null);
+                                                                        }}
+                                                                        className="h-8 px-4 rounded-full border border-white text-white text-[14px] leading-[18px] font-medium hover:bg-white/10 transition-colors"
+                                                                    >
+                                                                        Clear
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            if (calendarPreset === "All" || !rangeStart) {
+                                                                                setSelectedDateRange("Any Time");
+                                                                            } else if (rangeStart && !rangeEnd) {
+                                                                                setSelectedDateRange(formatFilterRangeLabel(rangeStart, rangeStart));
+                                                                            } else if (rangeStart && rangeEnd) {
+                                                                                setSelectedDateRange(formatFilterRangeLabel(rangeStart, rangeEnd));
+                                                                            }
+                                                                            setActiveFilterMenu(null);
+                                                                        }}
+                                                                        className="h-8 px-4 rounded-full bg-[#1ED36A] text-white text-[14px] leading-[18px] font-medium hover:bg-[#16BD5C] transition-colors"
+                                                                    >
+                                                                        Apply changes
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>
