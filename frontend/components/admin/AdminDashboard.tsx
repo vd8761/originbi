@@ -339,7 +339,7 @@ const AdminDashboard: React.FC = () => {
                    <div className="w-full h-full bg-gray-100 dark:bg-white/5 animate-pulse rounded-2xl" />
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={data?.revenueTrend || []}>
+                    <AreaChart data={data?.revenueTrend?.slice(-5) || []} margin={{ top: 10, right: 30, left: -15, bottom: 0 }}>
                       <defs>
                         <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#1ED36A" stopOpacity={0.3} />
@@ -353,6 +353,8 @@ const AdminDashboard: React.FC = () => {
                         tickLine={false}
                         tick={{ fill: isDark ? "#FFFFFF" : "#19211C", fontSize: 13, fontWeight: 500 }}
                         dy={10}
+                        interval={0}
+                        minTickGap={5}
                       />
                       <YAxis
                         axisLine={false}
