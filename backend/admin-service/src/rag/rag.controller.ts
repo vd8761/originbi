@@ -239,6 +239,13 @@ export interface RagResponse {
 export class RagController {
   private readonly logger = new Logger(RagController.name);
 
+  private ensureAdmin(user: UserContext): void {
+    const role = (user?.role || '').toUpperCase();
+    if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
+      throw new HttpException('Forbidden: admin access required', HttpStatus.FORBIDDEN);
+    }
+  }
+
   constructor(
     private readonly ragService: RagService,
     private readonly syncService: SyncService,
@@ -452,7 +459,7 @@ export class RagController {
    * RBAC: CognitoUniversalGuard handles authentication & enrichment:
    *   - Verifies Cognito token (if present) and enriches with DB IDs
    *   - Falls back to X-User-Context header (validated via DB)
-   *   - Defaults to anonymous STUDENT (most restricted) if no auth
+  *   - This endpoint requires an authenticated/enriched user context
    *
    * The enriched UserContext contains:
    *   - id: numeric users.id
@@ -469,6 +476,10 @@ export class RagController {
     this.logger.log(`🎯 POST /query | user=${user.id} role=${user.role} corporateId=${user.corporateId || 'N/A'}`);
 
     try {
+      if (!user || !user.id || user.id <= 0) {
+        throw new HttpException('Authentication required for chat queries', HttpStatus.UNAUTHORIZED);
+      }
+
       const question = queryDto?.question;
       if (!question) {
         throw new Error('Question is required');
@@ -500,7 +511,7 @@ export class RagController {
       this.logger.log(`✅ RAG query completed`);
 
       // ── Generate follow-up suggestions ──
-      const suggestions = this.ragService.generateFollowUpSuggestions(question, result.answer, result.searchType);
+      const suggestions = this.ragService.generateFollowUpSuggestions(question, result.answer, result.searchType, user.role);
 
       // ── Chat memory: save assistant reply + auto-title ──
       if (user.id > 0 && convId > 0) {
@@ -518,7 +529,8 @@ export class RagController {
 
       // ── Track BI's response in ConversationService for entity context ──
       try {
-        const sessionId = convId > 0 ? `conv_${convId}` : `user_${user.id || 0}`;
+        const roleKey = (user.role || 'UNKNOWN').toLowerCase();
+        const sessionId = convId > 0 ? `conv_${convId}` : `user_${roleKey}_${user.id}`;
         this.conversationService.addBiResponse(sessionId, result.answer, result.searchType);
       } catch (e) {
         // Non-blocking
@@ -538,9 +550,14 @@ export class RagController {
    * POST /rag/ingest
    * Ingest a single document into the RAG system
    */
+  @UseGuards(CognitoUniversalGuard)
   @Post('ingest')
-  async ingest(@Body() dto: IngestDocumentDto) {
+  async ingest(
+    @Body() dto: IngestDocumentDto,
+    @CurrentUser() user: UserContext,
+  ) {
     try {
+      this.ensureAdmin(user);
       const result = (await this.ragService.ingest(dto)) as any;
       if (result.success) {
         return { success: true, documentId: result.documentId };
@@ -559,9 +576,14 @@ export class RagController {
    * POST /rag/ingest/bulk
    * Ingest multiple documents at once
    */
+  @UseGuards(CognitoUniversalGuard)
   @Post('ingest/bulk')
-  async bulkIngest(@Body() dto: BulkIngestDto) {
+  async bulkIngest(
+    @Body() dto: BulkIngestDto,
+    @CurrentUser() user: UserContext,
+  ) {
     try {
+      this.ensureAdmin(user);
       return await this.ragService.bulkIngest(dto.documents);
     } catch (error) {
       throw new HttpException(
@@ -575,9 +597,11 @@ export class RagController {
    * POST /rag/index
    * Index existing database content (career_roles, questions, etc.)
    */
+  @UseGuards(CognitoUniversalGuard)
   @Post('index')
-  async indexExistingData() {
+  async indexExistingData(@CurrentUser() user: UserContext) {
     try {
+      this.ensureAdmin(user);
       const result = await this.ragService.indexExistingData();
       return { success: true, ...result };
     } catch (error) {
@@ -609,9 +633,11 @@ export class RagController {
   /**
    * POST /rag/seed (alias for /rag/index)
    */
+  @UseGuards(CognitoUniversalGuard)
   @Post('seed')
-  async seedKnowledgeBase() {
+  async seedKnowledgeBase(@CurrentUser() user: UserContext) {
     try {
+      this.ensureAdmin(user);
       const result = await this.ragService.seedKnowledgeBase();
       return { success: true, ...result };
     } catch (error) {
@@ -626,9 +652,11 @@ export class RagController {
    * POST /rag/rebuild
    * Clear and rebuild the entire knowledge base
    */
+  @UseGuards(CognitoUniversalGuard)
   @Post('rebuild')
-  async rebuildKnowledgeBase() {
+  async rebuildKnowledgeBase(@CurrentUser() user: UserContext) {
     try {
+      this.ensureAdmin(user);
       const result = await this.ragService.rebuildKnowledgeBase();
       return { success: true, message: 'Knowledge base rebuilt', ...result };
     } catch (error) {
@@ -685,9 +713,11 @@ export class RagController {
    * POST /rag/sync/trigger
    * Manually trigger a sync
    */
+  @UseGuards(CognitoUniversalGuard)
   @Post('sync/trigger')
-  async triggerSync() {
+  async triggerSync(@CurrentUser() user: UserContext) {
     try {
+      this.ensureAdmin(user);
       const result = await this.syncService.triggerSync();
       return { success: true, ...result };
     } catch (error) {
