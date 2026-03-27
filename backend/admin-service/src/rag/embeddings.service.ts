@@ -3,6 +3,16 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CohereClient } from 'cohere-ai';
 
+interface SemanticSearchOptions {
+  hybridWeights?: {
+    vector?: number;
+    lexical?: number;
+  };
+  categoryWeights?: Record<string, number>;
+  sourceWeights?: Record<string, number>;
+  allowCrossCategoryFallback?: boolean;
+}
+
 /**
  * Production-Grade Embeddings Service — Google Gemini
  * Model: gemini-embedding-001 (1536 dimensions)
@@ -19,6 +29,19 @@ export class EmbeddingsService implements OnModuleInit {
   private googleApiKey: string | null = null;
   private pgvectorAvailable = false;
   private embeddingsAvailable = false;
+  private readonly includeLegacyDocs =
+    (process.env.RAG_INCLUDE_LEGACY_DOCS || 'false').toLowerCase() === 'true';
+
+  private readonly defaultSourceWeights: Record<string, number> = {
+    career_roles: 1.18,
+    department_degrees: 1.18,
+    courses: 1.12,
+    personality_traits: 1.1,
+    career_role_tools: 1.08,
+    programs: 1.05,
+    departments: 1.05,
+    open_questions: 1.02,
+  };
 
   private readonly MODEL = 'models/gemini-embedding-001';
   private readonly EMBEDDING_DIM = 1536;  // Safe dimension that works with both IVFFlat and HNSW
@@ -71,6 +94,9 @@ export class EmbeddingsService implements OnModuleInit {
 
     this.logger.log(
       `⚙️ Embeddings config (hardcoded): batch=${this.BATCH_SIZE}, retries=${this.MAX_RETRIES}, rpm=${this.RATE_LIMIT_RPM}, cooldownMs=${this.QUOTA_COOLDOWN}, maxCooldownMs=${this.MAX_QUOTA_COOLDOWN}`,
+    );
+    this.logger.log(
+      `📚 Semantic retrieval legacy docs: ${this.includeLegacyDocs ? 'enabled (including source_table IS NULL)' : 'disabled (excluding source_table IS NULL)'}`,
     );
 
     // Init Cohere Reranker
@@ -678,12 +704,22 @@ export class EmbeddingsService implements OnModuleInit {
   async semanticSearch(
     query: string,
     limit: number = 5,
-    category?: string,
+    category?: string | string[],
     minSimilarity: number = 0.3,
+    options?: SemanticSearchOptions,
   ): Promise<any[]> {
     if (!this.pgvectorAvailable) return [];
 
     try {
+      const categories = this.normalizeCategories(category);
+      const hybridWeights = {
+        vector: this.clampWeight(options?.hybridWeights?.vector, 1.0),
+        lexical: this.clampWeight(options?.hybridWeights?.lexical, 0.85),
+      };
+      const categoryWeights = options?.categoryWeights || {};
+      const sourceWeights = { ...this.defaultSourceWeights, ...(options?.sourceWeights || {}) };
+      const allowCrossCategoryFallback = options?.allowCrossCategoryFallback !== false;
+
       const queryEmbedding = await this.generateEmbedding(query, 'query');
       if (!queryEmbedding) {
         this.logger.warn('⚠️ Embedding unavailable for semantic search; using lexical fallback only');
@@ -699,10 +735,13 @@ export class EmbeddingsService implements OnModuleInit {
           FROM rag_documents d
           WHERE to_tsvector('english', d.content) @@ plainto_tsquery('english', $1)
         `;
+        if (!this.includeLegacyDocs) {
+          lexicalSql += ` AND d.source_table IS NOT NULL`;
+        }
         const lexicalParams: any[] = [query];
-        if (category) {
-          lexicalSql += ` AND d.category = $2`;
-          lexicalParams.push(category);
+        if (categories.length > 0) {
+          lexicalSql += ` AND d.category = ANY($2::text[])`;
+          lexicalParams.push(categories);
         }
         lexicalSql += ` ORDER BY lexical_score DESC LIMIT $${lexicalParams.length + 1}`;
         lexicalParams.push(limit);
@@ -716,91 +755,265 @@ export class EmbeddingsService implements OnModuleInit {
 
       const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
-      // Fetch more candidates for better reranking/hybrid fusion.
-      const fetchLimit = this.cohereAvailable ? limit * 4 : limit * 3;
+      const primaryCandidates = await this.retrieveHybridCandidates(
+        query,
+        embeddingStr,
+        Math.max(limit * 4, 12),
+        minSimilarity,
+        categories,
+        hybridWeights,
+        categoryWeights,
+        sourceWeights,
+      );
 
-      let vectorSql = `
-                SELECT 
-                    d.id,
-                    d.content,
-                    d.metadata,
-                    d.category,
-                    d.source_table,
-                    d.source_id,
-                    1 - (e.embedding <=> $1::vector) AS similarity
-                FROM rag_embeddings e
-                JOIN rag_documents d ON d.id = e.document_id
-                WHERE 1 - (e.embedding <=> $1::vector) >= $2
-            `;
+      let candidates = primaryCandidates;
 
-      const vectorParams: any[] = [embeddingStr, minSimilarity];
-
-      if (category) {
-        vectorSql += ` AND d.category = $3`;
-        vectorParams.push(category);
-      }
-
-      vectorSql += ` ORDER BY e.embedding <=> $1::vector LIMIT $${vectorParams.length + 1}`;
-      vectorParams.push(fetchLimit);
-
-      const vectorCandidates = await this.dataSource.query(vectorSql, vectorParams);
-
-      // Hybrid lexical candidates: helps for exact names/codes/rare tokens.
-      let lexicalCandidates: any[] = [];
-      try {
-        let lexicalSql = `
-          SELECT
-              d.id,
-              d.content,
-              d.metadata,
-              d.category,
-              d.source_table,
-              d.source_id,
-              ts_rank_cd(to_tsvector('english', d.content), plainto_tsquery('english', $1)) AS lexical_score
-          FROM rag_documents d
-          WHERE to_tsvector('english', d.content) @@ plainto_tsquery('english', $1)
-        `;
-        const lexicalParams: any[] = [query];
-        if (category) {
-          lexicalSql += ` AND d.category = $2`;
-          lexicalParams.push(category);
+      if (categories.length > 1) {
+        const perCategoryLimit = Math.max(4, Math.ceil(limit / categories.length) + 2);
+        for (const cat of categories) {
+          const categoryCandidates = await this.retrieveHybridCandidates(
+            query,
+            embeddingStr,
+            perCategoryLimit,
+            minSimilarity,
+            [cat],
+            hybridWeights,
+            categoryWeights,
+            sourceWeights,
+          );
+          candidates = this.mergeCandidatesById(candidates, categoryCandidates);
         }
-        lexicalSql += ` ORDER BY lexical_score DESC LIMIT $${lexicalParams.length + 1}`;
-        lexicalParams.push(fetchLimit);
-        lexicalCandidates = await this.dataSource.query(lexicalSql, lexicalParams);
-      } catch (lexErr) {
-        // Keep vector-only search if tsvector functions are unavailable.
-        this.logger.debug(`Lexical fallback skipped: ${lexErr?.message || lexErr}`);
       }
 
-      // Reciprocal Rank Fusion (RRF) on ids from vector + lexical rankings.
-      const fusedById = new Map<number, { row: any; score: number }>();
-      const k = 60;
-      vectorCandidates.forEach((row, idx) => {
-        const curr = fusedById.get(row.id) || { row, score: 0 };
-        curr.score += 1 / (k + idx + 1);
-        fusedById.set(row.id, curr);
-      });
-      lexicalCandidates.forEach((row, idx) => {
-        const curr = fusedById.get(row.id) || { row, score: 0 };
-        curr.score += 1 / (k + idx + 1);
-        fusedById.set(row.id, curr);
-      });
+      // If strict category filtering is too narrow, expand search breadth while preserving weights.
+      if (allowCrossCategoryFallback && categories.length > 0 && candidates.length < limit) {
+        const expanded = await this.retrieveHybridCandidates(
+          query,
+          embeddingStr,
+          Math.max(limit * 6, 18),
+          minSimilarity,
+          [],
+          hybridWeights,
+          categoryWeights,
+          sourceWeights,
+        );
+        candidates = this.mergeCandidatesById(primaryCandidates, expanded);
+      }
 
-      const candidates = Array.from(fusedById.values())
-        .sort((a, b) => b.score - a.score)
-        .map((x) => x.row);
+      // Deduplicate near-identical chunks so the final context is diverse.
+      const dedupedCandidates: any[] = [];
+      const seenKeys = new Set<string>();
+      for (const row of candidates) {
+        const contentKey = String(row?.content || '')
+          .toLowerCase()
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 220);
+        const sourceKey = `${row?.source_table || '-'}:${row?.source_id || '-'}:${row?.category || '-'}`;
+        const key = `${sourceKey}|${contentKey}`;
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+        dedupedCandidates.push(row);
+      }
+
+      const diversifiedCandidates = this.diversifyByCategory(
+        dedupedCandidates,
+        categories,
+        Math.max(limit * 3, 12),
+      );
 
       // Rerank candidates with Cohere for higher precision
-      if (this.cohereAvailable && candidates.length > limit) {
-        return await this.rerankWithCohere({ query, documents: candidates, topN: limit });
+      if (this.cohereAvailable && diversifiedCandidates.length > limit) {
+        return await this.rerankWithCohere({ query, documents: diversifiedCandidates, topN: limit });
       }
 
-      return candidates.slice(0, limit);
+      return diversifiedCandidates.slice(0, limit);
     } catch (error) {
       this.logger.error('Semantic search failed:', error);
       return [];
     }
+  }
+
+  private normalizeCategories(category?: string | string[]): string[] {
+    if (!category) return [];
+    const list = Array.isArray(category) ? category : [category];
+    return [...new Set(list.map((c) => String(c || '').trim().toLowerCase()).filter(Boolean))];
+  }
+
+  private clampWeight(value: number | undefined, fallback: number): number {
+    if (typeof value !== 'number' || Number.isNaN(value)) return fallback;
+    return Math.max(0.1, Math.min(2.0, value));
+  }
+
+  private applyRowBoost(
+    baseScore: number,
+    row: any,
+    categories: string[],
+    categoryWeights: Record<string, number>,
+    sourceWeights: Record<string, number>,
+  ): number {
+    const category = String(row?.category || '').toLowerCase();
+    const source = String(row?.source_table || '').toLowerCase();
+
+    const categoryBias =
+      categoryWeights[category]
+      ?? (categories.length === 0 ? 1 : (categories.includes(category) ? 1.12 : 0.94));
+    const sourceBias = sourceWeights[source] ?? (source ? 1 : 0.65);
+
+    return baseScore * categoryBias * sourceBias;
+  }
+
+  private mergeCandidatesById(primary: any[], secondary: any[]): any[] {
+    const merged = new Map<number, any>();
+    for (const row of primary) merged.set(row.id, row);
+    for (const row of secondary) {
+      if (!merged.has(row.id)) merged.set(row.id, row);
+    }
+    return Array.from(merged.values());
+  }
+
+  private diversifyByCategory(candidates: any[], categories: string[], maxPool: number): any[] {
+    if (!Array.isArray(candidates) || candidates.length === 0) return [];
+    if (categories.length <= 1) return candidates.slice(0, maxPool);
+
+    const queueByCategory = new Map<string, any[]>();
+    const orderedCategories = categories.map((c) => c.toLowerCase());
+    for (const c of orderedCategories) queueByCategory.set(c, []);
+
+    const uncategorized: any[] = [];
+    for (const row of candidates) {
+      const cat = String(row?.category || '').toLowerCase();
+      if (queueByCategory.has(cat)) {
+        queueByCategory.get(cat)!.push(row);
+      } else {
+        uncategorized.push(row);
+      }
+    }
+
+    const diversified: any[] = [];
+    const seen = new Set<number>();
+
+    while (diversified.length < maxPool) {
+      let progressed = false;
+      for (const c of orderedCategories) {
+        const queue = queueByCategory.get(c) || [];
+        while (queue.length > 0) {
+          const row = queue.shift();
+          if (!row || seen.has(row.id)) continue;
+          diversified.push(row);
+          seen.add(row.id);
+          progressed = true;
+          break;
+        }
+        if (diversified.length >= maxPool) break;
+      }
+      if (!progressed) break;
+    }
+
+    for (const row of uncategorized) {
+      if (diversified.length >= maxPool) break;
+      if (seen.has(row.id)) continue;
+      diversified.push(row);
+      seen.add(row.id);
+    }
+
+    if (diversified.length < maxPool) {
+      for (const row of candidates) {
+        if (diversified.length >= maxPool) break;
+        if (seen.has(row.id)) continue;
+        diversified.push(row);
+        seen.add(row.id);
+      }
+    }
+
+    return diversified;
+  }
+
+  private async retrieveHybridCandidates(
+    query: string,
+    embeddingStr: string,
+    fetchLimit: number,
+    minSimilarity: number,
+    categories: string[],
+    hybridWeights: { vector: number; lexical: number },
+    categoryWeights: Record<string, number>,
+    sourceWeights: Record<string, number>,
+  ): Promise<any[]> {
+    let vectorSql = `
+      SELECT
+          d.id,
+          d.content,
+          d.metadata,
+          d.category,
+          d.source_table,
+          d.source_id,
+          1 - (e.embedding <=> $1::vector) AS similarity
+      FROM rag_embeddings e
+      JOIN rag_documents d ON d.id = e.document_id
+      WHERE 1 - (e.embedding <=> $1::vector) >= $2
+    `;
+
+    if (!this.includeLegacyDocs) {
+      vectorSql += ` AND d.source_table IS NOT NULL`;
+    }
+
+    const vectorParams: any[] = [embeddingStr, minSimilarity];
+    if (categories.length > 0) {
+      vectorSql += ` AND d.category = ANY($3::text[])`;
+      vectorParams.push(categories);
+    }
+    vectorSql += ` ORDER BY e.embedding <=> $1::vector LIMIT $${vectorParams.length + 1}`;
+    vectorParams.push(fetchLimit);
+
+    const vectorCandidates = await this.dataSource.query(vectorSql, vectorParams);
+
+    let lexicalCandidates: any[] = [];
+    try {
+      let lexicalSql = `
+        SELECT
+            d.id,
+            d.content,
+            d.metadata,
+            d.category,
+            d.source_table,
+            d.source_id,
+            ts_rank_cd(to_tsvector('english', d.content), plainto_tsquery('english', $1)) AS lexical_score
+        FROM rag_documents d
+        WHERE to_tsvector('english', d.content) @@ plainto_tsquery('english', $1)
+      `;
+      if (!this.includeLegacyDocs) {
+        lexicalSql += ` AND d.source_table IS NOT NULL`;
+      }
+      const lexicalParams: any[] = [query];
+      if (categories.length > 0) {
+        lexicalSql += ` AND d.category = ANY($2::text[])`;
+        lexicalParams.push(categories);
+      }
+      lexicalSql += ` ORDER BY lexical_score DESC LIMIT $${lexicalParams.length + 1}`;
+      lexicalParams.push(fetchLimit);
+      lexicalCandidates = await this.dataSource.query(lexicalSql, lexicalParams);
+    } catch (lexErr) {
+      this.logger.debug(`Lexical fallback skipped: ${lexErr?.message || lexErr}`);
+    }
+
+    const fusedById = new Map<number, { row: any; score: number }>();
+    const k = 60;
+    vectorCandidates.forEach((row, idx) => {
+      const curr = fusedById.get(row.id) || { row, score: 0 };
+      const base = hybridWeights.vector * (1 / (k + idx + 1));
+      curr.score += this.applyRowBoost(base, row, categories, categoryWeights, sourceWeights);
+      fusedById.set(row.id, curr);
+    });
+    lexicalCandidates.forEach((row, idx) => {
+      const curr = fusedById.get(row.id) || { row, score: 0 };
+      const base = hybridWeights.lexical * (1 / (k + idx + 1));
+      curr.score += this.applyRowBoost(base, row, categories, categoryWeights, sourceWeights);
+      fusedById.set(row.id, curr);
+    });
+
+    return Array.from(fusedById.values())
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.row);
   }
 
   // ─────────────── Stats & Status ───────────────

@@ -22,6 +22,25 @@ function normalizeContext(context: string): string {
 
 function isQuotaOrRateLimitError(error: any): boolean {
   const msg = String(error?.message || error?.cause?.message || '').toLowerCase();
+  const status = Number(error?.status || error?.statusCode || error?.response?.status || 0);
+  const code = String(
+    error?.code ||
+    error?.error?.code ||
+    error?.response?.data?.error?.code ||
+    error?.response?.data?.code ||
+    '',
+  ).toLowerCase();
+  const reason = String(
+    error?.error?.status ||
+    error?.response?.data?.error?.status ||
+    error?.response?.data?.status ||
+    '',
+  ).toLowerCase();
+
+  if (status === 429 || status === 503) return true;
+  if (code.includes('rate_limit') || code.includes('quota') || code === '429') return true;
+  if (reason.includes('resource_exhausted') || reason.includes('rate_limit') || reason.includes('quota')) return true;
+
   return (
     msg.includes('resource_exhausted') ||
     msg.includes('quota') ||

@@ -25,6 +25,74 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## OriginBI RAG Stack (Low Cost + High Quality)
+
+This service includes a multi-stage RAG pipeline (planner, SQL generation, retrieval, synthesis).
+To reduce cost without shrinking final answer richness, use a hybrid model stack.
+
+### Recommended model stack
+
+- Planner: `gemini-2.0-flash` (cheap, fast)
+- Reflector: `gemini-2.0-flash` (cheap quality check)
+- SQL generation: `gemini-2.5-flash` (higher reliability for complex joins)
+- SQL synthesizer: `gemini-2.5-flash` (keep answer quality)
+- Final RAG answer: `gemini-2.5-flash` (keep output quality)
+- Embeddings: `gemini-embedding-001`
+- Optional reranker: Cohere `rerank-v3.5`
+
+### Why this works
+
+- Cost drops by moving helper stages to cheaper models.
+- Complex DB questions remain accurate because SQL + final synthesis stay on stronger models.
+- Final answer token budget can stay high, so response detail is preserved.
+
+### Production env template
+
+```bash
+# Core keys
+GEMINI_API_KEY=your_key
+GROQ_API_KEY=your_key
+COHERE_API_KEY=your_key
+
+# Model routing
+GEMINI_PLANNER_MODEL=gemini-2.0-flash
+GEMINI_REFLECTOR_MODEL=gemini-2.0-flash
+GEMINI_FORMATTER_MODEL=gemini-2.0-flash
+
+GEMINI_SQL_MODEL=gemini-2.5-flash
+GEMINI_SQL_SYNTH_MODEL=gemini-2.5-flash
+GEMINI_RAG_MODEL=gemini-2.5-flash
+GEMINI_KNOWLEDGE_MODEL=gemini-2.5-flash
+
+# Token budgets (do not reduce final answer richness)
+AGENT_PLANNER_MAX_OUTPUT_TOKENS=320
+AGENT_REFLECTOR_MAX_OUTPUT_TOKENS=180
+FORMATTER_MAX_OUTPUT_TOKENS=520
+
+SQL_MAX_OUTPUT_TOKENS=680
+SQL_SYNTH_MAX_OUTPUT_TOKENS=860
+RAG_MAX_OUTPUT_TOKENS=720
+KNOWLEDGE_MAX_OUTPUT_TOKENS=860
+```
+
+### Complex query quality checklist
+
+- Keep Text-to-SQL enabled for all data-heavy questions.
+- Keep schema introspector and SQL validator active.
+- Keep hybrid retrieval (vector + lexical + rerank) enabled.
+- Use cache for repeated queries, but scope it by tenant/user.
+- Monitor retry rate and fallback rate; if high, keep SQL on stronger model.
+
+### Gemini 2.0 Flash support
+
+Yes, `gemini-2.0-flash` is supported in this stack for planner/reflector/formatter stages.
+For complex SQL and final long-form answers, `gemini-2.5-flash` remains the recommended default.
+
+### Security note
+
+- Never commit `.env` with live API keys.
+- Rotate exposed keys immediately and store secrets in deployment secret manager.
+
 ## Project setup
 
 ```bash
