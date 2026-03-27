@@ -35,8 +35,8 @@ export class EmbeddingsService implements OnModuleInit {
     { embedding: number[]; timestamp: number }
   >();
   private readonly CACHE_TTL = 1000 * 60 * 60; // 1 hour cache
-  private BATCH_SIZE = 80; // Google supports up to 100 per batch
-  private MAX_RETRIES = 4;
+  private BATCH_SIZE = 40; // Hardcoded production tuning
+  private MAX_RETRIES = 3;
 
   // Request pacing (configurable for free/paid tiers)
   private requestTimestamps: number[] = [];
@@ -44,16 +44,20 @@ export class EmbeddingsService implements OnModuleInit {
 
   // Quota exhaustion tracking — temporarily disable when quota is hit
   private quotaExhaustedUntil: number = 0;
-  private QUOTA_COOLDOWN = 15 * 1000;
+  private QUOTA_COOLDOWN = 30 * 1000;
+  private readonly BASE_QUOTA_COOLDOWN = 30 * 1000;
+  private readonly MAX_QUOTA_COOLDOWN = 5 * 60 * 1000;
+  private consecutiveQuotaHits = 0;
+  private lastQuotaHitAt = 0;
+  private lastSingleCooldownLogAt = 0;
+  private lastBatchCooldownLogAt = 0;
+  private readonly COOLDOWN_LOG_INTERVAL_MS = 15000;
 
   constructor(private dataSource: DataSource) { }
 
   async onModuleInit() {
     this.googleApiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || null;
-    this.BATCH_SIZE = this.parseIntEnv('EMBEDDINGS_BATCH_SIZE', this.BATCH_SIZE, 1, 100);
-    this.MAX_RETRIES = this.parseIntEnv('EMBEDDINGS_MAX_RETRIES', this.MAX_RETRIES, 1, 8);
-    this.RATE_LIMIT_RPM = this.parseIntEnv('EMBEDDINGS_RATE_LIMIT_RPM', this.RATE_LIMIT_RPM, 1, 5000);
-    this.QUOTA_COOLDOWN = this.parseIntEnv('EMBEDDINGS_QUOTA_COOLDOWN_MS', this.QUOTA_COOLDOWN, 1000, 10 * 60 * 1000);
+    this.consecutiveQuotaHits = 0;
 
     if (this.googleApiKey) {
       this.logger.log('✅ Google Gemini API key configured');
@@ -66,7 +70,7 @@ export class EmbeddingsService implements OnModuleInit {
     }
 
     this.logger.log(
-      `⚙️ Embeddings config: batch=${this.BATCH_SIZE}, retries=${this.MAX_RETRIES}, rpm=${this.RATE_LIMIT_RPM}, cooldownMs=${this.QUOTA_COOLDOWN}`,
+      `⚙️ Embeddings config (hardcoded): batch=${this.BATCH_SIZE}, retries=${this.MAX_RETRIES}, rpm=${this.RATE_LIMIT_RPM}, cooldownMs=${this.QUOTA_COOLDOWN}, maxCooldownMs=${this.MAX_QUOTA_COOLDOWN}`,
     );
 
     // Init Cohere Reranker
@@ -230,17 +234,66 @@ export class EmbeddingsService implements OnModuleInit {
     this.requestTimestamps.push(Date.now());
   }
 
-  private parseIntEnv(
-    key: string,
-    fallback: number,
-    min: number,
-    max: number,
-  ): number {
-    const raw = process.env[key];
-    if (!raw) return fallback;
-    const parsed = Number.parseInt(raw, 10);
-    if (Number.isNaN(parsed)) return fallback;
-    return Math.max(min, Math.min(max, parsed));
+  private isQuotaCoolingDown(mode: 'single' | 'batch'): boolean {
+    const now = Date.now();
+    if (now >= this.quotaExhaustedUntil) return false;
+
+    const remainingMs = this.quotaExhaustedUntil - now;
+    const remainingSec = Math.ceil(remainingMs / 1000);
+    const lastLogAt = mode === 'single' ? this.lastSingleCooldownLogAt : this.lastBatchCooldownLogAt;
+
+    if (now - lastLogAt >= this.COOLDOWN_LOG_INTERVAL_MS) {
+      if (mode === 'single') {
+        this.lastSingleCooldownLogAt = now;
+        this.logger.debug(`⏸️ Embedding skipped — API quota cooling down (${remainingSec}s remaining)`);
+      } else {
+        this.lastBatchCooldownLogAt = now;
+        this.logger.debug(`⏸️ Batch embeddings skipped — API quota cooling down (${remainingSec}s remaining)`);
+      }
+    }
+
+    return true;
+  }
+
+  private enterQuotaCooldown(source: 'single' | 'batch'): void {
+    const now = Date.now();
+    if (now - this.lastQuotaHitAt > 5 * 60 * 1000) {
+      this.consecutiveQuotaHits = 0;
+    }
+    this.lastQuotaHitAt = now;
+    this.consecutiveQuotaHits += 1;
+
+    const scaledCooldown = Math.min(
+      this.MAX_QUOTA_COOLDOWN,
+      Math.round(this.QUOTA_COOLDOWN * Math.pow(1.6, Math.max(0, this.consecutiveQuotaHits - 1))),
+    );
+
+    this.quotaExhaustedUntil = now + scaledCooldown;
+    const cooldownSec = Math.ceil(scaledCooldown / 1000);
+    this.logger.warn(
+      `🚫 ${source === 'batch' ? 'Batch ' : ''}API quota exhausted — cooldown ${cooldownSec}s (hit #${this.consecutiveQuotaHits})`,
+    );
+  }
+
+  private markQuotaRecovered(): void {
+    if (this.consecutiveQuotaHits > 0) {
+      this.logger.log('✅ Embeddings quota recovered — resuming normal throughput');
+    }
+    this.consecutiveQuotaHits = 0;
+  }
+
+  getQuotaStatus(): {
+    coolingDown: boolean;
+    remainingMs: number;
+    consecutiveQuotaHits: number;
+  } {
+    const now = Date.now();
+    const remainingMs = Math.max(0, this.quotaExhaustedUntil - now);
+    return {
+      coolingDown: remainingMs > 0,
+      remainingMs,
+      consecutiveQuotaHits: this.consecutiveQuotaHits,
+    };
   }
 
   // ─────────────── Core: Single Embedding ───────────────
@@ -257,8 +310,7 @@ export class EmbeddingsService implements OnModuleInit {
     if (!this.embeddingsAvailable || !this.googleApiKey) return null;
 
     // Quota exhaustion: temporarily skip API calls after rate limit hits
-    if (Date.now() < this.quotaExhaustedUntil) {
-      this.logger.debug('⏸️ Embedding skipped — API quota cooling down');
+    if (this.isQuotaCoolingDown('single')) {
       return null;
     }
 
@@ -301,8 +353,7 @@ export class EmbeddingsService implements OnModuleInit {
         if (response.status === 429) {
           this.logger.warn(`⏳ Rate limited (attempt ${attempt}), backing off...`);
           if (attempt === this.MAX_RETRIES) {
-            this.quotaExhaustedUntil = Date.now() + this.QUOTA_COOLDOWN;
-            this.logger.warn(`🚫 API quota exhausted — disabling embeddings for ${this.QUOTA_COOLDOWN / 60000} min`);
+            this.enterQuotaCooldown('single');
             return null;
           }
           await this.sleep(2000 * attempt);
@@ -324,6 +375,7 @@ export class EmbeddingsService implements OnModuleInit {
         const embedding: number[] | undefined = data?.embedding?.values;
 
         if (embedding && embedding.length === this.EMBEDDING_DIM) {
+          this.markQuotaRecovered();
           this.embeddingCache.set(cacheKey, {
             embedding,
             timestamp: Date.now(),
@@ -363,8 +415,7 @@ export class EmbeddingsService implements OnModuleInit {
     }
 
     // Quota exhaustion: temporarily skip API calls after rate limit hits.
-    if (Date.now() < this.quotaExhaustedUntil) {
-      this.logger.debug('⏸️ Batch embeddings skipped — API quota cooling down');
+    if (this.isQuotaCoolingDown('batch')) {
       return new Array(texts.length).fill(null);
     }
 
@@ -421,8 +472,7 @@ export class EmbeddingsService implements OnModuleInit {
           if (response.status === 429) {
             this.logger.warn(`⏳ Batch rate limited (attempt ${attempt}), backing off...`);
             if (attempt === this.MAX_RETRIES) {
-              this.quotaExhaustedUntil = Date.now() + this.QUOTA_COOLDOWN;
-              this.logger.warn(`🚫 Batch API quota exhausted — disabling embeddings for ${this.QUOTA_COOLDOWN / 1000}s`);
+              this.enterQuotaCooldown('batch');
               break;
             }
             await this.sleep(3000 * attempt);
@@ -435,6 +485,7 @@ export class EmbeddingsService implements OnModuleInit {
           }
 
           const data = await response.json();
+          this.markQuotaRecovered();
           const embeddings: any[] = data?.embeddings || [];
 
           embeddings.forEach((emb: any, idx: number) => {
@@ -781,7 +832,11 @@ export class EmbeddingsService implements OnModuleInit {
     batchSize: number;
     maxRetries: number;
     quotaCooldownMs: number;
+    quotaCoolingDown: boolean;
+    quotaCooldownRemainingMs: number;
+    consecutiveQuotaHits: number;
   } {
+    const quotaStatus = this.getQuotaStatus();
     return {
       embeddingsAvailable: this.embeddingsAvailable,
       pgvectorAvailable: this.pgvectorAvailable,
@@ -791,6 +846,9 @@ export class EmbeddingsService implements OnModuleInit {
       batchSize: this.BATCH_SIZE,
       maxRetries: this.MAX_RETRIES,
       quotaCooldownMs: this.QUOTA_COOLDOWN,
+      quotaCoolingDown: quotaStatus.coolingDown,
+      quotaCooldownRemainingMs: quotaStatus.remainingMs,
+      consecutiveQuotaHits: quotaStatus.consecutiveQuotaHits,
     };
   }
 
@@ -843,6 +901,15 @@ export class EmbeddingsService implements OnModuleInit {
 
           // Only update if content changed
           if (existing[0].content !== doc.content) {
+            if (!embedding) {
+              // Keep document + embedding in sync; defer updates when embedding is unavailable.
+              this.logger.warn(
+                `Deferred update for ${doc.sourceTable}:${doc.sourceId} due to unavailable embedding (quota/backoff)`
+              );
+              failed++;
+              continue;
+            }
+
             await this.dataSource.query(
               `UPDATE rag_documents 
                              SET content = $1, metadata = $2, updated_at = NOW()
@@ -850,19 +917,25 @@ export class EmbeddingsService implements OnModuleInit {
               [doc.content, JSON.stringify(doc.metadata), id],
             );
 
-            if (embedding) {
-              const vectorStr = `[${embedding.join(',')}]`;
-              await this.dataSource.query(
-                `UPDATE rag_embeddings 
-                                 SET embedding = $1::vector
-                                 WHERE document_id = $2`,
-                [vectorStr, id],
-              );
-            }
+            const vectorStr = `[${embedding.join(',')}]`;
+            await this.dataSource.query(
+              `UPDATE rag_embeddings 
+                               SET embedding = $1::vector
+                               WHERE document_id = $2`,
+              [vectorStr, id],
+            );
             this.logger.debug(`Updated doc ${id}`);
           }
         } else {
           // INSERT
+          if (!embedding) {
+            this.logger.warn(
+              `Deferred insert for ${doc.sourceTable}:${doc.sourceId} due to unavailable embedding (quota/backoff)`
+            );
+            failed++;
+            continue;
+          }
+
           await this.storeDocument(
             doc.content,
             doc.category,

@@ -108,7 +108,7 @@ export class AgentOrchestratorService {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
       const plannerModel = process.env.GEMINI_PLANNER_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
-      const plannerMaxTokens = Math.max(128, Number(process.env.AGENT_PLANNER_MAX_OUTPUT_TOKENS || 320));
+      const plannerMaxTokens = Math.max(180, Number(process.env.AGENT_PLANNER_MAX_OUTPUT_TOKENS || 420));
       this.plannerLlm = new ChatGoogleGenerativeAI({
         apiKey,
         model: plannerModel,
@@ -124,7 +124,7 @@ export class AgentOrchestratorService {
     if (!this.plannerFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
-      const plannerMaxTokens = Math.max(128, Number(process.env.AGENT_PLANNER_MAX_OUTPUT_TOKENS || 320));
+      const plannerMaxTokens = Math.max(180, Number(process.env.AGENT_PLANNER_MAX_OUTPUT_TOKENS || 420));
       this.plannerFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
@@ -142,7 +142,7 @@ export class AgentOrchestratorService {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
       const synthesizerModel = process.env.GEMINI_SYNTH_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
-      const synthesizerMaxTokens = Math.max(180, Number(process.env.AGENT_SYNTH_MAX_OUTPUT_TOKENS || 420));
+      const synthesizerMaxTokens = Math.max(260, Number(process.env.AGENT_SYNTH_MAX_OUTPUT_TOKENS || 700));
       this.synthesizerLlm = new ChatGoogleGenerativeAI({
         apiKey,
         model: synthesizerModel,
@@ -158,7 +158,7 @@ export class AgentOrchestratorService {
     if (!this.synthesizerFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
-      const synthesizerMaxTokens = Math.max(180, Number(process.env.AGENT_SYNTH_MAX_OUTPUT_TOKENS || 420));
+      const synthesizerMaxTokens = Math.max(260, Number(process.env.AGENT_SYNTH_MAX_OUTPUT_TOKENS || 700));
       this.synthesizerFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
@@ -176,7 +176,7 @@ export class AgentOrchestratorService {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
       const reflectorModel = process.env.GEMINI_REFLECTOR_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
-      const reflectorMaxTokens = Math.max(96, Number(process.env.AGENT_REFLECTOR_MAX_OUTPUT_TOKENS || 140));
+      const reflectorMaxTokens = Math.max(120, Number(process.env.AGENT_REFLECTOR_MAX_OUTPUT_TOKENS || 180));
       this.reflectorLlm = new ChatGoogleGenerativeAI({
         apiKey,
         model: reflectorModel,
@@ -192,7 +192,7 @@ export class AgentOrchestratorService {
     if (!this.reflectorFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
-      const reflectorMaxTokens = Math.max(96, Number(process.env.AGENT_REFLECTOR_MAX_OUTPUT_TOKENS || 140));
+      const reflectorMaxTokens = Math.max(120, Number(process.env.AGENT_REFLECTOR_MAX_OUTPUT_TOKENS || 180));
       this.reflectorFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
@@ -994,6 +994,7 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
                pt.blended_style_name as personality_style,
                pt.blended_style_desc as personality_desc,
                p.name as program_name,
+               (SELECT COUNT(*) FROM assessment_attempts aa2 WHERE aa2.registration_id = r.id AND aa2.status = 'COMPLETED') as attempt_count,
                CASE
                  WHEN LOWER(r.full_name) = $2 THEN 100
                  WHEN LOWER(r.full_name) LIKE $3 THEN 94
@@ -1005,7 +1006,13 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
                END AS match_score
         FROM registrations r
         LEFT JOIN users u ON u.id = r.user_id
-        LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id
+        LEFT JOIN LATERAL (
+          SELECT aa1.total_score, aa1.status, aa1.dominant_trait_id, aa1.program_id
+          FROM assessment_attempts aa1
+          WHERE aa1.registration_id = r.id AND aa1.status = 'COMPLETED'
+          ORDER BY aa1.completed_at DESC NULLS LAST, aa1.total_score DESC NULLS LAST, aa1.id DESC
+          LIMIT 1
+        ) aa ON true
         LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
         LEFT JOIN programs p ON aa.program_id = p.id
         WHERE LOWER(r.full_name) LIKE $1 AND r.is_deleted = false${filter}
@@ -1039,9 +1046,15 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
       if (disambiguationNeeded) {
         const choices = results
           .slice(0, 5)
-          .map((r: any, i: number) =>
-            `${i + 1}. **${r.full_name}** — ${r.assessment_status === 'COMPLETED' ? `Score: ${r.total_score ?? 'N/A'}` : 'Not assessed'}`,
-          )
+          .map((r: any, i: number) => {
+            const attemptCount = parseInt(r.attempt_count || '0');
+            const attemptLabel = attemptCount > 1
+              ? ` (${attemptCount} assessments)`
+              : attemptCount === 1
+                ? ' (1 assessment)'
+                : ' (no assessments)';
+            return `${i + 1}. **${r.full_name}** — ${r.assessment_status === 'COMPLETED' ? `Score: ${r.total_score ?? 'N/A'}` : 'Not assessed'}${attemptLabel}`;
+          })
           .join('\n');
 
         return {
@@ -1069,9 +1082,15 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
 
       // If multiple matches, include disambiguation info
       const allMatches = results.length > 1
-        ? results.map((r: any, i: number) =>
-            `${i + 1}. **${r.full_name}** — ${r.assessment_status === 'COMPLETED' ? `Score: ${r.total_score}` : 'Not assessed'}`
-          ).join('\n')
+        ? results.map((r: any, i: number) => {
+            const attemptCount = parseInt(r.attempt_count || '0');
+            const attemptLabel = attemptCount > 1
+              ? ` (${attemptCount} assessments)`
+              : attemptCount === 1
+                ? ' (1 assessment)'
+                : ' (no assessments)';
+            return `${i + 1}. **${r.full_name}** — ${r.assessment_status === 'COMPLETED' ? `Score: ${r.total_score}` : 'Not assessed'}${attemptLabel}`;
+          }).join('\n')
         : null;
 
       return {
@@ -1385,40 +1404,56 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
     user: UserContext,
   ): Promise<string> {
     const role = (user?.role || 'STUDENT').toUpperCase();
-    const roleRules = ['STUDENT', 'INDIVIDUAL', 'COUNSELLOR', 'COUNSELOR'].includes(role)
+    const isStudent = ['STUDENT', 'INDIVIDUAL', 'COUNSELLOR', 'COUNSELOR'].includes(role);
+    const isCorporate = role === 'CORPORATE';
+
+    const roleRules = isStudent
       ? `STUDENT RULES:
-- Answer only what was asked.
-- Keep simple requests to 1-2 short sentences.
-- Skip salary/company comparisons unless explicitly asked.`
-      : role === 'CORPORATE'
+- Answer what was asked — nothing more, nothing less.
+- Simple factual questions → 1-2 sentences. Complex guidance → structured sections.
+- Use encouraging, supportive tone. Bold key terms.
+- Skip salary/company comparisons unless explicitly asked.
+- End with ONE actionable suggestion relevant to their question.`
+      : isCorporate
         ? `CORPORATE RULES:
-- Keep output executive, concise, and data-first.
-- Prioritize metrics, trends, and actions.`
+- Executive, data-first format. Lead with the metric/number.
+- Use tables for comparisons. Bold key KPIs.
+- End with 1 strategic recommendation or next action.
+- Prioritize: metrics → trends → actions.`
         : `ADMIN RULES:
-- Be precise and complete without unnecessary prose.`;
+- Be precise and complete. Use tables for multi-row data.
+- Bold key values and counts.
+- For person lookups: structured profile with key data points.
+- End with 1 practical next step.`;
 
     const toolOutputs = results.map(r => {
-      return `── ${r.toolName.toUpperCase()} RESULT ──
-${r.summary}
-${r.data?.answer ? `\nDetailed Answer:\n${r.data.answer?.slice(0, 320)}` : ''}`;
+      const detailSlice = r.data?.answer ? r.data.answer.slice(0, 500) : '';
+      return `── ${r.toolName.toUpperCase()} (confidence: ${r.confidence || 'N/A'}) ──
+${r.summary || 'No summary'}
+${detailSlice ? `\nDetails:\n${detailSlice}` : ''}`;
     }).join('\n\n');
 
-    const synthesisPrompt = `Answer from tool outputs only. Be concise and complete.
+    const synthesisPrompt = `You are Ask BI, an advanced data intelligence assistant. Synthesize the tool outputs below into a polished, professional response.
 
 USER ROLE: ${role}
 ${roleRules}
 
-RULES:
-1) Use only tool facts; no fabrication.
-2) Start with direct answer.
-3) If multi-part ask, answer each part explicitly.
-4) Keep wording tight; avoid repetition.
-5) If tools conflict, mention uncertainty briefly and pick highest-confidence result.
-6) Use this structure when useful:
-  - Quick Answer
-  - Key Findings
-  - Recommended Next Action
-7) For missing data, say "No users found." and provide one practical next step.
+FORMATTING RULES:
+1) Use ONLY facts from tool outputs. NEVER fabricate data, names, or numbers.
+2) Start with a direct answer in the first line — no preamble like "Based on the data...".
+3) Use markdown formatting:
+   - **Bold** for key numbers, names, and metrics
+   - Tables (| col | col |) for multi-row data
+   - Bullet points for lists of 3+ items
+   - Numbered lists for step-by-step guidance
+4) For multi-part questions, address each part with a clear section header.
+5) Keep wording tight — no repetition, no filler phrases.
+6) If tools returned no data, say specifically what wasn't found and suggest 1 alternative query.
+7) If tools conflict, note briefly and use the highest-confidence result.
+8) Structure complex responses as:
+   **Quick Answer** → Key data/table → Brief insight → Suggested next step
+9) Maximum 1 emoji per section header for visual scanning (📊 🎯 💡 ✅).
+10) NEVER repeat the question back. NEVER say "Here is" or "I found". Just give the answer.
 
 USER QUESTION:
 "${question}"
@@ -1545,15 +1580,34 @@ FINAL RESPONSE:`;
   private postProcessAnswer(answer: string): string {
     if (!answer) return answer;
 
-    const lines = answer
-      .split('\n')
-      .map(l => l.trimEnd())
-      .filter(l => l.length > 0);
+    let processed = answer
+      // Remove LLM preamble artifacts
+      .replace(/^(Here is|Here's|Based on|According to|I found|Let me)\s[^.\n]{0,80}[.:]/i, '')
+      // Fix double-bold: ****text**** → **text**
+      .replace(/\*{3,}([^*]+)\*{3,}/g, '**$1**')
+      // Fix broken markdown headers with extra spaces
+      .replace(/^(#{1,3})\s{2,}/gm, '$1 ')
+      // Remove trailing colons on headers
+      .replace(/^(#{1,3}\s.+):$/gm, '$1')
+      // Clean up excessive blank lines
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
 
+    const lines = processed
+      .split('\n')
+      .map(l => l.trimEnd());
+
+    // Deduplicate consecutive identical lines
     const deduped: string[] = [];
     let prevNorm = '';
     for (const line of lines) {
-      const norm = line.toLowerCase().replace(/\s+/g, ' ');
+      const norm = line.toLowerCase().replace(/\s+/g, ' ').trim();
+      if (!norm) {
+        // Keep blank lines for spacing but deduplicate consecutive blanks
+        if (prevNorm !== '') deduped.push(line);
+        prevNorm = norm;
+        continue;
+      }
       if (norm !== prevNorm) {
         deduped.push(line);
       }
@@ -1561,10 +1615,14 @@ FINAL RESPONSE:`;
     }
 
     const merged = deduped.join('\n').trim();
-    if (/^conversation context loaded\.?$/i.test(merged)) {
-      return 'No users found.';
+
+    // Catch empty-state generic responses
+    if (/^(conversation context loaded|no (relevant |)data (found|available))\.?$/i.test(merged)) {
+      return 'No matching data found. Try rephrasing your question or ask about a specific candidate, batch, or metric.';
     }
-    return merged;
+
+    // Remove trailing "Let me know if you need anything else" type closings
+    return merged.replace(/\n*(?:Let me know|Feel free|Don't hesitate|Please let me know)[^\n]*$/i, '').trim();
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

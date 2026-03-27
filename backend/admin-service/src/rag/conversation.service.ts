@@ -152,7 +152,12 @@ export class ConversationService {
      * Detect if the current query is a follow-up question
      */
     isFollowUp(sessionId: string, question: string): boolean {
-        const q = question.toLowerCase();
+        const q = question.toLowerCase().trim();
+
+        // Bare number selection is always a follow-up to disambiguation
+        if (/^#?\s*\d+$/.test(q)) {
+            return true;
+        }
 
         // Follow-up indicators
         const followUpPatterns = [
@@ -163,10 +168,12 @@ export class ConversationService {
             /^(compare|versus|vs)/,
             /\b(again|another|else|other)\b/,
             /\?$/,  // Just a short question
+            /^(first|second|third|last|previous)\b/,
+            /^(option|choice|selection)\s*\d+$/,
         ];
 
         // Check if short question that might be follow-up
-        if (q.split(' ').length <= 3 && this.getSession(sessionId).messages.length > 0) {
+        if (q.split(' ').filter(Boolean).length <= 3 && this.getSession(sessionId).messages.length > 0) {
             return true;
         }
 
@@ -213,20 +220,18 @@ export class ConversationService {
             return '';
         }
 
-        // Get last 10 messages for deeper context
-        const recentMessages = session.messages.slice(-10);
+        // Get last 6 messages for context
+        const recentMessages = session.messages.slice(-6);
 
-        let history = '--- CONVERSATION HISTORY ---\n';
+        let history = 'Chat history:\n';
         recentMessages.forEach(msg => {
             const roleLabel = msg.role === 'user' ? 'User' : 'BI';
-            // Clean content to avoid massive prompts if message is huge (e.g. previous report)
             let content = msg.content;
-            if (content.length > 500) {
-                content = content.substring(0, 500) + '... [content truncated]';
+            if (content.length > 300) {
+                content = content.substring(0, 300) + '...';
             }
             history += `${roleLabel}: ${content}\n`;
         });
-        history += '--- CURRENT INTERACTION ---\n';
 
         return history;
     }

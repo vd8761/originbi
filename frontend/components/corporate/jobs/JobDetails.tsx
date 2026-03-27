@@ -155,10 +155,20 @@ export default function JobDetails({ jobId, onBack }: JobDetailsProps) {
 
     // Show CandidateDetail when a candidate is selected
     if (selectedCandidateId) {
+        const selectedCandidate = mockCandidates.find((candidate) => candidate.id === selectedCandidateId);
+
         return (
             <CandidateDetail
                 candidateId={selectedCandidateId}
                 jobTitle={job.title}
+                candidateData={selectedCandidate ? {
+                    name: selectedCandidate.name,
+                    originId: selectedCandidate.originId,
+                    avatar: selectedCandidate.avatar,
+                    trait: selectedCandidate.trait,
+                    traitColor: selectedCandidate.traitColor,
+                    alignment: selectedCandidate.alignment,
+                } : undefined}
                 onBack={() => setSelectedCandidateId(null)}
             />
         );

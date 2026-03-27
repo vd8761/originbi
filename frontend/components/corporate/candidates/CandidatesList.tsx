@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronDownIcon, SearchIcon } from "lucide-react";
 import CandidateDetail from "./CandidateDetail";
-import { EyeSolidIcon } from "../../icons";
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -23,19 +22,32 @@ interface CandidateRow {
 
 // ─── Mock Data ──────────────────────────────────────────────────
 
-const mockCandidateRows: CandidateRow[] = Array.from({ length: 10 }, (_, i) => ({
-    id: `202001256_${i}`,
-    name: "Monishwar Rajasekaran",
-    originId: "202001256",
-    avatar: `https://i.pravatar.cc/150?u=${200 + i}`,
-    trait: "Supportive Energizer",
-    traitColor: "text-[#FFB020]",
-    appliedJobs: [
-        { title: "UX/UI Designer", count: 3 },
-    ],
-    latestApplied: "13 May 2025",
-    candidateStatus: { hired: 2, shortlist: 4, rejected: 6 },
-}));
+const traitSeed = [
+    { name: "Supportive Energizer", colorClass: "text-[#FFB020]" },
+    { name: "Analytical Leader", colorClass: "text-[#13C065]" },
+    { name: "Creative Thinker", colorClass: "text-[#6B7BFF]" },
+    { name: "Decisive Analyst", colorClass: "text-[#00A7A0]" },
+    { name: "Structured Supporter", colorClass: "text-[#A26BFF]" },
+    { name: "Strategic Stabilizer", colorClass: "text-[#FF6B6B]" },
+];
+
+const mockCandidateRows: CandidateRow[] = Array.from({ length: 10 }, (_, i) => {
+    const trait = traitSeed[i % traitSeed.length];
+
+    return {
+        id: `202001256_${i}`,
+        name: "Monishwar Rajasekaran",
+        originId: "202001256",
+        avatar: `https://i.pravatar.cc/150?u=${200 + i}`,
+        trait: trait.name,
+        traitColor: trait.colorClass,
+        appliedJobs: [
+            { title: "UX/UI Designer", count: 3 },
+        ],
+        latestApplied: "13 May 2025",
+        candidateStatus: { hired: 2, shortlist: 4, rejected: 6 },
+    };
+});
 
 // ─── Filter Dropdown ─────────────────────────────────────────────
 
@@ -68,17 +80,25 @@ function FilterDropdown({
         ? (label.includes(":") ? `${label.split(":")[0]}: ${value}` : value!)
         : label;
 
+    const iconNode = React.isValidElement(icon)
+        ? React.cloneElement(icon as React.ReactElement<{ className?: string }>, {
+            className: `${(icon as React.ReactElement<{ className?: string }>).props.className ?? ""} ${
+                isActive ? "text-[#1ED36A]" : "text-[#7B8A84] dark:text-white/65"
+            }`,
+        })
+        : icon;
+
     return (
         <div className="relative shrink-0" ref={ref}>
             <button
                 onClick={() => setOpen(!open)}
-                className={`flex items-center gap-2 px-4 py-[7px] rounded-lg text-[12px] font-medium transition-colors cursor-pointer whitespace-nowrap border ${
+                className={`flex items-center gap-2 h-[44px] px-4 rounded-xl text-[13px] font-medium transition-colors cursor-pointer whitespace-nowrap border ${
                     isActive
-                        ? "border-brand-green bg-brand-green/15 text-white dark:bg-brand-green/20"
-                        : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-white/15 dark:bg-transparent dark:text-white/90 dark:hover:bg-white/5"
+                        ? "border-brand-green/50 bg-[#E7F8EE] text-[#1F3B2A] hover:bg-[#DDF4E7] dark:bg-brand-green/20 dark:text-white dark:hover:bg-brand-green/25"
+                        : "border-gray-300 bg-transparent text-[#33413B] hover:bg-black/[0.04] dark:border-white/[0.24] dark:text-white/90 dark:hover:bg-white/5"
                 }`}
             >
-                {icon}
+                {iconNode}
                 <span>{displayLabel}</span>
                 <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
             </button>
@@ -111,6 +131,25 @@ function FilterDropdown({
     );
 }
 
+function EyeIcon({ width = 24, height = 24 }: { width?: number; height?: number }) {
+    return (
+        <span className="group inline-block cursor-pointer">
+            <svg viewBox="0 0 24 24" width={width} height={height} className="block">
+                <path
+                    d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6-10-6-10-6z"
+                    className="fill-transparent stroke-[#22c55e] [stroke-width:2] transition-all duration-300 ease-in-out group-hover:fill-[#22c55e]"
+                />
+                <circle
+                    cx="12"
+                    cy="12"
+                    r="3"
+                    className="fill-transparent stroke-[#22c55e] [stroke-width:2] transition-all duration-300 ease-in-out origin-center group-hover:fill-[#065f46] group-hover:scale-125"
+                />
+            </svg>
+        </span>
+    );
+}
+
 // ─── Main Component ─────────────────────────────────────────────
 
 export default function CandidatesList() {
@@ -127,6 +166,7 @@ export default function CandidatesList() {
     const [dateFilter, setDateFilter] = useState<string | null>(null);
     const totalEntries = 1676;
     const totalPages = Math.ceil(totalEntries / entriesPerPage);
+    const hasMoreThanSelectedEntries = totalEntries > entriesPerPage;
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
@@ -145,17 +185,27 @@ export default function CandidatesList() {
 
     // Show CandidateDetail when a candidate is selected
     if (selectedCandidateId) {
+        const selectedCandidate = mockCandidateRows.find((row) => row.id === selectedCandidateId);
         return (
             <CandidateDetail
                 candidateId={selectedCandidateId}
                 initialTab={selectedTab}
+                candidateData={selectedCandidate ? {
+                    name: selectedCandidate.name,
+                    originId: selectedCandidate.originId,
+                    avatar: selectedCandidate.avatar,
+                    trait: selectedCandidate.trait,
+                    traitColor: `${selectedCandidate.traitColor.replace("text-[", "border-[")} ${selectedCandidate.traitColor}`,
+                } : undefined}
                 onBack={() => { setSelectedCandidateId(null); setSelectedTab("origin_report"); }}
             />
         );
     }
 
+    const traitOptions = Array.from(new Set(mockCandidateRows.map((row) => row.trait)));
+
     return (
-        <div className="flex flex-col h-full w-full gap-5 font-sans p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-[#18241F]">
+        <div className="flex flex-col w-full min-h-0 gap-5 font-sans p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-[#18241F]">
 
             {/* Breadcrumb */}
             <div className="flex items-center text-xs text-gray-500 dark:text-white/70 mb-1.5 font-normal">
@@ -174,11 +224,11 @@ export default function CandidatesList() {
                     Candidates
                 </h1>
                 <div className="flex items-center gap-2.5 text-[13px] text-gray-500 dark:text-white/60">
-                    <span className="font-normal">Showing</span>
+                    <span className="font-light">Showing</span>
                     <div className="relative" ref={showingRef}>
                         <button
                             onClick={() => setShowingMenuOpen((prev) => !prev)}
-                            className="flex items-center gap-1.5 bg-gray-100 dark:bg-white/10 border border-gray-200 dark:border-white/10 px-2.5 py-1 rounded-[7px] text-[13px] text-brand-green font-semibold min-w-[42px] justify-between transition-all cursor-pointer hover:border-brand-green/55"
+                            className="flex items-center gap-1.5 bg-gray-100 dark:bg-white/10 border border-gray-200 dark:border-white/10 px-2.5 py-1 rounded-[7px] text-[13px] text-brand-green font-medium min-w-[42px] justify-between transition-all cursor-pointer hover:border-brand-green/55"
                         >
                             {entriesPerPage}
                             <ChevronDownIcon className={`w-3 h-3 text-gray-400 dark:text-white/50 transition-transform ${showingMenuOpen ? "rotate-180" : ""}`} />
@@ -205,14 +255,20 @@ export default function CandidatesList() {
                             </div>
                         )}
                     </div>
-                    <span className="whitespace-nowrap font-normal">of {totalEntries.toLocaleString()} entries</span>
+                    <span className="whitespace-nowrap font-light">of {totalEntries.toLocaleString()} entries</span>
                     <div className="flex items-center gap-1.5 ml-1">
                         <button className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center transition-all cursor-pointer text-gray-500 dark:text-white/50 hover:text-brand-green hover:dark:text-brand-green hover:bg-gray-200 dark:hover:bg-white/15">
                             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                                 <path d="M7.5 3L4.5 6L7.5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                         </button>
-                        <button className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center transition-all cursor-pointer text-gray-500 dark:text-white/50 hover:text-brand-green hover:dark:text-brand-green hover:bg-gray-200 dark:hover:bg-white/15">
+                        <button
+                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                                hasMoreThanSelectedEntries
+                                    ? "bg-[#1ED36A] text-white hover:bg-[#18C963]"
+                                    : "bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-white/50 hover:text-brand-green hover:dark:text-brand-green hover:bg-gray-200 dark:hover:bg-white/15"
+                            }`}
+                        >
                             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                                 <path d="M4.5 3L7.5 6L4.5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
@@ -234,7 +290,7 @@ export default function CandidatesList() {
                             placeholder="Search by Name, OriginID..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full rounded-lg border border-gray-200 dark:border-white/12 bg-gray-50 dark:bg-white/5 pl-10 pr-4 py-2 text-[13px] text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35 transition-colors focus:outline-none focus:border-brand-green/50"
+                            className="w-full h-[44px] rounded-xl border border-gray-300 dark:border-white/[0.24] bg-transparent pl-10 pr-4 text-[13px] text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35 transition-colors focus:outline-none focus:border-brand-green/50"
                         />
                     </div>
 
@@ -244,7 +300,7 @@ export default function CandidatesList() {
                             label="Trait"
                             value={traitFilter}
                             onChange={setTraitFilter}
-                            options={["Supportive Energizer", "Creative Thinker", "Strategic Leader", "Analytical Mind"]}
+                            options={traitOptions}
                         />
                         <FilterDropdown
                             label="Status"
@@ -255,8 +311,15 @@ export default function CandidatesList() {
                         <FilterDropdown
                             label="Applied Job"
                             icon={
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-brand-green shrink-0">
-                                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                                <svg width="14" height="14" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+                                    <path
+                                        d="M15.3 2.7H14.4V0.9C14.4 0.661305 14.3052 0.432387 14.1364 0.263604C13.9676 0.0948211 13.7387 0 13.5 0C13.2613 0 13.0324 0.0948211 12.8636 0.263604C12.6948 0.432387 12.6 0.661305 12.6 0.9V2.7H5.4V0.9C5.4 0.661305 5.30518 0.432387 5.1364 0.263604C4.96761 0.0948211 4.73869 0 4.5 0C4.2613 0 4.03239 0.0948211 3.8636 0.263604C3.69482 0.432387 3.6 0.661305 3.6 0.9V2.7H2.7C1.98392 2.7 1.29716 2.98446 0.790812 3.49081C0.284464 3.99716 0 4.68392 0 5.4V6.3H18V5.4C18 4.68392 17.7155 3.99716 17.2092 3.49081C16.7028 2.98446 16.0161 2.7 15.3 2.7Z"
+                                        fill="currentColor"
+                                    />
+                                    <path
+                                        d="M0 15.3C0 16.0161 0.284464 16.7028 0.790812 17.2092C1.29716 17.7155 1.98392 18 2.7 18H15.3C16.0161 18 16.7028 17.7155 17.2092 17.2092C17.7155 16.7028 18 16.0161 18 15.3V8.09998H0V15.3Z"
+                                        fill="currentColor"
+                                    />
                                 </svg>
                             }
                             value={jobFilter}
@@ -266,7 +329,7 @@ export default function CandidatesList() {
                         <FilterDropdown
                             label="Applied Date"
                             icon={
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" className="text-brand-green shrink-0">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" className="shrink-0">
                                     <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                                 </svg>
                             }
@@ -278,74 +341,74 @@ export default function CandidatesList() {
                 </div>
 
                 {/* Table */}
-                <div className="overflow-x-auto">
-                    <table className="w-full text-[13px]">
+                <div className="w-full overflow-x-auto">
+                    <table className="w-full min-w-[980px] text-[13px]">
                         <thead>
                             <tr className="border-b border-gray-100 dark:border-white/[0.06] bg-gray-50 dark:bg-white/[0.06]">
-                                <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-gray-500 dark:text-white/55 whitespace-nowrap">
+                                <th className="text-left px-4 sm:px-5 py-3.5 text-[12px] font-semibold text-gray-500 dark:text-white/55 whitespace-nowrap">
                                     Name
                                     <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" className="inline ml-1 text-brand-green"><path d="M4 0L7 3H1L4 0ZM4 8L1 5H7L4 8Z" /></svg>
                                 </th>
-                                <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-gray-500 dark:text-white/55 whitespace-nowrap">Trait</th>
-                                <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-gray-500 dark:text-white/55 whitespace-nowrap">Applied Jobs</th>
-                                <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-gray-500 dark:text-white/55 whitespace-nowrap">
+                                <th className="text-left px-4 sm:px-5 py-3.5 text-[12px] font-semibold text-gray-500 dark:text-white/55 whitespace-nowrap">Trait</th>
+                                <th className="text-left px-4 sm:px-5 py-3.5 text-[12px] font-semibold text-gray-500 dark:text-white/55 whitespace-nowrap">Applied Jobs</th>
+                                <th className="text-left px-4 sm:px-5 py-3.5 text-[12px] font-semibold text-gray-500 dark:text-white/55 whitespace-nowrap">
                                     Latest Applied
                                     <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" className="inline ml-1 text-brand-green"><path d="M4 0L7 3H1L4 0ZM4 8L1 5H7L4 8Z" /></svg>
                                 </th>
-                                <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-gray-500 dark:text-white/55 whitespace-nowrap">Candidate Status</th>
-                                <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-gray-500 dark:text-white/55 whitespace-nowrap">Action</th>
+                                <th className="text-left px-4 sm:px-5 py-3.5 text-[12px] font-semibold text-gray-500 dark:text-white/55 whitespace-nowrap">Candidate Status</th>
+                                <th className="text-left px-4 sm:px-5 py-3.5 text-[12px] font-semibold text-gray-500 dark:text-white/55 whitespace-nowrap">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             {mockCandidateRows.map((candidate) => (
                                 <tr key={candidate.id} className="border-b border-gray-100 dark:border-white/[0.04] transition-colors last:border-b-0 hover:bg-gray-50 dark:hover:bg-white/[0.03]">
                                     {/* Name + Avatar */}
-                                    <td className="px-5 py-4">
+                                    <td className="px-4 sm:px-5 py-4">
                                         <div className="flex items-center gap-3">
                                             <div className="w-[40px] h-[40px] rounded-full overflow-hidden border border-gray-200 dark:border-white/10 shrink-0">
                                                 <img src={candidate.avatar} alt={candidate.name} className="w-full h-full object-cover" />
                                             </div>
                                             <div>
-                                                <p className="font-semibold text-[#19211C] dark:text-white">{candidate.name}</p>
-                                                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Origin ID : {candidate.originId}</p>
+                                                <p className="font-medium text-[#19211C] dark:text-white">{candidate.name}</p>
+                                                <p className="text-[11px] font-light text-gray-500 dark:text-gray-400 mt-0.5">Origin ID : {candidate.originId}</p>
                                             </div>
                                         </div>
                                     </td>
                                     {/* Trait */}
-                                    <td className="px-5 py-4 text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                                    <td className={`px-4 sm:px-5 py-4 whitespace-nowrap font-medium ${candidate.traitColor}`}>
                                         {candidate.trait}
                                     </td>
                                     {/* Applied Jobs — click opens Applied Jobs tab */}
-                                    <td className="px-5 py-4">
+                                    <td className="px-4 sm:px-5 py-4">
                                         <button
                                             onClick={() => openCandidate(candidate.id, "applied_jobs")}
-                                            className="text-brand-green font-medium hover:underline cursor-pointer text-left"
+                                            className="text-brand-green font-medium underline decoration-solid underline-offset-2 cursor-pointer text-left"
                                         >
                                             {candidate.appliedJobs[0].title}{" "}
                                             <span>+{candidate.appliedJobs[0].count}</span>
                                         </button>
                                     </td>
                                     {/* Latest Applied */}
-                                    <td className="px-5 py-4 text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                                    <td className="px-4 sm:px-5 py-4 font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap">
                                         {candidate.latestApplied}
                                     </td>
                                     {/* Status */}
-                                    <td className="px-5 py-4">
-                                        <div className="flex items-center gap-2 text-[12px] whitespace-nowrap">
-                                            <span className="text-gray-600 dark:text-gray-300">Hired <span className="text-brand-green font-semibold">({candidate.candidateStatus.hired})</span></span>
+                                    <td className="px-4 sm:px-5 py-4">
+                                        <div className="flex items-center gap-2 text-[12px] font-medium whitespace-nowrap">
+                                            <span className="text-gray-600 dark:text-gray-300">Hired <span className="text-brand-green font-medium">({candidate.candidateStatus.hired})</span></span>
                                             <span className="text-gray-400">·</span>
-                                            <span className="text-gray-600 dark:text-gray-300">Shortlist <span className="text-[#FFB020] font-semibold">({candidate.candidateStatus.shortlist})</span></span>
+                                            <span className="text-gray-600 dark:text-gray-300">Shortlist <span className="text-[#FFB020] font-medium">({candidate.candidateStatus.shortlist})</span></span>
                                             <span className="text-gray-400">·</span>
-                                            <span className="text-gray-600 dark:text-gray-300">Rejected <span className="text-[#FF4A4A] font-semibold">({candidate.candidateStatus.rejected})</span></span>
+                                            <span className="text-gray-600 dark:text-gray-300">Rejected <span className="text-[#FF4A4A] font-medium">({candidate.candidateStatus.rejected})</span></span>
                                         </div>
                                     </td>
                                     {/* Action — eye muted by default, green on hover */}
-                                    <td className="px-5 py-4">
+                                    <td className="px-4 sm:px-5 py-4">
                                         <button
                                             onClick={() => openCandidate(candidate.id)}
-                                            className="group/eye flex items-center justify-center cursor-pointer transition-all duration-150"
+                                            className="group/eye flex items-center justify-center w-[34px] h-[24px] rounded-[4px] bg-transparent transition-all duration-150 cursor-pointer"
                                         >
-                                            <EyeSolidIcon className="w-5 h-5 text-[#13C065]/70 dark:text-[#13C065]/60 transition-all duration-150 group-hover/eye:text-[#1ED36A] group-hover/eye:scale-110" />
+                                            <EyeIcon width={24} height={24} />
                                         </button>
                                     </td>
                                 </tr>

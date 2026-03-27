@@ -72,7 +72,7 @@ export class TextToSqlService {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
       const sqlModel = process.env.GEMINI_SQL_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
-      const sqlMaxTokens = Math.max(180, Number(process.env.SQL_MAX_OUTPUT_TOKENS || 520));
+      const sqlMaxTokens = Math.max(240, Number(process.env.SQL_MAX_OUTPUT_TOKENS || 680));
       this.llm = new ChatGoogleGenerativeAI({
         apiKey,
         model: sqlModel,
@@ -88,7 +88,7 @@ export class TextToSqlService {
     if (!this.sqlFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
-      const sqlMaxTokens = Math.max(180, Number(process.env.SQL_MAX_OUTPUT_TOKENS || 520));
+      const sqlMaxTokens = Math.max(240, Number(process.env.SQL_MAX_OUTPUT_TOKENS || 680));
       this.sqlFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
@@ -105,7 +105,7 @@ export class TextToSqlService {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
       const formatterModel = process.env.GEMINI_FORMATTER_MODEL || process.env.GEMINI_SQL_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
-      const formatterMaxTokens = Math.max(160, Number(process.env.FORMATTER_MAX_OUTPUT_TOKENS || 480));
+      const formatterMaxTokens = Math.max(220, Number(process.env.FORMATTER_MAX_OUTPUT_TOKENS || 620));
       this.formatterLlm = new ChatGoogleGenerativeAI({
         apiKey,
         model: formatterModel,
@@ -121,7 +121,7 @@ export class TextToSqlService {
     if (!this.formatterFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
-      const formatterMaxTokens = Math.max(160, Number(process.env.FORMATTER_MAX_OUTPUT_TOKENS || 480));
+      const formatterMaxTokens = Math.max(220, Number(process.env.FORMATTER_MAX_OUTPUT_TOKENS || 620));
       this.formatterFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
@@ -138,7 +138,7 @@ export class TextToSqlService {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
       const synthesizerModel = process.env.GEMINI_SQL_SYNTH_MODEL || process.env.GEMINI_SQL_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
-      const synthMaxTokens = Math.max(180, Number(process.env.SQL_SYNTH_MAX_OUTPUT_TOKENS || 620));
+      const synthMaxTokens = Math.max(260, Number(process.env.SQL_SYNTH_MAX_OUTPUT_TOKENS || 860));
       this.synthesizerLlm = new ChatGoogleGenerativeAI({
         apiKey,
         model: synthesizerModel,
@@ -154,7 +154,7 @@ export class TextToSqlService {
     if (!this.synthesizerFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
-      const synthMaxTokens = Math.max(180, Number(process.env.SQL_SYNTH_MAX_OUTPUT_TOKENS || 620));
+      const synthMaxTokens = Math.max(260, Number(process.env.SQL_SYNTH_MAX_OUTPUT_TOKENS || 860));
       this.synthesizerFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
@@ -465,21 +465,26 @@ Return ONLY the corrected SQL, nothing else:`;
     const dataStr = JSON.stringify(truncatedData);
     const totalRows = data.length;
 
-    const formatPrompt = `Answer from data only. Be concise and insightful.
+    const formatPrompt = `You are Ask BI, an advanced data intelligence assistant. Format this data into an insightful, well-structured response.
 
-Rules:
-1) Never fabricate names, values, or trends.
-2) Start with the direct answer.
-3) Use markdown table only when it improves readability.
-4) Add at most 1 short insight line from the provided numbers.
-5) No filler, no methodology, no external references.
+RULES:
+1) NEVER fabricate names, values, or trends. Use ONLY the provided data.
+2) Start with a **one-line summary** (e.g., "**15 candidates** found with completed assessments").
+3) If data has 2+ columns and 2+ rows, ALWAYS use a markdown table.
+4) After the table/data, add 1 short **insight line** highlighting:
+   - A notable pattern, outlier, or trend from the numbers
+   - Example: "📊 **Top 3 candidates** scored above 85%, while the average is 72%"
+5) For comparison queries, use side-by-side tables or bullet contrasts.
+6) Bold all key numbers and names for visual scanning.
+7) No methodology, no filler phrases, no "Based on the data...".
+8) Keep response under 300 words.
 
 Question: ${question}
 Role: ${user.role}
-Rows: ${totalRows}${totalRows > 30 ? ` (showing first 30)` : ''}
+Rows: ${totalRows}${totalRows > 30 ? ` (showing first 15)` : ''}
 Data: ${dataStr}
 
-Final answer:`;
+Formatted response:`;
 
     try {
       const response = await invokeWithFallback({
@@ -509,20 +514,23 @@ Final answer:`;
     const num = typeof count === 'string' ? parseInt(count, 10) : count;
     const q = question.toLowerCase();
 
-    // Build a contextual response
+    // Build a contextual response with bold numbers
     if (/\b(candidate|student|registration|employee|resource|people|person)\b/i.test(q)) {
-      if (/\b(female|girl|women)\b/i.test(q)) return `**${num}** female candidates found.`;
-      if (/\b(male|boy|men)\b/i.test(q)) return `**${num}** male candidates found.`;
-      if (/\bcompleted\b/i.test(q)) return `**${num}** candidates have completed their assessments.`;
-      return `**${num}** candidates total.`;
+      if (/\b(female|girl|women)\b/i.test(q)) return `**${num}** female candidate${num !== 1 ? 's' : ''} found.`;
+      if (/\b(male|boy|men)\b/i.test(q)) return `**${num}** male candidate${num !== 1 ? 's' : ''} found.`;
+      if (/\bcompleted\b/i.test(q)) return `**${num}** candidate${num !== 1 ? 's have' : ' has'} completed their assessment${num !== 1 ? 's' : ''}.`;
+      if (/\bactive\b/i.test(q)) return `**${num}** active candidate${num !== 1 ? 's' : ''} found.`;
+      if (/\bpending\b/i.test(q)) return `**${num}** candidate${num !== 1 ? 's' : ''} with pending status.`;
+      return `**${num}** candidate${num !== 1 ? 's' : ''} total.`;
     }
-    if (/\b(assessment|test|exam)\b/i.test(q)) return `**${num}** assessments found.`;
-    if (/\b(career|role|job)\b/i.test(q)) return `**${num}** career roles available.`;
-    if (/\b(course|program)\b/i.test(q)) return `**${num}** courses/programs available.`;
-    if (/\b(user|login|account)\b/i.test(q)) return `**${num}** user accounts found.`;
-    if (/\b(group|batch)\b/i.test(q)) return `**${num}** groups found.`;
+    if (/\b(assessment|test|exam)\b/i.test(q)) return `**${num}** assessment${num !== 1 ? 's' : ''} found.`;
+    if (/\b(career|role|job)\b/i.test(q)) return `**${num}** career role${num !== 1 ? 's' : ''} available.`;
+    if (/\b(course|program)\b/i.test(q)) return `**${num}** course${num !== 1 ? 's' : ''}/ program${num !== 1 ? 's' : ''} available.`;
+    if (/\b(user|login|account)\b/i.test(q)) return `**${num}** user account${num !== 1 ? 's' : ''} found.`;
+    if (/\b(group|batch)\b/i.test(q)) return `**${num}** group${num !== 1 ? 's' : ''} found.`;
+    if (/\b(compan|corporate|organization)\b/i.test(q)) return `**${num}** corporate account${num !== 1 ? 's' : ''} found.`;
 
-    return `**${num}** records found.`;
+    return `**${num}** record${num !== 1 ? 's' : ''} found.`;
   }
 
   /**
@@ -540,12 +548,8 @@ Final answer:`;
         return `**${entries[0][1]}**`;
       }
 
-      // Single row with multiple fields — bullet list
-      const lines = entries.map(([key, value]) => {
-        const label = this.humanizeColumnName(key);
-        return `- **${label}**: ${value}`;
-      });
-      return lines.join('\n');
+      // Single row with multiple fields — table format for consistency in UI.
+      return this.buildMarkdownTable([row]);
     }
 
     // 2+ rows — create a neat table
@@ -577,21 +581,27 @@ Final answer:`;
     const q = question.toLowerCase();
 
     if (/\b(who|find|search|show|list)\b/i.test(q) && /\b(name|person|candidate)\b/i.test(q)) {
-      return `No users found.`;
+      return `No matching candidates found for this query.\n\n💡 **Try:** "List all candidates" or "Show candidates from [batch name]"`;
     }
 
     // Contextual messages based on what the user asked about
-    if (/\b(education|qualification|degree|department|school|board|stream)\b/i.test(q)) {
-      return `The requested education/qualification details are not available for these candidates at this time.`;
+    if (/\b(personality|trait|behavior|aptitude|strength|weakness)\b/i.test(q)) {
+      return `No personality/trait data available for this query. The candidates may need to complete their psychometric assessments first.\n\n💡 **Try:** "Show candidates who completed assessments" or "List assessment results"`;
     }
-    if (/\b(score|marks|assessment|test|exam|result)\b/i.test(q)) {
-      return `No assessment data is currently available for this query. The candidates may not have completed their assessments yet.`;
+    if (/\b(education|qualification|degree|department|school|board|stream)\b/i.test(q)) {
+      return `No education/qualification data found for this query. This information may not have been captured for the selected candidates.\n\n💡 **Try:** "List candidates with their details" or "Show all registrations"`;
+    }
+    if (/\b(score|marks|assessment|test|exam|result|performance|top|best|highest|lowest)\b/i.test(q)) {
+      return `No assessment data found for this query. The candidates may not have completed their assessments yet.\n\n💡 **Try:** "Show candidates with completed assessments" or "List all assessment statuses"`;
     }
     if (/\b(email|phone|mobile|contact)\b/i.test(q)) {
-      return `The requested contact details are not available for these candidates.`;
+      return `No contact details found matching this query.\n\n💡 **Try:** "List all candidates" to see available contact information.`;
+    }
+    if (/\b(compare|versus|vs|difference|between)\b/i.test(q)) {
+      return `No data available for this comparison. One or both entities may not exist.\n\n💡 **Try:** specifying exact batch or group names as they appear in the system.`;
     }
 
-    return `No users found.`;
+    return `No data found for this query. The criteria may be too specific or the data hasn't been entered yet.\n\n💡 **Try:** broadening your search or asking "What data is available?"`;
   }
 
   /**
