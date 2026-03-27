@@ -21,9 +21,8 @@ import { UserEnrichmentService } from './user-enrichment.service';
  * Auth resolution order (first match wins):
  *   Path 1: Authorization: Bearer <cognito-id-token>  → best security
  *   Path 2: X-User-Context header (JSON)              → validated via DB
- *   Path 3: request.body.user (frontend fallback)     → validated via DB
- *   Path 4: Existing request.user from middleware      → enriched
- *   Path 5: Anonymous STUDENT (most restricted)        → fallback
+ *   Path 3: Existing request.user from middleware      → enriched
+ *   Path 4: Anonymous STUDENT (most restricted)        → fallback
  *
  * Unlike CognitoAdminGuard, this guard never rejects based on role —
  * role-based restrictions are handled downstream by AccessPolicy.
@@ -86,28 +85,7 @@ export class CognitoUniversalGuard implements CanActivate {
       }
     }
 
-    // ─── Path 3: User object in request body (frontend sends { question, user }) ───
-    const bodyUser = request.body?.user;
-    if (
-      bodyUser &&
-      typeof bodyUser === 'object' &&
-      bodyUser.id &&
-      bodyUser.id > 0
-    ) {
-      try {
-        const userContext =
-          await this.userEnrichment.enrichFromHeader(bodyUser);
-        request.user = userContext;
-        this.logger.debug(
-          `Auth[Body]: user=${userContext.id}, role=${userContext.role}, corp=${userContext.corporateId || 'N/A'}`,
-        );
-        return true;
-      } catch (e) {
-        this.logger.warn('Failed to enrich body user context');
-      }
-    }
-
-    // ─── Path 4: User already set by upstream middleware/guard ───
+    // ─── Path 3: User already set by upstream middleware/guard ───
     if (request.user && request.user.role && request.user.id > 0) {
       const enriched = await this.userEnrichment.enrichFromHeader(request.user);
       request.user = enriched;
@@ -117,7 +95,7 @@ export class CognitoUniversalGuard implements CanActivate {
       return true;
     }
 
-    // ─── Path 5: No authentication — anonymous with most restricted access ───
+    // ─── Path 4: No authentication — anonymous with most restricted access ───
     request.user = this.userEnrichment.getAnonymousContext();
     this.logger.debug(
       'Auth[Anonymous]: No credentials found → anonymous STUDENT context',

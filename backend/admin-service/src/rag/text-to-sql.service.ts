@@ -71,7 +71,7 @@ export class TextToSqlService {
     if (!this.llm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
-      const sqlModel = process.env.GEMINI_SQL_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
+      const sqlModel = process.env.GEMINI_SQL_MODEL || 'gemini-2.5-flash';
       const sqlMaxTokens = Math.max(240, Number(process.env.SQL_MAX_OUTPUT_TOKENS || 680));
       this.llm = new ChatGoogleGenerativeAI({
         apiKey,
@@ -104,8 +104,11 @@ export class TextToSqlService {
     if (!this.formatterLlm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
-      const formatterModel = process.env.GEMINI_FORMATTER_MODEL || process.env.GEMINI_SQL_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
-      const formatterMaxTokens = Math.max(220, Number(process.env.FORMATTER_MAX_OUTPUT_TOKENS || 620));
+      const formatterModel =
+        process.env.GEMINI_FORMATTER_MODEL ||
+        process.env.GEMINI_LLM_MODEL ||
+        'gemini-2.5-flash';
+      const formatterMaxTokens = Math.max(220, Number(process.env.FORMATTER_MAX_OUTPUT_TOKENS || 520));
       this.formatterLlm = new ChatGoogleGenerativeAI({
         apiKey,
         model: formatterModel,
@@ -137,7 +140,7 @@ export class TextToSqlService {
     if (!this.synthesizerLlm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
-      const synthesizerModel = process.env.GEMINI_SQL_SYNTH_MODEL || process.env.GEMINI_SQL_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
+      const synthesizerModel = process.env.GEMINI_SQL_SYNTH_MODEL || process.env.GEMINI_SQL_MODEL || 'gemini-2.5-flash';
       const synthMaxTokens = Math.max(260, Number(process.env.SQL_SYNTH_MAX_OUTPUT_TOKENS || 860));
       this.synthesizerLlm = new ChatGoogleGenerativeAI({
         apiKey,

@@ -166,16 +166,7 @@ const RenderContent = memo(({ content, streaming, onDone, apiUrl }: {
     const handleDownload = async (reportPath: string) => {
         try {
             const baseUrl = apiUrl || process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
-            const headers: Record<string, string> = {};
-            const token = sessionStorage.getItem('idToken') || sessionStorage.getItem('accessToken');
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-            const storedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
-            if (storedUser) {
-                try {
-                    const u = JSON.parse(storedUser);
-                    if (u.id && u.id > 0) headers['X-User-Context'] = storedUser;
-                } catch { /* skip */ }
-            }
+            const headers = getAuthHeaders();
 
             const response = await fetch(`${baseUrl}${reportPath}`, { headers });
             if (!response.ok) {
@@ -724,8 +715,8 @@ export default function ChatAssistant({
                 label: 'Corporate', color: 'bg-white/40 dark:bg-white/5 text-brand-green border-brand-green/20 dark:border-white/10', icon: Briefcase,
                 suggestions: [
                     { icon: Target, text: 'Show my employees', desc: 'View your team members' },
-                    { icon: TrendingUp, text: 'Best performers in my company', desc: 'Top talent insights' },
-                    { icon: Brain, text: 'Career recommendations for my team', desc: 'AI-powered guidance' },
+                    { icon: TrendingUp, text: 'List candidates completed the assessment', desc: 'Assessment completion list' },
+                    { icon: Brain, text: 'Candidates suitable for UI/UX', desc: 'Role-based talent match' },
                 ],
             };
             case 'STUDENT': return {
@@ -740,8 +731,8 @@ export default function ChatAssistant({
                 label: 'Admin', color: 'bg-white/40 dark:bg-white/5 text-brand-green border-brand-green/20 dark:border-white/10', icon: Star,
                 suggestions: [
                     { icon: Target, text: 'List all candidates', desc: 'Browse the talent pool' },
-                    { icon: TrendingUp, text: 'Show top performers', desc: 'Best scoring talent' },
-                    { icon: Zap, text: 'Generate career report', desc: 'AI career analysis' },
+                    { icon: TrendingUp, text: 'Top performer for Team Lead', desc: 'Role-wise talent insights' },
+                    { icon: Zap, text: 'List corporate accounts', desc: 'Organization intelligence' },
                 ],
             };
         }

@@ -107,8 +107,11 @@ export class AgentOrchestratorService {
     if (!this.plannerLlm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
-      const plannerModel = process.env.GEMINI_PLANNER_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
-      const plannerMaxTokens = Math.max(180, Number(process.env.AGENT_PLANNER_MAX_OUTPUT_TOKENS || 420));
+      const plannerModel =
+        process.env.GEMINI_PLANNER_MODEL ||
+        process.env.GEMINI_LLM_MODEL ||
+        'gemini-2.5-flash';
+      const plannerMaxTokens = Math.max(180, Number(process.env.AGENT_PLANNER_MAX_OUTPUT_TOKENS || 320));
       this.plannerLlm = new ChatGoogleGenerativeAI({
         apiKey,
         model: plannerModel,
@@ -141,7 +144,7 @@ export class AgentOrchestratorService {
     if (!this.synthesizerLlm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
-      const synthesizerModel = process.env.GEMINI_SYNTH_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
+      const synthesizerModel = process.env.GEMINI_SYNTH_MODEL || 'gemini-2.5-flash';
       const synthesizerMaxTokens = Math.max(260, Number(process.env.AGENT_SYNTH_MAX_OUTPUT_TOKENS || 700));
       this.synthesizerLlm = new ChatGoogleGenerativeAI({
         apiKey,
@@ -175,7 +178,10 @@ export class AgentOrchestratorService {
     if (!this.reflectorLlm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
-      const reflectorModel = process.env.GEMINI_REFLECTOR_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
+      const reflectorModel =
+        process.env.GEMINI_REFLECTOR_MODEL ||
+        process.env.GEMINI_LLM_MODEL ||
+        'gemini-2.5-flash';
       const reflectorMaxTokens = Math.max(120, Number(process.env.AGENT_REFLECTOR_MAX_OUTPUT_TOKENS || 180));
       this.reflectorLlm = new ChatGoogleGenerativeAI({
         apiKey,
@@ -909,7 +915,23 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
     limit: number = 5,
   ): Promise<ToolResult> {
     try {
-      const results = await this.embeddingsService.semanticSearch(query, limit, category);
+      const semanticProfile = this.inferSemanticHybridProfile(query);
+      const requestedCategories = category
+        ? [category, ...semanticProfile.categories]
+        : semanticProfile.categories;
+
+      const results = await this.embeddingsService.semanticSearch(
+        query,
+        limit,
+        requestedCategories,
+        0.3,
+        {
+          hybridWeights: { vector: 1.08, lexical: 1.0 },
+          categoryWeights: semanticProfile.categoryWeights,
+          sourceWeights: semanticProfile.sourceWeights,
+          allowCrossCategoryFallback: true,
+        },
+      );
       if (!results || results.length === 0) {
         return {
           toolName: 'semantic_search',
@@ -930,7 +952,10 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
         data: { documents: results, contextChunks },
         summary: `Found ${results.length} relevant knowledge base documents.`,
         confidence: 0.7,
-        metadata: { documentCount: results.length },
+        metadata: {
+          documentCount: results.length,
+          categories: requestedCategories,
+        },
       };
     } catch (error) {
       this.logger.warn(`semantic_search tool failed: ${error.message}`);
@@ -942,6 +967,58 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
         confidence: 0,
       };
     }
+  }
+
+  private inferSemanticHybridProfile(query: string): {
+    categories: string[];
+    categoryWeights: Record<string, number>;
+    sourceWeights: Record<string, number>;
+  } {
+    const q = String(query || '').toLowerCase();
+    const categories = new Set<string>();
+    const categoryWeights: Record<string, number> = {};
+
+    const addCategory = (name: string, weight: number) => {
+      categories.add(name);
+      categoryWeights[name] = Math.max(categoryWeights[name] || 1, weight);
+    };
+
+    if (/\b(department|degree|academic|college|campus|program|specialization|specialisation|branch)\b/.test(q)) {
+      addCategory('education', 1.25);
+      addCategory('department', 1.1);
+    }
+    if (/\b(course|certification|curriculum|training|learning path|syllabus)\b/.test(q)) {
+      addCategory('course', 1.22);
+      addCategory('education', 1.08);
+    }
+    if (/\b(tool|tools|software|platform|tech stack|technology|framework|library)\b/.test(q)) {
+      addCategory('tool', 1.2);
+    }
+    if (/\b(personality|trait|traits|disc|behavioral|behavioural|aptitude style)\b/.test(q)) {
+      addCategory('personality', 1.24);
+      addCategory('career', 1.08);
+    }
+    if (/\b(career|role|job|path|opportunity|future role|position)\b/.test(q)) {
+      addCategory('career', 1.2);
+    }
+
+    if (categories.size === 0) {
+      addCategory('career', 1.12);
+      addCategory('education', 1.08);
+    }
+
+    return {
+      categories: Array.from(categories),
+      categoryWeights,
+      sourceWeights: {
+        career_roles: 1.18,
+        department_degrees: 1.18,
+        courses: 1.12,
+        personality_traits: 1.1,
+        career_role_tools: 1.08,
+        programs: 1.05,
+      },
+    };
   }
 
   private async executePersonLookup(
