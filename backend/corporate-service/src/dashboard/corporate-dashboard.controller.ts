@@ -147,6 +147,7 @@ export class CorporateDashboardController {
     @Query('status') status?: string,
     @Query('userId') userId?: number,
     @Query('type') type?: string,
+    @Query('emailStatus') emailStatus?: 'sent' | 'not_sent' | 'third_party',
   ) {
     if (!email) throw new BadRequestException('Email is required');
     return this.dashboardService.getAssessmentSessions(
@@ -161,6 +162,7 @@ export class CorporateDashboardController {
       status,
       userId,
       type,
+      emailStatus,
     );
   }
 

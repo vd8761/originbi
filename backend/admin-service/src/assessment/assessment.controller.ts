@@ -17,6 +17,7 @@ export class AssessmentController {
     @Query('status') status?: string,
     @Query('userId') userId?: string,
     @Query('type') type?: string,
+    @Query('emailStatus') emailStatus?: string,
   ) {
     const pageNum = Number(page) || 1;
     const limitNum = Number(limit) || 10;
@@ -32,6 +33,7 @@ export class AssessmentController {
       status,
       userId,
       type,
+      emailStatus,
     );
   }
 
