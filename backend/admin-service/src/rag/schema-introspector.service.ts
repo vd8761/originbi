@@ -334,6 +334,15 @@ export class SchemaIntrospectorService implements OnModuleInit {
       lines.push(`${table.tableName}: ${colNames.join(', ')}`);
     }
 
+    // Add essential rules inline
+    lines.push('');
+    lines.push('Key rules:');
+    lines.push('- candidates/students=registrations, score=total_score, style=personality_traits');
+    lines.push('- Always filter: is_deleted=false');
+    lines.push('- Status: COMPLETED/IN_PROGRESS/ABANDONED for attempts');
+    lines.push('- Gender: MALE|FEMALE');
+    lines.push('- career_roles: use career_role_name (not name), short_description (not description)');
+
     return lines.join('\n');
   }
 

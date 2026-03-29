@@ -17,11 +17,12 @@ async function resilientLLMCall(
     opts: { maxTokens?: number; temperature?: number; logger?: Logger } = {},
 ): Promise<string> {
     const { maxTokens = 1000, temperature = 0, logger } = opts;
+    const geminiModel = process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
 
     // ── Attempt 1: Google Gemini ──
     const googleApiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
     if (googleApiKey) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${googleApiKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${googleApiKey}`;
         const geminiBody = {
             contents: [{ parts: [{ text: messages.map(m => `${m.role}: ${m.content}`).join('\n') }] }],
             generationConfig: { temperature, maxOutputTokens: maxTokens },

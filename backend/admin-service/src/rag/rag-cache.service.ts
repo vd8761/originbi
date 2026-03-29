@@ -30,6 +30,13 @@ export interface CachedAnswer {
   hitCount: number;
 }
 
+interface CacheScope {
+  role?: string;
+  userId?: number;
+  corporateId?: number | null;
+  affiliateId?: number | null;
+}
+
 @Injectable()
 export class RagCacheService implements OnModuleInit {
   private readonly logger = new Logger('RagCache');
@@ -107,25 +114,27 @@ export class RagCacheService implements OnModuleInit {
    * Look up a cached answer for a semantically similar question.
    * Returns null on cache miss.
    */
-  async lookup(question: string, userRole: string = 'ADMIN'): Promise<CachedAnswer | null> {
+  async lookup(question: string, scope: CacheScope): Promise<CachedAnswer | null> {
     if (!this.tableReady) return null;
 
     try {
+      const scopeKey = this.buildScopeKey(scope);
+
       // Step 1: Fast exact-match check (hash-based, <1ms)
-      const hash = this.hashQuestion(question, userRole);
+      const hash = this.hashQuestion(question, scopeKey);
       const exactRows = await this.dataSource.query(
         `SELECT answer, search_type, confidence, created_at, hit_count
          FROM rag_response_cache
-         WHERE question_hash = $1 AND expires_at > NOW()
+         WHERE question_hash = $1 AND user_role = $2 AND expires_at > NOW()
          LIMIT 1`,
-        [hash],
+        [hash, scopeKey],
       );
       if (exactRows.length > 0) {
         const row = exactRows[0];
         // Update hit count (fire-and-forget)
         this.dataSource.query(
-          `UPDATE rag_response_cache SET hit_count = hit_count + 1, last_hit_at = NOW() WHERE question_hash = $1`,
-          [hash],
+          `UPDATE rag_response_cache SET hit_count = hit_count + 1, last_hit_at = NOW() WHERE question_hash = $1 AND user_role = $2`,
+          [hash, scopeKey],
         ).catch(() => {});
         this.logger.log(`⚡ Cache HIT (exact hash) for: "${question.slice(0, 60)}..."`);
         return {
@@ -151,7 +160,7 @@ export class RagCacheService implements OnModuleInit {
            AND question_embedding IS NOT NULL
          ORDER BY question_embedding <=> $1::vector
          LIMIT 1`,
-        [embStr, userRole],
+        [embStr, scopeKey],
       );
 
       if (semanticRows.length > 0) {
@@ -163,7 +172,7 @@ export class RagCacheService implements OnModuleInit {
             `UPDATE rag_response_cache SET hit_count = hit_count + 1, last_hit_at = NOW()
              WHERE id = (SELECT id FROM rag_response_cache WHERE expires_at > NOW() AND user_role = $1
                          ORDER BY question_embedding <=> $2::vector LIMIT 1)`,
-            [userRole, embStr],
+            [scopeKey, embStr],
           ).catch(() => {});
           this.logger.log(`⚡ Cache HIT (semantic, sim=${similarity.toFixed(3)}) for: "${question.slice(0, 60)}..."`);
           return {
@@ -193,7 +202,7 @@ export class RagCacheService implements OnModuleInit {
     answer: string,
     searchType: string,
     confidence: number,
-    userRole: string = 'ADMIN',
+    scope: CacheScope,
   ): Promise<void> {
     if (!this.tableReady) return;
     // Don't cache low-confidence or error responses
@@ -212,12 +221,13 @@ export class RagCacheService implements OnModuleInit {
     }
 
     try {
-      const hash = this.hashQuestion(question, userRole);
+      const scopeKey = this.buildScopeKey(scope);
+      const hash = this.hashQuestion(question, scopeKey);
 
       // Don't re-cache if exact hash already exists
       const existing = await this.dataSource.query(
-        `SELECT id FROM rag_response_cache WHERE question_hash = $1 LIMIT 1`,
-        [hash],
+        `SELECT id FROM rag_response_cache WHERE question_hash = $1 AND user_role = $2 LIMIT 1`,
+        [hash, scopeKey],
       );
       if (existing.length > 0) return;
 
@@ -228,7 +238,7 @@ export class RagCacheService implements OnModuleInit {
       await this.dataSource.query(
         `INSERT INTO rag_response_cache (question_hash, question_text, question_embedding, answer, search_type, confidence, user_role, expires_at)
          VALUES ($1, $2, $3::vector, $4, $5, $6, $7, NOW() + INTERVAL '${this.CACHE_TTL_HOURS} hours')`,
-        [hash, question.slice(0, 500), embStr, answer, searchType, confidence, userRole],
+        [hash, question.slice(0, 500), embStr, answer, searchType, confidence, scopeKey],
       );
 
       // Auto-prune if cache is too large
@@ -279,12 +289,31 @@ export class RagCacheService implements OnModuleInit {
 
   // ── Helpers ──
 
-  private hashQuestion(question: string, role: string): string {
+  private hashQuestion(question: string, scopeKey: string): string {
     // Simple hash: normalize and combine role + question
     const normalized = question.toLowerCase().trim()
       .replace(/\s+/g, ' ')
       .replace(/[^\w\s]/g, '');
-    return `${role}:${normalized}`;
+    return `${scopeKey}:${normalized}`;
+  }
+
+  private buildScopeKey(scope: CacheScope): string {
+    const role = (scope.role || 'ANON').toUpperCase();
+
+    if (role === 'CORPORATE') {
+      return `CORPORATE:${scope.corporateId || 0}`;
+    }
+    if (role === 'STUDENT') {
+      return `STUDENT:${scope.userId || 0}`;
+    }
+    if (role === 'AFFILIATE') {
+      return `AFFILIATE:${scope.affiliateId || 0}`;
+    }
+    if (role === 'ADMIN' || role === 'SUPER_ADMIN') {
+      return 'ADMIN';
+    }
+
+    return `ANON:${scope.userId || 0}`;
   }
 
   private async pruneIfNeeded(): Promise<void> {

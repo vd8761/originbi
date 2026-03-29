@@ -74,4 +74,16 @@ export class CreateRegistrationDto {
   @IsString()
   @IsOptional()
   referral_code?: string;
+
+  @IsString()
+  @IsOptional()
+  payment_amount?: string;
+
+  @IsString()
+  @IsOptional()
+  payment_reference?: string;
+
+  @IsString()
+  @IsOptional()
+  payment_provider?: string;
 }

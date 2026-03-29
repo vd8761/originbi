@@ -23,6 +23,7 @@ import { Program } from '@originbi/shared-entities';
 import { GroupAssessment } from '@originbi/shared-entities';
 import { Groups } from '@originbi/shared-entities';
 import { CorporateCounsellingAccess } from '@originbi/shared-entities';
+import { Department, DepartmentDegree, DegreeType } from '@originbi/shared-entities';
 import { CounsellingType } from '@originbi/shared-entities';
 import { CounsellingSession } from '@originbi/shared-entities';
 import { CounsellingResponse } from '@originbi/shared-entities';
@@ -1312,6 +1313,10 @@ export class CorporateDashboardService {
       .createQueryBuilder('registration')
       .leftJoinAndSelect('registration.user', 'user')
       .leftJoinAndSelect('registration.group', 'group')
+      .leftJoinAndSelect('registration.program', 'program')
+      .leftJoin('DepartmentDegree', 'dd', 'registration.departmentDegreeId = dd.id')
+      .leftJoinAndMapOne('registration.deptRaw', 'Department', 'dept', 'dd.departmentId = dept.id')
+      .leftJoinAndMapOne('registration.degRaw', 'DegreeType', 'deg', 'dd.degreeTypeId = deg.id')
       .where('registration.corporateAccountId = :corpId', {
         corpId: corporate.id,
       });
@@ -1736,7 +1741,20 @@ export class CorporateDashboardService {
   // ========================================================================
   // SEARCH BY REPORT NUMBER
   // ========================================================================
-  async searchByReportNumber(reportNumber: string, corporateAccountId: number) {
+  async searchByReportNumber(reportNumberInput: string, corporateAccountId: number) {
+    let reportNumber = reportNumberInput.toUpperCase();
+    
+    // Reverse the abbreviations used in the generated report PDFs
+    if (reportNumber.includes('-CS-')) {
+      reportNumber = reportNumber.replace('-CS-', '-COLLEGE_STUDENT-');
+    } else if (reportNumber.includes('-SS-')) {
+      reportNumber = reportNumber.replace('-SS-', '-SCHOOL_STUDENT-');
+    } else if (reportNumber.includes('-E-')) {
+      reportNumber = reportNumber.replace('-E-', '-EMPLOYEE-');
+    } else if (reportNumber.includes('-CG-')) {
+      reportNumber = reportNumber.replace('-CG-', '-CXO_GENERAL-');
+    }
+
     const query = `
       SELECT
         ar.report_number,
@@ -1773,6 +1791,7 @@ export class CorporateDashboardService {
       LEFT JOIN degree_types dt ON dd.degree_type_id = dt.id
       WHERE ar.report_number = $1
         AND r.corporate_account_id = $2
+      ORDER BY aa.dominant_trait_id DESC NULLS LAST
       LIMIT 1
     `;
 
@@ -1799,8 +1818,17 @@ export class CorporateDashboardService {
     const traitName = (row.blended_style_name || '').trim();
     const traitImageKey = traitName.replace(/\s+/g, '_');
 
+    const formatReportRef = (ref: string | null) => {
+      if (!ref) return 'Nil';
+      return ref
+        .replace('COLLEGE_STUDENT', 'CS')
+        .replace('SCHOOL_STUDENT', 'SS')
+        .replace('EMPLOYEE', 'E')
+        .replace('CXO_GENERAL', 'CG');
+    };
+
     return {
-      reportNumber: row.report_number,
+      reportNumber: formatReportRef(row.report_number),
       generatedAt: row.generated_at,
       candidateName: row.full_name,
       email: row.email,

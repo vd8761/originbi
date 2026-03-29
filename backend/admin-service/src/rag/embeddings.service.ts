@@ -3,6 +3,16 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CohereClient } from 'cohere-ai';
 
+interface SemanticSearchOptions {
+  hybridWeights?: {
+    vector?: number;
+    lexical?: number;
+  };
+  categoryWeights?: Record<string, number>;
+  sourceWeights?: Record<string, number>;
+  allowCrossCategoryFallback?: boolean;
+}
+
 /**
  * Production-Grade Embeddings Service — Google Gemini
  * Model: gemini-embedding-001 (1536 dimensions)
@@ -19,6 +29,19 @@ export class EmbeddingsService implements OnModuleInit {
   private googleApiKey: string | null = null;
   private pgvectorAvailable = false;
   private embeddingsAvailable = false;
+  private readonly includeLegacyDocs =
+    (process.env.RAG_INCLUDE_LEGACY_DOCS || 'false').toLowerCase() === 'true';
+
+  private readonly defaultSourceWeights: Record<string, number> = {
+    career_roles: 1.18,
+    department_degrees: 1.18,
+    courses: 1.12,
+    personality_traits: 1.1,
+    career_role_tools: 1.08,
+    programs: 1.05,
+    departments: 1.05,
+    open_questions: 1.02,
+  };
 
   private readonly MODEL = 'models/gemini-embedding-001';
   private readonly EMBEDDING_DIM = 1536;  // Safe dimension that works with both IVFFlat and HNSW
@@ -35,8 +58,8 @@ export class EmbeddingsService implements OnModuleInit {
     { embedding: number[]; timestamp: number }
   >();
   private readonly CACHE_TTL = 1000 * 60 * 60; // 1 hour cache
-  private BATCH_SIZE = 80; // Google supports up to 100 per batch
-  private MAX_RETRIES = 4;
+  private BATCH_SIZE = 40; // Hardcoded production tuning
+  private MAX_RETRIES = 3;
 
   // Request pacing (configurable for free/paid tiers)
   private requestTimestamps: number[] = [];
@@ -44,16 +67,20 @@ export class EmbeddingsService implements OnModuleInit {
 
   // Quota exhaustion tracking — temporarily disable when quota is hit
   private quotaExhaustedUntil: number = 0;
-  private QUOTA_COOLDOWN = 15 * 1000;
+  private QUOTA_COOLDOWN = 30 * 1000;
+  private readonly BASE_QUOTA_COOLDOWN = 30 * 1000;
+  private readonly MAX_QUOTA_COOLDOWN = 5 * 60 * 1000;
+  private consecutiveQuotaHits = 0;
+  private lastQuotaHitAt = 0;
+  private lastSingleCooldownLogAt = 0;
+  private lastBatchCooldownLogAt = 0;
+  private readonly COOLDOWN_LOG_INTERVAL_MS = 15000;
 
   constructor(private dataSource: DataSource) { }
 
   async onModuleInit() {
     this.googleApiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || null;
-    this.BATCH_SIZE = this.parseIntEnv('EMBEDDINGS_BATCH_SIZE', this.BATCH_SIZE, 1, 100);
-    this.MAX_RETRIES = this.parseIntEnv('EMBEDDINGS_MAX_RETRIES', this.MAX_RETRIES, 1, 8);
-    this.RATE_LIMIT_RPM = this.parseIntEnv('EMBEDDINGS_RATE_LIMIT_RPM', this.RATE_LIMIT_RPM, 1, 5000);
-    this.QUOTA_COOLDOWN = this.parseIntEnv('EMBEDDINGS_QUOTA_COOLDOWN_MS', this.QUOTA_COOLDOWN, 1000, 10 * 60 * 1000);
+    this.consecutiveQuotaHits = 0;
 
     if (this.googleApiKey) {
       this.logger.log('✅ Google Gemini API key configured');
@@ -66,7 +93,10 @@ export class EmbeddingsService implements OnModuleInit {
     }
 
     this.logger.log(
-      `⚙️ Embeddings config: batch=${this.BATCH_SIZE}, retries=${this.MAX_RETRIES}, rpm=${this.RATE_LIMIT_RPM}, cooldownMs=${this.QUOTA_COOLDOWN}`,
+      `⚙️ Embeddings config (hardcoded): batch=${this.BATCH_SIZE}, retries=${this.MAX_RETRIES}, rpm=${this.RATE_LIMIT_RPM}, cooldownMs=${this.QUOTA_COOLDOWN}, maxCooldownMs=${this.MAX_QUOTA_COOLDOWN}`,
+    );
+    this.logger.log(
+      `📚 Semantic retrieval legacy docs: ${this.includeLegacyDocs ? 'enabled (including source_table IS NULL)' : 'disabled (excluding source_table IS NULL)'}`,
     );
 
     // Init Cohere Reranker
@@ -230,17 +260,66 @@ export class EmbeddingsService implements OnModuleInit {
     this.requestTimestamps.push(Date.now());
   }
 
-  private parseIntEnv(
-    key: string,
-    fallback: number,
-    min: number,
-    max: number,
-  ): number {
-    const raw = process.env[key];
-    if (!raw) return fallback;
-    const parsed = Number.parseInt(raw, 10);
-    if (Number.isNaN(parsed)) return fallback;
-    return Math.max(min, Math.min(max, parsed));
+  private isQuotaCoolingDown(mode: 'single' | 'batch'): boolean {
+    const now = Date.now();
+    if (now >= this.quotaExhaustedUntil) return false;
+
+    const remainingMs = this.quotaExhaustedUntil - now;
+    const remainingSec = Math.ceil(remainingMs / 1000);
+    const lastLogAt = mode === 'single' ? this.lastSingleCooldownLogAt : this.lastBatchCooldownLogAt;
+
+    if (now - lastLogAt >= this.COOLDOWN_LOG_INTERVAL_MS) {
+      if (mode === 'single') {
+        this.lastSingleCooldownLogAt = now;
+        this.logger.debug(`⏸️ Embedding skipped — API quota cooling down (${remainingSec}s remaining)`);
+      } else {
+        this.lastBatchCooldownLogAt = now;
+        this.logger.debug(`⏸️ Batch embeddings skipped — API quota cooling down (${remainingSec}s remaining)`);
+      }
+    }
+
+    return true;
+  }
+
+  private enterQuotaCooldown(source: 'single' | 'batch'): void {
+    const now = Date.now();
+    if (now - this.lastQuotaHitAt > 5 * 60 * 1000) {
+      this.consecutiveQuotaHits = 0;
+    }
+    this.lastQuotaHitAt = now;
+    this.consecutiveQuotaHits += 1;
+
+    const scaledCooldown = Math.min(
+      this.MAX_QUOTA_COOLDOWN,
+      Math.round(this.QUOTA_COOLDOWN * Math.pow(1.6, Math.max(0, this.consecutiveQuotaHits - 1))),
+    );
+
+    this.quotaExhaustedUntil = now + scaledCooldown;
+    const cooldownSec = Math.ceil(scaledCooldown / 1000);
+    this.logger.warn(
+      `🚫 ${source === 'batch' ? 'Batch ' : ''}API quota exhausted — cooldown ${cooldownSec}s (hit #${this.consecutiveQuotaHits})`,
+    );
+  }
+
+  private markQuotaRecovered(): void {
+    if (this.consecutiveQuotaHits > 0) {
+      this.logger.log('✅ Embeddings quota recovered — resuming normal throughput');
+    }
+    this.consecutiveQuotaHits = 0;
+  }
+
+  getQuotaStatus(): {
+    coolingDown: boolean;
+    remainingMs: number;
+    consecutiveQuotaHits: number;
+  } {
+    const now = Date.now();
+    const remainingMs = Math.max(0, this.quotaExhaustedUntil - now);
+    return {
+      coolingDown: remainingMs > 0,
+      remainingMs,
+      consecutiveQuotaHits: this.consecutiveQuotaHits,
+    };
   }
 
   // ─────────────── Core: Single Embedding ───────────────
@@ -257,8 +336,7 @@ export class EmbeddingsService implements OnModuleInit {
     if (!this.embeddingsAvailable || !this.googleApiKey) return null;
 
     // Quota exhaustion: temporarily skip API calls after rate limit hits
-    if (Date.now() < this.quotaExhaustedUntil) {
-      this.logger.debug('⏸️ Embedding skipped — API quota cooling down');
+    if (this.isQuotaCoolingDown('single')) {
       return null;
     }
 
@@ -301,8 +379,7 @@ export class EmbeddingsService implements OnModuleInit {
         if (response.status === 429) {
           this.logger.warn(`⏳ Rate limited (attempt ${attempt}), backing off...`);
           if (attempt === this.MAX_RETRIES) {
-            this.quotaExhaustedUntil = Date.now() + this.QUOTA_COOLDOWN;
-            this.logger.warn(`🚫 API quota exhausted — disabling embeddings for ${this.QUOTA_COOLDOWN / 60000} min`);
+            this.enterQuotaCooldown('single');
             return null;
           }
           await this.sleep(2000 * attempt);
@@ -324,6 +401,7 @@ export class EmbeddingsService implements OnModuleInit {
         const embedding: number[] | undefined = data?.embedding?.values;
 
         if (embedding && embedding.length === this.EMBEDDING_DIM) {
+          this.markQuotaRecovered();
           this.embeddingCache.set(cacheKey, {
             embedding,
             timestamp: Date.now(),
@@ -363,8 +441,7 @@ export class EmbeddingsService implements OnModuleInit {
     }
 
     // Quota exhaustion: temporarily skip API calls after rate limit hits.
-    if (Date.now() < this.quotaExhaustedUntil) {
-      this.logger.debug('⏸️ Batch embeddings skipped — API quota cooling down');
+    if (this.isQuotaCoolingDown('batch')) {
       return new Array(texts.length).fill(null);
     }
 
@@ -421,8 +498,7 @@ export class EmbeddingsService implements OnModuleInit {
           if (response.status === 429) {
             this.logger.warn(`⏳ Batch rate limited (attempt ${attempt}), backing off...`);
             if (attempt === this.MAX_RETRIES) {
-              this.quotaExhaustedUntil = Date.now() + this.QUOTA_COOLDOWN;
-              this.logger.warn(`🚫 Batch API quota exhausted — disabling embeddings for ${this.QUOTA_COOLDOWN / 1000}s`);
+              this.enterQuotaCooldown('batch');
               break;
             }
             await this.sleep(3000 * attempt);
@@ -435,6 +511,7 @@ export class EmbeddingsService implements OnModuleInit {
           }
 
           const data = await response.json();
+          this.markQuotaRecovered();
           const embeddings: any[] = data?.embeddings || [];
 
           embeddings.forEach((emb: any, idx: number) => {
@@ -627,12 +704,22 @@ export class EmbeddingsService implements OnModuleInit {
   async semanticSearch(
     query: string,
     limit: number = 5,
-    category?: string,
+    category?: string | string[],
     minSimilarity: number = 0.3,
+    options?: SemanticSearchOptions,
   ): Promise<any[]> {
     if (!this.pgvectorAvailable) return [];
 
     try {
+      const categories = this.normalizeCategories(category);
+      const hybridWeights = {
+        vector: this.clampWeight(options?.hybridWeights?.vector, 1.0),
+        lexical: this.clampWeight(options?.hybridWeights?.lexical, 0.85),
+      };
+      const categoryWeights = options?.categoryWeights || {};
+      const sourceWeights = { ...this.defaultSourceWeights, ...(options?.sourceWeights || {}) };
+      const allowCrossCategoryFallback = options?.allowCrossCategoryFallback !== false;
+
       const queryEmbedding = await this.generateEmbedding(query, 'query');
       if (!queryEmbedding) {
         this.logger.warn('⚠️ Embedding unavailable for semantic search; using lexical fallback only');
@@ -648,10 +735,13 @@ export class EmbeddingsService implements OnModuleInit {
           FROM rag_documents d
           WHERE to_tsvector('english', d.content) @@ plainto_tsquery('english', $1)
         `;
+        if (!this.includeLegacyDocs) {
+          lexicalSql += ` AND d.source_table IS NOT NULL`;
+        }
         const lexicalParams: any[] = [query];
-        if (category) {
-          lexicalSql += ` AND d.category = $2`;
-          lexicalParams.push(category);
+        if (categories.length > 0) {
+          lexicalSql += ` AND d.category = ANY($2::text[])`;
+          lexicalParams.push(categories);
         }
         lexicalSql += ` ORDER BY lexical_score DESC LIMIT $${lexicalParams.length + 1}`;
         lexicalParams.push(limit);
@@ -665,91 +755,265 @@ export class EmbeddingsService implements OnModuleInit {
 
       const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
-      // Fetch more candidates for better reranking/hybrid fusion.
-      const fetchLimit = this.cohereAvailable ? limit * 4 : limit * 3;
+      const primaryCandidates = await this.retrieveHybridCandidates(
+        query,
+        embeddingStr,
+        Math.max(limit * 4, 12),
+        minSimilarity,
+        categories,
+        hybridWeights,
+        categoryWeights,
+        sourceWeights,
+      );
 
-      let vectorSql = `
-                SELECT 
-                    d.id,
-                    d.content,
-                    d.metadata,
-                    d.category,
-                    d.source_table,
-                    d.source_id,
-                    1 - (e.embedding <=> $1::vector) AS similarity
-                FROM rag_embeddings e
-                JOIN rag_documents d ON d.id = e.document_id
-                WHERE 1 - (e.embedding <=> $1::vector) >= $2
-            `;
+      let candidates = primaryCandidates;
 
-      const vectorParams: any[] = [embeddingStr, minSimilarity];
-
-      if (category) {
-        vectorSql += ` AND d.category = $3`;
-        vectorParams.push(category);
-      }
-
-      vectorSql += ` ORDER BY e.embedding <=> $1::vector LIMIT $${vectorParams.length + 1}`;
-      vectorParams.push(fetchLimit);
-
-      const vectorCandidates = await this.dataSource.query(vectorSql, vectorParams);
-
-      // Hybrid lexical candidates: helps for exact names/codes/rare tokens.
-      let lexicalCandidates: any[] = [];
-      try {
-        let lexicalSql = `
-          SELECT
-              d.id,
-              d.content,
-              d.metadata,
-              d.category,
-              d.source_table,
-              d.source_id,
-              ts_rank_cd(to_tsvector('english', d.content), plainto_tsquery('english', $1)) AS lexical_score
-          FROM rag_documents d
-          WHERE to_tsvector('english', d.content) @@ plainto_tsquery('english', $1)
-        `;
-        const lexicalParams: any[] = [query];
-        if (category) {
-          lexicalSql += ` AND d.category = $2`;
-          lexicalParams.push(category);
+      if (categories.length > 1) {
+        const perCategoryLimit = Math.max(4, Math.ceil(limit / categories.length) + 2);
+        for (const cat of categories) {
+          const categoryCandidates = await this.retrieveHybridCandidates(
+            query,
+            embeddingStr,
+            perCategoryLimit,
+            minSimilarity,
+            [cat],
+            hybridWeights,
+            categoryWeights,
+            sourceWeights,
+          );
+          candidates = this.mergeCandidatesById(candidates, categoryCandidates);
         }
-        lexicalSql += ` ORDER BY lexical_score DESC LIMIT $${lexicalParams.length + 1}`;
-        lexicalParams.push(fetchLimit);
-        lexicalCandidates = await this.dataSource.query(lexicalSql, lexicalParams);
-      } catch (lexErr) {
-        // Keep vector-only search if tsvector functions are unavailable.
-        this.logger.debug(`Lexical fallback skipped: ${lexErr?.message || lexErr}`);
       }
 
-      // Reciprocal Rank Fusion (RRF) on ids from vector + lexical rankings.
-      const fusedById = new Map<number, { row: any; score: number }>();
-      const k = 60;
-      vectorCandidates.forEach((row, idx) => {
-        const curr = fusedById.get(row.id) || { row, score: 0 };
-        curr.score += 1 / (k + idx + 1);
-        fusedById.set(row.id, curr);
-      });
-      lexicalCandidates.forEach((row, idx) => {
-        const curr = fusedById.get(row.id) || { row, score: 0 };
-        curr.score += 1 / (k + idx + 1);
-        fusedById.set(row.id, curr);
-      });
+      // If strict category filtering is too narrow, expand search breadth while preserving weights.
+      if (allowCrossCategoryFallback && categories.length > 0 && candidates.length < limit) {
+        const expanded = await this.retrieveHybridCandidates(
+          query,
+          embeddingStr,
+          Math.max(limit * 6, 18),
+          minSimilarity,
+          [],
+          hybridWeights,
+          categoryWeights,
+          sourceWeights,
+        );
+        candidates = this.mergeCandidatesById(primaryCandidates, expanded);
+      }
 
-      const candidates = Array.from(fusedById.values())
-        .sort((a, b) => b.score - a.score)
-        .map((x) => x.row);
+      // Deduplicate near-identical chunks so the final context is diverse.
+      const dedupedCandidates: any[] = [];
+      const seenKeys = new Set<string>();
+      for (const row of candidates) {
+        const contentKey = String(row?.content || '')
+          .toLowerCase()
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 220);
+        const sourceKey = `${row?.source_table || '-'}:${row?.source_id || '-'}:${row?.category || '-'}`;
+        const key = `${sourceKey}|${contentKey}`;
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+        dedupedCandidates.push(row);
+      }
+
+      const diversifiedCandidates = this.diversifyByCategory(
+        dedupedCandidates,
+        categories,
+        Math.max(limit * 3, 12),
+      );
 
       // Rerank candidates with Cohere for higher precision
-      if (this.cohereAvailable && candidates.length > limit) {
-        return await this.rerankWithCohere({ query, documents: candidates, topN: limit });
+      if (this.cohereAvailable && diversifiedCandidates.length > limit) {
+        return await this.rerankWithCohere({ query, documents: diversifiedCandidates, topN: limit });
       }
 
-      return candidates.slice(0, limit);
+      return diversifiedCandidates.slice(0, limit);
     } catch (error) {
       this.logger.error('Semantic search failed:', error);
       return [];
     }
+  }
+
+  private normalizeCategories(category?: string | string[]): string[] {
+    if (!category) return [];
+    const list = Array.isArray(category) ? category : [category];
+    return [...new Set(list.map((c) => String(c || '').trim().toLowerCase()).filter(Boolean))];
+  }
+
+  private clampWeight(value: number | undefined, fallback: number): number {
+    if (typeof value !== 'number' || Number.isNaN(value)) return fallback;
+    return Math.max(0.1, Math.min(2.0, value));
+  }
+
+  private applyRowBoost(
+    baseScore: number,
+    row: any,
+    categories: string[],
+    categoryWeights: Record<string, number>,
+    sourceWeights: Record<string, number>,
+  ): number {
+    const category = String(row?.category || '').toLowerCase();
+    const source = String(row?.source_table || '').toLowerCase();
+
+    const categoryBias =
+      categoryWeights[category]
+      ?? (categories.length === 0 ? 1 : (categories.includes(category) ? 1.12 : 0.94));
+    const sourceBias = sourceWeights[source] ?? (source ? 1 : 0.65);
+
+    return baseScore * categoryBias * sourceBias;
+  }
+
+  private mergeCandidatesById(primary: any[], secondary: any[]): any[] {
+    const merged = new Map<number, any>();
+    for (const row of primary) merged.set(row.id, row);
+    for (const row of secondary) {
+      if (!merged.has(row.id)) merged.set(row.id, row);
+    }
+    return Array.from(merged.values());
+  }
+
+  private diversifyByCategory(candidates: any[], categories: string[], maxPool: number): any[] {
+    if (!Array.isArray(candidates) || candidates.length === 0) return [];
+    if (categories.length <= 1) return candidates.slice(0, maxPool);
+
+    const queueByCategory = new Map<string, any[]>();
+    const orderedCategories = categories.map((c) => c.toLowerCase());
+    for (const c of orderedCategories) queueByCategory.set(c, []);
+
+    const uncategorized: any[] = [];
+    for (const row of candidates) {
+      const cat = String(row?.category || '').toLowerCase();
+      if (queueByCategory.has(cat)) {
+        queueByCategory.get(cat)!.push(row);
+      } else {
+        uncategorized.push(row);
+      }
+    }
+
+    const diversified: any[] = [];
+    const seen = new Set<number>();
+
+    while (diversified.length < maxPool) {
+      let progressed = false;
+      for (const c of orderedCategories) {
+        const queue = queueByCategory.get(c) || [];
+        while (queue.length > 0) {
+          const row = queue.shift();
+          if (!row || seen.has(row.id)) continue;
+          diversified.push(row);
+          seen.add(row.id);
+          progressed = true;
+          break;
+        }
+        if (diversified.length >= maxPool) break;
+      }
+      if (!progressed) break;
+    }
+
+    for (const row of uncategorized) {
+      if (diversified.length >= maxPool) break;
+      if (seen.has(row.id)) continue;
+      diversified.push(row);
+      seen.add(row.id);
+    }
+
+    if (diversified.length < maxPool) {
+      for (const row of candidates) {
+        if (diversified.length >= maxPool) break;
+        if (seen.has(row.id)) continue;
+        diversified.push(row);
+        seen.add(row.id);
+      }
+    }
+
+    return diversified;
+  }
+
+  private async retrieveHybridCandidates(
+    query: string,
+    embeddingStr: string,
+    fetchLimit: number,
+    minSimilarity: number,
+    categories: string[],
+    hybridWeights: { vector: number; lexical: number },
+    categoryWeights: Record<string, number>,
+    sourceWeights: Record<string, number>,
+  ): Promise<any[]> {
+    let vectorSql = `
+      SELECT
+          d.id,
+          d.content,
+          d.metadata,
+          d.category,
+          d.source_table,
+          d.source_id,
+          1 - (e.embedding <=> $1::vector) AS similarity
+      FROM rag_embeddings e
+      JOIN rag_documents d ON d.id = e.document_id
+      WHERE 1 - (e.embedding <=> $1::vector) >= $2
+    `;
+
+    if (!this.includeLegacyDocs) {
+      vectorSql += ` AND d.source_table IS NOT NULL`;
+    }
+
+    const vectorParams: any[] = [embeddingStr, minSimilarity];
+    if (categories.length > 0) {
+      vectorSql += ` AND d.category = ANY($3::text[])`;
+      vectorParams.push(categories);
+    }
+    vectorSql += ` ORDER BY e.embedding <=> $1::vector LIMIT $${vectorParams.length + 1}`;
+    vectorParams.push(fetchLimit);
+
+    const vectorCandidates = await this.dataSource.query(vectorSql, vectorParams);
+
+    let lexicalCandidates: any[] = [];
+    try {
+      let lexicalSql = `
+        SELECT
+            d.id,
+            d.content,
+            d.metadata,
+            d.category,
+            d.source_table,
+            d.source_id,
+            ts_rank_cd(to_tsvector('english', d.content), plainto_tsquery('english', $1)) AS lexical_score
+        FROM rag_documents d
+        WHERE to_tsvector('english', d.content) @@ plainto_tsquery('english', $1)
+      `;
+      if (!this.includeLegacyDocs) {
+        lexicalSql += ` AND d.source_table IS NOT NULL`;
+      }
+      const lexicalParams: any[] = [query];
+      if (categories.length > 0) {
+        lexicalSql += ` AND d.category = ANY($2::text[])`;
+        lexicalParams.push(categories);
+      }
+      lexicalSql += ` ORDER BY lexical_score DESC LIMIT $${lexicalParams.length + 1}`;
+      lexicalParams.push(fetchLimit);
+      lexicalCandidates = await this.dataSource.query(lexicalSql, lexicalParams);
+    } catch (lexErr) {
+      this.logger.debug(`Lexical fallback skipped: ${lexErr?.message || lexErr}`);
+    }
+
+    const fusedById = new Map<number, { row: any; score: number }>();
+    const k = 60;
+    vectorCandidates.forEach((row, idx) => {
+      const curr = fusedById.get(row.id) || { row, score: 0 };
+      const base = hybridWeights.vector * (1 / (k + idx + 1));
+      curr.score += this.applyRowBoost(base, row, categories, categoryWeights, sourceWeights);
+      fusedById.set(row.id, curr);
+    });
+    lexicalCandidates.forEach((row, idx) => {
+      const curr = fusedById.get(row.id) || { row, score: 0 };
+      const base = hybridWeights.lexical * (1 / (k + idx + 1));
+      curr.score += this.applyRowBoost(base, row, categories, categoryWeights, sourceWeights);
+      fusedById.set(row.id, curr);
+    });
+
+    return Array.from(fusedById.values())
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.row);
   }
 
   // ─────────────── Stats & Status ───────────────
@@ -781,7 +1045,11 @@ export class EmbeddingsService implements OnModuleInit {
     batchSize: number;
     maxRetries: number;
     quotaCooldownMs: number;
+    quotaCoolingDown: boolean;
+    quotaCooldownRemainingMs: number;
+    consecutiveQuotaHits: number;
   } {
+    const quotaStatus = this.getQuotaStatus();
     return {
       embeddingsAvailable: this.embeddingsAvailable,
       pgvectorAvailable: this.pgvectorAvailable,
@@ -791,6 +1059,9 @@ export class EmbeddingsService implements OnModuleInit {
       batchSize: this.BATCH_SIZE,
       maxRetries: this.MAX_RETRIES,
       quotaCooldownMs: this.QUOTA_COOLDOWN,
+      quotaCoolingDown: quotaStatus.coolingDown,
+      quotaCooldownRemainingMs: quotaStatus.remainingMs,
+      consecutiveQuotaHits: quotaStatus.consecutiveQuotaHits,
     };
   }
 
@@ -843,6 +1114,15 @@ export class EmbeddingsService implements OnModuleInit {
 
           // Only update if content changed
           if (existing[0].content !== doc.content) {
+            if (!embedding) {
+              // Keep document + embedding in sync; defer updates when embedding is unavailable.
+              this.logger.warn(
+                `Deferred update for ${doc.sourceTable}:${doc.sourceId} due to unavailable embedding (quota/backoff)`
+              );
+              failed++;
+              continue;
+            }
+
             await this.dataSource.query(
               `UPDATE rag_documents 
                              SET content = $1, metadata = $2, updated_at = NOW()
@@ -850,19 +1130,25 @@ export class EmbeddingsService implements OnModuleInit {
               [doc.content, JSON.stringify(doc.metadata), id],
             );
 
-            if (embedding) {
-              const vectorStr = `[${embedding.join(',')}]`;
-              await this.dataSource.query(
-                `UPDATE rag_embeddings 
-                                 SET embedding = $1::vector
-                                 WHERE document_id = $2`,
-                [vectorStr, id],
-              );
-            }
+            const vectorStr = `[${embedding.join(',')}]`;
+            await this.dataSource.query(
+              `UPDATE rag_embeddings 
+                               SET embedding = $1::vector
+                               WHERE document_id = $2`,
+              [vectorStr, id],
+            );
             this.logger.debug(`Updated doc ${id}`);
           }
         } else {
           // INSERT
+          if (!embedding) {
+            this.logger.warn(
+              `Deferred insert for ${doc.sourceTable}:${doc.sourceId} due to unavailable embedding (quota/backoff)`
+            );
+            failed++;
+            continue;
+          }
+
           await this.storeDocument(
             doc.content,
             doc.category,

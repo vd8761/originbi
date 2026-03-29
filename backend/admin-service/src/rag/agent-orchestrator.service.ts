@@ -42,6 +42,7 @@ interface AgentResult {
   searchType: string;
   confidence: number;
   sources?: any;
+  evidence?: Record<string, any>;
   toolsUsed: string[];
   planningTimeMs: number;
   executionTimeMs: number;
@@ -106,11 +107,16 @@ export class AgentOrchestratorService {
     if (!this.plannerLlm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+      const plannerModel =
+        process.env.GEMINI_PLANNER_MODEL ||
+        process.env.GEMINI_LLM_MODEL ||
+        'gemini-2.5-flash';
+      const plannerMaxTokens = Math.max(180, Number(process.env.AGENT_PLANNER_MAX_OUTPUT_TOKENS || 320));
       this.plannerLlm = new ChatGoogleGenerativeAI({
         apiKey,
-        model: 'gemini-2.5-flash',
+        model: plannerModel,
         temperature: 0,       // Deterministic planning
-        maxOutputTokens: 512, // Plans are compact JSON
+        maxOutputTokens: plannerMaxTokens, // Plans are compact JSON
         callbacks: [getTokenTrackerCallback('Agent Planner')],
       });
     }
@@ -121,11 +127,12 @@ export class AgentOrchestratorService {
     if (!this.plannerFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+      const plannerMaxTokens = Math.max(180, Number(process.env.AGENT_PLANNER_MAX_OUTPUT_TOKENS || 420));
       this.plannerFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
         temperature: 0,
-        maxTokens: 512,
+        maxTokens: plannerMaxTokens,
         timeout: 10000,
         callbacks: [getTokenTrackerCallback('Agent Planner (Groq Fallback)')],
       });
@@ -137,11 +144,13 @@ export class AgentOrchestratorService {
     if (!this.synthesizerLlm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+      const synthesizerModel = process.env.GEMINI_SYNTH_MODEL || 'gemini-2.5-flash';
+      const synthesizerMaxTokens = Math.max(260, Number(process.env.AGENT_SYNTH_MAX_OUTPUT_TOKENS || 700));
       this.synthesizerLlm = new ChatGoogleGenerativeAI({
         apiKey,
-        model: 'gemini-2.5-flash',
+        model: synthesizerModel,
         temperature: 0.2,
-        maxOutputTokens: 650,
+        maxOutputTokens: synthesizerMaxTokens,
         callbacks: [getTokenTrackerCallback('Agent Synthesizer')],
       });
     }
@@ -152,11 +161,12 @@ export class AgentOrchestratorService {
     if (!this.synthesizerFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+      const synthesizerMaxTokens = Math.max(260, Number(process.env.AGENT_SYNTH_MAX_OUTPUT_TOKENS || 700));
       this.synthesizerFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
         temperature: 0.2,
-        maxTokens: 650,
+        maxTokens: synthesizerMaxTokens,
         timeout: 15000,
         callbacks: [getTokenTrackerCallback('Agent Synthesizer (Groq Fallback)')],
       });
@@ -168,11 +178,16 @@ export class AgentOrchestratorService {
     if (!this.reflectorLlm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
+      const reflectorModel =
+        process.env.GEMINI_REFLECTOR_MODEL ||
+        process.env.GEMINI_LLM_MODEL ||
+        'gemini-2.5-flash';
+      const reflectorMaxTokens = Math.max(120, Number(process.env.AGENT_REFLECTOR_MAX_OUTPUT_TOKENS || 180));
       this.reflectorLlm = new ChatGoogleGenerativeAI({
         apiKey,
-        model: 'gemini-2.5-flash',
+        model: reflectorModel,
         temperature: 0,
-        maxOutputTokens: 160, // Reflections are very compact
+        maxOutputTokens: reflectorMaxTokens, // Reflections are very compact
         callbacks: [getTokenTrackerCallback('Agent Reflector')],
       });
     }
@@ -183,11 +198,12 @@ export class AgentOrchestratorService {
     if (!this.reflectorFallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
+      const reflectorMaxTokens = Math.max(120, Number(process.env.AGENT_REFLECTOR_MAX_OUTPUT_TOKENS || 180));
       this.reflectorFallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
         temperature: 0,
-        maxTokens: 160,
+        maxTokens: reflectorMaxTokens,
         timeout: 8000,
         callbacks: [getTokenTrackerCallback('Agent Reflector (Groq Fallback)')],
       });
@@ -322,6 +338,7 @@ export class AgentOrchestratorService {
 
       const toolsUsed = results.map(r => r.toolName);
       const maxConfidence = Math.max(...results.map(r => r.confidence), 0.5);
+      const evidence = this.buildEvidence(results, toolsUsed, planningTimeMs, executionTimeMs);
 
       // Record telemetry
       this.recordTelemetry(question, telemetryEntries, Date.now() - startTime);
@@ -334,6 +351,7 @@ export class AgentOrchestratorService {
         searchType: `agent:${toolsUsed.join('+')}`,
         confidence: maxConfidence,
         sources: this.extractSources(results),
+        evidence,
         toolsUsed,
         planningTimeMs,
         executionTimeMs,
@@ -416,10 +434,11 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
 
       const rawOutput = response.content.toString().trim();
       const plan = this.parsePlannerOutput(rawOutput, question);
-      return plan;
+      return this.optimizePlanForComplexity(plan, question, complexity);
     } catch (error) {
       this.logger.warn(`Planner LLM failed: ${error.message} — using fallback plan`);
-      return this.getFallbackPlan(question, user);
+      const fallbackPlan = this.getFallbackPlan(question, user);
+      return this.optimizePlanForComplexity(fallbackPlan, question, complexity);
     }
   }
 
@@ -544,6 +563,88 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
       reasoning: 'Recovered malformed planner output using tool-name extraction',
       requiresSynthesis: detectedSteps.length > 1,
     };
+  }
+
+  private optimizePlanForComplexity(
+    plan: ExecutionPlan,
+    question: string,
+    complexity?: ComplexityAssessment,
+  ): ExecutionPlan {
+    if (!complexity) {
+      return plan;
+    }
+
+    const steps = [...plan.steps];
+    const hasTool = (tool: ToolCall['tool']) => steps.some(s => s.tool === tool);
+    const addStep = (step: ToolCall) => {
+      if (!hasTool(step.tool) && steps.length < 3) {
+        steps.push(step);
+      }
+    };
+
+    // Force data grounding for data-heavy or multi-part questions.
+    if (complexity.needsData && !hasTool('text_to_sql')) {
+      addStep({
+        tool: 'text_to_sql',
+        params: { question },
+        reason: 'Complexity optimizer: requires deterministic data grounding',
+      });
+    }
+
+    // Add analysis for mixed ask (data + guidance) so synthesis can produce an actionable answer.
+    if ((complexity.needsAnalysis || complexity.isMultiPart) && !hasTool('knowledge_ai')) {
+      addStep({
+        tool: 'knowledge_ai',
+        params: { question },
+        reason: 'Complexity optimizer: requires analytical layer for multi-intent query',
+      });
+    }
+
+    const extractedName = this.extractNameFromQuestion(question);
+    if (complexity.needsPersonLookup && extractedName && !hasTool('person_lookup')) {
+      addStep({
+        tool: 'person_lookup',
+        params: { name: extractedName },
+        reason: 'Complexity optimizer: explicit person lookup detected',
+      });
+    }
+
+    // Add lightweight context resolution for clear follow-up pronouns.
+    if (this.shouldUseConversationContext(question) && !hasTool('conversation_context')) {
+      addStep({
+        tool: 'conversation_context',
+        params: { question },
+        reason: 'Complexity optimizer: pronoun-based follow-up context required',
+      });
+    }
+
+    const priority: Record<ToolCall['tool'], number> = {
+      conversation_context: 1,
+      person_lookup: 2,
+      personal_info: 3,
+      text_to_sql: 4,
+      semantic_search: 5,
+      knowledge_ai: 6,
+      career_report: 7,
+    };
+
+    const sorted = steps
+      .sort((a, b) => (priority[a.tool] ?? 99) - (priority[b.tool] ?? 99))
+      .slice(0, 3);
+
+    const dataToolUsed = sorted.some(s => s.tool === 'text_to_sql' || s.tool === 'person_lookup' || s.tool === 'personal_info');
+    const analysisToolUsed = sorted.some(s => s.tool === 'knowledge_ai' || s.tool === 'semantic_search' || s.tool === 'career_report');
+    const requiresSynthesis = sorted.length > 1 && (analysisToolUsed || dataToolUsed);
+
+    return {
+      steps: sorted,
+      reasoning: plan.reasoning,
+      requiresSynthesis,
+    };
+  }
+
+  private shouldUseConversationContext(question: string): boolean {
+    return /\b(him|her|them|those|that one|that person|same person|previous|above|earlier)\b/i.test(question);
   }
 
   /**
@@ -814,7 +915,23 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
     limit: number = 5,
   ): Promise<ToolResult> {
     try {
-      const results = await this.embeddingsService.semanticSearch(query, limit, category);
+      const semanticProfile = this.inferSemanticHybridProfile(query);
+      const requestedCategories = category
+        ? [category, ...semanticProfile.categories]
+        : semanticProfile.categories;
+
+      const results = await this.embeddingsService.semanticSearch(
+        query,
+        limit,
+        requestedCategories,
+        0.3,
+        {
+          hybridWeights: { vector: 1.08, lexical: 1.0 },
+          categoryWeights: semanticProfile.categoryWeights,
+          sourceWeights: semanticProfile.sourceWeights,
+          allowCrossCategoryFallback: true,
+        },
+      );
       if (!results || results.length === 0) {
         return {
           toolName: 'semantic_search',
@@ -835,7 +952,10 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
         data: { documents: results, contextChunks },
         summary: `Found ${results.length} relevant knowledge base documents.`,
         confidence: 0.7,
-        metadata: { documentCount: results.length },
+        metadata: {
+          documentCount: results.length,
+          categories: requestedCategories,
+        },
       };
     } catch (error) {
       this.logger.warn(`semantic_search tool failed: ${error.message}`);
@@ -847,6 +967,58 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
         confidence: 0,
       };
     }
+  }
+
+  private inferSemanticHybridProfile(query: string): {
+    categories: string[];
+    categoryWeights: Record<string, number>;
+    sourceWeights: Record<string, number>;
+  } {
+    const q = String(query || '').toLowerCase();
+    const categories = new Set<string>();
+    const categoryWeights: Record<string, number> = {};
+
+    const addCategory = (name: string, weight: number) => {
+      categories.add(name);
+      categoryWeights[name] = Math.max(categoryWeights[name] || 1, weight);
+    };
+
+    if (/\b(department|degree|academic|college|campus|program|specialization|specialisation|branch)\b/.test(q)) {
+      addCategory('education', 1.25);
+      addCategory('department', 1.1);
+    }
+    if (/\b(course|certification|curriculum|training|learning path|syllabus)\b/.test(q)) {
+      addCategory('course', 1.22);
+      addCategory('education', 1.08);
+    }
+    if (/\b(tool|tools|software|platform|tech stack|technology|framework|library)\b/.test(q)) {
+      addCategory('tool', 1.2);
+    }
+    if (/\b(personality|trait|traits|disc|behavioral|behavioural|aptitude style)\b/.test(q)) {
+      addCategory('personality', 1.24);
+      addCategory('career', 1.08);
+    }
+    if (/\b(career|role|job|path|opportunity|future role|position)\b/.test(q)) {
+      addCategory('career', 1.2);
+    }
+
+    if (categories.size === 0) {
+      addCategory('career', 1.12);
+      addCategory('education', 1.08);
+    }
+
+    return {
+      categories: Array.from(categories),
+      categoryWeights,
+      sourceWeights: {
+        career_roles: 1.18,
+        department_degrees: 1.18,
+        courses: 1.12,
+        personality_traits: 1.1,
+        career_role_tools: 1.08,
+        programs: 1.05,
+      },
+    };
   }
 
   private async executePersonLookup(
@@ -899,6 +1071,7 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
                pt.blended_style_name as personality_style,
                pt.blended_style_desc as personality_desc,
                p.name as program_name,
+               (SELECT COUNT(*) FROM assessment_attempts aa2 WHERE aa2.registration_id = r.id AND aa2.status = 'COMPLETED') as attempt_count,
                CASE
                  WHEN LOWER(r.full_name) = $2 THEN 100
                  WHEN LOWER(r.full_name) LIKE $3 THEN 94
@@ -910,7 +1083,13 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
                END AS match_score
         FROM registrations r
         LEFT JOIN users u ON u.id = r.user_id
-        LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id
+        LEFT JOIN LATERAL (
+          SELECT aa1.total_score, aa1.status, aa1.dominant_trait_id, aa1.program_id
+          FROM assessment_attempts aa1
+          WHERE aa1.registration_id = r.id AND aa1.status = 'COMPLETED'
+          ORDER BY aa1.completed_at DESC NULLS LAST, aa1.total_score DESC NULLS LAST, aa1.id DESC
+          LIMIT 1
+        ) aa ON true
         LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
         LEFT JOIN programs p ON aa.program_id = p.id
         WHERE LOWER(r.full_name) LIKE $1 AND r.is_deleted = false${filter}
@@ -944,9 +1123,15 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
       if (disambiguationNeeded) {
         const choices = results
           .slice(0, 5)
-          .map((r: any, i: number) =>
-            `${i + 1}. **${r.full_name}** — ${r.assessment_status === 'COMPLETED' ? `Score: ${r.total_score ?? 'N/A'}` : 'Not assessed'}`,
-          )
+          .map((r: any, i: number) => {
+            const attemptCount = parseInt(r.attempt_count || '0');
+            const attemptLabel = attemptCount > 1
+              ? ` (${attemptCount} assessments)`
+              : attemptCount === 1
+                ? ' (1 assessment)'
+                : ' (no assessments)';
+            return `${i + 1}. **${r.full_name}** — ${r.assessment_status === 'COMPLETED' ? `Score: ${r.total_score ?? 'N/A'}` : 'Not assessed'}${attemptLabel}`;
+          })
           .join('\n');
 
         return {
@@ -974,9 +1159,15 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
 
       // If multiple matches, include disambiguation info
       const allMatches = results.length > 1
-        ? results.map((r: any, i: number) =>
-            `${i + 1}. **${r.full_name}** — ${r.assessment_status === 'COMPLETED' ? `Score: ${r.total_score}` : 'Not assessed'}`
-          ).join('\n')
+        ? results.map((r: any, i: number) => {
+            const attemptCount = parseInt(r.attempt_count || '0');
+            const attemptLabel = attemptCount > 1
+              ? ` (${attemptCount} assessments)`
+              : attemptCount === 1
+                ? ' (1 assessment)'
+                : ' (no assessments)';
+            return `${i + 1}. **${r.full_name}** — ${r.assessment_status === 'COMPLETED' ? `Score: ${r.total_score}` : 'Not assessed'}${attemptLabel}`;
+          }).join('\n')
         : null;
 
       return {
@@ -1256,6 +1447,24 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
         return primary.data.formattedProfile;
       }
 
+      // For semantic_search-only flows, synthesize a direct answer from retrieved context
+      // instead of returning generic "Found N documents" summaries.
+      if (primary.toolName === 'semantic_search' && primary.data?.contextChunks) {
+        try {
+          const semanticAnswer = await this.oriIntelligence.answerAnyQuestion(
+            question,
+            await this.oriIntelligence.getUserProfile(user.id, user.email),
+            primary.data.contextChunks,
+            user?.role || 'STUDENT',
+          );
+          if (semanticAnswer?.trim()) {
+            return semanticAnswer;
+          }
+        } catch {
+          // fall through to summary fallback
+        }
+      }
+
       return primary.summary;
     }
 
@@ -1272,35 +1481,56 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
     user: UserContext,
   ): Promise<string> {
     const role = (user?.role || 'STUDENT').toUpperCase();
-    const roleRules = ['STUDENT', 'INDIVIDUAL', 'COUNSELLOR', 'COUNSELOR'].includes(role)
+    const isStudent = ['STUDENT', 'INDIVIDUAL', 'COUNSELLOR', 'COUNSELOR'].includes(role);
+    const isCorporate = role === 'CORPORATE';
+
+    const roleRules = isStudent
       ? `STUDENT RULES:
-- Answer only what was asked.
-- Keep simple requests to 1-2 short sentences.
-- Skip salary/company comparisons unless explicitly asked.`
-      : role === 'CORPORATE'
+- Answer what was asked — nothing more, nothing less.
+- Simple factual questions → 1-2 sentences. Complex guidance → structured sections.
+- Use encouraging, supportive tone. Bold key terms.
+- Skip salary/company comparisons unless explicitly asked.
+- End with ONE actionable suggestion relevant to their question.`
+      : isCorporate
         ? `CORPORATE RULES:
-- Keep output executive, concise, and data-first.
-- Prioritize metrics, trends, and actions.`
+- Executive, data-first format. Lead with the metric/number.
+- Use tables for comparisons. Bold key KPIs.
+- End with 1 strategic recommendation or next action.
+- Prioritize: metrics → trends → actions.`
         : `ADMIN RULES:
-- Be precise and complete without unnecessary prose.`;
+- Be precise and complete. Use tables for multi-row data.
+- Bold key values and counts.
+- For person lookups: structured profile with key data points.
+- End with 1 practical next step.`;
 
     const toolOutputs = results.map(r => {
-      return `── ${r.toolName.toUpperCase()} RESULT ──
-${r.summary}
-${r.data?.answer ? `\nDetailed Answer:\n${r.data.answer?.slice(0, 700)}` : ''}`;
+      const detailSlice = r.data?.answer ? r.data.answer.slice(0, 500) : '';
+      return `── ${r.toolName.toUpperCase()} (confidence: ${r.confidence || 'N/A'}) ──
+${r.summary || 'No summary'}
+${detailSlice ? `\nDetails:\n${detailSlice}` : ''}`;
     }).join('\n\n');
 
-    const synthesisPrompt = `You are Ask BI's Synthesizer Agent.
+    const synthesisPrompt = `You are Ask BI, an advanced data intelligence assistant. Synthesize the tool outputs below into a polished, professional response.
 
 USER ROLE: ${role}
 ${roleRules}
 
-RULES:
-1) Start directly with the answer.
-2) Use only tool facts, never fabricate.
-3) Remove repetition and redundant phrasing.
-4) Use concise markdown only when helpful.
-5) If tools disagree, state uncertainty briefly and choose the highest-confidence fact.
+FORMATTING RULES:
+1) Use ONLY facts from tool outputs. NEVER fabricate data, names, or numbers.
+2) Start with a direct answer in the first line — no preamble like "Based on the data...".
+3) Use markdown formatting:
+   - **Bold** for key numbers, names, and metrics
+   - Tables (| col | col |) for multi-row data
+   - Bullet points for lists of 3+ items
+   - Numbered lists for step-by-step guidance
+4) For multi-part questions, address each part with a clear section header.
+5) Keep wording tight — no repetition, no filler phrases.
+6) If tools returned no data, say specifically what wasn't found and suggest 1 alternative query.
+7) If tools conflict, note briefly and use the highest-confidence result.
+8) Structure complex responses as:
+   **Quick Answer** → Key data/table → Brief insight → Suggested next step
+9) Maximum 1 emoji per section header for visual scanning (📊 🎯 💡 ✅).
+10) NEVER repeat the question back. NEVER say "Here is" or "I found". Just give the answer.
 
 USER QUESTION:
 "${question}"
@@ -1394,18 +1624,67 @@ FINAL RESPONSE:`;
     return sources;
   }
 
+  private buildEvidence(
+    results: ToolResult[],
+    toolsUsed: string[],
+    planningTimeMs: number,
+    executionTimeMs: number,
+  ): Record<string, any> {
+    const successful = results.filter(r => r.success);
+    const failed = results.filter(r => !r.success);
+
+    return {
+      plan: {
+        toolsUsed,
+        planningTimeMs,
+        executionTimeMs,
+      },
+      quality: {
+        successfulTools: successful.length,
+        failedTools: failed.map(r => r.toolName),
+        avgToolConfidence: successful.length
+          ? Math.round((successful.reduce((sum, r) => sum + (r.confidence || 0), 0) / successful.length) * 100) / 100
+          : 0,
+      },
+      toolConfidence: results.map(r => ({
+        tool: r.toolName,
+        confidence: r.confidence,
+        success: r.success,
+      })),
+    };
+  }
+
   private postProcessAnswer(answer: string): string {
     if (!answer) return answer;
 
-    const lines = answer
-      .split('\n')
-      .map(l => l.trimEnd())
-      .filter(l => l.length > 0);
+    let processed = answer
+      // Remove LLM preamble artifacts
+      .replace(/^(Here is|Here's|Based on|According to|I found|Let me)\s[^.\n]{0,80}[.:]/i, '')
+      // Fix double-bold: ****text**** → **text**
+      .replace(/\*{3,}([^*]+)\*{3,}/g, '**$1**')
+      // Fix broken markdown headers with extra spaces
+      .replace(/^(#{1,3})\s{2,}/gm, '$1 ')
+      // Remove trailing colons on headers
+      .replace(/^(#{1,3}\s.+):$/gm, '$1')
+      // Clean up excessive blank lines
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
 
+    const lines = processed
+      .split('\n')
+      .map(l => l.trimEnd());
+
+    // Deduplicate consecutive identical lines
     const deduped: string[] = [];
     let prevNorm = '';
     for (const line of lines) {
-      const norm = line.toLowerCase().replace(/\s+/g, ' ');
+      const norm = line.toLowerCase().replace(/\s+/g, ' ').trim();
+      if (!norm) {
+        // Keep blank lines for spacing but deduplicate consecutive blanks
+        if (prevNorm !== '') deduped.push(line);
+        prevNorm = norm;
+        continue;
+      }
       if (norm !== prevNorm) {
         deduped.push(line);
       }
@@ -1413,10 +1692,14 @@ FINAL RESPONSE:`;
     }
 
     const merged = deduped.join('\n').trim();
-    if (/^conversation context loaded\.?$/i.test(merged)) {
-      return 'No users found.';
+
+    // Catch empty-state generic responses
+    if (/^(conversation context loaded|no (relevant |)data (found|available))\.?$/i.test(merged)) {
+      return 'No matching data found. Try rephrasing your question or ask about a specific candidate, batch, or metric.';
     }
-    return merged;
+
+    // Remove trailing "Let me know if you need anything else" type closings
+    return merged.replace(/\n*(?:Let me know|Feel free|Don't hesitate|Please let me know)[^\n]*$/i, '').trim();
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

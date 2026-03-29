@@ -246,6 +246,43 @@ const EmployeePreview: React.FC<EmployeePreviewProps> = ({ registration, onBack,
                         </span>
                     </div>
                 </div>
+
+                {/* Role Specific Details Row (MNC Standard) */}
+                {(registration.program_code || registration.program_name || registration.school_level || registration.department_degree_id || registration.current_year) && (
+                    <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6 mt-6 pt-6 border-t border-gray-100 dark:border-white/5 animate-in fade-in slide-in-from-top-2 duration-300">
+                        {registration.program_code === 'COLLEGE_STUDENT' && (
+                            <>
+                                <div>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Academic Year</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                        {registration.current_year ? `${registration.current_year}${registration.current_year === '1' ? 'st' : registration.current_year === '2' ? 'nd' : registration.current_year === '3' ? 'rd' : 'th'} Year` : 'N/A'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Degree</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white">{registration.degree_name || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Department</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white">{registration.department_name || 'N/A'}</p>
+                                </div>
+                            </>
+                        )}
+                        {registration.program_code === 'EMPLOYEE' && (
+                            <div>
+                                <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Role Type</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">Corporate Professional</p>
+                            </div>
+                        )}
+                        {/* Generic Program Label if code is missing but name exists */}
+                        {!registration.program_code && registration.program_name && (
+                             <div>
+                                <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Program</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">{registration.program_name}</p>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Assessments List Section */}
