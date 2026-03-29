@@ -1527,6 +1527,16 @@ export class StudentService {
       }
       // --------------------------------------------
 
+      if (
+        registration.registrationSource !== 'SELF' &&
+        registration.registrationSource !== 'AFFILIATE'
+      ) {
+        this.logger.log(
+          `Skipping automatic report generation and email for registration source: ${registration.registrationSource} (User: ${userId})`
+        );
+        return;
+      }
+
       // 2. Trigger Report Generation
       const port = process.env.PORT || 4004;
       const reportServiceUrl = `http://localhost:${port}/report`;
