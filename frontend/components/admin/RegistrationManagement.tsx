@@ -22,6 +22,7 @@ import RegistrationPreview from "./RegistrationPreview"; // Import
 import AssessmentResultPreview from "./AssessmentResultPreview"; // Import
 import GroupAssessmentPreview from './GroupAssessmentPreview';
 import GroupCandidateAssessmentPreview from './GroupCandidateAssessmentPreview'; // Import
+import BulkEmailTab from './BulkEmailTab'; // Import
 import { Registration } from '../../lib/types';
 import { registrationService } from '../../lib/services/registration.service';
 import { assessmentService, AssessmentSession } from '../../lib/services/assessment.service';
@@ -38,9 +39,17 @@ const useDebounce = (value: string, delay: number) => {
 
 const RegistrationManagement: React.FC = () => {
   const [view, setView] = useState<"list" | "add" | "bulk" | "preview" | "assessment-preview" | "group-assessment-preview" | "group-candidate-assessment-preview">("list");
-  const [activeTab, setActiveTab] = useState<"registrations" | "individual" | "group">(
+  const [activeTab, setActiveTab] = useState<"registrations" | "individual" | "group" | "send-emails">(
     "registrations"
   );
+  const [showSendEmailsTab, setShowSendEmailsTab] = useState(false);
+
+  // Send Emails tab pagination (lifted so it appears in the shared top bar)
+  const [sendEmailsPage, setSendEmailsPage] = useState(1);
+  const [sendEmailsEntriesPerPage, setSendEmailsEntriesPerPage] = useState(20);
+  const [sendEmailsTotal, setSendEmailsTotal] = useState(0);
+  const [showSendEmailsEntriesDropdown, setShowSendEmailsEntriesDropdown] = useState(false);
+  const sendEmailsEntriesRef = useRef<HTMLDivElement>(null);
   const [selectedRegistration, setSelectedRegistration] = useState<Registration | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [selectedSession, setSelectedSession] = useState<AssessmentSession | null>(null);
@@ -644,9 +653,31 @@ const RegistrationManagement: React.FC = () => {
               ({tabCounts.group !== null ? tabCounts.group : "..."})
             </span>
           </button>
+          {/* Dynamic Send Emails hidden tab */}
+          {showSendEmailsTab && (
+            <button
+              onClick={() => setActiveTab('send-emails')}
+              className={`px-1 py-3 ml-8 text-sm sm:text-base border-b-2 transition-colors whitespace-nowrap cursor-pointer flex items-center gap-2 ${activeTab === 'send-emails'
+                ? 'border-brand-green font-medium'
+                : 'border-transparent hover:border-gray-200 font-[300] opacity-60 hover:opacity-100'
+              }`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-brand-green" viewBox="0 0 20 20" fill="currentColor"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg>
+              <span className="text-[#19211C] dark:text-white">Send Emails</span>
+              {/* Close button */}
+              <span
+                onClick={(e) => { e.stopPropagation(); setShowSendEmailsTab(false); setActiveTab('individual'); }}
+                className="ml-1 w-4 h-4 flex items-center justify-center rounded-full hover:bg-gray-200 dark:hover:bg-white/20 text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors text-xs leading-none"
+                title="Close tab"
+              >
+                ×
+              </span>
+            </button>
+          )}
         </div>
 
-        {/* Compact "Showing / per page / arrows" – styled like Corporate */}
+        {/* Per-page + arrows — hidden on send-emails tab, send-emails version shown instead */}
+        {activeTab !== 'send-emails' && (
         <div className="flex items-center gap-3 py-2 w-full xl:w-auto justify-end">
           <span className="text-sm text-[#19211C] dark:text-brand-text-secondary hidden sm:inline font-[300]">
             Showing
@@ -708,9 +739,65 @@ const RegistrationManagement: React.FC = () => {
             </button>
           </div>
         </div>
+        )}
+
+        {/* Send Emails tab pagination — same position as the per-page/arrows for other tabs */}
+        {activeTab === 'send-emails' && (() => {
+          const seTotal = sendEmailsTotal;
+          const seTotalPages = Math.max(1, Math.ceil(seTotal / sendEmailsEntriesPerPage));
+          return (
+            <div className="flex items-center gap-3 py-2 w-full xl:w-auto justify-end">
+              <span className="text-sm text-[#19211C] dark:text-brand-text-secondary hidden sm:inline font-[300]">Showing</span>
+              <div className="relative" ref={sendEmailsEntriesRef}>
+                <button
+                  onClick={() => setShowSendEmailsEntriesDropdown(v => !v)}
+                  className="flex items-center gap-2 bg-white dark:bg-[#FFFFFF1F] px-3 py-1.5 rounded-lg text-sm text-brand-green font-semibold min-w-[60px] justify-between shadow-sm border border-transparent dark:border-[#FFFFFF1F] hover:border-gray-200 transition-all"
+                >
+                  {sendEmailsEntriesPerPage}
+                  <ChevronDownIcon className="w-3 h-3 text-brand-green" />
+                </button>
+                {showSendEmailsEntriesDropdown && (
+                  <div className="absolute top-full right-0 mt-1 w-20 bg-brand-light-secondary dark:bg-[#303438] border border-brand-light-tertiary dark:border-white/10 rounded-lg shadow-xl z-50 overflow-hidden">
+                    {[10, 20, 50, 100].map(n => (
+                      <button key={n} onClick={() => { setSendEmailsEntriesPerPage(n); setSendEmailsPage(1); setShowSendEmailsEntriesDropdown(false); }}
+                        className="w-full text-center py-1.5 text-sm hover:bg-black/5 dark:hover:bg-white/10 text-brand-text-light-primary dark:text-white"
+                      >{n}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <span className="text-sm text-[#19211C] dark:text-brand-text-secondary whitespace-nowrap font-[300]">of {seTotal.toLocaleString()} entries</span>
+              <div className="flex items-center gap-2 ml-2">
+                <button
+                  onClick={() => setSendEmailsPage(p => Math.max(1, p - 1))}
+                  disabled={sendEmailsPage === 1}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                    sendEmailsPage === 1
+                      ? "bg-white dark:bg-[#FFFFFF1F] text-[#19211C] dark:text-white border border-transparent dark:border-[#FFFFFF1F]"
+                      : "bg-brand-green text-white shadow-lg shadow-brand-green/20 hover:bg-brand-green/90"
+                  }`}
+                >
+                  <ArrowLeftWithoutLineIcon className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => setSendEmailsPage(p => Math.min(seTotalPages, p + 1))}
+                  disabled={sendEmailsPage >= seTotalPages}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                    sendEmailsPage >= seTotalPages
+                      ? "bg-white dark:bg-[#FFFFFF1F] text-[#19211C] dark:text-white border border-transparent dark:border-[#FFFFFF1F]"
+                      : "bg-brand-green text-white shadow-lg shadow-brand-green/20 hover:bg-brand-green/90"
+                  }`}
+                >
+                  <ArrowRightWithoutLineIcon className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
-      {/* Search + filters + buttons row – aligned with other screens */}
+      {/* Search + filters + buttons row — hidden on send-emails tab (it has its own) */}
+      {activeTab !== 'send-emails' && (
       <div className="flex flex-col xl:flex-row justify-between gap-4 items-start xl:items-center">
         {/* Search */}
         <div className="relative w-full xl:w-96">
@@ -800,6 +887,17 @@ const RegistrationManagement: React.FC = () => {
 
           <ExcelExportButton onClick={handleExport} />
 
+          {/* Send Emails button — only visible on Individual Assessment tab */}
+          {activeTab === 'individual' && (
+            <button
+              onClick={() => { setShowSendEmailsTab(true); setActiveTab('send-emails'); }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-brand-green/10 hover:bg-brand-green/20 border border-brand-green/30 rounded-lg text-sm font-medium text-brand-green transition-all shadow-sm cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg>
+              <span>Send Emails</span>
+            </button>
+          )}
+
           {activeTab === 'registrations' && (
             <button
               onClick={handleBulkUpload}
@@ -822,10 +920,21 @@ const RegistrationManagement: React.FC = () => {
           </button>
         </div>
       </div>
+      )}
 
       {/* Table Area - flex-1 ensures it fills available vertical space */}
       <div className="flex-1 min-h-[300px] relative flex flex-col">
-        {activeTab === 'registrations' ? (
+        {activeTab === 'send-emails' ? (
+          <BulkEmailTab
+            page={sendEmailsPage}
+            entriesPerPage={sendEmailsEntriesPerPage}
+            onTotalChange={(total) => setSendEmailsTotal(total)}
+            onViewSession={(session) => {
+              setSelectedSession(session);
+              setView('assessment-preview');
+            }}
+          />
+        ) : activeTab === 'registrations' ? (
           <RegistrationTable
             users={users}
             loading={loading}
@@ -853,8 +962,8 @@ const RegistrationManagement: React.FC = () => {
 
       </div>
 
-      {/* Bottom pagination + footer */}
-      {/* Bottom pagination + footer */}
+      {/* Bottom pagination + footer — hidden on send-emails tab */}
+      {activeTab !== 'send-emails' && (
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-xs sm:text-sm text-brand-text-light-secondary dark:text-brand-text-secondary pt-6 pb-2">
         {/* Left: Links */}
         <div className="flex gap-4 w-full sm:w-1/3 justify-center sm:justify-start order-2 sm:order-1">
@@ -920,6 +1029,7 @@ const RegistrationManagement: React.FC = () => {
           </span>
         </div>
       </div>
+      )}
     </div>
   );
 };

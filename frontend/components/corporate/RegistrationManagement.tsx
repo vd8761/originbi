@@ -7,6 +7,7 @@ import {
   ChevronDownIcon,
   ArrowLeftWithoutLineIcon,
   ArrowRightWithoutLineIcon,
+  EmailIcon,
 } from '../icons';
 import AddRegistrationForm from "./AddRegistrationForm";
 import DateRangeFilter, {
@@ -18,6 +19,7 @@ import RegistrationTable from '../ui/RegistrationTable';
 import AssessmentSessionsTable from "./AssessmentSessionsTable";
 import GroupAssessmentPreview from "./GroupAssessmentPreview";
 import GroupCandidateAssessmentPreview from "./GroupCandidateAssessmentPreview";
+import CorporateBulkEmailTab from "./CorporateBulkEmailTab";
 
 import { Registration } from '../../lib/types';
 import { corporateRegistrationService } from '../../lib/services/corporateRegistration.service';
@@ -38,7 +40,15 @@ const RegistrationManagement: React.FC = () => {
   type ViewState = 'list' | 'add' | 'preview' | 'assessment-preview' | 'group-assessment-preview' | 'group-candidate-assessment-preview';
   const [view, setView] = useState<ViewState>("list");
 
-  const [activeTab, setActiveTab] = useState<"registrations" | "individual" | "group">("registrations");
+  const [activeTab, setActiveTab] = useState<"registrations" | "individual" | "group" | "send-emails">("registrations");
+
+  // Send Emails tab state
+  const [showSendEmailsTab, setShowSendEmailsTab] = useState(false);
+  const [sendEmailsPage, setSendEmailsPage] = useState(1);
+  const [sendEmailsEntriesPerPage, setSendEmailsEntriesPerPage] = useState(20);
+  const [sendEmailsTotal, setSendEmailsTotal] = useState(0);
+  const [showSendEmailsEntriesDropdown, setShowSendEmailsEntriesDropdown] = useState(false);
+  const sendEmailsEntriesRef = useRef<HTMLDivElement>(null);
 
   // Data State
   const [users, setUsers] = useState<Registration[]>([]);
@@ -199,6 +209,7 @@ const RegistrationManagement: React.FC = () => {
     setSearchTerm("");
     setSortColumn("created_at");
     setSortOrder("DESC");
+    setShowSendEmailsTab(false);
   };
 
   const handleDateRangeSelect = (option: DateRangeOption) => {
@@ -386,10 +397,10 @@ const RegistrationManagement: React.FC = () => {
       {/* Tabs */}
       <div className="flex flex-col xl:flex-row justify-between items-end xl:items-center border-b border-brand-light-tertiary dark:border-brand-dark-tertiary pb-0 gap-4 xl:gap-0">
         <div className="flex items-center w-full xl:w-auto overflow-x-auto scrollbar-hide">
-          {['registrations', 'individual', 'group'].map(tab => (
+          {(['registrations', 'individual', 'group'] as const).map(tab => (
             <button
               key={tab}
-              onClick={() => handleTabChange(tab as any)}
+              onClick={() => handleTabChange(tab)}
               className={`px-1 py-3 mr-8 text-sm sm:text-base font-semibold border-b-2 transition-colors whitespace-nowrap capitalize ${activeTab === tab ? "text-brand-green border-brand-green" : "text-brand-text-light-secondary dark:text-brand-text-secondary border-transparent"
                 }`}
             >
@@ -397,109 +408,201 @@ const RegistrationManagement: React.FC = () => {
               ({tabCounts[tab as keyof typeof tabCounts] ?? '...'})
             </button>
           ))}
-        </div>
-        {/* Pagination / Sort Controls (Simplified for brevity, same as existing) */}
-        <div className="flex items-center gap-3 py-2 w-full xl:w-auto justify-end">
-          <span className="text-sm text-gray-500 hidden sm:inline">Showing</span>
-          <div className="relative">
+          {/* Send Emails — hidden tab revealed after clicking the button */}
+          {showSendEmailsTab && (
             <button
-              onClick={() => setShowEntriesDropdown(!showEntriesDropdown)}
-              className="flex items-center gap-2 bg-brand-light-tertiary dark:bg-[#303438] px-3 py-1.5 rounded-lg text-sm text-brand-text-light-primary dark:text-white font-medium min-w-[60px] justify-between"
+              onClick={() => setActiveTab('send-emails')}
+              className={`flex items-center gap-1.5 px-1 py-3 mr-8 text-sm sm:text-base font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                activeTab === 'send-emails' ? 'text-brand-green border-brand-green' : 'text-brand-text-light-secondary dark:text-brand-text-secondary border-transparent'
+              }`}
             >
-              {entriesPerPage}
-              <ChevronDownIcon className="w-3 h-3 text-gray-500" />
+              Send Emails
+              <span
+                onClick={(e) => { e.stopPropagation(); setShowSendEmailsTab(false); setActiveTab('individual'); }}
+                className="ml-1 text-xs text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
+                title="Close"
+              >✕</span>
             </button>
-            {showEntriesDropdown && (
-              <div className="absolute top-full right-0 mt-1 w-20 bg-brand-light-secondary dark:bg-[#303438] border border-brand-light-tertiary dark:border-white/10 rounded-lg shadow-xl z-50 overflow-hidden">
-                {[10, 25, 50, 100].map((num) => (
-                  <button
-                    key={num}
-                    onClick={() => {
-                      setEntriesPerPage(num);
-                      setShowEntriesDropdown(false);
-                      setCurrentPage(1);
-                    }}
-                    className="w-full text-center py-1.5 text-sm hover:bg-black/5 dark:hover:bg-white/10 text-brand-text-light-primary dark:text-white"
-                  >
-                    {num}
-                  </button>
-                ))}
-              </div>
+          )}
+        </div>
+        {/* Pagination / Sort Controls */}
+        {activeTab !== 'send-emails' ? (
+          <div className="flex items-center gap-3 py-2 w-full xl:w-auto justify-end">
+            <span className="text-sm text-gray-500 hidden sm:inline">Showing</span>
+            <div className="relative">
+              <button
+                onClick={() => setShowEntriesDropdown(!showEntriesDropdown)}
+                className="flex items-center gap-2 bg-brand-light-tertiary dark:bg-[#303438] px-3 py-1.5 rounded-lg text-sm text-brand-text-light-primary dark:text-white font-medium min-w-[60px] justify-between"
+              >
+                {entriesPerPage}
+                <ChevronDownIcon className="w-3 h-3 text-gray-500" />
+              </button>
+              {showEntriesDropdown && (
+                <div className="absolute top-full right-0 mt-1 w-20 bg-brand-light-secondary dark:bg-[#303438] border border-brand-light-tertiary dark:border-white/10 rounded-lg shadow-xl z-50 overflow-hidden">
+                  {[10, 25, 50, 100].map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => {
+                        setEntriesPerPage(num);
+                        setShowEntriesDropdown(false);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full text-center py-1.5 text-sm hover:bg-black/5 dark:hover:bg-white/10 text-brand-text-light-primary dark:text-white"
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <span className="text-sm text-brand-text-light-secondary dark:text-brand-text-secondary whitespace-nowrap">
+              of {totalCount.toLocaleString()} entries
+            </span>
+            <div className="flex items-center gap-2 ml-2">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                  currentPage === 1
+                    ? "bg-brand-light-tertiary dark:bg-[#303438] text-brand-text-light-secondary dark:text-gray-400 border border-transparent dark:border-[#FFFFFF1F]"
+                    : "bg-brand-green text-white shadow-lg shadow-brand-green/20 hover:bg-brand-green/90"
+                }`}
+              >
+                <ArrowLeftWithoutLineIcon className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                  currentPage === totalPages
+                    ? "bg-brand-light-tertiary dark:bg-[#303438] text-brand-text-light-secondary dark:text-gray-400 border border-transparent dark:border-[#FFFFFF1F]"
+                    : "bg-brand-green text-white shadow-lg shadow-brand-green/20 hover:bg-brand-green/90"
+                }`}
+              >
+                <ArrowRightWithoutLineIcon className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          // Send Emails pagination
+          <div className="flex items-center gap-3 py-2 w-full xl:w-auto justify-end" ref={sendEmailsEntriesRef}>
+            <span className="text-sm text-gray-500 hidden sm:inline">Showing</span>
+            <div className="relative">
+              <button
+                onClick={() => setShowSendEmailsEntriesDropdown(v => !v)}
+                className="flex items-center gap-2 bg-brand-light-tertiary dark:bg-[#303438] px-3 py-1.5 rounded-lg text-sm text-brand-text-light-primary dark:text-white font-medium min-w-[60px] justify-between"
+              >
+                {sendEmailsEntriesPerPage}
+                <ChevronDownIcon className="w-3 h-3 text-gray-500" />
+              </button>
+              {showSendEmailsEntriesDropdown && (
+                <div className="absolute top-full right-0 mt-1 w-20 bg-brand-light-secondary dark:bg-[#303438] border border-brand-light-tertiary dark:border-white/10 rounded-lg shadow-xl z-50 overflow-hidden">
+                  {[10, 20, 50, 100].map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => { setSendEmailsEntriesPerPage(num); setShowSendEmailsEntriesDropdown(false); setSendEmailsPage(1); }}
+                      className="w-full text-center py-1.5 text-sm hover:bg-black/5 dark:hover:bg-white/10 text-brand-text-light-primary dark:text-white"
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <span className="text-sm text-brand-text-light-secondary dark:text-brand-text-secondary whitespace-nowrap">
+              of {sendEmailsTotal.toLocaleString()} entries
+            </span>
+            <div className="flex items-center gap-2 ml-2">
+              <button
+                onClick={() => setSendEmailsPage(p => Math.max(1, p - 1))}
+                disabled={sendEmailsPage === 1}
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                  sendEmailsPage === 1
+                    ? "bg-brand-light-tertiary dark:bg-[#303438] text-brand-text-light-secondary dark:text-gray-400 border border-transparent dark:border-[#FFFFFF1F]"
+                    : "bg-brand-green text-white shadow-lg shadow-brand-green/20 hover:bg-brand-green/90"
+                }`}
+              >
+                <ArrowLeftWithoutLineIcon className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => setSendEmailsPage(p => p + 1)}
+                disabled={sendEmailsPage * sendEmailsEntriesPerPage >= sendEmailsTotal}
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                  sendEmailsPage * sendEmailsEntriesPerPage >= sendEmailsTotal
+                    ? "bg-brand-light-tertiary dark:bg-[#303438] text-brand-text-light-secondary dark:text-gray-400 border border-transparent dark:border-[#FFFFFF1F]"
+                    : "bg-brand-green text-white shadow-lg shadow-brand-green/20 hover:bg-brand-green/90"
+                }`}
+              >
+                <ArrowRightWithoutLineIcon className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Filters — hidden when Send Emails tab is active */}
+      {activeTab !== 'send-emails' && (
+        <div className="flex flex-col xl:flex-row justify-between gap-4 items-start xl:items-center">
+          <div className="relative w-full xl:w-96">
+            <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search..." className="w-full bg-transparent border border-brand-light-tertiary dark:border-brand-dark-tertiary rounded-lg py-2.5 pl-4 pr-10 text-sm" />
+            {/* Search icon ... */}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <DateRangeFilter selectedRange={dateRangeLabel} onRangeSelect={handleDateRangeSelect} />
+
+            <ExcelExportButton onClick={handleExport} />
+
+            <button
+              onClick={handleBulkUpload}
+              className="flex items-center gap-2 px-4 py-2.5 bg-brand-light-tertiary dark:bg-[#1A3A2C] border border-transparent dark:border-[#1A3A2C] rounded-lg text-sm font-medium text-brand-text-light-primary dark:text-white hover:opacity-90 transition-opacity"
+            >
+              <span>Bulk Registration</span>
+              <BulkUploadIcon className="w-4 h-4 dark:text-white text-brand-green" />
+            </button>
+
+            {/* Send Emails button — visible only on Individual Assessment tab */}
+            {activeTab === 'individual' && (
+              <button
+                onClick={() => { setShowSendEmailsTab(true); setActiveTab('send-emails'); }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-brand-light-tertiary dark:bg-[#1A3A2C] border border-transparent dark:border-brand-green/30 rounded-lg text-sm font-medium text-brand-green hover:opacity-90 transition-opacity"
+              >
+                <EmailIcon className="w-4 h-4" />
+                <span>Send Emails</span>
+              </button>
             )}
-          </div>
-          <span className="text-sm text-brand-text-light-secondary dark:text-brand-text-secondary whitespace-nowrap">
-            of {totalCount.toLocaleString()} entries
-          </span>
-          <div className="flex items-center gap-2 ml-2">
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
-                currentPage === 1
-                  ? "bg-brand-light-tertiary dark:bg-[#303438] text-brand-text-light-secondary dark:text-gray-400 border border-transparent dark:border-[#FFFFFF1F]"
-                  : "bg-brand-green text-white shadow-lg shadow-brand-green/20 hover:bg-brand-green/90"
-              }`}
-            >
-              <ArrowLeftWithoutLineIcon className="w-3 h-3" />
-            </button>
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
-                currentPage === totalPages
-                  ? "bg-brand-light-tertiary dark:bg-[#303438] text-brand-text-light-secondary dark:text-gray-400 border border-transparent dark:border-[#FFFFFF1F]"
-                  : "bg-brand-green text-white shadow-lg shadow-brand-green/20 hover:bg-brand-green/90"
-              }`}
-            >
-              <ArrowRightWithoutLineIcon className="w-3 h-3" />
+
+            <button onClick={() => setView('add')} className="flex items-center gap-2 px-4 py-2 bg-brand-green rounded-lg text-sm font-semibold text-white">
+              Add New
             </button>
           </div>
         </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col xl:flex-row justify-between gap-4 items-start xl:items-center">
-        <div className="relative w-full xl:w-96">
-          <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search..." className="w-full bg-transparent border border-brand-light-tertiary dark:border-brand-dark-tertiary rounded-lg py-2.5 pl-4 pr-10 text-sm" />
-          {/* Search icon ... */}
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <DateRangeFilter selectedRange={dateRangeLabel} onRangeSelect={handleDateRangeSelect} />
-
-          <ExcelExportButton onClick={handleExport} />
-
-          <button
-            onClick={handleBulkUpload}
-            className="flex items-center gap-2 px-4 py-2.5 bg-brand-light-tertiary dark:bg-[#1A3A2C] border border-transparent dark:border-[#1A3A2C] rounded-lg text-sm font-medium text-brand-text-light-primary dark:text-white hover:opacity-90 transition-opacity"
-          >
-            <span>Bulk Registration</span>
-            <BulkUploadIcon className="w-4 h-4 dark:text-white text-brand-green" />
-          </button>
-
-          <button onClick={() => setView('add')} className="flex items-center gap-2 px-4 py-2 bg-brand-green rounded-lg text-sm font-semibold text-white">
-            Add New
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Content */}
-      {activeTab === 'registrations' ? (
+      {activeTab === 'send-emails' ? (
+        <CorporateBulkEmailTab
+          page={sendEmailsPage}
+          entriesPerPage={sendEmailsEntriesPerPage}
+          onTotalChange={(total) => setSendEmailsTotal(total)}
+          onViewSession={(session) => {
+            setSelectedSession(session);
+            setSelectedGroupSessionId(null);
+            setView('group-candidate-assessment-preview');
+          }}
+        />
+      ) : activeTab === 'registrations' ? (
         <RegistrationTable users={users} loading={loading} error={error} showAiCounsellor={false} />
       ) : activeTab === 'individual' ? (
         <AssessmentSessionsTable
           sessions={sessions}
           loading={loading}
           error={error}
-          // no sorting logic passed for simplicity in this step, can add later
           onView={(id) => {
-            // For individual, finding session from list might fail if 'id' is string vs number confusion
-            // But assuming handleViewSession logic from Admin
             const sess = sessions.find(s => String(s.id) === String(id));
             if (sess) {
               setSelectedSession(sess);
-              // Clear group ID to ensure back button works
               setSelectedGroupSessionId(null);
-              setView('group-candidate-assessment-preview'); // Using same component for now!
+              setView('group-candidate-assessment-preview');
             }
           }}
         />
@@ -513,45 +616,47 @@ const RegistrationManagement: React.FC = () => {
         />
       )}
 
-      {/* Footer Pagination */}
-      <div className="flex justify-end gap-2 mt-4">
-        <div className="flex items-center gap-2">
-          {/* Pagination Controls Reuse */}
-          <button
-            onClick={() => handlePageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="w-8 h-8 flex items-center justify-center text-brand-text-light-secondary dark:text-gray-400 hover:text-brand-text-light-primary dark:hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <ArrowLeftWithoutLineIcon className="w-3 h-3" />
-          </button>
-
-          {getPaginationNumbers().map((page, index) => (
+      {/* Footer Pagination — hidden on Send Emails tab (pagination is in the top bar) */}
+      {activeTab !== 'send-emails' && (
+        <div className="flex justify-end gap-2 mt-4">
+          <div className="flex items-center gap-2">
+            {/* Pagination Controls Reuse */}
             <button
-              key={index}
-              onClick={() =>
-                typeof page === "number" ? handlePageChange(page) : null
-              }
-              disabled={typeof page !== "number"}
-              className={`min-w-[32px] h-8 px-1 rounded-md font-medium text-sm flex items-center justify-center transition-colors border ${currentPage === page
-                ? "bg-brand-green border-brand-green text-white shadow-lg shadow-brand-green/20"
-                : typeof page === "number"
-                  ? "bg-transparent dark:bg-[#19211C] border-brand-light-tertiary dark:border-brand-dark-tertiary text-brand-text-light-primary dark:text-gray-400 hover:border-brand-text-light-secondary dark:hover:border-gray-500"
-                  : "border-transparent text-gray-500 cursor-default"
-                }`}
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="w-8 h-8 flex items-center justify-center text-brand-text-light-secondary dark:text-gray-400 hover:text-brand-text-light-primary dark:hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
-              {page}
+              <ArrowLeftWithoutLineIcon className="w-3 h-3" />
             </button>
-          ))}
 
-          <button
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="w-8 h-8 flex items-center justify-center text-brand-text-light-secondary dark:text-gray-400 hover:text-brand-text-light-primary dark:hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <ArrowRightWithoutLineIcon className="w-3 h-3" />
-          </button>
+            {getPaginationNumbers().map((page, index) => (
+              <button
+                key={index}
+                onClick={() =>
+                  typeof page === "number" ? handlePageChange(page) : null
+                }
+                disabled={typeof page !== "number"}
+                className={`min-w-[32px] h-8 px-1 rounded-md font-medium text-sm flex items-center justify-center transition-colors border ${currentPage === page
+                  ? "bg-brand-green border-brand-green text-white shadow-lg shadow-brand-green/20"
+                  : typeof page === "number"
+                    ? "bg-transparent dark:bg-[#19211C] border-brand-light-tertiary dark:border-brand-dark-tertiary text-brand-text-light-primary dark:text-gray-400 hover:border-brand-text-light-secondary dark:hover:border-gray-500"
+                    : "border-transparent text-gray-500 cursor-default"
+                  }`}
+              >
+                {page}
+              </button>
+            ))}
+
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="w-8 h-8 flex items-center justify-center text-brand-text-light-secondary dark:text-gray-400 hover:text-brand-text-light-primary dark:hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ArrowRightWithoutLineIcon className="w-3 h-3" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
     </div>
   );

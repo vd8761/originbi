@@ -1365,6 +1365,7 @@ export class CorporateDashboardService {
     status?: string,
     userId?: number,
     type?: string,
+    emailStatus?: 'sent' | 'not_sent' | 'third_party',
   ) {
     const { ILike } = require('typeorm');
     const user = await this.userRepo.findOne({
@@ -1504,13 +1505,26 @@ export class CorporateDashboardService {
     }
 
     // Filter out grouped ones if fetching individual
-    // Actually, individual view usually wants non-grouped.
-    // But previously it showed everything?
-    // Admin service logic: if 'individual' -> filter out grouped.
-    // User request: "in the Employee management page also, introfuce ne tabs like in admin Individual assesment and group assessments"
-    // So yes, split them.
     if (type === 'individual') {
       qb.andWhere('(s.groupId IS NULL OR s.groupId = 0)');
+    }
+
+    // Email status filter: JOIN with assessment_reports
+    if (emailStatus) {
+      qb.leftJoin(
+        'assessment_reports',
+        'ar',
+        'ar.assessment_session_id = s.id',
+      );
+      if (emailStatus === 'sent') {
+        qb.andWhere('ar.email_sent = true AND ar.email_sent_to = u.email');
+      } else if (emailStatus === 'third_party') {
+        qb.andWhere('ar.email_sent = true AND ar.email_sent_to != u.email');
+      } else if (emailStatus === 'not_sent') {
+        qb.andWhere(
+          '(ar.email_sent IS NULL OR ar.email_sent = false)',
+        );
+      }
     }
 
     if (sortBy) {
@@ -1561,14 +1575,27 @@ export class CorporateDashboardService {
       .take(limit)
       .getManyAndCount();
 
-    // Populate groupName for individual sessions if they happen to belong to group but shown here (unlikely if filtered)
-    // or just return as is.
-    // But wait, the frontend expects `groupName` if we reuse the table.
-    // Individual sessions usually don't have groupName or we can fetch it.
-    // But if filtering `groupId IS NULL`, no group name needed.
+    // Hydrate email metadata via secondary raw SQL (avoids TypeORM leftJoinAndMapOne bug)
+    if (data.length > 0) {
+      const sessionIds = data.map((s) => s.id);
+      const emailRows: { assessment_session_id: string; email_sent: boolean; email_sent_to: string | null }[] =
+        await this.dataSource.query(
+          `SELECT assessment_session_id, email_sent, email_sent_to
+           FROM assessment_reports
+           WHERE assessment_session_id = ANY($1)`,
+          [sessionIds],
+        );
 
-    // However, we need to adapt structure to match frontend expectations if it changed.
-    // Frontend `AssessmentSessionsTable` uses `session.groupName`.
+      const emailMap = new Map(
+        emailRows.map((row) => [String(row.assessment_session_id), row]),
+      );
+
+      for (const session of data) {
+        const emailRow = emailMap.get(String(session.id));
+        (session as any).emailSent = emailRow?.email_sent ?? null;
+        (session as any).emailSentTo = emailRow?.email_sent_to ?? null;
+      }
+    }
 
     return {
       data: data || [],

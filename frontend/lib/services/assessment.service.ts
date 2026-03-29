@@ -37,6 +37,9 @@ export interface AssessmentSession {
     metadata?: any;
     currentAttempt?: any;
     attempts?: any[];
+    // Bulk email data from sessions list
+    emailSent?: boolean | null;
+    emailSentTo?: string | null;
 }
 
 export const assessmentService = {
@@ -52,6 +55,7 @@ export const assessmentService = {
             status?: string;
             userId?: string;
             type?: "individual" | "group";
+            emailStatus?: 'sent' | 'not_sent' | 'third_party';
         },
     ): Promise<PaginatedResponse<AssessmentSession>> {
         const params = new URLSearchParams();
@@ -65,6 +69,7 @@ export const assessmentService = {
         if (filters?.status) params.set("status", filters.status);
         if (filters?.userId) params.set("userId", filters.userId);
         if (filters?.type) params.set("type", filters.type);
+        if (filters?.emailStatus) params.set("emailStatus", filters.emailStatus);
 
         const token = AuthService.getToken();
 
@@ -83,6 +88,21 @@ export const assessmentService = {
             throw new Error("Failed to fetch assessment sessions");
         }
 
+        return res.json();
+    },
+
+    async sendBulkReportEmails(userIds: number[]): Promise<{ message: string; enqueued: number; failed: number[] }> {
+        const STUDENT_API_URL = process.env.NEXT_PUBLIC_STUDENT_API_URL || 'http://localhost:3002';
+        const token = AuthService.getToken();
+        const res = await fetch(`${STUDENT_API_URL}/student/send-bulk-report-emails`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: token ? `Bearer ${token}` : '',
+            },
+            body: JSON.stringify({ userIds }),
+        });
+        if (!res.ok) throw new Error('Failed to queue bulk emails');
         return res.json();
     },
     async getLevels(): Promise<any[]> {

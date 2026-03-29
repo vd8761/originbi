@@ -362,6 +362,16 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
 
                                         setDownloadProgress('');
                                         await assessmentService.sendReportEmail(session.userId);
+                                        // Optimistically update local session metadata so badge refreshes immediately
+                                        setSession(prev => prev ? {
+                                            ...prev,
+                                            metadata: {
+                                                ...prev.metadata,
+                                                emailSent: true,
+                                                emailSentTo: prev.user?.email || '',
+                                                emailSentAt: new Date().toISOString(),
+                                            }
+                                        } : prev);
                                         setEmailSent(true);
                                         setTimeout(() => setEmailSent(false), 5000);
                                     } catch (error) {
@@ -411,8 +421,9 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                         <InfoItem icon={EmailIcon} label="Email" value={displayData.email} />
                         <InfoItem icon={ProfileIcon} label="Mobile" value={displayData.mobile} />
                     </div>
-                    <div className="grid grid-cols-1 gap-3">
+                    <div className="grid grid-cols-2 gap-3">
                         <InfoItem icon={LockIcon} label="Report Password" value={displayData.reportPassword} />
+                        <InfoItem icon={EmailIcon} label="Email Status" value={emailStatusText} />
                     </div>
                     {displayData.isReportReady && (
                         <div className="p-4 rounded-xl bg-gradient-to-r from-[#19211C] to-brand-green/5 border border-brand-green/20 mt-2">
@@ -420,19 +431,11 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                                 <CheckIcon className="w-4 h-4 text-brand-green" />
                                 <span className="text-sm font-semibold text-brand-green">Report Generated</span>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Password</p>
-                                    <div className="flex items-center gap-2">
-                                        <LockIcon className="w-3 h-3 text-gray-400" />
-                                        <code className="text-xs bg-black/30 px-2 py-1 rounded text-brand-green font-mono">{displayData.reportPassword}</code>
-                                    </div>
-                                </div>
-                                <div>
-                                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Email Status</p>
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${session?.metadata?.emailSent ? 'bg-brand-green text-black' : 'bg-gray-600 text-gray-200'}`}>
-                                        {emailStatusText}
-                                    </span>
+                            <div>
+                                <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Password</p>
+                                <div className="flex items-center gap-2">
+                                    <LockIcon className="w-3 h-3 text-gray-400" />
+                                    <code className="text-xs bg-black/30 px-2 py-1 rounded text-brand-green font-mono">{displayData.reportPassword}</code>
                                 </div>
                             </div>
                         </div>
@@ -884,6 +887,17 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
 
                                         setDownloadProgress('');
                                         await assessmentService.sendReportEmail(session.userId, customEmail);
+                                        // Optimistically update local session metadata so badge refreshes immediately
+                                        const resolvedEmail = customEmail.trim() || session.user?.email || '';
+                                        setSession(prev => prev ? {
+                                            ...prev,
+                                            metadata: {
+                                                ...prev.metadata,
+                                                emailSent: true,
+                                                emailSentTo: resolvedEmail,
+                                                emailSentAt: new Date().toISOString(),
+                                            }
+                                        } : prev);
                                         setCustomEmail('');
                                         setEmailSent(true);
                                         setTimeout(() => setEmailSent(false), 5000);
