@@ -22,7 +22,9 @@ type StatCardProps = {
   change: string;
   isPositive: boolean;
   isLoading?: boolean;
+  href?: string;
 };
+
 
 const API_BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "";
 
@@ -95,30 +97,44 @@ const StatCard: React.FC<StatCardProps> = ({
   value,
   change,
   isPositive,
-  isLoading
-}) => (
-  <div className="dashboard-glass-card p-6 relative overflow-hidden">
-    {isLoading && (
-      <div className="absolute inset-0 bg-white/50 dark:bg-black/50 z-10 animate-pulse" />
-    )}
-    <h3 className="text-[#19211C] dark:text-white opacity-90 text-sm font-medium mb-2">
-      {title}
-    </h3>
-    <div className="flex items-end justify-between">
-      <div className="text-3xl font-bold text-brand-text-light-primary dark:text-white">
-        {value}
-      </div>
-      <div
-        className={`text-xs font-bold px-2 py-1 rounded-full ${isPositive
-          ? "bg-green-500/10 text-green-500"
-          : "bg-red-500/10 text-red-500"
-          }`}
-      >
-        {change}
+  isLoading,
+  href
+}) => {
+  const content = (
+    <div className="dashboard-glass-card p-6 relative overflow-hidden h-full group transition-all duration-300 hover:shadow-lg hover:shadow-brand-green/5 cursor-pointer">
+      {isLoading && (
+        <div className="absolute inset-0 bg-white/50 dark:bg-black/50 z-10 animate-pulse" />
+      )}
+      <h3 className="text-[#19211C] dark:text-white opacity-90 text-sm font-medium mb-2 group-hover:text-brand-green transition-colors">
+        {title}
+      </h3>
+      <div className="flex items-end justify-between">
+        <div className="text-3xl font-bold text-brand-text-light-primary dark:text-white">
+          {value}
+        </div>
+        <div
+          className={`text-xs font-bold px-2 py-1 rounded-full ${isPositive
+            ? "bg-green-500/10 text-green-500"
+            : "bg-red-500/10 text-red-500"
+            }`}
+        >
+          {change}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+
+  if (href) {
+    return (
+      <Link href={href}>
+        {content}
+      </Link>
+    );
+  }
+
+  return content;
+};
+
 
 interface DashboardData {
   totalReadyToPayment: number;
@@ -199,30 +215,35 @@ const AdminDashboard: React.FC = () => {
       value: loading ? "..." : (data?.totalUsers || 0).toLocaleString(),
       change: "Total",
       isPositive: true,
-      isLoading: loading
+      isLoading: loading,
+      href: "/admin/registrations"
     },
     {
       title: "Active Assessments",
       value: loading ? "..." : (data?.activeAssessments || 0).toLocaleString(),
       change: "This Week",
       isPositive: true,
-      isLoading: loading
+      isLoading: loading,
+      href: "/admin/registrations?tab=individual"
     },
     {
       title: "Corporate Clients",
       value: loading ? "..." : (data?.corporateClients || 0).toLocaleString(),
       change: "Total",
       isPositive: true,
-      isLoading: loading
+      isLoading: loading,
+      href: "/admin/corporate"
     },
     {
       title: "Total Commissions Paid",
       value: loading ? "..." : formatCurrency(data?.totalCommissionsPaid || 0),
       change: "Distributed",
       isPositive: true,
-      isLoading: loading
+      isLoading: loading,
+      href: "/admin/affiliates"
     },
   ];
+
 
   return (
     <div className="relative min-h-screen font-sans transition-colors duration-300 pb-12 flex flex-col gap-6">

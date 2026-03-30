@@ -157,23 +157,25 @@ export class AdminService {
   }
 
   private async getUserDistribution() {
-    const schoolCount = await this.registrationRepo.count({
-      where: { schoolLevel: Not(IsNull()) },
-    });
-    const collegeCount = await this.registrationRepo.count({
-      where: { departmentDegreeId: Not(IsNull()) },
-    });
-    
-    // More robust way to handle JSON filtering by doing it in memory for corporate accounts
-    const corporateRegs = await this.registrationRepo.find({
-      where: { corporateAccountId: Not(IsNull()) },
-    });
+    const [schoolCount, collegeCount, totalCorporateCount, cxoCount] =
+      await Promise.all([
+        this.registrationRepo.count({
+          where: { schoolLevel: Not(IsNull()) },
+        }),
+        this.registrationRepo.count({
+          where: { departmentDegreeId: Not(IsNull()) },
+        }),
+        this.registrationRepo.count({
+          where: { corporateAccountId: Not(IsNull()) },
+        }),
+        this.registrationRepo
+          .createQueryBuilder('r')
+          .where('r.corporate_account_id IS NOT NULL')
+          .andWhere("r.metadata->>'programType' ILIKE :type", { type: '%cxo%' })
+          .getCount(),
+      ]);
 
-    const cxoCount = corporateRegs.filter(reg => 
-      String(reg.metadata?.programType || '').toLowerCase().includes('cxo')
-    ).length;
-
-    const employeeCount = corporateRegs.length - cxoCount;
+    const employeeCount = totalCorporateCount - cxoCount;
 
     return {
       totalWithTraits: schoolCount + collegeCount + employeeCount + cxoCount,

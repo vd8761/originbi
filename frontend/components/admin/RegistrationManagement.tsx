@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from 'next/navigation';
+
 import {
   BulkUploadIcon,
   PlusIcon,
@@ -39,9 +41,13 @@ const useDebounce = (value: string, delay: number) => {
 
 const RegistrationManagement: React.FC = () => {
   const [view, setView] = useState<"list" | "add" | "bulk" | "preview" | "assessment-preview" | "group-assessment-preview" | "group-candidate-assessment-preview">("list");
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get('tab') as "registrations" | "individual" | "group" | "send-emails";
+
   const [activeTab, setActiveTab] = useState<"registrations" | "individual" | "group" | "send-emails">(
-    "registrations"
+    initialTab || "registrations"
   );
+
   const [showSendEmailsTab, setShowSendEmailsTab] = useState(false);
 
   // Send Emails tab pagination (lifted so it appears in the shared top bar)
