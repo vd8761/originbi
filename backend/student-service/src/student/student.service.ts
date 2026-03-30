@@ -687,12 +687,6 @@ export class StudentService {
   // PUBLIC REGISTER
   // ---------------------------------------------------------------------------
   async register(dto: CreateRegistrationDto) {
-    this.logger.log(`[Register Debug] Register called for: ${dto.email}`);
-    this.logger.log(`[Register Debug] Payload: ${JSON.stringify(dto)}`);
-    this.logger.log(
-      `[Register Debug] Public registration attempt for: ${dto.email}`,
-    );
-
     try {
       // 1. Check if User exists
       let user = await this.userRepo.findOne({
@@ -741,6 +735,9 @@ export class StudentService {
           gender: dto.gender,
           hasChangedPassword: true, // Assuming allow login immediately
           cognitoSub: cognitoSub, // Store in metadata if not in column
+          ...(dto.metadata || {}), // Merge extra metadata
+          currentRole: dto.current_role || dto.metadata?.current_role,
+          roleDescription: dto.role_description || dto.metadata?.role_description,
         },
         createdAt: new Date(),
       });
@@ -785,6 +782,9 @@ export class StudentService {
           groupCode: dto.group_code,
           studentBoard: dto.student_board || dto.studentBoard, // Store in metadata as well
           sendEmail: true,
+          ...(dto.metadata || {}), // Merge extra metadata
+          currentRole: dto.current_role || dto.metadata?.current_role,
+          roleDescription: dto.role_description || dto.metadata?.role_description,
         },
         createdAt: new Date(),
         updatedAt: new Date(),
