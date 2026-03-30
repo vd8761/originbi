@@ -741,6 +741,9 @@ export class StudentService {
           gender: dto.gender,
           hasChangedPassword: true, // Assuming allow login immediately
           cognitoSub: cognitoSub, // Store in metadata if not in column
+          ...(dto.metadata || {}), // Merge extra metadata
+          currentRole: dto.current_role || dto.metadata?.current_role,
+          roleDescription: dto.role_description || dto.metadata?.role_description,
         },
         createdAt: new Date(),
       });
@@ -785,6 +788,9 @@ export class StudentService {
           groupCode: dto.group_code,
           studentBoard: dto.student_board || dto.studentBoard, // Store in metadata as well
           sendEmail: true,
+          ...(dto.metadata || {}), // Merge extra metadata
+          currentRole: dto.current_role || dto.metadata?.current_role,
+          roleDescription: dto.role_description || dto.metadata?.role_description,
         },
         createdAt: new Date(),
         updatedAt: new Date(),
