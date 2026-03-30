@@ -4,7 +4,8 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThanOrEqual, LessThan, In } from 'typeorm';
+import { Repository, MoreThanOrEqual, LessThan, In, And } from 'typeorm';
+
 
 import {
   User as AdminUser,
@@ -209,10 +210,13 @@ export class AdminService {
   }
 
   private async getRecentExpiredAssessments() {
+    const sevenDaysAgo = dayjs().subtract(7, 'day').toDate();
     return this.sessionRepo.find({
       where: {
-        validTo: LessThan(new Date()),
-        status: In(['ASSIGNED', 'STARTED']),
+        validTo: And(LessThan(new Date()), MoreThanOrEqual(sevenDaysAgo)),
+        status: In(['NOT_STARTED', 'IN_PROGRESS', 'EXPIRED', 'PARTIALLY_EXPIRED']),
+
+
       },
       relations: ['user', 'program', 'registration'],
       order: { validTo: 'DESC' },
@@ -220,6 +224,7 @@ export class AdminService {
     });
 
   }
+
 
   private async getTodaysRegistrations() {
     const startOfToday = dayjs().startOf('day').toDate();
@@ -235,21 +240,22 @@ export class AdminService {
 
   }
 
-  async extendAssessmentSession(sessionId: number, days: number) {
+  async extendAssessmentSession(sessionId: number, newDate: string) {
     const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
     if (!session) {
       throw new Error('Assessment session not found');
     }
 
-    const currentValidTo = dayjs(session.validTo);
-    const newValidTo = (currentValidTo.isBefore(dayjs()) ? dayjs() : currentValidTo).add(days, 'day').toDate();
+    session.validTo = new Date(newDate);
 
-    session.validTo = newValidTo;
-    // If it was expired, we keep the status but update validity. 
-    // Usually it stays ASSIGNED or STARTED.
+    // If it was EXPIRED, we should reset it to ASSIGNED or STARTED to allow the user back in
+    if (session.status === 'EXPIRED') {
+       session.status = 'IN_PROGRESS'; // Or appropriately 'NOT_STARTED' if never opened
+    }
     
     return this.sessionRepo.save(session);
   }
+
 
   getMessage() {
 

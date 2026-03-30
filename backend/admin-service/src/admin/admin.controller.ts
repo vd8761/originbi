@@ -39,9 +39,10 @@ export class AdminController {
   @Put('assessments/:id/extend')
   async extendAssessment(
     @Param('id') id: string,
-    @Body('days') days: number,
+    @Body('newDate') newDate: string,
   ) {
-    return this.adminService.extendAssessmentSession(Number(id), days);
+    return this.adminService.extendAssessmentSession(Number(id), newDate);
   }
+
 }
 
