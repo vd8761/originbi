@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from "react";
 import Link from 'next/link';
 import { AffiliateSettlementModal } from "./AffiliateSettlementModal";
+import { ExtendAssessmentModal } from "./ExtendAssessmentModal";
+import { formatDistanceToNow } from "date-fns";
+
+
 import { capitalizeWords } from "../../lib/utils";
 import { api } from "../../lib/api";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -156,7 +160,10 @@ interface DashboardData {
     total_settled_commission?: number;
     commission_percentage?: number;
   }>;
+  recentExpiredAssessments: any[];
+  todaysRegistrations: any[];
 }
+
 
 const AdminDashboard: React.FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -165,8 +172,14 @@ const AdminDashboard: React.FC = () => {
   // Settlement Modal State
   const [settlementModalOpen, setSettlementModalOpen] = useState(false);
   const [selectedAffiliate, setSelectedAffiliate] = useState<any | null>(null);
+  
+  // Extend Assessment Modal State
+  const [extendModalOpen, setExtendModalOpen] = useState(false);
+  const [selectedExpiredSession, setSelectedExpiredSession] = useState<any | null>(null);
+
   const { theme } = useTheme();
   const isDark = theme === "dark";
+
 
   const fetchStats = async () => {
     try {
@@ -191,6 +204,27 @@ const AdminDashboard: React.FC = () => {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     }).format(val);
+  };
+
+  const getAvatarColor = (name: string) => {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const h = Math.abs(hash) % 360;
+    const s = 55 + (Math.abs(hash) % 20);
+    const l = 45 + (Math.abs(hash) % 10);
+    const hslToHex = (h: number, s: number, l: number) => {
+        l /= 100;
+        const a = s * Math.min(l, 1 - l) / 100;
+        const f = (n: number) => {
+            const k = (n + h / 30) % 12;
+            const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+            return Math.round(255 * color).toString(16).padStart(2, '0');
+        };
+        return `${f(0)}${f(8)}${f(4)}`;
+    };
+    return hslToHex(h, s, l);
   };
 
   const openSettlementModal = (affiliate: any) => {
@@ -459,7 +493,149 @@ const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* New Row: Today's Registrations & Expired Assessments */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Today's New Registrations */}
+        <div className="dashboard-glass-card flex flex-col overflow-hidden min-h-[400px]">
+          <div className="px-6 pt-6 pb-4 flex justify-between items-center">
+            <h3 className="font-semibold text-[#19211C] dark:text-white text-lg">
+              Today's New Registrations
+            </h3>
+            <Link href="/admin/registrations" className="font-medium text-brand-green text-xs hover:underline">
+              View All
+            </Link>
+          </div>
+          <hr className="border-[#19211C]/10 dark:border-white/10" />
+          <div className="flex-grow overflow-auto custom-scrollbar">
+            {loading ? (
+              <div className="p-6 space-y-4">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-16 bg-white/5 animate-pulse rounded-xl" />
+                ))}
+              </div>
+            ) : !data?.todaysRegistrations || data.todaysRegistrations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <p className="text-sm text-[#19211C]/60 dark:text-white/60">No registrations today yet.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                {data.todaysRegistrations.map((reg) => (
+                  <div key={reg.id} className="px-6 group even:bg-white/5 hover:bg-white/10 dark:hover:bg-white/5 transition-all duration-200 border-b border-black/5 dark:border-white/5 last:border-0">
+                    <div className="flex items-center py-4 gap-4">
+                      {/* Left: User Info */}
+                      <div className="flex items-center gap-3 w-1/3 min-w-0">
+                        <img
+                          src={`https://ui-avatars.com/api/?name=${encodeURIComponent(reg.fullName || 'User')}&background=${getAvatarColor(reg.fullName || 'User')}&color=fff&font-size=0.4`}
+                          alt=""
+                          className="w-10 h-10 rounded-full object-cover border border-brand-light-tertiary dark:border-brand-dark-tertiary shrink-0"
+                        />
+                        <div className="flex flex-col min-w-0">
+                          <h4 className="font-semibold text-[#19211C] dark:text-white text-sm truncate">
+                            {reg.fullName || 'New User'}
+                          </h4>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{reg.user?.email}</p>
+                        </div>
+                      </div>
+
+
+                      {/* Center: Program */}
+                      <div className="flex-1 text-center min-w-0">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-brand-green/10 text-brand-green border border-brand-green/20 truncate max-w-full">
+                          {reg.program?.assessmentTitle || 'N/A'}
+                        </span>
+                      </div>
+
+                      {/* Right: Time */}
+                      <div className="w-1/4 text-right shrink-0">
+                        <span className="text-[11px] font-medium text-gray-400">
+                          {formatDistanceToNow(new Date(reg.createdAt), { addSuffix: true })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Recent Expired Assessments */}
+        <div className="dashboard-glass-card flex flex-col overflow-hidden min-h-[400px]">
+          <div className="px-6 pt-6 pb-4 flex justify-between items-center">
+            <h3 className="font-semibold text-[#19211C] dark:text-white text-lg">
+              Recent Expired Assessments
+            </h3>
+            <Link href="/admin/registrations?tab=individual" className="font-medium text-brand-green text-xs hover:underline">
+              View All
+            </Link>
+          </div>
+          <hr className="border-[#19211C]/10 dark:border-white/10" />
+          <div className="flex-grow overflow-auto custom-scrollbar">
+            {loading ? (
+              <div className="p-6 space-y-4">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-16 bg-white/5 animate-pulse rounded-xl" />
+                ))}
+              </div>
+            ) : !data?.recentExpiredAssessments || data.recentExpiredAssessments.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <p className="text-sm text-[#19211C]/60 dark:text-white/60">No recent expired assessments.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                {data.recentExpiredAssessments.map((session) => (
+                  <div key={session.id} className="px-6 group even:bg-white/5 hover:bg-white/10 dark:hover:bg-white/5 transition-all duration-200 border-b border-black/5 dark:border-white/5 last:border-0">
+                    <div className="flex items-center py-4 gap-4">
+                      {/* Left: User Info */}
+                      <div className="flex items-center gap-3 w-1/3 min-w-0">
+                        <img
+                          src={`https://ui-avatars.com/api/?name=${encodeURIComponent(session.registration?.fullName || 'User')}&background=${getAvatarColor(session.registration?.fullName || 'User')}&color=fff&font-size=0.4`}
+                          alt=""
+                          className="w-10 h-10 rounded-full object-cover border border-brand-light-tertiary dark:border-brand-dark-tertiary shrink-0"
+                        />
+                        <div className="flex flex-col min-w-0">
+                          <h4 className="font-semibold text-[#19211C] dark:text-white text-sm truncate">
+                            {session.registration?.fullName || session.user?.email || 'Student'}
+                          </h4>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{session.user?.email}</p>
+                        </div>
+                      </div>
+
+
+                      {/* Center: Program & Expiry */}
+                      <div className="flex-1 text-center min-w-0">
+                        <p className="text-xs text-brand-green font-bold truncate">
+                          {session.program?.assessmentTitle || 'Assessment'}
+                        </p>
+                        <p className="text-[10px] text-red-500 mt-0.5">
+                          Expired {formatDistanceToNow(new Date(session.validTo), { addSuffix: true })}
+                        </p>
+                      </div>
+
+                      {/* Right: Action */}
+                      <div className="w-1/4 text-right shrink-0">
+                        <button 
+                          onClick={() => {
+                            setSelectedExpiredSession(session);
+                            setExtendModalOpen(true);
+                          }}
+                          className="px-3 py-1.5 bg-brand-green text-white text-[11px] font-bold rounded-lg hover:bg-brand-green/90 transition-all shadow-md shadow-brand-green/20"
+                        >
+                          Extend
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+      </div>
+
       {/* Settle Modal */}
+
       {settlementModalOpen && selectedAffiliate && (
         <AffiliateSettlementModal
           affiliate={selectedAffiliate}
@@ -474,7 +650,24 @@ const AdminDashboard: React.FC = () => {
           }}
         />
       )}
+
+      {/* Extend Assessment Modal */}
+      {extendModalOpen && selectedExpiredSession && (
+        <ExtendAssessmentModal
+          session={selectedExpiredSession}
+          onClose={() => {
+            setExtendModalOpen(false);
+            setSelectedExpiredSession(null);
+          }}
+          onSuccess={() => {
+            setExtendModalOpen(false);
+            setSelectedExpiredSession(null);
+            fetchStats(); // Refresh dashboard data
+          }}
+        />
+      )}
     </div>
+
   );
 };
 

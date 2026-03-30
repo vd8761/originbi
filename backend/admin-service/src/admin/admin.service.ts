@@ -4,7 +4,8 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThanOrEqual } from 'typeorm';
+import { Repository, MoreThanOrEqual, LessThan, In } from 'typeorm';
+
 import {
   User as AdminUser,
   GroupAssessment,
@@ -93,11 +94,14 @@ export class AdminService {
         revenueTrend,
         totalCommissionsPaid,
         userDistribution,
+        recentExpiredAssessments: await this.getRecentExpiredAssessments(),
+        todaysRegistrations: await this.getTodaysRegistrations(),
         // Optional: meta for frontend to show date ranges if needed
         statsContext: {
           weekStart: startOfWeek.format('YYYY-MM-DD'),
         },
       };
+
     } catch (error: any) {
       this.logger.error(
         `Error calculating dashboard stats: ${error.message}`,
@@ -204,7 +208,51 @@ export class AdminService {
     };
   }
 
+  private async getRecentExpiredAssessments() {
+    return this.sessionRepo.find({
+      where: {
+        validTo: LessThan(new Date()),
+        status: In(['ASSIGNED', 'STARTED']),
+      },
+      relations: ['user', 'program', 'registration'],
+      order: { validTo: 'DESC' },
+      take: 5,
+    });
+
+  }
+
+  private async getTodaysRegistrations() {
+    const startOfToday = dayjs().startOf('day').toDate();
+    return this.registrationRepo.find({
+      where: {
+        createdAt: MoreThanOrEqual(startOfToday),
+      },
+      relations: ['user', 'program'],
+      order: { createdAt: 'DESC' },
+      take: 5,
+    });
+
+
+  }
+
+  async extendAssessmentSession(sessionId: number, days: number) {
+    const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
+    if (!session) {
+      throw new Error('Assessment session not found');
+    }
+
+    const currentValidTo = dayjs(session.validTo);
+    const newValidTo = (currentValidTo.isBefore(dayjs()) ? dayjs() : currentValidTo).add(days, 'day').toDate();
+
+    session.validTo = newValidTo;
+    // If it was expired, we keep the status but update validity. 
+    // Usually it stays ASSIGNED or STARTED.
+    
+    return this.sessionRepo.save(session);
+  }
+
   getMessage() {
+
     return { message: 'Admin service working!' };
   }
 }
