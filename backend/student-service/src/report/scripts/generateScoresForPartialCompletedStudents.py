@@ -143,9 +143,17 @@ def generate_report_number(cur, group_id, program_id):
     program = cur.fetchone()
     program_code = program['code'] if program else "UNK"
 
+    short_code_map = {
+        "COLLEGE_STUDENT": "CS",
+        "SCHOOL_STUDENT": "SS",
+        "EMPLOYEE": "E",
+        "CXO_GENERAL": "CG"
+    }
+    short_code = short_code_map.get(program_code, program_code)
+
     # Generate Prefix: OBI-G{group_id}-{Month/Year}-{Program code}-
     date_str = datetime.now().strftime("%m/%y")
-    report_prefix = f"OBI-G{group_id}-{date_str}-{program_code}-"
+    report_prefix = f"OBI-G{group_id}-{date_str}-{short_code}-"
     
     # Calculate Sequence
     cur.execute("SELECT COUNT(*) as count FROM public.assessment_reports WHERE report_number LIKE %s", (report_prefix + '%',))

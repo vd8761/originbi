@@ -15,6 +15,7 @@ import { JDMatchingService } from './jd-matching.service';
 import { TextToSqlService } from './text-to-sql.service';
 import { RagCacheService } from './rag-cache.service';
 import { AgentOrchestratorService } from './agent-orchestrator.service';
+import { SyncService } from './sync.service';
 
 // RBAC Imports
 import { AccessPolicyFactory } from './policies';
@@ -212,6 +213,9 @@ export class RagService {
   // Tracks the last list query per user so "next 10" / "show more" works
   private paginationCache = new Map<string, {
     intent: string;       // e.g. 'list_users', 'list_candidates', 'test_results', 'career_roles'
+    searchTerm: string | null;
+    table: string;
+    includePersonality: boolean;
     page: number;         // current page (0-based)
     totalCount: number;   // total rows available
     timestamp: number;
@@ -241,6 +245,7 @@ export class RagService {
     private auditLogger: AuditLoggerService,
     private ragCache: RagCacheService,
     private agentOrchestrator: AgentOrchestratorService,
+    private syncService: SyncService,
   ) {
     this.reportsDir = path.join(process.cwd(), 'reports');
     if (!fs.existsSync(this.reportsDir)) {
@@ -385,10 +390,30 @@ export class RagService {
     sanitized = sanitized.replace(/\n{3,}/g, '\n\n').trim();
 
     const q = (question || '').toLowerCase();
-    if (/\bhigh\s*score\b|\bhighest\b|\btop\b|\bbest\b/.test(q)
-      && !/score\s*basis:/i.test(raw)
-      && (/\|\s*total[_\s]?score\s*\|/i.test(raw) || /\*\*🏆\s*Top Performers:/i.test(raw))) {
-      return `${sanitized}\n\n**Score Basis:** Values are from each candidate's completed assessment results.`;
+
+    if (role === 'CORPORATE') {
+      const asksRestrictedDirectory = /\b(list|show|get|display|view|count|total|how\s+many)\b.*\b(users?|admins?|corporates?|companies|accounts?)\b/i.test(q)
+        || /\b(other\s+companies?|all\s+companies?|all\s+corporates?)\b/i.test(q);
+      const looksLikeCorporateDump = /\b(company\s*name|sector\s*code|total\s*credits|available\s*credits|is\s*active)\b/i.test(sanitized)
+        && /\b\d+\b/.test(sanitized);
+
+      if (asksRestrictedDirectory || looksLikeCorporateDump) {
+        return 'For security and RBAC, I can only show your own corporate account and candidates under your company scope. I cannot share other corporate, admin, or global user data.';
+      }
+    }
+
+    const genericCount = sanitized.match(/\*\*(\d+)\*\*\s+records?\s+found\.?/i) || sanitized.match(/\b(\d+)\s+records?\s+found\.?/i);
+    if (genericCount && /\b(how\s+many|count|total)\b/.test(q)) {
+      const n = genericCount[1];
+      if (/\b(employee|employees|resource|resources|staff|member|members)\b/.test(q)) {
+        return `**${n} employees total.**`;
+      }
+      if (/\b(candidate|candidates|student|students)\b/.test(q)) {
+        return `**${n} candidates total.**`;
+      }
+      if (/\b(user|users|account|accounts)\b/.test(q)) {
+        return `**${n} users total.**`;
+      }
     }
 
     return sanitized;
@@ -400,6 +425,16 @@ export class RagService {
   ): { intent: string; searchTerm: string | null; table: string; includePersonality: boolean; includeAll?: boolean } | null {
     const q = this.normalizeQuery(message).toLowerCase();
 
+    // Test/assessment report is text-first and should not trigger custom career-fitment PDF generation.
+    if (/\b(test|assessment|exam)\s*report\b/.test(q) || (/\breport\b/.test(q) && /\b(test|assessment|exam)\b/.test(q))) {
+      const name = this.extractName(message);
+      return {
+        intent: 'person_lookup',
+        searchTerm: name,
+        table: 'assessment_attempts',
+        includePersonality: true,
+      };
+    }
     if (/(\bhow\s+many\b|\bcount\b|\btotal\b)/.test(q)) {
       if (/\b(employee|employees|resource|resources|staff|member|members)\b/.test(q)) {
         return { intent: 'count', searchTerm: 'employees', table: 'registrations', includePersonality: false };
@@ -424,13 +459,22 @@ export class RagService {
     }
 
     if (/\b(list|show|get|display|view)\b\s+(my|our)?\s*\b(candidates?|students?|employees?|resources?|staff|members?)\b/.test(q)) {
-      return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
+      const teamScoped = /\b(my|our)\b/.test(q);
+      return {
+        intent: 'list_candidates',
+        searchTerm: teamScoped ? '__MY_TEAM__' : null,
+        table: 'registrations',
+        includePersonality: false,
+      };
     }
 
     if (/\bwhich\s+candidate\s+has\s+high\s+score\b/.test(q) ||
       /\bhigh\s+score\b/.test(q) ||
       /\b(which|who)\b.*\b(best|top|highest)\b.*\b(employee|employees|candidate|candidates|student|students|resource|resources|performer|performers)\b/.test(q) ||
       /\b(best|top|highest)\b\s+\b(employee|employees|candidate|candidates|student|students|resource|resources|performer|performers)\b/.test(q)) {
+      if (this.needsTopPerformerRoleClarification(message)) {
+        return { intent: 'best_performer_clarification', searchTerm: null, table: 'assessment_attempts', includePersonality: false };
+      }
       return { intent: 'best_performer', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
     }
 
@@ -446,6 +490,16 @@ export class RagService {
   private shouldForceDbAnswer(question: string, userRole: string): boolean {
     const q = this.normalizeQuery(question).toLowerCase();
     const role = (userRole || 'STUDENT').toUpperCase();
+
+    if (role === 'CORPORATE') {
+      // Avoid broad Text-to-SQL routes for security-sensitive directory queries.
+      if (/\b(users?|admins?|corporates?|companies|accounts?)\b/.test(q)) {
+        return false;
+      }
+      if (/\b(all|overall|global)\b/.test(q) && /\b(candidates?|employees?|resources?|students?)\b/.test(q)) {
+        return false;
+      }
+    }
 
     const hasDataVerb = /\b(list|show|get|count|how many|total|compare|breakdown|top|best|highest|lowest|average)\b/.test(q);
     const hasPlatformEntity = /\b(user|users|candidate|candidates|student|students|employee|employees|resource|resources|registration|registrations|assessment|assessments|score|scores|result|results|corporate|company|companies|affiliate|affiliates|referral|referrals|group|groups|batch|batches|program|programs)\b/.test(q);
@@ -463,6 +517,45 @@ export class RagService {
     }
 
     return false;
+  }
+
+  private getCorporateAccessBoundary(question: string, user?: UserContext): QueryResult | null {
+    const role = (user?.role || 'STUDENT').toUpperCase();
+    if (role !== 'CORPORATE') return null;
+
+    const q = this.normalizeQuery(question).toLowerCase();
+
+    const asksOtherCorporateDetails = /\b(list|show|get|display|view)\b.*\b(corporates?|companies|company\s+accounts?)\b/.test(q)
+      || /\blist\s+the\s+corporates?\b/.test(q)
+      || /\b(other\s+companies?|all\s+companies?|all\s+corporates?)\b/.test(q);
+    if (asksOtherCorporateDetails) {
+      return {
+        answer: 'I cannot show other corporate accounts. I can only access your own corporate profile and your company candidates.',
+        searchType: 'corporate_scope_guard',
+        confidence: 0.99,
+      };
+    }
+
+    const asksAdminOrUserDirectory = /\b(list|show|get|display|view|count|total|how\s+many)\b.*\b(users?|admins?|admin\s+details?)\b/.test(q);
+    if (asksAdminOrUserDirectory) {
+      return {
+        answer: 'Access denied by RBAC. Corporate users cannot view admin or global user details.',
+        searchType: 'corporate_scope_guard',
+        confidence: 0.99,
+      };
+    }
+
+    const asksGlobalCandidates = /\b(all|overall|global)\b/.test(q)
+      && /\b(candidates?|employees?|resources?|students?)\b/.test(q);
+    if (asksGlobalCandidates) {
+      return {
+        answer: 'I can only show candidates under your corporate account. Use "show my employees" to view your scoped candidate list.',
+        searchType: 'corporate_scope_guard',
+        confidence: 0.99,
+      };
+    }
+
+    return null;
   }
 
   private async resolveEffectiveCorporateId(user?: UserContext): Promise<number | null> {
@@ -610,6 +703,80 @@ export class RagService {
       .join('\n---\n');
   }
 
+  private inferSemanticCategory(question: string): string | undefined {
+    const q = this.normalizeQuery(question || '').toLowerCase();
+
+    if (/\b(department|degree|academic|college|campus|program|specialization|specialisation|branch)\b/.test(q)) {
+      return 'education';
+    }
+    if (/\b(course|certification|certifications|learning path|curriculum|syllabus|module|training)\b/.test(q)) {
+      return 'course';
+    }
+    if (/\b(tool|tools|software|platform|tech stack|technology|framework|library)\b/.test(q)) {
+      return 'tool';
+    }
+    if (/\b(personality|trait|traits|disc|behavioral|behavioural|aptitude style)\b/.test(q)) {
+      return 'personality';
+    }
+    if (/\b(career|role|job|path|opportunity|opportunities|future role|position)\b/.test(q)) {
+      return 'career';
+    }
+
+    return undefined;
+  }
+
+  private inferSemanticHybridProfile(question: string): {
+    categories: string[];
+    categoryWeights: Record<string, number>;
+    sourceWeights: Record<string, number>;
+  } {
+    const q = this.normalizeQuery(question || '').toLowerCase();
+    const categories = new Set<string>();
+    const categoryWeights: Record<string, number> = {};
+
+    const addCategory = (name: string, weight: number) => {
+      categories.add(name);
+      categoryWeights[name] = Math.max(categoryWeights[name] || 1, weight);
+    };
+
+    if (/\b(department|degree|academic|college|campus|program|specialization|specialisation|branch)\b/.test(q)) {
+      addCategory('education', 1.25);
+      addCategory('department', 1.1);
+    }
+    if (/\b(course|certification|certifications|learning path|curriculum|syllabus|module|training)\b/.test(q)) {
+      addCategory('course', 1.22);
+      addCategory('education', 1.1);
+    }
+    if (/\b(tool|tools|software|platform|tech stack|technology|framework|library)\b/.test(q)) {
+      addCategory('tool', 1.2);
+    }
+    if (/\b(personality|trait|traits|disc|behavioral|behavioural|aptitude style)\b/.test(q)) {
+      addCategory('personality', 1.24);
+      addCategory('career', 1.08);
+    }
+    if (/\b(career|role|job|path|opportunity|opportunities|future role|position)\b/.test(q)) {
+      addCategory('career', 1.2);
+    }
+
+    if (categories.size === 0) {
+      addCategory('career', 1.12);
+      addCategory('education', 1.08);
+    }
+
+    return {
+      categories: Array.from(categories),
+      categoryWeights,
+      sourceWeights: {
+        career_roles: 1.18,
+        department_degrees: 1.18,
+        courses: 1.12,
+        personality_traits: 1.1,
+        career_role_tools: 1.08,
+        programs: 1.05,
+      },
+    };
+  }
+
   private getLlm(): ChatGoogleGenerativeAI {
     if (!this.llm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
@@ -658,6 +825,7 @@ export class RagService {
     q = q.replace(/\bwhatabout\b/gi, 'what about');
     q = q.replace(/\blistmy\b/gi, 'list my');
     q = q.replace(/\bshowmy\b/gi, 'show my');
+    q = q.replace(/\bfit\s+ment\b/gi, 'fitment');
 
     // ── Domain-specific typo dictionary ──
     // Maps common misspellings to correct terms
@@ -695,10 +863,13 @@ export class RagService {
       'scor': 'score', 'scors': 'scores', 'scroe': 'score',
       // Report variations
       'reprt': 'report', 'repert': 'report', 'reprot': 'report',
+      'repot': 'report', 'repotrt': 'report', 'reporrt': 'report', 'rport': 'report',
       // Other common typos
       'detils': 'details', 'detials': 'details', 'deatils': 'details',
       'carreer': 'career', 'carrer': 'career', 'carier': 'career',
+      'careeer': 'career',
       'abut': 'about', 'abot': 'about', 'abour': 'about',
+      'fot': 'for', 'fr': 'for',
       'knw': 'know', 'konw': 'know',
       'shw': 'show', 'shwo': 'show',
       'lst': 'list', 'lsit': 'list',
@@ -773,6 +944,7 @@ export class RagService {
       return word;
     });
     q = correctedWords.join(' ');
+    q = q.replace(/\bfit\s+ment\b/gi, 'fitment');
 
     // Step 2: Apply multi-word synonym mapping
     const qLower = q.toLowerCase();
@@ -937,6 +1109,11 @@ export class RagService {
       // ═══════════════════════════════════════════════════════════════
       question = this.normalizeQuery(question);
 
+      const corporateBoundary = this.getCorporateAccessBoundary(question, user as UserContext);
+      if (corporateBoundary) {
+        return corporateBoundary;
+      }
+
       // Deterministic count path for admin/corporate employee/candidate/user totals.
       // Prevents ambiguous Text-to-SQL interpretations such as generic "records found".
       {
@@ -968,6 +1145,27 @@ export class RagService {
       }
 
       const sessionId = conversationId > 0 ? `conv_${conversationId}` : `user_${user?.id || 0}`;
+
+      // Follow-up after top-performer clarification: "for team lead" -> role-based matching directly.
+      const roleFollowUp = this.extractStandaloneRoleFollowUp(question);
+      if (roleFollowUp) {
+        this.logger.log(`🎯 Role follow-up detected after clarification: ${roleFollowUp}`);
+        return await this.handleJDCandidateMatch(`top candidate for ${roleFollowUp}`, user);
+      }
+
+      // Career fitment clarification: generic "top performer" needs a target role/skill focus.
+      if (this.needsTopPerformerRoleClarification(question)) {
+        const roleNow = (user?.role || 'STUDENT').toUpperCase();
+        this.conversationService.addUserMessage(sessionId, question, 'best_performer_clarification', []);
+        this.conversationService.addBiResponse(sessionId, 'Top performer requires role clarification', 'best_performer_clarification');
+        return {
+          answer: this.buildTopPerformerClarification(roleNow),
+          searchType: 'best_performer_clarification',
+          confidence: 0.98,
+          needsClarification: true,
+          clarifyingQuestion: 'For which role do you want top performers?',
+        };
+      }
       const explicitListAllInterpretation = this.resolveExplicitListAllInterpretation(question, sessionId);
       if (explicitListAllInterpretation) {
         this.logger.log(`🎯 Direct routing: ${explicitListAllInterpretation.intent} (deterministic full list)`);
@@ -991,6 +1189,16 @@ export class RagService {
       if (roleAwareDirectInterpretation) {
         this.logger.log(`🎯 Direct role-aware routing: ${roleAwareDirectInterpretation.intent}`);
 
+        if (roleAwareDirectInterpretation.intent === 'best_performer_clarification') {
+          return {
+            answer: this.buildTopPerformerClarification(currentUserRole),
+            searchType: 'best_performer_clarification',
+            confidence: 0.98,
+            needsClarification: true,
+            clarifyingQuestion: 'For which role do you want top performers?',
+          };
+        }
+
         if (roleAwareDirectInterpretation.intent === 'career_report') {
           return await this.handleCareerReport(roleAwareDirectInterpretation.searchTerm, user);
         }
@@ -1001,6 +1209,20 @@ export class RagService {
 
         const totalCount = await this.getTotalCount(roleAwareDirectInterpretation, user as UserContext);
         const data = await this.executeQuery(roleAwareDirectInterpretation, user as UserContext, 0);
+
+        // Preserve pagination context so "next" keeps the same list format/scope.
+        if (['list_users', 'list_candidates', 'test_results', 'best_performer', 'career_roles', 'corporate_details', 'affiliate_referrals', 'affiliate_payments', 'affiliate_list', 'affiliate_earnings', 'affiliate_students'].includes(roleAwareDirectInterpretation.intent)) {
+          const pagKey = this.getPaginationKey(user);
+          this.paginationCache.set(pagKey, {
+            intent: roleAwareDirectInterpretation.intent,
+            searchTerm: roleAwareDirectInterpretation.searchTerm ?? null,
+            table: roleAwareDirectInterpretation.table,
+            includePersonality: !!roleAwareDirectInterpretation.includePersonality,
+            page: 0,
+            totalCount,
+            timestamp: Date.now(),
+          });
+        }
 
         if (!data || data.length === 0) {
           return {
@@ -1035,7 +1257,7 @@ export class RagService {
       // Detects pagination requests and returns the next/prev page
       // ═══════════════════════════════════════════════════════════════
       if (/^(next|more|show\s*more|next\s*\d+|see\s*more|continue|prev|previous|go\s*back)\b/i.test(normalizedQ) ||
-        /\b(next|more)\s+(\d+\s+)?(users?|candidates?|students?|results?|roles?)\b/i.test(normalizedQ)) {
+        /\b(next|more)\s+(\d+\s+)?(users?|candidates?|students?|employees?|resources?|results?|roles?)\b/i.test(normalizedQ)) {
         const pagKey = this.getPaginationKey(user);
         const pagCtx = this.paginationCache.get(pagKey);
         if (pagCtx && Date.now() - pagCtx.timestamp < this.PAGINATION_EXPIRY) {
@@ -1064,15 +1286,9 @@ export class RagService {
 
           const interpretation = {
             intent: pagCtx.intent,
-            searchTerm: null as string | null,
-            table: pagCtx.intent === 'list_users' ? 'users' :
-              pagCtx.intent === 'list_candidates' ? 'registrations' :
-                pagCtx.intent === 'career_roles' ? 'career_roles' :
-                  pagCtx.intent === 'affiliate_referrals' ? 'affiliate_referral_transactions' :
-                    pagCtx.intent === 'affiliate_payments' ? 'affiliate_settlement_transactions' :
-                      pagCtx.intent === 'affiliate_list' || pagCtx.intent === 'affiliate_earnings' ? 'affiliate_accounts' :
-                        'assessment_attempts',
-            includePersonality: ['test_results', 'best_performer'].includes(pagCtx.intent),
+            searchTerm: pagCtx.searchTerm,
+            table: pagCtx.table,
+            includePersonality: pagCtx.includePersonality,
           };
           const data = await this.executeQuery(interpretation, user as UserContext, offset);
           if (data.length === 0) {
@@ -1087,15 +1303,15 @@ export class RagService {
         }
       }
 
-      const bareNumberMatch = normalizedQ.match(/^#?\s*(\d+)$/);
-      if (bareNumberMatch) {
+      const disambiguationSelectionMatch = normalizedQ.match(/^#?\s*(\d+)(?:[\s,.-]*[a-z][a-z\s.'-]{0,40})?$/i);
+      if (disambiguationSelectionMatch) {
         const disambigKey = this.getDisambiguationKey(user);
         const ctx = this.disambiguationCache.get(disambigKey);
         this.logger.log(`🔢 Bare number "${normalizedQ}" detected | cache exists: ${!!ctx} | handler: ${ctx?.handler || 'none'} | options: ${ctx?.options?.length || 0}`);
         
         if (ctx && Date.now() - ctx.timestamp < this.DISAMBIG_EXPIRY) {
           this.logger.log(`🔢 Resuming disambiguation for "${ctx.searchTerm}" (handler=${ctx.handler || 'career_report'})`);
-          const selectedIndex = parseInt(bareNumberMatch[1], 10) - 1;
+          const selectedIndex = parseInt(disambiguationSelectionMatch[1], 10) - 1;
           if (ctx.options?.length && (selectedIndex < 0 || selectedIndex >= ctx.options.length)) {
             return {
               answer: `**❌ Invalid selection.** Please use a number between 1 and ${ctx.options.length}.`,
@@ -1105,6 +1321,7 @@ export class RagService {
           }
 
           const selectedName = ctx.options?.[selectedIndex];
+          const selectionNum = parseInt(disambiguationSelectionMatch[1], 10);
           this.logger.log(`🔢 Selected: "${selectedName}" (index ${selectedIndex})`);
           
           // Update conversation context with the selected person
@@ -1115,11 +1332,15 @@ export class RagService {
           
           this.disambiguationCache.delete(disambigKey);
 
-          const targetTerm = selectedName || `${ctx.searchTerm} #${bareNumberMatch[1]}`;
+          const numberedSelection = `${ctx.searchTerm} #${selectionNum}`;
+          const targetTerm = selectedName || numberedSelection;
 
           // Route to the correct handler based on what created the disambiguation
           if (ctx.handler === 'person_lookup') {
-            return await this.handlePersonLookup(targetTerm, user);
+            return await this.handlePersonLookup(numberedSelection, user);
+          }
+          if (ctx.handler === 'custom_report') {
+            return await this.handleCustomReport(user, numberedSelection, `custom report for ${numberedSelection}`);
           }
           return await this.handleCareerReport(targetTerm, user);
         } else {
@@ -1152,7 +1373,12 @@ export class RagService {
         this.logger.debug(`⏭️ Cache bypass for dynamic/personal query: "${question.slice(0, 60)}"`);
       } else {
         try {
-          const cached = await this.ragCache.lookup(question, userRole);
+          const cached = await this.ragCache.lookup(question, {
+            role: userRole,
+            userId: user?.id,
+            corporateId: user?.corporateId,
+            affiliateId: user?.affiliateId,
+          });
           if (cached) {
             this.logger.log(`⚡ Cache HIT — returning cached response (similarity ≥ 0.92)`);
             return {
@@ -1226,11 +1452,15 @@ export class RagService {
 
         // Store pagination state
         if (['list_users', 'list_candidates', 'test_results', 'best_performer', 'career_roles', 'corporate_details', 'affiliate_referrals'].includes(followUpResolved.intent)) {
+          const followUpTotalCount = await this.getTotalCount(followUpResolved, user as UserContext);
           const pagKey = this.getPaginationKey(user);
           this.paginationCache.set(pagKey, {
             intent: followUpResolved.intent,
+            searchTerm: followUpResolved.searchTerm ?? null,
+            table: followUpResolved.table,
+            includePersonality: !!followUpResolved.includePersonality,
             page: 0,
-            totalCount: Array.isArray(followUpData) ? followUpData.length : 0,
+            totalCount: followUpTotalCount,
             timestamp: Date.now(),
           });
         }
@@ -1379,7 +1609,12 @@ export class RagService {
                 agentResult.answer,
                 agentResult.searchType,
                 agentResult.confidence,
-                userRole,
+                {
+                  role: userRole,
+                  userId: user?.id,
+                  corporateId: user?.corporateId,
+                  affiliateId: user?.affiliateId,
+                },
               );
             } catch { /* non-blocking */ }
           }
@@ -1410,6 +1645,16 @@ export class RagService {
       const interpretation = await this.understandQuery(resolvedQuestion, userRole, routingHistory);
       this.logger.log(`🎯 Intent: ${interpretation.intent}`);
       this.logger.log(`🔍 Search: ${interpretation.searchTerm || 'general'}`);
+
+      if (interpretation.intent === 'best_performer' && this.needsTopPerformerRoleClarification(resolvedQuestion)) {
+        return {
+          answer: this.buildTopPerformerClarification(userRole),
+          searchType: 'best_performer_clarification',
+          confidence: 0.98,
+          needsClarification: true,
+          clarifyingQuestion: 'For which role do you want top performers?',
+        };
+      }
 
       // Track entities: extract person names from the question for future pronoun resolution
       const mentionedEntities: string[] = [];
@@ -1568,7 +1813,22 @@ export class RagService {
         const userEmail = user?.email || '';
         const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
         // Semantic enrichment: fetch relevant career/knowledge docs from vector store
-        const careerRagChunks = await this.embeddingsService.semanticSearch(resolvedQuestion, 3).catch(() => []);
+        const hybridProfile = this.inferSemanticHybridProfile(resolvedQuestion);
+        const careerCategory = this.inferSemanticCategory(resolvedQuestion) || 'career';
+        const careerRagChunks = await this.embeddingsService
+          .semanticSearch(
+            resolvedQuestion,
+            3,
+            [careerCategory, ...hybridProfile.categories],
+            0.3,
+            {
+              hybridWeights: { vector: 1.1, lexical: 0.95 },
+              categoryWeights: { ...hybridProfile.categoryWeights, career: 1.25 },
+              sourceWeights: hybridProfile.sourceWeights,
+              allowCrossCategoryFallback: true,
+            },
+          )
+          .catch(() => []);
         if (careerRagChunks.length > 0) {
           this.logger.log(`📚 Career guidance enriched with ${careerRagChunks.length} semantic chunks`);
           const ragCtx = `\n\n— RELEVANT KNOWLEDGE BASE —\n${careerRagChunks.map((d: any, i: number) => `[${i + 1}] ${d.content}`).join('\n---\n')}`;
@@ -1726,7 +1986,18 @@ export class RagService {
           if (tsResult.confidence > 0.3) {
             // Store in semantic cache (fire-and-forget) unless query is dynamic/personal
             if (!this.shouldBypassResponseCache(resolvedQuestion)) {
-              this.ragCache.store(resolvedQuestion, tsResult.answer, tsResult.searchType, tsResult.confidence, userRole).catch(() => {});
+              this.ragCache.store(
+                resolvedQuestion,
+                tsResult.answer,
+                tsResult.searchType,
+                tsResult.confidence,
+                {
+                  role: userRole,
+                  userId: user?.id,
+                  corporateId: user?.corporateId,
+                  affiliateId: user?.affiliateId,
+                },
+              ).catch(() => {});
             }
             return {
               answer: tsResult.answer,
@@ -1894,7 +2165,22 @@ export class RagService {
         this.logger.log('🧠 Using LLM directly for general knowledge');
         const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
         // Semantic enrichment: pull relevant docs from vector store with Cohere reranking
-        const genKnowledgeChunks = await this.embeddingsService.semanticSearch(resolvedQuestion, 3).catch(() => []);
+        const semanticCategory = this.inferSemanticCategory(resolvedQuestion);
+        const hybridProfile = this.inferSemanticHybridProfile(resolvedQuestion);
+        const genKnowledgeChunks = await this.embeddingsService
+          .semanticSearch(
+            resolvedQuestion,
+            3,
+            semanticCategory ? [semanticCategory, ...hybridProfile.categories] : hybridProfile.categories,
+            0.3,
+            {
+              hybridWeights: { vector: 1.05, lexical: 1.0 },
+              categoryWeights: hybridProfile.categoryWeights,
+              sourceWeights: hybridProfile.sourceWeights,
+              allowCrossCategoryFallback: true,
+            },
+          )
+          .catch(() => []);
         const compactKnowledge = this.buildCompactKnowledgeContext(genKnowledgeChunks);
         const genRagContext = compactKnowledge
           ? `${enrichedHistory}\n\n— RELEVANT PLATFORM KNOWLEDGE (use if applicable) —\n${compactKnowledge}`
@@ -1980,6 +2266,9 @@ export class RagService {
         const pagKey = this.getPaginationKey(user);
         this.paginationCache.set(pagKey, {
           intent: interpretation.intent,
+          searchTerm: interpretation.searchTerm ?? null,
+          table: interpretation.table,
+          includePersonality: !!interpretation.includePersonality,
           page: 0,
           totalCount,
           timestamp: Date.now(),
@@ -2148,6 +2437,56 @@ export class RagService {
         confidence: 0,
       };
     }
+  }
+
+  private needsTopPerformerRoleClarification(question: string): boolean {
+    const q = this.normalizeQuery(question).toLowerCase();
+    const asksTopPerformer = /\b(best|top|highest)\s+(candidate|performer|student|person|scorer|employee|resource|member)s?\b/.test(q)
+      || /\b(show|list|get)\s+(top|best)\b/.test(q)
+      || /\btop\s*\d+\b/.test(q);
+
+    if (!asksTopPerformer) return false;
+
+    // If user already asked role-specific matching, do not interrupt.
+    if (this.isLikelyJDCandidateMatchingQuery(question)) return false;
+
+    // Allow cohort-based performer requests (batch/group/program) to proceed as-is.
+    if (/\b(batch|group|program)\b/.test(q)) return false;
+
+    // If an explicit role signal is present, no clarification needed.
+    if (/\b(for|to|as)\s+(an?\s+)?[a-z][a-z\s/&-]{2,}\b/.test(q)) return false;
+
+    return true;
+  }
+
+  private buildTopPerformerClarification(userRole: string): string {
+    const scopeLine = userRole === 'CORPORATE'
+      ? 'I can rank only within your organization scope.'
+      : userRole === 'STUDENT'
+        ? 'I can explain role fit from your own profile and scores.'
+        : 'I can rank candidates across your permitted admin scope.';
+
+    return `In a career-fitment platform, candidates are strong in different roles and skill combinations.
+There is no single universal top performer for every skill.
+
+${scopeLine}
+
+Please tell me the target role first, for example:
+- Top performer for Software Developer
+- Top performer for Team Lead
+- Top performer for Data Analyst (communication + problem solving)`;
+  }
+
+  private extractStandaloneRoleFollowUp(question: string): string | null {
+    const q = this.normalizeQuery(question).trim();
+    const m = q.match(/^for\s+([a-z][a-z0-9\s/&-]{2,80})$/i);
+    if (!m) return null;
+
+    const role = m[1].replace(/\s+/g, ' ').trim();
+    if (!role || /\b(report|reports|result|results|details|list|users?|candidates?|students?)\b/i.test(role)) {
+      return null;
+    }
+    return role;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -2817,7 +3156,11 @@ export class RagService {
           searchTerm: cleanSearchTerm,
           timestamp: Date.now(),
           handler: 'career_report',
-          options: personData.slice(0, 10).map((p: any) => p.full_name),
+          options: personData.slice(0, 10).map((p: any) => {
+            const email = p.email ? ` ${p.email}` : '';
+            const mobile = p.mobile_number ? ` ${String(p.mobile_number).slice(-4)}` : '';
+            return `${p.full_name}${email}${mobile}`.trim();
+          }),
         });
 
         return {
@@ -3075,7 +3418,7 @@ export class RagService {
       const person = selected.person;
       const attempts = selected.attempts;
 
-      let response = `**📊 Assessment Results for ${person.full_name}**\n\n`;
+      let response = `**🧪 Test Report (Assessment Results) for ${person.full_name}**\n\n`;
 
       if (person.email) response += `📧 **Email:** ${person.email}\n`;
       if (person.gender) response += `👤 **Gender:** ${person.gender}\n`;
@@ -3085,33 +3428,41 @@ export class RagService {
       } else {
         // Show the latest/best attempt details
         const latest = attempts[0];
-        const scoreNum = latest.total_score ? parseFloat(latest.total_score) : NaN;
+        const assessment1 = attempts.find((a: any) => !!a.behavioral_style) || null;
+        const assessment2 = attempts.find((a: any) => a.total_score !== null && a.total_score !== undefined) || null;
+        const scoreNum = assessment2?.total_score ? parseFloat(assessment2.total_score) : NaN;
 
-        if (latest.behavioral_style) {
-          response += `\n📋 **Behavioral Style: ${latest.behavioral_style}**\n`;
-          if (latest.behavior_description) {
-            response += `${latest.behavior_description}\n`;
+        response += `\n**🧾 Assessment Breakdown:**\n`;
+
+        if (assessment1?.behavioral_style) {
+          response += `• **Assessment 1:** Completed\n`;
+          response += `  - Style: **${assessment1.behavioral_style}**\n`;
+          if (assessment1.behavior_description) {
+            response += `  - Insight: ${assessment1.behavior_description}\n`;
           }
+        } else {
+          response += `• **Assessment 1:** Not available\n`;
         }
 
         if (!isNaN(scoreNum)) {
           const agile = this.getAgileLevel(scoreNum);
-          response += `\n🎯 **Agile Compatibility: ${agile.name}** (Score: ${scoreNum}/125)\n`;
-          response += `${agile.desc}\n`;
+          response += `• **Assessment 2:** Score **${scoreNum.toFixed(1)}/125** — **${agile.name}**\n`;
+          response += `  - Interpretation: ${agile.desc}\n`;
+        } else {
+          response += `• **Assessment 2:** Not available\n`;
         }
 
-        if (latest.sincerity_class) {
-          response += `\n🔒 **Sincerity:** ${latest.sincerity_class}`;
-          if (latest.sincerity_index) response += ` (Index: ${parseFloat(latest.sincerity_index).toFixed(1)})`;
-          response += '\n';
-        }
+        response += '\n';
 
         if (latest.program_name) {
           response += `📚 **Program:** ${latest.program_name}\n`;
         }
 
-        if (latest.completed_at) {
-          response += `📅 **Completed:** ${new Date(latest.completed_at).toLocaleDateString()}\n`;
+        const durationSec = latest.time_spent_seconds ? parseInt(latest.time_spent_seconds) : 0;
+        if (durationSec > 0) {
+          const mins = Math.floor(durationSec / 60);
+          const secs = durationSec % 60;
+          response += `⏱️ **Duration:** ${mins > 0 ? `${mins}m ` : ''}${secs}s\n`;
         }
 
         // Show additional attempts if any
@@ -3348,6 +3699,7 @@ export class RagService {
       const userId = user?.id;
       let targetUserId: number | null = null;
       let targetName = searchTerm;
+      let targetIndex = -1;
 
       // RBAC: Students can only generate reports for themselves
       if (userRole === 'STUDENT') {
@@ -3385,43 +3737,109 @@ export class RagService {
         }
 
         if (targetName) {
+          const numberMatch = targetName.match(/(.+?)\s*[#]?\s*(\d+)$/);
+          if (numberMatch) {
+            targetName = numberMatch[1].trim();
+            targetIndex = parseInt(numberMatch[2], 10) - 1;
+          }
+
           this.logger.log(`🔍 Looking up user by name: "${targetName}"`);
 
           // RBAC: Corporate users can only find candidates in their company
           let lookupSql: string;
           let lookupParams: any[];
+          const fuzzyLike = `%${targetName.toLowerCase()}%`;
+          const exactLower = targetName.toLowerCase();
+          const prefixLower = `${targetName.toLowerCase()}%`;
 
           if (userRole === 'CORPORATE' && corporateId) {
             lookupSql = `
-              SELECT r.user_id, r.full_name
+              SELECT r.user_id, r.full_name, u.email,
+                     CASE
+                       WHEN LOWER(r.full_name) = $2 THEN 100
+                       WHEN LOWER(r.full_name) LIKE $3 THEN 92
+                       WHEN LOWER(split_part(r.full_name, ' ', 1)) = $2 THEN 90
+                       WHEN LOWER(split_part(r.full_name, ' ', 1)) LIKE $3 THEN 86
+                       WHEN LOWER(r.full_name) LIKE $1 THEN 70
+                       ELSE 0
+                     END AS match_score
               FROM registrations r
+              LEFT JOIN users u ON r.user_id = u.id
               WHERE LOWER(r.full_name) LIKE $1
               AND r.is_deleted = false
-              AND r.corporate_account_id = $2
-              ORDER BY r.created_at DESC
-              LIMIT 1
+              AND r.corporate_account_id = $4
+              ORDER BY match_score DESC, r.created_at DESC
+              LIMIT 10
             `;
-            lookupParams = [`%${targetName.toLowerCase()}%`, corporateId];
+            lookupParams = [fuzzyLike, exactLower, prefixLower, corporateId];
           } else {
             // ADMIN: search all
             lookupSql = `
-              SELECT r.user_id, r.full_name
+              SELECT r.user_id, r.full_name, u.email,
+                     CASE
+                       WHEN LOWER(r.full_name) = $2 THEN 100
+                       WHEN LOWER(r.full_name) LIKE $3 THEN 92
+                       WHEN LOWER(split_part(r.full_name, ' ', 1)) = $2 THEN 90
+                       WHEN LOWER(split_part(r.full_name, ' ', 1)) LIKE $3 THEN 86
+                       WHEN LOWER(r.full_name) LIKE $1 THEN 70
+                       ELSE 0
+                     END AS match_score
               FROM registrations r
+              LEFT JOIN users u ON r.user_id = u.id
               WHERE LOWER(r.full_name) LIKE $1
               AND r.is_deleted = false
-              ORDER BY r.created_at DESC
-              LIMIT 1
+              ORDER BY match_score DESC, r.created_at DESC
+              LIMIT 10
             `;
-            lookupParams = [`%${targetName.toLowerCase()}%`];
+            lookupParams = [fuzzyLike, exactLower, prefixLower];
           }
 
           const results = await this.executeDatabaseQuery(lookupSql, lookupParams);
 
-          if (results && results.length > 0) {
+          if (results && results.length > 1 && targetIndex < 0) {
+            let response = `**👥 I found multiple close matches for "${targetName}".**\n\nPlease reply with the exact full name:\n\n`;
+            results.slice(0, 5).forEach((person: any, idx: number) => {
+              response += `**${idx + 1}.** ${person.full_name}\n`;
+            });
+            response += `\nYou can also reply with a number (e.g. **1** or **2**).`;
+
+            this.disambiguationCache.set(this.getDisambiguationKey(user), {
+              searchTerm: targetName,
+              timestamp: Date.now(),
+              handler: 'custom_report',
+              options: results.slice(0, 10).map((p: any) => {
+                const email = p.email ? ` ${p.email}` : '';
+                return `${p.full_name}${email}`.trim();
+              }),
+            });
+
+            return {
+              answer: response,
+              searchType: 'disambiguation',
+              confidence: 0.72,
+            };
+          }
+
+          if (results && results.length > 1 && targetIndex >= 0) {
+            if (targetIndex >= results.length) {
+              return {
+                answer: `**❌ Invalid selection.** Please use a number between 1 and ${results.length}.`,
+                searchType: 'disambiguation',
+                confidence: 0.4,
+              };
+            }
+            targetUserId = parseInt(results[targetIndex].user_id);
+            targetName = results[targetIndex].full_name;
+            this.logger.log(`✅ Selected disambiguated user: ${targetName} (ID: ${targetUserId})`);
+          }
+
+          if (!targetUserId && results && results.length > 0) {
             targetUserId = parseInt(results[0].user_id);
             targetName = results[0].full_name;
             this.logger.log(`✅ Found user: ${targetName} (ID: ${targetUserId})`);
-          } else {
+          }
+
+          if (!results || results.length === 0) {
             const scopeMsg = userRole === 'CORPORATE' ? ' in your organization' : '';
             return {
               answer: `**⚠️ User "${targetName}" not found${scopeMsg}.** Please check the name and try again.\n\nYou can ask:\n- "Generate career fitment report for [full name]"\n- "Custom report for [person name]"`,
@@ -3448,9 +3866,8 @@ export class RagService {
 
       this.logger.log(`📊 Generating Custom Career Fitment Report for ${targetName} (userId: ${targetUserId})`);
 
-      // Use the name parameter for better matching (handles users with incomplete assessments)
-      const encodedName = encodeURIComponent(targetName || '');
-      const downloadUrl = `/rag/custom-report/pdf?name=${encodedName}&type=career_fitment`;
+      // Use userId to avoid ambiguity when multiple users share the same name.
+      const downloadUrl = `/rag/custom-report/pdf?userId=${targetUserId}&type=career_fitment`;
 
       return {
         answer: `I'm ready to generate **${targetName}'s Career Fitment & Future Role Readiness Report**! 🎯\n\n📄 **[Click here to download the personalized PDF Report](${downloadUrl})**\n\nThis report includes:\n- Profile Snapshot\n- Behavioral Alignment Summary\n- Skill Assessment with AI-generated scores\n- Future Role Readiness Mapping\n- Role Fitment Score\n- Industry Suitability Analysis\n- Transition Requirements\n- Executive Insights\n\nDownload the PDF for the complete analysis!`,
@@ -4201,8 +4618,19 @@ export class RagService {
 
     // If the follow-up mentions specific data qualifiers (education, scores, etc.),
     // route to data_query which can use text-to-SQL for flexible column selection
-    const hasDataQualifier = /\b(education|qualification|score|marks|assessment|personality|department|degree|experience|gender|age|email|mobile|phone|board|stream|level)\b/i.test(q);
+    const hasDataQualifier = /\b(education|qualification|score|marks|assessment|personality|trait|traits|disc|style|behavioral|behavioural|department|degree|experience|gender|age|email|mobile|phone|board|stream|level)\b/i.test(q);
+    const asksPersonalityTraits = /\b(personality|trait|traits|disc|style|behavioral|behavioural)\b/i.test(q);
+    const lastPerson = session?.currentContext?.lastPersonMentioned || null;
     if (hasDataQualifier) {
+      // If user asks "their personality traits" right after a person-focused flow,
+      // resolve to that specific person instead of a broad data_query.
+      if (asksPersonalityTraits && lastPerson && ['person_lookup', 'career_report', 'self_results', 'test_results', 'best_performer'].includes(lastIntent)) {
+        return { intent: 'person_lookup', searchTerm: lastPerson, table: 'assessment_attempts', includePersonality: true };
+      }
+      // For list-style flows, personality follow-up should stay in assessment domain.
+      if (asksPersonalityTraits && ['list_candidates', 'test_results', 'best_performer'].includes(lastIntent)) {
+        return { intent: 'test_results', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+      }
       return { intent: 'data_query', searchTerm: null, table: 'registrations', includePersonality: true };
     }
 
@@ -4578,10 +5006,10 @@ export class RagService {
     if (/\breport\b/i.test(q) && /\b(for|of|about)\s+/i.test(q)) {
       const name = this.extractName(question);
       if (name) {
-        // Only route to person_lookup if explicitly asking for test RESULTS/SCORES (not just "test report")
+        const isTestReport = /\b(test\s+reports?|assessment\s+reports?|exam\s+reports?)\b/i.test(q);
         const isTestResults = /\b(test\s+results?|test\s+scores?|assessment\s+results?|exam\s+results?|exam\s+scores?|score\s+details?)\b/i.test(q);
         return {
-          intent: isTestResults ? 'person_lookup' : 'career_report',
+          intent: isTestReport ? 'person_lookup' : (isTestResults ? 'person_lookup' : 'career_report'),
           searchTerm: name,
           table: 'assessment_attempts',
           includePersonality: true,
@@ -4594,9 +5022,10 @@ export class RagService {
       // First try extractName which is smarter about finding actual person names
       const nameFromExtract = this.extractName(question);
       if (nameFromExtract) {
+        const isTestReport = /\b(test\s+reports?|assessment\s+reports?|exam\s+reports?)\b/i.test(q);
         const isTestResults = /\b(test\s+results?|test\s+scores?|assessment\s+results?|exam\s+results?|exam\s+scores?|score\s+details?)\b/i.test(q);
         return {
-          intent: isTestResults ? 'person_lookup' : 'career_report',
+          intent: isTestReport ? 'person_lookup' : (isTestResults ? 'person_lookup' : 'career_report'),
           searchTerm: nameFromExtract,
           table: 'assessment_attempts',
           includePersonality: true,
@@ -4625,9 +5054,10 @@ export class RagService {
         cleanedBeforeReport = cleanedBeforeReport.replace(leadingStopWords, '').trim();
       }
       if (cleanedBeforeReport.length >= 2 && !/^(show|get|list|create|generate|overall|custom|my|test|exam|assessment)$/i.test(cleanedBeforeReport)) {
+        const isTestReport = /\b(test\s+reports?|assessment\s+reports?|exam\s+reports?)\b/i.test(q);
         const isTestResults = /\b(test\s+results?|test\s+scores?|assessment\s+results?|exam\s+results?|exam\s+scores?|score\s+details?)\b/i.test(q);
         return {
-          intent: isTestResults ? 'person_lookup' : 'career_report',
+          intent: isTestReport ? 'person_lookup' : (isTestResults ? 'person_lookup' : 'career_report'),
           searchTerm: cleanedBeforeReport,
           table: 'assessment_attempts',
           includePersonality: true,
@@ -5043,6 +5473,8 @@ export class RagService {
     if (/\breport\b|\bprofile\b|\bdetails\b|\bresults\b/.test(q) && /\b(my|for|about)\b|^[a-z][a-z\s.'-]{1,40}\s+report\b/.test(q)) return true;
     if (/\bmy organization\b|\bmy team\b|\bmy assessment\b|\bmy score\b|\bmy results\b|\blatest\b/.test(q)) return true;
     if (/\b(secret|internal|schema|query logic|system prompt|bypass)\b/.test(q)) return true;
+    if (/\b(top|best|highest)\s+(performer|candidate|employee|resource|student)\b/.test(q)) return true;
+    if (/^for\s+[a-z]/i.test(q)) return true;
     if (/\b(also|and)\b/.test(q) && /\b(my|their|those|these|him|her|team|organization)\b/.test(q)) return true;
     if (/\band\s+also\b|\balso\b/.test(q)) return true;
     if (/\bcompare\b/.test(q) && /\bsuggest|recommend|improve\b/.test(q)) return true;
@@ -5132,6 +5564,17 @@ export class RagService {
       return {
         intent: 'custom_report',
         searchTerm: null,
+        table: 'assessment_attempts',
+        includePersonality: true,
+      };
+    }
+
+    // Test/assessment report queries should return text-first test report.
+    if (qLowerUniq.match(/\b(test|assessment|exam)\s*report\b/)) {
+      const name = this.extractName(question);
+      return {
+        intent: 'person_lookup',
+        searchTerm: name,
         table: 'assessment_attempts',
         includePersonality: true,
       };
@@ -5241,8 +5684,10 @@ export class RagService {
 
   private extractName(question: string): string | null {
     const patterns = [
+      // "jai test report" / "anjaly assessment report" → "jai" / "anjaly"
+      /^\s*((?:[A-Za-z]+\.?\s*){1,4})\s+(?:test|assessment|exam)\s*report\b/i,
       // "for Jaya Krishna Reddy #1" → "Jaya Krishna Reddy #1"
-      /(?:for|about|bout|of)\s+((?:[A-Za-z]+\.?\s*){1,4}(?:\s*#\s*\d+)?)/i,
+      /(?:for|fot|fr|about|bout|of)\s+((?:[A-Za-z]+\.?\s*){1,4}(?:\s*#\s*\d+)?)/i,
       // "Jaya Krishna's score" → "Jaya Krishna"
       /((?:[A-Za-z]+\.?\s+){0,3}[A-Za-z]+)'s?\s+(?:test|exam|score|result|detail|report|profile|data)/i,
       // "show Jaya Krishna" → "Jaya Krishna"
@@ -5252,7 +5697,7 @@ export class RagService {
       // "know about jai" → "jai"
       /(?:know|tell|learn)\s+(?:about|bout)\s+((?:[A-Za-z]+\.?\s*){1,4})/i,
       // Simple: "for ajay" → "ajay" (single word fallback)
-      /(?:for|about|bout|of)\s+([A-Za-z]+(?:\s*#\s*\d+)?)/i,
+      /(?:for|fot|fr|about|bout|of)\s+([A-Za-z]+(?:\s*#\s*\d+)?)/i,
     ];
 
     const stopWords = new Set([
@@ -5559,10 +6004,21 @@ export class RagService {
           break;
         case 'list_candidates':
           if (userRole === 'ADMIN') {
+            if (interpretation.searchTerm === '__MY_TEAM__') {
+              const adminScopedCorporateId = await this.resolveEffectiveCorporateId(user);
+              if (adminScopedCorporateId) {
+                sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false AND corporate_account_id = $1`;
+                params.push(adminScopedCorporateId);
+                break;
+              }
+            }
             sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false`;
           } else if (userRole === 'CORPORATE' && corporateId) {
             sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false AND corporate_account_id = $1`;
             params.push(corporateId);
+          } else if (userRole === 'CORPORATE') {
+            // Never fall back to unscoped/other scope for corporate list queries.
+            return 0;
           } else {
             sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false AND user_id = $1`;
             params.push(userId);
@@ -5754,10 +6210,21 @@ export class RagService {
 
       case 'list_candidates':
         if (userRole === 'ADMIN') {
+          if (interpretation.searchTerm === '__MY_TEAM__') {
+            const adminScopedCorporateId = await this.resolveEffectiveCorporateId(user);
+            if (adminScopedCorporateId) {
+              sql = `SELECT full_name, gender, mobile_number, status FROM registrations WHERE is_deleted = false AND corporate_account_id = $1 ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+              params.push(adminScopedCorporateId);
+              break;
+            }
+          }
           sql = `SELECT full_name, gender, mobile_number, status FROM registrations WHERE is_deleted = false ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
         } else if (userRole === 'CORPORATE' && corporateId) {
           sql = `SELECT full_name, gender, mobile_number, status FROM registrations WHERE is_deleted = false AND corporate_account_id = $1 ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
           params.push(corporateId);
+        } else if (userRole === 'CORPORATE') {
+          this.logger.warn('⚠️ RBAC: CORPORATE list_candidates requested without resolvable corporateId; returning empty result to avoid cross-company data leakage');
+          return [];
         } else {
           sql = `SELECT full_name, gender, mobile_number, status FROM registrations WHERE is_deleted = false AND user_id = $1 LIMIT ${limit}`;
           params.push(userId);
@@ -5766,39 +6233,77 @@ export class RagService {
 
       case 'test_results':
       case 'best_performer': {
+        const reportAgileExpr = await this.getReportAgileScoresExpr('ar');
         const baseTestSql = `
+          WITH latest_reports AS (
+            SELECT DISTINCT ON (ar.assessment_session_id)
+              ar.assessment_session_id,
+              ${reportAgileExpr} as agile_scores
+            FROM assessment_reports ar
+            ORDER BY ar.assessment_session_id, ar.created_at DESC NULLS LAST, ar.id DESC
+          ),
+          best_attempts AS (
+            SELECT
+              aa.*,
+              ROW_NUMBER() OVER (
+                PARTITION BY COALESCE(aa.registration_id, -aa.user_id)
+                ORDER BY aa.total_score DESC NULLS LAST, aa.completed_at DESC NULLS LAST, aa.id DESC
+              ) as rn
+            FROM assessment_attempts aa
+            WHERE (
+              TRIM(UPPER(aa.status)) IN ('COMPLETED', 'COMPLETE', 'FINISHED', 'SUBMITTED')
+              OR aa.completed_at IS NOT NULL
+            )
+          )
           SELECT 
             COALESCE(registrations.id, 0) as registration_id,
             COALESCE(registrations.full_name, split_part(users.email, '@', 1), 'Candidate') as full_name,
             users.email,
-            assessment_attempts.total_score,
-            assessment_attempts.status,
-            personality_traits.blended_style_name as behavioral_style,
+            COALESCE(
+              best_attempts.total_score,
+              NULLIF(
+                regexp_replace(
+                  COALESCE(
+                    latest_reports.agile_scores->>'total_score',
+                    latest_reports.agile_scores->>'overall_score',
+                    latest_reports.agile_scores->>'overall',
+                    ''
+                  ),
+                  '[^0-9\\.-]',
+                  '',
+                  'g'
+                ),
+                ''
+              )::numeric
+            ) as total_score,
+            best_attempts.status,
+            COALESCE(
+              personality_traits.blended_style_name,
+              latest_reports.agile_scores->>'dominant_trait'
+            ) as behavioral_style,
             personality_traits.blended_style_desc as behavior_description,
             programs.name as program_name,
-            NULL::jsonb as trait_scores_json
-          FROM assessment_attempts
-          LEFT JOIN registrations ON assessment_attempts.registration_id = registrations.id
-          LEFT JOIN users ON users.id = COALESCE(registrations.user_id, assessment_attempts.user_id)
-          LEFT JOIN personality_traits ON assessment_attempts.dominant_trait_id = personality_traits.id
-          LEFT JOIN programs ON assessment_attempts.program_id = programs.id
-          WHERE (
-            TRIM(UPPER(assessment_attempts.status)) IN ('COMPLETED', 'COMPLETE', 'FINISHED', 'SUBMITTED')
-            OR assessment_attempts.completed_at IS NOT NULL
-          )
+            latest_reports.agile_scores as trait_scores_json
+          FROM best_attempts
+          LEFT JOIN registrations ON best_attempts.registration_id = registrations.id
+          LEFT JOIN users ON users.id = COALESCE(registrations.user_id, best_attempts.user_id)
+          LEFT JOIN personality_traits ON best_attempts.dominant_trait_id = personality_traits.id
+          LEFT JOIN programs ON best_attempts.program_id = programs.id
+          LEFT JOIN latest_reports ON latest_reports.assessment_session_id = best_attempts.assessment_session_id
+          WHERE best_attempts.rn = 1
             AND COALESCE(registrations.is_deleted, false) = false`;
 
         if (userRole === 'ADMIN') {
-          sql = `${baseTestSql} ORDER BY assessment_attempts.total_score DESC LIMIT ${limit} OFFSET ${offset}`;
+          sql = `${baseTestSql} ORDER BY total_score DESC NULLS LAST LIMIT ${limit} OFFSET ${offset}`;
         } else if (userRole === 'CORPORATE' && corporateId) {
-          sql = `${baseTestSql} AND registrations.corporate_account_id = $1 ORDER BY assessment_attempts.total_score DESC LIMIT ${limit} OFFSET ${offset}`;
+          sql = `${baseTestSql} AND registrations.corporate_account_id = $1 ORDER BY total_score DESC NULLS LAST LIMIT ${limit} OFFSET ${offset}`;
           params.push(corporateId);
         } else if (userId && userId > 0) {
-          sql = `${baseTestSql} AND registrations.user_id = $1 LIMIT ${limit} OFFSET ${offset}`;
+          sql = `${baseTestSql} AND registrations.user_id = $1 ORDER BY total_score DESC NULLS LAST LIMIT ${limit} OFFSET ${offset}`;
           params.push(userId);
         } else if (user?.email) {
           // Fallback: email-based lookup when userId is 0
-          sql = `${baseTestSql} AND registrations.user_id = (SELECT id FROM users WHERE email = $1 LIMIT 1) LIMIT ${limit} OFFSET ${offset}`;
+          sql = `${baseTestSql} AND registrations.user_id = (SELECT id FROM users WHERE email = $1 LIMIT 1) ORDER BY total_score DESC NULLS LAST LIMIT ${limit} OFFSET ${offset}`;
           params.push(user.email);
         } else {
           this.logger.log('⚠️ test_results: No userId or email for student scoping');
@@ -6501,7 +7006,8 @@ export class RagService {
         if (gLabel === 'FEMALE') return `👩 **Female: ${cnt}**`;
         if (requested === 'employees') return `**${cnt} employees total.**`;
         if (requested === 'users') return `**${cnt} users total.**`;
-        return `**${cnt} candidates total.**`;
+        if (requested === 'candidates') return `**${cnt} candidates (employees/resources) total.**`;
+        return `**${cnt} candidates (employees/resources) total.**`;
       }
 
       case 'count_by_role': {
@@ -6577,7 +7083,9 @@ export class RagService {
 
     const latest = data[0];
     const name = latest.full_name || 'there';
-    const scoreNum = latest.total_score ? parseFloat(latest.total_score) : NaN;
+    const assessment1 = data.find((r: any) => !!r.behavioral_style) || null;
+    const assessment2 = data.find((r: any) => r.total_score !== null && r.total_score !== undefined) || null;
+    const scoreNum = assessment2?.total_score ? parseFloat(assessment2.total_score) : NaN;
     const maxScore = latest.max_score_snapshot ? parseInt(latest.max_score_snapshot) : null;
     const isSelf = (latest.registration_source || '').toUpperCase() === 'SELF';
 
@@ -6588,19 +7096,28 @@ export class RagService {
       response += `📌 **Registration Type:** Self-registered student\n\n`;
     }
 
-    if (latest.behavioral_style) {
-      response += `📋 **Personality Style:** ${latest.behavioral_style}\n`;
-      if (latest.behavior_description) {
-        response += `   _${latest.behavior_description}_\n\n`;
+    response += `**🧾 Assessment Breakdown:**\n`;
+
+    if (assessment1?.behavioral_style) {
+      response += `• **Assessment 1:** Completed\n`;
+      response += `  - Style: **${assessment1.behavioral_style}**\n`;
+      if (assessment1.behavior_description) {
+        response += `  - Insight: _${assessment1.behavior_description}_\n`;
       }
+    } else {
+      response += `• **Assessment 1:** Not available\n`;
     }
 
     if (!isNaN(scoreNum)) {
       const agile = this.getAgileLevel(scoreNum);
       const maxStr = maxScore ? `/${maxScore}` : '/100';
-      response += `🎯 **Agile Score:** ${scoreNum.toFixed(1)}${maxStr} — **${agile.name}**\n`;
-      response += `   _${agile.desc}_\n\n`;
+      response += `• **Assessment 2:** Score **${scoreNum.toFixed(1)}${maxStr}** — **${agile.name}**\n`;
+      response += `  - Interpretation: _${agile.desc}_\n`;
+    } else {
+      response += `• **Assessment 2:** Not available\n`;
     }
+
+    response += `\n`;
 
     // Assessment answer details (from assessment_answers table)
     const totalQ = parseInt(latest.total_questions || '0');
@@ -6625,14 +7142,6 @@ export class RagService {
       response += `\n`;
     }
 
-    // Sincerity info
-    if (latest.sincerity_index) {
-      const sincIdx = parseFloat(latest.sincerity_index);
-      response += `🔍 **Sincerity Index:** ${sincIdx.toFixed(1)}%`;
-      if (latest.sincerity_class) response += ` (${latest.sincerity_class})`;
-      response += `\n\n`;
-    }
-
     if (latest.program_name) {
       response += `📝 **Program:** ${latest.program_name}\n`;
     }
@@ -6641,12 +7150,9 @@ export class RagService {
       const end = new Date(latest.completed_at);
       const durationMs = end.getTime() - start.getTime();
       const durationMins = Math.round(durationMs / 60000);
-      response += `📅 **Completed:** ${end.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`;
-      if (durationMins > 0) response += ` (Duration: ${durationMins} min)`;
-      response += `\n`;
-    } else if (latest.completed_at) {
-      const completedDate = new Date(latest.completed_at);
-      response += `📅 **Completed:** ${completedDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}\n`;
+      if (durationMins > 0) {
+        response += `⏱️ **Duration:** ${durationMins} min\n`;
+      }
     }
 
     // Show additional attempts if multiple
@@ -6677,7 +7183,8 @@ export class RagService {
       : '**📊 Assessment Results:**\n\n';
 
     if (isBestPerformer) {
-      response += '_Score basis: completed assessment scores._\n\n';
+      response += 'Candidates shown below are strong in different role-fit dimensions.\n';
+      response += 'Please specify the target role to shortlist the best fit (for example: Software Developer, Team Lead).\n\n';
     }
 
     data.forEach((row, i) => {
@@ -6687,31 +7194,26 @@ export class RagService {
 
       response += `${medal} **${name}**\n`;
 
-      // Behavioral Style (DISC)
-      if (row.behavioral_style) {
-        response += `   📋 **Style: ${row.behavioral_style}**\n`;
-        if (row.behavior_description) {
-          response += `   ${row.behavior_description}\n`;
+      if (!isBestPerformer) {
+        // Behavioral Style (DISC)
+        if (row.behavioral_style) {
+          response += `   📋 **Style: ${row.behavioral_style}**\n`;
+          if (row.behavior_description) {
+            response += `   ${row.behavior_description}\n`;
+          }
         }
-      }
 
-      // Agile Compatibility
-      const scoreNum = row.total_score ? parseFloat(row.total_score) : NaN;
-      if (!isNaN(scoreNum)) {
-        response += `   📈 **Total Score:** ${scoreNum.toFixed(2)}\n`;
-        const agile = this.getAgileLevel(scoreNum);
-        response += `   🎯 **${agile.name}**: ${agile.desc}\n`;
+        // Agile Compatibility
+        const scoreNum = row.total_score ? parseFloat(row.total_score) : NaN;
+        if (!isNaN(scoreNum)) {
+          response += `   📈 **Total Score:** ${scoreNum.toFixed(2)}\n`;
+          const agile = this.getAgileLevel(scoreNum);
+          response += `   🎯 **${agile.name}**: ${agile.desc}\n`;
+        }
       }
 
       response += '\n';
     });
-
-    if (isBestPerformer) {
-      const traitLeaders = this.buildBestPerformerTraitLeaders(data);
-      if (traitLeaders) {
-        response += `\n${traitLeaders}`;
-      }
-    }
 
     return response.trim();
   }
@@ -6759,11 +7261,20 @@ export class RagService {
 
   private buildBestPerformerTraitLeaders(data: any[]): string {
     const leaders = new Map<string, { name: string; traitScore: number; totalScore: number }>();
+    const styleLeaders = new Map<string, { name: string; totalScore: number }>();
 
     for (const row of data) {
       const name = row?.full_name || row?.email || 'Unknown';
       const totalScore = Number(row?.total_score || 0);
       const traitScores = this.parseTraitScores(row?.trait_scores_json);
+      const style = String(row?.behavioral_style || '').trim();
+
+      if (style && Number.isFinite(totalScore)) {
+        const existingStyle = styleLeaders.get(style);
+        if (!existingStyle || totalScore > existingStyle.totalScore) {
+          styleLeaders.set(style, { name, totalScore });
+        }
+      }
 
       for (const [traitKey, traitValue] of Object.entries(traitScores)) {
         const existing = leaders.get(traitKey);
@@ -6777,15 +7288,33 @@ export class RagService {
       }
     }
 
-    if (leaders.size === 0) return '';
+    if (leaders.size === 0 && styleLeaders.size === 0) return '';
 
-    let section = '**🏅 Best Candidate Per Trait:**\n\n';
-    section += '| Trait | Best Candidate | Trait Score | Overall Score |\n';
-    section += '|---|---|---:|---:|\n';
+    let section = '';
 
-    const sortedTraits = Array.from(leaders.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-    for (const [traitKey, leader] of sortedTraits) {
-      section += `| ${this.prettifyTraitName(traitKey)} | ${leader.name} | ${leader.traitScore.toFixed(2)} | ${leader.totalScore.toFixed(2)} |\n`;
+    if (leaders.size > 0) {
+      section += '**🏅 Best Candidate Per Trait:**\n\n';
+      section += '| Trait | Best Candidate | Trait Score | Overall Score |\n';
+      section += '|---|---|---:|---:|\n';
+
+      const sortedTraits = Array.from(leaders.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+      for (const [traitKey, leader] of sortedTraits) {
+        section += `| ${this.prettifyTraitName(traitKey)} | ${leader.name} | ${leader.traitScore.toFixed(2)} | ${leader.totalScore.toFixed(2)} |\n`;
+      }
+    }
+
+    // Fallback/companion leaderboard when raw trait_scores_json is unavailable.
+    // This makes "top performer" vary by behavioral style, not just one global ranking.
+    if (styleLeaders.size > 0) {
+      if (section) section += '\n';
+      section += '**🎯 Best Candidate Per Behavioral Style:**\n\n';
+      section += '| Behavioral Style | Best Candidate | Overall Score |\n';
+      section += '|---|---|---:|\n';
+
+      const sortedStyles = Array.from(styleLeaders.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+      for (const [style, leader] of sortedStyles) {
+        section += `| ${style} | ${leader.name} | ${leader.totalScore.toFixed(2)} |\n`;
+      }
     }
 
     return section;
@@ -7125,9 +7654,10 @@ export class RagService {
   // ═══════════════════════════════════════════════════════════════════════════
   // FOLLOW-UP SUGGESTION GENERATOR
   // ═══════════════════════════════════════════════════════════════════════════
-  generateFollowUpSuggestions(question: string, answer: string, searchType: string): string[] {
+  generateFollowUpSuggestions(question: string, answer: string, searchType: string, userRole: string = 'STUDENT'): string[] {
     const q = question.toLowerCase();
     const a = answer.toLowerCase();
+    const role = (userRole || 'STUDENT').toUpperCase();
     const suggestions: string[] = [];
 
     // Context-aware suggestions based on search type
@@ -7188,20 +7718,58 @@ export class RagService {
 
       case 'list_candidates':
       case 'list_registrations':
-        suggestions.push('Show top performers');
-        suggestions.push('How many candidates completed assessments?');
-        suggestions.push('Generate career report for a candidate');
+        if (role === 'ADMIN') {
+          suggestions.push('Top performer for Software Developer');
+          suggestions.push('Top performer for Team Lead');
+          suggestions.push('How many candidates completed assessments?');
+        } else if (role === 'CORPORATE') {
+          suggestions.push('Top performer for Software Developer in my company');
+          suggestions.push('Top performer for Team Lead in my company');
+          suggestions.push('How many of my employees completed assessments?');
+        } else {
+          suggestions.push('Show my assessment results');
+          suggestions.push('What roles suit my profile?');
+          suggestions.push('How can I improve my weak areas?');
+        }
         break;
       case 'person_lookup':
       case 'career_report':
-        suggestions.push('Show their personality traits');
-        suggestions.push('What careers suit this person?');
-        suggestions.push('Generate a detailed career report');
+        if (role === 'STUDENT') {
+          suggestions.push('Show my personality traits');
+          suggestions.push('What careers suit me?');
+          suggestions.push('Show my strongest role fit');
+        } else {
+          suggestions.push('Show their personality traits');
+          suggestions.push('What careers suit this person?');
+          suggestions.push('Compare this person with a target role');
+        }
         break;
       case 'test_results':
-        suggestions.push('Who are the top scorers?');
-        suggestions.push('Show average scores');
-        suggestions.push('Compare performance across groups');
+      case 'best_performer':
+        if (role === 'STUDENT') {
+          suggestions.push('How do my scores map to roles?');
+          suggestions.push('What skills should I improve first?');
+          suggestions.push('Show my personality strengths');
+        } else {
+          suggestions.push('Top performer for Software Developer');
+          suggestions.push('Top performer for Team Lead');
+          suggestions.push('Show role-wise top performers by skill');
+        }
+        break;
+      case 'best_performer_clarification':
+        if (role === 'CORPORATE') {
+          suggestions.push('Top performer for Software Developer in my company');
+          suggestions.push('Top performer for Team Lead in my company');
+          suggestions.push('Top performer for Sales Executive in my company');
+        } else if (role === 'ADMIN') {
+          suggestions.push('Top performer for Software Developer');
+          suggestions.push('Top performer for Team Lead');
+          suggestions.push('Top performer for Data Analyst');
+        } else {
+          suggestions.push('Show my strongest role fit');
+          suggestions.push('What role fits my scores best?');
+          suggestions.push('What should I improve for Team Lead role?');
+        }
         break;
       case 'career_guidance':
         suggestions.push('What skills should I develop?');
@@ -7244,9 +7812,19 @@ export class RagService {
         suggestions.push('Which corporate has the most candidates?');
         break;
       default:
-        suggestions.push('List all candidates');
-        suggestions.push('Show top performers');
-        suggestions.push('Ask me about career paths');
+        if (role === 'ADMIN') {
+          suggestions.push('List all candidates');
+          suggestions.push('Top performer for Software Developer');
+          suggestions.push('List corporate accounts');
+        } else if (role === 'CORPORATE') {
+          suggestions.push('Show my employees');
+          suggestions.push('Top performer for Team Lead in my company');
+          suggestions.push('How many resources completed assessments?');
+        } else {
+          suggestions.push('Show my assessment results');
+          suggestions.push('What careers suit me?');
+          suggestions.push('Give me a career roadmap');
+        }
         break;
     }
 
@@ -7287,10 +7865,33 @@ export class RagService {
   }
 
   async seedKnowledgeBase() {
-    return { indexed: 0 };
+    this.logger.log('🌱 Seeding knowledge base via sync pipeline...');
+    const result = await this.syncService.triggerSync();
+    return {
+      indexed: result?.total ?? 0,
+      status: result?.status || 'unknown',
+      details: result?.details || {},
+      duration: result?.duration,
+    };
   }
+
   async rebuildKnowledgeBase() {
-    return { indexed: 0 };
+    this.logger.log('♻️ Rebuilding knowledge base: clearing vectors + full sync');
+
+    try {
+      await this.executeDatabaseQuery('DELETE FROM rag_embeddings');
+      await this.executeDatabaseQuery('DELETE FROM rag_documents');
+    } catch (e) {
+      this.logger.warn(`RAG clear step warning: ${e?.message || e}`);
+    }
+
+    const result = await this.syncService.triggerSync();
+    return {
+      indexed: result?.total ?? 0,
+      status: result?.status || 'unknown',
+      details: result?.details || {},
+      duration: result?.duration,
+    };
   }
   async ingest(req: any) {
     const id = await this.embeddingsService.storeDocument(
@@ -7306,7 +7907,14 @@ export class RagService {
     return this.embeddingsService.bulkStoreDocuments(docs);
   }
   async indexExistingData() {
-    return { indexed: 0 };
+    this.logger.log('📚 Indexing existing DB data into vector store via sync pipeline...');
+    const result = await this.syncService.triggerSync();
+    return {
+      indexed: result?.total ?? 0,
+      status: result?.status || 'unknown',
+      details: result?.details || {},
+      duration: result?.duration,
+    };
   }
   async generatePdf(data: any, q: string) {
     return Buffer.from(`Query: ${q}\n\n${data.answer}`);

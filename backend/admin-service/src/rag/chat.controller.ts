@@ -41,11 +41,18 @@ export class RenameConversationDto {
 export class ChatController {
   private readonly logger = new Logger('ChatController');
 
+  private ensurePersistentChatUser(user: UserContext): void {
+    if (!user?.id || user.id <= 0) {
+      throw new HttpException('Authentication required for chat history', HttpStatus.UNAUTHORIZED);
+    }
+  }
+
   constructor(private readonly chatMemory: ChatMemoryService) {}
 
   /* ── List conversations ── */
   @Get('conversations')
   async listConversations(@CurrentUser() user: UserContext) {
+    this.ensurePersistentChatUser(user);
     this.logger.log(`📋 List conversations | user=${user.id} role=${user.role}`);
     const conversations = await this.chatMemory.listConversations(user.id);
     return { conversations };
@@ -57,6 +64,7 @@ export class ChatController {
     @CurrentUser() user: UserContext,
     @Body() dto: CreateConversationDto,
   ) {
+    this.ensurePersistentChatUser(user);
     this.logger.log(`➕ Create conversation | user=${user.id}`);
     const conversation = await this.chatMemory.createConversation(
       user.id,
@@ -72,6 +80,7 @@ export class ChatController {
     @CurrentUser() user: UserContext,
     @Param('id', ParseIntPipe) id: number,
   ) {
+    this.ensurePersistentChatUser(user);
     const messages = await this.chatMemory.getMessages(id, user.id);
     return { messages };
   }
@@ -83,6 +92,7 @@ export class ChatController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: RenameConversationDto,
   ) {
+    this.ensurePersistentChatUser(user);
     const ok = await this.chatMemory.renameConversation(id, user.id, dto.title);
     if (!ok) throw new HttpException('Not found', HttpStatus.NOT_FOUND);
     return { success: true };
@@ -94,6 +104,7 @@ export class ChatController {
     @CurrentUser() user: UserContext,
     @Param('id', ParseIntPipe) id: number,
   ) {
+    this.ensurePersistentChatUser(user);
     const ok = await this.chatMemory.deleteConversation(id, user.id);
     if (!ok) throw new HttpException('Not found', HttpStatus.NOT_FOUND);
     return { success: true };

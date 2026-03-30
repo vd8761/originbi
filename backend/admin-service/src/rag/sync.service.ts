@@ -116,33 +116,70 @@ export class SyncService implements OnModuleInit, OnModuleDestroy {
     let total = 0;
     const details: Record<string, number> = {};
 
-    // Define all tables to index with contextual formatting
+    // Define DB sources with contextual formatting for knowledge-oriented retrieval.
+    // Keep sourceId stable so bulkUpsert can update instead of duplicating.
     const tableSources = [
       // Career & Skills
       {
         name: 'career_roles',
-        query: `SELECT id, career_role_name, short_description, is_active FROM career_roles WHERE is_deleted = false`,
+        query: `
+          SELECT
+            cr.id,
+            cr.career_role_name,
+            cr.short_description,
+            cr.is_active,
+            COALESCE(string_agg(DISTINCT crt.tool_name, ', '), '') AS tools
+          FROM career_roles cr
+          LEFT JOIN career_role_tools crt
+            ON crt.career_role_id = cr.id AND crt.is_deleted = false
+          WHERE cr.is_deleted = false
+          GROUP BY cr.id, cr.career_role_name, cr.short_description, cr.is_active
+        `,
         format: (r: any) => `CAREER ROLE: ${r.career_role_name}
 Description: ${r.short_description || 'Professional role'}
 Status: ${r.is_active ? 'Active' : 'Inactive'}
-Type: Career opportunity in this field`,
+Key tools/skills: ${r.tools || 'Not specified'}
+Type: Career opportunity and competency profile`,
         category: 'career',
       },
       {
         name: 'career_role_tools',
-        query: `SELECT DISTINCT tool_name FROM career_role_tools WHERE is_deleted = false LIMIT 500`,
+        query: `
+          SELECT
+            MIN(id) AS id,
+            tool_name,
+            COUNT(DISTINCT career_role_id) AS usage_count
+          FROM career_role_tools
+          WHERE is_deleted = false
+          GROUP BY tool_name
+          LIMIT 2000
+        `,
         format: (r: any) => `PROFESSIONAL TOOL: ${r.tool_name}
-Type: Technology/Software tool used in IT and software development careers
+Type: Technology/Software tool used in career pathways
+Used in ${r.usage_count || 1} role(s)
 Category: Technical skill`,
         category: 'tool',
       },
       // Courses & Education
       {
         name: 'courses',
-        query: `SELECT id, course_name, notes, compatibility_percentage FROM trait_based_course_details WHERE is_deleted = false`,
+        query: `
+          SELECT
+            tcd.id,
+            tcd.course_name,
+            tcd.notes,
+            tcd.compatibility_percentage,
+            COALESCE(pt.blended_style_name, 'General') AS trait_name,
+            COALESCE(pt.blended_style_desc, '') AS trait_desc
+          FROM trait_based_course_details tcd
+          LEFT JOIN personality_traits pt ON pt.id = tcd.trait_id
+          WHERE tcd.is_deleted = false
+        `,
         format: (r: any) => `COURSE: ${r.course_name}
+Recommended for trait: ${r.trait_name}
+Trait insight: ${r.trait_desc || 'Not specified'}
 Notes: ${r.notes || 'Educational course'}
-Compatibility Score: ${r.compatibility_percentage}%
+Compatibility Score: ${r.compatibility_percentage ?? 'N/A'}
 Type: Educational program for career development`,
         category: 'course',
       },
@@ -164,44 +201,6 @@ Code: ${r.code}
 Description: ${r.blended_style_desc || 'Personality assessment category'}`,
         category: 'personality',
       },
-      // Users
-      {
-        name: 'users',
-        query: `SELECT id, email, role, is_active, is_blocked, login_count FROM users`,
-        format: (r: any) => `USER: ${r.email}
-Role: ${r.role || 'User'}
-Status: ${r.is_active ? 'Active' : 'Inactive'}${r.is_blocked ? ' (Blocked)' : ''}
-Logins: ${r.login_count || 0}`,
-        category: 'user',
-      },
-      // Registrations (Candidates)
-      {
-        name: 'registrations',
-        query: `SELECT id, full_name, gender, status, mobile_number FROM registrations WHERE is_deleted = false LIMIT 1000`,
-        format: (r: any) => `CANDIDATE: ${r.full_name}
-Gender: ${r.gender || 'Not specified'}
-Status: ${r.status || 'Registered'}
-Contact: ${r.mobile_number || 'N/A'}`,
-        category: 'candidate',
-      },
-      // Corporate Accounts
-      {
-        name: 'corporate_accounts',
-        query: `SELECT id, company_name, sector_code, total_credits, available_credits FROM corporate_accounts`,
-        format: (r: any) => `CORPORATE ACCOUNT: ${r.company_name}
-Sector: ${r.sector_code || 'General'}
-Credits: ${r.available_credits}/${r.total_credits}`,
-        category: 'corporate',
-      },
-      // Groups
-      {
-        name: 'groups',
-        query: `SELECT id, code, name FROM groups WHERE is_deleted = false`,
-        format: (r: any) => `GROUP: ${r.name}
-Code: ${r.code}
-Type: Candidate assessment group`,
-        category: 'group',
-      },
       // Departments
       {
         name: 'departments',
@@ -209,6 +208,26 @@ Type: Candidate assessment group`,
         format: (r: any) => `DEPARTMENT: ${r.name} (${r.short_name})
 Category: ${r.category || 'Academic'}`,
         category: 'department',
+      },
+      // Degree mappings for academic context
+      {
+        name: 'department_degrees',
+        query: `
+          SELECT
+            dd.id,
+            d.name AS department_name,
+            d.short_name,
+            dt.name AS degree_name,
+            dt.level AS degree_level
+          FROM department_degrees dd
+          JOIN departments d ON d.id = dd.department_id AND d.is_deleted = false
+          JOIN degree_types dt ON dt.id = dd.degree_type_id AND dt.is_deleted = false
+        `,
+        format: (r: any) => `ACADEMIC PATHWAY: ${r.department_name} (${r.short_name || '-'})
+Degree: ${r.degree_name}
+Level: ${r.degree_level || 'General'}
+Type: Department to degree mapping`,
+        category: 'education',
       },
       // Open Questions
       {

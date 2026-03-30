@@ -173,7 +173,7 @@ export const corporateDashboardService = {
         search = '',
         sortBy = '',
         sortOrder: 'ASC' | 'DESC' = 'DESC',
-        filters: { start_date?: string, end_date?: string, status?: string, userId?: number, type?: string } = {}
+        filters: { start_date?: string, end_date?: string, status?: string, userId?: number, type?: string, emailStatus?: 'sent' | 'not_sent' | 'third_party' } = {}
     ) {
         const token = AuthService.getToken();
         const query = new URLSearchParams({
@@ -188,6 +188,7 @@ export const corporateDashboardService = {
             ...(filters.status && { status: filters.status }),
             ...(filters.userId && { userId: String(filters.userId) }),
             ...(filters.type && { type: filters.type }),
+            ...(filters.emailStatus && { emailStatus: filters.emailStatus }),
         });
 
         const res = await fetch(`${API_URL}/dashboard/assessment-sessions?${query.toString()}`, {

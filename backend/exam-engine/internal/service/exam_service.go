@@ -781,7 +781,18 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 						// 3. Generate Report Number Prefix
 						// Format: OBI-G{group_id}-{Month/Year}-{Program code}-
 						dateStr := now.Format("01/06") // Month/Year (e.g., 06/25)
-						reportPrefix := fmt.Sprintf("OBI-%s%s-%s-", groupIDStr, dateStr, program.Code)
+						shortProgramCode := program.Code
+						switch program.Code {
+						case "COLLEGE_STUDENT":
+							shortProgramCode = "CS"
+						case "SCHOOL_STUDENT":
+							shortProgramCode = "SS"
+						case "EMPLOYEE":
+							shortProgramCode = "E"
+						case "CXO_GENERAL":
+							shortProgramCode = "CG"
+						}
+						reportPrefix := fmt.Sprintf("OBI-%s%s-%s-", groupIDStr, dateStr, shortProgramCode)
 
 						// 4. Calculate Sequence Number
 						var count int64
