@@ -687,12 +687,6 @@ export class StudentService {
   // PUBLIC REGISTER
   // ---------------------------------------------------------------------------
   async register(dto: CreateRegistrationDto) {
-    this.logger.log(`[Register Debug] Register called for: ${dto.email}`);
-    this.logger.log(`[Register Debug] Payload: ${JSON.stringify(dto)}`);
-    this.logger.log(
-      `[Register Debug] Public registration attempt for: ${dto.email}`,
-    );
-
     try {
       // 1. Check if User exists
       let user = await this.userRepo.findOne({
