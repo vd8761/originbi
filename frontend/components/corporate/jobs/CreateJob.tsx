@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ChevronDownIcon, XIcon, CheckCircle2, AlertCircle, InfoIcon, XCircle, Gem } from "lucide-react";
+import { AnnualCtcJobIcon, EmploymentTypeJobIcon, ExperienceLevelJobIcon, ShiftJobIcon, WorkModeJobIcon } from "../../icons";
 
 export interface CreateJobProps {
     onBack?: () => void;
@@ -464,8 +465,13 @@ export default function CreateJob({ onBack, mode = "create", initialData }: Crea
                                 <div className="w-full bg-[#E5E7EB] dark:bg-[#39403B] border border-transparent dark:border-white/8 rounded-2xl overflow-hidden grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-[1fr_1fr_0.9fr_1fr_1.25fr] gap-px">
                                     {/* Type */}
                                     <div className="bg-white dark:bg-[#343B36] p-4 flex flex-row items-center gap-4 min-w-0">
-                                    <div className="flex items-center justify-center text-[#13C065] shrink-0 mt-0.5 xl:mt-0">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+                                    <div className="flex items-center justify-center shrink-0">
+                                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1ED36A] text-white dark:hidden">
+                                            <EmploymentTypeJobIcon className="w-5 h-[18px]" />
+                                        </div>
+                                        <div className="hidden h-11 w-11 items-center justify-center rounded-full border border-[#D7E2DD] bg-[#EEF3F0] text-[#13C065] dark:flex dark:border-[#3E4A44] dark:bg-[#2F3833]">
+                                            <EmploymentTypeJobIcon className="w-5 h-[18px]" />
+                                        </div>
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">Employment Type</span>
@@ -474,8 +480,13 @@ export default function CreateJob({ onBack, mode = "create", initialData }: Crea
                                 </div>
                                     {/* Mode */}
                                     <div className="bg-white dark:bg-[#343B36] p-4 flex flex-row items-center gap-4 min-w-0">
-                                    <div className="flex items-center justify-center text-[#13C065] shrink-0 mt-0.5 xl:mt-0">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                                    <div className="flex items-center justify-center shrink-0">
+                                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1ED36A] text-white dark:hidden">
+                                            <WorkModeJobIcon className="w-10 h-10" withBackground={false} />
+                                        </div>
+                                        <div className="hidden items-center justify-center text-[#13C065] dark:flex">
+                                            <WorkModeJobIcon className="w-10 h-10" />
+                                        </div>
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">Work Mode</span>
@@ -484,11 +495,13 @@ export default function CreateJob({ onBack, mode = "create", initialData }: Crea
                                 </div>
                                     {/* Shift */}
                                     <div className="bg-white dark:bg-[#343B36] p-4 flex flex-row items-center gap-4 min-w-0">
-                                    <div className="flex items-center justify-center text-[#13C065] shrink-0 mt-0.5 xl:mt-0">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                            <circle cx="12" cy="12" r="4" />
-                                            <path d="M12 3v2M12 19v2M3.5 12h2M18.5 12h2M5.5 5.5l1.5 1.5M17 17l1.5 1.5M5.5 18.5l1.5-1.5M17 7l1.5-1.5" />
-                                        </svg>
+                                    <div className="flex items-center justify-center shrink-0">
+                                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1ED36A] text-white dark:hidden">
+                                            <ShiftJobIcon className="w-6 h-6" withBackground={false} />
+                                        </div>
+                                        <div className="hidden h-11 w-11 items-center justify-center rounded-full border border-[#495850] bg-[#303B36] text-[#13C065] dark:flex">
+                                            <ShiftJobIcon className="w-6 h-6" withBackground={false} />
+                                        </div>
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">Shift</span>
@@ -497,8 +510,13 @@ export default function CreateJob({ onBack, mode = "create", initialData }: Crea
                                 </div>
                                     {/* Experience */}
                                     <div className="bg-white dark:bg-[#343B36] p-4 flex flex-row items-center gap-4 min-w-0">
-                                    <div className="flex items-center justify-center text-[#13C065] shrink-0 mt-0.5 xl:mt-0">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                                    <div className="flex items-center justify-center shrink-0">
+                                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1ED36A] text-white dark:hidden">
+                                            <ExperienceLevelJobIcon className="w-10 h-10" withBackground={false} />
+                                        </div>
+                                        <div className="hidden items-center justify-center text-[#13C065] dark:flex">
+                                            <ExperienceLevelJobIcon className="w-10 h-10" />
+                                        </div>
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">Experience Level</span>
@@ -507,8 +525,15 @@ export default function CreateJob({ onBack, mode = "create", initialData }: Crea
                                 </div>
                                     {/* CTC */}
                                     <div className="bg-white dark:bg-[#343B36] p-4 flex flex-row items-center gap-4 md:col-span-2 lg:col-span-1 min-w-0">
-                                        <div className="flex items-center justify-center text-[#13C065] shrink-0 font-bold text-[20px] leading-none">
-                                            ₹
+                                        <div className="flex items-center justify-center shrink-0">
+                                            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1ED36A] text-white text-[0px] leading-none dark:hidden">
+                                                <AnnualCtcJobIcon className="w-[15px] h-5" />
+                                                ₹
+                                            </div>
+                                            <div className="hidden h-11 w-11 items-center justify-center rounded-full border border-[#D7E2DD] bg-[#EEF3F0] text-[#13C065] text-[0px] leading-none dark:flex dark:border-[#3E4A44] dark:bg-[#2F3833]">
+                                                <AnnualCtcJobIcon className="w-[15px] h-5" />
+                                                ₹
+                                            </div>
                                         </div>
                                         <div className="flex flex-col min-w-0 flex-1">
                                             <span className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">Annual CTC</span>
@@ -723,7 +748,7 @@ interface AdvancedToastProps {
     primaryAction?: string;
 }
 
-function AdvancedToast({ type, title, message, primaryAction }: AdvancedToastProps) {
+function _AdvancedToast({ type, title, message, primaryAction }: AdvancedToastProps) {
     const config = {
         success: {
             bgIcon: "bg-[#13C065]",

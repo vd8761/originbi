@@ -617,7 +617,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                         {/* Skills */}
                         <div className="flex flex-wrap justify-center gap-2 max-w-[371px]">
                             {candidate.skills.map((skill, i) => (
-                                <span key={i} className="h-[26px] px-[12px] rounded-xl border border-white/[0.08] bg-white text-[14px] leading-[18px] font-normal text-[#19211C] flex items-center">
+                                <span key={i} className="px-3.5 py-[5px] rounded-full border border-[#DDE1DE] dark:border-transparent bg-[#F3F5F3] dark:bg-[#F0F2F0] text-[13px] font-normal text-[#2E3431] dark:text-[#2E3431]">
                                     {skill}
                                 </span>
                             ))}

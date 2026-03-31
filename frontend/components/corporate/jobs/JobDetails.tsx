@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
-import { ChevronDownIcon, SearchIcon, ClockIcon, MapPinIcon, StarIcon, CheckCircle2, XCircle } from "lucide-react";
+import { ChevronDownIcon, SearchIcon, ClockIcon, MapPinIcon } from "lucide-react";
 import CandidateDetail from "../candidates/CandidateDetail";
+import { AnnualCtcJobIcon, EmploymentTypeJobIcon, ExperienceLevelJobIcon, ShiftJobIcon, WorkModeJobIcon } from "../../icons";
 
 export interface JobDetailsProps {
     jobId: string;
@@ -146,7 +147,7 @@ const mockCandidates: Candidate[] = [
 
 type TabKey = "job_details" | "all" | "new" | "shortlisted" | "hired" | "rejected";
 
-export default function JobDetails({ jobId, onBack }: JobDetailsProps) {
+export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
     const [activeTab, setActiveTab] = useState<TabKey>("job_details");
     const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
     const [candidateSearchTerm, setCandidateSearchTerm] = useState("");
@@ -554,11 +555,13 @@ export default function JobDetails({ jobId, onBack }: JobDetailsProps) {
                     <div className="flex items-center justify-start py-2 gap-7 overflow-x-auto scrollbar-hide whitespace-nowrap">
 
                         <div className="flex items-center gap-3.5 pr-1">
-                            <div className="w-11 h-11 rounded-full border border-[#D7E2DD] dark:border-[#3E4A44] bg-[#EEF3F0] dark:bg-[#2F3833] flex items-center justify-center text-[#13C065] shrink-0">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-                                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-                                </svg>
+                            <div className="flex items-center justify-center shrink-0">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1ED36A] text-white dark:hidden">
+                                    <EmploymentTypeJobIcon className="w-5 h-[18px]" />
+                                </div>
+                                <div className="hidden h-11 w-11 items-center justify-center rounded-full border border-[#D7E2DD] bg-[#EEF3F0] text-[#13C065] dark:flex dark:border-[#3E4A44] dark:bg-[#2F3833]">
+                                    <EmploymentTypeJobIcon className="w-5 h-[18px]" />
+                                </div>
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-[12px] text-gray-500 dark:text-gray-400 mb-0.5">Employment Type</span>
@@ -569,11 +572,13 @@ export default function JobDetails({ jobId, onBack }: JobDetailsProps) {
                         <div className="w-[1px] h-8 bg-white/10 shrink-0" />
 
                         <div className="flex items-center gap-3.5 pr-1">
-                            <div className="w-11 h-11 rounded-full border border-[#D7E2DD] dark:border-[#3E4A44] bg-[#EEF3F0] dark:bg-[#2F3833] flex items-center justify-center text-[#13C065] shrink-0">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                                    <circle cx="12" cy="10" r="3"></circle>
-                                </svg>
+                            <div className="flex items-center justify-center shrink-0">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1ED36A] text-white dark:hidden">
+                                    <WorkModeJobIcon className="w-10 h-10" withBackground={false} />
+                                </div>
+                                <div className="hidden items-center justify-center text-[#13C065] dark:flex">
+                                    <WorkModeJobIcon className="w-10 h-10" />
+                                </div>
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-[12px] text-gray-500 dark:text-gray-400 mb-0.5">Work Mode</span>
@@ -584,13 +589,13 @@ export default function JobDetails({ jobId, onBack }: JobDetailsProps) {
                         <div className="w-[1px] h-8 bg-white/10 shrink-0" />
 
                         <div className="flex items-center gap-3.5 pr-1">
-                            <div className="w-11 h-11 rounded-full border border-[#D7E2DD] dark:border-[#3E4A44] bg-[#EEF3F0] dark:bg-[#2F3833] flex items-center justify-center text-[#13C065] shrink-0">
-                                {/* Sun/Moon Shift Icon */}
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <circle cx="12" cy="12" r="4" />
-                                    <path d="M12 3v2M12 19v2M3.5 12h2M18.5 12h2M5.5 5.5l1.5 1.5M17 17l1.5 1.5M5.5 18.5l1.5-1.5M17 7l1.5-1.5" />
-                                    <path d="M15 9a5 5 0 0 1 0 6 7 7 0 0 0 0-6Z" fill="currentColor" stroke="none" />
-                                </svg>
+                            <div className="flex items-center justify-center shrink-0">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1ED36A] text-white dark:hidden">
+                                    <ShiftJobIcon className="w-6 h-6" withBackground={false} />
+                                </div>
+                                <div className="hidden h-11 w-11 items-center justify-center rounded-full border border-[#495850] bg-[#303B36] text-[#13C065] dark:flex">
+                                    <ShiftJobIcon className="w-6 h-6" withBackground={false} />
+                                </div>
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-[12px] text-gray-500 dark:text-gray-400 mb-0.5">Shift</span>
@@ -601,10 +606,13 @@ export default function JobDetails({ jobId, onBack }: JobDetailsProps) {
                         <div className="w-[1px] h-8 bg-white/10 shrink-0" />
 
                         <div className="flex items-center gap-3.5 pr-1">
-                            <div className="w-11 h-11 rounded-full border border-[#D7E2DD] dark:border-[#3E4A44] bg-[#EEF3F0] dark:bg-[#2F3833] flex items-center justify-center text-[#13C065] shrink-0">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                                </svg>
+                            <div className="flex items-center justify-center shrink-0">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1ED36A] text-white dark:hidden">
+                                    <ExperienceLevelJobIcon className="w-10 h-10" withBackground={false} />
+                                </div>
+                                <div className="hidden items-center justify-center text-[#13C065] dark:flex">
+                                    <ExperienceLevelJobIcon className="w-10 h-10" />
+                                </div>
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-[12px] text-gray-500 dark:text-gray-400 mb-0.5">Experience Level</span>
@@ -615,8 +623,15 @@ export default function JobDetails({ jobId, onBack }: JobDetailsProps) {
                         <div className="w-[1px] h-8 bg-white/10 shrink-0" />
 
                         <div className="flex items-center gap-3.5 pr-1">
-                            <div className="w-11 h-11 rounded-full border border-[#D7E2DD] dark:border-[#3E4A44] bg-[#EEF3F0] dark:bg-[#2F3833] flex items-center justify-center text-[#13C065] shrink-0 font-bold text-[19px]">
-                                ₹
+                            <div className="flex items-center justify-center shrink-0">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1ED36A] text-white text-[0px] dark:hidden">
+                                    <AnnualCtcJobIcon className="w-[15px] h-5" />
+                                    ₹
+                                </div>
+                                <div className="hidden h-11 w-11 items-center justify-center rounded-full border border-[#D7E2DD] bg-[#EEF3F0] text-[#13C065] text-[0px] dark:flex dark:border-[#3E4A44] dark:bg-[#2F3833]">
+                                    <AnnualCtcJobIcon className="w-[15px] h-5" />
+                                    ₹
+                                </div>
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-[12px] text-gray-500 dark:text-gray-400 mb-0.5">Annual CTC</span>
@@ -866,18 +881,18 @@ export default function JobDetails({ jobId, onBack }: JobDetailsProps) {
                                     </div>
 
                                     {/* Action Buttons */}
-                                    <div className="flex items-center gap-3">
-                                        <button className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-[14px] leading-[100%] font-normal transition-colors cursor-pointer ${activeTab === 'hired' ? 'bg-[#1ED36A] text-white border border-[#1ED36A]' : 'bg-[#E2E6E3] hover:bg-[#D8DEDA] text-[#1F2723] border border-[#D2D8D4] dark:bg-[#454D49] dark:hover:bg-[#4C5751] dark:text-white dark:border-white/10'}`}>
+                                    <div className="flex items-center gap-4 shrink-0">
+                                        <button className={`w-[96.6056px] h-[55px] flex items-center justify-center gap-2 rounded-[27.5px] text-[14px] leading-none font-normal transition-colors cursor-pointer ${activeTab === 'hired' ? 'bg-[#1ED36A] text-white border border-[#1ED36A]' : 'bg-[#E2E6E3] hover:bg-[#D8DEDA] text-[#1F2723] border border-[#D2D8D4] dark:bg-[#454D49] dark:hover:bg-[#4C5751] dark:text-white dark:border-white/10'}`}>
                                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={activeTab === 'hired' ? '#FFFFFF' : '#1ED36A'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
                                             Hire
                                         </button>
-                                        <button className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-[14px] leading-[100%] font-normal transition-colors cursor-pointer ${activeTab === 'shortlisted' ? 'bg-[#FFB020] text-white border border-[#FFB020]' : 'bg-[#E2E6E3] hover:bg-[#D8DEDA] text-[#1F2723] border border-[#D2D8D4] dark:bg-[#454D49] dark:hover:bg-[#4C5751] dark:text-white dark:border-white/10'}`}>
+                                        <button className={`w-[127.791px] h-[55px] flex items-center justify-center gap-2 rounded-[27.5px] text-[14px] leading-none font-normal transition-colors cursor-pointer ${activeTab === 'shortlisted' ? 'bg-[#FFB020] text-white border border-[#FFB020]' : 'bg-[#E2E6E3] hover:bg-[#D8DEDA] text-[#1F2723] border border-[#D2D8D4] dark:bg-[#454D49] dark:hover:bg-[#4C5751] dark:text-white dark:border-white/10'}`}>
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" className={`${activeTab === 'shortlisted' ? 'text-white' : 'text-[#FFB020]'}`}>
                                                 <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                                             </svg>
                                             Shortlist
                                         </button>
-                                        <button className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-[14px] leading-[100%] font-normal transition-colors cursor-pointer ${activeTab === 'rejected' ? 'bg-[#FF4A4A] text-white border border-[#FF4A4A]' : 'bg-[#E2E6E3] hover:bg-[#D8DEDA] text-[#1F2723] border border-[#D2D8D4] dark:bg-[#454D49] dark:hover:bg-[#4C5751] dark:text-white dark:border-white/10'}`}>
+                                        <button className={`w-[109.001px] h-[55px] flex items-center justify-center gap-2 rounded-[27.5px] text-[14px] leading-none font-normal transition-colors cursor-pointer ${activeTab === 'rejected' ? 'bg-[#FF4A4A] text-white border border-[#FF4A4A]' : 'bg-[#E2E6E3] hover:bg-[#D8DEDA] text-[#1F2723] border border-[#D2D8D4] dark:bg-[#454D49] dark:hover:bg-[#4C5751] dark:text-white dark:border-white/10'}`}>
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={activeTab === 'rejected' ? '#FFFFFF' : '#FF4A4A'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
                                             Reject
                                         </button>
