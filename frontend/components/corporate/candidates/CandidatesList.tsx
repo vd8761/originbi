@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { ChevronDownIcon, SearchIcon } from "lucide-react";
 import CandidateDetail from "./CandidateDetail";
 
 // ─── Types ──────────────────────────────────────────────────────
 
 type TabKey = "origin_report" | "resume" | "certificate1" | "certificate2" | "applied_jobs";
+type SortColumn = "name" | "latestApplied";
+type SortDirection = "asc" | "desc";
 
 interface CandidateRow {
     id: string;
@@ -49,6 +51,31 @@ const mockCandidateRows: CandidateRow[] = Array.from({ length: 10 }, (_, i) => {
     };
 });
 
+function parseDisplayDate(value: string): number {
+    const parts = value.trim().split(" ");
+    if (parts.length !== 3) return 0;
+
+    const day = Number(parts[0]);
+    const monthName = parts[1].toLowerCase();
+    const year = Number(parts[2]);
+    const monthMap: Record<string, number> = {
+        jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+        jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+    };
+
+    const month = monthMap[monthName.slice(0, 3)] ?? 0;
+    if (!day || !month || !year) return 0;
+
+    return year * 10000 + month * 100 + day;
+}
+
+function normalizeJobText(value: string): string {
+    return value
+        .toLowerCase()
+        .replace(/ui\/ux|ux\/ui/g, "uiux")
+        .replace(/[^a-z0-9]/g, "");
+}
+
 // ─── Filter Dropdown ─────────────────────────────────────────────
 
 function FilterDropdown({
@@ -57,12 +84,18 @@ function FilterDropdown({
     options,
     value,
     onChange,
+    selectedTone = "neutral",
+    forceGreenIcon = false,
+    selectedDisplay,
 }: {
     label: string;
     icon?: React.ReactNode;
     options: string[];
     value: string | null;
     onChange: (v: string | null) => void;
+    selectedTone?: "green" | "neutral";
+    forceGreenIcon?: boolean;
+    selectedDisplay?: (value: string | null, label: string) => string;
 }) {
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
@@ -76,27 +109,35 @@ function FilterDropdown({
     }, []);
 
     const isActive = value !== null;
-    const displayLabel = isActive
-        ? (label.includes(":") ? `${label.split(":")[0]}: ${value}` : value!)
-        : label;
+    const displayLabel = selectedDisplay
+        ? selectedDisplay(value, label)
+        : isActive
+            ? (label.includes(":") ? `${label.split(":")[0]}: ${value}` : value!)
+            : label;
 
     const iconNode = React.isValidElement(icon)
         ? React.cloneElement(icon as React.ReactElement<{ className?: string }>, {
             className: `${(icon as React.ReactElement<{ className?: string }>).props.className ?? ""} ${
-                isActive ? "text-[#1ED36A]" : "text-[#7B8A84] dark:text-white/65"
+                forceGreenIcon
+                    ? "text-[#1ED36A]"
+                    : isActive && selectedTone === "green"
+                    ? "text-[#19211C] dark:text-white"
+                    : isActive
+                        ? "text-[#1ED36A]"
+                        : "text-[#7B8A84] dark:text-white/65"
             }`,
         })
         : icon;
+
+    const buttonToneClass = isActive && selectedTone === "green"
+        ? "border border-[#9ADAB4] bg-[#CBEED8] text-[#19211C] hover:bg-[#BCE7CC] dark:border-transparent dark:bg-[#1ED36A33] dark:text-white dark:hover:bg-[#1ED36A45]"
+        : "border border-[#D2D9D6] bg-[#F2F4F3] text-[#19211C] hover:bg-[#E8ECEA] dark:border-transparent dark:bg-white/[0.12] dark:text-white/90 dark:hover:bg-white/[0.16]";
 
     return (
         <div className="relative shrink-0" ref={ref}>
             <button
                 onClick={() => setOpen(!open)}
-                className={`flex items-center gap-2 h-[44px] px-4 rounded-xl text-[13px] font-medium transition-colors cursor-pointer whitespace-nowrap border ${
-                    isActive
-                        ? "border-brand-green/50 bg-[#E7F8EE] text-[#1F3B2A] hover:bg-[#DDF4E7] dark:bg-brand-green/20 dark:text-white dark:hover:bg-brand-green/25"
-                        : "border-gray-300 bg-transparent text-[#33413B] hover:bg-black/[0.04] dark:border-white/[0.24] dark:text-white/90 dark:hover:bg-white/5"
-                }`}
+                className={`flex items-center gap-2 h-[44px] px-4 rounded-xl text-[13px] leading-[18px] font-medium transition-colors cursor-pointer whitespace-nowrap border ${buttonToneClass}`}
             >
                 {iconNode}
                 <span>{displayLabel}</span>
@@ -153,6 +194,8 @@ function EyeIcon({ width = 24, height = 24 }: { width?: number; height?: number 
 // ─── Main Component ─────────────────────────────────────────────
 
 export default function CandidatesList() {
+    const jobOptionTitles = ["UI/UX", "UI/UX Designer", "Front-End Developer", "Product Manager", "Data Analyst"];
+
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
     const [selectedTab, setSelectedTab] = useState<TabKey>("origin_report");
@@ -160,13 +203,304 @@ export default function CandidatesList() {
     const [entriesPerPage, setEntriesPerPage] = useState(10);
     const [showingMenuOpen, setShowingMenuOpen] = useState(false);
     const showingRef = useRef<HTMLDivElement>(null);
-    const [traitFilter, setTraitFilter] = useState<string | null>(null);
-    const [statusFilter, setStatusFilter] = useState<string | null>(null);
-    const [jobFilter, setJobFilter] = useState<string | null>(null);
-    const [dateFilter, setDateFilter] = useState<string | null>(null);
-    const totalEntries = 1676;
+    const [traitFilter, setTraitFilter] = useState<string | null>("Supportive Energizer");
+    const [statusFilter, setStatusFilter] = useState<string | null>("Shortlisted");
+    const [jobFilter, setJobFilter] = useState<string | null>("UI/UX");
+    const [dateFilter, setDateFilter] = useState<string | null>("Applied Date");
+    const [showDateModal, setShowDateModal] = useState(false);
+    const [calendarPreset, setCalendarPreset] = useState("Any Time");
+    const [rangeStart, setRangeStart] = useState<Date | null>(new Date(2025, 9, 9));
+    const [rangeEnd, setRangeEnd] = useState<Date | null>(new Date(2025, 10, 17));
+    const [leftCalendarMonth, setLeftCalendarMonth] = useState<Date>(new Date(2025, 9, 1));
+    const [sortColumn, setSortColumn] = useState<SortColumn>("latestApplied");
+    const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
+    const filteredCandidateRows = useMemo(() => {
+        return mockCandidateRows.filter((candidate) => {
+            const query = searchTerm.trim().toLowerCase();
+            const matchesSearch = !query
+                || candidate.name.toLowerCase().includes(query)
+                || candidate.originId.toLowerCase().includes(query)
+                || candidate.appliedJobs.some((job) => job.title.toLowerCase().includes(query));
+
+            const matchesTrait = !traitFilter || candidate.trait === traitFilter;
+
+            const matchesStatus = !statusFilter
+                || statusFilter === "Hired" && candidate.candidateStatus.hired > 0
+                || statusFilter === "Shortlisted" && candidate.candidateStatus.shortlist > 0
+                || statusFilter === "Rejected" && candidate.candidateStatus.rejected > 0;
+
+            const matchesJob = !jobFilter
+                || jobFilter === "UI/UX"
+                || candidate.appliedJobs.some((job) => {
+                    const normalizedSelected = normalizeJobText(jobFilter);
+                    const normalizedJob = normalizeJobText(job.title);
+                    return normalizedJob.includes(normalizedSelected) || normalizedSelected.includes(normalizedJob);
+                });
+
+            const matchesDate = !dateFilter
+                || dateFilter === "Applied Date"
+                || dateFilter === "Any Time"
+                || dateFilter.includes(" to ")
+                || candidate.latestApplied === dateFilter;
+
+            return matchesSearch && matchesTrait && matchesStatus && matchesJob && matchesDate;
+        });
+    }, [searchTerm, traitFilter, statusFilter, jobFilter, dateFilter]);
+
+    const totalEntries = filteredCandidateRows.length;
     const totalPages = Math.ceil(totalEntries / entriesPerPage);
     const hasMoreThanSelectedEntries = totalEntries > entriesPerPage;
+
+    const sortedCandidateRows = useMemo(() => {
+        const rows = [...filteredCandidateRows];
+
+        rows.sort((a, b) => {
+            if (sortColumn === "name") {
+                return a.name.localeCompare(b.name);
+            }
+
+            return parseDisplayDate(a.latestApplied) - parseDisplayDate(b.latestApplied);
+        });
+
+        return sortDirection === "asc" ? rows : rows.reverse();
+    }, [filteredCandidateRows, sortColumn, sortDirection]);
+
+    const paginatedCandidateRows = useMemo(() => {
+        const start = (currentPage - 1) * entriesPerPage;
+        const end = start + entriesPerPage;
+        return sortedCandidateRows.slice(start, end);
+    }, [sortedCandidateRows, currentPage, entriesPerPage]);
+
+    useEffect(() => {
+        const safeTotalPages = Math.max(1, totalPages);
+        if (currentPage > safeTotalPages) {
+            setCurrentPage(safeTotalPages);
+        }
+    }, [currentPage, totalPages]);
+
+    const visiblePages = useMemo(() => {
+        const safeTotalPages = Math.max(1, totalPages);
+        if (safeTotalPages <= 7) {
+            return Array.from({ length: safeTotalPages }, (_, i) => i + 1);
+        }
+
+        if (currentPage <= 4) {
+            return [1, 2, 3, 4, 5, -1, safeTotalPages];
+        }
+
+        if (currentPage >= safeTotalPages - 3) {
+            return [1, -1, safeTotalPages - 4, safeTotalPages - 3, safeTotalPages - 2, safeTotalPages - 1, safeTotalPages];
+        }
+
+        return [1, -1, currentPage - 1, currentPage, currentPage + 1, -1, safeTotalPages];
+    }, [currentPage, totalPages]);
+
+    const calendarPresets = ["Any Time", "Today", "Yesterday", "Last 7 Days", "Last 30 Days", "This Month", "Last Month", "Custom Range"];
+    const weekDays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+
+    const normalizeDate = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    const addMonths = (date: Date, months: number) => new Date(date.getFullYear(), date.getMonth() + months, 1);
+    const getMonthLabel = (date: Date) => date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    const formatShortNumericDate = (date: Date) => {
+        const day = `${date.getDate()}`.padStart(2, "0");
+        const month = `${date.getMonth() + 1}`.padStart(2, "0");
+        const year = `${date.getFullYear()}`.slice(-2);
+        return `${day}/${month}/${year}`;
+    };
+    const formatFilterRangeLabel = (start: Date, end: Date) => {
+        const startDay = `${start.getDate()}`.padStart(2, "0");
+        const endDay = `${end.getDate()}`.padStart(2, "0");
+        const startMonth = start.toLocaleDateString("en-US", { month: "short" });
+        const endMonth = end.toLocaleDateString("en-US", { month: "short" });
+        const endYear = end.getFullYear();
+        return `${startDay} ${startMonth} to ${endDay} ${endMonth} ${endYear}`;
+    };
+
+    const buildMonthGrid = (year: number, month: number) => {
+        const firstDay = new Date(year, month, 1);
+        const startDayIndex = (firstDay.getDay() + 6) % 7;
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const daysInPrevMonth = new Date(year, month, 0).getDate();
+        const cells: { date: Date; inCurrentMonth: boolean }[] = [];
+
+        for (let i = 0; i < startDayIndex; i += 1) {
+            cells.push({ date: new Date(year, month - 1, daysInPrevMonth - startDayIndex + i + 1), inCurrentMonth: false });
+        }
+
+        for (let day = 1; day <= daysInMonth; day += 1) {
+            cells.push({ date: new Date(year, month, day), inCurrentMonth: true });
+        }
+
+        while (cells.length < 42) {
+            const nextDay = cells.length - (startDayIndex + daysInMonth) + 1;
+            cells.push({ date: new Date(year, month + 1, nextDay), inCurrentMonth: false });
+        }
+
+        return cells;
+    };
+
+    const startTime = rangeStart ? normalizeDate(rangeStart) : null;
+    const endTime = rangeEnd ? normalizeDate(rangeEnd) : null;
+    const selectedRangeText = rangeStart && rangeEnd
+        ? `${formatShortNumericDate(rangeStart)} - ${formatShortNumericDate(rangeEnd)}`
+        : "No range selected";
+
+    const handleDateCellClick = (date: Date) => {
+        setCalendarPreset("Custom Range");
+
+        if (!rangeStart || (rangeStart && rangeEnd)) {
+            setRangeStart(date);
+            setRangeEnd(null);
+            return;
+        }
+
+        if (normalizeDate(date) < normalizeDate(rangeStart)) {
+            setRangeEnd(rangeStart);
+            setRangeStart(date);
+            return;
+        }
+
+        setRangeEnd(date);
+    };
+
+    const isInRange = (date: Date) => {
+        if (!startTime) return false;
+        const time = normalizeDate(date);
+        if (!endTime) return time === startTime;
+        return time >= startTime && time <= endTime;
+    };
+
+    const isRangeStart = (date: Date) => startTime !== null && normalizeDate(date) === startTime;
+    const isRangeEnd = (date: Date) => endTime !== null && normalizeDate(date) === endTime;
+
+    const applyPresetRange = (preset: string) => {
+        const today = new Date();
+        const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+        if (preset === "Any Time") {
+            setDateFilter("Any Time");
+            setShowDateModal(false);
+            return;
+        }
+        if (preset === "Today") {
+            setDateFilter("Today");
+            setShowDateModal(false);
+            return;
+        }
+        if (preset === "Yesterday") {
+            setDateFilter("Yesterday");
+            setShowDateModal(false);
+            return;
+        }
+        if (preset === "Last 7 Days") {
+            setDateFilter("Past Week");
+            setShowDateModal(false);
+            return;
+        }
+        if (preset === "Last 30 Days") {
+            setDateFilter("Past Month");
+            setShowDateModal(false);
+            return;
+        }
+        if (preset === "This Month") {
+            const start = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1);
+            const end = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0);
+            setRangeStart(start);
+            setRangeEnd(end);
+            setLeftCalendarMonth(new Date(start.getFullYear(), start.getMonth(), 1));
+            setCalendarPreset("Custom Range");
+            return;
+        }
+        if (preset === "Last Month") {
+            const start = new Date(todayDate.getFullYear(), todayDate.getMonth() - 1, 1);
+            const end = new Date(todayDate.getFullYear(), todayDate.getMonth(), 0);
+            setRangeStart(start);
+            setRangeEnd(end);
+            setLeftCalendarMonth(new Date(start.getFullYear(), start.getMonth(), 1));
+            setCalendarPreset("Custom Range");
+            return;
+        }
+
+        setCalendarPreset("Custom Range");
+    };
+
+    const renderCalendarMonth = (year: number, month: number, title: string) => {
+        const cells = buildMonthGrid(year, month);
+
+        return (
+            <div className="w-[344px] h-[300px] rounded-[12px] bg-white/[0.08] border border-white/[0.12] px-5 py-3.5">
+                <div className="flex items-center justify-between mb-3 text-white/90 pb-3.5 border-b border-white/[0.12]">
+                    <button type="button" onClick={() => setLeftCalendarMonth((prev) => addMonths(prev, -1))} className="p-1 text-white/60 hover:text-white transition-colors">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M7.5 2L3.5 6L7.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    </button>
+                    <p className="text-[14px] leading-[18px] font-semibold text-[#E7EFEB]">{title}</p>
+                    <button type="button" onClick={() => setLeftCalendarMonth((prev) => addMonths(prev, 1))} className="p-1 text-white/60 hover:text-white transition-colors">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 2L8.5 6L4.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    </button>
+                </div>
+                <div className="grid grid-cols-7 gap-y-2 mb-2">
+                    {weekDays.map((day) => (
+                        <span key={`${title}-${day}`} className="text-center text-[13px] leading-[17px] font-normal text-white/80">{day}</span>
+                    ))}
+                </div>
+                <div className="grid grid-cols-7 gap-y-1.5">
+                    {cells.map((cell) => {
+                        const day = cell.date.getDate();
+                        const inRange = isInRange(cell.date);
+                        const start = isRangeStart(cell.date);
+                        const end = isRangeEnd(cell.date);
+                        const isMuted = !cell.inCurrentMonth;
+                        const rangePillClass = inRange
+                            ? `${start ? "rounded-l-[24px]" : ""} ${end ? "rounded-r-[100px]" : ""} ${!start && !end ? "rounded-none" : ""}`
+                            : "";
+
+                        return (
+                            <div key={`${title}-${cell.date.toISOString()}`} className={`h-[28px] flex items-center justify-center text-[13px] leading-[17px] ${inRange ? "bg-[#1ED36A]/[0.16]" : ""} ${rangePillClass}`}>
+                                <button
+                                    type="button"
+                                    onClick={() => handleDateCellClick(new Date(cell.date.getFullYear(), cell.date.getMonth(), cell.date.getDate()))}
+                                    className={`h-9 w-9 flex items-center justify-center font-normal ${start || end ? "rounded-full bg-[#1ED36A] text-white shadow-[0px_4px_6.7px_rgba(0,0,0,0.4),0px_2px_17.9px_rgba(30,211,106,0.4)]" : ""} ${!start && !end && inRange ? "text-white" : ""} ${!inRange && !isMuted ? "text-white" : ""} ${isMuted ? "text-white/40" : ""}`}
+                                >
+                                    {day}
+                                </button>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
+    const toggleSort = (column: SortColumn) => {
+        if (sortColumn === column) {
+            setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+            return;
+        }
+
+        setSortColumn(column);
+        setSortDirection("asc");
+    };
+
+    const renderSortHeader = (label: string, column: SortColumn) => {
+        const isActive = sortColumn === column;
+        const upColor = isActive && sortDirection === "asc" ? "#1ED36A" : "rgba(255,255,255,0.35)";
+        const downColor = isActive && sortDirection === "desc" ? "#1ED36A" : "rgba(255,255,255,0.35)";
+
+        return (
+            <button
+                type="button"
+                onClick={() => toggleSort(column)}
+                className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#5C6963] dark:text-white/80 hover:text-[#19211C] dark:hover:text-white transition-colors cursor-pointer"
+            >
+                <span>{label}</span>
+                <svg width="8" height="12" viewBox="0 0 8 12" fill="none" className="shrink-0">
+                    <path d="M4 0L8 4H0L4 0Z" fill={upColor} />
+                    <path d="M4 12L0 8H8L4 12Z" fill={downColor} />
+                </svg>
+            </button>
+        );
+    };
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
@@ -203,9 +537,11 @@ export default function CandidatesList() {
     }
 
     const traitOptions = Array.from(new Set(mockCandidateRows.map((row) => row.trait)));
+    const appliedDateLabel = dateFilter && dateFilter !== "Applied Date" ? dateFilter : "Applied Date";
+    const isDateFilterActive = Boolean(dateFilter && dateFilter !== "Applied Date");
 
     return (
-        <div className="flex flex-col w-full min-h-0 gap-5 font-sans p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-[#18241F]">
+        <div className="flex flex-col w-full min-h-screen gap-5 font-sans p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-[#19211C]">
 
             {/* Breadcrumb */}
             <div className="flex items-center text-xs text-gray-500 dark:text-white/70 mb-1.5 font-normal">
@@ -220,7 +556,7 @@ export default function CandidatesList() {
 
             {/* Header */}
             <div className="flex items-center justify-between">
-                <h1 className="text-2xl sm:text-[32px] font-semibold text-[#19211C] dark:text-white">
+                <h1 className="text-[44px] leading-[56px] font-semibold text-[#19211C] dark:text-white">
                     Candidates
                 </h1>
                 <div className="flex items-center gap-2.5 text-[13px] text-gray-500 dark:text-white/60">
@@ -228,7 +564,7 @@ export default function CandidatesList() {
                     <div className="relative" ref={showingRef}>
                         <button
                             onClick={() => setShowingMenuOpen((prev) => !prev)}
-                            className="flex items-center gap-1.5 bg-gray-100 dark:bg-white/10 border border-gray-200 dark:border-white/10 px-2.5 py-1 rounded-[7px] text-[13px] text-brand-green font-medium min-w-[42px] justify-between transition-all cursor-pointer hover:border-brand-green/55"
+                            className="flex items-center gap-1.5 bg-gray-100 dark:bg-white/10 border border-transparent px-2.5 py-1 rounded-[7px] text-[13px] text-brand-green font-medium min-w-[42px] justify-between transition-all cursor-pointer"
                         >
                             {entriesPerPage}
                             <ChevronDownIcon className={`w-3 h-3 text-gray-400 dark:text-white/50 transition-transform ${showingMenuOpen ? "rotate-180" : ""}`} />
@@ -257,19 +593,19 @@ export default function CandidatesList() {
                     </div>
                     <span className="whitespace-nowrap font-light">of {totalEntries.toLocaleString()} entries</span>
                     <div className="flex items-center gap-1.5 ml-1">
-                        <button className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center transition-all cursor-pointer text-gray-500 dark:text-white/50 hover:text-brand-green hover:dark:text-brand-green hover:bg-gray-200 dark:hover:bg-white/15">
-                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <button className="w-10 h-10 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center transition-all cursor-pointer text-gray-600 dark:text-white/70 hover:bg-brand-green dark:hover:bg-brand-green hover:text-white">
+                            <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
                                 <path d="M7.5 3L4.5 6L7.5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                         </button>
                         <button
-                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
                                 hasMoreThanSelectedEntries
-                                    ? "bg-[#1ED36A] text-white hover:bg-[#18C963]"
-                                    : "bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-white/50 hover:text-brand-green hover:dark:text-brand-green hover:bg-gray-200 dark:hover:bg-white/15"
+                                    ? "bg-brand-green text-white hover:bg-brand-green/90"
+                                    : "bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-white/70 hover:bg-brand-green dark:hover:bg-brand-green hover:text-white"
                             }`}
                         >
-                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
                                 <path d="M4.5 3L7.5 6L4.5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                         </button>
@@ -278,104 +614,182 @@ export default function CandidatesList() {
             </div>
 
             {/* Content Box — search + filters + table + progress bar all inside */}
-            <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#232E28] overflow-hidden shadow-sm">
+            <div className="rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] overflow-visible">
 
                 {/* Filters Bar */}
-                <div className="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center lg:justify-between border-b border-gray-100 dark:border-white/[0.05]">
+                <div className="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center lg:justify-between border-b border-gray-200 dark:border-white/[0.08]">
                     {/* Search */}
-                    <div className="relative w-full lg:w-[260px]">
+                    <div className="relative w-full lg:w-[360px]">
                         <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-white/40 w-4 h-4" />
                         <input
                             type="text"
                             placeholder="Search by Name, OriginID..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full h-[44px] rounded-xl border border-gray-300 dark:border-white/[0.24] bg-transparent pl-10 pr-4 text-[13px] text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35 transition-colors focus:outline-none focus:border-brand-green/50"
+                            className="w-full h-[44px] rounded-xl border border-gray-300 dark:border-white/[0.24] bg-transparent pl-10 pr-4 text-[13px] text-gray-800 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35 transition-colors focus:outline-none focus:border-white/40"
                         />
                     </div>
 
                     {/* Filter Dropdowns */}
                     <div className="flex w-full flex-wrap items-center justify-end gap-2 lg:w-auto">
                         <FilterDropdown
-                            label="Trait"
+                            label="Trait:"
                             value={traitFilter}
                             onChange={setTraitFilter}
                             options={traitOptions}
+                            selectedTone="green"
                         />
                         <FilterDropdown
                             label="Status"
                             value={statusFilter}
                             onChange={setStatusFilter}
                             options={["Hired", "Shortlisted", "Rejected"]}
+                            selectedTone="green"
                         />
                         <FilterDropdown
                             label="Applied Job"
                             icon={
-                                <svg width="14" height="14" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
-                                    <path
-                                        d="M15.3 2.7H14.4V0.9C14.4 0.661305 14.3052 0.432387 14.1364 0.263604C13.9676 0.0948211 13.7387 0 13.5 0C13.2613 0 13.0324 0.0948211 12.8636 0.263604C12.6948 0.432387 12.6 0.661305 12.6 0.9V2.7H5.4V0.9C5.4 0.661305 5.30518 0.432387 5.1364 0.263604C4.96761 0.0948211 4.73869 0 4.5 0C4.2613 0 4.03239 0.0948211 3.8636 0.263604C3.69482 0.432387 3.6 0.661305 3.6 0.9V2.7H2.7C1.98392 2.7 1.29716 2.98446 0.790812 3.49081C0.284464 3.99716 0 4.68392 0 5.4V6.3H18V5.4C18 4.68392 17.7155 3.99716 17.2092 3.49081C16.7028 2.98446 16.0161 2.7 15.3 2.7Z"
-                                        fill="currentColor"
-                                    />
-                                    <path
-                                        d="M0 15.3C0 16.0161 0.284464 16.7028 0.790812 17.2092C1.29716 17.7155 1.98392 18 2.7 18H15.3C16.0161 18 16.7028 17.7155 17.2092 17.2092C17.7155 16.7028 18 16.0161 18 15.3V8.09998H0V15.3Z"
-                                        fill="currentColor"
-                                    />
+                                <svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0 text-[#1ED36A]">
+                                    <path d="M6.3 3.15005C6.3 2.90141 6.39877 2.66345 6.57455 2.48767C6.75033 2.31189 6.9883 2.21313 7.23694 2.21313H10.7631C11.0117 2.21313 11.2497 2.31189 11.4254 2.48767C11.6012 2.66345 11.7 2.90141 11.7 3.15005V4.08753H6.3V3.15005Z" fill="currentColor" />
+                                    <path d="M15.075 4.83752H2.925C2.26283 4.83752 1.62779 5.10063 1.15995 5.56847C0.692115 6.03631 0.429001 6.67135 0.429001 7.33352V8.23277C0.429001 8.48013 0.627374 8.67852 0.874738 8.67852H7.15272V8.21852C7.15272 7.97717 7.24838 7.7457 7.4188 7.57529C7.58922 7.40487 7.82068 7.3092 8.06203 7.3092H9.93797C10.1793 7.3092 10.4108 7.40487 10.5812 7.57529C10.7516 7.7457 10.8473 7.97717 10.8473 8.21852V8.67852H17.1253C17.3726 8.67852 17.571 8.48013 17.571 8.23277V7.33352C17.571 6.67135 17.3079 6.03631 16.8401 5.56847C16.3722 5.10063 15.7372 4.83752 15.075 4.83752Z" fill="currentColor" />
+                                    <path d="M10.8473 9.42847V9.93753C10.8473 10.1789 10.7516 10.4103 10.5812 10.5808C10.4108 10.7512 10.1793 10.8468 9.93797 10.8468H8.06203C7.82068 10.8468 7.58922 10.7512 7.4188 10.5808C7.24838 10.4103 7.15272 10.1789 7.15272 9.93753V9.42847H0.874738V12.9018C0.874738 13.5639 1.13785 14.199 1.60569 14.6668C2.07353 15.1346 2.70856 15.3978 3.37074 15.3978H14.6293C15.2914 15.3978 15.9265 15.1346 16.3943 14.6668C16.8621 14.199 17.1253 13.5639 17.1253 12.9018V9.42847H10.8473Z" fill="currentColor" />
                                 </svg>
                             }
                             value={jobFilter}
                             onChange={setJobFilter}
-                            options={["UI/UX Designer", "Front-End Developer", "Product Manager", "Data Analyst"]}
+                            options={jobOptionTitles}
+                            selectedTone="green"
+                            forceGreenIcon
+                            selectedDisplay={(value) => (value ? `Applied Job (${value})` : "Applied Job")}
                         />
-                        <FilterDropdown
-                            label="Applied Date"
-                            icon={
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" className="shrink-0">
-                                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-                                </svg>
-                            }
-                            value={dateFilter}
-                            onChange={setDateFilter}
-                            options={["Today", "Past Week", "Past Month", "Custom Range"]}
-                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowDateModal(true)}
+                            className={`h-[40px] rounded-[12px] px-3 text-[13px] flex items-center gap-2 font-normal cursor-pointer transition-all ${isDateFilterActive
+                                ? "border border-[#9ADAB4] bg-[#CBEED8] text-[#19211C] hover:bg-[#BCE7CC] dark:border-transparent dark:bg-[#1ED36A33] dark:text-white dark:hover:bg-[#1ED36A45]"
+                                : "border border-[#D2D9D6] bg-[#F2F4F3] text-[#19211C] hover:bg-[#E8ECEA] dark:border-transparent dark:bg-white/[0.12] dark:text-white/90 dark:hover:bg-white/[0.16]"
+                                }`}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0 text-[#1ED36A]">
+                                <path d="M15.3 2.7H14.4V0.9C14.4 0.661305 14.3052 0.432387 14.1364 0.263604C13.9676 0.0948211 13.7387 0 13.5 0C13.2613 0 13.0324 0.0948211 12.8636 0.263604C12.6948 0.432387 12.6 0.661305 12.6 0.9V2.7H5.4V0.9C5.4 0.661305 5.30518 0.432387 5.1364 0.263604C4.96761 0.0948211 4.73869 0 4.5 0C4.2613 0 4.03239 0.0948211 3.8636 0.263604C3.69482 0.432387 3.6 0.661305 3.6 0.9V2.7H2.7C1.98392 2.7 1.29716 2.98446 0.790812 3.49081C0.284464 3.99716 0 4.68392 0 5.4V6.3H18V5.4C18 4.68392 17.7155 3.99716 17.2092 3.49081C16.7028 2.98446 16.0161 2.7 15.3 2.7Z" fill="currentColor" />
+                                <path d="M0 15.3C0 16.0161 0.284464 16.7028 0.790812 17.2092C1.29716 17.7155 1.98392 18 2.7 18H15.3C16.0161 18 16.7028 17.7155 17.2092 17.2092C17.7155 16.7028 18 16.0161 18 15.3V8.09998H0V15.3Z" fill="currentColor" />
+                            </svg>
+                            <span>{appliedDateLabel}</span>
+                            <ChevronDownIcon className="w-3.5 h-3.5 text-[#19211C]/70 dark:text-white/70" />
+                        </button>
                     </div>
                 </div>
+
+                {showDateModal && (
+                    <div className="fixed inset-0 z-[80] bg-[#08120E]/80 backdrop-blur-[1.5px] flex items-center justify-center px-3" onClick={() => setShowDateModal(false)}>
+                        <div className="w-[900px] h-[480px] max-w-[95vw] rounded-[24px] border border-white/[0.2] bg-[#19211C]/40 shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-5" onClick={(e) => e.stopPropagation()}>
+                            <div className="w-[860px] max-w-full mx-auto flex items-center justify-between pb-3.5 border-b border-white/[0.12]">
+                                <p className="text-[18px] leading-[23px] font-semibold text-white">Select Date Range</p>
+                                <button type="button" onClick={() => setShowDateModal(false)} className="w-8 h-8 rounded-full bg-white/[0.12] text-[#1ED36A] hover:bg-[#1ED36A]/30 hover:text-white transition-colors flex items-center justify-center" aria-label="Close date range picker">
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M10.5 3.5L3.5 10.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                        <path d="M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div className="w-[860px] max-w-full mx-auto pt-3.5 flex gap-4 h-[318px]">
+                                <div className="w-[126px] shrink-0 border-r border-white/[0.12] pr-2.5">
+                                    {calendarPresets.map((preset) => {
+                                        const isActivePreset = calendarPreset === preset;
+                                        return (
+                                            <button
+                                                key={preset}
+                                                type="button"
+                                                onClick={() => {
+                                                    setCalendarPreset(preset);
+                                                    applyPresetRange(preset);
+                                                }}
+                                                className={`w-full text-left px-3 py-1.5 rounded-r-[4px] text-[13px] leading-[17px] transition-colors mb-[2px] ${isActivePreset ? "bg-[#1ED36A] text-white font-semibold" : "text-white/60 font-normal hover:bg-white/[0.08] hover:text-white"}`}
+                                            >
+                                                {preset}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <div className="flex-1">
+                                    <div className="flex gap-3">
+                                        {renderCalendarMonth(leftCalendarMonth.getFullYear(), leftCalendarMonth.getMonth(), getMonthLabel(leftCalendarMonth))}
+                                        {renderCalendarMonth(addMonths(leftCalendarMonth, 1).getFullYear(), addMonths(leftCalendarMonth, 1).getMonth(), getMonthLabel(addMonths(leftCalendarMonth, 1)))}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="w-[860px] max-w-full mx-auto pt-3 mt-3 border-t border-white/[0.12] flex items-center justify-between gap-3">
+                                <p className="text-[12px] leading-[16px] font-normal text-white">Selected Range : {selectedRangeText}</p>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setCalendarPreset("Any Time");
+                                            setRangeStart(null);
+                                            setRangeEnd(null);
+                                            setDateFilter("Any Time");
+                                            setShowDateModal(false);
+                                        }}
+                                        className="h-7 px-4 rounded-full border border-white text-white text-[12px] leading-[16px] font-medium hover:bg-white/10 transition-colors"
+                                    >
+                                        Clear
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (calendarPreset === "Any Time" || !rangeStart) {
+                                                setDateFilter("Any Time");
+                                            } else if (rangeStart && !rangeEnd) {
+                                                setDateFilter(formatFilterRangeLabel(rangeStart, rangeStart));
+                                            } else if (rangeStart && rangeEnd) {
+                                                setDateFilter(formatFilterRangeLabel(rangeStart, rangeEnd));
+                                            }
+                                            setShowDateModal(false);
+                                        }}
+                                        className="h-7 px-4 rounded-full bg-[#1ED36A] text-white text-[12px] leading-[16px] font-medium hover:bg-[#16BD5C] transition-colors"
+                                    >
+                                        Apply changes
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Table */}
                 <div className="w-full overflow-x-auto">
                     <table className="w-full min-w-[980px] text-[13px]">
                         <thead>
-                            <tr className="border-b border-gray-100 dark:border-white/[0.06] bg-gray-50 dark:bg-white/[0.06]">
-                                <th className="text-left px-4 sm:px-5 py-3.5 text-[12px] font-semibold text-gray-500 dark:text-white/55 whitespace-nowrap">
-                                    Name
-                                    <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" className="inline ml-1 text-brand-green"><path d="M4 0L7 3H1L4 0ZM4 8L1 5H7L4 8Z" /></svg>
+                            <tr className="border-b border-gray-200 dark:border-white/[0.08] bg-black/[0.06] dark:bg-white/[0.1]">
+                                <th className="text-left px-4 sm:px-5 py-3.5 whitespace-nowrap">
+                                    {renderSortHeader("Name", "name")}
                                 </th>
-                                <th className="text-left px-4 sm:px-5 py-3.5 text-[12px] font-semibold text-gray-500 dark:text-white/55 whitespace-nowrap">Trait</th>
-                                <th className="text-left px-4 sm:px-5 py-3.5 text-[12px] font-semibold text-gray-500 dark:text-white/55 whitespace-nowrap">Applied Jobs</th>
-                                <th className="text-left px-4 sm:px-5 py-3.5 text-[12px] font-semibold text-gray-500 dark:text-white/55 whitespace-nowrap">
-                                    Latest Applied
-                                    <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" className="inline ml-1 text-brand-green"><path d="M4 0L7 3H1L4 0ZM4 8L1 5H7L4 8Z" /></svg>
+                                <th className="text-left px-4 sm:px-5 py-3.5 text-[12px] font-semibold text-[#3A4741] dark:text-white/70 whitespace-nowrap">Trait</th>
+                                <th className="text-left px-4 sm:px-5 py-3.5 text-[12px] font-semibold text-[#3A4741] dark:text-white/70 whitespace-nowrap">Applied Jobs</th>
+                                <th className="text-left px-4 sm:px-5 py-3.5 whitespace-nowrap">
+                                    {renderSortHeader("Latest Applied", "latestApplied")}
                                 </th>
-                                <th className="text-left px-4 sm:px-5 py-3.5 text-[12px] font-semibold text-gray-500 dark:text-white/55 whitespace-nowrap">Candidate Status</th>
-                                <th className="text-left px-4 sm:px-5 py-3.5 text-[12px] font-semibold text-gray-500 dark:text-white/55 whitespace-nowrap">Action</th>
+                                <th className="text-left px-4 sm:px-5 py-3.5 text-[12px] font-semibold text-[#3A4741] dark:text-white/70 whitespace-nowrap">Candidate Status</th>
+                                <th className="text-left px-4 sm:px-5 py-3.5 text-[12px] font-semibold text-[#3A4741] dark:text-white/70 whitespace-nowrap">Action</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {mockCandidateRows.map((candidate) => (
-                                <tr key={candidate.id} className="border-b border-gray-100 dark:border-white/[0.04] transition-colors last:border-b-0 hover:bg-gray-50 dark:hover:bg-white/[0.03]">
+                            {paginatedCandidateRows.map((candidate) => (
+                                <tr key={candidate.id} className="border-b border-gray-200 dark:border-white/[0.08] transition-colors last:border-b-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
                                     {/* Name + Avatar */}
                                     <td className="px-4 sm:px-5 py-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-[40px] h-[40px] rounded-full overflow-hidden border border-gray-200 dark:border-white/10 shrink-0">
+                                            <div className="w-[52px] h-[52px] rounded-full overflow-hidden border border-white/20 shrink-0">
                                                 <img src={candidate.avatar} alt={candidate.name} className="w-full h-full object-cover" />
                                             </div>
                                             <div>
-                                                <p className="font-medium text-[#19211C] dark:text-white">{candidate.name}</p>
-                                                <p className="text-[11px] font-light text-gray-500 dark:text-gray-400 mt-0.5">Origin ID : {candidate.originId}</p>
+                                                <p className="text-[16px] leading-[21px] font-medium text-[#19211C] dark:text-white">{candidate.name}</p>
+                                                <p className="text-[14px] leading-[18px] font-normal text-gray-600 dark:text-white/80 mt-1">Origin ID : {candidate.originId}</p>
                                             </div>
                                         </div>
                                     </td>
                                     {/* Trait */}
-                                    <td className={`px-4 sm:px-5 py-4 whitespace-nowrap font-medium ${candidate.traitColor}`}>
+                                    <td className="px-4 sm:px-5 py-4 whitespace-nowrap text-[#19211C] dark:text-white/90 font-medium text-[16px] leading-[21px]">
                                         {candidate.trait}
                                     </td>
                                     {/* Applied Jobs — click opens Applied Jobs tab */}
@@ -389,17 +803,17 @@ export default function CandidatesList() {
                                         </button>
                                     </td>
                                     {/* Latest Applied */}
-                                    <td className="px-4 sm:px-5 py-4 font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                                    <td className="px-4 sm:px-5 py-4 font-medium text-[#19211C] dark:text-white whitespace-nowrap">
                                         {candidate.latestApplied}
                                     </td>
                                     {/* Status */}
                                     <td className="px-4 sm:px-5 py-4">
                                         <div className="flex items-center gap-2 text-[12px] font-medium whitespace-nowrap">
-                                            <span className="text-gray-600 dark:text-gray-300">Hired <span className="text-brand-green font-medium">({candidate.candidateStatus.hired})</span></span>
+                                            <span className="text-[#19211C] dark:text-white">Hired <span className="text-brand-green font-medium">({candidate.candidateStatus.hired})</span></span>
                                             <span className="text-gray-400">·</span>
-                                            <span className="text-gray-600 dark:text-gray-300">Shortlist <span className="text-[#FFB020] font-medium">({candidate.candidateStatus.shortlist})</span></span>
+                                            <span className="text-[#19211C] dark:text-white">Shortlist <span className="text-[#FFB020] font-medium">({candidate.candidateStatus.shortlist})</span></span>
                                             <span className="text-gray-400">·</span>
-                                            <span className="text-gray-600 dark:text-gray-300">Rejected <span className="text-[#FF4A4A] font-medium">({candidate.candidateStatus.rejected})</span></span>
+                                            <span className="text-[#19211C] dark:text-white">Rejected <span className="text-[#FF4A4A] font-medium">({candidate.candidateStatus.rejected})</span></span>
                                         </div>
                                     </td>
                                     {/* Action — eye muted by default, green on hover */}
@@ -417,32 +831,45 @@ export default function CandidatesList() {
                     </table>
                 </div>
 
-                {/* Progress Bar — attached to bottom of box */}
-                <div className="w-full h-1 overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-[#FFB020] via-[#13C065] to-[#13C065] rounded-full" style={{ width: `${(currentPage / totalPages) * 100}%` }} />
-                </div>
-
             </div>
 
             {/* Pagination */}
             <div className="flex items-center justify-center gap-2 mt-2 mb-4 text-[13px] font-medium">
-                <button onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} className="w-8 h-8 rounded flex items-center justify-center border border-gray-200 dark:border-white/10 text-gray-500 dark:text-white/60 hover:text-brand-green hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer">&lt;</button>
-                {[1, 2, 3, 4, 5, 6].map((page) => (
-                    <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`w-8 h-8 rounded flex items-center justify-center transition-colors cursor-pointer ${currentPage === page ? "bg-brand-green text-white font-bold" : "border border-gray-200 dark:border-white/10 text-gray-500 dark:text-white/60 hover:bg-gray-100 dark:hover:bg-white/5"}`}
-                    >
-                        {page}
-                    </button>
+                <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    className="w-10 h-10 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center transition-all cursor-pointer text-gray-600 dark:text-white/70 hover:bg-brand-green dark:hover:bg-brand-green hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={currentPage === 1}
+                >
+                    <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
+                        <path d="M7.5 3L4.5 6L7.5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                </button>
+                {visiblePages.map((page, index) => (
+                    page === -1 ? (
+                        <span key={`ellipsis-${index}`} className="px-1 text-gray-400">...</span>
+                    ) : (
+                        <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`w-8 h-8 rounded flex items-center justify-center transition-colors cursor-pointer ${currentPage === page ? "bg-brand-green text-white font-bold" : "border border-gray-200 dark:border-white/10 text-gray-500 dark:text-white/60 hover:bg-gray-100 dark:hover:bg-white/5"}`}
+                        >
+                            {page}
+                        </button>
+                    )
                 ))}
-                <span className="px-1 text-gray-400">...</span>
-                <button onClick={() => setCurrentPage(144)} className={`min-w-8 px-2 h-8 rounded flex items-center justify-center transition-colors cursor-pointer ${currentPage === 144 ? "bg-brand-green text-white font-bold" : "border border-gray-200 dark:border-white/10 text-gray-500 dark:text-white/60 hover:bg-gray-100 dark:hover:bg-white/5"}`}>144</button>
-                <button onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))} className="w-8 h-8 rounded flex items-center justify-center border border-gray-200 dark:border-white/10 text-gray-500 dark:text-white/60 hover:text-brand-green hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer">&gt;</button>
+                <button
+                    onClick={() => setCurrentPage(Math.min(Math.max(1, totalPages), currentPage + 1))}
+                    className="w-10 h-10 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center transition-all cursor-pointer text-gray-600 dark:text-white/70 hover:bg-brand-green dark:hover:bg-brand-green hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={currentPage >= Math.max(1, totalPages)}
+                >
+                    <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
+                        <path d="M4.5 3L7.5 6L4.5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                </button>
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400 mt-2 pb-4">
+            <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400 mt-auto pb-4">
                 <div className="flex items-center gap-4">
                     <span className="text-brand-green hover:underline cursor-pointer">Privacy Policy</span>
                     <span className="text-brand-green hover:underline cursor-pointer">Terms & Conditions</span>

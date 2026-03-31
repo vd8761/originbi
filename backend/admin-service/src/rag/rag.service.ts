@@ -458,7 +458,7 @@ export class RagService {
       return { intent: 'custom_report', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
     }
 
-    if (/\b(list|show|get|display|view)\b\s+(my|our)?\s*\b(candidates?|students?|employees?|resources?|staff|members?)\b/.test(q)) {
+    if (/\b(list|show|get|display|view)\b\s+(my|our)?\s*\b(candidates?|students?|employees?|resources?|staff|members?|people|peoples|persons?)\b/.test(q)) {
       const teamScoped = /\b(my|our)\b/.test(q);
       return {
         intent: 'list_candidates',
@@ -2295,6 +2295,12 @@ export class RagService {
       if (data.length === 0) {
         this.logger.log('🧠 No data found for intent: ' + interpretation.intent);
 
+        const recovered = await this.recoverNoDataByWordAnalysis(question, user);
+        if (recovered) {
+          this.logger.log(`✅ No-data recovery succeeded via word analysis for question: "${question}"`);
+          return recovered;
+        }
+
         const curRole = (user?.role || 'STUDENT').toUpperCase();
         const scopeMsg = curRole === 'CORPORATE' ? ' in your organization' : '';
 
@@ -2328,7 +2334,7 @@ export class RagService {
           };
 
           const answer = noDataMessages[interpretation.intent]
-            || `No data found for this query${scopeMsg}.`;
+            || `No matching data found${scopeMsg}.`;
 
           return {
             answer,
@@ -3246,6 +3252,209 @@ Please tell me the target role first, for example:
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLER: PERSON LOOKUP (with smart matching + disambiguation)
   // ═══════════════════════════════════════════════════════════════════════════
+  private isEntityKeywordSearchCandidate(searchTerm: string): boolean {
+    const q = (searchTerm || '').trim();
+    if (!q) return false;
+    // Keep this for short direct keyword lookups like "kiot", "touchmark", etc.
+    if (q.length < 2 || q.length > 50) return false;
+    if (/[@#]/.test(q)) return false;
+    if (/\d{6,}/.test(q)) return false;
+    if (/\b(list|show|get|display|view|count|total|how\s+many|report|summarize|summary)\b/i.test(q)) return false;
+    const tokens = q.split(/\s+/).filter(Boolean);
+    return tokens.length <= 4;
+  }
+
+  private extractCollegeKeyword(question: string): string | null {
+    const q = (question || '').trim();
+    if (!q) return null;
+
+    const normalized = q
+      .replace(/\bclg\b/gi, 'college')
+      .replace(/\bpeoples\b/gi, 'people')
+      .trim();
+
+    const prepMatch = normalized.match(/\b(?:from|of|in|for)\s+([a-z0-9][a-z0-9\s&._-]{1,40})$/i);
+    if (prepMatch && prepMatch[1]) {
+      const k = prepMatch[1]
+        .replace(/\b(college|university|institute|school|group|batch|program|people|candidates?|students?)\b/gi, '')
+        .trim();
+      if (k.length >= 2) return k;
+    }
+
+    if (/^[a-z0-9][a-z0-9\s&._-]{1,40}$/i.test(normalized)) {
+      const k = normalized.trim();
+      if (this.isEntityKeywordSearchCandidate(k)) return k;
+    }
+
+    return null;
+  }
+
+  private async recoverNoDataByWordAnalysis(question: string, user?: any): Promise<QueryResult | null> {
+    const q = (question || '').trim();
+    if (!q) return null;
+
+    const qNorm = q.toLowerCase().replace(/\bclg\b/g, 'college').replace(/\bpeoples\b/g, 'people');
+    const asksPeopleList = /\b(list|show|get|display|view)\b/.test(qNorm)
+      && /\b(people|persons?|candidates?|students?|employees?|resources?|members?)\b/.test(qNorm);
+    const hasCollegeContext = /\b(college|university|institute|school|group|batch|program)\b/.test(qNorm);
+    const keyword = this.extractCollegeKeyword(q);
+
+    if (keyword) {
+      const entityFallback = await this.handleEntityKeywordFallback(keyword, user);
+      if (entityFallback) return entityFallback;
+    }
+
+    if (!asksPeopleList && !hasCollegeContext) return null;
+
+    const userRole = (user?.role || 'STUDENT').toUpperCase();
+    const corporateId = user?.corporateId;
+    const params: any[] = [];
+    let where = 'r.is_deleted = false';
+
+    if (userRole === 'CORPORATE' && corporateId) {
+      params.push(corporateId);
+      where += ` AND r.corporate_account_id = $${params.length}`;
+    } else if (userRole === 'STUDENT' && user?.id) {
+      params.push(user.id);
+      where += ` AND r.user_id = $${params.length}`;
+    }
+
+    if (keyword) {
+      params.push(`%${keyword}%`);
+      const idx = params.length;
+      where += ` AND (
+        COALESCE(g.name, '') ILIKE $${idx}
+        OR COALESCE(g.code, '') ILIKE $${idx}
+        OR COALESCE(p.name, '') ILIKE $${idx}
+        OR COALESCE(p.code, '') ILIKE $${idx}
+        OR COALESCE(ca.company_name, '') ILIKE $${idx}
+      )`;
+    }
+
+    const rows = await this.executeDatabaseQuery(
+      `SELECT
+         r.full_name,
+         COALESCE(g.name, p.name, ca.company_name, '-') as college_name,
+         r.gender,
+         r.mobile_number,
+         CASE WHEN aa.id IS NULL THEN 'NOT_COMPLETED' ELSE 'COMPLETED' END as assessment_status
+       FROM registrations r
+       LEFT JOIN groups g ON r.group_id = g.id
+       LEFT JOIN programs p ON r.program_id = p.id
+       LEFT JOIN corporate_accounts ca ON r.corporate_account_id = ca.id
+       LEFT JOIN LATERAL (
+         SELECT id FROM assessment_attempts ax
+         WHERE ax.registration_id = r.id AND ax.status = 'COMPLETED'
+         ORDER BY ax.completed_at DESC NULLS LAST, ax.id DESC
+         LIMIT 1
+       ) aa ON true
+       WHERE ${where}
+       ORDER BY r.created_at DESC
+       LIMIT 25`,
+      params,
+    );
+
+    if (rows.length === 0) return null;
+
+    let table = '| Name | College/Group | Gender | Mobile | Assessment |\n';
+    table += '|---|---|---|---|---|\n';
+    for (const r of rows) {
+      table += `| ${r.full_name || '-'} | ${r.college_name || '-'} | ${r.gender || '-'} | ${r.mobile_number || '-'} | ${r.assessment_status || '-'} |\n`;
+    }
+
+    const label = keyword ? `Matching "${keyword}"` : 'College/Group candidates';
+    return {
+      answer: `**${label} (${rows.length})**\n\n${table}`,
+      searchType: 'word_analysis_recovery',
+      confidence: 0.9,
+    };
+  }
+
+  private async handleEntityKeywordFallback(searchTerm: string, user?: any): Promise<QueryResult | null> {
+    const keyword = (searchTerm || '').trim();
+    if (!this.isEntityKeywordSearchCandidate(keyword)) return null;
+
+    const like = `%${keyword}%`;
+    const userRole = (user?.role || 'STUDENT').toUpperCase();
+    const corporateId = user?.corporateId;
+
+    // RBAC: corporate users can only resolve entities in their company scope.
+    const scopeClause = userRole === 'CORPORATE' && corporateId ? ' AND g.corporate_account_id = $2' : '';
+    const scopeClauseForRegs = userRole === 'CORPORATE' && corporateId ? ' AND r.corporate_account_id = $2' : '';
+    const scopeClauseForCorp = userRole === 'CORPORATE' && corporateId ? ' AND ca.id = $2' : '';
+    const params = userRole === 'CORPORATE' && corporateId ? [like, corporateId] : [like];
+
+    const groups = await this.executeDatabaseQuery(
+      `SELECT
+         'GROUP' as entity_type,
+         g.name as entity_name,
+         COALESCE(g.code, '-') as entity_code,
+         COUNT(DISTINCT r.id) as candidate_count,
+         COUNT(DISTINCT aa.registration_id) as completed_count
+       FROM groups g
+       LEFT JOIN registrations r ON r.group_id = g.id AND r.is_deleted = false
+       LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id AND aa.status = 'COMPLETED'
+       WHERE g.is_deleted = false
+         AND (g.name ILIKE $1 OR COALESCE(g.code, '') ILIKE $1)${scopeClause}
+       GROUP BY g.id, g.name, g.code
+       ORDER BY candidate_count DESC, g.name ASC
+       LIMIT 8`,
+      params,
+    );
+
+    const programs = await this.executeDatabaseQuery(
+      `SELECT
+         'PROGRAM' as entity_type,
+         p.name as entity_name,
+         COALESCE(p.code, '-') as entity_code,
+         COUNT(DISTINCT r.id) as candidate_count,
+         COUNT(DISTINCT aa.registration_id) as completed_count
+       FROM programs p
+       LEFT JOIN registrations r ON r.program_id = p.id AND r.is_deleted = false${scopeClauseForRegs}
+       LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id AND aa.status = 'COMPLETED'
+       WHERE p.is_deleted = false
+         AND (p.name ILIKE $1 OR COALESCE(p.code, '') ILIKE $1)
+       GROUP BY p.id, p.name, p.code
+       ORDER BY candidate_count DESC, p.name ASC
+       LIMIT 8`,
+      params,
+    );
+
+    const corporates = await this.executeDatabaseQuery(
+      `SELECT
+         'COMPANY' as entity_type,
+         ca.company_name as entity_name,
+         '-' as entity_code,
+         COUNT(DISTINCT r.id) as candidate_count,
+         COUNT(DISTINCT aa.registration_id) as completed_count
+       FROM corporate_accounts ca
+       LEFT JOIN registrations r ON r.corporate_account_id = ca.id AND r.is_deleted = false
+       LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id AND aa.status = 'COMPLETED'
+       WHERE ca.is_deleted = false
+         AND ca.company_name ILIKE $1${scopeClauseForCorp}
+       GROUP BY ca.id, ca.company_name
+       ORDER BY candidate_count DESC, ca.company_name ASC
+       LIMIT 8`,
+      params,
+    );
+
+    const matches = [...groups, ...programs, ...corporates].slice(0, 10);
+    if (matches.length === 0) return null;
+
+    let table = '| Type | Name | Code | Candidates | Completed |\n';
+    table += '|---|---|---:|---:|---:|\n';
+    for (const m of matches) {
+      table += `| ${m.entity_type} | ${m.entity_name} | ${m.entity_code || '-'} | ${Number(m.candidate_count || 0)} | ${Number(m.completed_count || 0)} |\n`;
+    }
+
+    const scopedText = userRole === 'CORPORATE' ? ' within your organization' : '';
+    return {
+      answer: `I couldn't find a person named **"${keyword}"**, but I found matching entity data${scopedText}:\n\n${table}\nTry follow-ups:\n- **summarize batch ${keyword}**\n- **list candidates from ${keyword}**\n- **count candidates in ${keyword}**`,
+      searchType: 'entity_keyword_lookup',
+      confidence: 0.88,
+    };
+  }
+
   private async handlePersonLookup(
     searchTerm: string,
     user?: any,
@@ -3320,6 +3529,11 @@ Please tell me the target role first, for example:
       }
 
       if (data.length === 0) {
+        const entityFallback = await this.handleEntityKeywordFallback(cleanSearch, user);
+        if (entityFallback) {
+          this.logger.log(`🔎 Keyword fallback resolved non-person entity for "${cleanSearch}"`);
+          return entityFallback;
+        }
         const scopeMsg = userRole === 'CORPORATE' ? ' within your organization' : '';
         return {
           answer: `**"${cleanSearch}" not found${scopeMsg}.** Check the spelling or try "list candidates".`,

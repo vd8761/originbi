@@ -580,8 +580,74 @@ Formatted response:`;
   /**
    * Format response for empty results
    */
-  private async formatEmptyResult(question: string, _user: UserContext): Promise<string> {
+  private async formatEmptyResult(question: string, user: UserContext): Promise<string> {
     const q = question.toLowerCase();
+    const qNorm = q.replace(/\bclg\b/g, 'college').replace(/\bpeoples\b/g, 'people');
+
+    const keywordMatch = qNorm.match(/\b(?:in|from|of|for)\s+([a-z0-9][a-z0-9\s&._-]{1,40})/i);
+    let keyword = keywordMatch?.[1]?.trim() || '';
+    keyword = keyword.replace(/\b(college|university|institute|school|group|batch|program|people|candidates?|students?)\b/gi, '').trim();
+    if (!keyword && /^[a-z0-9][a-z0-9\s&._-]{1,40}$/i.test(qNorm.trim())) {
+      keyword = qNorm.trim();
+    }
+
+    const asksPeople = /\b(candidate|candidates|student|students|employee|employees|resource|resources|people|person|members?)\b/.test(qNorm);
+    const hasEntityWord = /\b(college|university|institute|school|group|batch|program|company|corporate)\b/.test(qNorm);
+
+    if (keyword && (asksPeople || hasEntityWord)) {
+      try {
+        const params: any[] = [];
+        let where = 'r.is_deleted = false';
+
+        if (user.role === 'CORPORATE' && user.corporateId) {
+          params.push(user.corporateId);
+          where += ` AND r.corporate_account_id = $${params.length}`;
+        } else if (user.role === 'STUDENT' && user.id) {
+          params.push(user.id);
+          where += ` AND r.user_id = $${params.length}`;
+        }
+
+        params.push(`%${keyword}%`);
+        const keyIdx = params.length;
+        where += ` AND (
+          COALESCE(g.name, '') ILIKE $${keyIdx}
+          OR COALESCE(g.code, '') ILIKE $${keyIdx}
+          OR COALESCE(p.name, '') ILIKE $${keyIdx}
+          OR COALESCE(p.code, '') ILIKE $${keyIdx}
+          OR COALESCE(ca.company_name, '') ILIKE $${keyIdx}
+        )`;
+
+        const rows = await this.dataSource.query(
+          `SELECT
+             r.full_name,
+             COALESCE(g.name, p.name, ca.company_name, '-') as college_group,
+             r.gender,
+             r.mobile_number,
+             CASE WHEN aa.id IS NULL THEN 'NOT_COMPLETED' ELSE 'COMPLETED' END as assessment_status
+           FROM registrations r
+           LEFT JOIN groups g ON r.group_id = g.id
+           LEFT JOIN programs p ON r.program_id = p.id
+           LEFT JOIN corporate_accounts ca ON r.corporate_account_id = ca.id
+           LEFT JOIN LATERAL (
+             SELECT id FROM assessment_attempts ax
+             WHERE ax.registration_id = r.id AND ax.status = 'COMPLETED'
+             ORDER BY ax.completed_at DESC NULLS LAST, ax.id DESC
+             LIMIT 1
+           ) aa ON true
+           WHERE ${where}
+           ORDER BY r.created_at DESC
+           LIMIT 20`,
+          params,
+        );
+
+        if (rows.length > 0) {
+          const table = this.buildMarkdownTable(rows);
+          return `**Found ${rows.length} matching candidates for "${keyword}"**\n\n${table}`;
+        }
+      } catch (e) {
+        this.logger.warn(`formatEmptyResult keyword recovery failed: ${e.message}`);
+      }
+    }
 
     if (/\b(who|find|search|show|list)\b/i.test(q) && /\b(name|person|candidate)\b/i.test(q)) {
       return `No matching candidates found for this query.\n\n💡 **Try:** "List all candidates" or "Show candidates from [batch name]"`;
@@ -604,7 +670,7 @@ Formatted response:`;
       return `No data available for this comparison. One or both entities may not exist.\n\n💡 **Try:** specifying exact batch or group names as they appear in the system.`;
     }
 
-    return `No data found for this query. The criteria may be too specific or the data hasn't been entered yet.\n\n💡 **Try:** broadening your search or asking "What data is available?"`;
+    return `No matching records found for the requested data.\n\n💡 **Try:** using keywords like college/group/company name, for example: "candidates in KIOT" or "list groups".`;
   }
 
   /**

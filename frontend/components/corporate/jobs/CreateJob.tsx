@@ -3,16 +3,25 @@ import { ChevronDownIcon, XIcon, CheckCircle2, AlertCircle, InfoIcon, XCircle, G
 
 export interface CreateJobProps {
     onBack?: () => void;
+    mode?: "create" | "edit";
+    initialData?: {
+        title?: string;
+        employmentType?: string;
+        shift?: string;
+        experienceLevel?: string;
+        jobLocation?: string;
+        workMode?: string;
+    };
 }
 
-export default function CreateJob({ onBack }: CreateJobProps) {
+export default function CreateJob({ onBack, mode = "create", initialData }: CreateJobProps) {
     // Form State
-    const [jobTitle, setJobTitle] = useState("UI/UX Designer");
-    const [employmentType, setEmploymentType] = useState("Internship");
-    const [shift, setShift] = useState("Day");
-    const [experience, setExperience] = useState("Fresher");
-    const [jobLocation, setJobLocation] = useState("Chennai, Tamil Nadu");
-    const [workMode, setWorkMode] = useState("Onsite");
+    const [jobTitle, setJobTitle] = useState(initialData?.title ?? "UI/UX Designer");
+    const [employmentType, setEmploymentType] = useState(initialData?.employmentType ?? "Internship");
+    const [shift, setShift] = useState(initialData?.shift ?? "Day");
+    const [experience, setExperience] = useState(initialData?.experienceLevel ?? "Fresher");
+    const [jobLocation, setJobLocation] = useState(initialData?.jobLocation ?? "Chennai, Tamil Nadu");
+    const [workMode, setWorkMode] = useState(initialData?.workMode ?? "Onsite");
 
     const [minCtc, setMinCtc] = useState("3,50,000");
     const [maxCtc, setMaxCtc] = useState("4,50,000");
@@ -51,23 +60,23 @@ export default function CreateJob({ onBack }: CreateJobProps) {
                 {/* Header Area */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 dark:border-white/5 pb-5">
                     <div className="flex items-center gap-4">
-                        <h1 className="text-[28px] font-semibold text-[#19211C] dark:text-white leading-tight">
-                            Create a Job Post
+                        <h1 className="text-[38px] lg:text-[56px] font-semibold text-[#19211C] dark:text-white leading-[100%]">
+                            {mode === "edit" ? "Edit Job Post" : "Create a Job Post"}
                         </h1>
-                        <div className="flex items-center gap-2 text-[12px] text-gray-600 dark:text-gray-300 font-medium ml-2">
+                        <div className="flex items-center gap-2 text-[16px] text-gray-600 dark:text-white font-normal ml-2">
                             <span className="w-2 h-2 rounded-full bg-[#13C065] shrink-0"></span>
                             Draft Auto Saved...
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        <button className="px-5 py-2.5 rounded-full text-[13px] font-medium border border-transparent dark:border-gray-600 text-[#19211C] dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-white/5 transition-colors cursor-pointer">
+                        <button className="px-5 py-2.5 rounded-full text-[16px] font-medium border border-transparent dark:border-gray-600 text-[#19211C] dark:text-white hover:bg-gray-200 dark:hover:bg-white/5 transition-colors cursor-pointer">
                             Save Draft
                         </button>
-                        <button onClick={() => setIsPreviewOpen(true)} className="px-5 py-2.5 rounded-full text-[13px] font-medium border border-transparent dark:border-gray-600 text-[#19211C] dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-white/5 transition-colors cursor-pointer">
+                        <button onClick={() => setIsPreviewOpen(true)} className="px-5 py-2.5 rounded-full text-[16px] font-medium border border-transparent dark:border-gray-600 text-[#19211C] dark:text-white hover:bg-gray-200 dark:hover:bg-white/5 transition-colors cursor-pointer">
                             Preview as Candidate
                         </button>
-                        <button className="px-6 py-2.5 rounded-full text-[13px] font-bold bg-[#13C065] text-white hover:bg-[#10A958] transition-colors border border-transparent shadow-sm cursor-pointer whitespace-nowrap">
-                            Post Job
+                        <button className="px-6 py-2.5 rounded-full text-[16px] font-semibold bg-[#13C065] text-white hover:bg-[#10A958] transition-colors border border-transparent shadow-sm cursor-pointer whitespace-nowrap">
+                            {mode === "edit" ? "Update Job" : "Post Job"}
                         </button>
                     </div>
                 </div>
@@ -83,32 +92,32 @@ export default function CreateJob({ onBack }: CreateJobProps) {
                                 {/* Section 1: Basic Job Information */}
                                 <div className="flex flex-col gap-6 pb-8">
                                     <div className="flex items-center justify-between">
-                                        <h2 className="text-[15px] font-semibold flex items-center gap-2 text-[#19211C] dark:text-white/90">
+                                        <h2 className="text-[22px] font-semibold flex items-center gap-2 text-[#19211C] dark:text-white leading-[100%]">
                                             Basic Job Information
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-brand-green mt-0.5">
                                                 <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                                             </svg>
                                         </h2>
-                                        <span className="text-[12px] text-gray-500 dark:text-gray-400 font-medium tracking-wide">Job ID : 18722765562</span>
+                                        <span className="text-[20px] text-gray-500 dark:text-white/70 font-medium tracking-wide">Job ID : 18722765562</span>
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-6">
                                         {/* Job Title */}
                                         <div className="flex flex-col gap-2">
-                                            <label className="text-[12px] font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1">
+                                            <label className="text-[16px] font-medium text-gray-600 dark:text-white flex items-center gap-1">
                                                 Job Title <span className="text-red-500">*</span>
                                             </label>
                                             <input
                                                 type="text"
                                                 value={jobTitle}
                                                 onChange={(e) => setJobTitle(e.target.value)}
-                                                className="w-full bg-white dark:bg-[#555B57] border border-transparent dark:border-transparent rounded-full px-5 h-[42px] text-[13px] text-[#19211C] dark:text-white focus:outline-none focus:ring-1 focus:ring-brand-green/40 transition-colors"
+                                                className="w-full bg-white dark:bg-[#555B57] border border-transparent dark:border-transparent rounded-full px-5 h-[42px] text-[16px] text-[#19211C] dark:text-white focus:outline-none focus:ring-1 focus:ring-brand-green/40 transition-colors"
                                             />
                                         </div>
 
                                         {/* Employment Type segments */}
                                         <div className="flex flex-col gap-2">
-                                            <label className="text-[12px] font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1">
+                                            <label className="text-[16px] font-medium text-gray-600 dark:text-white flex items-center gap-1">
                                                 Employment Type <span className="text-red-500">*</span>
                                             </label>
                                             <div className="flex items-center bg-white dark:bg-[#555B57] rounded-full border border-transparent dark:border-transparent overflow-hidden h-[42px]">
@@ -116,9 +125,9 @@ export default function CreateJob({ onBack }: CreateJobProps) {
                                                     <button
                                                         key={type}
                                                         onClick={() => setEmploymentType(type)}
-                                                        className={`flex-1 text-center h-full text-[13px] font-medium transition-all cursor-pointer ${employmentType === type
+                                                        className={`flex-1 text-center h-full text-[16px] font-normal transition-all cursor-pointer ${employmentType === type
                                                             ? "bg-[#13C065] text-white"
-                                                            : "text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5"
+                                                            : "text-gray-600 dark:text-white/95 hover:bg-black/5 dark:hover:bg-white/5"
                                                             } ${idx !== arr.length - 1 && employmentType !== type && employmentType !== arr[idx + 1] ? 'border-r border-gray-200 dark:border-white/5' : ''}`}
                                                     >
                                                         {type}
@@ -129,14 +138,14 @@ export default function CreateJob({ onBack }: CreateJobProps) {
 
                                         {/* Work Mode */}
                                         <div className="flex flex-col gap-2">
-                                            <label className="text-[12px] font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1">
+                                            <label className="text-[16px] font-medium text-gray-600 dark:text-white flex items-center gap-1">
                                                 Work Mode <span className="text-red-500">*</span>
                                             </label>
                                             <div className="relative">
                                                 <select
                                                     value={workMode}
                                                     onChange={(e) => setWorkMode(e.target.value)}
-                                                    className="w-full bg-white dark:bg-[#555B57] border border-transparent dark:border-transparent rounded-full pl-5 pr-10 h-[42px] text-[13px] text-gray-700 dark:text-gray-200 appearance-none focus:outline-none transition-colors cursor-pointer"
+                                                    className="w-full bg-white dark:bg-[#555B57] border border-transparent dark:border-transparent rounded-full pl-5 pr-10 h-[42px] text-[16px] text-gray-700 dark:text-white appearance-none focus:outline-none transition-colors cursor-pointer"
                                                 >
                                                     <option value="Onsite">Onsite</option>
                                                     <option value="Hybrid">Hybrid</option>
@@ -148,7 +157,7 @@ export default function CreateJob({ onBack }: CreateJobProps) {
 
                                         {/* Shift segments */}
                                         <div className="flex flex-col gap-2">
-                                            <label className="text-[12px] font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1">
+                                            <label className="text-[16px] font-medium text-gray-600 dark:text-white flex items-center gap-1">
                                                 Shift
                                             </label>
                                             <div className="flex items-center bg-white dark:bg-[#555B57] rounded-full border border-transparent dark:border-transparent overflow-hidden h-[42px]">
@@ -156,9 +165,9 @@ export default function CreateJob({ onBack }: CreateJobProps) {
                                                     <button
                                                         key={s}
                                                         onClick={() => setShift(s)}
-                                                        className={`flex-1 text-center h-full text-[13px] font-medium transition-all cursor-pointer ${shift === s
+                                                        className={`flex-1 text-center h-full text-[16px] font-normal transition-all cursor-pointer ${shift === s
                                                             ? "bg-[#13C065] text-white"
-                                                            : "text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5"
+                                                            : "text-gray-600 dark:text-white/95 hover:bg-black/5 dark:hover:bg-white/5"
                                                             } ${idx !== arr.length - 1 && shift !== s && shift !== arr[idx + 1] ? 'border-r border-gray-200 dark:border-white/5' : ''}`}
                                                     >
                                                         {s}
@@ -169,14 +178,14 @@ export default function CreateJob({ onBack }: CreateJobProps) {
 
                                         {/* Experience Level */}
                                         <div className="flex flex-col gap-2">
-                                            <label className="text-[12px] font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1">
+                                            <label className="text-[16px] font-medium text-gray-600 dark:text-white flex items-center gap-1">
                                                 Experience Level
                                             </label>
                                             <div className="relative">
                                                 <select
                                                     value={experience}
                                                     onChange={(e) => setExperience(e.target.value)}
-                                                    className="w-full bg-white dark:bg-[#555B57] border border-transparent dark:border-transparent rounded-full pl-5 pr-10 h-[42px] text-[13px] text-gray-700 dark:text-gray-200 appearance-none focus:outline-none transition-colors cursor-pointer"
+                                                    className="w-full bg-white dark:bg-[#555B57] border border-transparent dark:border-transparent rounded-full pl-5 pr-10 h-[42px] text-[16px] text-gray-700 dark:text-white appearance-none focus:outline-none transition-colors cursor-pointer"
                                                 >
                                                     <option value="Fresher">Fresher</option>
                                                     <option value="1-3 Years">1-3 Years</option>
@@ -189,14 +198,14 @@ export default function CreateJob({ onBack }: CreateJobProps) {
 
                                         {/* Job Location */}
                                         <div className="flex flex-col gap-2">
-                                            <label className="text-[12px] font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1">
+                                            <label className="text-[16px] font-medium text-gray-600 dark:text-white flex items-center gap-1">
                                                 Job Location
                                             </label>
                                             <input
                                                 type="text"
                                                 value={jobLocation}
                                                 onChange={(e) => setJobLocation(e.target.value)}
-                                                className="w-full bg-white dark:bg-[#555B57] border border-transparent dark:border-transparent rounded-full px-5 h-[42px] text-[13px] text-[#19211C] dark:text-white focus:outline-none focus:ring-1 focus:ring-brand-green/40 transition-colors"
+                                                className="w-full bg-white dark:bg-[#555B57] border border-transparent dark:border-transparent rounded-full px-5 h-[42px] text-[16px] text-[#19211C] dark:text-white focus:outline-none focus:ring-1 focus:ring-brand-green/40 transition-colors"
                                             />
                                         </div>
                                     </div>
@@ -204,7 +213,7 @@ export default function CreateJob({ onBack }: CreateJobProps) {
 
                                 {/* Section 2: Hiring Timeline & Compensation */}
                                 <div className="flex flex-col gap-6 border-t border-gray-200 dark:border-white/10 py-8">
-                                    <h2 className="text-[15px] font-semibold flex items-center gap-2 text-[#19211C] dark:text-white/90">
+                                    <h2 className="text-[22px] font-semibold flex items-center gap-2 text-[#19211C] dark:text-white leading-[100%]">
                                         Hiring Timeline & Compensation
                                         <div className="w-[18px] h-[18px] flex items-center justify-center mt-0.5">
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-red-500">
@@ -217,17 +226,17 @@ export default function CreateJob({ onBack }: CreateJobProps) {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                         {/* Hiring Timeline */}
                                         <div className="flex flex-col gap-2">
-                                            <label className="text-[12px] font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1">
+                                            <label className="text-[16px] font-medium text-gray-600 dark:text-white flex items-center gap-1">
                                                 Hiring Timeline <span className="text-red-500">*</span>
                                             </label>
-                                            <button className="w-full flex items-center justify-between bg-white dark:bg-[#555B57] border border-transparent dark:border-transparent rounded-full px-5 py-2.5 text-[13px] text-gray-600 dark:text-gray-200 transition-colors cursor-pointer">
+                                            <button className="w-full flex items-center justify-between bg-white dark:bg-[#555B57] border border-transparent dark:border-transparent rounded-full px-5 py-2.5 text-[16px] text-gray-600 dark:text-white transition-colors cursor-pointer">
                                                 <div className="flex items-center gap-2.5 text-brand-green">
                                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                                         <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" />
                                                         <path d="M16 2V6M8 2V6M3 10H21" />
                                                     </svg>
-                                                    <span className="text-[#0D6D3A] dark:text-gray-100 font-medium">09 Oct to 08 Nov 2025</span>
-                                                    <span className="text-gray-500 dark:text-gray-400 font-normal">(30 Days)</span>
+                                                    <span className="text-[#0D6D3A] dark:text-white font-normal">09 Oct to 08 Nov 2025</span>
+                                                    <span className="text-gray-500 dark:text-white/70 font-normal">(30 Days)</span>
                                                 </div>
                                                 <ChevronDownIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                                             </button>
@@ -235,31 +244,31 @@ export default function CreateJob({ onBack }: CreateJobProps) {
 
                                         {/* Annual CTC */}
                                         <div className="flex flex-col gap-2">
-                                            <label className="text-[12px] font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1">
+                                            <label className="text-[16px] font-medium text-gray-600 dark:text-white flex items-center gap-1">
                                                 Annual CTC (₹ / year) <span className="text-red-500">*</span>
                                             </label>
                                             <div className="flex items-center gap-2">
                                                 <div className="flex-1 flex items-center bg-white dark:bg-[#555B57] border border-transparent dark:border-transparent rounded-full px-4 py-2.5 transition-colors">
-                                                    <span className="text-[12px] font-medium text-gray-500 dark:text-gray-400 mr-2">MIN</span>
-                                                    <span className="text-[13px] text-gray-600 dark:text-gray-300 mr-1.5">₹</span>
+                                                    <span className="text-[16px] font-medium text-gray-500 dark:text-white/70 mr-2">MIN</span>
+                                                    <span className="text-[16px] text-gray-600 dark:text-white mr-1.5">₹</span>
                                                     <input
                                                         type="text"
                                                         value={minCtc}
                                                         onChange={(e) => setMinCtc(e.target.value)}
-                                                        className="w-full bg-transparent text-[13px] text-gray-900 dark:text-white focus:outline-none"
+                                                        className="w-full bg-transparent text-[16px] text-gray-900 dark:text-white focus:outline-none"
                                                     />
                                                 </div>
 
                                                 <span className="text-gray-500 mx-1">-</span>
 
                                                 <div className="flex-1 flex items-center bg-white dark:bg-[#555B57] border border-transparent dark:border-transparent rounded-full px-4 py-2.5 transition-colors">
-                                                    <span className="text-[12px] font-medium text-gray-500 dark:text-gray-400 mr-2">MAX</span>
-                                                    <span className="text-[13px] text-gray-600 dark:text-gray-300 mr-1.5">₹</span>
+                                                    <span className="text-[16px] font-medium text-gray-500 dark:text-white/70 mr-2">MAX</span>
+                                                    <span className="text-[16px] text-gray-600 dark:text-white mr-1.5">₹</span>
                                                     <input
                                                         type="text"
                                                         value={maxCtc}
                                                         onChange={(e) => setMaxCtc(e.target.value)}
-                                                        className="w-full bg-transparent text-[13px] text-gray-900 dark:text-white focus:outline-none"
+                                                        className="w-full bg-transparent text-[16px] text-gray-900 dark:text-white focus:outline-none"
                                                     />
                                                 </div>
                                             </div>
@@ -270,7 +279,7 @@ export default function CreateJob({ onBack }: CreateJobProps) {
                                 {/* Section 3: Rich Text Areas & Skills */}
                                 <div className="flex flex-col gap-6 border-t border-gray-200 dark:border-white/10 pt-8">
                                     <div className="flex items-center gap-2 px-1 mb-[-8px]">
-                                        <h2 className="text-[15px] font-semibold text-[#19211C] dark:text-white/90">Job Description</h2>
+                                        <h2 className="text-[22px] font-semibold text-[#19211C] dark:text-white">Job Description</h2>
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-[#13C065] mt-0.5">
                                             <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                                         </svg>
@@ -339,7 +348,7 @@ export default function CreateJob({ onBack }: CreateJobProps) {
                         {/* Employer Details Box Container */}
                         <div className="bg-[#F8F9FA] dark:bg-[#2A302C] border border-transparent dark:border-transparent rounded-2xl p-8 flex flex-col gap-5">
                             {/* Employer Details Header */}
-                            <h2 className="text-[15px] font-semibold text-[#19211C] dark:text-white/90">Employer Details</h2>
+                            <h2 className="text-[22px] font-semibold text-[#19211C] dark:text-white">Employer Details</h2>
                             <div className="flex flex-col items-center mt-2 mb-6 text-center">
                                 {/* Using the solid Google Logo from the design */}
                                 <div className="w-[60px] h-[60px] bg-white rounded-full flex items-center justify-center mb-3 shadow-sm border border-transparent">
@@ -350,8 +359,8 @@ export default function CreateJob({ onBack }: CreateJobProps) {
                                         <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                                     </svg>
                                 </div>
-                                <h3 className="text-lg font-semibold text-[#19211C] dark:text-white mb-2 tracking-wide">Google</h3>
-                                <p className="text-[12px] text-gray-500 dark:text-gray-300 leading-relaxed">
+                                <h3 className="text-[44px] font-semibold text-[#19211C] dark:text-white mb-2 tracking-wide leading-[100%]">Google</h3>
+                                <p className="text-[16px] text-gray-500 dark:text-white leading-relaxed">
                                     Google is a global tech leader known for innovation, offering students and freshers opportunities to learn, work on real projects, and grow in a creative culture.
                                 </p>
                             </div>
@@ -359,19 +368,19 @@ export default function CreateJob({ onBack }: CreateJobProps) {
                             <div className="flex flex-col gap-4 border-t border-transparent dark:border-white/10 pt-5">
                                 <div className="flex justify-between items-start">
                                     <div className="flex-1 pr-6">
-                                        <h4 className="text-[11px] text-gray-500 dark:text-gray-400 font-medium mb-1.5">Business Location</h4>
-                                        <p className="text-[12px] text-gray-600 dark:text-white/80 leading-relaxed font-light">Rio Business Park, Mahadevapura Village, Krishnarajapuram, Hobli, Bengaluru East, Bengaluru, Karnataka 560037</p>
+                                        <h4 className="text-[16px] text-gray-500 dark:text-white/70 font-medium mb-1.5">Business Location</h4>
+                                        <p className="text-[16px] text-gray-600 dark:text-white leading-relaxed font-normal">Rio Business Park, Mahadevapura Village, Krishnarajapuram, Hobli, Bengaluru East, Bengaluru, Karnataka 560037</p>
                                     </div>
                                     <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 mt-2">
                                     <div>
-                                        <h4 className="text-[11px] text-gray-500 dark:text-gray-400 font-medium mb-1.5">Email Address</h4>
-                                        <p className="text-[12px] text-gray-600 dark:text-white/80 font-light truncate">Monish@touchmarkdes.com</p>
+                                        <h4 className="text-[16px] text-gray-500 dark:text-white/70 font-medium mb-1.5">Email Address</h4>
+                                        <p className="text-[16px] text-gray-600 dark:text-white font-normal truncate">Monish@touchmarkdes.com</p>
                                     </div>
                                     <div>
-                                        <h4 className="text-[11px] text-gray-500 dark:text-gray-400 font-medium mb-1.5">Mobile Number</h4>
-                                        <p className="text-[12px] text-gray-600 dark:text-white/80 font-light">90876554432</p>
+                                        <h4 className="text-[16px] text-gray-500 dark:text-white/70 font-medium mb-1.5">Mobile Number</h4>
+                                        <p className="text-[16px] text-gray-600 dark:text-white font-normal">90876554432</p>
                                     </div>
                                 </div>
                             </div>
@@ -600,9 +609,13 @@ export default function CreateJob({ onBack }: CreateJobProps) {
 // ─── Helper Components ──────────────────────────────────────────
 
 function RichTextArea({ label, required, completed, value, onChange, maxLength }: any) {
+    const [isBoldSelected, setIsBoldSelected] = useState(false);
+    const [isItalicSelected, setIsItalicSelected] = useState(false);
+    const [isListSelected, setIsListSelected] = useState(false);
+
     return (
         <div className="flex flex-col gap-2">
-            <label className="text-[12px] font-semibold flex items-center gap-1.5 text-[#19211C] dark:text-white/90">
+            <label className="text-[16px] font-medium flex items-center gap-1.5 text-[#19211C] dark:text-white">
                 {label}
                 {completed ? (
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-brand-green">
@@ -616,13 +629,25 @@ function RichTextArea({ label, required, completed, value, onChange, maxLength }
                 {/* Toolbar */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-white/8 bg-[#F6F7F8] dark:bg-[#616763]">
                     <div className="flex items-center gap-2">
-                        <button className="p-1 rounded hover:bg-white/10 text-brand-green transition-colors">
+                        <button
+                            type="button"
+                            onClick={() => setIsBoldSelected((prev: boolean) => !prev)}
+                            className={`p-1 rounded hover:bg-white/10 transition-colors ${isBoldSelected ? "text-brand-green" : "text-[#19211C] dark:text-white"}`}
+                        >
                             <span className="font-serif font-bold italic text-[13px] leading-none">B</span>
                         </button>
-                        <button className="p-1 rounded hover:bg-white/10 text-[#19211C] dark:text-white transition-colors">
+                        <button
+                            type="button"
+                            onClick={() => setIsItalicSelected((prev: boolean) => !prev)}
+                            className={`p-1 rounded hover:bg-white/10 transition-colors ${isItalicSelected ? "text-brand-green" : "text-[#19211C] dark:text-white"}`}
+                        >
                             <span className="font-serif italic text-[13px] leading-none">I</span>
                         </button>
-                        <button className="p-1 rounded hover:bg-white/10 text-[#13C065] transition-colors flex items-center justify-center">
+                        <button
+                            type="button"
+                            onClick={() => setIsListSelected((prev: boolean) => !prev)}
+                            className={`p-1 rounded hover:bg-white/10 transition-colors flex items-center justify-center ${isListSelected ? "text-brand-green" : "text-[#19211C] dark:text-white"}`}
+                        >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <line x1="8" y1="6" x2="21" y2="6"></line>
                                 <line x1="8" y1="12" x2="21" y2="12"></line>
@@ -642,7 +667,7 @@ function RichTextArea({ label, required, completed, value, onChange, maxLength }
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     maxLength={maxLength}
-                    className="w-full min-h-[104px] bg-[#F6F7F8] dark:bg-[#555B57] text-[13px] text-gray-700 dark:text-gray-100 p-4 focus:outline-none resize-none leading-relaxed"
+                    className="w-full min-h-[104px] bg-[#F6F7F8] dark:bg-[#555B57] text-[16px] text-gray-700 dark:text-white p-4 focus:outline-none resize-none leading-relaxed"
                     placeholder="Type here..."
                 />
             </div>
@@ -663,13 +688,13 @@ function TagsInput({ label, required, tags, onAdd, onRemove }: any) {
 
     return (
         <div className="flex flex-col gap-2">
-            <label className="text-[12px] font-semibold flex items-center gap-1.5 text-[#19211C] dark:text-white/90">
+            <label className="text-[16px] font-medium flex items-center gap-1.5 text-[#19211C] dark:text-white">
                 {label}
                 {required && <span className="text-red-500">*</span>}
             </label>
             <div className="flex flex-wrap items-center gap-2 bg-white dark:bg-[#555B57] border border-gray-200 dark:border-transparent rounded-[24px] px-5 py-4 min-h-[56px] focus-within:border-brand-green/30 transition-colors">
                 {tags.map((tag: string) => (
-                    <span key={tag} className="flex items-center gap-1.5 px-3 py-1 bg-white text-[#111412] text-[11px] font-semibold rounded-full shadow-sm">
+                    <span key={tag} className="flex items-center gap-1.5 px-3 py-1 bg-white text-[#111412] text-[16px] font-normal rounded-full shadow-sm">
                         {tag}
                         <button onClick={() => onRemove(tag)} className="hover:bg-gray-200 rounded-full ml-1">
                             <XIcon className="w-3.5 h-3.5 text-gray-600" strokeWidth={2.5} />
