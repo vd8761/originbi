@@ -107,7 +107,7 @@ export class TextToSqlService {
       const formatterModel =
         process.env.GEMINI_FORMATTER_MODEL ||
         process.env.GEMINI_LLM_MODEL ||
-        'gemini-2.5-flash';
+        'gemini-2.0-flash';
       const formatterMaxTokens = Math.max(220, Number(process.env.FORMATTER_MAX_OUTPUT_TOKENS || 520));
       this.formatterLlm = new ChatGoogleGenerativeAI({
         apiKey,

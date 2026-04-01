@@ -8,8 +8,7 @@ import {
     Clock, ChevronRight, Star, Briefcase, GraduationCap,
     MessageSquare, Plus, MoreHorizontal, PenLine,
     Search, PanelLeftClose, PanelLeft, X,
-    RefreshCw, Code, ExternalLink,
-    Lightbulb, CornerDownRight, Table, AlertCircle
+    Code, ExternalLink, CornerDownRight
 } from 'lucide-react';
 import { getAuthHeaders, getStoredUser, snapshotUserToSession } from '../../lib/auth-helpers';
 
@@ -42,10 +41,6 @@ interface ChatAssistantProps {
 /* ───────────────────────── API Helpers ─────────────────────────── */
 async function apiGet(url: string) {
     const res = await fetch(url, { headers: getAuthHeaders() });
-    return res.json();
-}
-async function apiPost(url: string, body: any = {}) {
-    const res = await fetch(url, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(body) });
     return res.json();
 }
 async function apiPatch(url: string, body: any) {
@@ -678,6 +673,15 @@ export default function ChatAssistant({
                 }),
             });
 
+            if (!res.ok) {
+                let errorMsg = `Server error (${res.status})`;
+                try {
+                    const errData = await res.json();
+                    errorMsg = errData.message || errData.error || errorMsg;
+                } catch { /* non-JSON response */ }
+                throw new Error(errorMsg);
+            }
+
             const data = await res.json();
 
             // If this was a new chat, capture the conversationId returned
@@ -704,11 +708,12 @@ export default function ChatAssistant({
                 searchType: data.searchType,
                 confidence: data.confidence,
             }]);
-        } catch {
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
             setMessages(prev => [...prev, {
                 id: botId,
                 role: 'assistant',
-                content: 'Unable to connect. Please check your connection.',
+                content: `Unable to process the request. ${errorMessage}`,
                 timestamp: new Date(),
                 isStreaming: false,
             }]);

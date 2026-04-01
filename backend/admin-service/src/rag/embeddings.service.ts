@@ -149,24 +149,56 @@ export class EmbeddingsService implements OnModuleInit {
       const currentDim = colInfo[0].atttypmod;
 
       if (currentDim !== this.EMBEDDING_DIM) {
-        this.logger.warn(
-          `⚠️ Schema mismatch detected (current: ${currentDim} dims, required: ${this.EMBEDDING_DIM} dims). Migrating...`,
+        const ragDocumentsExists = await this.dataSource.query(`
+          SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_name = 'rag_documents'
+          ) AS exists
+        `);
+        const docCount = ragDocumentsExists[0]?.exists
+          ? parseInt(
+            String(
+              (
+                await this.dataSource.query(`SELECT COUNT(*)::int AS cnt FROM rag_documents`)
+              )[0]?.cnt || 0,
+            ),
+            10,
+          )
+          : 0;
+        const embeddingCount = parseInt(
+          String(
+            (
+              await this.dataSource.query(`SELECT COUNT(*)::int AS cnt FROM rag_embeddings`)
+            )[0]?.cnt || 0,
+          ),
+          10,
         );
 
-        // 1. Clear incompatible embeddings
-        await this.dataSource.query('DELETE FROM rag_embeddings');
-        await this.dataSource.query('DELETE FROM rag_documents');
+        if (docCount > 0 || embeddingCount > 0) {
+          this.logger.error(
+            `❌ Vector schema mismatch detected (current: ${currentDim}, required: ${this.EMBEDDING_DIM}). ` +
+            `Automatic migration skipped to avoid deleting ${docCount} documents / ${embeddingCount} embeddings. ` +
+            `Run the explicit DB migration before restarting sync.`,
+          );
+          return;
+        }
 
-        // 2. Drop old indexes first
+        this.logger.warn(
+          `⚠️ Schema mismatch detected (current: ${currentDim} dims, required: ${this.EMBEDDING_DIM} dims). ` +
+          `Store is empty, applying safe migration...`,
+        );
+
+        // 1. Drop old indexes first
         await this.dataSource.query('DROP INDEX IF EXISTS idx_rag_embeddings_vector');
         await this.dataSource.query('DROP INDEX IF EXISTS rag_embeddings_embedding_idx');
 
-        // 3. Alter column to new dimension
+        // 2. Alter column to new dimension
         await this.dataSource.query(
           `ALTER TABLE rag_embeddings ALTER COLUMN embedding TYPE vector(${this.EMBEDDING_DIM})`,
         );
 
-        // 4. Create HNSW index (better for 1536+ dimensions)
+        // 3. Create HNSW index (better for 1536+ dimensions)
         try {
           await this.dataSource.query(`
             CREATE INDEX idx_rag_embeddings_vector 
@@ -182,7 +214,7 @@ export class EmbeddingsService implements OnModuleInit {
           `);
         }
 
-        // 5. Update semantic_search function to match new dimension
+        // 4. Update semantic_search function to match new dimension
         await this.dataSource.query(`
           CREATE OR REPLACE FUNCTION semantic_search(
               query_embedding vector(${this.EMBEDDING_DIM}),
@@ -213,7 +245,7 @@ export class EmbeddingsService implements OnModuleInit {
           $$ LANGUAGE plpgsql;
         `);
 
-        // 6. Update other tables if they exist
+        // 5. Update other tables if they exist
         const tables = ['rag_employee_profiles', 'rag_role_requirements'];
         for (const table of tables) {
           const tableExists = await this.dataSource.query(`
@@ -223,7 +255,6 @@ export class EmbeddingsService implements OnModuleInit {
             )
           `);
           if (tableExists[0].exists) {
-            await this.dataSource.query(`DELETE FROM ${table}`);
             await this.dataSource.query(
               `ALTER TABLE ${table} ALTER COLUMN embedding TYPE vector(${this.EMBEDDING_DIM})`,
             );
@@ -231,7 +262,7 @@ export class EmbeddingsService implements OnModuleInit {
         }
 
         this.logger.log(
-          `✅ Schema migrated to ${this.EMBEDDING_DIM} dimensions. Old data cleared.`,
+          `✅ Schema migrated to ${this.EMBEDDING_DIM} dimensions for the empty vector store.`,
         );
       } else {
         this.logger.log(`✅ Vector schema OK (${this.EMBEDDING_DIM} dimensions)`);
@@ -1082,81 +1113,136 @@ export class EmbeddingsService implements OnModuleInit {
     if (!this.pgvectorAvailable)
       return { success: 0, failed: documents.length };
 
-    // 1. Generate embeddings for all new contents
-    const contents = documents.map((d) => d.content);
-    const embeddings = await this.generateBatchEmbeddings(contents);
-
     let success = 0,
       failed = 0;
 
-    // 2. Process each document
-    for (let i = 0; i < documents.length; i++) {
-      const doc = documents[i];
-      const embedding = embeddings[i];
+    const pending: Array<{
+      doc: {
+        content: string;
+        category: string;
+        metadata?: Record<string, any>;
+        sourceTable?: string;
+        sourceId?: number;
+      };
+      existingId?: number;
+    }> = [];
 
-      if (!doc.sourceTable || !doc.sourceId) {
-        // If no source ID, fallback to regular insert
-        await this.storeDocument(doc.content, doc.category, doc.metadata);
-        success++;
+    // Preload existing source-backed docs so we only embed new/changed content.
+    const sourceIdsByTable = new Map<string, number[]>();
+    for (const doc of documents) {
+      if (!doc.sourceTable || doc.sourceId == null) continue;
+      const ids = sourceIdsByTable.get(doc.sourceTable) || [];
+      ids.push(doc.sourceId);
+      sourceIdsByTable.set(doc.sourceTable, ids);
+    }
+
+    const existingByKey = new Map<string, { id: number; content: string }>();
+    for (const [sourceTable, sourceIds] of sourceIdsByTable.entries()) {
+      const uniqueIds = [...new Set(sourceIds)];
+      if (uniqueIds.length === 0) continue;
+      const rows = await this.dataSource.query(
+        `SELECT id, content, source_id
+           FROM rag_documents
+          WHERE source_table = $1
+            AND source_id = ANY($2::bigint[])`,
+        [sourceTable, uniqueIds],
+      );
+      for (const row of rows) {
+        existingByKey.set(`${sourceTable}:${row.source_id}`, {
+          id: row.id,
+          content: row.content,
+        });
+      }
+    }
+
+    for (const doc of documents) {
+      if (doc.sourceTable && doc.sourceId != null) {
+        const existing = existingByKey.get(`${doc.sourceTable}:${doc.sourceId}`);
+        if (existing && existing.content === doc.content) {
+          success++;
+          continue;
+        }
+        pending.push({ doc, existingId: existing?.id });
         continue;
       }
+      pending.push({ doc });
+    }
 
+    if (pending.length === 0) {
+      return { success, failed };
+    }
+
+    // Only embed docs that truly need insert/update work.
+    const embeddings = await this.generateBatchEmbeddings(
+      pending.map((entry) => entry.doc.content),
+    );
+
+    // 2. Process each pending document
+    for (let i = 0; i < pending.length; i++) {
+      const { doc, existingId } = pending[i];
+      const embedding = embeddings[i];
       try {
-        // Check if exists
-        const existing = await this.dataSource.query(
-          `SELECT id, content FROM rag_documents WHERE source_table = $1 AND source_id = $2`,
-          [doc.sourceTable, doc.sourceId],
-        );
+        if (!embedding) {
+          this.logger.warn(
+            `Deferred ${existingId ? 'update' : 'insert'} for ${doc.sourceTable || 'inline'}:${doc.sourceId || 'N/A'} due to unavailable embedding (quota/backoff)`,
+          );
+          failed++;
+          continue;
+        }
 
-        if (existing.length > 0) {
-          // UPDATE
-          const id = existing[0].id;
+        if (existingId) {
+          await this.dataSource.query(
+            `UPDATE rag_documents
+                SET content = $1, metadata = $2, category = $3, updated_at = NOW()
+              WHERE id = $4`,
+            [doc.content, JSON.stringify(doc.metadata || {}), doc.category, existingId],
+          );
 
-          // Only update if content changed
-          if (existing[0].content !== doc.content) {
-            if (!embedding) {
-              // Keep document + embedding in sync; defer updates when embedding is unavailable.
-              this.logger.warn(
-                `Deferred update for ${doc.sourceTable}:${doc.sourceId} due to unavailable embedding (quota/backoff)`
-              );
-              failed++;
-              continue;
-            }
+          const vectorStr = `[${embedding.join(',')}]`;
+          const existingEmbedding = await this.dataSource.query(
+            `SELECT id FROM rag_embeddings WHERE document_id = $1 LIMIT 1`,
+            [existingId],
+          );
 
+          if (existingEmbedding.length > 0) {
             await this.dataSource.query(
-              `UPDATE rag_documents 
-                             SET content = $1, metadata = $2, updated_at = NOW()
-                             WHERE id = $3`,
-              [doc.content, JSON.stringify(doc.metadata), id],
+              `UPDATE rag_embeddings
+                  SET embedding = $1::vector
+                WHERE document_id = $2`,
+              [vectorStr, existingId],
             );
-
-            const vectorStr = `[${embedding.join(',')}]`;
+          } else {
             await this.dataSource.query(
-              `UPDATE rag_embeddings 
-                               SET embedding = $1::vector
-                               WHERE document_id = $2`,
-              [vectorStr, id],
+              `INSERT INTO rag_embeddings (document_id, embedding)
+               VALUES ($1, $2::vector)`,
+              [existingId, vectorStr],
             );
-            this.logger.debug(`Updated doc ${id}`);
-          }
-        } else {
-          // INSERT
-          if (!embedding) {
-            this.logger.warn(
-              `Deferred insert for ${doc.sourceTable}:${doc.sourceId} due to unavailable embedding (quota/backoff)`
-            );
-            failed++;
-            continue;
           }
 
-          await this.storeDocument(
+          this.logger.debug(`Updated doc ${existingId}`);
+          success++;
+          continue;
+        }
+
+        const docResult = await this.dataSource.query(
+          `INSERT INTO rag_documents (content, category, metadata, source_table, source_id)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING id`,
+          [
             doc.content,
             doc.category,
-            doc.metadata,
+            JSON.stringify(doc.metadata || {}),
             doc.sourceTable,
             doc.sourceId,
-          );
-        }
+          ],
+        );
+        const documentId = docResult[0].id;
+        const vectorStr = `[${embedding.join(',')}]`;
+        await this.dataSource.query(
+          `INSERT INTO rag_embeddings (document_id, embedding)
+           VALUES ($1, $2::vector)`,
+          [documentId, vectorStr],
+        );
         success++;
       } catch (error) {
         this.logger.error(
