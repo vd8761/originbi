@@ -1394,7 +1394,7 @@ export class StudentService {
         name,
         to,
         pass,
-        this.configService.get('FRONTEND_APP_URL') ?? 'http://localhost:3000',
+        this.configService.get('FRONTEND_URL') ?? 'https://mind.originbi.com/',
         assets,
         startDateTime,
         assessmentTitle,
@@ -1690,7 +1690,7 @@ export class StudentService {
       const emailHtml = getAssessmentCompletionEmailTemplate(
         registration.fullName || 'Student',
         password,
-        this.configService.get('FRONTEND_APP_URL') || 'http://localhost:3000',
+        this.configService.get('FRONTEND_URL') || 'https://mind.originbi.com/',
         assets,
         dateStr,
         ((registration as any).program?.reportTitle as string) ||
@@ -1882,7 +1882,7 @@ export class StudentService {
       const emailHtml = getReportDeliveryEmailTemplate(
         registration.fullName || 'Student',
         password,
-        this.configService.get('FRONTEND_APP_URL') || 'http://localhost:3000',
+        this.configService.get('FRONTEND_URL') || 'https://mind.originbi.com/',
         assets,
         examDate,
         reportTitle,
@@ -1970,7 +1970,7 @@ export class StudentService {
         studentCount,
         degreeType,
         departmentName,
-        this.configService.get('FRONTEND_APP_URL') || 'http://localhost:3000',
+        this.configService.get('FRONTEND_URL') || 'https://mind.originbi.com/',
       );
 
       const mailOptions = {

@@ -42,7 +42,7 @@ export class CorporateRegistrationsService {
   }
 
   private resolveWelcomeFrontendUrl(): string {
-    return 'https://mind.originbi.com';
+    return process.env.FRONTEND_URL || 'https://mind.originbi.com/';
   }
 
   async withRetry<T>(
