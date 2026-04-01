@@ -6,13 +6,30 @@ from datetime import datetime
 # ==========================================
 # CONFIGURATION
 # ==========================================
-DB_DSN = "postgres://postgres:postgres@localhost:5432/obidatanew"
-GROUP_ID = 29
+DB_DSN = "postgresql://neondb_owner:npg_Tj5ChLpNn9rP@ep-young-cherry-a48v28qx-pooler.us-east-1.aws.neon.tech/origin_neon?sslmode=require&channel_binding=require"
+
+# Set to a specific group ID if you want to limit the regeneration to one group, or None for all
+GROUP_ID = None
 
 def get_db_connection():
-    return psycopg2.connect(DB_DSN)
+    conn = psycopg2.connect(DB_DSN)
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        # Print connection resolution once so we can distinguish
+        # wrong-database issues from search_path issues.
+        cur.execute("""
+            SELECT
+                current_database() AS db,
+                current_user AS usr,
+                current_schema() AS schema,
+                current_setting('search_path') AS search_path,
+                to_regclass('assessment_answers') AS unqualified,
+                to_regclass('public.assessment_answers') AS qualified
+        """)
+        print(f"DB connection check: {dict(cur.fetchone())}")
+        cur.execute("SET search_path TO public")
+    return conn
 
-def get_target_users(cur, group_id):
+def get_target_users(cur, group_id=None):
     query = """
         SELECT DISTINCT
             s.group_id,
@@ -24,25 +41,30 @@ def get_target_users(cur, group_id):
             l2.metadata AS attempt_metadata,
             l2.assessment_level_id
         FROM
-            assessment_sessions s
+            public.assessment_sessions s
         JOIN
-            assessment_attempts l1 ON s.id = l1.assessment_session_id
+            public.assessment_attempts l1 ON s.id = l1.assessment_session_id
             AND l1.assessment_level_id = 1
             AND l1.status = 'COMPLETED'
         JOIN
-            assessment_attempts l2 ON s.id = l2.assessment_session_id
+            public.assessment_attempts l2 ON s.id = l2.assessment_session_id
             AND l2.assessment_level_id = 2
         WHERE
-            s.group_id = %s
-            AND l2.status NOT IN ('NOT_STARTED', 'COMPLETED')
+            l2.status NOT IN ('NOT_STARTED', 'COMPLETED')
             AND EXISTS (
                 SELECT 1
-                FROM assessment_answers ans
+                FROM public.assessment_answers ans
                 WHERE ans.assessment_attempt_id = l2.id
                   AND ans.status = 'ANSWERED'
-            );
+            )
     """
-    cur.execute(query, (group_id,))
+    if group_id is not None:
+        query += " AND s.group_id = %s;"
+        cur.execute(query, (group_id,))
+    else:
+        query += ";"
+        cur.execute(query)
+        
     return [dict(row) for row in cur.fetchall()]
 
 def calculate_scores(cur, attempt_id):
@@ -51,9 +73,9 @@ def calculate_scores(cur, attempt_id):
     # instead of relying on the potentially buggy 'answer_score' column in the answers table.
     query_agile = """
         SELECT q.category, COALESCE(SUM(o.score_value), 0) as total
-        FROM assessment_answers a
-        JOIN assessment_questions q ON a.main_question_id = q.id
-        LEFT JOIN assessment_question_options o ON a.main_option_id = o.id
+        FROM public.assessment_answers a
+        JOIN public.assessment_questions q ON a.main_question_id = q.id
+        LEFT JOIN public.assessment_question_options o ON a.main_option_id = o.id
         WHERE a.assessment_attempt_id = %s
         GROUP BY q.category
     """
@@ -95,7 +117,7 @@ def calculate_scores(cur, attempt_id):
         SELECT 
             COUNT(*) FILTER (WHERE is_attention_fail = true) as attention_fails, 
             COUNT(*) FILTER (WHERE is_distraction_chosen = true) as distractions_chosen
-        FROM assessment_answers
+        FROM public.assessment_answers
         WHERE assessment_attempt_id = %s
     """
     cur.execute(query_sincerity, (attempt_id,))
@@ -117,16 +139,24 @@ def calculate_scores(cur, attempt_id):
 
 def generate_report_number(cur, group_id, program_id):
     # Fetch Program Code
-    cur.execute("SELECT code FROM programs WHERE id = %s", (program_id,))
+    cur.execute("SELECT code FROM public.programs WHERE id = %s", (program_id,))
     program = cur.fetchone()
     program_code = program['code'] if program else "UNK"
 
+    short_code_map = {
+        "COLLEGE_STUDENT": "CS",
+        "SCHOOL_STUDENT": "SS",
+        "EMPLOYEE": "E",
+        "CXO_GENERAL": "CG"
+    }
+    short_code = short_code_map.get(program_code, program_code)
+
     # Generate Prefix: OBI-G{group_id}-{Month/Year}-{Program code}-
     date_str = datetime.now().strftime("%m/%y")
-    report_prefix = f"OBI-G{group_id}-{date_str}-{program_code}-"
+    report_prefix = f"OBI-G{group_id}-{date_str}-{short_code}-"
     
     # Calculate Sequence
-    cur.execute("SELECT COUNT(*) as count FROM assessment_reports WHERE report_number LIKE %s", (report_prefix + '%',))
+    cur.execute("SELECT COUNT(*) as count FROM public.assessment_reports WHERE report_number LIKE %s", (report_prefix + '%',))
     count = cur.fetchone()['count']
     seq_num = count + 1
     
@@ -161,7 +191,7 @@ def fix_user_data(conn, user):
         
         # 3. Update Assessment Attempt
         update_attempt_query = """
-            UPDATE assessment_attempts
+            UPDATE public.assessment_attempts
             SET status = 'COMPLETED',
                 completed_at = NOW(),
                 metadata = %s,
@@ -181,7 +211,7 @@ def fix_user_data(conn, user):
 
         # 4. Update Assessment Session
         update_session_query = """
-            UPDATE assessment_sessions
+            UPDATE public.assessment_sessions
             SET status = 'COMPLETED',
                 completed_at = NOW(),
                 updated_at = NOW()
@@ -190,7 +220,7 @@ def fix_user_data(conn, user):
         cur.execute(update_session_query, (session_id,))
 
         # 5. Generate/Update Assessment Report
-        cur.execute("SELECT id FROM assessment_reports WHERE assessment_session_id = %s", (session_id,))
+        cur.execute("SELECT id FROM public.assessment_reports WHERE assessment_session_id = %s", (session_id,))
         existing_report = cur.fetchone()
         
         if not existing_report:
@@ -199,7 +229,7 @@ def fix_user_data(conn, user):
             # Fetch Level 1 data for the report
             cur.execute("""
                 SELECT metadata, sincerity_index, dominant_trait_id 
-                FROM assessment_attempts 
+                FROM public.assessment_attempts 
                 WHERE assessment_session_id = %s AND assessment_level_id = 1
             """, (session_id,))
             l1_data = cur.fetchone()
@@ -222,7 +252,7 @@ def fix_user_data(conn, user):
                 dom_trait = l1_data['dominant_trait_id']
 
             create_report_query = """
-                INSERT INTO assessment_reports (
+                INSERT INTO public.assessment_reports (
                     assessment_session_id, report_number, generated_at,
                     disc_scores, agile_scores, level3_scores, level4_scores,
                     overall_sincerity, dominant_trait_id, metadata, created_at, updated_at
@@ -241,7 +271,7 @@ def fix_user_data(conn, user):
             # If report exists, update the missing scores
             print(f"  - Updating existing report ID: {existing_report['id']}")
             update_report_query = """
-                UPDATE assessment_reports
+                UPDATE public.assessment_reports
                 SET agile_scores = %s,
                     overall_sincerity = %s,
                     updated_at = NOW()
@@ -266,7 +296,10 @@ def main():
         target_users = get_target_users(cur, GROUP_ID)
         cur.close()
         
-        print(f"Found {len(target_users)} users to fix in Group {GROUP_ID}")
+        if GROUP_ID is not None:
+            print(f"Found {len(target_users)} users to fix in Group {GROUP_ID}")
+        else:
+            print(f"Found {len(target_users)} users to fix across all groups")
         
         for user in target_users:
             fix_user_data(conn, user)

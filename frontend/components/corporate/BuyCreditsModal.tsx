@@ -93,41 +93,43 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
 
                 {/* Header */}
                 {/* Header */}
-                <div className="px-3 py-2.5 flex items-center justify-between border-b border-gray-100 dark:border-white/10 relative min-h-[50px]">
-                    <h2 className="text-[15px] sm:text-[16px] font-bold text-[#150089] dark:text-white leading-none tracking-tight truncate max-w-[100px] xs:max-w-none">Buy Credits</h2>
+                <div className="px-5 py-3 flex items-center justify-between relative min-h-[50px]">
+                    <h2 className="text-[14px] sm:text-[15px] font-bold text-[#150089] dark:text-white leading-none tracking-tight">Buy Credits</h2>
 
                     {/* Centered Badge - Responsive for mobile and desktop */}
-                    <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5 sm:gap-2 bg-[#F8F9FB] dark:bg-white/10 pl-2 pr-3 py-1.5 rounded-[8px] whitespace-nowrap border border-gray-50 dark:border-white/5">
-                        <CoinIcon className="w-4 h-4 sm:w-5 sm:h-5 text-[#FBC02D] drop-shadow-sm" />
-                        <span className="text-[11px] sm:text-[13px] font-medium text-[#19211C] dark:text-white">
-                            <span className="text-gray-500 dark:text-gray-400">Current Balance</span> <span className="text-[#1ED36A] font-bold ml-0.5 sm:ml-1">{currentBalance} <span className="hidden xs:inline">Credits</span></span>
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-1.5 bg-[#F8F9FB] dark:bg-white/5 pl-2 pr-2.5 py-1.5 rounded-[8px] whitespace-nowrap border border-gray-50 dark:border-white/5">
+                        <CoinIcon className="w-3.5 h-3.5 text-[#FBC02D] drop-shadow-sm" />
+                        <span className="text-[10px] sm:text-[11px] font-medium text-[#19211C] dark:text-white flex items-center gap-1">
+                            <span className="text-gray-500 dark:text-gray-400 font-bold">Current Balance</span>
+                            <span className="text-[#1ED36A] font-extrabold">{currentBalance} <span className="ml-0.5">Credits</span></span>
                         </span>
                     </div>
 
                     <button
                         onClick={onClose}
-                        className="w-8 h-8 rounded-full bg-[#1ED36A] hover:bg-[#16b058] flex items-center justify-center transition-all shadow-md group active:scale-95 shrink-0"
+                        className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center transition-all group active:scale-95 shrink-0"
                     >
-                        <X className="w-4 h-4 text-white transition-transform duration-300 group-hover:rotate-90" strokeWidth={3} />
+                        <X className="w-4 h-4 text-[#1ED36A] transition-transform duration-300 group-hover:rotate-90" strokeWidth={3} />
                     </button>
                 </div>
 
+                {/* Separator Line below header */}
+                <div className="w-[92%] mx-auto h-[1px] bg-gray-100 dark:bg-white/10" />
                 {/* Price Display */}
-                <div className="text-center pt-3 pb-4 px-3">
-                    <div className="text-[11px] sm:text-[12px] text-[#19211C] dark:text-gray-400 font-medium mb-0.5">
-                        <span className="font-bold text-[#150089] dark:text-white line-clamp-1">₹{PER_CREDIT_COST} Per Credit (Taxes Extra, If Applicable)</span>
+                <div className="text-center pt-5 pb-6 px-5">
+                    <div className="text-[11px] sm:text-[12px] text-[#19211C] dark:text-gray-400 font-medium mb-1.5">
+                        <span className="font-bold text-[#150089] dark:text-white">₹{PER_CREDIT_COST} Per Credit (Taxes Extra, If Applicable)</span>
                     </div>
                     <div className="flex flex-wrap items-baseline justify-center gap-x-1.5 leading-none">
-                        <span className="text-[24px] sm:text-[28px] font-bold text-[#150089] dark:text-[#1ED36A] tracking-tight">₹{totalCost.toLocaleString()}</span>
-                        <span className="text-[14px] sm:text-[16px] text-[#150089] dark:text-white font-medium whitespace-nowrap">for {credits} Credits</span>
+                        <span className="text-[26px] sm:text-[32px] font-bold text-[#150089] dark:text-[#1ED36A] tracking-tight">{credits} Credits</span>
                     </div>
                 </div>
 
                 {/* Scrollable Content Area */}
-                <div className="overflow-y-auto no-scrollbar flex-1 px-3 pb-2 space-y-2">
+                <div className="overflow-y-auto no-scrollbar flex-1 px-5 pb-3 space-y-3">
 
                     {/* Main Card: Credits To Purchase */}
-                    <div className="bg-[#F8F9FB] dark:bg-white/5 rounded-[14px] p-3">
+                    <div className="bg-[#F8F9FB] dark:bg-white/5 rounded-[10px] p-4">
                         <div className="text-center text-[13px] font-semibold text-[#19211C] dark:text-white mb-3">Credits To Purchase</div>
 
                         {/* Slider Section */}
@@ -179,13 +181,14 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                                     min={INPUT_MIN}
                                     max={INPUT_MAX}
                                     value={credits}
+                                    step={25}
                                     onChange={handleSliderChange}
                                     className="absolute w-full h-full opacity-0 cursor-pointer z-30"
                                 />
                             </div>
 
                             <div className="flex justify-between text-[12px] font-medium text-gray-400 mt-[-4px]">
-                                <span>0</span>
+                                <span>25</span>
                                 <span>1000</span>
                             </div>
                         </div>
@@ -205,9 +208,9 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                                     <button
                                         key={val}
                                         onClick={() => handleQuickSelect(val)}
-                                        className={`h-[30px] rounded-[8px] text-[12px] font-bold transition-all border
+                                        className={`h-[30px] rounded-[4px] text-[12px] font-bold transition-all border
                                             ${credits === val
-                                                ? 'bg-[#E0F8E9] text-[#19211C] border-[#1ED36A] shadow-sm'
+                                                ? 'bg-[#E0F8E9] dark:bg-[#1ED36A]/20 text-[#19211C] dark:text-[#1ED36A] border-[#1ED36A]'
                                                 : 'bg-[#F3F4F6] dark:bg-white/5 text-[#19211C] dark:text-white border-transparent hover:bg-gray-200 dark:hover:bg-[#2A2D31]'
                                             }`}
                                     >
@@ -233,7 +236,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                                                 setCredits(MIN_CREDIT_PURCHASE);
                                             }
                                         }}
-                                        className="w-full h-[30px] rounded-[8px] bg-[#F3F4F6] dark:bg-white/5 text-[12px] px-1 text-center font-bold outline-none border-2 border-transparent focus:border-[#1ED36A] focus:bg-white dark:focus:bg-[#24272C] placeholder:text-gray-400 text-[#19211C] dark:text-white transition-all"
+                                        className="w-full h-[30px] rounded-[6px] bg-[#F3F4F6] dark:bg-white/5 text-[12px] px-1 text-center font-bold outline-none border-2 border-transparent focus:border-[#1ED36A] focus:bg-white dark:focus:bg-[#24272C] placeholder:text-gray-400 text-[#19211C] dark:text-white transition-all"
                                     />
                                 </div>
                             </div>
@@ -241,7 +244,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                     </div>
 
                     {/* Pricing Summary - Accordion Style */}
-                    <div className="bg-[#F8F9FB] dark:bg-white/5 rounded-[14px] px-3 pt-2.5 pb-3 cursor-pointer transition-all border border-transparent hover:border-gray-200 dark:hover:border-white/10" onClick={() => setIsPricingExpanded(!isPricingExpanded)}>
+                    <div className="bg-[#F8F9FB] dark:bg-white/5 rounded-[10px] px-4 pt-2.5 pb-3 cursor-pointer transition-all border border-transparent hover:border-gray-200 dark:hover:border-white/10" onClick={() => setIsPricingExpanded(!isPricingExpanded)}>
                         <div className="flex justify-between items-center">
                             <h4 className="font-bold text-[13px] text-[#19211C] dark:text-white">Pricing Summary</h4>
                             <svg
@@ -274,10 +277,10 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({
                 </div>
 
                 {/* Footer Fixed at Bottom */}
-                <div className="p-3 bg-white dark:bg-[#19211C]">
+                <div className="pt-1 pb-3 px-3 bg-white dark:bg-[#19211C]">
                     <button
                         onClick={handleBuy}
-                        className="w-full bg-[#1ED36A] hover:bg-[#16b058] text-white font-bold text-[14px] py-2 rounded-full shadow-[0_8px_20px_rgba(30,211,106,0.3)] hover:shadow-[0_10px_25px_rgba(30,211,106,0.4)] transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 tracking-wide"
+                        className="w-[96%] mx-auto bg-[#1ED36A] hover:bg-[#16b058] text-white font-bold text-[14px] py-2.5 rounded-full transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 tracking-wide"
                     >
                         <FlashIcon className="w-[18px] h-[20px] text-white" />
                         Buy Credits

@@ -1,8 +1,11 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { fetchAuthSession } from 'aws-amplify/auth';
 import { capitalizeWords } from "../../lib/utils";
+
+const API_BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "";
 
 interface AffiliateDocument {
     key: string;
@@ -18,10 +21,40 @@ interface AffiliateDetailsViewProps {
 const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBack }) => {
     const [previewDoc, setPreviewDoc] = useState<AffiliateDocument | null>(null);
     const [currentSettlementPage, setCurrentSettlementPage] = useState(1);
-    const settlementsPerPage = 5;
+    const [referrals, setReferrals] = useState<any[]>([]);
+    const [loadingReferrals, setLoadingReferrals] = useState(false);
+    const [currentReferralPage, setCurrentReferralPage] = useState(1);
+    const referralsPerPage = 5;
 
     const aadharDocs: AffiliateDocument[] = data.aadhar_documents || [];
     const panDocs: AffiliateDocument[] = data.pan_documents || [];
+
+    useEffect(() => {
+        const fetchReferrals = async () => {
+            if (!data.id) return;
+            setLoadingReferrals(true);
+            try {
+                const session = await fetchAuthSession();
+                const idToken = session.tokens?.idToken?.toString();
+                const res = await fetch(`${API_BASE}/admin/affiliates/${data.id}/referrals?limit=100`, {
+                    headers: {
+                        "Authorization": `Bearer ${idToken}`
+                    }
+                });
+                if (!res.ok) throw new Error("Failed to fetch referrals");
+                const json = await res.json();
+                setReferrals(json.data || []);
+            } catch (err) {
+                console.error("Error fetching referrals:", err);
+            } finally {
+                setLoadingReferrals(false);
+            }
+        };
+
+        fetchReferrals();
+    }, [data.id]);
+
+    const settlementsPerPage = 5;
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-IN', {
@@ -226,27 +259,70 @@ const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBac
                     </svg>
                     Payment Details
                 </h4>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-10 relative">
+                    {/* Vertical Divider for Large Screens */}
+                    <div className="hidden lg:block absolute left-1/2 top-0 bottom-0 w-px bg-brand-light-tertiary dark:bg-brand-dark-tertiary/20 -translate-x-1/2" />
+
                     {/* UPI Details */}
                     <div>
-                        <h5 className="text-sm font-semibold text-brand-text-light-primary dark:text-white mb-4 flex items-center gap-2">
-                            UPI Details
-                        </h5>
-                        <div className="space-y-4 pl-4">
-                            <DetailItem label="UPI ID" value={data.upi_id} />
-                            <DetailItem label="UPI Number" value={data.upi_number} />
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-8 h-8 rounded-lg bg-brand-green/10 flex items-center justify-center text-brand-green">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                            </div>
+                            <h5 className="text-sm font-bold text-brand-text-light-primary dark:text-white uppercase tracking-wider">
+                                UPI Configuration
+                            </h5>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <PaymentDetailItem
+                                label="UPI ID"
+                                value={data.upi_id}
+                                icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>}
+                            />
+                            <PaymentDetailItem
+                                label="UPI Number"
+                                value={data.upi_number}
+                                icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>}
+                            />
                         </div>
                     </div>
+
                     {/* Bank Details */}
                     <div>
-                        <h5 className="text-sm font-semibold text-brand-text-light-primary dark:text-white mb-4 flex items-center gap-2">
-                            Bank Account Details
-                        </h5>
-                        <div className="space-y-4 pl-4">
-                            <DetailItem label="Account Holder Name" value={capitalizeWords(data.banking_name)} />
-                            <DetailItem label="Account Number" value={data.account_number} />
-                            <DetailItem label="IFSC Code" value={data.ifsc_code} />
-                            <DetailItem label="Branch Name" value={data.branch_name} />
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-8 h-8 rounded-lg bg-brand-green/10 flex items-center justify-center text-brand-green">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                            </div>
+                            <h5 className="text-sm font-bold text-brand-text-light-primary dark:text-white uppercase tracking-wider">
+                                Bank Account Details
+                            </h5>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <PaymentDetailItem
+                                label="Holder Name"
+                                value={capitalizeWords(data.banking_name)}
+                                icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>}
+                            />
+                            <PaymentDetailItem
+                                label="Account Number"
+                                value={data.account_number}
+                                icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>}
+                            />
+                            <PaymentDetailItem
+                                label="IFSC Code"
+                                value={data.ifsc_code}
+                                icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>}
+                            />
+                            <PaymentDetailItem
+                                label="Branch"
+                                value={data.branch_name}
+                                icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>}
+                            />
                         </div>
                     </div>
                 </div>
@@ -329,6 +405,137 @@ const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBac
                             <button
                                 onClick={() => setCurrentSettlementPage(prev => Math.min(Math.ceil(data.settlements.length / settlementsPerPage), prev + 1))}
                                 disabled={currentSettlementPage >= Math.ceil(data.settlements.length / settlementsPerPage)}
+                                className="p-2 rounded-lg border border-brand-light-tertiary dark:border-brand-dark-tertiary text-brand-text-light-primary dark:text-white disabled:opacity-30 hover:bg-brand-light-secondary dark:hover:bg-brand-dark-secondary transition-colors"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Referral List Section */}
+            <div className="bg-brand-light-primary dark:bg-brand-dark-primary p-6 rounded-xl border border-brand-light-tertiary dark:border-brand-dark-tertiary">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <h4 className="text-lg font-semibold text-brand-text-light-primary dark:text-white flex items-center gap-2">
+                        <svg className="w-5 h-5 text-brand-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        Referral List
+                    </h4>
+                    <div className="flex items-center gap-2">
+                        <span className="px-3 py-1 rounded-full bg-brand-light-secondary dark:bg-brand-dark-secondary text-[11px] font-bold text-brand-text-light-secondary dark:text-brand-text-secondary border border-brand-light-tertiary dark:border-brand-dark-tertiary uppercase tracking-wider">
+                            {referrals.length} Students Referred
+                        </span>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="border-b border-brand-light-tertiary dark:border-brand-dark-tertiary">
+                                <th className="pb-3 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider">Student Details</th>
+                                <th className="pb-3 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider">Registered On</th>
+                                <th className="pb-3 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider">Status</th>
+                                <th className="pb-3 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider">Board/Level</th>
+                                <th className="pb-3 text-xs font-semibold text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-wider text-right">Commission</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-brand-light-tertiary dark:divide-brand-dark-tertiary/50">
+                            {loadingReferrals ? (
+                                Array.from({ length: 3 }).map((_, i) => (
+                                    <tr key={i} className="animate-pulse">
+                                        <td colSpan={5} className="py-4">
+                                            <div className="h-10 bg-gray-100 dark:bg-white/5 rounded-lg w-full"></div>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : referrals && referrals.length > 0 ? (
+                                referrals
+                                    .slice((currentReferralPage - 1) * referralsPerPage, currentReferralPage * referralsPerPage)
+                                    .map((r: any) => (
+                                        <tr key={r.id} className="group hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                                            <td className="py-4 text-sm align-middle">
+                                                <div className="flex flex-col min-w-0">
+                                                    <span className="text-brand-text-light-primary dark:text-white font-bold leading-tight truncate">
+                                                        {capitalizeWords(r.name)}
+                                                    </span>
+                                                    <span className="text-[11px] text-brand-text-light-secondary dark:text-brand-text-secondary opacity-60 truncate">
+                                                        {r.email}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="py-4 text-sm text-brand-text-light-primary dark:text-white font-medium align-middle">
+                                                {new Date(r.registeredOn).toLocaleDateString('en-IN', {
+                                                    day: '2-digit',
+                                                    month: 'short',
+                                                    year: 'numeric'
+                                                })}
+                                            </td>
+                                            <td className="py-4 text-sm align-middle">
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                                    r.status === 'converted' 
+                                                    ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
+                                                    : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                                                }`}>
+                                                    {r.status}
+                                                </span>
+                                            </td>
+                                            <td className="py-4 text-sm text-brand-text-light-secondary dark:text-brand-text-secondary align-middle">
+                                                <div className="flex flex-col">
+                                                    <span className="font-semibold text-xs text-brand-text-light-primary dark:text-white">{r.studentBoard}</span>
+                                                    <span className="text-[10px] opacity-70">{r.schoolLevel} {r.schoolStream !== '—' ? `• ${r.schoolStream}` : ''}</span>
+                                                </div>
+                                            </td>
+                                            <td className="py-4 text-sm text-brand-green font-bold text-right align-middle">
+                                                <div className="flex flex-col items-end">
+                                                    <span>{formatCurrency(r.totalEarnedCommission)}</span>
+                                                    <span className="text-[9px] text-brand-text-light-secondary dark:text-brand-text-secondary font-normal opacity-60">
+                                                        via {r.commissionPercentage}% share
+                                                    </span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={5} className="py-10 text-center text-sm text-brand-text-light-secondary dark:text-brand-text-secondary opacity-60">
+                                        <div className="flex flex-col items-center gap-2">
+                                            <svg className="w-8 h-8 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                            </svg>
+                                            No students registered under this affiliate yet.
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {referrals && referrals.length > referralsPerPage && (
+                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-brand-light-tertiary dark:border-brand-dark-tertiary/30">
+                        <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary opacity-70">
+                            Showing {((currentReferralPage - 1) * referralsPerPage) + 1} to {Math.min(currentReferralPage * referralsPerPage, referrals.length)} of {referrals.length} referrals
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setCurrentReferralPage(prev => Math.max(1, prev - 1))}
+                                disabled={currentReferralPage === 1}
+                                className="p-2 rounded-lg border border-brand-light-tertiary dark:border-brand-dark-tertiary text-brand-text-light-primary dark:text-white disabled:opacity-30 hover:bg-brand-light-secondary dark:hover:bg-brand-dark-secondary transition-colors"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+                            <span className="text-sm font-semibold text-brand-text-light-primary dark:text-white">
+                                {currentReferralPage}
+                            </span>
+                            <button
+                                onClick={() => setCurrentReferralPage(prev => Math.min(Math.ceil(referrals.length / referralsPerPage), prev + 1))}
+                                disabled={currentReferralPage >= Math.ceil(referrals.length / referralsPerPage)}
                                 className="p-2 rounded-lg border border-brand-light-tertiary dark:border-brand-dark-tertiary text-brand-text-light-primary dark:text-white disabled:opacity-30 hover:bg-brand-light-secondary dark:hover:bg-brand-dark-secondary transition-colors"
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -566,6 +773,24 @@ const DetailItem = ({ label, value }: { label: string; value?: string | number |
         <p className="text-base font-medium text-brand-text-light-primary dark:text-white">
             {value || '-'}
         </p>
+    </div>
+);
+
+const PaymentDetailItem = ({ label, icon, value }: { label: string; icon?: React.ReactNode; value?: string | number | null }) => (
+    <div className="p-4 rounded-xl bg-brand-light-secondary/50 dark:bg-brand-dark-secondary/30 border border-brand-light-tertiary dark:border-brand-dark-tertiary/10 flex items-center justify-between group hover:border-brand-green/30 transition-all duration-300">
+        <div className="flex flex-col min-w-0">
+            <span className="text-[10px] text-brand-text-light-secondary dark:text-brand-text-secondary uppercase tracking-[0.1em] font-bold opacity-60 mb-1">
+                {label}
+            </span>
+            <span className="text-sm font-bold text-brand-text-light-primary dark:text-white truncate" title={value?.toString() || '-'}>
+                {value || '-'}
+            </span>
+        </div>
+        {icon && (
+            <div className="p-2 rounded-lg bg-white dark:bg-brand-dark-primary text-brand-green shadow-sm border border-brand-light-tertiary dark:border-brand-dark-tertiary/20 group-hover:scale-110 transition-transform shrink-0 ml-3">
+                {icon}
+            </div>
+        )}
     </div>
 );
 

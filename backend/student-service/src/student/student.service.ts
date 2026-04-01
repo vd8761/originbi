@@ -77,7 +77,7 @@ export class StudentService {
     @InjectRepository(SchoolStream)
     private readonly schoolStreamRepo: Repository<SchoolStream>,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   /**
    * Creates a configured nodemailer transporter backed by AWS SES v2.
@@ -547,8 +547,8 @@ export class StudentService {
           totalCount > 0
             ? totalCount
             : level?.levelNumber === 2 ||
-              level?.name.includes('ACI') ||
-              level?.patternType === 'ACI'
+                level?.name.includes('ACI') ||
+                level?.patternType === 'ACI'
               ? 25
               : 60,
         unlockTime: unlockTime,
@@ -687,12 +687,6 @@ export class StudentService {
   // PUBLIC REGISTER
   // ---------------------------------------------------------------------------
   async register(dto: CreateRegistrationDto) {
-    this.logger.log(`[Register Debug] Register called for: ${dto.email}`);
-    this.logger.log(`[Register Debug] Payload: ${JSON.stringify(dto)}`);
-    this.logger.log(
-      `[Register Debug] Public registration attempt for: ${dto.email}`,
-    );
-
     try {
       // 1. Check if User exists
       let user = await this.userRepo.findOne({
@@ -741,6 +735,9 @@ export class StudentService {
           gender: dto.gender,
           hasChangedPassword: true, // Assuming allow login immediately
           cognitoSub: cognitoSub, // Store in metadata if not in column
+          ...(dto.metadata || {}), // Merge extra metadata
+          currentRole: dto.current_role || dto.metadata?.current_role,
+          roleDescription: dto.role_description || dto.metadata?.role_description,
         },
         createdAt: new Date(),
       });
@@ -758,7 +755,11 @@ export class StudentService {
         throw new Error(`Program ${programCode} not found`);
       }
 
-      // 5. Create Registration (Force TS Check)
+      // 5. Calculate Registration Amount
+      const configAmount = this.configService.get('REGISTRATION_COST') || 500;
+      const registrationAmountStr = (dto.payment_amount || configAmount).toString();
+
+      // 6. Create Registration (Force TS Check)
       const registration = this.sessionRepo.manager.create(Registration, {
         userId: user.id,
         registrationSource: dto.referral_code ? 'AFFILIATE' : 'SELF',
@@ -772,11 +773,18 @@ export class StudentService {
         studentBoard: dto.student_board || dto.studentBoard, // Explicit assignment
         // metadata: { ... } below also stores it
         status: 'COMPLETED' as RegistrationStatus,
-        paymentStatus: 'NOT_REQUIRED' as PaymentStatus,
+        paymentStatus: 'PAID' as PaymentStatus,
+        paymentAmount: registrationAmountStr,
+        paymentProvider: dto.payment_provider || 'RAZORPAY',
+        paymentReference: dto.payment_reference,
+        paidAt: new Date(),
         metadata: {
           groupCode: dto.group_code,
           studentBoard: dto.student_board || dto.studentBoard, // Store in metadata as well
           sendEmail: true,
+          ...(dto.metadata || {}), // Merge extra metadata
+          currentRole: dto.current_role || dto.metadata?.current_role,
+          roleDescription: dto.role_description || dto.metadata?.role_description,
         },
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -803,9 +811,7 @@ export class StudentService {
           );
 
           // Determine commission
-          const registrationAmount = Number(
-            this.configService.get('REGISTRATION_COST') || 500,
-          );
+          const registrationAmount = Number(registrationAmountStr);
           const commissionPercentage = affiliate.commissionPercentage || 0;
           const earnedCommission =
             (registrationAmount * commissionPercentage) / 100;
@@ -1388,7 +1394,7 @@ export class StudentService {
         name,
         to,
         pass,
-        this.configService.get('FRONTEND_APP_URL') ?? 'http://localhost:3000',
+        this.configService.get('FRONTEND_URL') ?? 'https://mind.originbi.com/',
         assets,
         startDateTime,
         assessmentTitle,
@@ -1520,6 +1526,16 @@ export class StudentService {
         }
       }
       // --------------------------------------------
+
+      if (
+        registration.registrationSource !== 'SELF' &&
+        registration.registrationSource !== 'AFFILIATE'
+      ) {
+        this.logger.log(
+          `Skipping automatic report generation and email for registration source: ${registration.registrationSource} (User: ${userId})`
+        );
+        return;
+      }
 
       // 2. Trigger Report Generation
       const port = process.env.PORT || 4004;
@@ -1674,11 +1690,11 @@ export class StudentService {
       const emailHtml = getAssessmentCompletionEmailTemplate(
         registration.fullName || 'Student',
         password,
-        this.configService.get('FRONTEND_APP_URL') || 'http://localhost:3000',
+        this.configService.get('FRONTEND_URL') || 'https://mind.originbi.com/',
         assets,
         dateStr,
         ((registration as any).program?.reportTitle as string) ||
-        'Self Discovery Report',
+          'Self Discovery Report',
       );
 
       try {
@@ -1759,12 +1775,10 @@ export class StudentService {
         throw new Error(`No completed session found for user ${userId}`);
       }
 
-      // 4. Get report entity for password
-      const reportEntity = await this.assessmentReportRepository.findOne({
+      // 4. Get report entity to update later
+      let reportEntity = await this.assessmentReportRepository.findOne({
         where: { assessmentSessionId: session.id },
       });
-
-      const password = reportEntity?.reportPassword || 'Please contact support';
 
       // 5. Generate + download PDF
       const port = this.configService.get<number>('PORT') || 4004;
@@ -1818,6 +1832,12 @@ export class StudentService {
         );
       }
 
+      // Re-fetch report entity for password since generation creates it if missing
+      reportEntity = await this.assessmentReportRepository.findOne({
+        where: { assessmentSessionId: session.id },
+      });
+      const password = reportEntity?.reportPassword || 'Please contact support';
+
       // Download PDF
       const downloadUrl = `${reportServiceUrl}/download/status/${jobId}`;
       const pdfResponse = await lastValueFrom(
@@ -1838,15 +1858,15 @@ export class StudentService {
       // 6. Build exam date from session
       const examDate = session.updatedAt
         ? new Date(session.updatedAt).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        })
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          })
         : new Date().toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        });
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          });
 
       const reportTitle =
         ((registration as any).program?.reportTitle as string) ||
@@ -1862,7 +1882,7 @@ export class StudentService {
       const emailHtml = getReportDeliveryEmailTemplate(
         registration.fullName || 'Student',
         password,
-        this.configService.get('FRONTEND_APP_URL') || 'http://localhost:3000',
+        this.configService.get('FRONTEND_URL') || 'https://mind.originbi.com/',
         assets,
         examDate,
         reportTitle,
@@ -1873,11 +1893,15 @@ export class StudentService {
       // 7. Send email
       const transporter = this.createEmailTransporter();
 
+      const subject = isThirdParty 
+        ? `${registration.fullName || 'Student'}'s Assessment Report – ${reportTitle}`
+        : `Your Assessment Report – ${reportTitle}`;
+
       const mailOptions = {
         from: `"${this.configService.get('EMAIL_SEND_FROM_NAME') || 'Origin BI Mind Works'}" <${this.configService.get('EMAIL_FROM') || 'no-reply@originbi.com'}>`,
         to: recipientEmail,
         cc: [this.configService.get('EMAIL_CC') || ''],
-        subject: `Your Assessment Report – ${reportTitle}`,
+        subject,
         html: emailHtml,
         attachments: [
           {
@@ -1946,7 +1970,7 @@ export class StudentService {
         studentCount,
         degreeType,
         departmentName,
-        this.configService.get('FRONTEND_APP_URL') || 'http://localhost:3000',
+        this.configService.get('FRONTEND_URL') || 'https://mind.originbi.com/',
       );
 
       const mailOptions = {

@@ -9,7 +9,7 @@ export default function LoginPage() {
     const router = useRouter();
 
     const handleLoginSuccess = () => {
-        router.push('/admin/programs');
+        router.push('/admin/dashboard');
     };
 
     const handleBack = () => {

@@ -50,6 +50,7 @@ export class AssessmentService {
     status?: string,
     userId?: string,
     type?: string,
+    emailStatus?: string,
   ) {
     try {
       // NEW LOGIC FOR GROUP ASSESSMENTS
@@ -173,6 +174,22 @@ export class AssessmentService {
         qb.andWhere('(as.groupId IS NULL OR as.groupId = 0)');
       }
 
+      // LEFT JOIN assessment_reports for email status filtering only
+      qb.leftJoin(
+        'assessment_reports',
+        'ar',
+        'ar.assessment_session_id = as.id',
+      );
+
+      // Email status filter
+      if (emailStatus === 'not_sent') {
+        qb.andWhere('(ar.email_sent IS NULL OR ar.email_sent = false)');
+      } else if (emailStatus === 'sent') {
+        qb.andWhere('ar.email_sent = true AND ar.email_sent_to = u.email');
+      } else if (emailStatus === 'third_party') {
+        qb.andWhere('ar.email_sent = true AND ar.email_sent_to != u.email');
+      }
+
       if (sortBy) {
         let sortCol = '';
         switch (sortBy) {
@@ -247,7 +264,30 @@ export class AssessmentService {
         totalLevels,
         currentLevel:
           currentLevelsMap[r.id] || (r.status === 'NOT_STARTED' ? 0 : 1),
+        userId: r.userId,
       }));
+
+      // Fetch email status from assessment_reports via raw query for all session IDs
+      if (augmentedRows.length > 0) {
+        const ids = augmentedRows.map(r => r.id);
+        const emailData: Array<{ session_id: number; email_sent: boolean; email_sent_to: string }> =
+          await this.sessionRepo.manager.query(
+            `SELECT assessment_session_id as session_id, email_sent, email_sent_to
+             FROM assessment_reports
+             WHERE assessment_session_id = ANY($1::int[])`,
+            [ids],
+          );
+        const emailMap = emailData.reduce((acc, e) => {
+          acc[e.session_id] = e;
+          return acc;
+        }, {} as Record<number, typeof emailData[0]>);
+
+        augmentedRows.forEach((r: any) => {
+          const e = emailMap[r.id];
+          r.emailSent = e?.email_sent ?? null;
+          r.emailSentTo = e?.email_sent_to ?? null;
+        });
+      }
 
       return { data: augmentedRows, total, page, limit };
     } catch (error) {
@@ -311,15 +351,20 @@ export class AssessmentService {
       let reportAgileScores: any = null;
       try {
         const report = await this.sessionRepo.manager.query(
-          `SELECT report_password as "reportPassword", agile_scores as "agileScores" FROM assessment_reports WHERE assessment_session_id = $1 LIMIT 1`,
+          `SELECT report_password as "reportPassword", agile_scores as "agileScores", email_sent as "emailSent", email_sent_at as "emailSentAt", email_sent_to as "emailSentTo" FROM assessment_reports WHERE assessment_session_id = $1 LIMIT 1`,
           [id],
         );
         if (report && report.length > 0) {
+          if (!session.metadata) {
+            session.metadata = {};
+          }
           if (report[0].reportPassword) {
-            if (!session.metadata) {
-              session.metadata = {};
-            }
             session.metadata.reportPassword = report[0].reportPassword;
+          }
+          if (report[0].emailSent !== undefined) {
+             session.metadata.emailSent = report[0].emailSent;
+             session.metadata.emailSentAt = report[0].emailSentAt;
+             session.metadata.emailSentTo = report[0].emailSentTo;
           }
           if (report[0].agileScores) {
             reportAgileScores = report[0].agileScores;

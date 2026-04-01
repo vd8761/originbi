@@ -895,41 +895,92 @@ const getDiscData = (attempt: any) => {
 
 // Helper to extract ACI data
 const getAciData = (attempt: any) => {
+    // Default structure with placeholders
     let breakdown = [
-        { value: 'Commitment', score: '-', note: 'Deeply dedicated and consistent.' },
-        { value: 'Focus', score: '-', note: 'Exceptionally attentive to detail and priority.' },
-        { value: 'Openness', score: '-', note: 'Learning to adapt and welcome diverse approaches.' },
-        { value: 'Respect', score: '-', note: 'Professional tone with scope to show empathy.' },
-        { value: 'Courage', score: '-', note: 'Honest and principled; leads through integrity.' },
+        { value: 'Commitment', score: '-', note: '-' },
+        { value: 'Focus', score: '-', note: '-' },
+        { value: 'Openness', score: '-', note: '-' },
+        { value: 'Respect', score: '-', note: '-' },
+        { value: 'Courage', score: '-', note: '-' },
     ];
-    let compatibility = {
+    const compatibility = {
         totalScore: '0 / 125',
         level: '-',
         tag: '-',
         interpretation: '-'
     };
 
-    const scores = attempt?.metadata?.agile_scores || attempt?.metadata?.aci_scores || attempt?.metadata?.scores;
+    if (attempt) {
+        // 1. Resolve Scores
+        // Try multiple sources for scores
+        const meta = attempt.metadata || {};
+        const scores = meta.agile_scores || meta.aci_scores || meta.scores || {};
 
-    if (attempt && scores) {
+        // 2. Resolve Total Score
+        // specific score total OR attempt column OR metadata total
+        const rawTotal = scores['total'] || attempt.totalScore || meta.total_score || '0';
+        compatibility.totalScore = String(rawTotal).includes('/') ? rawTotal : `${rawTotal} / 125`;
+
+        // 3. Resolve Compatibility Info using Backend Enriched Data (Preferred)
+        if (attempt.aciBand) {
+            compatibility.level = attempt.aciBand.levelName || '-';
+            compatibility.tag = attempt.aciBand.compatibilityTag || '-';
+            compatibility.interpretation = attempt.aciBand.interpretation || '-';
+        } else {
+            // Fallback: Manual Calculation
+            const totalScoreVal = parseInt(String(rawTotal).split('/')[0], 10) || 0;
+            if (totalScoreVal >= 100) {
+                compatibility.level = 'Agile Naturalist';
+                compatibility.tag = 'Embodies agility instinctively; thrives in collaboration and adapts with ease.';
+                compatibility.interpretation = 'You live the Agile mindset naturally — showing balance between speed, empathy, and integrity.';
+            } else if (totalScoreVal >= 75) {
+                compatibility.level = 'Agile Adaptive';
+                compatibility.tag = 'Shows strong energy, adaptability, and creative courage with growing consistency.';
+                compatibility.interpretation = 'You’re quick to learn and adjust to change. You work well in dynamic situations but can refine your focus.';
+            } else if (totalScoreVal >= 50) {
+                compatibility.level = 'Agile Learner';
+                compatibility.tag = 'Understands Agile values conceptually but applies them inconsistently.';
+                compatibility.interpretation = 'You show openness to Agile ideas and collaboration but may need guidance on consistent application.';
+            } else {
+                compatibility.level = 'Agile Resistant';
+                compatibility.tag = 'Prefers control and predictability; finds comfort in fixed systems and routines.';
+                compatibility.interpretation = 'You may feel uncertain when faced with change or fast-moving teamwork. This is a growth area for you.';
+            }
+        }
+
+        // 4. Resolve Breakdown and Notes
+        // Use enriched notes from backend if available (checking metadata as fallback)
+        const notes = attempt.aciNotes || attempt.metadata?.aciNotes || {};
+
         breakdown = [
-            { value: 'Commitment', score: scores['Commitment'] || scores['commitment'] || '-', note: 'Deeply dedicated and consistent.' },
-            { value: 'Focus', score: scores['Focus'] || scores['focus'] || '-', note: 'Exceptionally attentive to detail and priority.' },
-            { value: 'Openness', score: scores['Openness'] || scores['openness'] || '-', note: 'Learning to adapt and welcome diverse approaches.' },
-            { value: 'Respect', score: scores['Respect'] || scores['respect'] || '-', note: 'Professional tone with scope to show empathy.' },
-            { value: 'Courage', score: scores['Courage'] || scores['courage'] || '-', note: 'Honest and principled; leads through integrity.' },
+            {
+                value: 'Commitment',
+                score: scores['Commitment'] || scores['commitment'] || '-',
+                note: notes['Commitment'] || '-'
+            },
+            {
+                value: 'Focus',
+                score: scores['Focus'] || scores['focus'] || '-',
+                note: notes['Focus'] || '-'
+            },
+            {
+                value: 'Openness',
+                score: scores['Openness'] || scores['openness'] || '-',
+                note: notes['Openness'] || '-'
+            },
+            {
+                value: 'Respect',
+                score: scores['Respect'] || scores['respect'] || '-',
+                note: notes['Respect'] || '-'
+            },
+            {
+                value: 'Courage',
+                score: scores['Courage'] || scores['courage'] || '-',
+                note: notes['Courage'] || '-'
+            },
         ];
-
-        const rawTotal = scores['total'] || attempt.totalScore || '0';
-        const trait = attempt.dominantTrait;
-
-        compatibility = {
-            totalScore: String(rawTotal).includes('/') ? rawTotal : `${rawTotal} / 125`,
-            level: trait?.blendedStyleName || attempt.sincerityClass || '-',
-            tag: trait?.blendedStyleDesc || '-',
-            interpretation: trait?.metadata?.interpretation || '-'
-        };
     }
+
     return { breakdown, compatibility };
 };
 

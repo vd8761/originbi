@@ -1,4 +1,5 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Put, Param, Body, Req, UseGuards } from '@nestjs/common';
+
 import { Request } from 'express';
 import { AdminService } from './admin.service';
 import { AdminLoginGuard } from '../adminlogin/adminlogin.guard';
@@ -34,4 +35,14 @@ export class AdminController {
       adminName: req.user?.fullName,
     };
   }
+  
+  @Put('assessments/:id/extend')
+  async extendAssessment(
+    @Param('id') id: string,
+    @Body('newDate') newDate: string,
+  ) {
+    return this.adminService.extendAssessmentSession(Number(id), newDate);
+  }
+
 }
+

@@ -7,6 +7,8 @@ from datetime import datetime
 # CONFIGURATION
 # ==========================================
 DB_DSN = "postgres://postgres:postgres@localhost:5432/obidatanew"
+# DB_DSN = "postgresql://neondb_owner:npg_Tj5ChLpNn9rP@ep-young-cherry-a48v28qx-pooler.us-east-1.aws.neon.tech/origin_neon?sslmode=require&channel_binding=require"
+
 GROUP_ID = 29 # Change this to the target Group ID (e.g., matching Dept Degree 3)
 
 def get_db_connection():
@@ -39,8 +41,17 @@ def generate_report_number(cur, group_id, program_id):
     cur.execute("SELECT code FROM programs WHERE id = %s", (program_id,))
     program = cur.fetchone()
     program_code = program['code'] if program else "UNK"
+    
+    short_code_map = {
+        "COLLEGE_STUDENT": "CS",
+        "SCHOOL_STUDENT": "SS",
+        "EMPLOYEE": "E",
+        "CXO_GENERAL": "CG"
+    }
+    short_code = short_code_map.get(program_code, program_code)
+
     date_str = datetime.now().strftime("%m/%y")
-    report_prefix = f"OBI-G{group_id}-{date_str}-{program_code}-"
+    report_prefix = f"OBI-G{group_id}-{date_str}-{short_code}-"
     
     cur.execute("SELECT COUNT(*) as count FROM assessment_reports WHERE report_number LIKE %s", (report_prefix + '%',))
     count = cur.fetchone()['count']

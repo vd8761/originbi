@@ -8,7 +8,7 @@ export class StudentController {
   constructor(
     private readonly studentService: StudentService,
     private readonly boss: PgBossService,
-  ) { }
+  ) {}
 
   @Post('profile')
   async getProfile(@Body() body: { email: string }): Promise<any> {
@@ -126,6 +126,34 @@ export class StudentController {
 
     return { message: 'Report email sending started' };
   }
+
+  @Post('send-bulk-report-emails')
+  async sendBulkReportEmails(@Body() body: { userIds: number[] }) {
+    const logger = new Logger('SendBulkReportEmails');
+    logger.log(`Received send-bulk-report-emails for ${body.userIds?.length || 0} users`);
+    if (!Array.isArray(body.userIds) || body.userIds.length === 0) {
+      return { message: '0 email jobs queued', enqueued: 0 };
+    }
+    let enqueued = 0;
+    const errors: number[] = [];
+    for (const userId of body.userIds) {
+      try {
+        await this.boss.scheduleJob(
+          'manual-report-email-queue',
+          { userId },
+          { retryLimit: 3, retryBackoff: true },
+        );
+        enqueued++;
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        logger.error(`Failed to enqueue job for userId ${userId}: ${error.message}`);
+        errors.push(userId);
+      }
+    }
+    logger.log(`Bulk email: ${enqueued} queued, ${errors.length} failed`);
+    return { message: `${enqueued} email job(s) queued`, enqueued, failed: errors };
+  }
+
 
   @Post('send-placement-report-email')
   async sendPlacementReportEmail(

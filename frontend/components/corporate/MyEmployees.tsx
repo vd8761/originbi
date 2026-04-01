@@ -9,7 +9,9 @@ import {
     ArrowLeftWithoutLineIcon,
     ArrowRightWithoutLineIcon,
     FilterFunnelIcon,
+    EmailIcon,
 } from '../icons';
+import CorporateBulkEmailTab from './CorporateBulkEmailTab';
 import { format } from "date-fns";
 import { toast } from "react-hot-toast";
 import BulkUploadRegistration from "./BulkUploadRegistration";
@@ -42,9 +44,17 @@ const MyEmployeesContent: React.FC = () => {
 
     const [view, setView] = useState<"list" | "add" | "bulk" | "preview" | "group-assessment-preview" | "group-candidate-assessment-preview">("list");
     const [selectedEmployee, setSelectedEmployee] = useState<Registration | null>(null);
-    const [activeTab, setActiveTab] = useState<"registrations" | "individual" | "group">("registrations");
+    const [activeTab, setActiveTab] = useState<"registrations" | "individual" | "group" | "send-emails">("registrations");
     const [selectedGroupSessionId, setSelectedGroupSessionId] = useState<string | null>(null);
     const [selectedSession, setSelectedSession] = useState<AssessmentSession | null>(null);
+
+    // Send Emails tab state
+    const [showSendEmailsTab, setShowSendEmailsTab] = useState(false);
+    const [sendEmailsPage, setSendEmailsPage] = useState(1);
+    const [sendEmailsEntriesPerPage, setSendEmailsEntriesPerPage] = useState(20);
+    const [sendEmailsTotal, setSendEmailsTotal] = useState(0);
+    const [showSendEmailsEntriesDropdown, setShowSendEmailsEntriesDropdown] = useState(false);
+    const sendEmailsEntriesRef = React.useRef<HTMLDivElement>(null);
 
     // Data State
     const [users, setUsers] = useState<Registration[]>([]);
@@ -146,6 +156,21 @@ const MyEmployeesContent: React.FC = () => {
                             corporate_account_id: r.corporateAccountId,
                             gender: r.gender,
                             groupName: r.group?.name || undefined,
+                            program_code: r.program?.code || r.metadata?.program_code ||
+                                (r.program?.name?.toLowerCase().includes('college') ? 'COLLEGE_STUDENT' :
+                                 r.metadata?.programType?.toLowerCase().includes('college') ? 'COLLEGE_STUDENT' :
+                                 r.program?.name?.toLowerCase().includes('school') ? 'SCHOOL_STUDENT' :
+                                 r.metadata?.programType?.toLowerCase().includes('school') ? 'SCHOOL_STUDENT' :
+                                 r.program?.name?.toLowerCase().includes('employee') ? 'EMPLOYEE' :
+                                 r.metadata?.programType?.toLowerCase().includes('employee') ? 'EMPLOYEE' : undefined),
+                            program_name: r.program?.name || r.metadata?.program_name || r.metadata?.programType,
+                            school_level: r.schoolLevel,
+                            school_stream: r.schoolStream,
+                            student_board: r.studentBoard,
+                            current_year: r.metadata?.currentYear,
+                            department_degree_id: r.departmentDegreeId,
+                            department_name: r.deptRaw?.name,
+                            degree_name: r.degRaw?.name,
                         };
                         setSelectedEmployee(mapped);
                         setView("preview");
@@ -247,6 +272,21 @@ const MyEmployeesContent: React.FC = () => {
                     corporate_account_id: r.corporateAccountId,
                     gender: r.gender,
                     groupName: r.group?.name || undefined,
+                    program_code: r.program?.code || r.metadata?.program_code ||
+                        (r.program?.name?.toLowerCase().includes('college') ? 'COLLEGE_STUDENT' :
+                         r.metadata?.programType?.toLowerCase().includes('college') ? 'COLLEGE_STUDENT' :
+                         r.program?.name?.toLowerCase().includes('school') ? 'SCHOOL_STUDENT' :
+                         r.metadata?.programType?.toLowerCase().includes('school') ? 'SCHOOL_STUDENT' :
+                         r.program?.name?.toLowerCase().includes('employee') ? 'EMPLOYEE' :
+                         r.metadata?.programType?.toLowerCase().includes('employee') ? 'EMPLOYEE' : undefined),
+                    program_name: r.program?.name || r.metadata?.program_name || r.metadata?.programType,
+                    school_level: r.schoolLevel,
+                    school_stream: r.schoolStream,
+                    student_board: r.studentBoard,
+                    current_year: r.metadata?.currentYear,
+                    department_degree_id: r.departmentDegreeId,
+                    department_name: r.deptRaw?.name,
+                    degree_name: r.degRaw?.name,
                 }));
                 setUsers(mappedRegistrations);
                 total = empRes.total;
@@ -402,6 +442,7 @@ const MyEmployeesContent: React.FC = () => {
         setActiveTab(tab);
         setCurrentPage(1);
         setSearchTerm("");
+        setShowSendEmailsTab(false);
     };
 
     const handleSort = (column: string) => {
@@ -632,7 +673,7 @@ const MyEmployeesContent: React.FC = () => {
                     </button>
                     <button
                         onClick={() => handleTabChange("group")}
-                        className={`px-1 py-3 text-sm sm:text-base border-b-2 transition-colors whitespace-nowrap cursor-pointer ${activeTab === "group"
+                        className={`px-1 py-3 mr-8 text-sm sm:text-base border-b-2 transition-colors whitespace-nowrap cursor-pointer ${activeTab === "group"
                             ? "border-brand-green font-medium"
                             : "border-transparent hover:border-gray-200 font-[300] opacity-60 hover:opacity-100"
                             }`}
@@ -642,74 +683,146 @@ const MyEmployeesContent: React.FC = () => {
                             ({tabCounts.group !== null ? tabCounts.group : "..."})
                         </span>
                     </button>
+                    {/* Hidden Send Emails tab — revealed after clicking the button */}
+                    {showSendEmailsTab && (
+                        <button
+                            onClick={() => setActiveTab('send-emails')}
+                            className={`flex items-center gap-1.5 px-1 py-3 mr-8 text-sm sm:text-base border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
+                                activeTab === 'send-emails'
+                                    ? 'border-brand-green font-medium'
+                                    : 'border-transparent hover:border-gray-200 font-[300] opacity-60 hover:opacity-100'
+                            }`}
+                        >
+                            <span className="text-[#19211C] dark:text-white">Send Emails</span>
+                            <span
+                                onClick={(e) => { e.stopPropagation(); setShowSendEmailsTab(false); setActiveTab('individual'); }}
+                                className="ml-1 text-xs text-gray-400 hover:text-red-500 transition-colors"
+                                title="Close"
+                            >✕</span>
+                        </button>
+                    )}
                 </div>
 
-                {/* Compact "Showing / per page / arrows" */}
-                <div className="flex items-center gap-3 py-2 w-full xl:w-auto justify-end">
-                    {/* ... (pagination controls unchanged) ... */}
-                    <span className="text-sm text-[#19211C] dark:text-brand-text-secondary hidden sm:inline font-[300]">
-                        Showing
-                    </span>
-                    <div className="relative">
-                        <button
-                            onClick={() => setShowEntriesDropdown(!showEntriesDropdown)}
-                            className="flex items-center gap-2 bg-white dark:bg-[#FFFFFF1F] px-3 py-1.5 rounded-lg text-sm text-brand-green font-semibold min-w-[60px] justify-between shadow-sm border border-transparent dark:border-[#FFFFFF1F] hover:border-gray-200 transition-all"
-                        >
-                            {entriesPerPage}
-                            <ChevronDownIcon className="w-3 h-3 text-brand-green" />
-                        </button>
-                        {showEntriesDropdown && (
-                            <div className="absolute top-full right-0 mt-1 w-20 bg-brand-light-secondary dark:bg-[#303438] border border-brand-light-tertiary dark:border-white/10 rounded-lg shadow-xl z-50 overflow-hidden">
-                                {[10, 25, 50, 100].map((num) => (
-                                    <button
-                                        key={num}
-                                        onClick={() => {
-                                            setEntriesPerPage(num);
-                                            setShowEntriesDropdown(false);
-                                            setCurrentPage(1);
-                                        }}
-                                        className="w-full text-center py-1.5 text-sm hover:bg-black/5 dark:hover:bg-white/10 text-brand-text-light-primary dark:text-white"
-                                    >
-                                        {num}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
+                {/* Compact "Showing / per page / arrows" — swaps to send-emails pagination when active */}
+                {activeTab !== 'send-emails' ? (
+                    <div className="flex items-center gap-3 py-2 w-full xl:w-auto justify-end">
+                        <span className="text-sm text-[#19211C] dark:text-brand-text-secondary hidden sm:inline font-[300]">
+                            Showing
+                        </span>
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowEntriesDropdown(!showEntriesDropdown)}
+                                className="flex items-center gap-2 bg-white dark:bg-[#FFFFFF1F] px-3 py-1.5 rounded-lg text-sm text-brand-green font-semibold min-w-[60px] justify-between shadow-sm border border-transparent dark:border-[#FFFFFF1F] hover:border-gray-200 transition-all"
+                            >
+                                {entriesPerPage}
+                                <ChevronDownIcon className="w-3 h-3 text-brand-green" />
+                            </button>
+                            {showEntriesDropdown && (
+                                <div className="absolute top-full right-0 mt-1 w-20 bg-brand-light-secondary dark:bg-[#303438] border border-brand-light-tertiary dark:border-white/10 rounded-lg shadow-xl z-50 overflow-hidden">
+                                    {[10, 25, 50, 100].map((num) => (
+                                        <button
+                                            key={num}
+                                            onClick={() => {
+                                                setEntriesPerPage(num);
+                                                setShowEntriesDropdown(false);
+                                                setCurrentPage(1);
+                                            }}
+                                            className="w-full text-center py-1.5 text-sm hover:bg-black/5 dark:hover:bg-white/10 text-brand-text-light-primary dark:text-white"
+                                        >
+                                            {num}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <span className="text-sm text-[#19211C] dark:text-brand-text-secondary whitespace-nowrap font-[300]">
+                            of {totalCount.toLocaleString()} entries
+                        </span>
+                        <div className="flex items-center gap-2 ml-2">
+                            <button
+                                onClick={() => handlePageChange(currentPage - 1)}
+                                disabled={currentPage === 1}
+                                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                                    currentPage === 1
+                                        ? "bg-white dark:bg-[#FFFFFF1F] text-[#19211C] dark:text-white border border-transparent dark:border-[#FFFFFF1F]"
+                                        : "bg-brand-green text-white shadow-lg shadow-brand-green/20 hover:bg-brand-green/90"
+                                }`}
+                            >
+                                <ArrowLeftWithoutLineIcon className="w-3 h-3" />
+                            </button>
+                            <button
+                                onClick={() => handlePageChange(currentPage + 1)}
+                                disabled={currentPage === totalPages}
+                                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                                    currentPage === totalPages
+                                        ? "bg-white dark:bg-[#FFFFFF1F] text-[#19211C] dark:text-white border border-transparent dark:border-[#FFFFFF1F]"
+                                        : "bg-brand-green text-white shadow-lg shadow-brand-green/20 hover:bg-brand-green/90"
+                                }`}
+                            >
+                                <ArrowRightWithoutLineIcon className="w-3 h-3" />
+                            </button>
+                        </div>
                     </div>
-                    {/* ... (rest of pagination) ... */}
-                    <span className="text-sm text-[#19211C] dark:text-brand-text-secondary whitespace-nowrap font-[300]">
-                        of {totalCount.toLocaleString()} entries
-                    </span>
-                    <div className="flex items-center gap-2 ml-2">
-                        <button
-                            onClick={() => handlePageChange(currentPage - 1)}
-                            disabled={currentPage === 1}
-                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
-                                currentPage === 1
-                                    ? "bg-white dark:bg-[#FFFFFF1F] text-[#19211C] dark:text-white border border-transparent dark:border-[#FFFFFF1F]"
-                                    : "bg-brand-green text-white shadow-lg shadow-brand-green/20 hover:bg-brand-green/90"
-                            }`}
-                        >
-                            <ArrowLeftWithoutLineIcon className="w-3 h-3" />
-                        </button>
-                        <button
-                            onClick={() => handlePageChange(currentPage + 1)}
-                            disabled={currentPage === totalPages}
-                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
-                                currentPage === totalPages
-                                    ? "bg-white dark:bg-[#FFFFFF1F] text-[#19211C] dark:text-white border border-transparent dark:border-[#FFFFFF1F]"
-                                    : "bg-brand-green text-white shadow-lg shadow-brand-green/20 hover:bg-brand-green/90"
-                            }`}
-                        >
-                            <ArrowRightWithoutLineIcon className="w-3 h-3" />
-                        </button>
+                ) : (
+                    // Send Emails pagination
+                    <div className="flex items-center gap-3 py-2 w-full xl:w-auto justify-end" ref={sendEmailsEntriesRef}>
+                        <span className="text-sm text-[#19211C] dark:text-brand-text-secondary hidden sm:inline font-[300]">Showing</span>
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowSendEmailsEntriesDropdown(v => !v)}
+                                className="flex items-center gap-2 bg-white dark:bg-[#FFFFFF1F] px-3 py-1.5 rounded-lg text-sm text-brand-green font-semibold min-w-[60px] justify-between shadow-sm border border-transparent dark:border-[#FFFFFF1F] hover:border-gray-200 transition-all"
+                            >
+                                {sendEmailsEntriesPerPage}
+                                <ChevronDownIcon className="w-3 h-3 text-brand-green" />
+                            </button>
+                            {showSendEmailsEntriesDropdown && (
+                                <div className="absolute top-full right-0 mt-1 w-20 bg-brand-light-secondary dark:bg-[#303438] border border-brand-light-tertiary dark:border-white/10 rounded-lg shadow-xl z-50 overflow-hidden">
+                                    {[10, 20, 50, 100].map((num) => (
+                                        <button
+                                            key={num}
+                                            onClick={() => { setSendEmailsEntriesPerPage(num); setShowSendEmailsEntriesDropdown(false); setSendEmailsPage(1); }}
+                                            className="w-full text-center py-1.5 text-sm hover:bg-black/5 dark:hover:bg-white/10 text-brand-text-light-primary dark:text-white"
+                                        >
+                                            {num}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <span className="text-sm text-[#19211C] dark:text-brand-text-secondary whitespace-nowrap font-[300]">
+                            of {sendEmailsTotal.toLocaleString()} entries
+                        </span>
+                        <div className="flex items-center gap-2 ml-2">
+                            <button
+                                onClick={() => setSendEmailsPage(p => Math.max(1, p - 1))}
+                                disabled={sendEmailsPage === 1}
+                                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                                    sendEmailsPage === 1
+                                        ? "bg-white dark:bg-[#FFFFFF1F] text-[#19211C] dark:text-white border border-transparent dark:border-[#FFFFFF1F]"
+                                        : "bg-brand-green text-white shadow-lg shadow-brand-green/20 hover:bg-brand-green/90"
+                                }`}
+                            >
+                                <ArrowLeftWithoutLineIcon className="w-3 h-3" />
+                            </button>
+                            <button
+                                onClick={() => setSendEmailsPage(p => p + 1)}
+                                disabled={sendEmailsPage * sendEmailsEntriesPerPage >= sendEmailsTotal}
+                                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                                    sendEmailsPage * sendEmailsEntriesPerPage >= sendEmailsTotal
+                                        ? "bg-white dark:bg-[#FFFFFF1F] text-[#19211C] dark:text-white border border-transparent dark:border-[#FFFFFF1F]"
+                                        : "bg-brand-green text-white shadow-lg shadow-brand-green/20 hover:bg-brand-green/90"
+                                }`}
+                            >
+                                <ArrowRightWithoutLineIcon className="w-3 h-3" />
+                            </button>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
-            {/* Search + filters + buttons row */}
+            {/* Search + filters + buttons row — hidden on send-emails tab */}
+            {activeTab !== 'send-emails' && (
             <div className="flex flex-col xl:flex-row justify-between gap-4 items-start xl:items-center">
-                {/* ... Search ... */}
                 <div className="relative w-full xl:w-96">
                     <input
                         type="text"
@@ -795,6 +908,17 @@ const MyEmployeesContent: React.FC = () => {
                         </button>
                     )}
 
+                    {/* Send Emails button — only on Individual Assessment tab */}
+                    {activeTab === 'individual' && (
+                        <button
+                            onClick={() => { setShowSendEmailsTab(true); setActiveTab('send-emails'); }}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#FFFFFF1F] border border-brand-green/40 dark:border-brand-green/30 rounded-lg text-sm font-medium text-brand-green hover:bg-brand-green/5 transition-all shadow-sm cursor-pointer"
+                        >
+                            <EmailIcon className="w-4 h-4" />
+                            <span>Send Emails</span>
+                        </button>
+                    )}
+
                     <button
                         onClick={() => {
                             if (activeTab === 'registrations') setView("add");
@@ -806,18 +930,28 @@ const MyEmployeesContent: React.FC = () => {
                     </button>
                 </div>
             </div>
+            )}
 
             {/* Table Area */}
             <div className="flex-1 min-h-[300px] relative flex flex-col">
-                {activeTab === 'registrations' ? (
+                {activeTab === 'send-emails' ? (
+                    <CorporateBulkEmailTab
+                        page={sendEmailsPage}
+                        entriesPerPage={sendEmailsEntriesPerPage}
+                        onTotalChange={(total) => setSendEmailsTotal(total)}
+                        onViewSession={(session) => {
+                            setSelectedSession(session);
+                            setSelectedGroupSessionId(null);
+                            setView('group-candidate-assessment-preview');
+                        }}
+                    />
+                ) : activeTab === 'registrations' ? (
                     <RegistrationTable
                         users={users}
                         loading={loading}
                         error={error}
                         onViewDetails={handleViewDetails}
                         showAiCounsellor={false}
-                        // sortProps passed if RegistrationTable supported sorting, which it doesn't currently seem to fully support here or it's implicitly handled?
-                        // checked RegistrationTable properties, it accepts sortColumn/sortOrder/onSort.
                         sortColumn={sortColumn}
                         sortOrder={sortOrder}
                         onSort={handleSort}
@@ -848,7 +982,8 @@ const MyEmployeesContent: React.FC = () => {
                 )}
             </div>
 
-            {/* Bottom pagination + footer */}
+            {/* Bottom pagination + footer — hidden on send-emails tab */}
+            {activeTab !== 'send-emails' && (
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-xs sm:text-sm text-brand-text-light-secondary dark:text-brand-text-secondary pt-6 pb-2">
                 {/* Left: Links */}
                 <div className="flex gap-4 w-full sm:w-1/3 justify-center sm:justify-start order-2 sm:order-1">
@@ -902,6 +1037,7 @@ const MyEmployeesContent: React.FC = () => {
                     </span>
                 </div>
             </div>
+            )}
         </div>
     );
 };

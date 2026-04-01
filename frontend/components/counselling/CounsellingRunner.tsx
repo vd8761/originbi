@@ -192,6 +192,48 @@ export default function CounsellingRunner() {
         }
     };
 
+    useEffect(() => {
+        if (loading || verifying || !isVerified || completed || !questions[currentQuestionIndex]) return;
+
+        const currentQuestion = questions[currentQuestionIndex];
+        const selectedOptionId = answers[currentQuestion.id];
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                // Prevent Finish Assessment with arrow key
+                if (currentQuestionIndex < questions.length - 1 && selectedOptionId) {
+                    handleNext();
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (currentQuestion.options.length > 0) {
+                    const currentIndex = currentQuestion.options.findIndex(opt => opt.id === selectedOptionId);
+                    const nextIndex = currentIndex <= 0 ? currentQuestion.options.length - 1 : currentIndex - 1;
+                    handleOptionSelect(currentQuestion.id, currentQuestion.options[nextIndex].id);
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (currentQuestion.options.length > 0) {
+                    const currentIndex = currentQuestion.options.findIndex(opt => opt.id === selectedOptionId);
+                    const nextIndex = currentIndex === -1 || currentIndex === currentQuestion.options.length - 1 ? 0 : currentIndex + 1;
+                    handleOptionSelect(currentQuestion.id, currentQuestion.options[nextIndex].id);
+                }
+            } else {
+                const num = parseInt(e.key, 10);
+                if (!isNaN(num) && num > 0 && num <= currentQuestion.options.length) {
+                    handleOptionSelect(currentQuestion.id, currentQuestion.options[num - 1].id);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [loading, verifying, isVerified, completed, currentQuestionIndex, questions, answers]);
+
+
     if (loading || verifying) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-[#F0F4F8] text-[#4A5568]">
