@@ -436,6 +436,16 @@ export class RagService {
       };
     }
     if (/(\bhow\s+many\b|\bcount\b|\btotal\b)/.test(q)) {
+      const assessmentCountSearchTerm = this.detectAssessmentCountSearchTerm(q);
+      if (assessmentCountSearchTerm) {
+        return {
+          intent: 'count',
+          searchTerm: assessmentCountSearchTerm,
+          table: 'assessment_attempts',
+          includePersonality: false,
+        };
+      }
+
       if (/\b(employee|employees|resource|resources|staff|member|members)\b/.test(q)) {
         return { intent: 'count', searchTerm: 'employees', table: 'registrations', includePersonality: false };
       }
@@ -458,7 +468,7 @@ export class RagService {
       return { intent: 'custom_report', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
     }
 
-    if (/\b(list|show|get|display|view)\b\s+(my|our)?\s*\b(candidates?|students?|employees?|resources?|staff|members?)\b/.test(q)) {
+    if (/\b(list|show|get|display|view)\b\s+(my|our)?\s*\b(candidates?|students?|employees?|resources?|staff|members?|people|peoples|persons?)\b/.test(q)) {
       const teamScoped = /\b(my|our)\b/.test(q);
       return {
         intent: 'list_candidates',
@@ -482,6 +492,29 @@ export class RagService {
       /\b(my|me|mine)\b/.test(q) &&
       /\b(score|scores|result|results|assessment|test|personality|style|agile)\b/.test(q)) {
       return { intent: 'self_results', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    return null;
+  }
+
+  private detectAssessmentCountSearchTerm(
+    q: string,
+  ): 'completed_candidates' | 'not_completed_candidates' | 'completed_assessments' | null {
+    const hasAssessmentWord = /\b(assessment|assessments|test|tests|exam|exams)\b/.test(q);
+    if (!hasAssessmentWord) return null;
+    if (/\b(registration|register|registered)\b/.test(q)) return null;
+
+    const mentionsPeople = /\b(candidate|candidates|student|students|employee|employees|resource|resources|staff|member|members|people)\b/.test(q);
+    const notCompleted =
+      /\b(not\s+completed|not\s+complete|incomplete|unfinished|pending|didn'?t\s+complete|without\s+complet(?:e|ing)|not\s+done)\b/.test(q);
+    if (notCompleted) {
+      return 'not_completed_candidates';
+    }
+
+    const completed =
+      /\b(completed|complete|completes|completing|finished|submitted|done)\b/.test(q);
+    if (completed) {
+      return mentionsPeople ? 'completed_candidates' : 'completed_assessments';
     }
 
     return null;
@@ -566,6 +599,15 @@ export class RagService {
 
     try {
       if (user.id) {
+        const userLink = await this.dataSource.query(
+          'SELECT corporate_id FROM users WHERE id = $1 AND is_active = true LIMIT 1',
+          [user.id],
+        );
+        const directCorporateId = Number(userLink?.[0]?.corporate_id || 0);
+        if (directCorporateId > 0) {
+          return directCorporateId;
+        }
+
         const corpByUserId = await this.dataSource.query(
           'SELECT id FROM corporate_accounts WHERE user_id = $1 LIMIT 1',
           [user.id],
@@ -577,6 +619,19 @@ export class RagService {
       }
 
       if (user.email) {
+        const userByEmail = await this.dataSource.query(
+          `SELECT corporate_id
+           FROM users
+           WHERE LOWER(email) = LOWER($1)
+             AND is_active = true
+           LIMIT 1`,
+          [user.email],
+        );
+        const directCorporateId = Number(userByEmail?.[0]?.corporate_id || 0);
+        if (directCorporateId > 0) {
+          return directCorporateId;
+        }
+
         const corpByEmail = await this.dataSource.query(
           `SELECT ca.id
            FROM corporate_accounts ca
@@ -781,8 +836,20 @@ export class RagService {
     if (!this.llm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
-      const ragModel = process.env.GEMINI_RAG_MODEL || process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
-      const ragMaxTokens = Math.max(260, Number(process.env.RAG_MAX_OUTPUT_TOKENS || 720));
+      const ragModel =
+        process.env.GEMINI_ROUTER_MODEL ||
+        process.env.GEMINI_FORMATTER_MODEL ||
+        process.env.GEMINI_PLANNER_MODEL ||
+        process.env.GEMINI_LLM_MODEL ||
+        'gemini-2.0-flash';
+      const ragMaxTokens = Math.max(
+        120,
+        Number(
+          process.env.RAG_ROUTER_MAX_OUTPUT_TOKENS ||
+          process.env.AGENT_PLANNER_MAX_OUTPUT_TOKENS ||
+          220,
+        ),
+      );
       this.llm = new ChatGoogleGenerativeAI({
         apiKey,
         model: ragModel,
@@ -798,7 +865,14 @@ export class RagService {
     if (!this.fallbackLlm) {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error('GROQ_API_KEY not set for fallback');
-      const ragMaxTokens = Math.max(260, Number(process.env.RAG_MAX_OUTPUT_TOKENS || 720));
+      const ragMaxTokens = Math.max(
+        120,
+        Number(
+          process.env.RAG_ROUTER_MAX_OUTPUT_TOKENS ||
+          process.env.AGENT_PLANNER_MAX_OUTPUT_TOKENS ||
+          220,
+        ),
+      );
       this.fallbackLlm = new ChatGroq({
         apiKey,
         model: 'llama-3.3-70b-versatile',
@@ -1005,6 +1079,17 @@ export class RagService {
       };
     }
 
+    const effectiveRole = (user?.role || 'STUDENT').toUpperCase();
+    if (effectiveRole === 'CORPORATE') {
+      const resolvedCorporateId = await this.resolveEffectiveCorporateId(user as UserContext);
+      if (resolvedCorporateId && resolvedCorporateId !== Number(user?.corporateId || 0)) {
+        user = { ...user, corporateId: resolvedCorporateId };
+        this.logger.log(`🏢 Corporate scope resolved to company ${resolvedCorporateId}`);
+      } else if (!resolvedCorporateId) {
+        this.logger.warn(`⚠️ Corporate scope could not be resolved for user=${user?.id || 'N/A'}`);
+      }
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // AI COUNSELLOR MODE — Premium career counselling for students
     // Bypasses normal intent classification and routes directly to
@@ -1122,7 +1207,15 @@ export class RagService {
         const roleNow = (user?.role || 'STUDENT').toUpperCase();
         if (wantsCount && (roleNow === 'ADMIN' || roleNow === 'CORPORATE')) {
           let deterministic: { intent: string; searchTerm: string | null; table: string; includePersonality: boolean } | null = null;
-          if (/\b(employee|employees|resource|resources|staff|member|members)\b/.test(q)) {
+          const assessmentCountSearchTerm = this.detectAssessmentCountSearchTerm(q);
+          if (assessmentCountSearchTerm) {
+            deterministic = {
+              intent: 'count',
+              searchTerm: assessmentCountSearchTerm,
+              table: 'assessment_attempts',
+              includePersonality: false,
+            };
+          } else if (/\b(employee|employees|resource|resources|staff|member|members)\b/.test(q)) {
             deterministic = { intent: 'count', searchTerm: 'employees', table: 'registrations', includePersonality: false };
           } else if (/\b(candidate|candidates|student|students)\b/.test(q)) {
             deterministic = { intent: 'count', searchTerm: 'candidates', table: 'registrations', includePersonality: false };
@@ -1132,8 +1225,10 @@ export class RagService {
 
           if (deterministic) {
             this.logger.log(`🎯 Deterministic count routing: ${deterministic.searchTerm}`);
-            const totalCount = await this.getTotalCount(deterministic, user as UserContext);
-            const countData = [{ count: totalCount }];
+            const countData = await this.executeQuery(deterministic, user as UserContext, 0);
+            const totalCount = Array.isArray(countData) && countData.length > 0 && countData[0]?.count != null
+              ? parseInt(String(countData[0].count), 10) || 0
+              : 0;
             return {
               answer: this.formatResponse(deterministic, countData, 0, totalCount),
               searchType: 'count',
@@ -2244,6 +2339,11 @@ export class RagService {
         const qLow = (resolvedQuestion || question).toLowerCase();
         const hasMale = /\b(male|boys?|men)\b/.test(qLow);
         const hasFemale = /\b(female|girls?|women)\b/.test(qLow);
+        const assessmentCountSearchTerm = this.detectAssessmentCountSearchTerm(qLow);
+        if (assessmentCountSearchTerm) {
+          interpretation.table = 'assessment_attempts';
+          interpretation.searchTerm = assessmentCountSearchTerm;
+        }
         if (hasMale && hasFemale) {
           // Both genders requested → gender breakdown
           (interpretation as any).genderBreakdown = true;
@@ -2295,6 +2395,12 @@ export class RagService {
       if (data.length === 0) {
         this.logger.log('🧠 No data found for intent: ' + interpretation.intent);
 
+        const recovered = await this.recoverNoDataByWordAnalysis(question, user);
+        if (recovered) {
+          this.logger.log(`✅ No-data recovery succeeded via word analysis for question: "${question}"`);
+          return recovered;
+        }
+
         const curRole = (user?.role || 'STUDENT').toUpperCase();
         const scopeMsg = curRole === 'CORPORATE' ? ' in your organization' : '';
 
@@ -2328,7 +2434,7 @@ export class RagService {
           };
 
           const answer = noDataMessages[interpretation.intent]
-            || `No data found for this query${scopeMsg}.`;
+            || `No matching data found${scopeMsg}.`;
 
           return {
             answer,
@@ -3246,6 +3352,209 @@ Please tell me the target role first, for example:
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLER: PERSON LOOKUP (with smart matching + disambiguation)
   // ═══════════════════════════════════════════════════════════════════════════
+  private isEntityKeywordSearchCandidate(searchTerm: string): boolean {
+    const q = (searchTerm || '').trim();
+    if (!q) return false;
+    // Keep this for short direct keyword lookups like "kiot", "touchmark", etc.
+    if (q.length < 2 || q.length > 50) return false;
+    if (/[@#]/.test(q)) return false;
+    if (/\d{6,}/.test(q)) return false;
+    if (/\b(list|show|get|display|view|count|total|how\s+many|report|summarize|summary)\b/i.test(q)) return false;
+    const tokens = q.split(/\s+/).filter(Boolean);
+    return tokens.length <= 4;
+  }
+
+  private extractCollegeKeyword(question: string): string | null {
+    const q = (question || '').trim();
+    if (!q) return null;
+
+    const normalized = q
+      .replace(/\bclg\b/gi, 'college')
+      .replace(/\bpeoples\b/gi, 'people')
+      .trim();
+
+    const prepMatch = normalized.match(/\b(?:from|of|in|for)\s+([a-z0-9][a-z0-9\s&._-]{1,40})$/i);
+    if (prepMatch && prepMatch[1]) {
+      const k = prepMatch[1]
+        .replace(/\b(college|university|institute|school|group|batch|program|people|candidates?|students?)\b/gi, '')
+        .trim();
+      if (k.length >= 2) return k;
+    }
+
+    if (/^[a-z0-9][a-z0-9\s&._-]{1,40}$/i.test(normalized)) {
+      const k = normalized.trim();
+      if (this.isEntityKeywordSearchCandidate(k)) return k;
+    }
+
+    return null;
+  }
+
+  private async recoverNoDataByWordAnalysis(question: string, user?: any): Promise<QueryResult | null> {
+    const q = (question || '').trim();
+    if (!q) return null;
+
+    const qNorm = q.toLowerCase().replace(/\bclg\b/g, 'college').replace(/\bpeoples\b/g, 'people');
+    const asksPeopleList = /\b(list|show|get|display|view)\b/.test(qNorm)
+      && /\b(people|persons?|candidates?|students?|employees?|resources?|members?)\b/.test(qNorm);
+    const hasCollegeContext = /\b(college|university|institute|school|group|batch|program)\b/.test(qNorm);
+    const keyword = this.extractCollegeKeyword(q);
+
+    if (keyword) {
+      const entityFallback = await this.handleEntityKeywordFallback(keyword, user);
+      if (entityFallback) return entityFallback;
+    }
+
+    if (!asksPeopleList && !hasCollegeContext) return null;
+
+    const userRole = (user?.role || 'STUDENT').toUpperCase();
+    const corporateId = user?.corporateId;
+    const params: any[] = [];
+    let where = 'r.is_deleted = false';
+
+    if (userRole === 'CORPORATE' && corporateId) {
+      params.push(corporateId);
+      where += ` AND r.corporate_account_id = $${params.length}`;
+    } else if (userRole === 'STUDENT' && user?.id) {
+      params.push(user.id);
+      where += ` AND r.user_id = $${params.length}`;
+    }
+
+    if (keyword) {
+      params.push(`%${keyword}%`);
+      const idx = params.length;
+      where += ` AND (
+        COALESCE(g.name, '') ILIKE $${idx}
+        OR COALESCE(g.code, '') ILIKE $${idx}
+        OR COALESCE(p.name, '') ILIKE $${idx}
+        OR COALESCE(p.code, '') ILIKE $${idx}
+        OR COALESCE(ca.company_name, '') ILIKE $${idx}
+      )`;
+    }
+
+    const rows = await this.executeDatabaseQuery(
+      `SELECT
+         r.full_name,
+         COALESCE(g.name, p.name, ca.company_name, '-') as college_name,
+         r.gender,
+         r.mobile_number,
+         CASE WHEN aa.id IS NULL THEN 'NOT_COMPLETED' ELSE 'COMPLETED' END as assessment_status
+       FROM registrations r
+       LEFT JOIN groups g ON r.group_id = g.id
+       LEFT JOIN programs p ON r.program_id = p.id
+       LEFT JOIN corporate_accounts ca ON r.corporate_account_id = ca.id
+       LEFT JOIN LATERAL (
+         SELECT id FROM assessment_attempts ax
+         WHERE ax.registration_id = r.id AND ax.status = 'COMPLETED'
+         ORDER BY ax.completed_at DESC NULLS LAST, ax.id DESC
+         LIMIT 1
+       ) aa ON true
+       WHERE ${where}
+       ORDER BY r.created_at DESC
+       LIMIT 25`,
+      params,
+    );
+
+    if (rows.length === 0) return null;
+
+    let table = '| Name | College/Group | Gender | Mobile | Assessment |\n';
+    table += '|---|---|---|---|---|\n';
+    for (const r of rows) {
+      table += `| ${r.full_name || '-'} | ${r.college_name || '-'} | ${r.gender || '-'} | ${r.mobile_number || '-'} | ${r.assessment_status || '-'} |\n`;
+    }
+
+    const label = keyword ? `Matching "${keyword}"` : 'College/Group candidates';
+    return {
+      answer: `**${label} (${rows.length})**\n\n${table}`,
+      searchType: 'word_analysis_recovery',
+      confidence: 0.9,
+    };
+  }
+
+  private async handleEntityKeywordFallback(searchTerm: string, user?: any): Promise<QueryResult | null> {
+    const keyword = (searchTerm || '').trim();
+    if (!this.isEntityKeywordSearchCandidate(keyword)) return null;
+
+    const like = `%${keyword}%`;
+    const userRole = (user?.role || 'STUDENT').toUpperCase();
+    const corporateId = user?.corporateId;
+
+    // RBAC: corporate users can only resolve entities in their company scope.
+    const scopeClause = userRole === 'CORPORATE' && corporateId ? ' AND g.corporate_account_id = $2' : '';
+    const scopeClauseForRegs = userRole === 'CORPORATE' && corporateId ? ' AND r.corporate_account_id = $2' : '';
+    const scopeClauseForCorp = userRole === 'CORPORATE' && corporateId ? ' AND ca.id = $2' : '';
+    const params = userRole === 'CORPORATE' && corporateId ? [like, corporateId] : [like];
+
+    const groups = await this.executeDatabaseQuery(
+      `SELECT
+         'GROUP' as entity_type,
+         g.name as entity_name,
+         COALESCE(g.code, '-') as entity_code,
+         COUNT(DISTINCT r.id) as candidate_count,
+         COUNT(DISTINCT aa.registration_id) as completed_count
+       FROM groups g
+       LEFT JOIN registrations r ON r.group_id = g.id AND r.is_deleted = false
+       LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id AND aa.status = 'COMPLETED'
+       WHERE g.is_deleted = false
+         AND (g.name ILIKE $1 OR COALESCE(g.code, '') ILIKE $1)${scopeClause}
+       GROUP BY g.id, g.name, g.code
+       ORDER BY candidate_count DESC, g.name ASC
+       LIMIT 8`,
+      params,
+    );
+
+    const programs = await this.executeDatabaseQuery(
+      `SELECT
+         'PROGRAM' as entity_type,
+         p.name as entity_name,
+         COALESCE(p.code, '-') as entity_code,
+         COUNT(DISTINCT r.id) as candidate_count,
+         COUNT(DISTINCT aa.registration_id) as completed_count
+       FROM programs p
+       LEFT JOIN registrations r ON r.program_id = p.id AND r.is_deleted = false${scopeClauseForRegs}
+       LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id AND aa.status = 'COMPLETED'
+       WHERE p.is_deleted = false
+         AND (p.name ILIKE $1 OR COALESCE(p.code, '') ILIKE $1)
+       GROUP BY p.id, p.name, p.code
+       ORDER BY candidate_count DESC, p.name ASC
+       LIMIT 8`,
+      params,
+    );
+
+    const corporates = await this.executeDatabaseQuery(
+      `SELECT
+         'COMPANY' as entity_type,
+         ca.company_name as entity_name,
+         '-' as entity_code,
+         COUNT(DISTINCT r.id) as candidate_count,
+         COUNT(DISTINCT aa.registration_id) as completed_count
+       FROM corporate_accounts ca
+       LEFT JOIN registrations r ON r.corporate_account_id = ca.id AND r.is_deleted = false
+       LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id AND aa.status = 'COMPLETED'
+       WHERE ca.is_deleted = false
+         AND ca.company_name ILIKE $1${scopeClauseForCorp}
+       GROUP BY ca.id, ca.company_name
+       ORDER BY candidate_count DESC, ca.company_name ASC
+       LIMIT 8`,
+      params,
+    );
+
+    const matches = [...groups, ...programs, ...corporates].slice(0, 10);
+    if (matches.length === 0) return null;
+
+    let table = '| Type | Name | Code | Candidates | Completed |\n';
+    table += '|---|---|---:|---:|---:|\n';
+    for (const m of matches) {
+      table += `| ${m.entity_type} | ${m.entity_name} | ${m.entity_code || '-'} | ${Number(m.candidate_count || 0)} | ${Number(m.completed_count || 0)} |\n`;
+    }
+
+    const scopedText = userRole === 'CORPORATE' ? ' within your organization' : '';
+    return {
+      answer: `I couldn't find a person named **"${keyword}"**, but I found matching entity data${scopedText}:\n\n${table}\nTry follow-ups:\n- **summarize batch ${keyword}**\n- **list candidates from ${keyword}**\n- **count candidates in ${keyword}**`,
+      searchType: 'entity_keyword_lookup',
+      confidence: 0.88,
+    };
+  }
+
   private async handlePersonLookup(
     searchTerm: string,
     user?: any,
@@ -3320,6 +3629,11 @@ Please tell me the target role first, for example:
       }
 
       if (data.length === 0) {
+        const entityFallback = await this.handleEntityKeywordFallback(cleanSearch, user);
+        if (entityFallback) {
+          this.logger.log(`🔎 Keyword fallback resolved non-person entity for "${cleanSearch}"`);
+          return entityFallback;
+        }
         const scopeMsg = userRole === 'CORPORATE' ? ' within your organization' : '';
         return {
           answer: `**"${cleanSearch}" not found${scopeMsg}.** Check the spelling or try "list candidates".`,
@@ -4601,6 +4915,7 @@ Please tell me the target role first, for example:
       // Extended follow-ups: "show their list along with X", "list them with education", "show their details with scores"
       || /^(show|list|get|display)\s+(their|them|those|the)\s+(list|details?|info|data|names?)\b/i.test(q)
       || /^(list|show)\s+(them|those)\b/i.test(q)
+      || /^(report|reports|test\s+report|assessment\s+report|exam\s+report)\s*\??$/i.test(q)
       // Pronoun + data qualifier: "their education qualification", "their scores", "their details with education"
       || /\btheir\b/i.test(q) && /\b(education|qualification|score|marks|assessment|personality|department|degree|experience|gender|age|email|mobile|phone|board|stream|level)s?\b/i.test(q)
       // Standalone data qualifier as follow-up: "education qualification", "show scores"
@@ -4620,7 +4935,11 @@ Please tell me the target role first, for example:
     // route to data_query which can use text-to-SQL for flexible column selection
     const hasDataQualifier = /\b(education|qualification|score|marks|assessment|personality|trait|traits|disc|style|behavioral|behavioural|department|degree|experience|gender|age|email|mobile|phone|board|stream|level)\b/i.test(q);
     const asksPersonalityTraits = /\b(personality|trait|traits|disc|style|behavioral|behavioural)\b/i.test(q);
+    const asksReport = /\b(report|test\s+report|assessment\s+report|exam\s+report)\b/i.test(q);
     const lastPerson = session?.currentContext?.lastPersonMentioned || null;
+    if (asksReport && lastPerson && ['person_lookup', 'career_report', 'test_results', 'best_performer'].includes(lastIntent)) {
+      return { intent: 'person_lookup', searchTerm: lastPerson, table: 'assessment_attempts', includePersonality: true };
+    }
     if (hasDataQualifier) {
       // If user asks "their personality traits" right after a person-focused flow,
       // resolve to that specific person instead of a broad data_query.
@@ -5084,6 +5403,17 @@ Please tell me the target role first, for example:
       return { intent: 'jd_candidate_match', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
     }
     if (/\b(how\s*many|count|total\s*number)\b/.test(q) || /\btotal\s+(candidate|candidates|student|students|user|users|male|female|people|resource|employee|member|registration|count|number)s?\b/i.test(q)) {
+      const assessmentCountSearchTerm = this.detectAssessmentCountSearchTerm(q);
+      if (assessmentCountSearchTerm) {
+        const result: any = {
+          intent: 'count',
+          searchTerm: assessmentCountSearchTerm,
+          table: 'assessment_attempts',
+          includePersonality: false,
+        };
+        return result;
+      }
+
       // Detect role-based count (corporate, admin, student breakdown)
       const rolesRequested: string[] = [];
       if (/\b(corporate|corporates|company|companies)\b/i.test(q)) rolesRequested.push('CORPORATE');
@@ -6048,6 +6378,8 @@ Please tell me the target role first, for example:
                      AND COALESCE(r.is_deleted, false) = false
                      AND r.corporate_account_id = $1`;
             params.push(corporateId);
+          } else if (userRole === 'CORPORATE') {
+            return 0;
           } else if (interpretation.intent === 'self_results') {
             const countBase =
               "SELECT COUNT(*) as count FROM assessment_attempts aa JOIN registrations r ON aa.registration_id = r.id WHERE (TRIM(UPPER(aa.status)) IN ('COMPLETED', 'COMPLETE', 'FINISHED', 'SUBMITTED') OR aa.completed_at IS NOT NULL) AND r.is_deleted = false";
@@ -6298,6 +6630,9 @@ Please tell me the target role first, for example:
         } else if (userRole === 'CORPORATE' && corporateId) {
           sql = `${baseTestSql} AND registrations.corporate_account_id = $1 ORDER BY total_score DESC NULLS LAST LIMIT ${limit} OFFSET ${offset}`;
           params.push(corporateId);
+        } else if (userRole === 'CORPORATE') {
+          this.logger.warn('⚠️ RBAC: CORPORATE test_results requested without resolvable corporateId; returning empty result');
+          return [];
         } else if (userId && userId > 0) {
           sql = `${baseTestSql} AND registrations.user_id = $1 ORDER BY total_score DESC NULLS LAST LIMIT ${limit} OFFSET ${offset}`;
           params.push(userId);
@@ -6425,6 +6760,9 @@ Please tell me the target role first, for example:
         } else if (userRole === 'CORPORATE' && corporateId) {
           sql = `${baseLookupSql} AND registrations.full_name ~* $1 AND registrations.corporate_account_id = $2 ORDER BY registrations.full_name, assessment_attempts.completed_at DESC NULLS LAST LIMIT 20`;
           params.push(`\\m${searchName}\\M`, corporateId);
+        } else if (userRole === 'CORPORATE') {
+          this.logger.warn('⚠️ RBAC: CORPORATE person_lookup requested without resolvable corporateId; returning empty result');
+          return [];
         } else {
           // Students can only see themselves — ignore search term
           sql = `${baseLookupSql} AND registrations.user_id = $1 LIMIT 1`;
@@ -6448,6 +6786,9 @@ Please tell me the target role first, for example:
         } else if (userRole === 'CORPORATE' && corporateId) {
           sql = `${baseLookupSql} AND registrations.full_name ILIKE $1 AND registrations.corporate_account_id = $2 ORDER BY registrations.full_name, assessment_attempts.completed_at DESC NULLS LAST LIMIT 20`;
           params.push(`%${searchName}%`, corporateId);
+        } else if (userRole === 'CORPORATE') {
+          this.logger.warn('⚠️ RBAC: CORPORATE person_lookup fallback requested without resolvable corporateId; returning empty result');
+          return [];
         } else {
           sql = `${baseLookupSql} AND registrations.user_id = $1 LIMIT 1`;
           params.push(userId);
@@ -6463,6 +6804,7 @@ Please tell me the target role first, for example:
         // Extract gender filter from searchTerm (set by ask() method)
         const genderFilter = (interpretation as any).gender;
         const genderBreakdown = (interpretation as any).genderBreakdown;
+        const requestedCount = (interpretation.searchTerm || '').toLowerCase();
         let genderClause = '';
 
         // ── Gender breakdown: "total male and female" → return both counts ──
@@ -6496,19 +6838,159 @@ Please tell me the target role first, for example:
           } else if (userRole === 'CORPORATE' && corporateId) {
             params.push(corporateId);
             sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false AND corporate_account_id = $${params.length}${genderClause}`;
+          } else if (userRole === 'CORPORATE') {
+            this.logger.warn('⚠️ RBAC: CORPORATE registration count requested without resolvable corporateId; returning zero');
+            return [{ count: 0 }];
           } else {
             params.push(userId);
             sql = `SELECT COUNT(*) as count FROM registrations WHERE is_deleted = false AND user_id = $${params.length}${genderClause}`;
           }
         } else {
+          const completedPredicate = `(
+            TRIM(UPPER(aa.status)) IN ('COMPLETED', 'COMPLETE', 'FINISHED', 'SUBMITTED')
+            OR aa.completed_at IS NOT NULL
+          )`;
+          const registrationGenderClause = genderClause ? genderClause.replace('gender', 'r.gender') : '';
+
+          if (requestedCount === 'completed_candidates') {
+            if (userRole === 'ADMIN') {
+              return await this.executeDatabaseQuery(
+                `SELECT COUNT(*) as count
+                 FROM registrations r
+                 WHERE r.is_deleted = false
+                   ${registrationGenderClause}
+                   AND (
+                     TRIM(UPPER(COALESCE(r.status, ''))) IN ('COMPLETED', 'COMPLETE', 'FINISHED', 'SUBMITTED')
+                     OR EXISTS (
+                       SELECT 1
+                       FROM assessment_attempts aa
+                       WHERE aa.registration_id = r.id
+                         AND ${completedPredicate}
+                     )
+                   )`,
+              );
+            }
+            if (userRole === 'CORPORATE' && corporateId) {
+              return await this.executeDatabaseQuery(
+                `SELECT COUNT(*) as count
+                 FROM registrations r
+                 WHERE r.is_deleted = false
+                   AND r.corporate_account_id = $1
+                   ${registrationGenderClause}
+                   AND (
+                     TRIM(UPPER(COALESCE(r.status, ''))) IN ('COMPLETED', 'COMPLETE', 'FINISHED', 'SUBMITTED')
+                     OR EXISTS (
+                       SELECT 1
+                       FROM assessment_attempts aa
+                       WHERE aa.registration_id = r.id
+                         AND ${completedPredicate}
+                     )
+                   )`,
+                [corporateId],
+              );
+            }
+            if (userRole === 'CORPORATE') {
+              this.logger.warn('⚠️ RBAC: CORPORATE completed-candidate count requested without resolvable corporateId; returning zero');
+              return [{ count: 0 }];
+            }
+            return await this.executeDatabaseQuery(
+              `SELECT COUNT(*) as count
+               FROM registrations r
+               WHERE r.is_deleted = false
+                 AND r.user_id = $1
+                 ${registrationGenderClause}
+                 AND (
+                   TRIM(UPPER(COALESCE(r.status, ''))) IN ('COMPLETED', 'COMPLETE', 'FINISHED', 'SUBMITTED')
+                   OR EXISTS (
+                     SELECT 1
+                     FROM assessment_attempts aa
+                     WHERE aa.registration_id = r.id
+                       AND ${completedPredicate}
+                   )
+                 )`,
+              [userId],
+            );
+          }
+
+          if (requestedCount === 'not_completed_candidates') {
+            if (userRole === 'ADMIN') {
+              return await this.executeDatabaseQuery(
+                `SELECT COUNT(*) as count
+                 FROM registrations r
+                 WHERE r.is_deleted = false
+                   ${registrationGenderClause}
+                   AND TRIM(UPPER(COALESCE(r.status, ''))) NOT IN ('COMPLETED', 'COMPLETE', 'FINISHED', 'SUBMITTED')
+                   AND NOT EXISTS (
+                     SELECT 1
+                     FROM assessment_attempts aa
+                     WHERE aa.registration_id = r.id
+                       AND ${completedPredicate}
+                   )`,
+              );
+            }
+            if (userRole === 'CORPORATE' && corporateId) {
+              return await this.executeDatabaseQuery(
+                `SELECT COUNT(*) as count
+                 FROM registrations r
+                 WHERE r.is_deleted = false
+                   AND r.corporate_account_id = $1
+                   ${registrationGenderClause}
+                   AND TRIM(UPPER(COALESCE(r.status, ''))) NOT IN ('COMPLETED', 'COMPLETE', 'FINISHED', 'SUBMITTED')
+                   AND NOT EXISTS (
+                     SELECT 1
+                     FROM assessment_attempts aa
+                     WHERE aa.registration_id = r.id
+                       AND ${completedPredicate}
+                   )`,
+                [corporateId],
+              );
+            }
+            if (userRole === 'CORPORATE') {
+              this.logger.warn('⚠️ RBAC: CORPORATE incomplete-candidate count requested without resolvable corporateId; returning zero');
+              return [{ count: 0 }];
+            }
+            return await this.executeDatabaseQuery(
+              `SELECT COUNT(*) as count
+               FROM registrations r
+               WHERE r.is_deleted = false
+                 AND r.user_id = $1
+                 ${registrationGenderClause}
+                 AND TRIM(UPPER(COALESCE(r.status, ''))) NOT IN ('COMPLETED', 'COMPLETE', 'FINISHED', 'SUBMITTED')
+                 AND NOT EXISTS (
+                   SELECT 1
+                   FROM assessment_attempts aa
+                   WHERE aa.registration_id = r.id
+                     AND ${completedPredicate}
+                 )`,
+              [userId],
+            );
+          }
+
           if (userRole === 'ADMIN') {
-            sql = `SELECT COUNT(*) as count FROM assessment_attempts aa JOIN registrations r ON aa.registration_id = r.id WHERE aa.status = 'COMPLETED' AND r.is_deleted = false${genderClause ? genderClause.replace('gender', 'r.gender') : ''}`;
+            sql = `SELECT COUNT(*) as count
+                   FROM assessment_attempts aa
+                   JOIN registrations r ON aa.registration_id = r.id
+                   WHERE ${completedPredicate}
+                     AND r.is_deleted = false${registrationGenderClause}`;
           } else if (userRole === 'CORPORATE' && corporateId) {
             params.push(corporateId);
-            sql = `SELECT COUNT(*) as count FROM assessment_attempts aa JOIN registrations r ON aa.registration_id = r.id WHERE aa.status = 'COMPLETED' AND r.is_deleted = false AND r.corporate_account_id = $${params.length}${genderClause ? genderClause.replace('gender', 'r.gender') : ''}`;
+            sql = `SELECT COUNT(*) as count
+                   FROM assessment_attempts aa
+                   JOIN registrations r ON aa.registration_id = r.id
+                   WHERE ${completedPredicate}
+                     AND r.is_deleted = false
+                     AND r.corporate_account_id = $${params.length}${registrationGenderClause}`;
+          } else if (userRole === 'CORPORATE') {
+            this.logger.warn('⚠️ RBAC: CORPORATE assessment count requested without resolvable corporateId; returning zero');
+            return [{ count: 0 }];
           } else {
             params.push(userId);
-            sql = `SELECT COUNT(*) as count FROM assessment_attempts WHERE status = 'COMPLETED' AND user_id = $${params.length}`;
+            sql = `SELECT COUNT(*) as count
+                   FROM assessment_attempts aa
+                   JOIN registrations r ON aa.registration_id = r.id
+                   WHERE ${completedPredicate}
+                     AND r.is_deleted = false
+                     AND r.user_id = $${params.length}${registrationGenderClause}`;
           }
         }
         break;
@@ -7004,6 +7486,9 @@ Please tell me the target role first, for example:
         const gLabel = (interpretation as any).gender;
         if (gLabel === 'MALE') return `👨 **Male: ${cnt}**`;
         if (gLabel === 'FEMALE') return `👩 **Female: ${cnt}**`;
+        if (requested === 'completed_candidates') return `**${cnt} candidates completed the assessment.**`;
+        if (requested === 'not_completed_candidates') return `**${cnt} candidates have not completed the assessment yet.**`;
+        if (requested === 'completed_assessments' || (interpretation as any).table === 'assessment_attempts') return `**${cnt} completed assessments found.**`;
         if (requested === 'employees') return `**${cnt} employees total.**`;
         if (requested === 'users') return `**${cnt} users total.**`;
         if (requested === 'candidates') return `**${cnt} candidates (employees/resources) total.**`;

@@ -141,6 +141,23 @@ export class AffiliatesController {
     return this.affiliatesService.previewSettlement(Number(id), numAmount);
   }
 
+  @Get(':id/referrals')
+  async getReferrals(
+    @Param('id') id: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.affiliatesService.getReferralsPage(
+      Number(id),
+      Number(page),
+      Number(limit),
+      status,
+      search,
+    );
+  }
+
   @Get(':id')
   async findById(@Param('id') id: string) {
     return this.affiliatesService.findById(Number(id));

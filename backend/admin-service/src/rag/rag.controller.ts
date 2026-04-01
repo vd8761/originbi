@@ -239,6 +239,20 @@ export interface RagResponse {
 export class RagController {
   private readonly logger = new Logger(RagController.name);
 
+  private isCorporateRagChatEnabled(): boolean {
+    return (process.env.ENABLE_CORPORATE_RAG_CHAT ?? 'true').toLowerCase() === 'true';
+  }
+
+  private ensureCorporateRagChatEnabled(user: UserContext): void {
+    const role = (user?.role || '').toUpperCase();
+    if (role === 'CORPORATE' && !this.isCorporateRagChatEnabled()) {
+      throw new HttpException(
+        'Corporate AI assistant is temporarily disabled',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+  }
+
   private ensureAdmin(user: UserContext): void {
     const role = (user?.role || '').toUpperCase();
     if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
@@ -479,6 +493,8 @@ export class RagController {
       if (!user || !user.id || user.id <= 0) {
         throw new HttpException('Authentication required for chat queries', HttpStatus.UNAUTHORIZED);
       }
+
+      this.ensureCorporateRagChatEnabled(user);
 
       const question = queryDto?.question;
       if (!question) {

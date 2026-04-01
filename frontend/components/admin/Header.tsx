@@ -75,11 +75,11 @@ const NavItem: React.FC<NavItemProps> = ({
             <button
                 onClick={onClick}
                 // SCALING:
-                // LG/XL: Ultra-Compact Mode (h-8, px-2.5) to fit 5 items on laptop
+                // LG/XL: Ultra-Compact Mode (h-8/9, px-2.5) to fit 7 items on laptop
                 // 2XL: Robust Mode (h-10, px-6) for large screens
-                className={`flex items-center ${spacingClass} rounded-full transition-all duration-200 w-full ${isMobile ? "py-3.5" : "lg:h-10 2xl:h-10"} cursor-pointer ${active
-                    ? "bg-brand-green text-white border border-transparent shadow-none px-3 2xl:px-3.5"
-                    : "bg-gray-50 border border-gray-200 text-black hover:bg-gray-100 hover:text-black hover:border-gray-300 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white px-3 2xl:px-3.5"
+                className={`flex items-center ${spacingClass} rounded-full transition-all duration-200 w-full ${isMobile ? "py-3.5" : "lg:h-8.5 2xl:h-10"} cursor-pointer ${active
+                    ? "bg-brand-green text-white border border-transparent shadow-none px-2 2xl:px-3.5"
+                    : "bg-gray-50 border border-gray-200 text-black hover:bg-gray-100 hover:text-black hover:border-gray-300 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white px-2 2xl:px-3.5"
                     }`}
             >
                 <div
@@ -89,7 +89,7 @@ const NavItem: React.FC<NavItemProps> = ({
                 </div>
                 <span
                     // TEXT SCALING: text-xs on Laptop, text-sm on 2XL
-                    className={`font-medium ${isMobile ? "text-sm ml-2" : "text-xs 2xl:text-[12px]"} whitespace-nowrap ${isMobile ? "inline" : showDesktopText
+                    className={`font-medium ${isMobile ? "text-sm ml-2" : "text-[11px] 2xl:text-[12px]"} whitespace-nowrap ${isMobile ? "inline" : showDesktopText
                         }`}
                 >
                     {label}
@@ -548,7 +548,7 @@ const Header: React.FC<HeaderProps> = ({
     );
 
     return (
-        <header className={`fixed top-0 left-0 right-0 w-full z-50 transition-all ${isNotificationsOpen ? "duration-150" : "duration-300"} bg-transparent dark:bg-[#19211C]/40 ${isNotificationsOpen ? "" : "backdrop-blur-xl dark:backdrop-blur-[200px]"} border-b border-[#E0E0E0] dark:border-white/[0.08] shadow-none`}>
+        <header className={`fixed top-0 left-0 right-0 w-full z-50 transition-all ${isNotificationsOpen ? "duration-150" : "duration-300"} bg-white/95 dark:bg-[#19211C]/95 backdrop-blur-xl dark:backdrop-blur-[200px] border-b border-[#E0E0E0] dark:border-white/[0.08] shadow-none`}>
             {isNotificationsOpen && (
                 <div className="absolute top-full left-0 w-full h-[100vh] bg-black/20 dark:bg-black/40 z-[-1] animate-fade-in-fast" />
             )}
@@ -583,7 +583,7 @@ const Header: React.FC<HeaderProps> = ({
                     )}
                 </div>
 
-                <div className="flex items-center gap-1 lg:gap-1.5 2xl:gap-1.5">
+                <div className="flex items-center gap-1 lg:gap-1.5 2xl:gap-1.5 relative z-[200]">
                     <div className="hidden sm:block">
                         {/* Theme Toggle: Scale to h-8 (Laptop) / h-9 (2XL) */}
                         <div className="scale-90 lg:scale-100 2xl:scale-100 origin-right">
@@ -607,7 +607,7 @@ const Header: React.FC<HeaderProps> = ({
                                             <ChevronDownIcon className="w-2.5 h-2.5" />
                                         </button>
                                         {isLangOpen && (
-                                            <div className="absolute right-0 top-full mt-2 w-32 bg-white dark:bg-brand-dark-tertiary rounded-lg shadow-xl py-1 ring-1 ring-black ring-opacity-5 z-50 border border-gray-100 dark:border-transparent">
+                                            <div className="absolute right-0 top-full mt-2 w-32 bg-white dark:bg-brand-dark-tertiary rounded-lg shadow-xl py-1 ring-1 ring-black ring-opacity-5 z-[100] border border-gray-100 dark:border-transparent">
                                                 <button
                                                     onClick={() => handleLangChange("ENG")}
                                                     className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-brand-text-primary hover:bg-gray-50 dark:hover:bg-brand-dark-secondary/60"
@@ -643,7 +643,7 @@ const Header: React.FC<HeaderProps> = ({
                                     )}
                                 </button>
                                 {isNotificationsOpen && (
-                                    <div className="fixed sm:absolute left-4 right-4 sm:left-auto sm:right-0 top-[64px] sm:top-full mt-2 sm:mt-6 w-auto sm:w-[500px] md:w-[560px] notification-glass-card p-0 z-50 animate-slide-down overflow-hidden text-gray-900 dark:text-white cursor-default">
+                                    <div className="fixed sm:absolute left-4 right-4 sm:left-auto sm:right-0 top-[64px] sm:top-full mt-2 sm:mt-6 w-auto sm:w-[500px] md:w-[560px] notification-glass-card p-0 z-[100] animate-slide-down overflow-hidden text-gray-900 dark:text-white cursor-default">
                                         <div className="p-5 pb-4">
                                             <div className="flex justify-between items-center mb-4">
                                                 <h3 className="text-[17px] font-semibold tracking-wide text-gray-900 dark:text-white">
@@ -786,7 +786,7 @@ const Header: React.FC<HeaderProps> = ({
                         </button>
 
                         {isProfileOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-64 bg-brand-light-secondary dark:bg-brand-dark-secondary rounded-xl shadow-2xl z-50 border border-brand-light-tertiary dark:border-brand-dark-tertiary/50 overflow-hidden">
+                            <div className="absolute right-0 top-full mt-2 w-64 bg-brand-light-secondary dark:bg-brand-dark-secondary rounded-xl shadow-2xl z-[100] border border-brand-light-tertiary dark:border-brand-dark-tertiary/50 overflow-hidden">
                                 <div className="p-2">
                                     <button
                                         onClick={onLogout}
