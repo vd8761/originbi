@@ -10,6 +10,9 @@ import RequireCorporate from '../../components/auth/RequireCorporate';
 
 configureAmplify();
 
+const isCorporateAssistantEnabled =
+    process.env.NEXT_PUBLIC_ENABLE_CORPORATE_RAG_CHAT === 'true';
+
 export default function CorporateLayout({
     children,
 }: {
@@ -108,7 +111,7 @@ export default function CorporateLayout({
                         </div>
 
                         {/* Floating AI Chat Bot */}
-                        <FloatingChatBot userRole="CORPORATE" />
+                        {isCorporateAssistantEnabled && <FloatingChatBot userRole="CORPORATE" />}
                     </RequireCorporate>
                 ) : (
                     /* --- PUBLIC LAYOUT (No Header, No Guard) --- */

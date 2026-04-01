@@ -130,6 +130,14 @@
   .portal-bg {
     @apply bg-[url('/Background_Light_Theme.svg')] bg-cover bg-top bg-no-repeat dark:bg-none dark:bg-[#19211C];
   }
+
+  /* Shared lighter typography rendering for corporate list/detail pages */
+  .thin-ui-page {
+    font-weight: 300;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
 }
 
 /* Custom Fonts */

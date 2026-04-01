@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+﻿import React, { useMemo, useState } from "react";
 import { ChevronDownIcon, SearchIcon, ClockIcon, MapPinIcon } from "lucide-react";
 import CandidateDetail from "../candidates/CandidateDetail";
 import { AnnualCtcJobIcon, EmploymentTypeJobIcon, ExperienceLevelJobIcon, ShiftJobIcon, WorkModeJobIcon } from "../../icons";
@@ -8,7 +8,7 @@ export interface JobDetailsProps {
     onBack?: () => void;
 }
 
-// ─── Mock Data for Job Details ──────────────────────────────────
+// â”€â”€â”€ Mock Data for Job Details â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // TODO: Replace with real API data later
 const mockJobDetail = {
     id: "1",
@@ -56,7 +56,7 @@ const mockJobDetail = {
     }
 };
 
-// ─── Mock Candidates Data ───────────────────────────────────────
+// â”€â”€â”€ Mock Candidates Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export interface Candidate {
     id: string;
     name: string;
@@ -478,20 +478,20 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
             {/* Header: Title & Company Info & Edit Btn */}
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl sm:text-[32px] font-semibold text-[#19211C] dark:text-white mb-2 leading-tight">
+                    <h1 className="font-['Haskoy'] text-[38px] sm:text-[48px] font-medium text-[#19211C] dark:text-white mb-3 leading-[100%] tracking-[0px] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">
                         {job.title}
                     </h1>
-                    <div className="flex items-center gap-2 text-[16px] sm:text-[20px] leading-[100%] font-normal text-gray-600 dark:text-gray-300">
+                    <div className="flex items-center gap-2.5 font-['Haskoy'] text-[16px] sm:text-[18px] leading-[100%] font-[300] text-gray-600 dark:text-white/90 tracking-[0px] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">
                         <span>{job.company}</span>
-                        <span className="text-gray-400 dark:text-gray-500">•</span>
+                        <span className="text-gray-400 dark:text-gray-500">&middot;</span>
                         <span>{job.location}</span>
-                        <span className="text-gray-400 dark:text-gray-500">•</span>
+                        <span className="text-gray-400 dark:text-gray-500">&middot;</span>
                         <span>{job.employmentType}</span>
                         <span className="text-gray-400 dark:text-gray-500 ml-4">|</span>
-                        <span className="ml-4 font-normal">Job ID : {job.jobId}</span>
+                        <span className="ml-4 font-[300] dark:text-white/92">Job ID : {job.jobId}</span>
                     </div>
                 </div>
-                <button className="flex items-center gap-1.5 px-3.5 py-[7px] bg-white dark:bg-[#313B36] hover:bg-[#343D38] border border-gray-200 dark:border-[#FFFFFF14] rounded-full text-[13px] leading-[100%] font-medium text-[#19211C] dark:text-white transition-colors cursor-pointer shadow-sm dark:shadow-none">
+                <button className="flex items-center gap-1.5 px-3.5 py-[7px] bg-white dark:bg-[#313B36] hover:bg-[#343D38] border border-gray-200 dark:border-[#FFFFFF14] rounded-full font-['Haskoy'] text-[13px] leading-[100%] font-normal text-[#19211C] dark:text-white/90 transition-colors cursor-pointer shadow-sm dark:shadow-none">
                     Edit
                     <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#1ED36A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="opacity-100">
                         <path d="M2 10l2.1-.5L10 3.6 8.4 2 2.5 7.9 2 10z" />
@@ -501,7 +501,7 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
             </div>
 
             {/* Tabs + Dates Row */}
-            <div className="flex flex-col xl:flex-row justify-between items-end xl:items-end border-b border-brand-light-tertiary dark:border-white/10 pb-0 gap-4 xl:gap-0 mt-4">
+            <div className="flex flex-col xl:flex-row justify-between items-end xl:items-end border-b border-brand-light-tertiary dark:border-white/10 pb-0 gap-4 xl:gap-0 mt-5">
                 {/* Tabs */}
                 <div className="flex items-center w-full xl:w-auto overflow-x-auto scrollbar-hide">
                     {([
@@ -515,16 +515,16 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                         <button
                             key={tab.key}
                             onClick={() => setActiveTab(tab.key)}
-                            className={`px-1 py-3 -mb-px mr-6 text-[14px] border-b-[3px] transition-colors whitespace-nowrap cursor-pointer ${activeTab === tab.key
+                            className={`px-1 py-3 -mb-px mr-7 text-[15px] sm:text-[18px] border-b-[3px] transition-colors whitespace-nowrap cursor-pointer ${activeTab === tab.key
                                 ? "border-brand-green"
                                 : "border-transparent hover:border-gray-200 dark:hover:border-white/20"
                                 }`}
                         >
-                            <span className={activeTab === tab.key ? "font-light text-brand-green" : "font-light text-gray-500 dark:text-gray-400"}>
+                            <span className={activeTab === tab.key ? "font-semibold text-brand-green" : "font-normal text-gray-500 dark:text-white/70"}>
                                 {tab.label}
                             </span>
                             {tab.count !== null && (
-                                <span className={activeTab === tab.key ? "text-brand-green font-light ml-1.5" : "text-gray-400 dark:text-gray-500 font-light ml-1.5"}>
+                                <span className={activeTab === tab.key ? "text-brand-green font-semibold ml-1.5" : "text-gray-400 dark:text-white/60 font-normal ml-1.5"}>
                                     ({tab.count})
                                 </span>
                             )}
@@ -533,15 +533,15 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                 </div>
 
                 {/* Dates */}
-                <div className="flex items-center gap-5 py-2 w-full xl:w-auto justify-end flex-wrap text-[13px] font-normal">
-                    <div className="flex items-center gap-1.5 text-gray-600 dark:text-white font-normal">
+                <div className="flex items-center gap-6 py-2 w-full xl:w-auto justify-end flex-wrap font-['Haskoy'] text-[14px] sm:text-[16px] font-normal leading-[100%] tracking-[0px] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">
+                    <div className="flex items-center gap-2 text-gray-600 dark:text-white font-normal">
                         <svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0 text-[#1ED36A]">
                             <path d="M15.3 2.7H14.4V0.9C14.4 0.661305 14.3052 0.432387 14.1364 0.263604C13.9676 0.0948211 13.7387 0 13.5 0C13.2613 0 13.0324 0.0948211 12.8636 0.263604C12.6948 0.432387 12.6 0.661305 12.6 0.9V2.7H5.4V0.9C5.4 0.661305 5.30518 0.432387 5.1364 0.263604C4.96761 0.0948211 4.73869 0 4.5 0C4.2613 0 4.03239 0.0948211 3.8636 0.263604C3.69482 0.432387 3.6 0.661305 3.6 0.9V2.7H2.7C1.98392 2.7 1.29716 2.98446 0.790812 3.49081C0.284464 3.99716 0 4.68392 0 5.4V6.3H18V5.4C18 4.68392 17.7155 3.99716 17.2092 3.49081C16.7028 2.98446 16.0161 2.7 15.3 2.7Z" fill="currentColor" />
                             <path d="M0 15.3C0 16.0161 0.284464 16.7028 0.790812 17.2092C1.29716 17.7155 1.98392 18 2.7 18H15.3C16.0161 18 16.7028 17.7155 17.2092 17.2092C17.7155 16.7028 18 16.0161 18 15.3V8.09998H0V15.3Z" fill="currentColor" />
                         </svg>
                         Posted on {job.postedDate}
                     </div>
-                    <div className="flex items-center gap-1.5 text-gray-600 dark:text-white font-normal">
+                    <div className="flex items-center gap-2 text-gray-600 dark:text-white font-normal">
                         <span className="w-1.5 h-1.5 rounded-full bg-brand-green flex-shrink-0" />
                         Closes at {job.closingDate}
                     </div>
@@ -564,8 +564,8 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                                 </div>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[12px] text-gray-500 dark:text-gray-400 mb-0.5">Employment Type</span>
-                                <span className="text-[15px] font-semibold text-[#19211C] dark:text-white leading-tight">{job.employmentType}</span>
+                                <span className="font-['Haskoy'] text-[12px] text-gray-500 dark:text-gray-300 mb-0.5 font-normal leading-[100%]">Employment Type</span>
+                                <span className="font-['Haskoy'] text-[15px] font-semibold text-[#19211C] dark:text-white leading-tight">{job.employmentType}</span>
                             </div>
                         </div>
 
@@ -581,8 +581,8 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                                 </div>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[12px] text-gray-500 dark:text-gray-400 mb-0.5">Work Mode</span>
-                                <span className="text-[15px] font-semibold text-[#19211C] dark:text-white leading-tight">{job.workMode}</span>
+                                <span className="font-['Haskoy'] text-[12px] text-gray-500 dark:text-gray-300 mb-0.5 font-normal leading-[100%]">Work Mode</span>
+                                <span className="font-['Haskoy'] text-[15px] font-semibold text-[#19211C] dark:text-white leading-tight">{job.workMode}</span>
                             </div>
                         </div>
 
@@ -598,8 +598,8 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                                 </div>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[12px] text-gray-500 dark:text-gray-400 mb-0.5">Shift</span>
-                                <span className="text-[15px] font-semibold text-[#19211C] dark:text-white leading-tight">{job.shift}</span>
+                                <span className="font-['Haskoy'] text-[12px] text-gray-500 dark:text-gray-300 mb-0.5 font-normal leading-[100%]">Shift</span>
+                                <span className="font-['Haskoy'] text-[15px] font-semibold text-[#19211C] dark:text-white leading-tight">{job.shift}</span>
                             </div>
                         </div>
 
@@ -615,8 +615,8 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                                 </div>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[12px] text-gray-500 dark:text-gray-400 mb-0.5">Experience Level</span>
-                                <span className="text-[15px] font-semibold text-[#19211C] dark:text-white leading-tight">{job.experienceLevel}</span>
+                                <span className="font-['Haskoy'] text-[12px] text-gray-500 dark:text-gray-300 mb-0.5 font-normal leading-[100%]">Experience Level</span>
+                                <span className="font-['Haskoy'] text-[15px] font-semibold text-[#19211C] dark:text-white leading-tight">{job.experienceLevel}</span>
                             </div>
                         </div>
 
@@ -626,16 +626,16 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                             <div className="flex items-center justify-center shrink-0">
                                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1ED36A] text-white text-[0px] dark:hidden">
                                     <AnnualCtcJobIcon className="w-[15px] h-5" />
-                                    ₹
+                                    â‚¹
                                 </div>
                                 <div className="hidden h-11 w-11 items-center justify-center rounded-full border border-[#D7E2DD] bg-[#EEF3F0] text-[#13C065] text-[0px] dark:flex dark:border-[#3E4A44] dark:bg-[#2F3833]">
                                     <AnnualCtcJobIcon className="w-[15px] h-5" />
-                                    ₹
+                                    â‚¹
                                 </div>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[12px] text-gray-500 dark:text-gray-400 mb-0.5">Annual CTC</span>
-                                <span className="text-[15px] font-semibold text-[#19211C] dark:text-white leading-tight">{job.annualCTC}</span>
+                                <span className="font-['Haskoy'] text-[12px] text-gray-500 dark:text-gray-300 mb-0.5 font-normal leading-[100%]">Annual CTC</span>
+                                <span className="font-['Haskoy'] text-[15px] font-semibold text-[#19211C] dark:text-white leading-tight">{job.annualCTC}</span>
                             </div>
                         </div>
                     </div>
@@ -686,7 +686,7 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                             <h3 className="text-[13px] font-semibold text-[#19211C] dark:text-white mb-3">Required Skills (Mandatory for shortlisting)</h3>
                             <div className="flex flex-wrap gap-2.5">
                                 {job.requiredSkills.map((skill, i) => (
-                                    <span key={i} className="px-3.5 py-[5px] rounded-full border border-[#DDE1DE] dark:border-transparent bg-[#F3F5F3] dark:bg-[#F0F2F0] text-[13px] font-normal text-[#2E3431] dark:text-[#2E3431]">
+                                    <span key={i} className="px-3.5 py-[5px] rounded-full border border-gray-200 shadow-sm bg-white text-[13px] font-normal text-[#2E3431]">
                                         {skill}
                                     </span>
                                 ))}
@@ -782,7 +782,7 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                                         : "bg-[#E5E8E6] dark:bg-[#2F3833] border border-[#D3D8D5] dark:border-white/15 hover:bg-[#DCE1DE] dark:hover:bg-[#3A433E] text-[#19211C] dark:text-white"
                                         }`}
                                 >
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="text-[#1ED36A]" stroke="none">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 shrink-0 text-[#1ED36A]" stroke="none">
                                         <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                                     </svg>
                                     {alignmentFilterLabel}
@@ -849,7 +849,7 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                                 <div className="flex items-end justify-between mt-1">
                                     <div className="flex flex-wrap items-center gap-2 max-w-[72%]">
                                         {cad.skills.map((s, idx) => (
-                                            <span key={idx} className="bg-[#F2F3F2] text-[#333834] px-4 py-[6px] rounded-full text-[14px] leading-[100%] font-normal whitespace-nowrap">
+                                            <span key={idx} className="bg-white border border-gray-200 shadow-sm text-[#2E3431] px-4 py-[6px] rounded-full text-[14px] leading-[100%] font-normal whitespace-nowrap">
                                                 {s}
                                             </span>
                                         ))}
@@ -867,13 +867,13 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                                 {/* Footer Row */}
                                 <div className="flex items-center justify-between">
                                     {/* Alignment Score */}
-                                    <div className="flex flex-col gap-2">
-                                        <p className="text-[14px] leading-[100%] font-normal text-[#19211C] dark:text-white">
-                                            Role Alignment : <span className="text-[#1ED36A] font-semibold">{cad.alignment}</span>
+                                    <div className="flex flex-col gap-2.5">
+                                        <p className="text-[16px] leading-[100%] font-medium text-[#19211C] dark:text-white">
+                                            Role Alignment : <span className="text-[#1ED36A] font-semibold text-[16px]">{cad.alignment}</span>
                                         </p>
-                                        <div className="flex gap-1.5 text-[#1ED36A]">
+                                        <div className="flex gap-2 text-[#1ED36A]">
                                             {[1, 2, 3, 4, 5].map((star) => (
-                                                <svg key={star} width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none" className={star === 5 ? "opacity-35" : ""}>
+                                                <svg key={star} width="26" height="26" viewBox="0 0 24 24" fill="currentColor" stroke="none" className={star === 5 ? "opacity-35" : ""}>
                                                     <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                                                 </svg>
                                             ))}
@@ -882,17 +882,17 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
 
                                     {/* Action Buttons */}
                                     <div className="flex items-center gap-4 shrink-0">
-                                        <button className={`w-[96.6056px] h-[55px] flex items-center justify-center gap-2 rounded-[27.5px] text-[14px] leading-none font-normal transition-colors cursor-pointer ${activeTab === 'hired' ? 'bg-[#1ED36A] text-white border border-[#1ED36A]' : 'bg-[#E2E6E3] hover:bg-[#D8DEDA] text-[#1F2723] border border-[#D2D8D4] dark:bg-[#454D49] dark:hover:bg-[#4C5751] dark:text-white dark:border-white/10'}`}>
+                                        <button className={`w-[96.6056px] h-[55px] flex items-center justify-center gap-2 rounded-[27.5px] text-[14px] leading-none font-normal transition-colors cursor-pointer ${activeTab === 'hired' ? 'bg-[#1ED36A] text-white border border-[#1ED36A] shadow-[0_6px_14px_rgba(30,211,106,0.28)]' : 'bg-white hover:bg-gray-50 text-[#1F2723] border border-gray-200 shadow-sm dark:bg-[#3A433E] dark:hover:bg-[#46514B] dark:text-white dark:border-[#56625B]'}`}>
                                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={activeTab === 'hired' ? '#FFFFFF' : '#1ED36A'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
                                             Hire
                                         </button>
-                                        <button className={`w-[127.791px] h-[55px] flex items-center justify-center gap-2 rounded-[27.5px] text-[14px] leading-none font-normal transition-colors cursor-pointer ${activeTab === 'shortlisted' ? 'bg-[#FFB020] text-white border border-[#FFB020]' : 'bg-[#E2E6E3] hover:bg-[#D8DEDA] text-[#1F2723] border border-[#D2D8D4] dark:bg-[#454D49] dark:hover:bg-[#4C5751] dark:text-white dark:border-white/10'}`}>
+                                        <button className={`w-[127.791px] h-[55px] flex items-center justify-center gap-2 rounded-[27.5px] text-[14px] leading-none font-normal transition-colors cursor-pointer ${activeTab === 'shortlisted' ? 'bg-[#FFB020] text-white border border-[#FFB020] shadow-[0_6px_14px_rgba(255,176,32,0.26)]' : 'bg-white hover:bg-gray-50 text-[#1F2723] border border-gray-200 shadow-sm dark:bg-[#3A433E] dark:hover:bg-[#46514B] dark:text-white dark:border-[#56625B]'}`}>
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" className={`${activeTab === 'shortlisted' ? 'text-white' : 'text-[#FFB020]'}`}>
                                                 <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                                             </svg>
                                             Shortlist
                                         </button>
-                                        <button className={`w-[109.001px] h-[55px] flex items-center justify-center gap-2 rounded-[27.5px] text-[14px] leading-none font-normal transition-colors cursor-pointer ${activeTab === 'rejected' ? 'bg-[#FF4A4A] text-white border border-[#FF4A4A]' : 'bg-[#E2E6E3] hover:bg-[#D8DEDA] text-[#1F2723] border border-[#D2D8D4] dark:bg-[#454D49] dark:hover:bg-[#4C5751] dark:text-white dark:border-white/10'}`}>
+                                        <button className={`w-[109.001px] h-[55px] flex items-center justify-center gap-2 rounded-[27.5px] text-[14px] leading-none font-normal transition-colors cursor-pointer ${activeTab === 'rejected' ? 'bg-[#FF4A4A] text-white border border-[#FF4A4A] shadow-[0_6px_14px_rgba(255,74,74,0.24)]' : 'bg-white hover:bg-gray-50 text-[#1F2723] border border-gray-200 shadow-sm dark:bg-[#3A433E] dark:hover:bg-[#46514B] dark:text-white dark:border-[#56625B]'}`}>
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={activeTab === 'rejected' ? '#FFFFFF' : '#FF4A4A'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
                                             Reject
                                         </button>
@@ -1013,9 +1013,10 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                     <span className="text-brand-green hover:underline cursor-pointer">Terms & Conditions</span>
                 </div>
                 <span>
-                    © 2025 Origin BI, Made with <span className="text-brand-green cursor-pointer hover:underline">Touchmark Descience Pvt. Ltd.</span>
+                    Â© 2025 Origin BI, Made with <span className="text-brand-green cursor-pointer hover:underline">Touchmark Descience Pvt. Ltd.</span>
                 </span>
             </div>
         </div>
     );
 }
+

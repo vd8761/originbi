@@ -131,8 +131,8 @@ function FilterDropdown({
         : icon;
 
     const buttonToneClass = isActive && selectedTone === "green"
-        ? "border border-[#9ADAB4] bg-[#CBEED8] text-[#19211C] hover:bg-[#BCE7CC] dark:border-transparent dark:bg-[#1ED36A33] dark:text-white dark:hover:bg-[#1ED36A45]"
-        : "border border-[#D2D9D6] bg-[#F2F4F3] text-[#19211C] hover:bg-[#E8ECEA] dark:border-transparent dark:bg-white/[0.12] dark:text-white/90 dark:hover:bg-white/[0.16]";
+        ? "border border-[#1ED36A]/50 bg-[#E7F8EE]/60 text-[#1F3B2A] hover:bg-[#DDF4E7]/80 dark:border-transparent dark:bg-[#1ED36A33] dark:text-white dark:hover:bg-[#1ED36A45]"
+        : "border border-gray-300/80 bg-transparent text-[#33413B] hover:bg-black/[0.04] dark:border-transparent dark:bg-white/[0.12] dark:text-white/90 dark:hover:bg-white/[0.16]";
 
     return (
         <div className="relative shrink-0" ref={ref}>
@@ -145,11 +145,11 @@ function FilterDropdown({
                 <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
             </button>
             {open && (
-                <div className="absolute right-0 top-full mt-1.5 min-w-[170px] bg-white dark:bg-[#1F2823] border border-gray-200 dark:border-white/10 rounded-lg shadow-xl z-50 overflow-hidden py-1">
+                <div className="absolute right-0 top-full mt-1.5 min-w-[170px] bg-white/14 dark:bg-[rgba(25,33,28,0.12)] border border-[rgba(25,33,28,0.08)] dark:border-[rgba(255,255,255,0.2)] rounded-lg shadow-[0_16px_40px_rgba(25,33,28,0.05)] dark:shadow-[0_16px_40px_rgba(25,33,28,0.6)] backdrop-blur-[20px] z-50 overflow-hidden py-1 box-border">
                     <button
                         onClick={() => { onChange(null); setOpen(false); }}
                         className={`w-full text-left px-4 py-2.5 text-[12px] transition-colors cursor-pointer ${
-                            !value ? "text-brand-green font-semibold" : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5"
+                            !value ? "text-brand-green font-semibold bg-white/10 dark:bg-white/10" : "text-[#33413B] dark:text-white/90 hover:bg-white/10 dark:hover:bg-white/10"
                         }`}
                     >
                         All
@@ -160,8 +160,8 @@ function FilterDropdown({
                             onClick={() => { onChange(opt); setOpen(false); }}
                             className={`w-full text-left px-4 py-2.5 text-[12px] transition-colors cursor-pointer ${
                                 value === opt
-                                    ? "text-brand-green font-semibold bg-brand-green/5"
-                                    : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5"
+                                    ? "text-brand-green font-semibold bg-white/10 dark:bg-white/10"
+                                    : "text-[#33413B] dark:text-white/90 hover:bg-white/10 dark:hover:bg-white/10"
                             }`}
                         >
                             {opt}
@@ -542,7 +542,7 @@ export default function CandidatesList() {
     const isDateFilterActive = Boolean(dateFilter && dateFilter !== "Applied Date");
 
     return (
-        <div className="flex flex-col w-full min-h-screen gap-5 font-sans p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-[#19211C]">
+        <div className="thin-ui-page flex flex-col w-full min-h-screen gap-5 font-sans p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-[#19211C]">
 
             {/* Breadcrumb */}
             <div className="flex items-center text-xs text-gray-500 dark:text-white/70 mb-1.5 font-normal">
@@ -552,12 +552,12 @@ export default function CandidatesList() {
                         <path d="M3.75 2L6.75 5L3.75 8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                 </span>
-                <span className="text-brand-green font-semibold">Candidates</span>
+                <span className="text-brand-green font-medium">Candidates</span>
             </div>
 
             {/* Header */}
             <div className="flex items-center justify-between">
-                <h1 className="text-[44px] leading-[56px] font-semibold text-[#19211C] dark:text-white">
+                <h1 className="text-[44px] leading-[56px] font-medium text-[#19211C] dark:text-white">
                     Candidates
                 </h1>
                 <div className="flex items-center gap-2.5 text-[13px] text-gray-500 dark:text-white/60">
@@ -660,9 +660,9 @@ export default function CandidatesList() {
                         <button
                             type="button"
                             onClick={() => setShowDateModal(true)}
-                            className={`h-[40px] rounded-[12px] px-3 text-[13px] flex items-center gap-2 font-normal cursor-pointer transition-all ${isDateFilterActive
-                                ? "border border-[#9ADAB4] bg-[#CBEED8] text-[#19211C] hover:bg-[#BCE7CC] dark:border-transparent dark:bg-[#1ED36A33] dark:text-white dark:hover:bg-[#1ED36A45]"
-                                : "border border-[#D2D9D6] bg-[#F2F4F3] text-[#19211C] hover:bg-[#E8ECEA] dark:border-transparent dark:bg-white/[0.12] dark:text-white/90 dark:hover:bg-white/[0.16]"
+                            className={`h-[44px] rounded-xl px-4 text-[13px] flex items-center gap-2 font-medium cursor-pointer transition-all whitespace-nowrap border ${isDateFilterActive
+                                ? "border-[#1ED36A]/50 bg-[#E7F8EE]/60 text-[#1F3B2A] hover:bg-[#DDF4E7]/80 dark:border-transparent dark:bg-[#1ED36A33] dark:text-white dark:hover:bg-[#1ED36A45]"
+                                : "border-gray-300/80 bg-transparent text-[#33413B] hover:bg-black/[0.04] dark:border-transparent dark:bg-white/[0.12] dark:text-white/90 dark:hover:bg-white/[0.16]"
                                 }`}
                         >
                             <svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0 text-[#1ED36A]">
@@ -864,15 +864,18 @@ export default function CandidatesList() {
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400 mt-auto pb-4">
-                <div className="flex items-center gap-4">
-                    <span className="text-brand-green hover:underline cursor-pointer">Privacy Policy</span>
-                    <span className="text-brand-green hover:underline cursor-pointer">Terms & Conditions</span>
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-xs sm:text-sm text-brand-text-light-secondary dark:text-brand-text-secondary mt-auto pb-4">
+                <div className="flex gap-4 w-full sm:w-1/2 justify-center sm:justify-start">
+                    <a href="#" className="text-brand-green hover:text-brand-green/80 transition-colors underline cursor-pointer">Privacy Policy</a>
+                    <div className="h-4 w-px bg-brand-light-tertiary dark:bg-brand-dark-tertiary"></div>
+                    <a href="#" className="text-brand-green hover:text-brand-green/80 transition-colors underline cursor-pointer">Terms &amp; Conditions</a>
                 </div>
-                <span>
-                    © 2025 Origin BI, Made with{" "}
-                    <span className="text-brand-green hover:underline cursor-pointer">Touchmark Descience Pvt. Ltd</span>
-                </span>
+                <div className="text-center sm:text-right w-full sm:w-1/2 font-medium text-[#19211C] dark:text-[#FFFFFF]">
+                    &copy; {new Date().getFullYear()} Origin BI, Made with by{" "}
+                    <span className="underline text-[#1ED36A] hover:text-[#1ED36A]/80 transition-colors cursor-pointer">
+                        Touchmark Descience Pvt. Ltd.
+                    </span>
+                </div>
             </div>
         </div>
     );
