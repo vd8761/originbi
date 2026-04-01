@@ -41,10 +41,25 @@ export class RenameConversationDto {
 export class ChatController {
   private readonly logger = new Logger('ChatController');
 
+  private isCorporateRagChatEnabled(): boolean {
+    return (process.env.ENABLE_CORPORATE_RAG_CHAT ?? 'true').toLowerCase() === 'true';
+  }
+
+  private ensureCorporateRagChatEnabled(user: UserContext): void {
+    const role = (user?.role || '').toUpperCase();
+    if (role === 'CORPORATE' && !this.isCorporateRagChatEnabled()) {
+      throw new HttpException(
+        'Corporate AI assistant is temporarily disabled',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+  }
+
   private ensurePersistentChatUser(user: UserContext): void {
     if (!user?.id || user.id <= 0) {
       throw new HttpException('Authentication required for chat history', HttpStatus.UNAUTHORIZED);
     }
+    this.ensureCorporateRagChatEnabled(user);
   }
 
   constructor(private readonly chatMemory: ChatMemoryService) {}

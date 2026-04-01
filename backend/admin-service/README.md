@@ -73,6 +73,11 @@ SQL_MAX_OUTPUT_TOKENS=680
 SQL_SYNTH_MAX_OUTPUT_TOKENS=860
 RAG_MAX_OUTPUT_TOKENS=720
 KNOWLEDGE_MAX_OUTPUT_TOKENS=860
+
+# Corporate assistant plug-in/plug-out switch
+# true  => corporate users can access /rag/query and /rag/chat
+# false => corporate users are blocked (ADMIN/STUDENT unaffected)
+ENABLE_CORPORATE_RAG_CHAT=false
 ```
 
 ### Complex query quality checklist

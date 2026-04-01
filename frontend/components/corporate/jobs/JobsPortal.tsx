@@ -13,8 +13,8 @@ import {
 
 type JobStatus = "Active" | "Draft" | "Closed" | "Hold";
 type TabKey = "all" | "active" | "closed" | "draft";
-type SortOption = "title_asc" | "posted_newest" | "posted_oldest" | "closing_soon" | "applicants_high" | "applicants_low";
-type DateFilter = "all" | "today" | "yesterday" | "this_week" | "this_month" | "last_30_days";
+type SortOption = "none" | "title_asc" | "posted_newest" | "posted_oldest" | "closing_soon" | "applicants_high" | "applicants_low";
+type DateFilter = "all" | "today" | "yesterday" | "last_7_days" | "this_month" | "last_month" | "last_30_days" | "custom_range";
 
 interface Job {
     id: string;
@@ -67,9 +67,11 @@ const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
     { value: "all", label: "All Time" },
     { value: "today", label: "Today" },
     { value: "yesterday", label: "Yesterday" },
-    { value: "this_week", label: "This Week" },
+    { value: "last_7_days", label: "Last 7 Days" },
     { value: "this_month", label: "This Month" },
+    { value: "last_month", label: "Last Month" },
     { value: "last_30_days", label: "Last 30 Days" },
+    { value: "custom_range", label: "Custom Range" },
 ];
 
 function parseDisplayDate(dateValue: string): Date {
@@ -78,31 +80,65 @@ function parseDisplayDate(dateValue: string): Date {
     return Number.isNaN(parsed.getTime()) ? new Date("1970-01-01") : parsed;
 }
 
+function formatDisplayDate(date: Date): string {
+    return date.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+    });
+}
+
 function generateMockJobs(): Job[] {
     const jobs: Job[] = [];
     const statuses: JobStatus[] = [];
-    for (let i = 0; i < 80; i++) statuses.push("Active");
-    for (let i = 0; i < 19; i++) statuses.push("Closed");
-    for (let i = 0; i < 1; i++) statuses.push("Draft");
+    for (let i = 0; i < 72; i++) statuses.push("Active");
+    for (let i = 0; i < 15; i++) statuses.push("Closed");
+    for (let i = 0; i < 8; i++) statuses.push("Draft");
+    for (let i = 0; i < 5; i++) statuses.push("Hold");
+
+    const titles = [
+        "UI/UX Designer",
+        "Frontend Developer",
+        "Product Designer",
+        "Data Analyst",
+        "QA Engineer",
+        "Backend Developer",
+    ];
+
+    const companies = ["Google Inc", "Microsoft", "Zoho", "Freshworks", "Amazon", "Infosys"];
+    const locations = ["Chennai", "Bangalore", "Pune"];
+    const employmentTypes = ["Full Time", "Part Time", "Internship"];
+    const workModes = ["Onsite", "Remote"];
+
+    const today = new Date();
+    const makeDate = (daysAgo: number) => {
+        const d = new Date(today);
+        d.setDate(today.getDate() - daysAgo);
+        return d;
+    };
 
     for (let i = 0; i < 100; i++) {
+        const postedDateObj = makeDate(i % 45);
+        const closingDateObj = new Date(postedDateObj);
+        closingDateObj.setDate(postedDateObj.getDate() + 63);
+
         jobs.push({
             id: `job-${i + 1}`,
-            jobId: "18722765562",
-            title: "UI/UX Designer",
-            company: "Google Inc",
-            location: "Chennai",
-            workMode: i % 2 === 0 ? "Onsite" : "Remote",
-            employmentType: "Full Time",
-            postedDate: "27 December 2025",
-            closingDate: "28 February 2026",
+            jobId: `${18722765562 + i}`,
+            title: titles[i % titles.length],
+            company: companies[i % companies.length],
+            location: locations[i % locations.length],
+            workMode: workModes[i % workModes.length],
+            employmentType: employmentTypes[i % employmentTypes.length],
+            postedDate: formatDisplayDate(postedDateObj),
+            closingDate: formatDisplayDate(closingDateObj),
             status: statuses[i],
-            expiresIn: i === 1 ? 3 : undefined,
-            totalApplicants: 300,
-            newApplicants: 126,
-            shortListed: 88,
-            hired: 126,
-            rejected: 4,
+            expiresIn: i % 9 === 1 ? 3 : undefined,
+            totalApplicants: 160 + (i % 7) * 28,
+            newApplicants: 24 + (i % 8) * 11,
+            shortListed: 12 + (i % 6) * 9,
+            hired: 8 + (i % 5) * 7,
+            rejected: 2 + (i % 4) * 3,
         });
     }
     return jobs;
@@ -137,28 +173,35 @@ function useClickOutside(ref: React.RefObject<HTMLElement | null>, handler: () =
 const STATUS_STYLES: Record<JobStatus, { bg: string; text: string; dot: string; border: string }> = {
     Active: {
         bg: "bg-[#E8F8F0] dark:bg-[#1F6A45]",
-        text: "text-[#1F6A45] dark:text-white",
+        text: "text-[#1F6A45] dark:text-white/90",
         dot: "bg-[#1F6A45] dark:bg-brand-green",
         border: "border border-transparent dark:border-[#2B8A59]",
     },
     Draft: {
         bg: "bg-[#FFF8E6] dark:bg-[#6B5B23]",
-        text: "text-[#D99A00] dark:text-white",
+        text: "text-[#D99A00] dark:text-white/90",
         dot: "bg-[#D99A00] dark:bg-[#FFB800]",
         border: "border border-transparent dark:border-[#86702A]",
     },
     Closed: {
         bg: "bg-[#FFEBEB] dark:bg-[#6A2B2B]",
-        text: "text-[#FF4B4B] dark:text-white",
+        text: "text-[#FF4B4B] dark:text-white/90",
         dot: "bg-[#FF4B4B] dark:bg-[#FF4B4B]",
         border: "border border-transparent dark:border-[#8A3A3A]",
     },
     Hold: {
         bg: "bg-[#F3F4F6] dark:bg-[#4D5A53]",
-        text: "text-[#6B7280] dark:text-white",
-        dot: "bg-[#6B7280] dark:bg-purple-500",
+        text: "text-[#6B7280] dark:text-white/95",
+        dot: "bg-[#6B7280] dark:bg-[#A8B3AD]",
         border: "border border-transparent dark:border-[#64726B]",
     },
+};
+
+const STATUS_OPTION_STYLES: Record<JobStatus, string> = {
+    Active: "bg-[#8FDDB8]/45 text-[#19211C] font-medium dark:bg-[#32925B] dark:text-white",
+    Draft: "bg-[#8FDDB8]/45 text-[#19211C] font-medium dark:bg-[#32925B] dark:text-white",
+    Closed: "bg-[#8FDDB8]/45 text-[#19211C] font-medium dark:bg-[#32925B] dark:text-white",
+    Hold: "bg-[#8FDDB8]/45 text-[#19211C] font-medium dark:bg-[#32925B] dark:text-white",
 };
 
 function StatusBadge({
@@ -177,29 +220,33 @@ function StatusBadge({
         <div className="relative" ref={ref}>
             <button
                 onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium cursor-pointer transition-all ${s.bg} ${s.text} ${s.border}`}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full font-['Haskoy'] text-[11px] font-[300] cursor-pointer transition-all [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale] ${s.bg} ${s.text} ${s.border}`}
             >
                 <span className={`w-[8px] h-[8px] rounded-full ${s.dot}`} />
                 {status}
                 <ChevronDownIcon className="w-2.5 h-2.5" />
             </button>
             {open && (
-                <div className="absolute right-0 top-full mt-1 w-28 bg-white dark:bg-[#27322C] border border-gray-200 dark:border-white/10 rounded-lg shadow-xl z-50 overflow-hidden py-1">
+                <div className="absolute right-0 top-full mt-2 w-[102px] h-[136px] bg-white/8 dark:bg-[rgba(25,33,28,0.12)] border border-[rgba(25,33,28,0.08)] dark:border-[rgba(255,255,255,0.2)] rounded-[8px] shadow-[0_16px_40px_rgba(25,33,28,0.05)] dark:shadow-[0_16px_40px_rgba(25,33,28,0.6)] backdrop-blur-[20px] z-50 overflow-hidden py-0 box-border">
                     {(["Active", "Draft", "Hold"] as JobStatus[]).map((opt) => (
-                        <button
-                            key={opt}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onChangeStatus?.(opt);
-                                setOpen(false);
-                            }}
-                            className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${opt === status
-                                ? "bg-brand-green/10 dark:bg-brand-green/25 text-brand-green dark:text-white font-medium"
-                                : "text-gray-700 dark:text-white"
-                                }`}
-                        >
-                            {opt}
-                        </button>
+                        <div key={opt} className="relative">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onChangeStatus?.(opt);
+                                    setOpen(false);
+                                }}
+                                className={`w-full text-left px-4 h-[45px] text-[13px] transition-colors antialiased ${opt === status
+                                    ? STATUS_OPTION_STYLES[opt]
+                                    : "text-[#19211C] dark:text-white/90 hover:bg-white/10 dark:hover:bg-white/[0.08]"
+                                    }`}
+                            >
+                                {opt}
+                            </button>
+                            {opt !== "Hold" && (
+                                <div className="absolute bottom-0 left-4 right-4 h-px bg-[#19211C]/10 dark:bg-white/20" />
+                            )}
+                        </div>
                     ))}
                 </div>
             )}
@@ -225,7 +272,7 @@ function ThreeDotMenu({ onAction }: { onAction: (action: string) => void }) {
         <div className="relative" ref={ref}>
             <button
                 onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-                className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer group/btn ${open ? "bg-brand-green shadow-sm text-white" : "bg-gray-100 dark:bg-[#2A312D] border border-gray-200 dark:border-white/15 hover:bg-brand-green hover:shadow-sm hover:border-transparent text-gray-500 dark:text-white/50 hover:text-white"}`}
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer group/btn ${open ? "bg-brand-green shadow-sm text-white" : "bg-gray-100 dark:bg-[#2A312D] border border-gray-200 dark:border-white/15 hover:bg-brand-green dark:hover:bg-brand-green hover:shadow-sm hover:border-transparent dark:hover:border-transparent text-gray-500 dark:text-white/50 hover:text-white dark:hover:text-white"}`}
             >
                 {/* Horizontal three dots */}
                 <svg width="14" height="4" viewBox="0 0 14 4" fill="currentColor" className="transition-colors">
@@ -235,7 +282,7 @@ function ThreeDotMenu({ onAction }: { onAction: (action: string) => void }) {
                 </svg>
             </button>
             {open && (
-                <div className="absolute right-0 top-full mt-1 w-36 bg-white dark:bg-[#27322C] border border-gray-200 dark:border-white/10 rounded-lg shadow-xl z-50 overflow-hidden text-left">
+                <div className="absolute right-0 top-full mt-1 w-36 bg-white/14 dark:bg-[rgba(25,33,28,0.12)] border border-[rgba(25,33,28,0.08)] dark:border-[rgba(255,255,255,0.2)] rounded-lg shadow-[0_16px_40px_rgba(25,33,28,0.05)] dark:shadow-[0_16px_40px_rgba(25,33,28,0.6)] backdrop-blur-[20px] z-50 overflow-hidden text-left box-border">
                     {items.map((item, index) => (
                         <div key={item.key} className="relative">
                             <button
@@ -244,12 +291,12 @@ function ThreeDotMenu({ onAction }: { onAction: (action: string) => void }) {
                                     onAction(item.key);
                                     setOpen(false);
                                 }}
-                                className="w-full text-left px-4 py-3 text-[13px] hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-gray-700 dark:text-white"
+                                className="w-full text-left px-4 py-3 text-[13px] hover:bg-white/10 dark:hover:bg-white/10 transition-colors text-[#19211C] dark:text-white/90"
                             >
                                 {item.label}
                             </button>
                             {index < items.length - 1 && (
-                                <div className="absolute bottom-0 left-4 right-4 h-px bg-gray-100 dark:bg-white/10" />
+                                <div className="absolute bottom-0 left-4 right-4 h-px bg-[#19211C]/10 dark:bg-white/20" />
                             )}
                         </div>
                     ))}
@@ -284,12 +331,12 @@ function JobCard({ job, onStatusChange, onAction }: {
                 }`}>
             {/* Top row: Job ID + Status + Menu */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
-                <h3 className="text-[20px] sm:text-[24px] font-semibold text-gray-900 dark:text-white leading-tight">
+                <h3 className="font-['Haskoy'] text-[20px] sm:text-[24px] font-normal text-gray-900 dark:text-white/95 leading-[100%] tracking-[0px] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">
                     {job.title}
                 </h3>
                 <div className="flex items-center gap-3 flex-wrap">
-                    <span className="bg-gray-100 dark:bg-white/10 px-3 py-1.5 rounded-[6px] text-[13px] font-medium text-gray-700 dark:text-white/90 border border-transparent whitespace-nowrap">
-                        Job ID : <span className="text-brand-green">{job.jobId}</span>
+                    <span className="bg-gray-100 dark:bg-white/10 px-3 py-1.5 rounded-[6px] font-['Haskoy'] text-[13px] font-normal text-gray-700 dark:text-white/92 border border-transparent whitespace-nowrap [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">
+                        <span className="text-gray-700 dark:text-white">Job ID :</span>{" "}<span className="text-brand-green">{job.jobId}</span>
                     </span>
                     <StatusBadge
                         status={job.status}
@@ -300,7 +347,7 @@ function JobCard({ job, onStatusChange, onAction }: {
             </div>
 
             {/* Company info */}
-            <p className="text-[16px] text-gray-500 dark:text-white/60 mb-4">
+            <p className="font-['Haskoy'] text-[18px] text-white/82 mb-4 font-[300] leading-[100%] tracking-[0px] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">
                 {job.company} | {job.location}, {job.employmentType}
             </p>
 
@@ -309,52 +356,48 @@ function JobCard({ job, onStatusChange, onAction }: {
                 {/* Dates */}
                 <div className="flex flex-col gap-2 shrink-0">
                     {job.expiresIn && (
-                        <div className="flex">
-                            <span className="inline-flex items-center px-2.5 py-1 rounded text-[12px] font-semibold bg-red-50 text-red-600 border-red-200 dark:bg-red-500/15 dark:text-[#FF8888] dark:border-red-400/30">
+                        <div className="flex items-start justify-start">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-[4px] font-['Haskoy'] text-[12px] font-[300] leading-[100%] tracking-[0px] bg-red-50 text-red-600 border border-red-200 dark:bg-[#3A2A2A]/40 dark:text-white/82 dark:border-[#FF4B4B] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">
                                 Expires in {job.expiresIn} Days
                             </span>
                         </div>
                     )}
                     <div className="flex items-center gap-3 flex-wrap">
-                        <div className="flex items-center gap-1.5 text-[13px] text-gray-500 dark:text-white/60 whitespace-nowrap">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-brand-green shrink-0">
-                                <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                <path d="M16 2V6M8 2V6M3 10H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <div className="flex items-center gap-1.5 font-['Haskoy'] text-[14px] text-white/82 whitespace-nowrap font-[300] leading-[100%] tracking-[0px] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">
+                            <svg width="12" height="12" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-[12px] h-[12px] shrink-0 text-[#1ED36A]">
+                                <path d="M15.3 2.7H14.4V0.9C14.4 0.661305 14.3052 0.432387 14.1364 0.263604C13.9676 0.0948211 13.7387 0 13.5 0C13.2613 0 13.0324 0.0948211 12.8636 0.263604C12.6948 0.432387 12.6 0.661305 12.6 0.9V2.7H5.4V0.9C5.4 0.661305 5.30518 0.432387 5.1364 0.263604C4.96761 0.0948211 4.73869 0 4.5 0C4.2613 0 4.03239 0.0948211 3.8636 0.263604C3.69482 0.432387 3.6 0.661305 3.6 0.9V2.7H2.7C1.98392 2.7 1.29716 2.98446 0.790812 3.49081C0.284464 3.99716 0 4.68392 0 5.4V6.3H18V5.4C18 4.68392 17.7155 3.99716 17.2092 3.49081C16.7028 2.98446 16.0161 2.7 15.3 2.7Z" fill="currentColor" />
+                                <path d="M0 15.3C0 16.0161 0.284464 16.7028 0.790812 17.2092C1.29716 17.7155 1.98392 18 2.7 18H15.3C16.0161 18 16.7028 17.7155 17.2092 17.2092C17.7155 16.7028 18 16.0161 18 15.3V8.09998H0V15.3Z" fill="currentColor" />
                             </svg>
                             {job.expiresIn ? "Posted Today" : `Posted on ${job.postedDate}`}
                         </div>
                         <span className="w-[5px] h-[5px] rounded-full bg-brand-green/80 shrink-0" />
-                        <div className="flex items-center gap-1.5 text-[13px] text-gray-500 dark:text-white/60 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 font-['Haskoy'] text-[14px] text-white/82 whitespace-nowrap font-[300] leading-[100%] tracking-[0px] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">
                             Closes at {job.closingDate}
                         </div>
                     </div>
                 </div>
 
                 {/* Stats strip */}
-                <div className="flex items-center bg-[#F6F4F7] dark:bg-[#34403A] rounded-[8px] px-3 py-3 w-full xl:w-auto xl:min-w-[480px] 2xl:min-w-[540px] justify-between xl:ml-auto border border-gray-100 dark:border-transparent overflow-x-auto scrollbar-hide">
-                    <div className="text-center px-3 flex-1 min-w-[100px]">
-                        <div className="text-[20px] sm:text-[24px] font-semibold text-[#141566] dark:text-white leading-tight mb-1">{job.totalApplicants}</div>
-                        <div className="text-[12px] sm:text-[13px] font-normal text-[#2E2E2E] dark:text-white/70 leading-tight whitespace-nowrap">Total Applicants</div>
+                <div className="grid grid-cols-5 items-center bg-[#F6F4F7] dark:bg-white/[0.08] rounded-[4px] px-3 py-2.5 w-full xl:w-auto xl:min-w-[829px] xl:ml-auto border border-gray-100 dark:border-transparent overflow-x-auto scrollbar-hide">
+                    <div className="text-center px-3 min-w-[118px]">
+                        <div className="font-['Haskoy'] w-[99px] h-[41px] mx-auto text-center text-[32px] leading-[41px] font-semibold text-[#150089] dark:text-white [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">{job.totalApplicants}</div>
+                        <div className="font-['Haskoy'] text-[11px] sm:text-[12px] font-[300] text-[#2E2E2E] dark:text-white/65 leading-tight whitespace-nowrap [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">Total Applicants</div>
                     </div>
-                    <div className="w-px h-[36px] bg-gray-200 dark:bg-white/[0.08] shrink-0" />
-                    <div className="text-center px-3 flex-1 min-w-[100px]">
-                        <div className="text-[20px] sm:text-[24px] font-semibold text-[#141566] dark:text-white leading-tight mb-1">{job.newApplicants}</div>
-                        <div className="text-[12px] sm:text-[13px] font-normal text-[#2E2E2E] dark:text-white/70 leading-tight whitespace-nowrap">New Applicants</div>
+                    <div className="text-center px-3 min-w-[118px] border-l border-gray-200 dark:border-white/[0.08]">
+                        <div className="font-['Haskoy'] w-[99px] h-[41px] mx-auto text-center text-[32px] leading-[41px] font-semibold text-[#150089] dark:text-white [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">{job.newApplicants}</div>
+                        <div className="font-['Haskoy'] text-[11px] sm:text-[12px] font-[300] text-[#2E2E2E] dark:text-white/65 leading-tight whitespace-nowrap [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">New Applicants</div>
                     </div>
-                    <div className="w-px h-[36px] bg-gray-200 dark:bg-white/[0.08] shrink-0" />
-                    <div className="text-center px-3 flex-1 min-w-[90px]">
-                        <div className="text-[20px] sm:text-[24px] font-semibold text-[#141566] dark:text-white leading-tight mb-1">{job.shortListed}</div>
-                        <div className="text-[12px] sm:text-[13px] font-normal text-[#2E2E2E] dark:text-white/70 leading-tight whitespace-nowrap">Short Listed</div>
+                    <div className="text-center px-3 min-w-[118px] border-l border-gray-200 dark:border-white/[0.08]">
+                        <div className="font-['Haskoy'] w-[99px] h-[41px] mx-auto text-center text-[32px] leading-[41px] font-semibold text-[#150089] dark:text-white [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">{job.shortListed}</div>
+                        <div className="font-['Haskoy'] text-[11px] sm:text-[12px] font-[300] text-[#2E2E2E] dark:text-white/65 leading-tight whitespace-nowrap [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">Short Listed</div>
                     </div>
-                    <div className="w-px h-[36px] bg-gray-200 dark:bg-white/[0.08] shrink-0" />
-                    <div className="text-center px-3 flex-1 min-w-[80px]">
-                        <div className="text-[20px] sm:text-[24px] font-semibold text-[#141566] dark:text-white leading-tight mb-1">{job.hired}</div>
-                        <div className="text-[12px] sm:text-[13px] font-normal text-[#2E2E2E] dark:text-white/70 leading-tight whitespace-nowrap">Hired</div>
+                    <div className="text-center px-3 min-w-[118px] border-l border-gray-200 dark:border-white/[0.08]">
+                        <div className="font-['Haskoy'] w-[99px] h-[41px] mx-auto text-center text-[32px] leading-[41px] font-semibold text-[#150089] dark:text-white [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">{job.hired}</div>
+                        <div className="font-['Haskoy'] text-[11px] sm:text-[12px] font-[300] text-[#2E2E2E] dark:text-white/65 leading-tight whitespace-nowrap [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">Hired</div>
                     </div>
-                    <div className="w-px h-[36px] bg-gray-200 dark:bg-white/[0.08] shrink-0" />
-                    <div className="text-center px-3 flex-1 min-w-[80px]">
-                        <div className="text-[20px] sm:text-[24px] font-semibold text-gray-900 dark:text-white leading-tight mb-1">{String(job.rejected).padStart(2, "0")}</div>
-                        <div className="text-[12px] sm:text-[13px] font-normal text-gray-500 dark:text-white/70 leading-tight whitespace-nowrap">Rejected</div>
+                    <div className="text-center px-3 min-w-[118px] border-l border-gray-200 dark:border-white/[0.08]">
+                        <div className="font-['Haskoy'] w-[99px] h-[41px] mx-auto text-center text-[32px] leading-[41px] font-semibold text-[#150089] dark:text-white [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">{String(job.rejected).padStart(2, "0")}</div>
+                        <div className="font-['Haskoy'] text-[11px] sm:text-[12px] font-[300] text-gray-500 dark:text-white/65 leading-tight whitespace-nowrap [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">Rejected</div>
                     </div>
                 </div>
             </div>
@@ -411,17 +454,17 @@ function FilterSection({
     const [open, setOpen] = useState(defaultOpen);
 
     return (
-        <div className="mb-2 overflow-hidden bg-transparent">
+        <div className="mb-4 overflow-hidden bg-transparent rounded-[10px] border border-gray-200 dark:border-[#FFFFFF1F]">
             <button
                 onClick={() => setOpen(!open)}
-                className="flex items-center justify-between w-full px-4 py-3 text-[14px] font-medium text-gray-900 dark:text-white cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                className="flex items-center justify-between w-full px-4 py-3.5 text-[14px] font-medium text-gray-900 dark:text-white cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
             >
                 {title}
                 <ChevronDownIcon className={`w-3.5 h-3.5 text-gray-400 dark:text-white/60 transition-transform ${open ? "" : "-rotate-90"}`} />
             </button>
             <div className="border-t border-gray-100 dark:border-white/10 mx-4" />
             {open && (
-                <div className="px-4 pb-3 pt-3 flex flex-col gap-1">
+                <div className="px-4 pb-3 pt-2.5 flex flex-col gap-1">
                     {children}
                 </div>
             )}
@@ -467,7 +510,7 @@ function FiltersSidebar({
                 <h3 className="text-[16px] font-medium text-gray-900 dark:text-white">Filters</h3>
                 <button
                     onClick={onClearAll}
-                    className={`text-[12px] transition-colors cursor-pointer ${hasFilters ? "text-gray-600 dark:text-white/70 hover:text-brand-green dark:hover:text-brand-green" : "text-gray-400 dark:text-white/45 hover:text-brand-green dark:hover:text-brand-green"}`}
+                    className={`text-[13px] transition-colors cursor-pointer ${hasFilters ? "text-gray-600 dark:text-white hover:text-brand-green dark:hover:text-brand-green" : "text-gray-400 dark:text-white hover:text-brand-green dark:hover:text-brand-green"}`}
                 >
                     Clear all
                 </button>
@@ -577,12 +620,13 @@ export default function JobsPortal() {
     // Routing State
     const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
     const [isCreatingJob, setIsCreatingJob] = useState(false);
+    const [editingJob, setEditingJob] = useState<Job | null>(null);
 
     // UI State
     const [activeTab, setActiveTab] = useState<TabKey>("all");
     const [searchTerm, setSearchTerm] = useState("");
     const debouncedSearch = useDebounce(searchTerm, 500);
-    const [sortBy, setSortBy] = useState<SortOption>("posted_newest");
+    const [sortBy, setSortBy] = useState<SortOption>("none");
     const [showSortDropdown, setShowSortDropdown] = useState(false);
     const [filters, setFilters] = useState<FilterState>({
         locations: [],
@@ -594,8 +638,13 @@ export default function JobsPortal() {
     const [currentPage, setCurrentPage] = useState(1);
     const [entriesPerPage, setEntriesPerPage] = useState(5);
     const [showEntriesDropdown, setShowEntriesDropdown] = useState(false);
-    const [dateFilter, setDateFilter] = useState<DateFilter>("all");
-    const [showDateDropdown, setShowDateDropdown] = useState(false);
+    const [dateFilter, setDateFilter] = useState<DateFilter>("today");
+    const [showDateModal, setShowDateModal] = useState(false);
+    const [calendarPreset, setCalendarPreset] = useState("Any Time");
+    const [rangeStart, setRangeStart] = useState<Date | null>(new Date(2025, 9, 9));
+    const [rangeEnd, setRangeEnd] = useState<Date | null>(new Date(2025, 10, 17));
+    const [leftCalendarMonth, setLeftCalendarMonth] = useState<Date>(new Date(2025, 9, 1));
+    const [customDateLabel, setCustomDateLabel] = useState<string | null>(null);
 
 
     // Toast
@@ -604,10 +653,190 @@ export default function JobsPortal() {
     // Refs
     const sortRef = useRef<HTMLDivElement>(null);
     const entriesRef = useRef<HTMLDivElement>(null);
-    const dateRef = useRef<HTMLDivElement>(null);
     useClickOutside(sortRef, () => setShowSortDropdown(false));
     useClickOutside(entriesRef, () => setShowEntriesDropdown(false));
-    useClickOutside(dateRef, () => setShowDateDropdown(false));
+
+    const calendarPresets = ["Any Time", "Today", "Yesterday", "Last 7 Days", "Last 30 Days", "This Month", "Last Month", "Custom Range"];
+    const weekDays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+
+    const normalizeDate = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    const addMonths = (date: Date, months: number) => new Date(date.getFullYear(), date.getMonth() + months, 1);
+    const getMonthLabel = (date: Date) => date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    const formatShortNumericDate = (date: Date) => {
+        const day = `${date.getDate()}`.padStart(2, "0");
+        const month = `${date.getMonth() + 1}`.padStart(2, "0");
+        const year = `${date.getFullYear()}`.slice(-2);
+        return `${day}/${month}/${year}`;
+    };
+    const formatFilterRangeLabel = (start: Date, end: Date) => {
+        const startDay = `${start.getDate()}`.padStart(2, "0");
+        const endDay = `${end.getDate()}`.padStart(2, "0");
+        const startMonth = start.toLocaleDateString("en-US", { month: "short" });
+        const endMonth = end.toLocaleDateString("en-US", { month: "short" });
+        const endYear = end.getFullYear();
+        return `${startDay} ${startMonth} to ${endDay} ${endMonth} ${endYear}`;
+    };
+    const buildMonthGrid = (year: number, month: number) => {
+        const firstDay = new Date(year, month, 1);
+        const startDayIndex = (firstDay.getDay() + 6) % 7;
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const daysInPrevMonth = new Date(year, month, 0).getDate();
+        const cells: { date: Date; inCurrentMonth: boolean }[] = [];
+
+        for (let i = 0; i < startDayIndex; i += 1) {
+            cells.push({ date: new Date(year, month - 1, daysInPrevMonth - startDayIndex + i + 1), inCurrentMonth: false });
+        }
+        for (let day = 1; day <= daysInMonth; day += 1) {
+            cells.push({ date: new Date(year, month, day), inCurrentMonth: true });
+        }
+        while (cells.length < 42) {
+            const nextDay = cells.length - (startDayIndex + daysInMonth) + 1;
+            cells.push({ date: new Date(year, month + 1, nextDay), inCurrentMonth: false });
+        }
+
+        return cells;
+    };
+
+    const startTime = rangeStart ? normalizeDate(rangeStart) : null;
+    const endTime = rangeEnd ? normalizeDate(rangeEnd) : null;
+    const selectedRangeText = rangeStart && rangeEnd
+        ? `${formatShortNumericDate(rangeStart)} - ${formatShortNumericDate(rangeEnd)}`
+        : "No range selected";
+
+    const handleDateCellClick = (date: Date) => {
+        setCalendarPreset("Custom Range");
+
+        if (!rangeStart || (rangeStart && rangeEnd)) {
+            setRangeStart(date);
+            setRangeEnd(null);
+            return;
+        }
+
+        if (normalizeDate(date) < normalizeDate(rangeStart)) {
+            setRangeEnd(rangeStart);
+            setRangeStart(date);
+            return;
+        }
+
+        setRangeEnd(date);
+    };
+
+    const isInRange = (date: Date) => {
+        if (!startTime) return false;
+        const time = normalizeDate(date);
+        if (!endTime) return time === startTime;
+        return time >= startTime && time <= endTime;
+    };
+
+    const isRangeStart = (date: Date) => startTime !== null && normalizeDate(date) === startTime;
+    const isRangeEnd = (date: Date) => endTime !== null && normalizeDate(date) === endTime;
+
+    const applyPresetRange = (preset: string) => {
+        const today = new Date();
+        const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+        if (preset === "Any Time") {
+            setDateFilter("all");
+            setCustomDateLabel(null);
+            setShowDateModal(false);
+            return;
+        }
+        if (preset === "Today") {
+            setDateFilter("today");
+            setCustomDateLabel(null);
+            setShowDateModal(false);
+            return;
+        }
+        if (preset === "Yesterday") {
+            setDateFilter("yesterday");
+            setCustomDateLabel(null);
+            setShowDateModal(false);
+            return;
+        }
+        if (preset === "Last 7 Days") {
+            setDateFilter("last_7_days");
+            setCustomDateLabel(null);
+            setShowDateModal(false);
+            return;
+        }
+        if (preset === "Last 30 Days") {
+            setDateFilter("last_30_days");
+            setCustomDateLabel(null);
+            setShowDateModal(false);
+            return;
+        }
+        if (preset === "This Month") {
+            const start = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1);
+            const end = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0);
+            setRangeStart(start);
+            setRangeEnd(end);
+            setLeftCalendarMonth(new Date(start.getFullYear(), start.getMonth(), 1));
+            setCalendarPreset("Custom Range");
+            return;
+        }
+        if (preset === "Last Month") {
+            const start = new Date(todayDate.getFullYear(), todayDate.getMonth() - 1, 1);
+            const end = new Date(todayDate.getFullYear(), todayDate.getMonth(), 0);
+            setRangeStart(start);
+            setRangeEnd(end);
+            setLeftCalendarMonth(new Date(start.getFullYear(), start.getMonth(), 1));
+            setCalendarPreset("Custom Range");
+            return;
+        }
+
+        setCalendarPreset("Custom Range");
+    };
+
+    const renderCalendarMonth = (year: number, month: number, title: string) => {
+        const cells = buildMonthGrid(year, month);
+
+        return (
+            <div className="w-[344px] h-[300px] rounded-[12px] bg-white/[0.08] border border-white/[0.12] px-5 py-3.5">
+                <div className="flex items-center justify-between mb-3 text-white/90 pb-3.5 border-b border-white/[0.12]">
+                    <button type="button" onClick={() => setLeftCalendarMonth((prev) => addMonths(prev, -1))} className="p-1 text-white/60 hover:text-white transition-colors">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M7.5 2L3.5 6L7.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    </button>
+                    <p className="text-[14px] leading-[18px] font-semibold text-[#E7EFEB]">{title}</p>
+                    <button type="button" onClick={() => setLeftCalendarMonth((prev) => addMonths(prev, 1))} className="p-1 text-white/60 hover:text-white transition-colors">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 2L8.5 6L4.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    </button>
+                </div>
+                <div className="grid grid-cols-7 gap-y-2 mb-2">
+                    {weekDays.map((day) => (
+                        <span key={`${title}-${day}`} className="text-center text-[13px] leading-[17px] font-normal text-white/80">{day}</span>
+                    ))}
+                </div>
+                <div className="grid grid-cols-7 gap-y-1.5">
+                    {cells.map((cell) => {
+                        const day = cell.date.getDate();
+                        const inRange = isInRange(cell.date);
+                        const start = isRangeStart(cell.date);
+                        const end = isRangeEnd(cell.date);
+                        const isMuted = !cell.inCurrentMonth;
+                        const rangePillClass = inRange
+                            ? `${start ? "rounded-l-[24px]" : ""} ${end ? "rounded-r-[100px]" : ""} ${!start && !end ? "rounded-none" : ""}`
+                            : "";
+
+                        return (
+                            <div key={`${title}-${cell.date.toISOString()}`} className={`h-[28px] flex items-center justify-center text-[13px] leading-[17px] ${inRange ? "bg-[#1ED36A]/[0.16]" : ""} ${rangePillClass}`}>
+                                <button
+                                    type="button"
+                                    onClick={() => handleDateCellClick(new Date(cell.date.getFullYear(), cell.date.getMonth(), cell.date.getDate()))}
+                                    className={`h-9 w-9 flex items-center justify-center font-normal ${start || end ? "rounded-full bg-[#1ED36A] text-white shadow-[0px_4px_6.7px_rgba(0,0,0,0.4),0px_2px_17.9px_rgba(30,211,106,0.4)]" : ""} ${!start && !end && inRange ? "text-white" : ""} ${!inRange && !isMuted ? "text-white" : ""} ${isMuted ? "text-white/40" : ""}`}
+                                >
+                                    {day}
+                                </button>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
+    const dateFilterLabel = dateFilter === "custom_range"
+        ? (customDateLabel ?? "Custom Range")
+        : (DATE_FILTER_OPTIONS.find((o) => o.value === dateFilter)?.label ?? "All Time");
 
     // Tab counts
     const tabCounts = {
@@ -662,19 +891,29 @@ export default function JobsPortal() {
                         yesterday.setDate(yesterday.getDate() - 1);
                         return posted >= yesterday && posted < today;
                     }
-                    case "this_week": {
-                        const weekStart = new Date(today);
-                        weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-                        return posted >= weekStart;
+                    case "last_7_days": {
+                        const sevenDaysAgo = new Date(today);
+                        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                        return posted >= sevenDaysAgo;
                     }
                     case "this_month": {
                         const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
                         return posted >= monthStart;
                     }
+                    case "last_month": {
+                        const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                        const end = new Date(today.getFullYear(), today.getMonth(), 0);
+                        return posted >= start && posted <= end;
+                    }
                     case "last_30_days": {
                         const thirtyDaysAgo = new Date(today);
                         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
                         return posted >= thirtyDaysAgo;
+                    }
+                    case "custom_range": {
+                        if (!rangeStart || !rangeEnd) return true;
+                        const postedTime = new Date(posted.getFullYear(), posted.getMonth(), posted.getDate()).getTime();
+                        return postedTime >= normalizeDate(rangeStart) && postedTime <= normalizeDate(rangeEnd);
                     }
                     default:
                         return true;
@@ -697,6 +936,8 @@ export default function JobsPortal() {
                     return b.totalApplicants - a.totalApplicants;
                 case "applicants_low":
                     return a.totalApplicants - b.totalApplicants;
+                case "none":
+                    return 0;
                 default:
                     return 0;
             }
@@ -704,7 +945,7 @@ export default function JobsPortal() {
 
         setFilteredJobs(result);
         setCurrentPage(1);
-    }, [allJobs, activeTab, debouncedSearch, filters, sortBy, dateFilter]);
+    }, [allJobs, activeTab, debouncedSearch, filters, sortBy, dateFilter, rangeStart, rangeEnd]);
 
     // Pagination calculations
     const totalPages = Math.max(1, Math.ceil(filteredJobs.length / entriesPerPage));
@@ -729,6 +970,13 @@ export default function JobsPortal() {
                 setSelectedJobId(jobId);
                 break;
             case "edit":
+                {
+                    const jobToEdit = allJobs.find((job) => job.id === jobId);
+                    if (jobToEdit) {
+                        setEditingJob(jobToEdit);
+                        setIsCreatingJob(true);
+                    }
+                }
                 break;
             case "copy":
                 setToast({ message: "Job Copied", submessage: "A copy of the job has been created as Draft" });
@@ -736,7 +984,7 @@ export default function JobsPortal() {
             case "delete":
                 break;
         }
-    }, []);
+    }, [allJobs]);
 
     // Pagination number display
     const getPaginationNumbers = (): (number | "...")[] => {
@@ -756,7 +1004,23 @@ export default function JobsPortal() {
     };
 
     if (isCreatingJob) {
-        return <CreateJob onBack={() => setIsCreatingJob(false)} />;
+        return (
+            <CreateJob
+                mode={editingJob ? "edit" : "create"}
+                initialData={editingJob ? {
+                    title: editingJob.title,
+                    employmentType: editingJob.employmentType,
+                    shift: "Day",
+                    experienceLevel: "Fresher",
+                    jobLocation: editingJob.location,
+                    workMode: editingJob.workMode,
+                } : undefined}
+                onBack={() => {
+                    setIsCreatingJob(false);
+                    setEditingJob(null);
+                }}
+            />
+        );
     }
 
     if (selectedJobId) {
@@ -764,7 +1028,7 @@ export default function JobsPortal() {
     }
 
     return (
-        <div className="flex flex-col h-full w-full gap-5 font-sans p-4 sm:p-6 lg:p-8 bg-[#F9FAFB] dark:bg-[#19211C] min-h-screen">
+        <div className="thin-ui-page flex flex-col h-full w-full gap-5 font-sans antialiased p-4 sm:p-6 lg:p-8 bg-[#F9FAFB] dark:bg-[#19211C] min-h-screen">
             {/* Toast */}
             {toast && (
                 <ToastNotification
@@ -784,15 +1048,15 @@ export default function JobsPortal() {
                             <path d="M3.75 2L6.75 5L3.75 8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                     </span>
-                    <span className="text-brand-green font-semibold">Jobs</span>
+                    <span className="text-brand-green font-medium">Jobs</span>
                 </div>
-                <h1 className="text-[44px] font-semibold text-[#150089] dark:text-white leading-tight">
+                <h1 className="text-[44px] font-medium text-[#150089] dark:text-white leading-tight">
                     Job Posted
                 </h1>
             </div>
 
             {/* Tabs + Sort/Date/Create Row */}
-            <div className="flex flex-col xl:flex-row justify-between items-end xl:items-center border-b border-gray-200 dark:border-white/20 pb-0 gap-4 xl:gap-0">
+            <div className="flex flex-col xl:flex-row justify-between items-end xl:items-end border-b border-gray-200 dark:border-white/20 pb-0 gap-4 xl:gap-0">
                 {/* Tabs */}
                 <div className="flex items-center w-full xl:w-auto overflow-x-auto scrollbar-hide">
                     {([
@@ -804,13 +1068,13 @@ export default function JobsPortal() {
                         <button
                             key={tab.key}
                             onClick={() => { setActiveTab(tab.key); setCurrentPage(1); }}
-                            className={`px-1 py-3 mr-8 text-[18px] border-b-[3px] transition-colors whitespace-nowrap cursor-pointer ${activeTab === tab.key
+                            className={`px-1 py-3 -mb-px mr-8 text-[18px] border-b-[3px] transition-colors whitespace-nowrap cursor-pointer font-['Haskoy'] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale] ${activeTab === tab.key
                                 ? "border-brand-green"
                                 : "border-transparent hover:border-gray-300 dark:hover:border-white/20"
                                 }`}
                         >
-                            <span className={activeTab === tab.key ? "font-semibold text-gray-900 dark:text-white" : "font-normal text-gray-500 dark:text-white/45"}>{tab.label}</span>
-                            <span className={activeTab === tab.key ? "text-brand-green font-semibold ml-1" : "text-gray-400 dark:text-white/45 font-medium ml-1"}>({tab.count})</span>
+                            <span className={activeTab === tab.key ? "font-normal text-gray-900 dark:text-white/90" : "font-[300] text-gray-500 dark:text-white/40"}>{tab.label}</span>
+                            <span className={activeTab === tab.key ? "text-brand-green font-normal ml-1" : "text-gray-400 dark:text-white/40 font-[300] ml-1"}>({tab.count})</span>
                         </button>
                     ))}
                 </div>
@@ -821,16 +1085,17 @@ export default function JobsPortal() {
                     <div className="relative" ref={sortRef}>
                         <button
                             onClick={() => setShowSortDropdown(!showSortDropdown)}
-                            className="flex items-center gap-2 bg-white dark:bg-[#23302A] px-4 py-[9px] rounded-[8px] text-[14px] font-medium border border-gray-200 dark:border-[#355041] hover:border-brand-green dark:hover:border-brand-green/60 transition-all text-gray-900 dark:text-white cursor-pointer h-[44px] shadow-sm dark:shadow-none"
+                            className="flex items-center gap-2 bg-white dark:bg-[#23302A] px-4 py-[9px] rounded-[8px] text-[14px] font-normal border border-gray-200 dark:border-[#355041] hover:border-brand-green dark:hover:border-brand-green/60 transition-all text-gray-900 dark:text-white cursor-pointer h-[44px] shadow-sm dark:shadow-none"
                         >
-                            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" className="text-brand-green">
-                                <path d="M5 1L9 8H1L5 1Z" />
+                            <svg width="12" height="16" viewBox="0 0 12 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+                                <path d="M6 1L11 8H1L6 1Z" fill="#1ED36A" />
+                                <path d="M6 15L1 8H11L6 15Z" fill="rgba(255,255,255,0.35)" />
                             </svg>
                             <span className="text-left">Sort by</span>
                             <ChevronDownIcon className={`w-3.5 h-3.5 text-gray-500 dark:text-white/60 transition-transform ${showSortDropdown ? "rotate-180" : ""}`} />
                         </button>
                         {showSortDropdown && (
-                            <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-[#27322C] border border-gray-200 dark:border-white/10 rounded-[10px] shadow-lg z-50 overflow-hidden py-0 text-left">
+                            <div className="absolute top-full right-0 mt-2 w-64 bg-white/14 dark:bg-[rgba(25,33,28,0.12)] border border-[rgba(25,33,28,0.08)] dark:border-[rgba(255,255,255,0.2)] rounded-[10px] shadow-[0_16px_40px_rgba(25,33,28,0.05)] dark:shadow-[0_16px_40px_rgba(25,33,28,0.6)] backdrop-blur-[20px] z-50 overflow-hidden py-0 text-left box-border">
                                 {SORT_OPTIONS.map((opt, index) => (
                                     <div key={opt.value} className="relative">
                                         <button
@@ -839,14 +1104,14 @@ export default function JobsPortal() {
                                                 setShowSortDropdown(false);
                                             }}
                                             className={`w-full text-left px-5 py-3.5 text-[15px] transition-colors ${sortBy === opt.value
-                                                ? "bg-[#A2E0BA] dark:bg-brand-green/30 text-[#1F6A45] dark:text-white font-medium"
-                                                : "text-gray-700 dark:text-white font-normal hover:bg-gray-50 dark:hover:bg-white/5"
+                                                ? "bg-[#A2E0BA]/35 dark:bg-[#32925B]/70 text-[#19211C] dark:text-white font-medium"
+                                                : "text-[#19211C] dark:text-white/90 font-normal hover:bg-white/10 dark:hover:bg-white/10"
                                                 }`}
                                         >
                                             {opt.label}
                                         </button>
                                         {index < SORT_OPTIONS.length - 1 && (
-                                            <div className="w-full h-px bg-gray-200 dark:bg-white/10 absolute bottom-0 left-0" />
+                                            <div className="w-full h-px bg-[#19211C]/10 dark:bg-white/20 absolute bottom-0 left-0" />
                                         )}
                                     </div>
                                 ))}
@@ -855,43 +1120,24 @@ export default function JobsPortal() {
                     </div>
 
                     {/* Today/Date Filter Button */}
-                    <div className="relative" ref={dateRef}>
+                    <div className="relative">
                         <button
-                            onClick={() => setShowDateDropdown(!showDateDropdown)}
-                            className="flex items-center gap-2 bg-white dark:bg-[#23302A] px-4 py-[9px] rounded-[8px] text-[14px] font-medium border border-gray-200 dark:border-[#355041] hover:border-brand-green dark:hover:border-brand-green/60 transition-all text-gray-900 dark:text-white cursor-pointer h-[44px] shadow-sm dark:shadow-none"
+                            onClick={() => setShowDateModal(true)}
+                            className="flex items-center gap-2 bg-white dark:bg-[#23302A] px-4 py-[9px] rounded-[8px] text-[14px] font-normal border border-gray-200 dark:border-[#355041] hover:border-brand-green dark:hover:border-brand-green/60 transition-all text-gray-900 dark:text-white cursor-pointer h-[44px] shadow-sm dark:shadow-none"
                         >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-brand-green">
-                                <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                <path d="M16 2V6M8 2V6M3 10H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+                                <path d="M15.3 2.7H14.4V0.9C14.4 0.661305 14.3052 0.432387 14.1364 0.263604C13.9676 0.0948211 13.7387 0 13.5 0C13.2613 0 13.0324 0.0948211 12.8636 0.263604C12.6948 0.432387 12.6 0.661305 12.6 0.9V2.7H5.4V0.9C5.4 0.661305 5.30518 0.432387 5.1364 0.263604C4.96761 0.0948211 4.73869 0 4.5 0C4.2613 0 4.03239 0.0948211 3.8636 0.263604C3.69482 0.432387 3.6 0.661305 3.6 0.9V2.7H2.7C1.98392 2.7 1.29716 2.98446 0.790812 3.49081C0.284464 3.99716 0 4.68392 0 5.4V6.3H18V5.4C18 4.68392 17.7155 3.99716 17.2092 3.49081C16.7028 2.98446 16.0161 2.7 15.3 2.7Z" fill="#1ED36A" />
+                                <path d="M0 15.3C0 16.0161 0.284464 16.7028 0.790812 17.2092C1.29716 17.7155 1.98392 18 2.7 18H15.3C16.0161 18 16.7028 17.7155 17.2092 17.2092C17.7155 16.7028 18 16.0161 18 15.3V8.09998H0V15.3Z" fill="#1ED36A" />
                             </svg>
-                            {dateFilter === "all" ? "All Time" : DATE_FILTER_OPTIONS.find(o => o.value === dateFilter)?.label}
+                            {dateFilterLabel}
                             <ChevronDownIcon className="w-2.5 h-2.5 text-gray-500 dark:text-white/60" />
                         </button>
-                        {showDateDropdown && (
-                            <div className="absolute top-full right-0 mt-1 w-44 bg-white dark:bg-[#27322C] border border-gray-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden py-1">
-                                {DATE_FILTER_OPTIONS.map((opt) => (
-                                    <button
-                                        key={opt.value}
-                                        onClick={() => {
-                                            setDateFilter(opt.value);
-                                            setShowDateDropdown(false);
-                                        }}
-                                        className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${dateFilter === opt.value
-                                            ? "text-brand-green font-medium bg-brand-green/5 dark:bg-brand-green/10"
-                                            : "text-gray-700 dark:text-white"
-                                            }`}
-                                    >
-                                        {opt.label}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
                     </div>
 
                     {/* Create Job Button */}
                     <button
                         onClick={() => setIsCreatingJob(true)}
-                        className="flex items-center gap-1.5 bg-brand-green hover:bg-[#10A958] text-white px-6 py-[9px] rounded-[8px] text-[14px] font-semibold transition-colors shadow-sm cursor-pointer whitespace-nowrap h-[44px]"
+                        className="flex items-center gap-1.5 bg-brand-green hover:bg-[#10A958] text-white px-6 py-[9px] rounded-[8px] text-[14px] font-medium transition-colors shadow-sm cursor-pointer whitespace-nowrap h-[44px]"
                     >
                         Create Job
                         <PlusIcon className="w-3.5 h-3.5" />
@@ -902,8 +1148,8 @@ export default function JobsPortal() {
             {/* Main Content: Sidebar + Jobs List */}
             <div className="flex gap-6 flex-1 min-h-0">
                 {/* Filters Sidebar */}
-                <div className="hidden lg:block w-[220px] xl:w-[240px] shrink-0">
-                    <div className="bg-white dark:bg-[#212A25] border border-gray-200 dark:border-white/10 rounded-xl p-5 sticky top-6 shadow-sm dark:shadow-none">
+                <div className="hidden lg:block w-[250px] xl:w-[280px] shrink-0">
+                    <div className="bg-white dark:bg-[#212A25] rounded-xl p-5 sticky top-6 shadow-sm dark:shadow-none">
                         <FiltersSidebar
                             filters={filters}
                             onFilterChange={setFilters}
@@ -913,7 +1159,7 @@ export default function JobsPortal() {
                 </div>
 
                 {/* Jobs Content */}
-                <div className="flex-1 min-w-0 flex flex-col gap-3 bg-white dark:bg-[#212A25] border border-gray-200 dark:border-white/10 rounded-xl p-5 h-fit shadow-sm dark:shadow-none">
+                <div className="flex-1 min-w-0 flex flex-col gap-3 bg-white dark:bg-[#212A25] rounded-xl p-5 h-fit shadow-sm dark:shadow-none">
                     {/* Search + Pagination Bar */}
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                         {/* Search */}
@@ -923,11 +1169,8 @@ export default function JobsPortal() {
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 placeholder="Search by job title, company, or Job ID..."
-                                className="w-full bg-white dark:bg-transparent border border-gray-300 dark:border-white/35 rounded-xl py-2.5 pl-4 pr-10 text-[14px] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35 placeholder:font-normal focus:outline-none hover:border-gray-400 dark:hover:border-white/55 focus:border-brand-green transition-colors shadow-sm dark:shadow-none"
+                                className="w-full bg-white dark:bg-transparent border border-gray-300 dark:border-white/35 rounded-xl py-2.5 pl-4 pr-4 text-[14px] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35 placeholder:font-normal focus:outline-none hover:border-gray-400 dark:hover:border-white/55 focus:border-brand-green transition-colors shadow-sm dark:shadow-none"
                             />
-                            <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-white/40">
-                                <SearchIcon className="w-4 h-4" />
-                            </div>
                         </div>
 
                         {/* Showing entries + nav */}
@@ -938,13 +1181,13 @@ export default function JobsPortal() {
                             <div className="relative" ref={entriesRef}>
                                 <button
                                     onClick={() => setShowEntriesDropdown(!showEntriesDropdown)}
-                                    className="flex items-center gap-1.5 bg-gray-50 dark:bg-white/10 border border-gray-200 dark:border-white/10 px-3 py-1.5 rounded-[8px] text-[14px] text-brand-green font-semibold min-w-[52px] justify-between transition-all cursor-pointer hover:border-brand-green/55 shadow-sm dark:shadow-none"
+                                    className="flex items-center gap-1.5 bg-gray-50 dark:bg-white/10 border border-gray-200 dark:border-white/10 px-3 py-1.5 rounded-[8px] text-[14px] text-brand-green font-medium min-w-[52px] justify-between transition-all cursor-pointer hover:border-brand-green/55 shadow-sm dark:shadow-none"
                                 >
                                     {entriesPerPage}
                                     <ChevronDownIcon className={`w-3 h-3 text-gray-400 dark:text-white/50 hover:text-brand-green transition-transform ${showEntriesDropdown ? 'rotate-180' : ''}`} />
                                 </button>
                                 {showEntriesDropdown && (
-                                    <div className="absolute top-full right-0 mt-1 w-20 bg-white dark:bg-[#27322C] border border-gray-200 dark:border-white/10 rounded-lg shadow-xl z-50 overflow-hidden py-1">
+                                    <div className="absolute top-full right-0 mt-1 w-20 bg-white/14 dark:bg-[rgba(25,33,28,0.12)] border border-[rgba(25,33,28,0.08)] dark:border-[rgba(255,255,255,0.2)] rounded-lg shadow-[0_16px_40px_rgba(25,33,28,0.05)] dark:shadow-[0_16px_40px_rgba(25,33,28,0.6)] backdrop-blur-[20px] z-50 overflow-hidden py-1 box-border">
                                         {[5, 10, 25, 50].map((num) => (
                                             <button
                                                 key={num}
@@ -953,8 +1196,8 @@ export default function JobsPortal() {
                                                     setShowEntriesDropdown(false);
                                                     setCurrentPage(1);
                                                 }}
-                                                className={`w-full text-center py-1.5 text-[13px] hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer ${num === entriesPerPage
-                                                    ? "bg-brand-green/10 dark:bg-brand-green/20 text-brand-green dark:text-white font-medium"
+                                                className={`w-full text-center py-1.5 text-[13px] hover:bg-white/10 dark:hover:bg-white/5 cursor-pointer ${num === entriesPerPage
+                                                    ? "bg-brand-green/10 dark:bg-brand-green/20 text-brand-green dark:text-white font-normal"
                                                     : "text-gray-700 dark:text-white"
                                                     }`}
                                             >
@@ -1013,65 +1256,145 @@ export default function JobsPortal() {
                         )}
                     </div>
 
-                    {/* Bottom Pagination */}
-                    {filteredJobs.length > 0 && (
-                        <div className="flex items-center justify-between pt-4 pb-2">
-                            {/* Footer left */}
-                            <div className="flex items-center gap-4 text-xs text-gray-400 dark:text-gray-500">
-                                <span className="hover:text-brand-green cursor-pointer transition-colors">Privacy Policy</span>
-                                <span className="hover:text-brand-green cursor-pointer transition-colors">Terms & Conditions</span>
-                            </div>
-
-                            {/* Page numbers */}
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => handlePageChange(currentPage - 1)}
-                                    disabled={currentPage === 1}
-                                    className="w-7 h-7 flex items-center justify-center text-[#19211C] dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer bg-transparent"
-                                >
-                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                        <path d="M7.5 3L4.5 6L7.5 9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                </button>
-
-                                {getPaginationNumbers().map((page, idx) =>
-                                    page === "..." ? (
-                                        <span key={`dots-${idx}`} className="w-8 h-8 flex items-center justify-center text-sm text-[#19211C] dark:text-white">
-                                            ...
-                                        </span>
-                                    ) : (
-                                        <button
-                                            key={page}
-                                            onClick={() => handlePageChange(page as number)}
-                                            className={`w-8 h-8 rounded-[4px] flex items-center justify-center text-[13px] font-medium transition-all cursor-pointer ${currentPage === page
-                                                ? "bg-brand-green text-white border border-brand-green"
-                                                : "bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-[#19211C] dark:text-white hover:border-gray-300 dark:hover:border-white/20"
-                                                }`}
-                                        >
-                                            {page}
-                                        </button>
-                                    )
-                                )}
-
-                                <button
-                                    onClick={() => handlePageChange(currentPage + 1)}
-                                    disabled={currentPage === totalPages}
-                                    className="w-7 h-7 flex items-center justify-center text-[#19211C] dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer bg-transparent"
-                                >
-                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                        <path d="M4.5 3L7.5 6L4.5 9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                </button>
-                            </div>
-
-                            {/* Footer right */}
-                            <div className="text-xs text-gray-400 dark:text-gray-500">
-                                © 2025 Origin BI, Made with <span className="text-brand-green font-medium cursor-pointer hover:underline">Touchmark Devicorp Pvt. Ltd</span>
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
+
+            {/* Pagination */}
+            {filteredJobs.length > 0 && (
+                <div className="flex items-center justify-center gap-2 mt-2 mb-4 text-[13px] font-medium">
+                    <button
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="w-8 h-8 rounded-full bg-white dark:bg-[#FFFFFF1F] flex items-center justify-center border border-transparent dark:border-[#FFFFFF1F] text-[#19211C] dark:text-white transition-all shadow-sm hover:bg-brand-green hover:text-white hover:border-brand-green cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M7.5 3L4.5 6L7.5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    </button>
+
+                    {getPaginationNumbers().map((page, idx) =>
+                        page === "..." ? (
+                            <span key={`dots-${idx}`} className="px-1 text-gray-400">...</span>
+                        ) : (
+                            <button
+                                key={page}
+                                onClick={() => handlePageChange(page as number)}
+                                className={`w-8 h-8 rounded flex items-center justify-center text-[13px] font-medium transition-all cursor-pointer ${currentPage === page
+                                    ? "bg-brand-green text-white border border-brand-green"
+                                    : "border border-gray-200 dark:border-white/10 text-gray-500 dark:text-white/60 hover:bg-gray-100 dark:hover:bg-white/5"
+                                    }`}
+                            >
+                                {page}
+                            </button>
+                        )
+                    )}
+
+                    <button
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="w-8 h-8 rounded-full bg-white dark:bg-[#FFFFFF1F] flex items-center justify-center border border-transparent dark:border-[#FFFFFF1F] text-[#19211C] dark:text-white transition-all shadow-sm hover:bg-brand-green hover:text-white hover:border-brand-green cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M4.5 3L7.5 6L4.5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    </button>
+                </div>
+            )}
+
+            {/* Footer */}
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-xs sm:text-sm text-brand-text-light-secondary dark:text-brand-text-secondary mt-auto pb-4">
+                <div className="flex gap-4 w-full sm:w-1/2 justify-center sm:justify-start">
+                    <a href="#" className="text-brand-green hover:text-brand-green/80 transition-colors underline cursor-pointer">Privacy Policy</a>
+                    <div className="h-4 w-px bg-brand-light-tertiary dark:bg-brand-dark-tertiary"></div>
+                    <a href="#" className="text-brand-green hover:text-brand-green/80 transition-colors underline cursor-pointer">Terms &amp; Conditions</a>
+                </div>
+                <div className="text-center sm:text-right w-full sm:w-1/2 font-medium text-[#19211C] dark:text-[#FFFFFF]">
+                    &copy; {new Date().getFullYear()} Origin BI, Made with by{" "}
+                    <span className="underline text-[#1ED36A] hover:text-[#1ED36A]/80 transition-colors cursor-pointer">
+                        Touchmark Descience Pvt. Ltd.
+                    </span>
+                </div>
+            </div>
+
+            {showDateModal && (
+                <div className="fixed inset-0 z-[80] bg-[#08120E]/80 backdrop-blur-[1.5px] flex items-center justify-center px-3" onClick={() => setShowDateModal(false)}>
+                    <div className="w-[900px] h-[480px] max-w-[95vw] rounded-[24px] border border-white/[0.2] bg-[#19211C]/40 shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-5" onClick={(e) => e.stopPropagation()}>
+                        <div className="w-[860px] max-w-full mx-auto flex items-center justify-between pb-3.5 border-b border-white/[0.12]">
+                            <p className="text-[18px] leading-[23px] font-semibold text-white">Select Date Range</p>
+                            <button type="button" onClick={() => setShowDateModal(false)} className="w-8 h-8 rounded-full bg-white/[0.12] text-[#1ED36A] hover:bg-[#1ED36A]/30 hover:text-white transition-colors flex items-center justify-center" aria-label="Close date range picker">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M10.5 3.5L3.5 10.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                    <path d="M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="w-[860px] max-w-full mx-auto pt-3.5 flex gap-4 h-[318px]">
+                            <div className="w-[126px] shrink-0 border-r border-white/[0.12] pr-2.5">
+                                {calendarPresets.map((preset) => {
+                                    const isActivePreset = calendarPreset === preset;
+                                    return (
+                                        <button
+                                            key={preset}
+                                            type="button"
+                                            onClick={() => {
+                                                setCalendarPreset(preset);
+                                                applyPresetRange(preset);
+                                            }}
+                                            className={`w-full text-left px-3 py-1.5 rounded-r-[4px] text-[13px] leading-[17px] transition-colors mb-[2px] ${isActivePreset ? "bg-[#1ED36A] text-white font-semibold" : "text-white/60 font-normal hover:bg-white/[0.08] hover:text-white"}`}
+                                        >
+                                            {preset}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <div className="flex-1">
+                                <div className="flex gap-3">
+                                    {renderCalendarMonth(leftCalendarMonth.getFullYear(), leftCalendarMonth.getMonth(), getMonthLabel(leftCalendarMonth))}
+                                    {renderCalendarMonth(addMonths(leftCalendarMonth, 1).getFullYear(), addMonths(leftCalendarMonth, 1).getMonth(), getMonthLabel(addMonths(leftCalendarMonth, 1)))}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="w-[860px] max-w-full mx-auto pt-3 mt-3 border-t border-white/[0.12] flex items-center justify-between gap-3">
+                            <p className="text-[12px] leading-[16px] font-normal text-white">Selected Range : {selectedRangeText}</p>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setCalendarPreset("Any Time");
+                                        setRangeStart(null);
+                                        setRangeEnd(null);
+                                        setDateFilter("all");
+                                        setCustomDateLabel(null);
+                                        setShowDateModal(false);
+                                    }}
+                                    className="h-7 px-4 rounded-full border border-white text-white text-[12px] leading-[16px] font-medium hover:bg-white/10 transition-colors"
+                                >
+                                    Clear
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (calendarPreset === "Any Time" || !rangeStart) {
+                                            setDateFilter("all");
+                                            setCustomDateLabel(null);
+                                        } else if (rangeStart && !rangeEnd) {
+                                            setDateFilter("custom_range");
+                                            setCustomDateLabel(formatFilterRangeLabel(rangeStart, rangeStart));
+                                        } else if (rangeStart && rangeEnd) {
+                                            setDateFilter("custom_range");
+                                            setCustomDateLabel(formatFilterRangeLabel(rangeStart, rangeEnd));
+                                        }
+                                        setShowDateModal(false);
+                                    }}
+                                    className="h-7 px-4 rounded-full bg-[#1ED36A] text-white text-[12px] leading-[16px] font-medium hover:bg-[#16BD5C] transition-colors"
+                                >
+                                    Apply changes
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

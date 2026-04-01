@@ -110,7 +110,7 @@ export class AgentOrchestratorService {
       const plannerModel =
         process.env.GEMINI_PLANNER_MODEL ||
         process.env.GEMINI_LLM_MODEL ||
-        'gemini-2.5-flash';
+        'gemini-2.0-flash';
       const plannerMaxTokens = Math.max(180, Number(process.env.AGENT_PLANNER_MAX_OUTPUT_TOKENS || 320));
       this.plannerLlm = new ChatGoogleGenerativeAI({
         apiKey,
@@ -181,7 +181,7 @@ export class AgentOrchestratorService {
       const reflectorModel =
         process.env.GEMINI_REFLECTOR_MODEL ||
         process.env.GEMINI_LLM_MODEL ||
-        'gemini-2.5-flash';
+        'gemini-2.0-flash';
       const reflectorMaxTokens = Math.max(120, Number(process.env.AGENT_REFLECTOR_MAX_OUTPUT_TOKENS || 180));
       this.reflectorLlm = new ChatGoogleGenerativeAI({
         apiKey,
