@@ -646,6 +646,7 @@ export class CorporateDashboardService {
       available_credits: corporate.availableCredits,
       total_credits: corporate.totalCredits,
       is_active: corporate.isActive,
+      ask_bi_enabled: corporate.askBiEnabled,
       is_blocked: user.isBlocked,
       full_name: corporate.fullName,
       created_at: corporate.createdAt,

@@ -200,6 +200,20 @@ export const corporateRegistrationService = {
         if (!res.ok) throw new Error("Failed to update status");
     },
 
+    // Ask BI on/off per corporate account
+    async toggleAskBiStatus(id: string, askBiEnabled: boolean): Promise<void> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/admin/corporate-accounts/${id}/ask-bi`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: token ? `Bearer ${token}` : "",
+            },
+            body: JSON.stringify({ ask_bi_enabled: askBiEnabled }),
+        });
+        if (!res.ok) throw new Error("Failed to update Ask BI status");
+    },
+
     // -------------------------------------------------------------
     // Bulk Upload (Corporate Self-Service)
     // -------------------------------------------------------------

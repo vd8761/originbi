@@ -4901,8 +4901,56 @@ Please tell me the target role first, for example:
     sessionId: string,
     question: string,
     userRole: string,
-  ): { intent: string; searchTerm: string | null; table: string; includePersonality: boolean } | null {
+  ): {
+    intent: string;
+    searchTerm: string | null;
+    table: string;
+    includePersonality: boolean;
+    gender?: 'MALE' | 'FEMALE';
+    genderBreakdown?: boolean;
+  } | null {
     const q = question.toLowerCase().trim();
+
+    // Get conversation context once (used by specialized and generic follow-up logic)
+    const session = this.conversationService.getSession(sessionId);
+    const lastIntent = session?.currentContext?.lastIntent;
+    if (!lastIntent) return null;
+
+    const recentMessages = session.messages.slice(-4).map(m => m.content.toLowerCase()).join(' ');
+
+    // Gender count follow-ups after candidate/resource count/list responses:
+    // "male and female", "male vs female", "male", "female".
+    const asksGenderBreakdownFollowUp = /^(gender\s*(distribution|ratio|breakdown|split|comparison|count)?|(male|female|men|women|boys?|girls?)\s*(and|&|\/|vs\.?|versus)\s*(male|female|men|women|boys?|girls?)\s*(count|distribution|ratio|breakdown|split|comparison)?)\s*\??$/i.test(q);
+    const asksSingleGenderFollowUp = /^(male|female|males|females|men|women|boys?|girls?)\s*\??$/i.test(q)
+      || /^(what\s+about|how\s+about|and|and\s+the)\s+(male|female|males|females|men|women|boys?|girls?)\s*\??$/i.test(q);
+
+    if (
+      ['count', 'list_candidates', 'test_results', 'data_query'].includes(lastIntent)
+      && /\b(candidate|candidates|student|students|employee|employees|resource|resources|registration|registrations|male|female|gender)\b/i.test(recentMessages)
+    ) {
+      if (asksGenderBreakdownFollowUp) {
+        this.logger.log(`🔁 Gender follow-up resolved: "${question}" → count gender breakdown`);
+        return {
+          intent: 'count',
+          searchTerm: 'candidates',
+          table: 'registrations',
+          includePersonality: false,
+          genderBreakdown: true,
+        };
+      }
+
+      if (asksSingleGenderFollowUp) {
+        const gender = /\b(female|females|women|girls?)\b/i.test(q) ? 'FEMALE' : 'MALE';
+        this.logger.log(`🔁 Gender follow-up resolved: "${question}" → count ${gender}`);
+        return {
+          intent: 'count',
+          searchTerm: 'candidates',
+          table: 'registrations',
+          includePersonality: false,
+          gender,
+        };
+      }
+    }
 
     // Only trigger on generic follow-up patterns (no specific subject mentioned)
     const isGenericFollowUp = /^(list|show|get|give|display|tell)\s+(all\s+)?(the|those|these|them|me\s+the|me\s+those)?\s*(detail|info|data|accounts?|name|list|record|more)s?\s*\??$/i.test(q)
@@ -4922,12 +4970,6 @@ Please tell me the target role first, for example:
       || /^(show|list|get|display|tell|give)?\s*(me\s+)?(all\s+)?(the\s+|their\s+|those\s+)?(education|qualification|score|marks|assessment|department|degree|experience)s?\b/i.test(q) && q.split(/\s+/).length <= 5;
 
     if (!isGenericFollowUp) return null;
-
-    // Get conversation context
-    const session = this.conversationService.getSession(sessionId);
-    const lastIntent = session?.currentContext?.lastIntent;
-
-    if (!lastIntent) return null;
 
     this.logger.log(`🔁 Generic follow-up detected: "${question}" | lastIntent: ${lastIntent}`);
 
@@ -4978,7 +5020,7 @@ Please tell me the target role first, for example:
     };
 
     // Check conversation history for more context
-    const lastMessages = session.messages.slice(-4).map(m => m.content.toLowerCase()).join(' ');
+    const lastMessages = recentMessages;
 
     // Smart override: if last response mentioned "corporate" but lastIntent was count_by_role
     if (lastIntent === 'count_by_role' && lastMessages.includes('corporate')) {
@@ -5089,6 +5131,11 @@ Please tell me the target role first, for example:
     // FOLLOW-UP & GENDER PATTERNS — prevent "male"/"female" from
     // being treated as person names in follow-up queries
     // ═══════════════════════════════════════════════════════════════
+
+    // "male and female" / "male vs female" / "gender breakdown"
+    if (/^(gender\s*(distribution|ratio|breakdown|split|comparison|count)?|(male|female|men|women|boys?|girls?)\s*(and|&|\/|vs\.?|versus)\s*(male|female|men|women|boys?|girls?)\s*(count|distribution|ratio|breakdown|split|comparison)?)\s*\??$/i.test(q.trim())) {
+      return { intent: 'count', searchTerm: 'candidates', table: 'registrations', includePersonality: false, genderBreakdown: true } as any;
+    }
 
     // "what about male?" / "how about female?" / "and male?" / "and female?"
     if (/\b(what\s+about|how\s+about|and|and\s+the)\s+(male|female|males|females|boys?|girls?|men|women)\b/.test(q)) {

@@ -64,6 +64,9 @@ export class CorporateAccount {
     @Column({ name: 'is_blocked', default: false })
     isBlocked: boolean;
 
+    @Column({ name: 'ask_bi_enabled', default: false })
+    askBiEnabled: boolean;
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 

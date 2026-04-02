@@ -162,6 +162,9 @@ export class CorporateService {
           case 'is_active':
             sortCol = 'c.isActive';
             break;
+          case 'ask_bi_enabled':
+            sortCol = 'c.askBiEnabled';
+            break;
           case 'is_blocked':
             sortCol = 'c.isBlocked';
             break;
@@ -224,6 +227,7 @@ export class CorporateService {
           total_credits: r.totalCredits,
           employee_ref_id: r.employeeRefId,
           linkedin_url: r.linkedinUrl,
+          ask_bi_enabled: r.askBiEnabled,
           is_blocked: r.isBlocked,
         })),
         total,
@@ -277,6 +281,7 @@ export class CorporateService {
       available_credits: account.availableCredits,
       total_credits: account.totalCredits,
       is_active: account.isActive,
+      ask_bi_enabled: account.askBiEnabled,
       is_blocked: account.isBlocked,
     };
   }
@@ -503,6 +508,19 @@ export class CorporateService {
     await this.userRepo.save(account.user);
 
     return { success: true };
+  }
+
+  // ----------------------------------------------------------------
+  // UPDATE ASK BI STATUS
+  // ----------------------------------------------------------------
+  async updateAskBiStatus(id: number, askBiEnabled: boolean) {
+    const account = await this.corporateRepo.findOne({ where: { id } });
+    if (!account) throw new BadRequestException('Account not found');
+
+    account.askBiEnabled = !!askBiEnabled;
+    await this.corporateRepo.save(account);
+
+    return { success: true, ask_bi_enabled: account.askBiEnabled };
   }
 
   // ----------------------------------------------------------------
