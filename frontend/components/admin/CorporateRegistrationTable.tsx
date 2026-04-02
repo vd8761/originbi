@@ -22,6 +22,7 @@ interface RegistrationTableProps {
   loading: boolean;
   error: string | null;
   onToggleStatus: (id: string, currentStatus: boolean) => void;
+  onToggleAskBi?: (id: string, currentAskBi: boolean) => void;
   onViewDetails?: (id: string) => void;
   onEdit?: (id: string) => void;
   onToggleBlock?: (id: string, currentBlock: boolean) => void;
@@ -47,6 +48,7 @@ const CorporateRegistrationTable: React.FC<RegistrationTableProps> = ({
   loading,
   error,
   onToggleStatus,
+  onToggleAskBi,
   onViewDetails,
   onEdit,
   onToggleBlock,
@@ -133,6 +135,15 @@ const CorporateRegistrationTable: React.FC<RegistrationTableProps> = ({
               </th>
               <th
                 className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer text-center group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                onClick={() => onSort?.('ask_bi_enabled')}
+              >
+                <div className="flex items-center gap-1 justify-center">
+                  ASKBI
+                  <SortIcon sort={sortColumn === 'ask_bi_enabled' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
+                </div>
+              </th>
+              <th
+                className="p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider cursor-pointer text-center group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 onClick={() => onSort?.('is_blocked')}
               >
                 <div className="flex items-center gap-1 justify-center">
@@ -170,6 +181,9 @@ const CorporateRegistrationTable: React.FC<RegistrationTableProps> = ({
                   </td>
                   <td className="p-4 align-middle">
                     <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  </td>
+                  <td className="p-4 text-center align-middle">
+                    <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto"></div>
                   </td>
                   <td className="p-4 text-center align-middle">
                     <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto"></div>
@@ -260,6 +274,12 @@ const CorporateRegistrationTable: React.FC<RegistrationTableProps> = ({
                   </td>
                   <td className="pt-1 text-center align-middle">
                     <ToggleSwitch
+                      isOn={!!user.ask_bi_enabled}
+                      onToggle={() => onToggleAskBi?.(user.id, !!user.ask_bi_enabled)}
+                    />
+                  </td>
+                  <td className="pt-1 text-center align-middle">
+                    <ToggleSwitch
                       isOn={!!user.is_blocked}
                       onToggle={() => onToggleBlock?.(user.id, !!user.is_blocked)}
                       activeColor="bg-red-500"
@@ -291,7 +311,7 @@ const CorporateRegistrationTable: React.FC<RegistrationTableProps> = ({
             ) : (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={10}
                   className="p-8 text-center text-brand-text-light-secondary dark:text-gray-500"
                 >
                   No records found.

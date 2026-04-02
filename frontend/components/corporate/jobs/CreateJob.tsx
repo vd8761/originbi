@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ChevronDownIcon, XIcon, CheckCircle2, AlertCircle, InfoIcon, XCircle, Gem } from "lucide-react";
 import { AnnualCtcJobIcon, EmploymentTypeJobIcon, ExperienceLevelJobIcon, ShiftJobIcon, WorkModeJobIcon } from "../../icons";
 
@@ -25,7 +25,9 @@ export default function CreateJob({ onBack, mode = "create", initialData }: Crea
     const [workMode, setWorkMode] = useState(initialData?.workMode ?? "Onsite");
 
     const [minCtc, setMinCtc] = useState("3,50,000");
-    const [maxCtc, setMaxCtc] = useState("4,50,000");
+    const [maxCtc, setMaxCtc] = useState("4,00,000");
+    const previewMinCtc = (minCtc || "3,50,000").trim();
+    const previewMaxCtc = (maxCtc || "4,00,000").trim();
 
     const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
@@ -40,8 +42,23 @@ export default function CreateJob({ onBack, mode = "create", initialData }: Crea
 
     const [skills, setSkills] = useState(["Figma", "Prototyping", "Wire Framing", "Adobe XD"]);
 
+    useEffect(() => {
+        if (!isPreviewOpen) return;
+
+        const previousBodyOverflow = document.body.style.overflow;
+        const previousHtmlOverflow = document.documentElement.style.overflow;
+
+        document.body.style.overflow = "hidden";
+        document.documentElement.style.overflow = "hidden";
+
+        return () => {
+            document.body.style.overflow = previousBodyOverflow;
+            document.documentElement.style.overflow = previousHtmlOverflow;
+        };
+    }, [isPreviewOpen]);
+
     return (
-        <div className="thin-ui-page h-full w-full font-sans bg-[#F8F9FA] dark:bg-[#19211C] text-[#19211C] dark:text-white overflow-y-auto flex justify-center transition-colors duration-200">
+        <div className={`thin-ui-page h-full w-full font-sans bg-[#F8F9FA] dark:bg-[#19211C] text-[#19211C] dark:text-white ${isPreviewOpen ? "overflow-hidden" : "overflow-y-auto"} flex justify-center transition-colors duration-200`}>
             <div className="w-full flex flex-col gap-5 px-3 py-4 sm:px-4 sm:py-5 lg:px-6 xl:px-8">
                 {/* Breadcrumb */}
                 <div className="flex items-center text-[13px] text-gray-500 dark:text-gray-400 mb-2 font-normal">
@@ -72,13 +89,13 @@ export default function CreateJob({ onBack, mode = "create", initialData }: Crea
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        <button className="bg-white dark:bg-[#555B57] border border-gray-200 dark:border-transparent shadow-sm px-5 py-2.5 rounded-full text-[16px] font-normal text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/10 transition-colors cursor-pointer">
+                        <button className="h-[52px] px-7 rounded-full border border-gray-200 bg-white text-[16px] font-normal text-[#19211C] shadow-sm hover:bg-gray-50 transition-colors cursor-pointer dark:bg-[#23302A]/80 dark:border-[#5C6962] dark:text-white dark:hover:bg-[#2B3933]">
                             Save Draft
                         </button>
-                        <button onClick={() => setIsPreviewOpen(true)} className="bg-white dark:bg-[#555B57] border border-gray-200 dark:border-transparent shadow-sm px-5 py-2.5 rounded-full text-[16px] font-normal text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/10 transition-colors cursor-pointer">
+                        <button onClick={() => setIsPreviewOpen(true)} className="h-[52px] px-7 rounded-full border border-gray-200 bg-white text-[16px] font-normal text-[#19211C] shadow-sm hover:bg-gray-50 transition-colors cursor-pointer dark:bg-[#23302A]/80 dark:border-[#7D8A84] dark:text-white dark:hover:bg-[#2B3933]">
                             Preview as Candidate
                         </button>
-                        <button className="px-6 py-2.5 rounded-full text-[16px] font-normal bg-[#13C065] text-white hover:bg-[#10A958] transition-colors border border-transparent shadow-sm cursor-pointer whitespace-nowrap">
+                        <button className="h-[52px] px-8 rounded-full text-[16px] font-normal bg-[#13C065] text-white hover:bg-[#11B35E] transition-colors border border-[#21D471] shadow-[0_10px_24px_rgba(19,192,101,0.22)] cursor-pointer whitespace-nowrap">
                             {mode === "edit" ? "Update Job" : "Post Job"}
                         </button>
                     </div>
@@ -95,7 +112,7 @@ export default function CreateJob({ onBack, mode = "create", initialData }: Crea
                                 {/* Section 1: Basic Job Information */}
                                 <div className="flex flex-col gap-6 pb-8">
                                     <div className="flex items-center justify-between">
-                                        <h2 className="text-[22px] font-normal flex items-center gap-2 text-[#19211C] dark:text-white leading-[100%]">
+                                        <h2 className="text-[20px] font-normal flex items-center gap-2 text-[#19211C] dark:text-white leading-[100%]">
                                             Basic Job Information
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-brand-green mt-0.5">
                                                 <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
@@ -390,7 +407,7 @@ export default function CreateJob({ onBack, mode = "create", initialData }: Crea
                         {/* Employer Details Box Container */}
                         <div className="bg-white dark:bg-[#2A302C] border border-transparent dark:border-transparent rounded-xl p-6 flex flex-col gap-4 shadow-sm dark:shadow-none">
                             {/* Employer Details Header */}
-                            <h2 className="text-[22px] font-normal text-[#19211C] dark:text-white">Employer Details</h2>
+                            <h2 className="text-[20px] font-normal text-[#19211C] dark:text-white">Employer Details</h2>
                             <div className="flex flex-col items-center mt-2 mb-6 text-center">
                                 {/* Using the solid Google Logo from the design */}
                                 <div className="w-[60px] h-[60px] bg-white rounded-full flex items-center justify-center mb-3 shadow-sm border border-transparent">
@@ -401,7 +418,7 @@ export default function CreateJob({ onBack, mode = "create", initialData }: Crea
                                         <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                                     </svg>
                                 </div>
-                                <h3 className="text-[44px] font-normal text-[#19211C] dark:text-white mb-2 tracking-wide leading-[100%]">Google</h3>
+                                <h3 className="text-[32px] font-normal text-[#19211C] dark:text-white mb-2 tracking-wide leading-[100%]">Google</h3>
                                 <p className="text-[16px] text-[#19211C] dark:text-white leading-relaxed">
                                     Google is a global tech leader known for innovation, offering students and freshers opportunities to learn, work on real projects, and grow in a creative culture.
                                 </p>
@@ -410,18 +427,18 @@ export default function CreateJob({ onBack, mode = "create", initialData }: Crea
                             <div className="flex flex-col gap-4 border-t border-transparent dark:border-white/10 pt-5">
                                 <div className="flex justify-between items-start">
                                     <div className="flex-1 pr-6">
-                                        <h4 className="text-[16px] text-[#19211C] dark:text-white/70 font-normal mb-1.5">Business Location</h4>
-                                        <p className="text-[16px] text-[#19211C] dark:text-white leading-relaxed font-normal">Rio Business Park, Mahadevapura Village, Krishnarajapuram, Hobli, Bengaluru East, Bengaluru, Karnataka 560037</p>
+                                        <h4 className="font-['Haskoy'] text-[14px] leading-[18px] text-[#19211C] dark:text-white/70 font-normal mb-1.5">Business Location</h4>
+                                        <p className="text-[16px] text-[#19211C] dark:text-white leading-relaxed">Rio Business Park, Mahadevapura Village, Krishnarajapuram, Hobli, Bengaluru East, Bengaluru, Karnataka 560037</p>
                                     </div>
                                     <ChevronDownIcon className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 mt-2">
                                     <div>
-                                        <h4 className="text-[16px] text-[#19211C] dark:text-white/70 font-normal mb-1.5">Email Address</h4>
+                                        <h4 className="font-['Haskoy'] text-[14px] leading-[18px] text-[#19211C] dark:text-white/70 font-normal mb-1.5">Email Address</h4>
                                         <p className="text-[16px] text-[#19211C] dark:text-white font-normal truncate">Monish@touchmarkdes.com</p>
                                     </div>
                                     <div>
-                                        <h4 className="text-[16px] text-[#19211C] dark:text-white/70 font-normal mb-1.5">Mobile Number</h4>
+                                        <h4 className="font-['Haskoy'] text-[14px] leading-[18px] text-[#19211C] dark:text-white/70 font-normal mb-1.5">Mobile Number</h4>
                                         <p className="text-[16px] text-[#19211C] dark:text-white font-normal">90876554432</p>
                                     </div>
                                 </div>
@@ -450,68 +467,74 @@ export default function CreateJob({ onBack, mode = "create", initialData }: Crea
             {/* Preview Job Post Modal */}
             {isPreviewOpen && (
                 <div
-                    className="fixed inset-0 z-[99999] flex items-start justify-center px-4 sm:px-6 py-8 md:py-12 bg-black/70 dark:bg-black/80 overflow-y-auto"
+                    className="fixed inset-0 z-[99999] bg-black/70 dark:bg-[#19211C]/80 backdrop-blur-[2px] flex items-start justify-center px-4 sm:px-6 pt-[96px] sm:pt-[108px] pb-8 sm:pb-10 overflow-y-auto"
                     style={{ zIndex: 999999 }}
                     onClick={() => setIsPreviewOpen(false)}
                 >
                     {/* Modal Container */}
                     <div
-                        className="bg-white dark:bg-[#19211C] border border-transparent dark:border-white/10 w-full max-w-[1060px] h-fit rounded-[24px] shadow-2xl overflow-hidden flex flex-col relative animate-in fade-in zoom-in duration-200 my-auto"
+                        className="relative w-full max-w-[1060px]"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {/* Modal Header Bar */}
-                        <div className="z-10 bg-white/95 dark:bg-transparent backdrop-blur-none border-b border-gray-200 dark:border-white/10 px-6 py-4 flex items-center justify-between">
-                            <h2 className="text-[18px] font-semibold text-[#19211C] dark:text-white">Preview Job Post</h2>
-                            <button
-                                type="button"
-                                onClick={() => setIsPreviewOpen(false)}
-                                className="w-7 h-7 rounded-full bg-[#223227]/90 hover:bg-[#2b3d31] border border-[#2f5a45] flex items-center justify-center text-[#1ED36A] transition-colors cursor-pointer"
-                                aria-label="Close preview"
-                            >
-                                <XIcon className="w-4 h-4" strokeWidth={3} />
-                            </button>
-                        </div>
+                        <div className="bg-white dark:bg-[#19211C] border border-white/25 dark:border-white/12 w-full rounded-[24px] shadow-[0px_8px_32px_rgba(0,0,0,0.12)] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
+                            {/* Modal Header Bar */}
+                            <div className="z-10 bg-white/95 dark:bg-transparent backdrop-blur-none px-6 py-4 flex items-center justify-between shrink-0">
+                                <h2 className="font-['Haskoy'] text-[18px] font-normal text-[#19211C] dark:text-white leading-[100%]">Preview Job Post</h2>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsPreviewOpen(false)}
+                                    className="w-8 h-8 rounded-full bg-white hover:bg-gray-50 border border-gray-200 dark:bg-[#2A342F] dark:hover:bg-[#33423B] dark:border-[#3E4A44] flex items-center justify-center text-[#13C065] transition-colors cursor-pointer shadow-sm"
+                                    aria-label="Close preview"
+                                >
+                                    <XIcon className="w-4 h-4" strokeWidth={2.8} />
+                                </button>
+                            </div>
+                            <div className="mx-6 border-b border-white/25 dark:border-white/12" />
 
-                        {/* Modal Content */}
-                        <div className="p-6 md:p-8 flex flex-col gap-8">
+                            {/* Modal Content */}
+                            <div className="px-6 md:px-6 pt-8 md:pt-9 pb-10 md:pb-12 flex flex-col gap-9">
 
                             {/* Job Header & Actions */}
                             <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
                                 {/* Left Side: Title & Company */}
-                                <div className="flex items-center gap-5">
-                                    <div className="w-[68px] h-[68px] rounded-full bg-white border border-gray-100 dark:border-transparent flex items-center justify-center shrink-0 shadow-sm">
-                                        {/* Mock Google g logo */}
-                                        <svg viewBox="0 0 24 24" width="40" height="40" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                                        </svg>
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <h1 className="font-['Haskoy'] text-[44px] font-normal text-[#19211C] dark:text-white leading-[100%] tracking-[0px] mb-2">{jobTitle || "UI/UX Designer"}</h1>
-                                        <div className="font-['Haskoy'] text-[18px] text-[#19211C] dark:text-white font-normal leading-[100%] tracking-[0px] mb-3">
-                                            Google Inc &middot; {jobLocation || "Chennai"} &middot; {employmentType || "Full Time"}
+                                <div className="flex flex-col gap-4">
+                                    <div className="flex items-center gap-5">
+                                        <div className="w-[68px] h-[68px] rounded-full bg-white border border-gray-100 dark:border-transparent flex items-center justify-center shrink-0 shadow-sm">
+                                            {/* Mock Google g logo */}
+                                            <svg viewBox="0 0 24 24" width="40" height="40" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                                                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                                                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                                                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                                            </svg>
                                         </div>
-                                        {/* Dates */}
-                                        <div className="flex flex-wrap items-center gap-5 text-[14px] font-normal text-gray-500 dark:text-white/85">
-                                            <div className="flex items-center gap-2">
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-[#13C065]">
-                                                    <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2.5" />
-                                                    <path d="M16 2V6M8 2V6M3 10H21" stroke="currentColor" strokeWidth="2.5" />
-                                                </svg>
-                                                Posted on 27 December 2025
+                                        <div className="flex flex-col">
+                                            <h1 className="font-['Haskoy'] text-[32px] font-normal text-[#19211C] dark:text-white leading-[100%] tracking-[0px] mb-3">{jobTitle || "UI/UX Designer"}</h1>
+                                            <div className="font-['Haskoy'] text-[18px] text-[#19211C] dark:text-white font-normal leading-[100%] tracking-[0px]">
+                                                Google Inc &middot; {jobLocation || "Chennai"} &middot; {employmentType || "Full Time"}
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-[#13C065]"></span>
-                                                Closes at 28 February 2025
-                                            </div>
+                                        </div>
+                                    </div>
+                                    {/* Dates */}
+                                    <div className="flex flex-wrap items-center gap-4 font-['Haskoy'] text-[16px] font-normal leading-[100%] text-gray-500 dark:text-white/85">
+                                        <div className="flex items-center gap-2">
+                                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+                                                <path d="M11.9 2.1H11.2V0.7C11.2 0.514348 11.1262 0.336301 10.995 0.205025C10.8637 0.0737498 10.6857 0 10.5 0C10.3143 0 10.1363 0.0737498 10.005 0.205025C9.87375 0.336301 9.8 0.514348 9.8 0.7V2.1H4.2V0.7C4.2 0.514348 4.12625 0.336301 3.99497 0.205025C3.8637 0.0737498 3.68565 0 3.5 0C3.31435 0 3.1363 0.0737498 3.00503 0.205025C2.87375 0.336301 2.8 0.514348 2.8 0.7V2.1H2.1C1.54305 2.1 1.0089 2.32125 0.615076 2.71508C0.221249 3.1089 0 3.64304 0 4.2V4.9H14V4.2C14 3.64304 13.7787 3.1089 13.3849 2.71508C12.9911 2.32125 12.457 2.1 11.9 2.1Z" fill="#1ED36A" />
+                                                <path d="M0 11.8999C0 12.4568 0.221249 12.991 0.615076 13.3848C1.0089 13.7786 1.54305 13.9999 2.1 13.9999H11.9C12.457 13.9999 12.9911 13.7786 13.3849 13.3848C13.7787 12.991 14 12.4568 14 11.8999V6.29987H0V11.8999Z" fill="#1ED36A" />
+                                            </svg>
+                                            Posted on 27 December 2025
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+                                                <circle cx="6" cy="6" r="6" fill="#1ED36A" />
+                                            </svg>
+                                            Closes at 28 February 2025
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-3 shrink-0 self-end mb-1">
-                                    <button className="px-6 py-2.5 rounded-full text-[13px] font-normal border border-gray-300 dark:border-white/10 text-[#19211C] dark:text-white bg-transparent hover:bg-white/5 transition-colors cursor-pointer">
+                                <div className="flex items-center gap-3 shrink-0 self-start md:self-end md:mt-6 mb-1">
+                                    <button className="px-6 py-2.5 rounded-full text-[13px] font-normal border border-[#DDE7E1] dark:border-white/55 text-[#19211C] dark:text-white bg-transparent hover:bg-white/5 transition-colors cursor-pointer">
                                         Save Job
                                     </button>
                                     <button className="px-6 py-2.5 rounded-full text-[13px] font-normal bg-[#13C065] text-white hover:bg-[#10A958] transition-colors cursor-pointer shadow-sm">
@@ -521,91 +544,125 @@ export default function CreateJob({ onBack, mode = "create", initialData }: Crea
                             </div>
 
                             {/* Job Information Bar */}
-                            <div className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-transparent rounded-lg flex flex-row items-center divide-x divide-gray-200 dark:divide-white/10 h-[96px] px-2 md:px-0">
-                                {/* Type */}
-                                <div className="flex-1 px-4 md:px-6 flex flex-row items-center gap-4 min-w-0">
-                                    <div className="flex items-center justify-center shrink-0">
-                                        <div className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-[#13C065] dark:border-white/[0.08] dark:bg-transparent dark:text-[#1ED36A]">
-                                            <EmploymentTypeJobIcon className="w-5 h-[18px]" />
+                                <div className="w-full bg-[#F4F7F5] dark:bg-white/[0.08] border border-[#DCE6E0] dark:border-white/[0.10] rounded-[8px] h-[108px] px-4 md:px-6 flex items-center overflow-x-auto">
+
+                                    <div className="w-full min-w-[918px] flex items-center">
+                                        <div className="w-[206px] flex items-center gap-3.5 min-w-0">
+                                            <div className="flex items-center justify-center shrink-0">
+                                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1ED36A] text-white dark:hidden">
+                                                    <EmploymentTypeJobIcon className="w-5 h-[18px]" />
+                                                </div>
+                                                <div className="hidden h-10 w-10 items-center justify-center rounded-full bg-white/[0.08] text-[#13C065] dark:flex">
+                                                    <EmploymentTypeJobIcon className="w-5 h-[18px]" />
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col min-w-0 gap-1">
+                                                <span className="font-['Haskoy'] text-[13px] text-gray-500 dark:text-white/80 font-normal leading-[100%] whitespace-nowrap">Employment Type</span>
+                                                <span className="font-['Haskoy'] text-[17px] font-normal text-[#19211C] dark:text-white leading-[100%] truncate">{employmentType || "Full Time"}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="w-8 flex items-center justify-center shrink-0">
+                                            <div className="h-[31px] w-px rounded-full bg-[#D7E2DD] dark:bg-white/[0.24]" />
+                                        </div>
+
+                                        <div className="w-[119px] flex items-center gap-3.5 min-w-0">
+                                            <div className="flex items-center justify-center shrink-0">
+                                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1ED36A] text-white dark:hidden">
+                                                    <WorkModeJobIcon className="w-9 h-9" withBackground={false} />
+                                                </div>
+                                                <div className="hidden h-10 w-10 items-center justify-center rounded-full bg-white/[0.08] text-[#13C065] dark:flex">
+                                                    <WorkModeJobIcon className="w-9 h-9" withBackground={false} />
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col min-w-0 gap-1">
+                                                <span className="font-['Haskoy'] text-[13px] text-gray-500 dark:text-white/80 font-normal leading-[100%] whitespace-nowrap">Work Mode</span>
+                                                <span className="font-['Haskoy'] text-[17px] font-normal text-[#19211C] dark:text-white leading-[100%] truncate">{workMode || "Onsite"}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="w-8 flex items-center justify-center shrink-0">
+                                            <div className="h-[31px] w-px rounded-full bg-[#D7E2DD] dark:bg-white/[0.24]" />
+                                        </div>
+
+                                        <div className="w-[124px] flex items-center gap-3.5 min-w-0">
+                                            <div className="flex items-center justify-center shrink-0">
+                                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1ED36A] text-white dark:hidden">
+                                                    <ShiftJobIcon className="w-6 h-6" withBackground={false} />
+                                                </div>
+                                                <div className="hidden h-10 w-10 items-center justify-center rounded-full bg-white/[0.08] text-[#13C065] dark:flex">
+                                                    <ShiftJobIcon className="w-6 h-6" withBackground={false} />
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col min-w-0 gap-1">
+                                                <span className="font-['Haskoy'] text-[13px] text-gray-500 dark:text-white/80 font-normal leading-[100%] whitespace-nowrap">Shift</span>
+                                                <span className="font-['Haskoy'] text-[17px] font-normal text-[#19211C] dark:text-white leading-[100%] whitespace-nowrap">{shift || "Day"} Shift</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="w-8 flex items-center justify-center shrink-0">
+                                            <div className="h-[31px] w-px rounded-full bg-[#D7E2DD] dark:bg-white/[0.24]" />
+                                        </div>
+
+                                        <div className="w-[154px] flex items-center gap-3.5 min-w-0">
+                                            <div className="flex items-center justify-center shrink-0">
+                                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1ED36A] text-white dark:hidden">
+                                                    <ExperienceLevelJobIcon className="w-9 h-9" withBackground={false} />
+                                                </div>
+                                                <div className="hidden h-10 w-10 items-center justify-center rounded-full bg-white/[0.08] text-[#13C065] dark:flex">
+                                                    <ExperienceLevelJobIcon className="w-9 h-9" withBackground={false} />
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col min-w-0 gap-1">
+                                                <span className="font-['Haskoy'] text-[13px] text-gray-500 dark:text-white/80 font-normal leading-[100%] whitespace-nowrap">Experience Level</span>
+                                                <span className="font-['Haskoy'] text-[17px] font-normal text-[#19211C] dark:text-white leading-[100%] truncate">{experience || "Fresher"}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="w-8 flex items-center justify-center shrink-0">
+                                            <div className="h-[31px] w-px rounded-full bg-[#D7E2DD] dark:bg-white/[0.24]" />
+                                        </div>
+
+                                        <div className="flex-1 min-w-[193px] flex items-center gap-3.5">
+                                            <div className="flex items-center justify-center shrink-0">
+                                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1ED36A] text-white text-[0px] dark:hidden">
+                                                    <AnnualCtcJobIcon className="w-[15px] h-5" />
+                                                    ₹
+                                                </div>
+                                                <div className="hidden h-10 w-10 items-center justify-center rounded-full bg-white/[0.08] text-[#13C065] text-[0px] dark:flex">
+                                                    <AnnualCtcJobIcon className="w-[15px] h-5" />
+                                                    ₹
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col min-w-0 gap-1">
+                                                <span className="font-['Haskoy'] text-[13px] text-gray-500 dark:text-white/80 font-normal leading-[100%] whitespace-nowrap">Annual CTC</span>
+                                                <span className="font-['Haskoy'] text-[16px] font-normal text-[#19211C] dark:text-white leading-[100%] whitespace-nowrap">{previewMinCtc} - {previewMaxCtc}</span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-[12px] sm:text-[13px] text-gray-500 dark:text-white/70 font-normal whitespace-nowrap">Employment Type</span>
-                                        <span className="text-[14px] sm:text-[15px] font-[Haskoy] font-semibold text-[#19211C] dark:text-white truncate max-w-[100px] sm:max-w-[150px]">{employmentType || "Internship / Full-Time"}</span>
-                                    </div>
                                 </div>
-                                {/* Mode */}
-                                <div className="flex-1 px-4 md:px-6 flex flex-row items-center gap-4 min-w-0">
-                                    <div className="flex items-center justify-center shrink-0">
-                                        <div className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-[#13C065] dark:border-white/[0.08] dark:bg-transparent dark:text-[#1ED36A]">
-                                            <WorkModeJobIcon className="w-10 h-10" />
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-[12px] sm:text-[13px] text-gray-500 dark:text-white/70 font-normal whitespace-nowrap">Work Mode</span>
-                                        <span className="text-[14px] sm:text-[15px] font-[Haskoy] font-semibold text-[#19211C] dark:text-white truncate max-w-[100px] sm:max-w-[150px]">{workMode || "Onsite"}</span>
-                                    </div>
-                                </div>
-                                {/* Shift */}
-                                <div className="flex-1 px-4 md:px-6 flex flex-row items-center gap-4 min-w-0">
-                                    <div className="flex items-center justify-center shrink-0">
-                                        <div className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-[#13C065] dark:border-white/[0.08] dark:bg-transparent dark:text-[#1ED36A]">
-                                            <ShiftJobIcon className="w-6 h-6" withBackground={false} />
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-[12px] sm:text-[13px] text-gray-500 dark:text-white/70 font-normal whitespace-nowrap">Shift</span>
-                                        <span className="text-[14px] sm:text-[15px] font-[Haskoy] font-semibold text-[#19211C] dark:text-white whitespace-nowrap">{shift || "Day"} Shift</span>
-                                    </div>
-                                </div>
-                                {/* Experience */}
-                                <div className="flex-1 px-4 md:px-6 flex flex-row items-center gap-4 min-w-0">
-                                    <div className="flex items-center justify-center shrink-0">
-                                        <div className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-[#13C065] dark:border-white/[0.08] dark:bg-transparent dark:text-[#1ED36A]">
-                                            <ExperienceLevelJobIcon className="w-10 h-10" />
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-[12px] sm:text-[13px] text-gray-500 dark:text-white/70 font-normal whitespace-nowrap">Experience Level</span>
-                                        <span className="text-[14px] sm:text-[15px] font-[Haskoy] font-semibold text-[#19211C] dark:text-white whitespace-nowrap truncate max-w-[100px] sm:max-w-[150px]">{experience || "Fresher"}</span>
-                                    </div>
-                                </div>
-                                {/* CTC */}
-                                <div className="flex-1 pl-4 md:pl-6 pr-2 md:pr-4 flex flex-row items-center gap-4 min-w-0">
-                                    <div className="flex items-center justify-center shrink-0">
-                                        <div className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-[#13C065] dark:border-white/[0.08] dark:bg-transparent dark:text-[#1ED36A] text-[0px] leading-none">
-                                            <AnnualCtcJobIcon className="w-[15px] h-5" />
-                                            ?
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col min-w-0 flex-1">
-                                        <span className="text-[12px] sm:text-[13px] text-gray-500 dark:text-white/70 font-normal whitespace-nowrap">Annual CTC</span>
-                                        <span className="text-[14px] sm:text-[15px] font-[Haskoy] font-semibold text-[#19211C] dark:text-white leading-none mt-1 whitespace-nowrap">
-                                            {minCtc || "3,50,000"} - {maxCtc || "4,00,000"}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>                            {/* Markdown Sections Container */}
+
+                            {/* Markdown Sections Container */}
                             <div className="flex flex-col gap-7 text-[16px]">
 
                                 {/* Job Description */}
                                 <div>
-                                    <h3 className="font-semibold text-[#19211C] dark:text-white mb-3">Job Description</h3>
-                                    <p className="text-gray-700 dark:text-white/90 leading-relaxed max-w-4xl whitespace-pre-line">
+                                    <h3 className="font-['Haskoy'] text-[16px] font-normal leading-[100%] text-[#19211C] dark:text-white mb-3">Job Description</h3>
+                                    <p className="font-['Haskoy'] text-[16px] font-light leading-[130%] text-gray-700 dark:text-white/90 max-w-4xl whitespace-pre-line">
                                         {jobDesc || "We are looking for creative and passionate students or recent graduates..."}
                                     </p>
                                 </div>
 
                                 {/* Responsibilities */}
                                 <div>
-                                    <h3 className="font-semibold text-[#19211C] dark:text-white mb-2">Responsibilities</h3>
+                                    <h3 className="font-['Haskoy'] text-[16px] font-normal leading-[100%] text-[#19211C] dark:text-white mb-2">Responsibilities</h3>
                                     <ul className="flex flex-col gap-2.5">
                                         {(responsibilities || "- Design wireframes, UI screens, and simple prototypes\n- Collaborate with developers to ensure accurate design implementation\n- Participate in design discussions and review sessions\n- Assist in improving user experience across products\n- Maintain visual consistency and design standards").split('\n').filter(Boolean).map((resp, idx) => (
-                                            <li key={idx} className="flex flex-row items-center gap-[18px] p-0 text-gray-700 dark:text-white/90">
+                                            <li key={idx} className="flex flex-row items-center gap-[18px] p-0 font-['Haskoy'] text-[16px] font-light leading-[130%] text-gray-700 dark:text-white/90">
                                                 <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
                                                     <path d="M8.1181 2.94232L7.5 0L6.88113 2.94232C6.67755 3.91022 6.19676 4.79799 5.49737 5.49737C4.79799 6.19676 3.91022 6.67755 2.94232 6.88113L0 7.5L2.94232 8.1181C3.91032 8.32176 4.79814 8.80267 5.49753 9.5022C6.19692 10.2017 6.67766 11.0896 6.88113 12.0577L7.5 15L8.1181 12.0577C8.3216 11.0895 8.80244 10.2015 9.50199 9.50199C10.2015 8.80244 11.0895 8.3216 12.0577 8.1181L15 7.49922L12.0577 6.88113C11.0896 6.67771 10.2017 6.19698 9.50214 5.49758C8.80261 4.79818 8.32171 3.91034 8.1181 2.94232Z" fill="#1ED36A" />
                                                 </svg>
-                                                <span className="leading-relaxed">{resp.replace(/^\s*(?:[-•✦✳❇*])\s+/, '')}</span>
+                                                <span>{resp.replace(/^\s*(?:[-•✦✳❇*])\s+/, '')}</span>
                                             </li>
                                         ))}
                                     </ul>
@@ -613,14 +670,14 @@ export default function CreateJob({ onBack, mode = "create", initialData }: Crea
 
                                 {/* Eligibility */}
                                 <div>
-                                    <h3 className="font-semibold text-[#19211C] dark:text-white mb-2">Eligibility</h3>
+                                    <h3 className="font-['Haskoy'] text-[16px] font-normal leading-[100%] text-[#19211C] dark:text-white mb-2">Eligibility</h3>
                                     <ul className="flex flex-col gap-2.5">
                                         {(eligibility || "- Final-year students & recent graduates\n- 2024 / 2025 pass-outs\n- Basic UI/UX knowledge\n- Portfolio or academic projects accepted").split('\n').filter(Boolean).map((el, idx) => (
-                                            <li key={idx} className="flex flex-row items-center gap-[18px] p-0 text-gray-700 dark:text-white/90">
+                                            <li key={idx} className="flex flex-row items-center gap-[18px] p-0 font-['Haskoy'] text-[16px] font-light leading-[130%] text-gray-700 dark:text-white/90">
                                                 <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
                                                     <path d="M8.1181 2.94232L7.5 0L6.88113 2.94232C6.67755 3.91022 6.19676 4.79799 5.49737 5.49737C4.79799 6.19676 3.91022 6.67755 2.94232 6.88113L0 7.5L2.94232 8.1181C3.91032 8.32176 4.79814 8.80267 5.49753 9.5022C6.19692 10.2017 6.67766 11.0896 6.88113 12.0577L7.5 15L8.1181 12.0577C8.3216 11.0895 8.80244 10.2015 9.50199 9.50199C10.2015 8.80244 11.0895 8.3216 12.0577 8.1181L15 7.49922L12.0577 6.88113C11.0896 6.67771 10.2017 6.19698 9.50214 5.49758C8.80261 4.79818 8.32171 3.91034 8.1181 2.94232Z" fill="#1ED36A" />
                                                 </svg>
-                                                <span className="leading-relaxed">{el.replace(/^\s*(?:[-•✦✳❇*])\s+/, '')}</span>
+                                                <span>{el.replace(/^\s*(?:[-•✦✳❇*])\s+/, '')}</span>
                                             </li>
                                         ))}
                                     </ul>
@@ -628,7 +685,7 @@ export default function CreateJob({ onBack, mode = "create", initialData }: Crea
 
                                 {/* Required Skills */}
                                 <div>
-                                    <h3 className="font-semibold text-[#19211C] dark:text-white mb-2">Required Skills (Mandatory for shortlisting)</h3>
+                                    <h3 className="font-['Haskoy'] text-[16px] font-normal leading-[100%] text-[#19211C] dark:text-white mb-2">Required Skills (Mandatory for shortlisting)</h3>
                                     <div className="flex flex-wrap gap-2">
                                         {skills.length > 0 ? skills.map((skill: string, idx: number) => (
                                             <span key={idx} className="px-4 py-[8px] rounded-full bg-white text-gray-900 border border-gray-200 font-normal text-[14px] shadow-sm leading-none">
@@ -642,27 +699,28 @@ export default function CreateJob({ onBack, mode = "create", initialData }: Crea
 
                                 {/* Nice-to-Have Skills */}
                                 <div>
-                                    <h3 className="font-semibold text-[#19211C] dark:text-white mb-2">Nice-to-Have Skills</h3>
-                                    <p className="text-gray-700 dark:text-white/90 leading-relaxed max-w-4xl">
+                                    <h3 className="font-['Haskoy'] text-[16px] font-normal leading-[100%] text-[#19211C] dark:text-white mb-2">Nice-to-Have Skills</h3>
+                                    <p className="font-['Haskoy'] text-[16px] font-light leading-[130%] text-gray-700 dark:text-white/90 max-w-4xl">
                                         {niceToHave || "Basic knowledge of HTML/CSS, Awareness of responsive design principles."}
                                     </p>
                                 </div>
 
                                 {/* What You Will Learn */}
                                 <div>
-                                    <h3 className="font-semibold text-[#19211C] dark:text-white mb-2">What You Will Learn</h3>
+                                    <h3 className="font-['Haskoy'] text-[16px] font-normal leading-[100%] text-[#19211C] dark:text-white mb-2">What You Will Learn</h3>
                                     <ul className="flex flex-col gap-2.5">
                                         {(learn || "- Industry-standard UI/UX design workflows\n- Working with real product requirements and timelines\n- Collaboration with cross-functional teams\n- Iterating designs based on feedback and usability insights\n- Exposure to professional design systems and best practices").split('\n').filter(Boolean).map((item, idx) => (
-                                            <li key={idx} className="flex flex-row items-center gap-[18px] p-0 text-gray-700 dark:text-white/90">
+                                            <li key={idx} className="flex flex-row items-center gap-[18px] p-0 font-['Haskoy'] text-[16px] font-light leading-[130%] text-gray-700 dark:text-white/90">
                                                 <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
                                                     <path d="M8.1181 2.94232L7.5 0L6.88113 2.94232C6.67755 3.91022 6.19676 4.79799 5.49737 5.49737C4.79799 6.19676 3.91022 6.67755 2.94232 6.88113L0 7.5L2.94232 8.1181C3.91032 8.32176 4.79814 8.80267 5.49753 9.5022C6.19692 10.2017 6.67766 11.0896 6.88113 12.0577L7.5 15L8.1181 12.0577C8.3216 11.0895 8.80244 10.2015 9.50199 9.50199C10.2015 8.80244 11.0895 8.3216 12.0577 8.1181L15 7.49922L12.0577 6.88113C11.0896 6.67771 10.2017 6.19698 9.50214 5.49758C8.80261 4.79818 8.32171 3.91034 8.1181 2.94232Z" fill="#1ED36A" />
                                                 </svg>
-                                                <span className="leading-relaxed">{item.replace(/^\s*(?:[-•✦✳❇*])\s+/, '')}</span>
+                                                <span>{item.replace(/^\s*(?:[-•✦✳❇*])\s+/, '')}</span>
                                             </li>
                                         ))}
                                     </ul>
                                 </div>
 
+                            </div>
                             </div>
                         </div>
                     </div>
