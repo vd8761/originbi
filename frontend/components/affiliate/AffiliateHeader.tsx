@@ -62,15 +62,15 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, active, isMobile, onClic
         <div className="relative group">
             <button
                 onClick={onClick}
-                className={`flex items-center ${spacingClass} rounded-full transition-all duration-200 w-full ${isMobile ? "py-3.5" : "lg:h-8.5 2xl:h-10"} cursor-pointer ${active
-                    ? `bg-brand-green text-white border border-transparent shadow-none ${isMobile ? "px-4.5" : "px-2 2xl:px-3.5"}`
-                    : `bg-gray-50 border border-gray-200 text-[#19211C] hover:bg-gray-100 hover:text-black hover:border-gray-300 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white ${isMobile ? "px-4.5" : "px-2 2xl:px-3.5"}`
+                className={`flex items-center ${spacingClass} rounded-full transition-all duration-200 w-full ${isMobile ? "py-3.5" : "lg:h-8.5 xl:h-9 2xl:h-10"} cursor-pointer ${active
+                    ? `bg-brand-green text-white border border-transparent shadow-none ${isMobile ? "px-4.5" : "px-2 xl:px-3 2xl:px-3.5"}`
+                    : `bg-gray-50 border border-gray-200 text-[#19211C] hover:bg-gray-100 hover:text-black hover:border-gray-300 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white ${isMobile ? "px-4.5" : "px-2 xl:px-3 2xl:px-3.5"}`
                     }`}
             >
                 <div className={`${active ? "text-white" : "text-brand-green dark:text-white"}`}>
                     {icon}
                 </div>
-                <span className={`font-medium ${isMobile ? "text-sm" : "text-[10.5px] 2xl:text-[11.5px]"} whitespace-nowrap ${isMobile ? "inline" : showDesktopText}`}>
+                <span className={`font-medium ${isMobile ? "text-sm" : "text-[10.5px] xl:text-[11.5px] 2xl:text-[11.5px]"} whitespace-nowrap ${isMobile ? "inline" : showDesktopText}`}>
                     {label}
                 </span>
             </button>
@@ -335,7 +335,7 @@ const AffiliateHeader: React.FC<AffiliateHeaderProps> = ({ onLogout, onNavigate 
 
                     <img src="/Origin-BI-Logo-01.png" alt="OriginBI Logo" className="h-5 lg:h-5.5 2xl:h-6 w-auto dark:hidden" />
                     <img src="/Origin-BI-white-logo.png" alt="OriginBI Logo" className="h-5 lg:h-5.5 2xl:h-6 w-auto hidden dark:block" />
-                    <nav className="hidden md:flex items-center space-x-1 lg:space-x-1 2xl:space-x-1.5 ml-1.5 lg:ml-1.5 2xl:ml-3">
+                    <nav className="hidden md:flex items-center space-x-1 lg:space-x-1 xl:space-x-1.5 2xl:space-x-1.5 ml-1.5 lg:ml-1.5 xl:ml-2.5 2xl:ml-3">
                         {renderNavItems(false)}
                     </nav>
                 </div>
