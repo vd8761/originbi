@@ -12,6 +12,8 @@ import {
   Logger,
   UseGuards,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { Response } from 'express';
 import {
   IsString,
@@ -37,6 +39,7 @@ import { PdfService } from '../common/pdf/pdf.service';
 import { CognitoUniversalGuard } from '../auth/cognito-universal.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UserContext } from '../common/interfaces/user-context.interface';
+import { CorporateAccount } from '@originbi/shared-entities';
 
 // DTO for query request
 export class RagQueryDto {
@@ -239,16 +242,27 @@ export interface RagResponse {
 export class RagController {
   private readonly logger = new Logger(RagController.name);
 
-  private isCorporateRagChatEnabled(): boolean {
-    return (process.env.ENABLE_CORPORATE_RAG_CHAT ?? 'true').toLowerCase() === 'true';
-  }
-
-  private ensureCorporateRagChatEnabled(user: UserContext): void {
+  private async ensureCorporateRagChatEnabled(user: UserContext): Promise<void> {
     const role = (user?.role || '').toUpperCase();
-    if (role === 'CORPORATE' && !this.isCorporateRagChatEnabled()) {
+    if (role !== 'CORPORATE') {
+      return;
+    }
+
+    if (!user?.corporateId) {
       throw new HttpException(
-        'Corporate AI assistant is temporarily disabled',
-        HttpStatus.SERVICE_UNAVAILABLE,
+        'Corporate account context missing',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    const corporate = await this.corporateRepo.findOne({
+      where: { id: user.corporateId },
+    });
+
+    if (!corporate || !corporate.askBiEnabled) {
+      throw new HttpException(
+        'Ask BI is disabled for this corporate account',
+        HttpStatus.FORBIDDEN,
       );
     }
   }
@@ -269,6 +283,8 @@ export class RagController {
     private readonly chatMemory: ChatMemoryService,
     private readonly conversationService: ConversationService,
     private readonly pdfService: PdfService,
+    @InjectRepository(CorporateAccount)
+    private readonly corporateRepo: Repository<CorporateAccount>,
   ) { }
 
   /**
@@ -494,7 +510,7 @@ export class RagController {
         throw new HttpException('Authentication required for chat queries', HttpStatus.UNAUTHORIZED);
       }
 
-      this.ensureCorporateRagChatEnabled(user);
+      await this.ensureCorporateRagChatEnabled(user);
 
       const question = queryDto?.question;
       if (!question) {
@@ -696,6 +712,13 @@ export class RagController {
   ): Promise<void> {
     try {
       this.logger.log(`📄 PDF query | user=${user.id} role=${user.role}`);
+
+      if (!user || !user.id || user.id <= 0) {
+        throw new HttpException('Authentication required for chat queries', HttpStatus.UNAUTHORIZED);
+      }
+
+      await this.ensureCorporateRagChatEnabled(user);
+
       const result = await this.ragService.query(queryDto.question, user);
       const pdfBuffer = await this.ragService.generatePdf(
         result,
