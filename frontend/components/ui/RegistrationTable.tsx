@@ -115,8 +115,14 @@ const RegistrationTable: React.FC<RegistrationTableProps> = ({
                                 </div>
                             </th>
                             {showAiCounsellor && (
-                                <th className="w-[10%] p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider text-center">
-                                    AI Counsellor
+                                <th
+                                    className="w-[10%] p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider text-center cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                    onClick={() => onSort?.('has_ai_counsellor')}
+                                >
+                                    <div className="flex items-center gap-1 justify-center">
+                                        AI Counsellor
+                                        <SortIcon sort={sortColumn === 'has_ai_counsellor' ? (sortOrder === 'ASC' ? 'asc' : 'desc') : null} />
+                                    </div>
                                 </th>
                             )}
                             <th className="w-[10%] p-4 text-xs font-normal text-[#19211C] dark:text-brand-text-secondary tracking-wider text-center">

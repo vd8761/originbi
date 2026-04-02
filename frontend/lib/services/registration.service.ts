@@ -52,6 +52,7 @@ export const registrationService = {
       program_id?: string;
       start_date?: string;
       end_date?: string;
+      has_ai_counsellor?: boolean;
     },
     sortBy?: string,
     sortOrder?: "ASC" | "DESC"
@@ -64,6 +65,9 @@ export const registrationService = {
     if (filters?.program_id) params.set("program_id", filters.program_id);
     if (filters?.start_date) params.set("startDate", filters.start_date);
     if (filters?.end_date) params.set("endDate", filters.end_date);
+    if (filters?.has_ai_counsellor !== undefined) {
+      params.set("hasAiCounsellor", String(filters.has_ai_counsellor));
+    }
     if (sortBy) params.set("sortBy", sortBy);
     if (sortOrder) params.set("sortOrder", sortOrder);
 
