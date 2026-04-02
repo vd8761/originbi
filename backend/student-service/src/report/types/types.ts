@@ -56,6 +56,7 @@ export interface SchoolData {
   report_password?: string;
   dept_code?: string;
   group_name?: string;
+  student_board?: string;
 }
 
 export interface EmployeeData {
