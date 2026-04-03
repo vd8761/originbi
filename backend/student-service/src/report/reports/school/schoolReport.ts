@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unused-vars, @typescript-eslint/require-await, @typescript-eslint/no-unsafe-return, no-irregular-whitespace */
 import * as fs from 'fs';
 import { SchoolData, AgileScore, COLORS } from '../../types/types';
 import {
@@ -69,11 +69,11 @@ export class SchoolReport extends BaseReport {
     confidence: 'High' | 'Moderate' | 'Exploratory';
     topGap: number;
   } = {
-      bestFit: '',
-      secondaryFit: '',
-      confidence: 'Exploratory',
-      topGap: 0,
-    };
+    bestFit: '',
+    secondaryFit: '',
+    confidence: 'Exploratory',
+    topGap: 0,
+  };
 
   constructor(data: SchoolData, options?: PDFKit.PDFDocumentOptions) {
     super(options);
@@ -475,62 +475,62 @@ export class SchoolReport extends BaseReport {
       targets: { key: keyof typeof profile; target: number; weight: number }[];
       readinessKeys: (keyof typeof profile)[];
     }[] = [
-        {
-          label: 'Engineering & Technology',
-          targets: [
-            { key: 'C', target: 88, weight: 0.22 },
-            { key: 'Focus', target: 85, weight: 0.2 },
-            { key: 'Commitment', target: 72, weight: 0.16 },
-            { key: 'D', target: 52, weight: 0.12 },
-            { key: 'Openness', target: 48, weight: 0.1 },
-            { key: 'S', target: 46, weight: 0.1 },
-            { key: 'Courage', target: 58, weight: 0.1 },
-          ],
-          readinessKeys: ['Focus', 'Commitment', 'C'],
-        },
-        {
-          label: 'Management & Leadership',
-          targets: [
-            { key: 'D', target: 86, weight: 0.22 },
-            { key: 'Courage', target: 82, weight: 0.18 },
-            { key: 'Commitment', target: 72, weight: 0.16 },
-            { key: 'I', target: 62, weight: 0.14 },
-            { key: 'Focus', target: 60, weight: 0.1 },
-            { key: 'Openness', target: 56, weight: 0.08 },
-            { key: 'Respect', target: 52, weight: 0.06 },
-            { key: 'C', target: 48, weight: 0.06 },
-          ],
-          readinessKeys: ['Courage', 'Commitment', 'Focus'],
-        },
-        {
-          label: 'Creative & Design',
-          targets: [
-            { key: 'I', target: 84, weight: 0.22 },
-            { key: 'Openness', target: 86, weight: 0.22 },
-            { key: 'Courage', target: 60, weight: 0.12 },
-            { key: 'Commitment', target: 50, weight: 0.1 },
-            { key: 'Focus', target: 52, weight: 0.1 },
-            { key: 'D', target: 48, weight: 0.08 },
-            { key: 'Respect', target: 58, weight: 0.08 },
-            { key: 'C', target: 42, weight: 0.08 },
-          ],
-          readinessKeys: ['Openness', 'Courage', 'I'],
-        },
-        {
-          label: 'People & HR',
-          targets: [
-            { key: 'S', target: 84, weight: 0.22 },
-            { key: 'Respect', target: 84, weight: 0.22 },
-            { key: 'I', target: 66, weight: 0.14 },
-            { key: 'Commitment', target: 70, weight: 0.14 },
-            { key: 'Openness', target: 58, weight: 0.1 },
-            { key: 'Focus', target: 56, weight: 0.08 },
-            { key: 'Courage', target: 46, weight: 0.05 },
-            { key: 'D', target: 40, weight: 0.05 },
-          ],
-          readinessKeys: ['Respect', 'Commitment', 'S'],
-        },
-      ];
+      {
+        label: 'Engineering & Technology',
+        targets: [
+          { key: 'C', target: 88, weight: 0.22 },
+          { key: 'Focus', target: 85, weight: 0.2 },
+          { key: 'Commitment', target: 72, weight: 0.16 },
+          { key: 'D', target: 52, weight: 0.12 },
+          { key: 'Openness', target: 48, weight: 0.1 },
+          { key: 'S', target: 46, weight: 0.1 },
+          { key: 'Courage', target: 58, weight: 0.1 },
+        ],
+        readinessKeys: ['Focus', 'Commitment', 'C'],
+      },
+      {
+        label: 'Management & Leadership',
+        targets: [
+          { key: 'D', target: 86, weight: 0.22 },
+          { key: 'Courage', target: 82, weight: 0.18 },
+          { key: 'Commitment', target: 72, weight: 0.16 },
+          { key: 'I', target: 62, weight: 0.14 },
+          { key: 'Focus', target: 60, weight: 0.1 },
+          { key: 'Openness', target: 56, weight: 0.08 },
+          { key: 'Respect', target: 52, weight: 0.06 },
+          { key: 'C', target: 48, weight: 0.06 },
+        ],
+        readinessKeys: ['Courage', 'Commitment', 'Focus'],
+      },
+      {
+        label: 'Creative & Design',
+        targets: [
+          { key: 'I', target: 84, weight: 0.22 },
+          { key: 'Openness', target: 86, weight: 0.22 },
+          { key: 'Courage', target: 60, weight: 0.12 },
+          { key: 'Commitment', target: 50, weight: 0.1 },
+          { key: 'Focus', target: 52, weight: 0.1 },
+          { key: 'D', target: 48, weight: 0.08 },
+          { key: 'Respect', target: 58, weight: 0.08 },
+          { key: 'C', target: 42, weight: 0.08 },
+        ],
+        readinessKeys: ['Openness', 'Courage', 'I'],
+      },
+      {
+        label: 'People & HR',
+        targets: [
+          { key: 'S', target: 84, weight: 0.22 },
+          { key: 'Respect', target: 84, weight: 0.22 },
+          { key: 'I', target: 66, weight: 0.14 },
+          { key: 'Commitment', target: 70, weight: 0.14 },
+          { key: 'Openness', target: 58, weight: 0.1 },
+          { key: 'Focus', target: 56, weight: 0.08 },
+          { key: 'Courage', target: 46, weight: 0.05 },
+          { key: 'D', target: 40, weight: 0.05 },
+        ],
+        readinessKeys: ['Respect', 'Commitment', 'S'],
+      },
+    ];
 
     return models
       .map((model) => {
@@ -543,7 +543,7 @@ export class SchoolReport extends BaseReport {
         }, 0);
         const readiness = Math.round(
           model.readinessKeys.reduce((sum, key) => sum + profile[key], 0) /
-          model.readinessKeys.length,
+            model.readinessKeys.length,
         );
 
         return {
@@ -913,7 +913,7 @@ export class SchoolReport extends BaseReport {
         norm(agile?.focus ?? 0) +
         norm(agile?.openness ?? 0) +
         norm(agile?.respect ?? 0)) /
-      5,
+        5,
     );
     const leadershipScore = this.ci_patterns.leadership;
 
@@ -1436,7 +1436,6 @@ export class SchoolReport extends BaseReport {
     this.ci_generateDevelopmentZones();
   }
 
-
   // ==========================================
   // --- GENERATE GCSE (IGCSE) SECTIONS ---
   // ==========================================
@@ -1449,9 +1448,14 @@ export class SchoolReport extends BaseReport {
     // 1. Your Academic Strengths Profile
     try {
       this.generateGCSEStrengthsProfile(asFitments);
-      logger.info('[School REPORT][GCSE] Academic Strengths Profile Generated.');
+      logger.info(
+        '[School REPORT][GCSE] Academic Strengths Profile Generated.',
+      );
     } catch (err) {
-      logger.warn('[School REPORT][GCSE] Academic Strengths Profile skipped.', err);
+      logger.warn(
+        '[School REPORT][GCSE] Academic Strengths Profile skipped.',
+        err,
+      );
     }
 
     // 2. Understanding Your Two Pathways (neutral comparison)
@@ -1465,17 +1469,27 @@ export class SchoolReport extends BaseReport {
     // 3. AS & A Level Subject Recommendations
     try {
       this.generateGCSEASLevelRecommendations(asFitments);
-      logger.info('[School REPORT][GCSE] AS/A Level Recommendations Generated.');
+      logger.info(
+        '[School REPORT][GCSE] AS/A Level Recommendations Generated.',
+      );
     } catch (err) {
-      logger.warn('[School REPORT][GCSE] AS/A Level Recommendations skipped.', err);
+      logger.warn(
+        '[School REPORT][GCSE] AS/A Level Recommendations skipped.',
+        err,
+      );
     }
 
     // 4. AICE Diploma Subject Recommendations
     try {
       this.generateGCSEAICERecommendations(aiceFitments, hasAICE);
-      logger.info('[School REPORT][GCSE] AICE Diploma Recommendations Generated.');
+      logger.info(
+        '[School REPORT][GCSE] AICE Diploma Recommendations Generated.',
+      );
     } catch (err) {
-      logger.warn('[School REPORT][GCSE] AICE Diploma Recommendations skipped.', err);
+      logger.warn(
+        '[School REPORT][GCSE] AICE Diploma Recommendations skipped.',
+        err,
+      );
     }
 
     // 5. Your Personalised Academic Journey
@@ -1508,7 +1522,7 @@ export class SchoolReport extends BaseReport {
       D: [0.8, 0.7, 0.6, 0.5, 0.5, 0.8],
       I: [0.5, 0.4, 0.9, 0.8, 0.9, 0.4],
       S: [0.6, 0.5, 0.6, 0.5, 0.8, 0.7],
-      C: [0.9, 0.8, 0.5, 0.4, 0.4, 0.9]
+      C: [0.9, 0.8, 0.5, 0.4, 0.4, 0.9],
     };
     return table[discType] || table['DC'];
   }
@@ -1522,11 +1536,15 @@ export class SchoolReport extends BaseReport {
    */
   private computeGCSEFitment(subjects: GCSESubject[]): any[] {
     // 1. DISC Base Vector Selection
-    const topTwo = this.getTopTwoTraits(this.data.most_answered_answer_type, this.data);
+    const topTwo = this.getTopTwoTraits(
+      this.data.most_answered_answer_type,
+      this.data,
+    );
     const traitCode = topTwo[0] + topTwo[1];
     const baseVector = this.getGCSEDiscTraits(traitCode);
 
-    const [analytical, numerical, verbal, creative, interpersonal, structured] = baseVector;
+    const [analytical, numerical, verbal, creative, interpersonal, structured] =
+      baseVector;
 
     // 2. Agile Input Dimensions (0-1 Normalization)
     const agile = this.data.agile_scores?.[0];
@@ -1537,30 +1555,46 @@ export class SchoolReport extends BaseReport {
     const courage = Math.min(1.0, (agile?.courage ?? 0) / 25);
 
     // 3. Axis Adjustment Formulas (from PDF documentation)
-    const adjAnalytical = analytical + (focus * 0.10);
-    const adjNumerical = numerical + (commitment * 0.05);
-    const adjVerbal = verbal + (openness * 0.08);
-    const adjCreative = creative + (((openness + courage) / 2) * 0.10);
-    const adjInterpersonal = interpersonal + (((respect + courage) / 2) * 0.10);
-    const adjStructured = structured + (((focus + commitment + respect) / 3) * 0.10);
+    const adjAnalytical = analytical + focus * 0.1;
+    const adjNumerical = numerical + commitment * 0.05;
+    const adjVerbal = verbal + openness * 0.08;
+    const adjCreative = creative + ((openness + courage) / 2) * 0.1;
+    const adjInterpersonal = interpersonal + ((respect + courage) / 2) * 0.1;
+    const adjStructured =
+      structured + ((focus + commitment + respect) / 3) * 0.1;
 
     // 4. Final Student Vector (80% DISC base + 20% Agile-adjusted)
     const finalVector = [
-      Math.min(1.0, Math.max(0.0, (analytical * 0.8) + (adjAnalytical * 0.2))),
-      Math.min(1.0, Math.max(0.0, (numerical * 0.8) + (adjNumerical * 0.2))),
-      Math.min(1.0, Math.max(0.0, (verbal * 0.8) + (adjVerbal * 0.2))),
-      Math.min(1.0, Math.max(0.0, (creative * 0.8) + (adjCreative * 0.2))),
-      Math.min(1.0, Math.max(0.0, (interpersonal * 0.8) + (adjInterpersonal * 0.2))),
-      Math.min(1.0, Math.max(0.0, (structured * 0.8) + (adjStructured * 0.2)))
+      Math.min(1.0, Math.max(0.0, analytical * 0.8 + adjAnalytical * 0.2)),
+      Math.min(1.0, Math.max(0.0, numerical * 0.8 + adjNumerical * 0.2)),
+      Math.min(1.0, Math.max(0.0, verbal * 0.8 + adjVerbal * 0.2)),
+      Math.min(1.0, Math.max(0.0, creative * 0.8 + adjCreative * 0.2)),
+      Math.min(
+        1.0,
+        Math.max(0.0, interpersonal * 0.8 + adjInterpersonal * 0.2),
+      ),
+      Math.min(1.0, Math.max(0.0, structured * 0.8 + adjStructured * 0.2)),
     ];
 
     // 5. ACI percentage (as per GCSE.md Section 4)
-    const totalAci = (agile?.focus ?? 0) + (agile?.courage ?? 0) + (agile?.respect ?? 0) + (agile?.openness ?? 0) + (agile?.commitment ?? 0);
+    const totalAci =
+      (agile?.focus ?? 0) +
+      (agile?.courage ?? 0) +
+      (agile?.respect ?? 0) +
+      (agile?.openness ?? 0) +
+      (agile?.commitment ?? 0);
     const aciPct = Math.min(100, Math.max(0, (totalAci / 125) * 100));
 
     // 6. Subject Matching Engine (GCSE.md Sections 6-8)
-    const rawResults = subjects.map(sub => {
-      const subVector = [sub.analytical, sub.numerical, sub.verbal, sub.creative, sub.interpersonal, sub.structured];
+    const rawResults = subjects.map((sub) => {
+      const subVector = [
+        sub.analytical,
+        sub.numerical,
+        sub.verbal,
+        sub.creative,
+        sub.interpersonal,
+        sub.structured,
+      ];
 
       // DISC-based fitment: dot-product / 6 Ã— 100 (Section 6)
       let dotProduct = 0;
@@ -1573,13 +1607,13 @@ export class SchoolReport extends BaseReport {
       const fAci = aciPct * sub.agile_compatibility;
 
       // Combined fitment (Section 8): wDISC=0.6, wACI=0.4
-      const rawFit = (fDisc * 0.6) + (fAci * 0.4);
+      const rawFit = fDisc * 0.6 + fAci * 0.4;
 
       return {
         ...sub,
         fDisc,
         fAci,
-        rawFit
+        rawFit,
       };
     });
 
@@ -1594,7 +1628,7 @@ export class SchoolReport extends BaseReport {
 
     const results = rawResults.map((sub, idx) => {
       const rankRatio = idx / Math.max(1, n - 1); // 0 for best, 1 for worst
-      const fTotal = TOP_SCORE - (rankRatio * (TOP_SCORE - BOTTOM_SCORE));
+      const fTotal = TOP_SCORE - rankRatio * (TOP_SCORE - BOTTOM_SCORE);
 
       let interpretation = 'Explore';
       if (fTotal >= 82) interpretation = 'Strong Match';
@@ -1602,11 +1636,27 @@ export class SchoolReport extends BaseReport {
       else if (fTotal >= 55) interpretation = 'Worth Considering';
 
       // Identify the student's strongest matching trait for this subject
-      const traitNames = ['Analytical', 'Numerical', 'Verbal', 'Creative', 'Interpersonal', 'Structured'];
+      const traitNames = [
+        'Analytical',
+        'Numerical',
+        'Verbal',
+        'Creative',
+        'Interpersonal',
+        'Structured',
+      ];
       let bestTraitIdx = 0;
       let bestTraitScore = 0;
       for (let i = 0; i < 6; i++) {
-        const contribution = finalVector[i] * [sub.analytical, sub.numerical, sub.verbal, sub.creative, sub.interpersonal, sub.structured][i];
+        const contribution =
+          finalVector[i] *
+          [
+            sub.analytical,
+            sub.numerical,
+            sub.verbal,
+            sub.creative,
+            sub.interpersonal,
+            sub.structured,
+          ][i];
         if (contribution > bestTraitScore) {
           bestTraitScore = contribution;
           bestTraitIdx = i;
@@ -1617,7 +1667,7 @@ export class SchoolReport extends BaseReport {
         ...sub,
         fTotal: Math.round(fTotal),
         interpretation,
-        matchReason: traitNames[bestTraitIdx]
+        matchReason: traitNames[bestTraitIdx],
       };
     });
 
@@ -1635,30 +1685,44 @@ export class SchoolReport extends BaseReport {
     this.h1('Your Academic Strengths Profile');
     // this.doc.moveDown(0.2);
 
-    this.p('Based on your DISC personality assessment and Agile Competency indicators, here is how your natural strengths map across six core academic dimensions. These dimensions determine which subject groups align best with who you are.');
+    this.p(
+      'Based on your DISC personality assessment and Agile Competency indicators, here is how your natural strengths map across six core academic dimensions. These dimensions determine which subject groups align best with who you are.',
+    );
     this.doc.moveDown(0.3);
 
     // Retrieve the final student vector for display
-    const topTwo = this.getTopTwoTraits(this.data.most_answered_answer_type, this.data);
+    const topTwo = this.getTopTwoTraits(
+      this.data.most_answered_answer_type,
+      this.data,
+    );
     const traitCode = topTwo[0] + topTwo[1];
     const bv = this.getGCSEDiscTraits(traitCode);
 
-    const traitLabels = ['Analytical', 'Numerical', 'Verbal', 'Creative', 'Interpersonal', 'Structured'];
+    const traitLabels = [
+      'Analytical',
+      'Numerical',
+      'Verbal',
+      'Creative',
+      'Interpersonal',
+      'Structured',
+    ];
     const traitDescriptions: Record<string, string> = {
-      'Analytical': 'Logical thinking & problem-solving',
-      'Numerical': 'Comfort with numbers & data',
-      'Verbal': 'Expression through reading & writing',
-      'Creative': 'Imagination, design & original ideas',
-      'Interpersonal': 'Teamwork, empathy & communication',
-      'Structured': 'Planning, discipline & adherence to rules'
+      Analytical: 'Logical thinking & problem-solving',
+      Numerical: 'Comfort with numbers & data',
+      Verbal: 'Expression through reading & writing',
+      Creative: 'Imagination, design & original ideas',
+      Interpersonal: 'Teamwork, empathy & communication',
+      Structured: 'Planning, discipline & adherence to rules',
     };
 
     // Sort traits by value descending for display
-    const traitData = traitLabels.map((label, i) => ({
-      label,
-      value: Math.round(bv[i] * 100),
-      desc: traitDescriptions[label]
-    })).sort((a, b) => b.value - a.value);
+    const traitData = traitLabels
+      .map((label, i) => ({
+        label,
+        value: Math.round(bv[i] * 100),
+        desc: traitDescriptions[label],
+      }))
+      .sort((a, b) => b.value - a.value);
 
     // Draw horizontal trait bars
     const barMaxW = 220;
@@ -1670,26 +1734,48 @@ export class SchoolReport extends BaseReport {
       this.ensureSpace(30);
       yPos = this.doc.y; // sync after possible page break
       // Trait label
-      this.doc.font(this.FONT_SORA_BOLD).fontSize(10).fillColor(this.COLOR_DEEP_BLUE)
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(10)
+        .fillColor(this.COLOR_DEEP_BLUE)
         .text(trait.label, margin, yPos, { width: labelW });
 
       // Background bar
-      this.doc.roundedRect(margin + labelW + 5, yPos + 1, barMaxW, 12, 6)
-        .fillColor('#EEEEEE').fill();
+      this.doc
+        .roundedRect(margin + labelW + 5, yPos + 1, barMaxW, 12, 6)
+        .fillColor('#EEEEEE')
+        .fill();
 
       // Filled bar with gradient color depending on value
       const fillW = (trait.value / 100) * barMaxW;
-      const barColor = trait.value >= 70 ? '#150089' : trait.value >= 50 ? '#4A3ABA' : '#8B7FD4';
-      this.doc.roundedRect(margin + labelW + 5, yPos + 1, fillW, 12, 6)
-        .fillColor(barColor).fill();
+      const barColor =
+        trait.value >= 70
+          ? '#150089'
+          : trait.value >= 50
+            ? '#4A3ABA'
+            : '#8B7FD4';
+      this.doc
+        .roundedRect(margin + labelW + 5, yPos + 1, fillW, 12, 6)
+        .fillColor(barColor)
+        .fill();
 
       // Value percentage
-      this.doc.font(this.FONT_SORA_BOLD).fontSize(9).fillColor('#333333')
-        .text(`${trait.value}%`, margin + labelW + barMaxW + 12, yPos + 1, { width: 35 });
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(9)
+        .fillColor('#333333')
+        .text(`${trait.value}%`, margin + labelW + barMaxW + 12, yPos + 1, {
+          width: 35,
+        });
 
       // Description
-      this.doc.font(this.FONT_REGULAR).fontSize(8).fillColor('#777777')
-        .text(trait.desc, margin + labelW + barMaxW + 50, yPos + 2, { width: descW });
+      this.doc
+        .font(this.FONT_REGULAR)
+        .fontSize(8)
+        .fillColor('#777777')
+        .text(trait.desc, margin + labelW + barMaxW + 50, yPos + 2, {
+          width: descW,
+        });
 
       yPos += 22;
       this.doc.y = yPos;
@@ -1700,7 +1786,10 @@ export class SchoolReport extends BaseReport {
     // Highlight summary
     const top2Traits = traitData.slice(0, 2);
     this.doc.x = margin;
-    this.pHtml(`Your academic strengths are <b>${top2Traits[0].label}</b> and <b>${top2Traits[1].label}</b>. Subjects that rely heavily on these dimensions will naturally align with your learning style.`, { width: pageW });
+    this.pHtml(
+      `Your academic strengths are <b>${top2Traits[0].label}</b> and <b>${top2Traits[1].label}</b>. Subjects that rely heavily on these dimensions will naturally align with your learning style.`,
+      { width: pageW },
+    );
 
     // this.doc.y += this.DEFAULT_GAP;
   }
@@ -1728,14 +1817,19 @@ export class SchoolReport extends BaseReport {
     this.doc.font(this.FONT_REGULAR).fontSize(9);
     const descH = this.doc.heightOfString(opt.desc, { width: pageW - 30 });
     this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(8);
-    const structH = this.doc.heightOfString(opt.structure, { width: pageW - 30 });
+    const structH = this.doc.heightOfString(opt.structure, {
+      width: pageW - 30,
+    });
     const cardH = 12 + 18 + 4 + descH + 6 + structH + 10;
 
     this.ensureSpace(cardH + 8);
     const cy = this.doc.y;
 
     // Card background
-    this.doc.roundedRect(margin, cy, pageW, cardH, 8).fillColor('#FAFAFA').fill();
+    this.doc
+      .roundedRect(margin, cy, pageW, cardH, 8)
+      .fillColor('#FAFAFA')
+      .fill();
 
     // Left accent bar — clipped inside the card's rounded boundary
     this.doc.save();
@@ -1744,28 +1838,44 @@ export class SchoolReport extends BaseReport {
     this.doc.restore();
 
     // Card border (drawn after accent bar so it sits on top)
-    this.doc.roundedRect(margin, cy, pageW, cardH, 8).lineWidth(1).strokeColor(opt.accent).stroke();
+    this.doc
+      .roundedRect(margin, cy, pageW, cardH, 8)
+      .lineWidth(1)
+      .strokeColor(opt.accent)
+      .stroke();
 
     // Icon
     const iconPath = `${iconBasePath}/${opt.iconFile}`;
-    try { this.doc.image(iconPath, margin + 15, cy + 14, { width: 18, height: 18 }); } catch (e) { /* skip */ }
+    try {
+      this.doc.image(iconPath, margin + 15, cy + 14, { width: 18, height: 18 });
+    } catch (e) {
+      /* skip */
+    }
 
     // Title (h3-level styling, inside card)
-    this.doc.font(this.FONT_SORA_BOLD).fontSize(12).fillColor(opt.accent)
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(12)
+      .fillColor(opt.accent)
       .text(opt.title, margin + 40, cy + 14, { width: pageW - 55 });
 
     // Description
-    this.doc.font(this.FONT_REGULAR).fontSize(9).fillColor('#444444')
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(9)
+      .fillColor('#444444')
       .text(opt.desc, margin + 15, cy + 36, { width: pageW - 30 });
 
     // Structure line
     const structY = cy + 36 + descH + 6;
-    this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(8).fillColor(opt.accent)
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(8)
+      .fillColor(opt.accent)
       .text(opt.structure, margin + 15, structY, { width: pageW - 30 });
 
     this.doc.y = cy + cardH + 8;
   }
-
 
   // SECTION 3: AS & A LEVEL RECOMMENDATIONS
   // Top 5 with detail, rest as name-only list
@@ -1779,13 +1889,17 @@ export class SchoolReport extends BaseReport {
     this.h1(GCSE_PATHWAY_CONTENT.as_rec_title, { color: 'black' });
 
     // AS Pathway Card rendered under title
-    this.renderPathwayCard({
-      title: 'International AS & A-Levels',
-      desc: GCSE_PATHWAY_CONTENT.as_desc,
-      structure: GCSE_PATHWAY_CONTENT.as_structure,
-      iconFile: 'grade.png',
-      accent: '#1565C0'
-    }, margin, pageW);
+    this.renderPathwayCard(
+      {
+        title: 'International AS & A-Levels',
+        desc: GCSE_PATHWAY_CONTENT.as_desc,
+        structure: GCSE_PATHWAY_CONTENT.as_structure,
+        iconFile: 'grade.png',
+        accent: '#1565C0',
+      },
+      margin,
+      pageW,
+    );
     this.doc.moveDown(0.2);
 
     this.p(GCSE_PATHWAY_CONTENT.as_rec_intro);
@@ -1801,9 +1915,9 @@ export class SchoolReport extends BaseReport {
 
     // Sort groups alphabetically, subjects within each group by score desc
     const sortedGroups = Object.keys(groupMap)
-      .map(g => ({
+      .map((g) => ({
         name: g,
-        subjects: groupMap[g].sort((a: any, b: any) => b.fTotal - a.fTotal)
+        subjects: groupMap[g].sort((a: any, b: any) => b.fTotal - a.fTotal),
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -1825,20 +1939,28 @@ export class SchoolReport extends BaseReport {
       const rest = grp.subjects.slice(5);
       if (rest.length > 0) {
         this.doc.moveDown(0.2);
-        this.ensureSpace(0.10, true);
+        this.ensureSpace(0.1, true);
         this.pHtml(`${GCSE_PATHWAY_CONTENT.aice_group_others}`, { gap: 4 });
-        this.renderGroupRemainingSubjects(rest, margin, pageW, tickThreshold, 6);
+        this.renderGroupRemainingSubjects(
+          rest,
+          margin,
+          pageW,
+          tickThreshold,
+          6,
+        );
       }
 
       this.doc.moveDown(0.2);
     }
   }
 
-
   // SECTION 4: AICE DIPLOMA RECOMMENDATIONS
   // Per-group: top 5 detailed + remaining as names
 
-  private generateGCSEAICERecommendations(aiceFitments: any[], hasAICE: boolean): void {
+  private generateGCSEAICERecommendations(
+    aiceFitments: any[],
+    hasAICE: boolean,
+  ): void {
     this._useStdMargins = true;
     const margin = this.MARGIN_STD;
     const pageW = this.PAGE_WIDTH - 2 * margin;
@@ -1847,13 +1969,17 @@ export class SchoolReport extends BaseReport {
     this.h1(GCSE_PATHWAY_CONTENT.aice_rec_title, { color: 'black' });
 
     // AICE Pathway Card rendered under title
-    this.renderPathwayCard({
-      title: GCSE_PATHWAY_CONTENT.diploma_title,
-      desc: GCSE_PATHWAY_CONTENT.diploma_desc,
-      structure: GCSE_PATHWAY_CONTENT.diploma_structure,
-      iconFile: 'diploma.png',
-      accent: '#7B1FA2'
-    }, margin, pageW);
+    this.renderPathwayCard(
+      {
+        title: GCSE_PATHWAY_CONTENT.diploma_title,
+        desc: GCSE_PATHWAY_CONTENT.diploma_desc,
+        structure: GCSE_PATHWAY_CONTENT.diploma_structure,
+        iconFile: 'diploma.png',
+        accent: '#7B1FA2',
+      },
+      margin,
+      pageW,
+    );
     this.doc.moveDown(0.2);
 
     this.p(GCSE_PATHWAY_CONTENT.aice_rec_intro);
@@ -1862,10 +1988,25 @@ export class SchoolReport extends BaseReport {
     if (!hasAICE) {
       this.ensureSpace(50);
       const phY = this.doc.y;
-      this.doc.roundedRect(margin, phY, pageW, 40, 6).fillColor('#FFF8E1').fill();
-      this.doc.roundedRect(margin, phY, pageW, 40, 6).lineWidth(0.5).strokeColor('#FFD54F').stroke();
-      this.doc.font(this.FONT_REGULAR).fontSize(9).fillColor('#795548')
-        .text('AICE Diploma subject data is being prepared.', margin + 12, phY + 10, { width: pageW - 24 });
+      this.doc
+        .roundedRect(margin, phY, pageW, 40, 6)
+        .fillColor('#FFF8E1')
+        .fill();
+      this.doc
+        .roundedRect(margin, phY, pageW, 40, 6)
+        .lineWidth(0.5)
+        .strokeColor('#FFD54F')
+        .stroke();
+      this.doc
+        .font(this.FONT_REGULAR)
+        .fontSize(9)
+        .fillColor('#795548')
+        .text(
+          'AICE Diploma subject data is being prepared.',
+          margin + 12,
+          phY + 10,
+          { width: pageW - 24 },
+        );
       this.doc.y = phY + 50;
       return;
     }
@@ -1879,9 +2020,9 @@ export class SchoolReport extends BaseReport {
 
     // Sort each group internally by score, sort groups sequentially by name (Group 1, Group 2, etc)
     const sortedGroups = Object.keys(groupMap)
-      .map(g => ({
+      .map((g) => ({
         name: g,
-        subjects: groupMap[g].sort((a: any, b: any) => b.fTotal - a.fTotal)
+        subjects: groupMap[g].sort((a: any, b: any) => b.fTotal - a.fTotal),
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -1909,19 +2050,29 @@ export class SchoolReport extends BaseReport {
       const rest = grp.subjects.slice(5);
       if (rest.length > 0) {
         this.doc.moveDown(0.2);
-        this.ensureSpace(0.10, true);
+        this.ensureSpace(0.1, true);
         this.pHtml(`${GCSE_PATHWAY_CONTENT.aice_group_others}`, { gap: 4 });
-        this.renderGroupRemainingSubjects(rest, margin, pageW, tickThreshold, 6);
+        this.renderGroupRemainingSubjects(
+          rest,
+          margin,
+          pageW,
+          tickThreshold,
+          6,
+        );
       }
 
       this.doc.moveDown(0.2);
     }
   }
 
-
   // HELPER: Render top N subjects with progress bars and green tick
 
-  private renderGroupTopSubjects(subjects: any[], margin: number, pageW: number, tickThreshold: number): void {
+  private renderGroupTopSubjects(
+    subjects: any[],
+    margin: number,
+    pageW: number,
+    tickThreshold: number,
+  ): void {
     const tickIconPath = 'public/assets/images/school/greentick.png';
     const yellowTickIconPath = 'public/assets/images/school/yellowtick.png';
 
@@ -1939,8 +2090,12 @@ export class SchoolReport extends BaseReport {
     const colRank = margin;
 
     // Count consecutive ticked subjects from the top
-    const tickedCount = subjects.filter(s => s.fTotal >= tickThreshold).length;
-    const greenTickedCount = subjects.filter(s => s.fTotal >= tickThreshold && s.fTotal >= 60).length;
+    const tickedCount = subjects.filter(
+      (s) => s.fTotal >= tickThreshold,
+    ).length;
+    const greenTickedCount = subjects.filter(
+      (s) => s.fTotal >= tickThreshold && s.fTotal >= 60,
+    ).length;
     const yellowTickedCount = tickedCount - greenTickedCount;
     const tickedTotalH = tickedCount * (rowH + 2); // +2 for the row gap
 
@@ -1952,14 +2107,38 @@ export class SchoolReport extends BaseReport {
     // Draw the continuous highlight container with split colors
     if (tickedCount > 0) {
       this.doc.save();
-      this.doc.roundedRect(margin - 4, blockStartY - 4, pageW + 8, tickedTotalH + 2, 4).clip();
+      this.doc
+        .roundedRect(
+          margin - 4,
+          blockStartY - 4,
+          pageW + 8,
+          tickedTotalH + 2,
+          4,
+        )
+        .clip();
 
       const greenH = greenTickedCount * (rowH + 2);
       if (greenTickedCount > 0) {
-        this.doc.rect(margin - 4, blockStartY - 4, pageW + 8, greenH + (yellowTickedCount === 0 ? 2 : 0)).fillColor('#E4F9ED').fill();
+        this.doc
+          .rect(
+            margin - 4,
+            blockStartY - 4,
+            pageW + 8,
+            greenH + (yellowTickedCount === 0 ? 2 : 0),
+          )
+          .fillColor('#E4F9ED')
+          .fill();
       }
       if (yellowTickedCount > 0) {
-        this.doc.rect(margin - 4, blockStartY - 4 + greenH, pageW + 8, tickedTotalH + 2 - greenH).fillColor('#FFF9E6').fill();
+        this.doc
+          .rect(
+            margin - 4,
+            blockStartY - 4 + greenH,
+            pageW + 8,
+            tickedTotalH + 2 - greenH,
+          )
+          .fillColor('#FFF9E6')
+          .fill();
       }
       this.doc.restore();
     }
@@ -1980,12 +2159,17 @@ export class SchoolReport extends BaseReport {
       if (isYellowTicked) rankColor = '#D4BA6A';
       this.doc.font(this.FONT_SORA_BOLD).fontSize(12).fillColor(rankColor);
       const rankH = this.doc.heightOfString(`${idx + 1}`, { width: rankW });
-      this.doc.text(`${idx + 1}`, colRank, sy + midY - rankH / 2, { width: rankW, align: 'center' });
+      this.doc.text(`${idx + 1}`, colRank, sy + midY - rankH / 2, {
+        width: rankW,
+        align: 'center',
+      });
 
       // Subject name
       this.doc.font(this.FONT_SORA_BOLD).fontSize(9.5).fillColor('#222222');
       const nameH = this.doc.heightOfString(sub.name, { width: colNameW });
-      this.doc.text(sub.name, colName, sy + midY - nameH / 2, { width: colNameW });
+      this.doc.text(sub.name, colName, sy + midY - nameH / 2, {
+        width: colNameW,
+      });
 
       // Green or Yellow tick after subject name (if applicable)
       if (showTick) {
@@ -1993,7 +2177,14 @@ export class SchoolReport extends BaseReport {
         const nameTextW = this.doc.widthOfString(sub.name);
         const tickX = colName + nameTextW + 4;
         const tickSize = 10;
-        try { this.doc.image(iconPath, tickX, sy + midY - tickSize / 2, { width: tickSize, height: tickSize }); } catch (e) { /* skip */ }
+        try {
+          this.doc.image(iconPath, tickX, sy + midY - tickSize / 2, {
+            width: tickSize,
+            height: tickSize,
+          });
+        } catch (e) {
+          /* skip */
+        }
       }
 
       // Score bar — scaled from 30% to 100% for better visual differentiation
@@ -2001,32 +2192,44 @@ export class SchoolReport extends BaseReport {
       const barY = sy + midY - barH / 2;
       const scaledPct = Math.max(0, (sub.fTotal - 30) / 70);
       const normalizedW = Math.max(4, scaledPct * barW);
-      const barColor = sub.fTotal >= 80 ? '#150089' : sub.fTotal >= 65 ? '#4A3ABA' : '#8B7FD4';
+      const barColor =
+        sub.fTotal >= 80 ? '#150089' : sub.fTotal >= 65 ? '#4A3ABA' : '#8B7FD4';
 
       let barBgColor = '#EEEEEE';
       if (isGreenTicked) barBgColor = '#D6EFE0';
       if (isYellowTicked) barBgColor = '#F4EBD0';
-      this.doc.roundedRect(colBar, barY, barW, barH, 4).fillColor(barBgColor).fill();
-      this.doc.roundedRect(colBar, barY, normalizedW, barH, 4).fillColor(barColor).fill();
+      this.doc
+        .roundedRect(colBar, barY, barW, barH, 4)
+        .fillColor(barBgColor)
+        .fill();
+      this.doc
+        .roundedRect(colBar, barY, normalizedW, barH, 4)
+        .fillColor(barColor)
+        .fill();
 
       // Percentage
       this.doc.font(this.FONT_SORA_BOLD).fontSize(9).fillColor('#333333');
       const pctH = this.doc.heightOfString(`${sub.fTotal}%`, { width: pctW });
-      this.doc.text(`${sub.fTotal}%`, colPct, sy + midY - pctH / 2, { width: pctW });
+      this.doc.text(`${sub.fTotal}%`, colPct, sy + midY - pctH / 2, {
+        width: pctW,
+      });
 
       // Row divider
       if (idx < subjects.length - 1) {
         let divColor = '#EEEEEE';
         if (isGreenTicked) divColor = '#C8E6C9';
         if (isYellowTicked) divColor = '#EFE4B0';
-        this.doc.moveTo(margin, sy + rowH).lineTo(margin + pageW, sy + rowH)
-          .lineWidth(0.3).strokeColor(divColor).stroke();
+        this.doc
+          .moveTo(margin, sy + rowH)
+          .lineTo(margin + pageW, sy + rowH)
+          .lineWidth(0.3)
+          .strokeColor(divColor)
+          .stroke();
       }
     }
 
     this.doc.y = blockStartY + totalH + 4;
   }
-
 
   // HELPER: Compute green tick threshold from the top 5 subjects in a group
   // threshold = min + (range * 0.90) where range = max - min of top 5
@@ -2037,16 +2240,21 @@ export class SchoolReport extends BaseReport {
     const maxScore = top5[0].fTotal;
     const minScore = top5[top5.length - 1].fTotal;
     const range = maxScore - minScore;
-    return minScore + (range * 0.90);
+    return minScore + range * 0.9;
   }
-
 
   // HELPER: Render remaining subjects in 2-column layout
   // Format: numbering | subject name [tick] | percentage (no progress bars)
   // Green tick for subjects >= threshold, placed after subject name
   // Dynamic row heights based on text wrapping
 
-  private renderGroupRemainingSubjects(subjects: any[], margin: number, pageW: number, tickThreshold: number, startIdx: number): void {
+  private renderGroupRemainingSubjects(
+    subjects: any[],
+    margin: number,
+    pageW: number,
+    tickThreshold: number,
+    startIdx: number,
+  ): void {
     if (!subjects || subjects.length === 0) return;
 
     const tickIconPath = 'public/assets/images/school/greentick.png';
@@ -2067,7 +2275,10 @@ export class SchoolReport extends BaseReport {
     const rowsPerCol = Math.ceil(subjects.length / colCount);
     const cols: any[][] = [[], []];
     for (let i = 0; i < subjects.length; i++) {
-      cols[Math.floor(i / rowsPerCol)].push({ ...subjects[i], globalIdx: startIdx + i });
+      cols[Math.floor(i / rowsPerCol)].push({
+        ...subjects[i],
+        globalIdx: startIdx + i,
+      });
     }
 
     // Pre-calculate per-row heights based on text wrapping
@@ -2075,7 +2286,9 @@ export class SchoolReport extends BaseReport {
     const rowHeights: number[][] = [[], []];
     for (let c = 0; c < colCount; c++) {
       for (let r = 0; r < cols[c].length; r++) {
-        const textH = this.doc.heightOfString(cols[c][r].name, { width: nameW });
+        const textH = this.doc.heightOfString(cols[c][r].name, {
+          width: nameW,
+        });
         rowHeights[c].push(Math.max(20, textH + rowPad * 2));
       }
     }
@@ -2105,14 +2318,21 @@ export class SchoolReport extends BaseReport {
 
         // Numbering
         this.doc.font(this.FONT_SORA_BOLD).fontSize(12).fillColor('#CCCCCC');
-        const numH = this.doc.heightOfString(`${sub.globalIdx}`, { width: numW });
-        this.doc.text(`${sub.globalIdx}`, colX, curY + midY - numH / 2, { width: numW, align: 'center' });
+        const numH = this.doc.heightOfString(`${sub.globalIdx}`, {
+          width: numW,
+        });
+        this.doc.text(`${sub.globalIdx}`, colX, curY + midY - numH / 2, {
+          width: numW,
+          align: 'center',
+        });
 
         // Subject name — vertically centered within the row
         this.doc.font(this.FONT_SORA_BOLD).fontSize(9.5).fillColor('#222222');
         const textH = this.doc.heightOfString(sub.name, { width: nameW });
         const nameY = curY + midY - textH / 2;
-        this.doc.text(sub.name, colX + numW + innerGap, nameY, { width: nameW });
+        this.doc.text(sub.name, colX + numW + innerGap, nameY, {
+          width: nameW,
+        });
 
         // Green or Yellow tick after subject name (if applicable)
         if (showTick) {
@@ -2122,18 +2342,37 @@ export class SchoolReport extends BaseReport {
           const tickSize = 9;
           if (singleLine) {
             const tickX = colX + numW + innerGap + nameTextW + 3;
-            try { this.doc.image(iconPath, tickX, curY + midY - tickSize / 2, { width: tickSize, height: tickSize }); } catch (e) { /* skip */ }
+            try {
+              this.doc.image(iconPath, tickX, curY + midY - tickSize / 2, {
+                width: tickSize,
+                height: tickSize,
+              });
+            } catch (e) {
+              /* skip */
+            }
           } else {
             // Multi-line: place tick at right edge of name column, vertically centered
             const tickX = colX + numW + innerGap + nameW + 2;
-            try { this.doc.image(iconPath, tickX, curY + midY - tickSize / 2, { width: tickSize, height: tickSize }); } catch (e) { /* skip */ }
+            try {
+              this.doc.image(iconPath, tickX, curY + midY - tickSize / 2, {
+                width: tickSize,
+                height: tickSize,
+              });
+            } catch (e) {
+              /* skip */
+            }
           }
         }
 
         // Percentage
         this.doc.font(this.FONT_SORA_BOLD).fontSize(9).fillColor('#333333');
         const pctH = this.doc.heightOfString(`${sub.fTotal}%`, { width: pctW });
-        this.doc.text(`${sub.fTotal}%`, colX + colW - pctW, curY + midY - pctH / 2, { width: pctW, align: 'right' });
+        this.doc.text(
+          `${sub.fTotal}%`,
+          colX + colW - pctW,
+          curY + midY - pctH / 2,
+          { width: pctW, align: 'right' },
+        );
 
         curY += rH;
       }
@@ -2142,22 +2381,31 @@ export class SchoolReport extends BaseReport {
     // Vertical divider between columns
     if (cols[1].length > 0) {
       const divX = margin + colW + colGap / 2;
-      this.doc.moveTo(divX, startY + 2).lineTo(divX, startY + totalH - 4)
-        .lineWidth(0.5).strokeColor('#F0F0F0').stroke();
+      this.doc
+        .moveTo(divX, startY + 2)
+        .lineTo(divX, startY + totalH - 4)
+        .lineWidth(0.5)
+        .strokeColor('#F0F0F0')
+        .stroke();
     }
 
     this.doc.y = startY + totalH + 6;
   }
-
 
   /**
    * Renders a special card for the AICE Diploma Languages group (Group 2).
    * No scores or rankings - just a personal interest message and a list of
    * available language subjects.
    */
-  private renderLanguagesGroupCard(subjects: any[], margin: number, pageW: number): void {
+  private renderLanguagesGroupCard(
+    subjects: any[],
+    margin: number,
+    pageW: number,
+  ): void {
     // Sort language subject names A-Z
-    const subjectNames = subjects.map((s: any) => s.name).sort((a: string, b: string) => a.localeCompare(b));
+    const subjectNames = subjects
+      .map((s: any) => s.name)
+      .sort((a: string, b: string) => a.localeCompare(b));
 
     this.ensureSpace(0.3, true);
 
@@ -2170,11 +2418,19 @@ export class SchoolReport extends BaseReport {
     const pad = 15; // horizontal padding inside card
 
     this.doc.font(this.FONT_SORA_BOLD).fontSize(10);
-    const titleH = this.doc.heightOfString(GCSE_PATHWAY_CONTENT.languages_note_title, { width: innerW });
+    const titleH = this.doc.heightOfString(
+      GCSE_PATHWAY_CONTENT.languages_note_title,
+      { width: innerW },
+    );
     this.doc.font(this.FONT_REGULAR).fontSize(9);
-    const noteH = this.doc.heightOfString(GCSE_PATHWAY_CONTENT.languages_note, { width: innerW });
+    const noteH = this.doc.heightOfString(GCSE_PATHWAY_CONTENT.languages_note, {
+      width: innerW,
+    });
     this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(8);
-    const introH = this.doc.heightOfString(GCSE_PATHWAY_CONTENT.languages_subjects_intro, { width: innerW });
+    const introH = this.doc.heightOfString(
+      GCSE_PATHWAY_CONTENT.languages_subjects_intro,
+      { width: innerW },
+    );
 
     // Split subjects into 3 columns
     const colCount = 3;
@@ -2193,7 +2449,9 @@ export class SchoolReport extends BaseReport {
     for (let c = 0; c < colCount; c++) {
       let colH = 0;
       for (let r = 0; r < cols[c].length; r++) {
-        const itemH = this.doc.heightOfString(`\u2022  ${cols[c][r]}`, { width: colW });
+        const itemH = this.doc.heightOfString(`\u2022  ${cols[c][r]}`, {
+          width: colW,
+        });
         colH += itemH + 6;
       }
       if (colH > maxColH) maxColH = colH;
@@ -2209,22 +2467,41 @@ export class SchoolReport extends BaseReport {
     const grad = this.doc.linearGradient(margin, cardY, margin + pageW, cardY);
     grad.stop(0, '#FFF8E1').stop(1, '#FFF3E0');
     this.doc.roundedRect(margin, cardY, pageW, cardH, 8).fill(grad);
-    this.doc.roundedRect(margin, cardY, pageW, cardH, 8).lineWidth(0.5).strokeColor('#FFD54F').stroke();
+    this.doc
+      .roundedRect(margin, cardY, pageW, cardH, 8)
+      .lineWidth(0.5)
+      .strokeColor('#FFD54F')
+      .stroke();
 
     // Note title
     let curY = cardY + 12;
-    this.doc.font(this.FONT_SORA_BOLD).fontSize(10).fillColor('#E65100')
-      .text(GCSE_PATHWAY_CONTENT.languages_note_title, margin + pad, curY, { width: innerW });
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(10)
+      .fillColor('#E65100')
+      .text(GCSE_PATHWAY_CONTENT.languages_note_title, margin + pad, curY, {
+        width: innerW,
+      });
     curY += titleH + 6;
 
     // Note message
-    this.doc.font(this.FONT_REGULAR).fontSize(9).fillColor('#5D4037')
-      .text(GCSE_PATHWAY_CONTENT.languages_note, margin + pad, curY, { width: innerW });
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(9)
+      .fillColor('#5D4037')
+      .text(GCSE_PATHWAY_CONTENT.languages_note, margin + pad, curY, {
+        width: innerW,
+      });
     curY += noteH + 8;
 
     // Available subjects intro
-    this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(8).fillColor('#795548')
-      .text(GCSE_PATHWAY_CONTENT.languages_subjects_intro, margin + pad, curY, { width: innerW });
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(8)
+      .fillColor('#795548')
+      .text(GCSE_PATHWAY_CONTENT.languages_subjects_intro, margin + pad, curY, {
+        width: innerW,
+      });
     curY += introH + 8;
 
     // 3-column dynamic subject list
@@ -2244,13 +2521,16 @@ export class SchoolReport extends BaseReport {
     // Vertical column dividers
     for (let c = 1; c < colCount; c++) {
       const divX = margin + pad + c * (colW + colGap) - colGap / 2;
-      this.doc.moveTo(divX, listStartY - 2).lineTo(divX, listStartY + maxColH - 2)
-        .lineWidth(0.5).strokeColor('#E0C8A0').stroke();
+      this.doc
+        .moveTo(divX, listStartY - 2)
+        .lineTo(divX, listStartY + maxColH - 2)
+        .lineWidth(0.5)
+        .strokeColor('#E0C8A0')
+        .stroke();
     }
 
     this.doc.y = cardY + cardH + 10;
   }
-
 
   // SECTION 4: YOUR PERSONALISED ACADEMIC JOURNEY
   // A student-centric narrative journey with milestones
@@ -2282,29 +2562,29 @@ export class SchoolReport extends BaseReport {
         phase: 'Now',
         title: 'IGCSE Foundation',
         desc: 'You are here. Focus on building a strong foundation across all your subjects. Pay special attention to subjects that align with your strengths.',
-        color: '#19D36A'
+        color: '#19D36A',
       },
       {
         phase: 'Next Step',
         title: 'Choose Your Pathway & Subjects',
         desc: `Whether you opt for the AICE Diploma or Specialized AS & A Levels, consider starting with: ${names}. These subjects align most naturally with your behavioural strengths and learning style.`,
-        color: '#1565C0'
+        color: '#1565C0',
       },
       {
         phase: 'Building Up',
         title: 'Deepen Your Specialization',
         desc: `Continue your strongest AS subjects into full A Levels. Whether through AICE Diploma breadth or focused specialization, this is where you demonstrate mastery and build a portfolio that stands out for university applications.`,
-        color: '#150089'
+        color: '#150089',
       },
       {
         phase: 'Your Goal',
         title: 'University & Beyond',
         desc: `With a strong A-Level foundation in ${topGroup}, you will be well-positioned for competitive degree programmes. Your natural ${topSub.matchReason.toLowerCase()} strength gives you an edge in this field.`,
-        color: '#7B1FA2'
-      }
+        color: '#7B1FA2',
+      },
     ];
 
-    let y = this.doc.y;
+    const y = this.doc.y;
 
     for (let i = 0; i < milestones.length; i++) {
       const m = milestones[i];
@@ -2321,25 +2601,44 @@ export class SchoolReport extends BaseReport {
       // Timeline connector (starts at bottom of this circle, ends at top of next circle)
       if (i < milestones.length - 1) {
         const lineEndY = my + itemContentH + nextGap + 2;
-        this.doc.moveTo(margin + 18, my + 22).lineTo(margin + 18, lineEndY)
-          .lineWidth(2).strokeColor('#E0E0E0').stroke();
+        this.doc
+          .moveTo(margin + 18, my + 22)
+          .lineTo(margin + 18, lineEndY)
+          .lineWidth(2)
+          .strokeColor('#E0E0E0')
+          .stroke();
       }
 
       // Phase circle
-      this.doc.circle(margin + 18, my + 12, 10).fillColor(m.color).fill();
-      this.doc.font(this.FONT_SORA_BOLD).fontSize(7).fillColor('#FFFFFF')
+      this.doc
+        .circle(margin + 18, my + 12, 10)
+        .fillColor(m.color)
+        .fill();
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(7)
+        .fillColor('#FFFFFF')
         .text(`${i + 1}`, margin + 13, my + 8, { width: 10, align: 'center' });
 
       // Phase label
-      this.doc.font(this.FONT_SORA_BOLD).fontSize(9).fillColor(m.color)
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(9)
+        .fillColor(m.color)
         .text(m.phase.toUpperCase(), margin + 38, my + 2, { width: 80 });
 
       // Title
-      this.doc.font(this.FONT_SORA_BOLD).fontSize(13).fillColor('#222222')
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(13)
+        .fillColor('#222222')
         .text(m.title, margin + 38, my + 14, { width: pageW - 55 });
 
       // Description
-      this.doc.font(this.FONT_REGULAR).fontSize(10).fillColor('#555555')
+      this.doc
+        .font(this.FONT_REGULAR)
+        .fontSize(10)
+        .fillColor('#555555')
         .text(m.desc, margin + 38, my + 30, { width: pageW - 55 });
 
       this.doc.y = my + itemContentH + nextGap;
@@ -2532,9 +2831,9 @@ export class SchoolReport extends BaseReport {
     this.doc.font(this.FONT_SORA_REGULAR).fontSize(10);
     const subtitleH = streamFullTitle
       ? this.doc.heightOfString(streamFullTitle, {
-        width: textAreaW,
-        align: 'center',
-      })
+          width: textAreaW,
+          align: 'center',
+        })
       : 0;
     // Compatibility row height: label + bar + percent text inline
     const compatRowH = 18; // fixed height for the bar row
@@ -3353,10 +3652,10 @@ export class SchoolReport extends BaseReport {
   private generateACI(): void {
     const contentBlock =
       ACI[
-      this.getTopTwoTraits(
-        this.data.most_answered_answer_type,
-        this.data,
-      ).join('')
+        this.getTopTwoTraits(
+          this.data.most_answered_answer_type,
+          this.data,
+        ).join('')
       ];
     const agileSum =
       this.data.agile_scores[0].commitment +
@@ -5347,10 +5646,26 @@ export class SchoolReport extends BaseReport {
     const C = this.data.score_C;
 
     const fits = [
-      { label: 'Engineering & Technology', score: Math.round((C + nFocus) / 2), color: '' },
-      { label: 'Management & Leadership', score: Math.round((D + nCourage) / 2), color: '' },
-      { label: 'Creative & Design', score: Math.round((I + nOpenness) / 2), color: '' },
-      { label: 'People & HR', score: Math.round((S + nRespect) / 2), color: '' },
+      {
+        label: 'Engineering & Technology',
+        score: Math.round((C + nFocus) / 2),
+        color: '',
+      },
+      {
+        label: 'Management & Leadership',
+        score: Math.round((D + nCourage) / 2),
+        color: '',
+      },
+      {
+        label: 'Creative & Design',
+        score: Math.round((I + nOpenness) / 2),
+        color: '',
+      },
+      {
+        label: 'People & HR',
+        score: Math.round((S + nRespect) / 2),
+        color: '',
+      },
     ];
 
     // --- Sort high â†’ low ---
@@ -5390,7 +5705,10 @@ export class SchoolReport extends BaseReport {
         : Math.max(6, Math.min(12, Math.floor(totalW / (itemCount * 10))));
     const cellW = (totalW - gap * Math.max(0, itemCount - 1)) / itemCount;
     const ringRadius = Math.max(16, Math.min(30, Math.floor(cellW * 0.24)));
-    const ringThickness = Math.max(5, Math.min(9, Math.floor(ringRadius * 0.28)));
+    const ringThickness = Math.max(
+      5,
+      Math.min(9, Math.floor(ringRadius * 0.28)),
+    );
     const labelFontSize = cellW < 92 ? 7 : 8.5;
     const scoreFontSize = ringRadius >= 24 ? 11 : 9;
     const labelGap = 8;
@@ -5439,10 +5757,15 @@ export class SchoolReport extends BaseReport {
         .font(this.FONT_SORA_SEMIBOLD)
         .fontSize(labelFontSize)
         .fillColor(CI_COLORS.DARK_TEXT)
-        .text(item.label, cellX + (cellW - labelW) / 2, startY + ringRadius * 2 + labelGap, {
-          width: labelW,
-          align: 'center',
-        });
+        .text(
+          item.label,
+          cellX + (cellW - labelW) / 2,
+          startY + ringRadius * 2 + labelGap,
+          {
+            width: labelW,
+            align: 'center',
+          },
+        );
     });
 
     this.doc.y = startY + totalH;
@@ -5517,40 +5840,40 @@ export class SchoolReport extends BaseReport {
     });
 
     const styleTitles: Record<string, { title: string; techniques: string[] }> =
-    {
-      structured: {
-        title: 'Structured Learning Approach',
-        techniques: [
-          'Detailed revision timetables with milestone tracking',
-          'Systematic note-taking and concept mapping',
-          'Regular self-assessment against defined benchmarks',
-        ],
-      },
-      collaborative: {
-        title: 'Collaborative Learning Approach',
-        techniques: [
-          'Group discussions and peer-teaching sessions',
-          'Presentation-based learning and debate',
-          'Interactive workshops and case study analysis',
-        ],
-      },
-      'self-paced': {
-        title: 'Self-Paced Learning Approach',
-        techniques: [
-          'Consistent daily study routines with fixed duration',
-          'Repetitive practice with familiar question formats',
-          'Incremental complexity progression over time',
-        ],
-      },
-      competitive: {
-        title: 'Competitive Learning Approach',
-        techniques: [
-          'Mock tests and timed exam simulations',
-          'Leaderboard-based study challenges',
-          'Goal-setting with visible progress metrics',
-        ],
-      },
-    };
+      {
+        structured: {
+          title: 'Structured Learning Approach',
+          techniques: [
+            'Detailed revision timetables with milestone tracking',
+            'Systematic note-taking and concept mapping',
+            'Regular self-assessment against defined benchmarks',
+          ],
+        },
+        collaborative: {
+          title: 'Collaborative Learning Approach',
+          techniques: [
+            'Group discussions and peer-teaching sessions',
+            'Presentation-based learning and debate',
+            'Interactive workshops and case study analysis',
+          ],
+        },
+        'self-paced': {
+          title: 'Self-Paced Learning Approach',
+          techniques: [
+            'Consistent daily study routines with fixed duration',
+            'Repetitive practice with familiar question formats',
+            'Incremental complexity progression over time',
+          ],
+        },
+        competitive: {
+          title: 'Competitive Learning Approach',
+          techniques: [
+            'Mock tests and timed exam simulations',
+            'Leaderboard-based study challenges',
+            'Goal-setting with visible progress metrics',
+          ],
+        },
+      };
 
     const style =
       styleTitles[this.ci_patterns.academicStyle] || styleTitles['structured'];
@@ -6649,7 +6972,7 @@ export class SchoolReport extends BaseReport {
 
     this.pHtml(
       `Based on your Personality trait, the institutions below have been selected and ranked using <b>${params.primary}</b> as the primary parameter and <b>${params.secondary}</b> as the secondary parameter. ` +
-      `Results are filtered for <b>${streamLabel}</b> and ordered by NIRF national rank after selection.`,
+        `Results are filtered for <b>${streamLabel}</b> and ordered by NIRF national rank after selection.`,
     );
 
     const colleges: UniversityData[] = await getTopCollegesForStudent(
@@ -6903,7 +7226,7 @@ export class SchoolReport extends BaseReport {
 
     this.pHtml(
       `Based on your personality trait and top Agile scrum value your career trajectory has been mapped below. ` +
-      `The gauge shows how your combination accelerates your journey compared to the industry average.`,
+        `The gauge shows how your combination accelerates your journey compared to the industry average.`,
     );
 
     const parsePace = (s: string): [number, number] => {

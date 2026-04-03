@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
 /**
  * schoolReportJSON.ts
  * -------------------
@@ -277,7 +277,7 @@ function getGCSEDiscTraits(discType: string): number[] {
     D: [0.8, 0.7, 0.6, 0.5, 0.5, 0.8],
     I: [0.5, 0.4, 0.9, 0.8, 0.9, 0.4],
     S: [0.6, 0.5, 0.6, 0.5, 0.8, 0.7],
-    C: [0.9, 0.8, 0.5, 0.4, 0.4, 0.9]
+    C: [0.9, 0.8, 0.5, 0.4, 0.4, 0.9],
   };
   return table[discType] || table['DC'];
 }
@@ -288,7 +288,8 @@ function computeIGCSEFitment(data: SchoolData, subjects: any[]): any[] {
   const traitCode = topTwo[0] + topTwo[1];
   const baseVector = getGCSEDiscTraits(traitCode);
 
-  const [analytical, numerical, verbal, creative, interpersonal, structured] = baseVector;
+  const [analytical, numerical, verbal, creative, interpersonal, structured] =
+    baseVector;
 
   // 2. Agile Input Dimensions (0-1 Normalization)
   const agile = data.agile_scores?.[0];
@@ -299,43 +300,55 @@ function computeIGCSEFitment(data: SchoolData, subjects: any[]): any[] {
   const courage = Math.min(1.0, (agile?.courage ?? 0) / 25);
 
   // 3. Axis Adjustment Formulas
-  const adjAnalytical = analytical + (focus * 0.10);
-  const adjNumerical = numerical + (commitment * 0.05);
-  const adjVerbal = verbal + (openness * 0.08);
-  const adjCreative = creative + (((openness + courage) / 2) * 0.10);
-  const adjInterpersonal = interpersonal + (((respect + courage) / 2) * 0.10);
-  const adjStructured = structured + (((focus + commitment + respect) / 3) * 0.10);
+  const adjAnalytical = analytical + focus * 0.1;
+  const adjNumerical = numerical + commitment * 0.05;
+  const adjVerbal = verbal + openness * 0.08;
+  const adjCreative = creative + ((openness + courage) / 2) * 0.1;
+  const adjInterpersonal = interpersonal + ((respect + courage) / 2) * 0.1;
+  const adjStructured = structured + ((focus + commitment + respect) / 3) * 0.1;
 
   // 4. Final Student Vector (80% DISC base + 20% Agile-adjusted)
   const finalVector = [
-    Math.min(1.0, Math.max(0.0, (analytical * 0.8) + (adjAnalytical * 0.2))),
-    Math.min(1.0, Math.max(0.0, (numerical * 0.8) + (adjNumerical * 0.2))),
-    Math.min(1.0, Math.max(0.0, (verbal * 0.8) + (adjVerbal * 0.2))),
-    Math.min(1.0, Math.max(0.0, (creative * 0.8) + (adjCreative * 0.2))),
-    Math.min(1.0, Math.max(0.0, (interpersonal * 0.8) + (adjInterpersonal * 0.2))),
-    Math.min(1.0, Math.max(0.0, (structured * 0.8) + (adjStructured * 0.2)))
+    Math.min(1.0, Math.max(0.0, analytical * 0.8 + adjAnalytical * 0.2)),
+    Math.min(1.0, Math.max(0.0, numerical * 0.8 + adjNumerical * 0.2)),
+    Math.min(1.0, Math.max(0.0, verbal * 0.8 + adjVerbal * 0.2)),
+    Math.min(1.0, Math.max(0.0, creative * 0.8 + adjCreative * 0.2)),
+    Math.min(1.0, Math.max(0.0, interpersonal * 0.8 + adjInterpersonal * 0.2)),
+    Math.min(1.0, Math.max(0.0, structured * 0.8 + adjStructured * 0.2)),
   ];
 
   // 5. ACI percentage
-  const totalAci = (agile?.focus ?? 0) + (agile?.courage ?? 0) + (agile?.respect ?? 0) + (agile?.openness ?? 0) + (agile?.commitment ?? 0);
+  const totalAci =
+    (agile?.focus ?? 0) +
+    (agile?.courage ?? 0) +
+    (agile?.respect ?? 0) +
+    (agile?.openness ?? 0) +
+    (agile?.commitment ?? 0);
   const aciPct = Math.min(100, Math.max(0, (totalAci / 125) * 100));
 
   // 6. Subject Matching Engine
-  const rawResults = subjects.map(sub => {
-    const subVector = [sub.analytical, sub.numerical, sub.verbal, sub.creative, sub.interpersonal, sub.structured];
+  const rawResults = subjects.map((sub) => {
+    const subVector = [
+      sub.analytical,
+      sub.numerical,
+      sub.verbal,
+      sub.creative,
+      sub.interpersonal,
+      sub.structured,
+    ];
     let dotProduct = 0;
     for (let i = 0; i < 6; i++) {
       dotProduct += finalVector[i] * subVector[i];
     }
     const fDisc = (dotProduct / 6) * 100;
     const fAci = aciPct * sub.agile_compatibility;
-    const rawFit = (fDisc * 0.6) + (fAci * 0.4);
+    const rawFit = fDisc * 0.6 + fAci * 0.4;
 
     return {
       ...sub,
       fDisc,
       fAci,
-      rawFit
+      rawFit,
     };
   });
 
@@ -349,7 +362,7 @@ function computeIGCSEFitment(data: SchoolData, subjects: any[]): any[] {
 
   const results = rawResults.map((sub, idx) => {
     const rankRatio = idx / Math.max(1, n - 1);
-    const fTotal = TOP_SCORE - (rankRatio * (TOP_SCORE - BOTTOM_SCORE));
+    const fTotal = TOP_SCORE - rankRatio * (TOP_SCORE - BOTTOM_SCORE);
 
     let interpretation = 'Explore';
     if (fTotal >= 82) interpretation = 'Strong Match';
@@ -357,11 +370,27 @@ function computeIGCSEFitment(data: SchoolData, subjects: any[]): any[] {
     else if (fTotal >= 55) interpretation = 'Worth Considering';
 
     // Identify strongest matching trait
-    const traitNames = ['Analytical', 'Numerical', 'Verbal', 'Creative', 'Interpersonal', 'Structured'];
+    const traitNames = [
+      'Analytical',
+      'Numerical',
+      'Verbal',
+      'Creative',
+      'Interpersonal',
+      'Structured',
+    ];
     let bestTraitIdx = 0;
     let bestTraitScore = 0;
     for (let i = 0; i < 6; i++) {
-      const contribution = finalVector[i] * [sub.analytical, sub.numerical, sub.verbal, sub.creative, sub.interpersonal, sub.structured][i];
+      const contribution =
+        finalVector[i] *
+        [
+          sub.analytical,
+          sub.numerical,
+          sub.verbal,
+          sub.creative,
+          sub.interpersonal,
+          sub.structured,
+        ][i];
       if (contribution > bestTraitScore) {
         bestTraitScore = contribution;
         bestTraitIdx = i;
@@ -372,7 +401,7 @@ function computeIGCSEFitment(data: SchoolData, subjects: any[]): any[] {
       ...sub,
       fTotal: Math.round(fTotal),
       interpretation,
-      matchReason: traitNames[bestTraitIdx]
+      matchReason: traitNames[bestTraitIdx],
     };
   });
 
@@ -676,7 +705,7 @@ function buildStreamSelectionContent() {
       })),
     });
   }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+
   return streams;
 }
 
@@ -744,14 +773,14 @@ export async function buildSchoolReportJSON(data: SchoolData) {
   const isIGCSE = Boolean(
     data.student_board?.toUpperCase() === 'IGCSE' ||
     data.group_name?.toUpperCase() === 'IGCSE' ||
-    data.dept_code?.toUpperCase() === 'IGCSE'
+    data.dept_code?.toUpperCase() === 'IGCSE',
   );
   const isSSLC = !isIGCSE && data.school_level_id === 1;
   const isHSC = !isIGCSE && data.school_level_id !== 1;
 
   let courseCompatibility: CourseCompatibility[] = [];
   let topColleges: any[] = [];
-  
+
   try {
     if (isSSLC) {
       // SSLC -> recommended stream
