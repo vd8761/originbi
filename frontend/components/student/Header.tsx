@@ -63,19 +63,20 @@ const NavItem: React.FC<NavItemProps> = ({
             <button
                 onClick={onClick}
                 // SCALING (90% Simulation): 
-                // LG/XL: Compact (h-7, px-2) 
-                // 2XL: Regular (h-8, px-3)
-                className={`flex items-center ${spacingClass} rounded-full transition-all duration-200 w-full ${isMobile ? "py-3.5" : "lg:h-10 2xl:h-10"} cursor-pointer ${active
-                    ? "bg-[#1ED36A] text-white shadow-none border border-transparent px-3 2xl:px-3.5"
-                    : "bg-gray-50 border border-gray-200 text-[#19211C] hover:bg-gray-100 hover:text-black hover:border-gray-300 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white px-3 2xl:px-3.5"
+                // LG: Compact (px-2) 
+                // XL: Medium-Compact (px-3)
+                // 2XL: Regular (px-3.5)
+                className={`flex items-center ${spacingClass} rounded-full transition-all duration-200 w-full ${isMobile ? "py-3.5" : "lg:h-8.5 xl:h-9 2xl:h-10"} cursor-pointer ${active
+                    ? "bg-[#1ED36A] text-white shadow-none border border-transparent px-2 xl:px-3 2xl:px-3.5"
+                    : "bg-gray-50 border border-gray-200 text-[#19211C] hover:bg-gray-100 hover:text-black hover:border-gray-300 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white px-2 xl:px-3 2xl:px-3.5"
                     }`}
             >
                 <div className={`${active ? "text-white" : "text-[#1ED36A] dark:text-white"}`}>
                     {icon}
                 </div>
                 <span
-                    // TEXT SCALING: text-[10.5px] on Laptop, text-[11.5px] on 2XL
-                    className={`font-medium ${isMobile ? "text-sm ml-2" : "text-[10.5px] 2xl:text-[11.5px]"} whitespace-nowrap ${isMobile ? "inline" : showDesktopText
+                    // TEXT SCALING: text-[10.5px] on Laptop, text-[11.5px] on XL/2XL
+                    className={`font-medium ${isMobile ? "text-sm ml-2" : "text-[10.5px] xl:text-[11.5px] 2xl:text-[11.5px]"} whitespace-nowrap ${isMobile ? "inline" : showDesktopText
                         }`}
                 >
                     {label}
@@ -399,7 +400,7 @@ const Header: React.FC<HeaderProps> = ({
     };
 
     return (
-        <header className={`fixed top-0 left-0 right-0 w-full z-50 transition-all ${isNotificationsOpen ? "duration-150" : "duration-300"} bg-transparent dark:bg-[#19211C]/40 ${isNotificationsOpen ? "" : "backdrop-blur-xl dark:backdrop-blur-[200px]"} border-b border-[#E0E0E0] dark:border-white/[0.08] shadow-none`}>
+        <header className={`fixed top-0 left-0 right-0 w-full z-50 transition-all ${isNotificationsOpen ? "duration-150" : "duration-300"} bg-white/95 dark:bg-[#19211C]/95 backdrop-blur-xl dark:backdrop-blur-[200px] border-b border-[#E0E0E0] dark:border-white/[0.08] shadow-none`}>
             {isNotificationsOpen && (
                 <div className="absolute top-full left-0 w-full h-[100vh] bg-black/20 dark:bg-black/40 z-[-1] animate-fade-in-fast" />
             )}
@@ -421,13 +422,13 @@ const Header: React.FC<HeaderProps> = ({
                     <img src="/Origin-BI-white-logo.png" alt="OriginBI Logo" className="h-5 lg:h-5.5 2xl:h-6 w-auto hidden dark:block" />
 
                     {!hideNav && (
-                        <nav className="hidden md:flex items-center space-x-1 lg:space-x-1 2xl:space-x-1.5 ml-1.5 lg:ml-1.5 2xl:ml-3">
+                        <nav className="hidden md:flex items-center space-x-1 lg:space-x-1 xl:space-x-1.5 2xl:space-x-1.5 ml-1.5 lg:ml-1.5 xl:ml-2.5 2xl:ml-3">
                             {renderNavItems(false)}
                         </nav>
                     )}
                 </div>
 
-                <div className="flex items-center gap-1 sm:gap-2 lg:gap-1.5 2xl:gap-1.5">
+                <div className="flex items-center gap-1 sm:gap-2 lg:gap-1.5 2xl:gap-1.5 relative z-[200]">
                     <div className="hidden sm:block">
                         {/* Theme Toggle Scaled Down */}
                         <div className="scale-90 lg:scale-100 2xl:scale-100 origin-right">
@@ -446,7 +447,7 @@ const Header: React.FC<HeaderProps> = ({
                             <ChevronDownIcon className="w-2.5 h-2.5" />
                         </button>
                         {isLangOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-32 bg-white dark:bg-brand-dark-tertiary rounded-lg shadow-xl py-1 ring-1 ring-black ring-opacity-5 z-50 border border-gray-100 dark:border-transparent">
+                            <div className="absolute right-0 top-full mt-2 w-32 bg-white dark:bg-brand-dark-tertiary rounded-lg shadow-xl py-1 ring-1 ring-black ring-opacity-5 z-[100] border border-gray-100 dark:border-transparent">
                                 <button onClick={() => handleLangChange("ENG")} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-brand-text-primary hover:bg-gray-50 dark:hover:bg-brand-dark-secondary/60">English</button>
                                 <button onClick={() => handleLangChange("TAM")} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-brand-text-primary hover:bg-gray-50 dark:hover:bg-brand-dark-secondary/60">Tamil</button>
                             </div>
@@ -470,7 +471,7 @@ const Header: React.FC<HeaderProps> = ({
                             )}
                         </button>
                         {isNotificationsOpen && (
-                            <div className="fixed sm:absolute left-4 right-4 sm:left-auto sm:right-0 top-[64px] sm:top-full mt-2 sm:mt-6 w-auto sm:w-[480px] md:w-[540px] notification-glass-card p-0 z-50 animate-slide-down overflow-hidden text-gray-900 dark:text-white cursor-default">
+                            <div className="fixed sm:absolute left-4 right-4 sm:left-auto sm:right-0 top-[64px] sm:top-full mt-2 sm:mt-6 w-auto sm:w-[480px] md:w-[540px] notification-glass-card p-0 z-[100] animate-slide-down overflow-hidden text-gray-900 dark:text-white cursor-default">
                                 <div className="p-5 pb-4">
                                     <div className="flex justify-between items-center mb-4">
                                         <h3 className="text-[17px] font-semibold tracking-wide text-gray-900 dark:text-white">
@@ -611,7 +612,7 @@ const Header: React.FC<HeaderProps> = ({
                         </button>
 
                         {isProfileOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-72 bg-brand-light-secondary dark:bg-brand-dark-secondary rounded-xl shadow-2xl z-50 border border-brand-light-tertiary dark:border-brand-dark-tertiary/50 overflow-hidden">
+                            <div className="absolute right-0 top-full mt-2 w-72 bg-brand-light-secondary dark:bg-brand-dark-secondary rounded-xl shadow-2xl z-[100] border border-brand-light-tertiary dark:border-brand-dark-tertiary/50 overflow-hidden">
                                 <div className="px-4 py-3 border-b border-brand-light-tertiary dark:border-brand-dark-tertiary">
                                     <p className="text-sm font-semibold text-[#19211C] dark:text-brand-text-primary truncate">
                                         {user?.name || 'Student'}

@@ -4,7 +4,9 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThanOrEqual } from 'typeorm';
+import { Repository, MoreThanOrEqual, LessThan, In, And } from 'typeorm';
+
+
 import {
   User as AdminUser,
   GroupAssessment,
@@ -93,11 +95,14 @@ export class AdminService {
         revenueTrend,
         totalCommissionsPaid,
         userDistribution,
+        recentExpiredAssessments: await this.getRecentExpiredAssessments(),
+        todaysRegistrations: await this.getTodaysRegistrations(),
         // Optional: meta for frontend to show date ranges if needed
         statsContext: {
           weekStart: startOfWeek.format('YYYY-MM-DD'),
         },
       };
+
     } catch (error: any) {
       this.logger.error(
         `Error calculating dashboard stats: ${error.message}`,
@@ -157,23 +162,25 @@ export class AdminService {
   }
 
   private async getUserDistribution() {
-    const schoolCount = await this.registrationRepo.count({
-      where: { schoolLevel: Not(IsNull()) },
-    });
-    const collegeCount = await this.registrationRepo.count({
-      where: { departmentDegreeId: Not(IsNull()) },
-    });
-    
-    // More robust way to handle JSON filtering by doing it in memory for corporate accounts
-    const corporateRegs = await this.registrationRepo.find({
-      where: { corporateAccountId: Not(IsNull()) },
-    });
+    const [schoolCount, collegeCount, totalCorporateCount, cxoCount] =
+      await Promise.all([
+        this.registrationRepo.count({
+          where: { schoolLevel: Not(IsNull()) },
+        }),
+        this.registrationRepo.count({
+          where: { departmentDegreeId: Not(IsNull()) },
+        }),
+        this.registrationRepo.count({
+          where: { corporateAccountId: Not(IsNull()) },
+        }),
+        this.registrationRepo
+          .createQueryBuilder('r')
+          .where('r.corporate_account_id IS NOT NULL')
+          .andWhere("r.metadata->>'programType' ILIKE :type", { type: '%cxo%' })
+          .getCount(),
+      ]);
 
-    const cxoCount = corporateRegs.filter(reg => 
-      String(reg.metadata?.programType || '').toLowerCase().includes('cxo')
-    ).length;
-
-    const employeeCount = corporateRegs.length - cxoCount;
+    const employeeCount = totalCorporateCount - cxoCount;
 
     return {
       totalWithTraits: schoolCount + collegeCount + employeeCount + cxoCount,
@@ -202,7 +209,56 @@ export class AdminService {
     };
   }
 
+  private async getRecentExpiredAssessments() {
+    const sevenDaysAgo = dayjs().subtract(7, 'day').toDate();
+    return this.sessionRepo.find({
+      where: {
+        validTo: And(LessThan(new Date()), MoreThanOrEqual(sevenDaysAgo)),
+        status: In(['NOT_STARTED', 'IN_PROGRESS', 'EXPIRED', 'PARTIALLY_EXPIRED']),
+
+
+      },
+      relations: ['user', 'program', 'registration'],
+      order: { validTo: 'DESC' },
+      take: 5,
+    });
+
+  }
+
+
+  private async getTodaysRegistrations() {
+    const startOfToday = dayjs().startOf('day').toDate();
+    return this.registrationRepo.find({
+      where: {
+        createdAt: MoreThanOrEqual(startOfToday),
+      },
+      relations: ['user', 'program'],
+      order: { createdAt: 'DESC' },
+      take: 5,
+    });
+
+
+  }
+
+  async extendAssessmentSession(sessionId: number, newDate: string) {
+    const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
+    if (!session) {
+      throw new Error('Assessment session not found');
+    }
+
+    session.validTo = new Date(newDate);
+
+    // If it was EXPIRED, we should reset it to ASSIGNED or STARTED to allow the user back in
+    if (session.status === 'EXPIRED') {
+       session.status = 'IN_PROGRESS'; // Or appropriately 'NOT_STARTED' if never opened
+    }
+    
+    return this.sessionRepo.save(session);
+  }
+
+
   getMessage() {
+
     return { message: 'Admin service working!' };
   }
 }

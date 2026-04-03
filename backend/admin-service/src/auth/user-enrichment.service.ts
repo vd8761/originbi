@@ -84,15 +84,17 @@ export class UserEnrichmentService {
       cognitoSub,
       name:
         cognitoPayload.name ||
-        cognitoPayload['custom:name'] ||
-        email.split('@')[0],
+          cognitoPayload['custom:name'] ||
+          email.split('@')[0],
     };
 
     // Step 3: If CORPORATE, resolve the corporate_accounts.id
     if (userContext.role === 'CORPORATE') {
-      const corporateAccountId = await this.findCorporateAccountId(
-        userContext.id,
-      );
+      const directCorporateId = Number(userRow.corporate_id || 0);
+      const corporateAccountId =
+        directCorporateId > 0
+          ? directCorporateId
+          : await this.findCorporateAccountId(userContext.id);
       if (corporateAccountId) {
         userContext.corporateId = corporateAccountId;
         this.logger.debug(
@@ -184,9 +186,11 @@ export class UserEnrichmentService {
 
       // Enrich corporate ID from DB (don't trust the header value)
       if (userContext.role === 'CORPORATE') {
-        const corporateAccountId = await this.findCorporateAccountId(
-          userContext.id,
-        );
+        const directCorporateId = Number(userRow.corporate_id || 0);
+        const corporateAccountId =
+          directCorporateId > 0
+            ? directCorporateId
+            : await this.findCorporateAccountId(userContext.id);
         if (corporateAccountId) {
           userContext.corporateId = corporateAccountId;
         }

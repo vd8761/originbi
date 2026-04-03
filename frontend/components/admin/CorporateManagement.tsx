@@ -137,6 +137,22 @@ const CorporateManagement: React.FC = () => {
     }
   };
 
+  const handleToggleAskBi = async (id: string, currentAskBi: boolean) => {
+    setUsers((prev) =>
+      prev.map((u) => (u.id === id ? { ...u, ask_bi_enabled: !currentAskBi } : u))
+    );
+
+    try {
+      await corporateRegistrationService.toggleAskBiStatus(id, !currentAskBi);
+    } catch (err) {
+      console.error("Failed to toggle Ask BI status", err);
+      setUsers((prev) =>
+        prev.map((u) => (u.id === id ? { ...u, ask_bi_enabled: currentAskBi } : u))
+      );
+      alert("Failed to update Ask BI status");
+    }
+  };
+
   const handlePageChange = (page: number) => {
     const totalPages = Math.ceil(totalCount / entriesPerPage) || 1;
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
@@ -287,6 +303,7 @@ const CorporateManagement: React.FC = () => {
           onViewDetails={handleViewDetails}
           onEdit={handleEdit}
           onToggleBlock={handleToggleBlock}
+          onToggleAskBi={handleToggleAskBi}
           sortColumn={sortColumn}
           sortOrder={sortOrder}
           onSort={handleSort}

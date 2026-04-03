@@ -140,12 +140,13 @@ export class ChatMemoryService {
     title: string,
   ): Promise<boolean> {
     if (!this.tablesExist) return false;
-    const r = await this.dataSource.query(
+    const rows = await this.dataSource.query(
       `UPDATE chat_conversations SET title = $1, updated_at = NOW()
-       WHERE id = $2 AND user_id = $3`,
+       WHERE id = $2 AND user_id = $3
+       RETURNING id`,
       [title, conversationId, userId],
     );
-    return r[1] > 0;
+    return rows.length > 0;
   }
 
   /** Archive (soft-delete) a conversation */
@@ -154,12 +155,13 @@ export class ChatMemoryService {
     userId: number,
   ): Promise<boolean> {
     if (!this.tablesExist) return false;
-    const r = await this.dataSource.query(
+    const rows = await this.dataSource.query(
       `UPDATE chat_conversations SET is_archived = TRUE, updated_at = NOW()
-       WHERE id = $1 AND user_id = $2`,
+       WHERE id = $1 AND user_id = $2
+       RETURNING id`,
       [conversationId, userId],
     );
-    return r[1] > 0;
+    return rows.length > 0;
   }
 
   /** Hard-delete a conversation and all its messages */
@@ -168,11 +170,13 @@ export class ChatMemoryService {
     userId: number,
   ): Promise<boolean> {
     if (!this.tablesExist) return false;
-    const r = await this.dataSource.query(
-      `DELETE FROM chat_conversations WHERE id = $1 AND user_id = $2`,
+    const rows = await this.dataSource.query(
+      `DELETE FROM chat_conversations
+       WHERE id = $1 AND user_id = $2
+       RETURNING id`,
       [conversationId, userId],
     );
-    return r[1] > 0;
+    return rows.length > 0;
   }
 
   /* ═══════════════════════════════════════════════════════════

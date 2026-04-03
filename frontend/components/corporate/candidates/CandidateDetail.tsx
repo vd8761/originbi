@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useMemo, useState } from "react";
 import { ChevronDownIcon, Check, X, Download } from "lucide-react";
 
-// ─── Types ──────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface CandidateDetailProps {
     candidateId: string;
@@ -57,7 +57,7 @@ type TabKey = "origin_report" | "resume" | "certificate1" | "certificate2" | "ap
 type SortColumn = "title" | "role_alignment" | "posted_date" | "applied_date" | "close_date";
 type SortDirection = "asc" | "desc";
 
-// ─── Mock Data ──────────────────────────────────────────────────
+// â”€â”€â”€ Mock Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const mockCandidate: CandidateData = {
     id: "202001256",
@@ -124,7 +124,7 @@ const mockAppliedJobs: AppliedJob[] = [
     { id: "6", title: "Front-End Developer", company: "Google Inc", employmentType: "Full Time", roleAlignment: "92%", alignmentPercent: 92, postedDate: "31 Feb 2025", appliedDate: "13 May 2025", closeDate: "31 Feb 2025", status: "Hired" },
 ];
 
-// ─── Status Badge Helper ────────────────────────────────────────
+// â”€â”€â”€ Status Badge Helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const STATUS_COLORS: Record<string, string> = {
     Hired: "bg-[#1ED36A]/[0.24] border border-[#1ED36A] text-[#19211C] dark:text-white",
@@ -169,7 +169,7 @@ function parseDisplayDate(value: string): number {
     return year * 10000 + month * 100 + day;
 }
 
-// ─── Star Rating Component ──────────────────────────────────────
+// â”€â”€â”€ Star Rating Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function StarRating({ rating, max = 5 }: { rating: number; max?: number }) {
     return (
@@ -191,7 +191,7 @@ function StarRating({ rating, max = 5 }: { rating: number; max?: number }) {
     );
 }
 
-// ─── Main Component ─────────────────────────────────────────────
+// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function CandidateDetail({ candidateId, jobTitle, onBack, initialTab, candidateData }: CandidateDetailProps) {
     const [activeTab, setActiveTab] = useState<TabKey>(initialTab ?? "origin_report");
@@ -508,32 +508,32 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
         const cells = buildMonthGrid(year, month);
 
         return (
-            <div className="w-[380px] h-[334px] rounded-[12px] bg-white/[0.08] border border-white/[0.12] px-6 py-4">
-                <div className="flex items-center justify-between mb-4 text-white/90 pb-4 border-b border-white/[0.12]">
+            <div className="w-[344px] h-[300px] rounded-[12px] bg-white/[0.08] border border-white/[0.12] px-5 py-3.5">
+                <div className="flex items-center justify-between mb-3 text-white/90 pb-3.5 border-b border-white/[0.12]">
                     <button
                         type="button"
                         onClick={() => setLeftCalendarMonth((prev) => addMonths(prev, -1))}
                         className="p-1 text-white/60 hover:text-white transition-colors"
                     >
-                        <svg width="14" height="14" viewBox="0 0 12 12" fill="none"><path d="M7.5 2L3.5 6L7.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M7.5 2L3.5 6L7.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     </button>
-                    <p className="text-[16px] leading-[21px] font-semibold text-[#E7EFEB]">{title}</p>
+                    <p className="text-[14px] leading-[18px] font-semibold text-[#E7EFEB]">{title}</p>
                     <button
                         type="button"
                         onClick={() => setLeftCalendarMonth((prev) => addMonths(prev, 1))}
                         className="p-1 text-white/60 hover:text-white transition-colors"
                     >
-                        <svg width="14" height="14" viewBox="0 0 12 12" fill="none"><path d="M4.5 2L8.5 6L4.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 2L8.5 6L4.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     </button>
                 </div>
 
-                <div className="grid grid-cols-7 gap-y-3 mb-3">
+                <div className="grid grid-cols-7 gap-y-2 mb-2">
                     {weekDays.map((day) => (
-                        <span key={`${title}-${day}`} className="text-center text-[16px] leading-[21px] font-normal text-white/80">{day}</span>
+                        <span key={`${title}-${day}`} className="text-center text-[13px] leading-[17px] font-normal text-white/80">{day}</span>
                     ))}
                 </div>
 
-                <div className="grid grid-cols-7 gap-y-2">
+                <div className="grid grid-cols-7 gap-y-1.5">
                     {cells.map((cell) => {
                         const day = cell.date.getDate();
                         const inRange = isInRange(cell.date);
@@ -541,15 +541,15 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                         const end = isRangeEnd(cell.date);
                         const isMuted = !cell.inCurrentMonth;
                         const rangePillClass = inRange
-                            ? `${start ? "rounded-l-full" : ""} ${end ? "rounded-r-full" : ""} ${!start && !end ? "rounded-none" : ""}`
+                            ? `${start ? "rounded-l-[24px]" : ""} ${end ? "rounded-r-[100px]" : ""} ${!start && !end ? "rounded-none" : ""}`
                             : "";
 
                         return (
-                            <div key={`${title}-${cell.date.toISOString()}-${monthOffset}`} className={`h-[31px] flex items-center justify-center text-[16px] leading-[21px] ${inRange ? "bg-[#1ED36A]/[0.16]" : ""} ${rangePillClass}`}>
+                            <div key={`${title}-${cell.date.toISOString()}-${monthOffset}`} className={`h-[28px] flex items-center justify-center text-[13px] leading-[17px] ${inRange ? "bg-[#1ED36A]/[0.16]" : ""} ${rangePillClass}`}>
                                 <button
                                     type="button"
                                     onClick={() => handleDateCellClick(new Date(cell.date.getFullYear(), cell.date.getMonth(), cell.date.getDate()))}
-                                    className={`h-10 w-10 flex items-center justify-center font-normal ${start || end ? "rounded-full bg-[#1ED36A] text-white shadow-[0px_4px_6.7px_rgba(0,0,0,0.4),0px_2px_17.9px_rgba(30,211,106,0.4)]" : ""} ${!start && !end && inRange ? "text-white" : ""} ${!inRange && !isMuted ? "text-white" : ""} ${isMuted ? "text-white/40" : ""}`}
+                                    className={`h-9 w-9 flex items-center justify-center font-normal ${start || end ? "rounded-full bg-[#1ED36A] text-white shadow-[0px_4px_6.7px_rgba(0,0,0,0.4),0px_2px_17.9px_rgba(30,211,106,0.4)]" : ""} ${!start && !end && inRange ? "text-white" : ""} ${!inRange && !isMuted ? "text-white" : ""} ${isMuted ? "text-white/40" : ""}`}
                                 >
                                     {day}
                                 </button>
@@ -562,7 +562,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
     };
 
     return (
-        <div className="relative flex flex-col w-full max-w-[1920px] min-h-screen xl:min-h-[1281px] mx-auto gap-4 font-sans p-3 sm:p-5 lg:p-6 bg-[#F7FAF8] dark:bg-[#19211C]">
+        <div className="thin-ui-page relative flex flex-col w-full max-w-[1920px] min-h-0 mx-auto gap-4 font-sans p-4 sm:p-6 lg:p-8 bg-[#F7FAF8] dark:bg-[#19211C]">
 
             {/* Breadcrumb */}
             <div className="flex items-center text-xs text-[#5F6B65] dark:text-white/70 mb-1.5 font-normal">
@@ -588,15 +588,15 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                         </span>
                     </>
                 )}
-                <span className="text-brand-green font-semibold">Candidate Detail</span>
+                <span className="text-brand-green font-medium">Candidate Detail</span>
             </div>
 
             {/* Main Content: Left Sidebar + Right Panel */}
             <div className="grid grid-cols-1 xl:grid-cols-[435px_minmax(0,1fr)] gap-5 xl:gap-7 items-start">
 
-                {/* ─── Left Sidebar (Profile Card) ─── */}
+                {/* â”€â”€â”€ Left Sidebar (Profile Card) â”€â”€â”€ */}
                 <div className="w-full max-w-[435px] xl:w-[435px] shrink-0 mx-auto xl:mx-0">
-                    <div className="bg-white border border-gray-200 dark:bg-white/[0.08] dark:border-white/[0.2] shadow-[0_4px_40px_rgba(0,0,0,0.18)] dark:shadow-[0_4px_40px_rgba(0,0,0,0.4)] rounded-xl px-5 sm:px-6 xl:px-8 py-5 xl:py-6 flex flex-col items-center gap-6 min-h-[650px] xl:min-h-[669px]">
+                    <div className="bg-white border border-gray-200 dark:bg-white/[0.08] dark:border-white/[0.2] shadow-[0_4px_40px_rgba(0,0,0,0.18)] dark:shadow-[0_4px_40px_rgba(0,0,0,0.4)] rounded-xl px-5 sm:px-6 xl:px-8 py-5 xl:py-6 flex flex-col items-center gap-6">
                         {/* Avatar */}
                         <div className="w-[104px] h-[104px] rounded-full overflow-hidden border border-[#FFFFFF40]">
                             <img src={candidate.avatar} alt={candidate.name} className="w-full h-full object-cover" />
@@ -604,7 +604,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
 
                         {/* Name & ID */}
                         <div className="text-center flex flex-col gap-2">
-                            <h2 className="text-[24px] leading-[31px] font-semibold text-[#19211C] dark:text-white">{candidate.name}</h2>
+                            <h2 className="text-[24px] leading-[31px] font-medium text-[#19211C] dark:text-white">{candidate.name}</h2>
                             <p className="text-[16px] leading-[21px] font-normal text-[#3B4741] dark:text-white">Origin ID : {candidate.originId}</p>
                         </div>
 
@@ -617,7 +617,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                         {/* Skills */}
                         <div className="flex flex-wrap justify-center gap-2 max-w-[371px]">
                             {candidate.skills.map((skill, i) => (
-                                <span key={i} className="h-[26px] px-[12px] rounded-xl border border-white/[0.08] bg-white text-[14px] leading-[18px] font-normal text-[#19211C] flex items-center">
+                                <span key={i} className="px-3.5 py-[5px] rounded-full border border-gray-200 shadow-sm bg-white text-[13px] font-normal text-[#2E3431]">
                                     {skill}
                                 </span>
                             ))}
@@ -626,7 +626,11 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                         {/* Social Links */}
                         <div className="flex gap-3 w-full justify-center">
                             <a href={candidate.linkedIn} target="_blank" rel="noopener noreferrer" className="h-[37px] min-w-[165px] flex items-center justify-center gap-2 px-4 bg-[#007EBB] text-white rounded-xl text-[16px] leading-[21px] font-medium hover:opacity-90 transition-opacity whitespace-nowrap">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="shrink-0"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" /></svg>
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+                                    <path d="M15.9963 16.0001V10.1401C15.9963 7.26006 15.3763 5.06006 12.0163 5.06006C10.3962 5.06006 9.31625 5.94006 8.87625 6.78006H8.83625V5.32006H5.65625V16.0001H8.97625V10.7001C8.97625 9.30006 9.23625 7.96006 10.9563 7.96006C12.6563 7.96006 12.6763 9.54006 12.6763 10.7801V15.9801H15.9963V16.0001Z" fill="white"/>
+                                    <path d="M0.257812 5.31995H3.57781V15.9999H0.257812V5.31995Z" fill="white"/>
+                                    <path d="M1.92 0C0.86 0 0 0.86 0 1.92C0 2.98 0.86 3.86 1.92 3.86C2.98 3.86 3.84 2.98 3.84 1.92C3.84 0.86 2.98 0 1.92 0Z" fill="white"/>
+                                </svg>
                                 LinkedIn Profile
                             </a>
                             <a href={candidate.github} target="_blank" rel="noopener noreferrer" className="h-[37px] min-w-[165px] flex items-center justify-center gap-2 px-4 bg-[#1B1F23] text-white border border-white/[0.16] rounded-xl text-[16px] leading-[21px] font-medium hover:opacity-90 transition-opacity whitespace-nowrap">
@@ -640,10 +644,10 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
 
                         {/* Role */}
                         <div className="flex flex-col items-center gap-5 w-full">
-                            <h3 className="text-[24px] leading-[31px] font-semibold text-[#19211C] dark:text-white">{candidate.role}</h3>
+                            <h3 className="text-[24px] leading-[31px] font-medium text-[#19211C] dark:text-white">{candidate.role}</h3>
 
                             {/* Alignment */}
-                            <p className="text-[18px] leading-[23px] font-semibold text-[#19211C] dark:text-white">
+                            <p className="text-[18px] leading-[23px] font-normal text-[#19211C] dark:text-white">
                                 Role Alignment : <span className="text-[#1ED36A]">{candidate.alignment}</span>
                             </p>
 
@@ -653,17 +657,17 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
 
                         {/* Action Buttons */}
                         <div className="flex items-center justify-center gap-4 mt-0 w-full">
-                            <button className="h-[55px] min-w-[96px] flex items-center justify-center gap-3 px-4 rounded-full text-[18px] leading-[23px] font-normal bg-gray-100 hover:bg-gray-200 dark:bg-white/[0.08] dark:hover:bg-white/[0.14] text-[#19211C] dark:text-white border border-gray-200 dark:border-white/[0.08] transition-colors cursor-pointer">
+                            <button className="h-[55px] min-w-[96px] flex items-center justify-center gap-3 px-4 rounded-full text-[18px] leading-[23px] font-normal bg-gray-50 hover:bg-gray-100 dark:bg-[#343B36] dark:hover:bg-[#454D49] text-[#19211C] dark:text-white border border-gray-200 shadow-sm dark:border-white/[0.08] transition-colors cursor-pointer">
                                 <Check className="w-[20px] h-[20px] text-[#1ED36A]" strokeWidth={3} />
                                 Hire
                             </button>
-                            <button className="h-[55px] min-w-[128px] flex items-center justify-center gap-3 px-4 rounded-full text-[18px] leading-[23px] font-normal bg-gray-100 hover:bg-gray-200 dark:bg-white/[0.08] dark:hover:bg-white/[0.14] text-[#19211C] dark:text-white border border-gray-200 dark:border-white/[0.08] transition-colors cursor-pointer">
+                            <button className="h-[55px] min-w-[128px] flex items-center justify-center gap-3 px-4 rounded-full text-[18px] leading-[23px] font-normal bg-gray-50 hover:bg-gray-100 dark:bg-[#343B36] dark:hover:bg-[#454D49] text-[#19211C] dark:text-white border border-gray-200 shadow-sm dark:border-white/[0.08] transition-colors cursor-pointer">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none" className="text-[#FFB020]">
                                     <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                                 </svg>
                                 Shortlist
                             </button>
-                            <button className="h-[55px] min-w-[109px] flex items-center justify-center gap-3 px-4 rounded-full text-[18px] leading-[23px] font-normal bg-gray-100 hover:bg-gray-200 dark:bg-white/[0.08] dark:hover:bg-white/[0.14] text-[#19211C] dark:text-white border border-gray-200 dark:border-white/[0.08] transition-colors cursor-pointer">
+                            <button className="h-[55px] min-w-[109px] flex items-center justify-center gap-3 px-4 rounded-full text-[18px] leading-[23px] font-normal bg-gray-50 hover:bg-gray-100 dark:bg-[#343B36] dark:hover:bg-[#454D49] text-[#19211C] dark:text-white border border-gray-200 shadow-sm dark:border-white/[0.08] transition-colors cursor-pointer">
                                 <X className="w-[20px] h-[20px] text-[#FF4A4A]" strokeWidth={3} />
                                 Reject
                             </button>
@@ -671,11 +675,11 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                     </div>
                 </div>
 
-                {/* ─── Right Content Panel ─── */}
+                {/* â”€â”€â”€ Right Content Panel â”€â”€â”€ */}
                 <div className="w-full min-w-0">
 
                     {/* Tab and Content Container - Wrapped with Border */}
-                    <div className="bg-white border border-gray-200 dark:bg-white/[0.08] dark:border-white/[0.2] shadow-[0_4px_40px_rgba(0,0,0,0.18)] dark:shadow-[0_4px_40px_rgba(0,0,0,0.4)] rounded-xl w-full max-w-[1372px] min-h-[650px] xl:min-h-[669px] flex flex-col overflow-hidden">
+                    <div className="bg-white border border-gray-200 dark:bg-white/[0.08] dark:border-white/[0.2] shadow-[0_4px_40px_rgba(0,0,0,0.18)] dark:shadow-[0_4px_40px_rgba(0,0,0,0.4)] rounded-xl w-full max-w-[1372px] flex flex-col overflow-hidden">
                         {/* Tabs */}
                         <div className="flex items-center gap-0 border-b border-gray-200 dark:border-white/[0.1] overflow-x-auto scrollbar-hide shrink-0 px-6 pt-6">
                             {tabs.map((tab) => (
@@ -684,11 +688,11 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                     onClick={() => setActiveTab(tab.key)}
                                     className="relative px-1 pt-3 pb-5 mr-8 text-[18px] leading-[23px] transition-colors whitespace-nowrap cursor-pointer"
                                 >
-                                    <span className={activeTab === tab.key ? "font-semibold dark:font-medium text-[#1ED36A]" : "font-semibold dark:font-light text-[#63716B] dark:text-white/60"}>
+                                    <span className={activeTab === tab.key ? "font-medium dark:font-medium text-[#1ED36A]" : "font-normal dark:font-light text-[#63716B] dark:text-white/60"}>
                                         {tab.label}
                                     </span>
                                     {tab.count !== undefined && (
-                                        <span className={activeTab === tab.key ? "text-[#1ED36A] font-semibold dark:font-medium ml-1.5" : "text-[#63716B] dark:text-white/60 font-semibold dark:font-light ml-1.5"}>
+                                        <span className={activeTab === tab.key ? "text-[#1ED36A] font-medium dark:font-medium ml-1.5" : "text-[#63716B] dark:text-white/60 font-normal dark:font-light ml-1.5"}>
                                             ({tab.count})
                                         </span>
                                     )}
@@ -701,13 +705,13 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
 
                         {/* Content Area */}
                         <div className="p-5 sm:p-6 overflow-y-auto overflow-x-hidden scrollbar-hide flex-1 relative">
-                            {/* ─── Origin Report Tab ─── */}
+                            {/* â”€â”€â”€ Origin Report Tab â”€â”€â”€ */}
                             {activeTab === "origin_report" && (
                                 <div className="pt-2">
                                     <div className="grid grid-cols-1 xl:grid-cols-[280px_340px_minmax(0,1fr)] gap-6 xl:gap-8 items-start mb-8 w-full">
                                         {/* Left: Trait Name */}
                                         <div className="flex items-center justify-start order-2 xl:order-1 px-3 xl:px-0 xl:pt-24">
-                                            <h2 className="text-[36px] leading-[46px] font-semibold text-[#19211C] dark:text-white tracking-tight">
+                                            <h2 className="text-[36px] leading-[46px] font-medium text-[#19211C] dark:text-white tracking-tight">
                                                 {traitHeadingFirst} <br />
                                                 <span className="ml-20">{traitHeadingRest}</span>
                                             </h2>
@@ -730,7 +734,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                         {/* Right: Info and Key Strengths */}
                                         <div className="flex flex-col items-start order-3 px-4 xl:px-0 xl:pt-3">
                                             <div className="mb-6 w-full">
-                                                <h3 className="text-[22px] leading-[30px] font-semibold text-[#19211C] dark:text-white">{report.characterName}</h3>
+                                                <h3 className="text-[22px] leading-[30px] font-medium text-[#19211C] dark:text-white">{report.characterName}</h3>
                                                 <p className="text-[14px] leading-[22px] text-[#1ED36A] font-light mt-1">{report.degreeInfo}</p>
                                                 <p className="text-[14px] leading-[18px] text-[#3B4741] dark:text-white font-light mt-0.5">{report.collegeName}</p>
                                             </div>
@@ -753,10 +757,10 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
 
                                                 {/* Key Strengths */}
                                                 <div className="flex-1">
-                                                    <h3 className="text-[16px] leading-[24px] font-semibold text-[#19211C] dark:text-white mb-4">Key Strength</h3>
+                                                    <h3 className="text-[16px] leading-[24px] font-normal text-[#19211C] dark:text-white mb-4">Key Strength</h3>
                                                     <ul className="flex flex-col gap-3">
                                                         {report.keyStrengths.map((strength, i) => (
-                                                            <li key={i} className="flex items-start gap-3 text-[14px] font-light text-[#32403A] dark:text-white leading-[1.4]">
+                                                            <li key={i} className="flex items-start gap-3 text-[16px] font-[300] text-[#32403A] dark:text-white/95 leading-[1.4]">
                                                                 <span className="w-1.5 h-1.5 rounded-full bg-[#32403A] dark:bg-white mt-[10px] shrink-0" />
                                                                 {strength}
                                                             </li>
@@ -773,12 +777,12 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                             {/* Left Column: Role Alignment */}
                                             <div className="lg:w-[38%] flex flex-col border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-white/10">
                                                 <div className="px-8 h-[60px] border-b border-gray-200 dark:border-white/10 bg-black/[0.04] dark:bg-white/[0.12] flex items-center">
-                                                    <h3 className="text-[18px] leading-[28px] font-semibold text-[#1ED36A]">{report.roleAlignment.title}</h3>
+                                                    <h3 className="text-[18px] leading-[28px] font-medium text-[#1ED36A]">{report.roleAlignment.title}</h3>
                                                 </div>
                                                 <div className="p-8 h-full">
                                                     <ul className="flex flex-col gap-3">
                                                         {report.roleAlignment.items.map((item, i) => (
-                                                            <li key={i} className="flex items-start gap-2.5 text-[14px] font-light text-[#32403A] dark:text-white leading-[1.5]">
+                                                            <li key={i} className="flex items-start gap-2.5 text-[16px] font-[300] text-[#32403A] dark:text-white/95 leading-[1.5]">
                                                                 <span className="w-1.5 h-1.5 rounded-full bg-[#32403A]/60 dark:bg-white/60 mt-[10px] shrink-0"></span>
                                                                 {item}
                                                             </li>
@@ -790,17 +794,17 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                             {/* Right Column: Career Growth Tips */}
                                             <div className="flex-1 flex flex-col">
                                                 <div className="px-8 h-[60px] border-b border-gray-200 dark:border-white/10 bg-black/[0.04] dark:bg-white/[0.12] flex items-center">
-                                                    <h3 className="text-[18px] leading-[28px] font-semibold text-[#1ED36A]">{report.careerGrowthTips.title}</h3>
+                                                    <h3 className="text-[18px] leading-[28px] font-medium text-[#1ED36A]">{report.careerGrowthTips.title}</h3>
                                                 </div>
                                                 <div className="p-8 h-full">
-                                                    <p className="text-[14px] font-light text-[#32403A] dark:text-white mb-6 leading-[1.5]">
+                                                    <p className="text-[16px] font-[300] text-[#32403A] dark:text-white/95 mb-6 leading-[1.5]">
                                                         The candidate&apos;s vibrant personality and optimistic outlook are among his/her greatest assets, but like any strength, these can be overextended. To ensure continued growth, here are some tailored recommendations for the candidate:
                                                     </p>
                                                     <div className="flex flex-col gap-6">
                                                         {report.careerGrowthTips.sections.map((section, i) => (
                                                             <div key={i}>
-                                                                <h4 className="text-[14px] font-semibold text-[#19211C] dark:text-white mb-2">{section.heading}</h4>
-                                                                <p className="text-[14px] font-light text-[#32403A] dark:text-white leading-[1.5]">{section.body}</p>
+                                                                <h4 className="text-[14px] font-medium text-[#19211C] dark:text-white mb-2">{section.heading}</h4>
+                                                                <p className="text-[16px] font-[300] text-[#32403A] dark:text-white/95 leading-[1.5]">{section.body}</p>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -811,7 +815,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                 </div>
                             )}
 
-                            {/* ─── Resume Tab ─── */}
+                            {/* â”€â”€â”€ Resume Tab â”€â”€â”€ */}
                             {activeTab === "resume" && (
                                 <div className="flex flex-col gap-4">
                                     <div className="flex items-center justify-between">
@@ -880,7 +884,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                 </div>
                             )}
 
-                            {/* ─── Certificate Tabs ─── */}
+                            {/* â”€â”€â”€ Certificate Tabs â”€â”€â”€ */}
                             {(activeTab === "certificate1" || activeTab === "certificate2") && (
                                 <div className="bg-white dark:bg-[#1F2320] border border-gray-200 dark:border-white/5 rounded-2xl p-8 min-h-[400px] flex items-center justify-center">
                                     <div className="text-center text-gray-400 dark:text-gray-500">
@@ -894,7 +898,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                 </div>
                             )}
 
-                            {/* ─── Applied Jobs Tab ─── */}
+                            {/* â”€â”€â”€ Applied Jobs Tab â”€â”€â”€ */}
                             {activeTab === "applied_jobs" && (
                                 <div className="flex flex-col gap-0 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] w-full max-w-[1324px] min-h-0 mx-auto">
                                     {/* Filters */}
@@ -928,7 +932,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                 })()}
 
                                                 {activeFilterMenu === 'status' && (
-                                                    <div className="absolute left-0 top-full mt-2 w-40 bg-white dark:bg-[#29322D] border border-gray-200 dark:border-white/10 rounded-lg shadow-lg z-50 overflow-hidden py-1">
+                                                    <div className="absolute left-0 top-full mt-2 w-40 bg-white/14 dark:bg-[rgba(25,33,28,0.12)] border border-[rgba(25,33,28,0.08)] dark:border-[rgba(255,255,255,0.2)] rounded-lg shadow-[0_16px_40px_rgba(25,33,28,0.05)] dark:shadow-[0_16px_40px_rgba(25,33,28,0.6)] backdrop-blur-[20px] z-50 overflow-hidden py-1 box-border">
                                                         {['All Status', 'Hired', 'Shortlisted', 'Rejected'].map((status) => (
                                                             <button
                                                                 key={status}
@@ -936,7 +940,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                                     setSelectedStatus(status);
                                                                     setActiveFilterMenu(null);
                                                                 }}
-                                                                className="w-full text-left px-4 py-2.5 text-[12px] text-[#33413B] dark:text-white/85 hover:bg-black/[0.04] dark:hover:bg-white/5 transition-colors cursor-pointer"
+                                                                className="w-full text-left px-4 py-2.5 text-[12px] text-[#33413B] dark:text-white/90 hover:bg-white/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
                                                             >
                                                                 {status}
                                                             </button>
@@ -983,10 +987,10 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                         onClick={() => setActiveFilterMenu(null)}
                                                     >
                                                         <div
-                                                            className="w-[990px] h-[538px] max-w-[95vw] rounded-[24px] border border-white/[0.2] bg-[#19211C]/40 shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-6"
+                                                            className="w-[900px] h-[480px] max-w-[95vw] rounded-[24px] border border-white/[0.2] bg-[#19211C]/40 shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-5"
                                                             onClick={(e) => e.stopPropagation()}
                                                         >
-                                                            <div className="flex items-center justify-between pb-4 border-b border-white/[0.12]">
+                                                            <div className="w-[860px] max-w-full mx-auto flex items-center justify-between pb-3.5 border-b border-white/[0.12]">
                                                                 <p className="text-[18px] leading-[23px] font-semibold text-white">Select Date Range</p>
                                                                 <button
                                                                     type="button"
@@ -997,8 +1001,8 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                                 </button>
                                                             </div>
 
-                                                            <div className="pt-4 flex gap-5 h-[356px]">
-                                                                <div className="w-[142px] shrink-0 border-r border-white/[0.12] pr-3">
+                                                            <div className="w-[860px] max-w-full mx-auto pt-3.5 flex gap-4 h-[318px]">
+                                                                <div className="w-[126px] shrink-0 border-r border-white/[0.12] pr-2.5">
                                                                     {calendarPresets.map((preset) => {
                                                                         const isActivePreset = calendarPreset === preset;
 
@@ -1010,7 +1014,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                                                     setCalendarPreset(preset);
                                                                                     applyPresetRange(preset);
                                                                                 }}
-                                                                                className={`w-full text-left px-3 py-2 rounded-r-[4px] text-[16px] leading-[21px] transition-colors mb-[2px] font-normal ${isActivePreset ? "bg-[#1ED36A] text-white" : "text-white/60 hover:bg-white/[0.08] hover:text-white"}`}
+                                                                                className={`w-full text-left px-3 py-1.5 rounded-r-[4px] text-[13px] leading-[17px] transition-colors mb-[2px] ${isActivePreset ? "bg-[#1ED36A] text-white font-semibold" : "text-white/60 font-normal hover:bg-white/[0.08] hover:text-white"}`}
                                                                             >
                                                                                 {preset}
                                                                             </button>
@@ -1019,15 +1023,15 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                                 </div>
 
                                                                 <div className="flex-1">
-                                                                    <div className="flex gap-3.5">
+                                                                    <div className="flex gap-3">
                                                                         {renderCalendarMonth(leftCalendarMonth.getFullYear(), leftCalendarMonth.getMonth(), getMonthLabel(leftCalendarMonth), 0)}
                                                                         {renderCalendarMonth(addMonths(leftCalendarMonth, 1).getFullYear(), addMonths(leftCalendarMonth, 1).getMonth(), getMonthLabel(addMonths(leftCalendarMonth, 1)), 1)}
                                                                     </div>
                                                                 </div>
                                                             </div>
 
-                                                            <div className="pt-4 mt-4 border-t border-white/[0.12] flex items-center justify-between gap-3">
-                                                                <p className="text-[14px] leading-[18px] font-normal text-white">Selected Range : {selectedRangeText}</p>
+                                                            <div className="w-[860px] max-w-full mx-auto pt-3 mt-3 border-t border-white/[0.12] flex items-center justify-between gap-3">
+                                                                <p className="text-[12px] leading-[16px] font-normal text-white">Selected Range : {selectedRangeText}</p>
                                                                 <div className="flex items-center gap-2">
                                                                     <button
                                                                         type="button"
@@ -1038,7 +1042,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                                             setSelectedDateRange("Any Time");
                                                                             setActiveFilterMenu(null);
                                                                         }}
-                                                                        className="h-8 px-4 rounded-full border border-white text-white text-[14px] leading-[18px] font-medium hover:bg-white/10 transition-colors"
+                                                                        className="h-7 px-4 rounded-full border border-white text-white text-[12px] leading-[16px] font-medium hover:bg-white/10 transition-colors"
                                                                     >
                                                                         Clear
                                                                     </button>
@@ -1054,7 +1058,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                                             }
                                                                             setActiveFilterMenu(null);
                                                                         }}
-                                                                        className="h-8 px-4 rounded-full bg-[#1ED36A] text-white text-[14px] leading-[18px] font-medium hover:bg-[#16BD5C] transition-colors"
+                                                                        className="h-7 px-4 rounded-full bg-[#1ED36A] text-white text-[12px] leading-[16px] font-medium hover:bg-[#16BD5C] transition-colors"
                                                                     >
                                                                         Apply changes
                                                                     </button>
@@ -1074,7 +1078,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                     onClick={() => setActiveFilterMenu(activeFilterMenu === 'alignment' ? null : 'alignment')}
                                                     className={getFilterButtonClass(isAlignmentSelected)}
                                                 >
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" className={isAlignmentSelected ? "text-[#1ED36A]" : "text-[#7B8A84] dark:text-white/65"}>
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" className={isAlignmentSelected ? "text-[#1ED36A]" : "text-[#7B8A84] dark:text-white/65"}>
                                                         <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                                                     </svg>
                                                     {selectedAlignmentRange}
@@ -1084,7 +1088,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                 })()}
 
                                                 {activeFilterMenu === 'alignment' && (
-                                                    <div className="absolute left-0 top-full mt-2 w-48 bg-white dark:bg-[#29322D] border border-gray-200 dark:border-white/10 rounded-lg shadow-lg z-50 overflow-hidden py-1">
+                                                    <div className="absolute left-0 top-full mt-2 w-48 bg-white/14 dark:bg-[rgba(25,33,28,0.12)] border border-[rgba(25,33,28,0.08)] dark:border-[rgba(255,255,255,0.2)] rounded-lg shadow-[0_16px_40px_rgba(25,33,28,0.05)] dark:shadow-[0_16px_40px_rgba(25,33,28,0.6)] backdrop-blur-[20px] z-50 overflow-hidden py-1 box-border">
                                                         {['All Alignment', 'Alignment (90% - 100%)', 'Alignment (70% - 89%)', 'Alignment (50% - 69%)', 'Alignment (Below 50%)'].map((align) => (
                                                             <button
                                                                 key={align}
@@ -1092,7 +1096,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                                     setSelectedAlignmentRange(align);
                                                                     setActiveFilterMenu(null);
                                                                 }}
-                                                                className="w-full text-left px-4 py-2.5 text-[12px] text-[#33413B] dark:text-white/85 hover:bg-black/[0.04] dark:hover:bg-white/5 transition-colors cursor-pointer"
+                                                                className="w-full text-left px-4 py-2.5 text-[12px] text-[#33413B] dark:text-white/90 hover:bg-white/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
                                                             >
                                                                 {align}
                                                             </button>
@@ -1104,7 +1108,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                     </div>
 
                                     {/* Table */}
-                                    <div className="w-full overflow-x-auto pb-2">
+                                    <div className="w-full overflow-x-auto overflow-y-visible scrollbar-hide pb-2">
                                         <table className="w-full min-w-[980px] text-[14px] text-[#19211C] dark:text-white">
                                                 <thead>
                                                     <tr className="border-b border-gray-200 dark:border-white/[0.08] bg-black/[0.06] dark:bg-white/[0.1]">
@@ -1114,7 +1118,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                         <th className="text-left px-4 py-3 whitespace-nowrap">{renderSortLabel("Applied Date", "applied_date")}</th>
                                                         <th className="text-left px-4 py-3 whitespace-nowrap">{renderSortLabel("Close Date", "close_date")}</th>
                                                         <th className="text-center px-4 py-3 text-[13px] leading-[16px] font-light text-[#3A4741] dark:text-white/70 whitespace-nowrap">Current Status</th>
-                                                        <th className="text-center px-4 py-3 text-[13px] leading-[16px] font-light text-[#3A4741] dark:text-white/70 whitespace-nowrap">Action</th>
+                                                        <th className="text-center w-[96px] px-4 py-3 text-[13px] leading-[16px] font-light text-[#3A4741] dark:text-white/70 whitespace-nowrap">Action</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -1123,14 +1127,14 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                             <td className="px-4 py-4">
                                                                 <div>
                                                                     <p className="font-medium text-[16px] leading-[20px] text-[#19211C] dark:text-white">{job.title}</p>
-                                                                    <p className="text-[12px] leading-[16px] font-light text-[#4E5B55] dark:text-white/80 mt-1">{job.company} · Chennai · {job.employmentType}</p>
+                                                                    <p className="text-[12px] leading-[16px] font-light text-[#4E5B55] dark:text-white/80 mt-1">{job.company} Â· Chennai Â· {job.employmentType}</p>
                                                                 </div>
                                                             </td>
                                                             <td className="px-4 py-4">
                                                                 <div className="flex items-center gap-2">
                                                                     <div className="flex gap-0.5">
                                                                         {[1, 2, 3, 4, 5].map((star) => (
-                                                                            <svg key={star} width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" className={star <= 4 ? "text-[#13C065]" : "text-[#13C065]/30"}>
+                                                                            <svg key={star} width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none" className={star <= 4 ? "text-[#13C065]" : "text-[#13C065]/30"}>
                                                                                 <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                                                                             </svg>
                                                                         ))}
@@ -1150,11 +1154,11 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                                     </span>
                                                                 )}
                                                             </td>
-                                                            <td className="px-4 py-4 relative text-center">
+                                                            <td className="w-[96px] px-4 py-4 relative text-center align-middle overflow-visible">
                                                                 <button
                                                                     onClick={() => setActionMenuOpen(actionMenuOpen === job.id ? null : job.id)}
                                                                     data-action-menu="toggle"
-                                                                    className={`w-8 h-8 rounded-full flex items-center justify-center border transition-colors cursor-pointer ${actionMenuOpen === job.id ? 'bg-[#13C065] border-[#13C065] text-white' : 'border-gray-300 dark:border-white/20 hover:bg-[#13C065] hover:border-[#13C065] hover:text-white text-[#6F7D77] dark:text-white/70'}`}
+                                                                    className={`mx-auto w-8 h-8 rounded-full flex items-center justify-center border transition-colors cursor-pointer ${actionMenuOpen === job.id ? 'bg-[#13C065] border-[#13C065] text-white' : 'border-gray-300 dark:border-white/20 hover:bg-[#13C065] hover:border-[#13C065] hover:text-white text-[#6F7D77] dark:text-white/70'}`}
                                                                 >
                                                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                                                                         <circle cx="5" cy="12" r="1.5" />
@@ -1165,14 +1169,14 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
 
                                                                 {/* Dropdown Menu */}
                                                                 {actionMenuOpen === job.id && (
-                                                                    <div data-action-menu="panel" className="absolute right-4 top-12 w-32 bg-white dark:bg-[#2A332E] border border-gray-200 dark:border-white/15 rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.20)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.35)] z-50 overflow-hidden text-left">
-                                                                        <button className="w-full text-left px-4 py-2.5 text-[14px] font-medium text-[#2C3933] dark:text-white/90 hover:bg-black/[0.04] dark:hover:bg-white/5 transition-colors">
+                                                                    <div data-action-menu="panel" className="absolute right-0 top-11 w-32 bg-white/14 dark:bg-[rgba(25,33,28,0.12)] border border-[rgba(25,33,28,0.08)] dark:border-[rgba(255,255,255,0.2)] rounded-xl shadow-[0_16px_40px_rgba(25,33,28,0.05)] dark:shadow-[0_16px_40px_rgba(25,33,28,0.6)] backdrop-blur-[20px] z-50 overflow-hidden text-left box-border">
+                                                                        <button className="w-full text-left px-4 py-2.5 text-[14px] font-medium text-[#2C3933] dark:text-white/90 hover:bg-white/10 dark:hover:bg-white/10 transition-colors">
                                                                             View Job
                                                                         </button>
-                                                                        <button className="w-full text-left px-4 py-2.5 text-[14px] font-medium text-[#2C3933] dark:text-white/90 hover:bg-black/[0.04] dark:hover:bg-white/5 transition-colors border-t border-gray-200 dark:border-white/10">
+                                                                        <button className="w-full text-left px-4 py-2.5 text-[14px] font-medium text-[#2C3933] dark:text-white/90 hover:bg-white/10 dark:hover:bg-white/10 transition-colors border-t border-[#19211C]/10 dark:border-white/20">
                                                                             Shortlist
                                                                         </button>
-                                                                        <button className="w-full text-left px-4 py-2.5 text-[14px] font-medium text-[#2C3933] dark:text-white/90 hover:bg-black/[0.04] dark:hover:bg-white/5 transition-colors border-t border-gray-200 dark:border-white/10">
+                                                                        <button className="w-full text-left px-4 py-2.5 text-[14px] font-medium text-[#2C3933] dark:text-white/90 hover:bg-white/10 dark:hover:bg-white/10 transition-colors border-t border-[#19211C]/10 dark:border-white/20">
                                                                             Reject
                                                                         </button>
                                                                     </div>
@@ -1185,7 +1189,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                     </div>
                                 </div>
                             )}
-                            {/* ─── End Applied Jobs Tab ─── */}
+                            {/* â”€â”€â”€ End Applied Jobs Tab â”€â”€â”€ */}
 
                         </div>
                     </div>
@@ -1207,3 +1211,5 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
         </div>
     );
 }
+
+

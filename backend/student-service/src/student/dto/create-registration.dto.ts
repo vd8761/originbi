@@ -86,4 +86,15 @@ export class CreateRegistrationDto {
   @IsString()
   @IsOptional()
   payment_provider?: string;
+
+  @IsString()
+  @IsOptional()
+  current_role?: string;
+
+  @IsString()
+  @IsOptional()
+  role_description?: string;
+
+  @IsOptional()
+  metadata?: any;
 }

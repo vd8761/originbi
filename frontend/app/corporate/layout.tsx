@@ -1,12 +1,13 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Header from '../../components/corporate/Header';
 import FloatingChatBot from '../../components/admin/FloatingChatBot';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut } from 'aws-amplify/auth';
 import { configureAmplify } from '../../lib/aws-amplify-config';
 import RequireCorporate from '../../components/auth/RequireCorporate';
+import { corporateDashboardService } from '../../lib/services';
 
 configureAmplify();
 
@@ -17,6 +18,7 @@ export default function CorporateLayout({
 }) {
     const pathname = usePathname();
     const router = useRouter();
+    const [showAssistant, setShowAssistant] = useState(false);
 
     // Show header only if NOT on auth pages (login, register, forgot-password, reset-password)
     const hideHeaderRoutes = [
@@ -29,6 +31,39 @@ export default function CorporateLayout({
     // Check if current path starts with any of the hide routes (to cover subpaths if any)
     // Or simpler exact match if routes are exact.
     const showHeader = !hideHeaderRoutes.some(route => pathname === route || pathname.startsWith(`${route}/`));
+
+    useEffect(() => {
+        let mounted = true;
+
+        const loadAssistantAccess = async () => {
+            if (!showHeader) {
+                if (mounted) setShowAssistant(false);
+                return;
+            }
+
+            const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
+            if (!email) {
+                if (mounted) setShowAssistant(false);
+                return;
+            }
+
+            try {
+                const profile = await corporateDashboardService.getProfile(email);
+                if (mounted) {
+                    setShowAssistant(!!profile?.ask_bi_enabled);
+                }
+            } catch (error) {
+                console.error('Failed to load Ask BI access', error);
+                if (mounted) setShowAssistant(false);
+            }
+        };
+
+        loadAssistantAccess();
+
+        return () => {
+            mounted = false;
+        };
+    }, [showHeader, pathname]);
 
     const handleNavigate = (view: string) => {
         // Map view ID to route
@@ -108,7 +143,7 @@ export default function CorporateLayout({
                         </div>
 
                         {/* Floating AI Chat Bot */}
-                        <FloatingChatBot userRole="CORPORATE" />
+                        {showAssistant && <FloatingChatBot userRole="CORPORATE" />}
                     </RequireCorporate>
                 ) : (
                     /* --- PUBLIC LAYOUT (No Header, No Guard) --- */

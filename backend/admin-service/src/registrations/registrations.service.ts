@@ -821,7 +821,7 @@ export class RegistrationsService {
       name,
       to,
       pass,
-      process.env.FRONTEND_URL ?? '',
+      process.env.FRONTEND_URL ?? 'https://mind.originbi.com/',
       assets,
       startDateTime,
       assessmentTitle,

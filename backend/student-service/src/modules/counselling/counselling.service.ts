@@ -180,7 +180,7 @@ export class CounsellingService {
 
     await this.sessionRepo.save(session);
 
-    const frontendUrl = this.configService.get<string>('FRONTEND_APP_URL');
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'https://mind.originbi.com/';
     const redirectUrl = `${frontendUrl}/counselling/start?token=${sessionToken}`;
 
     // --- Trigger External API ---

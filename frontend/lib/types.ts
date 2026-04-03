@@ -145,6 +145,7 @@ export interface CorporateAccount {
   total_credits: number;
   available_credits: number;
   is_active: boolean;
+  ask_bi_enabled?: boolean;
   is_blocked: boolean;
   created_at: string;
   updated_at: string;

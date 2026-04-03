@@ -216,6 +216,45 @@ const RenderContent = memo(({ content, streaming, onDone }: {
                     const parseRow = (r: string) => r.split('|').filter((_, ci, arr) => ci > 0 && ci < arr.length - 1).map(c => c.trim());
                     const header = rows[0] ? parseRow(rows[0]) : [];
                     const body = rows.slice(1).map(parseRow);
+                    const shouldRenderAsText = header.length >= 8 || header.join(' ').length > 90;
+                    const normalizedHeaders = header.map(h => h.toLowerCase().replace(/\s+/g, ' ').trim());
+                    const companyNameIndex = normalizedHeaders.findIndex(h => h.includes('company name') || h === 'company' || h.includes('organization name'));
+                    const hiddenColumns = new Set(
+                        normalizedHeaders
+                            .map((h, idx) => ({ h, idx }))
+                            .filter(x => x.h === 'id' || x.h === 's.no' || x.h === 's no' || x.h === 'serial no' || x.h === 'serial number')
+                            .map(x => x.idx)
+                    );
+                    const isCompanyFocusedTable = companyNameIndex !== -1;
+
+                    if (shouldRenderAsText) {
+                        return (
+                            <div key={bi} className="my-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 p-3 space-y-3">
+                                {body.map((row, ri) => (
+                                    <div key={ri} className="rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/[0.03] p-3">
+                                        {isCompanyFocusedTable && row[companyNameIndex] ? (
+                                            <div className="mb-2.5 pb-2 border-b border-emerald-200 dark:border-emerald-700/40">
+                                                <h4 className="text-lg font-extrabold tracking-tight text-emerald-600 dark:text-emerald-400 break-words">{formatInline(row[companyNameIndex])}</h4>
+                                            </div>
+                                        ) : null}
+                                        <div className="space-y-1.5">
+                                            {header.map((h, hi) => {
+                                                if (hiddenColumns.has(hi)) return null;
+                                                if (isCompanyFocusedTable && hi === companyNameIndex) return null;
+                                                return (
+                                                <p key={hi} className="text-sm text-gray-700 dark:text-gray-300 break-words">
+                                                    <span className="font-semibold text-gray-600 dark:text-gray-400">{formatInline(h)}:</span>{' '}
+                                                    <span>{formatInline(row[hi] || '-')}</span>
+                                                </p>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    }
+
                     return (
                         <div key={bi} className="overflow-x-auto my-3 rounded-xl border border-gray-200 dark:border-white/10">
                             <table className="w-full text-sm">
@@ -224,7 +263,7 @@ const RenderContent = memo(({ content, streaming, onDone }: {
                                 ))}</tr></thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-white/5">{body.map((row, ri) => (
                                     <tr key={ri} className="hover:bg-gray-50/60 dark:hover:bg-white/5 transition-colors">{row.map((cell, ci) => (
-                                        <td key={ci} className="px-4 py-2.5 text-gray-700 dark:text-gray-300">{formatInline(cell)}</td>
+                                        <td key={ci} className="px-4 py-2.5 text-gray-700 dark:text-gray-300 break-words">{formatInline(cell)}</td>
                                     ))}</tr>
                                 ))}</tbody>
                             </table>

@@ -34,6 +34,7 @@ import {
   PersonalityTrait,
   Program,
   Groups,
+  CorporateAccount,
 } from '@originbi/shared-entities';
 import { PdfModule } from '../common/pdf/pdf.module';
 
@@ -47,6 +48,7 @@ import { PdfModule } from '../common/pdf/pdf.module';
       PersonalityTrait,
       Program,
       Groups,
+      CorporateAccount,
     ]),
     PdfModule,
     AuthModule,

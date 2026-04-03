@@ -69,6 +69,14 @@ export class CorporateController {
     return this.corporateService.updateBlockStatus(+id, isBlocked);
   }
 
+  @Patch(':id/ask-bi')
+  async updateAskBiStatus(
+    @Param('id') id: string,
+    @Body('ask_bi_enabled') askBiEnabled: boolean,
+  ) {
+    return this.corporateService.updateAskBiStatus(+id, askBiEnabled);
+  }
+
   @Patch(':id/credits')
   async updateCredits(
     @Param('id') id: string,
