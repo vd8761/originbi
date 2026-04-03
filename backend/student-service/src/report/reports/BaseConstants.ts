@@ -1,6 +1,7 @@
 export const SCHOOL_LEVEL_ID = {
   SSLC: 1,
   HSC: 2,
+  GCSE: 1,
 };
 
 export const SCHOOL_STREAM_ID = {
