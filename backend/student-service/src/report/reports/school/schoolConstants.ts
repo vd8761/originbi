@@ -30,7 +30,7 @@ export const SSLC_TOC_CONTENT = [
   'Your Personalized Behavioral Charts',
   'Future Industry Glimpse (2035)',
   'Career Popularity',
-  'Tech Areas That Will Matter in 2030 - 2035',
+  'Tech Areas That Will Matter in 2027 - 2035',
   'Behavioral Capability Profile',
   'Mapping Your Strengths to Future Academic and Career Goals',
   'Career Alignment Index',
@@ -68,7 +68,7 @@ export const HSC_TOC_CONTENT = [
   'Your Personalized Behavioral Charts',
   'Future Industry Glimpse (2035)',
   'Career Popularity',
-  'Tech Areas That Will Matter in 2030 - 2035',
+  'Tech Areas That Will Matter in 2027 - 2035',
   'Behavioral Capability Profile',
   'Mapping Your Strengths to Future Academic and Career Goals',
   'Career Alignment Index',
@@ -76,6 +76,25 @@ export const HSC_TOC_CONTENT = [
   'Course Compatibility Matrix',
   'Your Reach Institutions - Top Colleges for You',
   'Career Flight Path',
+  'Disclaimer',
+];
+
+export const GCSE_TOC_CONTENT = [
+  'About the Origin BI Self-Discovery Report',
+  'Benefits of Understanding Your Ideal Learning and Growth Paths',
+  'General Characteristics for $full_name',
+  'YOUR STRENGTHS - What You Bring to Your Learning Journey',
+  'Motivations and Needs - Insights Personalized for You',
+  'Agile Compatibility Index (ACI)',
+  'Your Personalized Behavioral Charts',
+  'Future Industry Glimpse (2035)',
+  'Career Popularity',
+  'Tech Areas That Will Matter in 2027 - 2035',
+  'Behavioral Capability Profile',
+  'Mapping Your Strengths to Future Academic and Career Goals',
+    'Your Academic Strengths Profile',
+    'Academic Pathways',
+    'Your Personalised Academic Journey',
   'Disclaimer',
 ];
 
@@ -1257,8 +1276,8 @@ export const GCSE: GCSESubject[] = [
 
 // Text templates for the redesigned GCSE pathway report sections
 export const GCSE_PATHWAY_CONTENT = {
-  // Section 2: Understanding Your Two Pathways
-  pathways_title: 'Understanding Your Two Pathways',
+  // Section 2: Academic Pathways
+  pathways_title: 'Academic Pathways',
   pathways_intro: 'After completing your IGCSEs, you have two routes to university-level qualifications. Both are internationally recognised and lead to the same universities - the difference is how you structure your subject choices.',
 
   as_title: 'International AS & A-Levels',

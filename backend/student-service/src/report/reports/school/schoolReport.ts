@@ -13,6 +13,7 @@ import {
   STREAM_FULL_NAMES,
   SSLC_TOC_CONTENT,
   HSC_TOC_CONTENT,
+  GCSE_TOC_CONTENT,
   SCHOOL_CONTENT,
   SCHOOL_DYNAMIC_CONTENT,
   SCHOOL_BLENDED_STYLE_MAPPING,
@@ -297,8 +298,19 @@ export class SchoolReport extends BaseReport {
     // Set the starting Y position for the first item
     let currentY = 45 * this.MM;
 
-    const tocContent =
-      this.data.school_level_id === 1 ? SSLC_TOC_CONTENT : HSC_TOC_CONTENT;
+    // Determine which TOC to use
+    const isGCSE =
+      this.data.student_board?.toUpperCase() === 'IGCSE' ||
+      this.data.group_name?.toUpperCase() === 'IGCSE' ||
+      this.data.dept_code?.toUpperCase() === 'IGCSE';
+
+    let tocContent;
+    if (isGCSE) {
+      tocContent = GCSE_TOC_CONTENT;
+    } else {
+      tocContent =
+        this.data.school_level_id === 1 ? SSLC_TOC_CONTENT : HSC_TOC_CONTENT;
+    }
 
     // TOC items gap by TOC items count
     let tocItemsGap = 10;
@@ -1764,7 +1776,7 @@ export class SchoolReport extends BaseReport {
     const pageW = this.PAGE_WIDTH - 2 * margin;
 
     this.ensureSpace(0.4, true);
-    this.h1(GCSE_PATHWAY_CONTENT.as_rec_title);
+    this.h1(GCSE_PATHWAY_CONTENT.as_rec_title, { color: 'black' });
 
     // AS Pathway Card rendered under title
     this.renderPathwayCard({
@@ -1832,7 +1844,7 @@ export class SchoolReport extends BaseReport {
     const pageW = this.PAGE_WIDTH - 2 * margin;
 
     this.ensureSpace(0.4, true);
-    this.h1(GCSE_PATHWAY_CONTENT.aice_rec_title);
+    this.h1(GCSE_PATHWAY_CONTENT.aice_rec_title, { color: 'black' });
 
     // AICE Pathway Card rendered under title
     this.renderPathwayCard({
