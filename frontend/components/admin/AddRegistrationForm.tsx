@@ -61,7 +61,12 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
   const schoolLevels = [
     { value: "SSLC", label: "SSLC" },
     { value: "HSC", label: "HSC" },
+    { value: "GCSE", label: "GCSE" },
   ];
+
+  const filteredSchoolLevels = formData.student_board === "IGCSE" 
+    ? schoolLevels.filter(l => l.value === "GCSE")
+    : schoolLevels.filter(l => l.value !== "GCSE");
 
   const schoolStreams = [
     { value: "SCIENCE", label: "Science" },
@@ -121,9 +126,9 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
   };
 
   const getZIndex = (field: string) => {
-    if (openField === field) return "z-[60]";
-    if (activeField === field) return "z-50";
-    return "z-0";
+    if (openField === field) return "z-[100]";
+    if (activeField === field) return "z-[50]";
+    return ""; // Return empty to avoid creating unnecessary stacking contexts
   };
 
   const validateForm = () => {
@@ -293,7 +298,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
             {/* Full Name */}
-            <div className="space-y-2 z-0">
+            <div className="space-y-2">
               <label className={baseLabelClasses}>
                 Full Name <span className="text-red-500">*</span>
               </label>
@@ -308,7 +313,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
             </div>
 
             {/* Gender */}
-            <div className="space-y-2 z-0">
+            <div className="space-y-2">
               <label className={baseLabelClasses}>
                 Gender <span className="text-red-500">*</span>
               </label>
@@ -330,7 +335,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
             </div>
 
             {/* Email */}
-            <div className="space-y-2 z-0">
+            <div className="space-y-2">
               <label className={baseLabelClasses}>
                 Email Address <span className="text-red-500">*</span>
               </label>
@@ -441,18 +446,44 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
               )}
             </div>
 
+            {/* Student Board (for School Students) */}
+            {isSchoolProgram && (
+              <div
+                className={`relative animate-fade-in ${getZIndex("board")}`}
+                onMouseEnter={() => setActiveField("board")}
+                onMouseLeave={() => setActiveField(null)}
+              >
+                <CustomSelect
+                  label="Board"
+                  required
+                  options={boardOptions}
+                  value={formData.student_board || ""}
+                  onChange={(val) => {
+                    handleInputChange("student_board", val);
+                    handleInputChange("school_level", ""); // Clear school level when board changes
+                  }}
+                  onOpenChange={(isOpen) => handleOpenStatus("board", isOpen)}
+                  placeholder="Select Board"
+                />
+                {formErrors.student_board && (
+                  <p className="text-xs text-red-500 ml-1 mt-1">
+                    {formErrors.student_board}
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* School Level (for School Students) */}
             {isSchoolProgram && (
               <div
-                className={`relative animate-fade-in ${activeField === "schoolLevel" ? "z-50" : "z-auto"
-                  }`}
+                className={`relative animate-fade-in ${getZIndex("schoolLevel")}`}
                 onMouseEnter={() => setActiveField("schoolLevel")}
                 onMouseLeave={() => setActiveField(null)}
               >
                 <CustomSelect
                   label="School Level"
                   required
-                  options={schoolLevels}
+                  options={filteredSchoolLevels}
                   value={formData.school_level || ""}
                   onChange={(val) => {
                     handleInputChange("school_level", val);
@@ -470,36 +501,10 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
               </div>
             )}
 
-            {/* Student Board (for School Students) */}
-            {isSchoolProgram && (
-              <div
-                className={`relative animate-fade-in ${activeField === "board" ? "z-50" : "z-auto"
-                  }`}
-                onMouseEnter={() => setActiveField("board")}
-                onMouseLeave={() => setActiveField(null)}
-              >
-                <CustomSelect
-                  label="Board"
-                  required
-                  options={boardOptions}
-                  value={formData.student_board || ""}
-                  onChange={(val) => handleInputChange("student_board", val)}
-                  onOpenChange={(isOpen) => handleOpenStatus("board", isOpen)}
-                  placeholder="Select Board"
-                />
-                {formErrors.student_board && (
-                  <p className="text-xs text-red-500 ml-1 mt-1">
-                    {formErrors.student_board}
-                  </p>
-                )}
-              </div>
-            )}
-
             {/* Stream (HSC only) */}
             {isSchoolProgram && formData.school_level === "HSC" && (
               <div
-                className={`relative animate-fade-in ${activeField === "stream" ? "z-50" : "z-auto"
-                  }`}
+                className={`relative animate-fade-in ${getZIndex("stream")}`}
                 onMouseEnter={() => setActiveField("stream")}
                 onMouseLeave={() => setActiveField(null)}
               >
@@ -552,8 +557,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
             {/* Department (College Students) */}
             {isCollegeProgram && (
               <div
-                className={`relative animate-fade-in ${activeField === "dept" ? "z-50" : "z-auto"
-                  }`}
+                className={`relative animate-fade-in ${getZIndex("dept")}`}
                 onMouseEnter={() => setActiveField("dept")}
                 onMouseLeave={() => setActiveField(null)}
               >
@@ -604,7 +608,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
             )}
 
             {/* Group Name */}
-            <div className="space-y-2 relative z-0">
+            <div className="space-y-2 relative">
               <label className={baseLabelClasses}>Group Name</label>
               <input
                 type="text"
@@ -616,7 +620,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
             </div>
 
             {/* Send Email Notification */}
-            <div className="space-y-2 relative z-0">
+            <div className="space-y-2 relative">
               <label className={baseLabelClasses}>
                 Send Email Notification <span className="text-red-500">*</span>
               </label>
