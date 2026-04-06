@@ -5,7 +5,7 @@ import { ArrowUpRightIcon } from '../icons';
 
 const RoadmapItem: React.FC<{ item: RoadmapItemType & { id?: string } }> = ({ item }) => (
     <div
-        className="block -mx-6 px-6 lg:-mx-[1.25vw] lg:px-[1.25vw] even:bg-white/5 hover:bg-white/10 dark:hover:bg-brand-dark-tertiary transition-colors duration-200 group relative"
+        className="block -mx-6 px-6 lg:-mx-[1.25vw] lg:px-[1.25vw] even:bg-white/5 hover:bg-white/5 transition-colors duration-200 group relative"
     >
         <div className="flex justify-between items-center py-4 lg:py-[0.833vw]">
             <div className="pr-4">
