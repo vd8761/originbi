@@ -1686,7 +1686,7 @@ export class SchoolReport extends BaseReport {
     // this.doc.moveDown(0.2);
 
     this.p(
-      'Based on your DISC personality assessment and Agile Competency indicators, here is how your natural strengths map across six core academic dimensions. These dimensions determine which subject groups align best with who you are.',
+      'Based on your personality and Agile Competency indicators, here is how your natural strengths map across six core academic dimensions. These dimensions determine which subject groups align best with who you are.',
     );
     this.doc.moveDown(0.3);
 
@@ -4158,7 +4158,7 @@ export class SchoolReport extends BaseReport {
 
     // B. Sub Headers (DISC Focus, etc.)
     const subHeaders = [
-      'DISC Focus',
+      'Personality Focus',
       'Problem/Tasks',
       'People',
       'Pace (Environment)',

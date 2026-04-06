@@ -28,7 +28,7 @@ export const EMPLOYEE_CONTENT = {
   ],
 
   what_you_gain: [
-    'A comprehensive analysis of your DISC profile.',
+    'A comprehensive analysis of your Personality profile.',
     'Personalized strategies for growth and success.',
     'Tailored career recommendations to align with your natural strengths.',
     'Insights to improve teamwork, leadership, and overall effectiveness.',
@@ -49,7 +49,7 @@ export const EMPLOYEE_CONTENT = {
   how_this_report_helps_list: [
     'The roles and work environments where you are most likely to excel.',
     'The key drivers behind your success and satisfaction.',
-    'Practical recommendations to align your career with your DISC profile.',
+    'Practical recommendations to align your career with your Personality profile.',
   ],
 
   how_this_report_helps_you_para_2: `The insights gained from this report serve as a foundational guide to help you explore career paths that suit your unique traits. Whether you're at the beginning of your career journey or looking to pivot in a new direction, this report is a tool to inform and inspire your next steps.`,
