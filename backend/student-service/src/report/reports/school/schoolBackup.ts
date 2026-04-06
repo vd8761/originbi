@@ -2019,7 +2019,7 @@
 
 //         // B. Sub Headers (DISC Focus, etc.)
 //         const subHeaders = [
-//             'DISC Focus',
+//             'Personality Focus',
 //             'Problem/Tasks',
 //             'People',
 //             'Pace (Environment)',
