@@ -20,7 +20,7 @@ const MoodItem: React.FC<{
 }> = ({ item, isHighlighted, onClick }) => (
     <div
         onClick={onClick}
-        className={`grid grid-cols-2 gap-4 lg:gap-[1.25vw] px-6 py-4 lg:px-[1.25vw] lg:py-[0.833vw] transition-all duration-200 cursor-pointer group hover:bg-white/10 ${isHighlighted ? 'bg-white/10' : 'even:bg-white/5'}`}
+        className={`grid grid-cols-2 gap-4 lg:gap-[1.25vw] px-6 py-4 lg:px-[1.25vw] lg:py-[0.833vw] transition-all duration-200 cursor-pointer group hover:bg-white/10 ${isHighlighted ? 'bg-white/10' : ''}`}
     >
         <div className="relative w-full aspect-video overflow-hidden rounded-xl">
             <img
@@ -108,12 +108,14 @@ const MoodCard: React.FC = () => {
 
             <div className="flex flex-col flex-grow overflow-y-auto w-full">
                 {moodItems.map((item, index) => (
-                    <MoodItem
-                        key={index}
-                        item={item}
-                        isHighlighted={index === 0}
-                        onClick={() => { }}
-                    />
+                    <React.Fragment key={index}>
+                        <MoodItem
+                            item={item}
+                            isHighlighted={index === 0}
+                            onClick={() => { }}
+                        />
+                        {index < moodItems.length - 1 && <hr className="w-full border-[#19211C]/20 dark:border-white/10" />}
+                    </React.Fragment>
                 ))}
             </div>
         </div>
