@@ -15,11 +15,12 @@ const getTagClasses = (tag: MoodTag | string): string => {
 
 const MoodItem: React.FC<{
     item: MoodItemType;
+    isHighlighted?: boolean;
     onClick: () => void;
-}> = ({ item, onClick }) => (
+}> = ({ item, isHighlighted, onClick }) => (
     <div
         onClick={onClick}
-        className="grid grid-cols-2 gap-4 lg:gap-[1.25vw] px-6 py-4 lg:px-[1.25vw] lg:py-[0.833vw] transition-all duration-200 cursor-pointer group hover:bg-white/5 even:bg-white/5"
+        className={`grid grid-cols-2 gap-4 lg:gap-[1.25vw] px-6 py-4 lg:px-[1.25vw] lg:py-[0.833vw] transition-all duration-200 cursor-pointer group hover:bg-white/10 ${isHighlighted ? 'bg-white/10' : 'even:bg-white/5'}`}
     >
         <div className="relative w-full aspect-video overflow-hidden rounded-xl">
             <img
@@ -110,6 +111,7 @@ const MoodCard: React.FC = () => {
                     <MoodItem
                         key={index}
                         item={item}
+                        isHighlighted={index === 0}
                         onClick={() => { }}
                     />
                 ))}
