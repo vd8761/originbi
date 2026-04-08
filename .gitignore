@@ -49,6 +49,7 @@ logs
 *.log
 *.log.*
 /tmp
+/tmp2
 
 # EDITOR FOLDERS
 .vscode/
