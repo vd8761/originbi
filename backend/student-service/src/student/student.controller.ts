@@ -130,7 +130,9 @@ export class StudentController {
   @Post('send-bulk-report-emails')
   async sendBulkReportEmails(@Body() body: { userIds: number[] }) {
     const logger = new Logger('SendBulkReportEmails');
-    logger.log(`Received send-bulk-report-emails for ${body.userIds?.length || 0} users`);
+    logger.log(
+      `Received send-bulk-report-emails for ${body.userIds?.length || 0} users`,
+    );
     if (!Array.isArray(body.userIds) || body.userIds.length === 0) {
       return { message: '0 email jobs queued', enqueued: 0 };
     }
@@ -146,14 +148,19 @@ export class StudentController {
         enqueued++;
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
-        logger.error(`Failed to enqueue job for userId ${userId}: ${error.message}`);
+        logger.error(
+          `Failed to enqueue job for userId ${userId}: ${error.message}`,
+        );
         errors.push(userId);
       }
     }
     logger.log(`Bulk email: ${enqueued} queued, ${errors.length} failed`);
-    return { message: `${enqueued} email job(s) queued`, enqueued, failed: errors };
+    return {
+      message: `${enqueued} email job(s) queued`,
+      enqueued,
+      failed: errors,
+    };
   }
-
 
   @Post('send-placement-report-email')
   async sendPlacementReportEmail(
