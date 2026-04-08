@@ -39,8 +39,26 @@ const BAR_WIDTH_PX = 80;
 const BAR_GAP_PX = 12;
 const GROUP_WIDTH_PX = 172;
 const GROUP_GAP_PX = 131;
-const BAR_MAX_HEIGHT_PX = 300;
 const GROUP_TOTAL_HEIGHT_PX = 284;
+const BAR_MAX_HEIGHT_PX = 284;
+const CHART_BASE_VISIBLE_GROUPS = 6;
+
+const MONTH_FULL_LABELS: Record<string, string> = {
+  Jan: "January",
+  Feb: "February",
+  Mar: "March",
+  Apr: "April",
+  May: "May",
+  Jun: "June",
+  Jul: "July",
+  Aug: "August",
+  Sep: "September",
+  Oct: "October",
+  Nov: "November",
+  Dec: "December",
+};
+
+const USE_MOCK_USAGE_DATA = true;
 
 const DEFAULT_USAGE_DATA: UsagePoint[] = [
   { month: "Jan", studentProgram: 390, employeeProgram: 500, otherProgram: 0 },
@@ -75,9 +93,6 @@ interface TransactionHistoryRow {
   method: string;
   paymentStatus: "Completed" | "Pending" | "Failed" | "Refunded";
 }
-
-const USAGE_HISTORY_TOTAL_ENTRIES = 1676;
-const TRANSACTION_HISTORY_TOTAL_ENTRIES = 1676;
 
 const USAGE_HISTORY_ROWS: UsageHistoryRow[] = [
   {
@@ -210,20 +225,16 @@ function parseUsageRowDate(value: string): Date | null {
   return new Date(year, month - 1, day);
 }
 
-function EyeIcon({ width = 24, height = 24 }: { width?: number; height?: number }) {
+function EyeIcon({ width = 31, height = 20 }: { width?: number; height?: number }) {
   return (
-    <span className="group inline-block cursor-pointer">
-      <svg viewBox="0 0 24 24" width={width} height={height} className="block">
-        <path
-          d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6-10-6-10-6z"
-          className="fill-transparent stroke-[#22c55e] [stroke-width:2] transition-all duration-300 ease-in-out group-hover:fill-[#22c55e]"
-        />
-        <circle
-          cx="12"
-          cy="12"
-          r="3"
-          className="fill-transparent stroke-[#22c55e] [stroke-width:2] transition-all duration-300 ease-in-out origin-center group-hover:fill-[#065f46] group-hover:scale-125"
-        />
+    <span className="inline-flex items-center justify-center">
+      <svg width={width} height={height} viewBox="0 0 31 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="block group-hover/eye:hidden">
+        <path d="M15.4697 20C9.67887 20 4.13428 15.7396 0.474369 11.3165C-0.158123 10.5521 -0.158123 9.44246 0.474369 8.67809C1.39456 7.566 3.32293 5.42048 5.89892 3.5454C12.3871 -1.17724 18.5398 -1.18635 25.0405 3.5454C28.0668 5.74819 30.4651 8.63677 30.4651 8.67809C31.0975 9.44246 31.0975 10.5521 30.4651 11.3165C26.8057 15.739 21.2619 20 15.4697 20ZM15.4697 1.89989C9.05465 1.89989 3.49375 8.01767 1.94226 9.8927C1.89213 9.95331 1.89213 10.0413 1.94226 10.1019C3.49381 11.9769 9.05465 18.0947 15.4697 18.0947C21.8848 18.0947 27.4457 11.9769 28.9972 10.1019C29.0876 9.99255 28.9912 9.8927 28.9972 9.8927C27.4456 8.01767 21.8848 1.89989 15.4697 1.89989Z" fill="#1ED36A"/>
+        <path d="M15.4702 16.6658C11.7932 16.6658 8.80176 13.6743 8.80176 9.99732C8.80176 6.32032 11.7932 3.32886 15.4702 3.32886C19.1472 3.32886 22.1387 6.32032 22.1387 9.99732C22.1387 13.6743 19.1472 16.6658 15.4702 16.6658ZM15.4702 5.23413C12.8438 5.23413 10.707 7.3709 10.707 9.99732C10.707 12.6237 12.8438 14.7605 15.4702 14.7605C18.0966 14.7605 20.2334 12.6237 20.2334 9.99732C20.2334 7.3709 18.0966 5.23413 15.4702 5.23413Z" fill="#1ED36A"/>
+      </svg>
+      <svg width={width} height={height} viewBox="0 0 31 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="hidden group-hover/eye:block">
+        <path d="M15.4692 14.7659C18.0999 14.7659 20.2324 12.6333 20.2324 10.0027C20.2324 7.37205 18.0999 5.2395 15.4692 5.2395C12.8386 5.2395 10.7061 7.37205 10.7061 10.0027C10.7061 12.6333 12.8386 14.7659 15.4692 14.7659Z" fill="#1ED36A"/>
+        <path d="M30.4649 8.68329C26.8035 4.25888 21.2613 0 15.4698 0C9.67716 0 4.13358 4.26186 0.474681 8.68329C-0.158227 9.44778 -0.158227 10.5576 0.474681 11.3221C1.39457 12.4337 3.32307 14.5795 5.89876 16.4544C12.3856 21.1766 18.5397 21.1871 25.0408 16.4544C27.6165 14.5795 29.545 12.4337 30.4649 11.3221C31.096 10.5591 31.0992 9.45028 30.4649 8.68329ZM15.4698 3.33423C19.147 3.33423 22.1382 6.32551 22.1382 10.0027C22.1382 13.6799 19.147 16.6711 15.4698 16.6711C11.7926 16.6711 8.80132 13.6799 8.80132 10.0027C8.80132 6.32551 11.7926 3.33423 15.4698 3.33423Z" fill="#1ED36A"/>
       </svg>
     </span>
   );
@@ -236,10 +247,12 @@ const OriginCreditsDashboard: React.FC = () => {
   const [openRangeDropdown, setOpenRangeDropdown] = useState<"default" | "chart" | null>(null);
   const [usageSearchTerm, setUsageSearchTerm] = useState("");
   const [usageEntriesPerPage, setUsageEntriesPerPage] = useState(10);
+  const [usageCurrentPage, setUsageCurrentPage] = useState(1);
   const [usageEntriesMenuOpen, setUsageEntriesMenuOpen] = useState(false);
   const [usageStatusFilter, setUsageStatusFilter] = useState<"All" | UsageHistoryRow["examStatus"]>("All");
   const [showUsageFilterDropdown, setShowUsageFilterDropdown] = useState(false);
   const [showUsageDateModal, setShowUsageDateModal] = useState(false);
+  const [usageDateModalAnchorStyle, setUsageDateModalAnchorStyle] = useState<{ top: number; left: number } | null>(null);
   const [usageDateFilter, setUsageDateFilter] = useState<string>("Applied Date");
   const [usageCalendarPreset, setUsageCalendarPreset] = useState<string>("Any Time");
   const [usageRangeStart, setUsageRangeStart] = useState<Date | null>(null);
@@ -252,10 +265,12 @@ const OriginCreditsDashboard: React.FC = () => {
   const [usageSortDirection, setUsageSortDirection] = useState<"asc" | "desc">("desc");
   const [transactionSearchTerm, setTransactionSearchTerm] = useState("");
   const [transactionEntriesPerPage, setTransactionEntriesPerPage] = useState(10);
+  const [transactionCurrentPage, setTransactionCurrentPage] = useState(1);
   const [transactionEntriesMenuOpen, setTransactionEntriesMenuOpen] = useState(false);
   const [transactionStatusFilter, setTransactionStatusFilter] = useState<"All" | TransactionHistoryRow["paymentStatus"]>("All");
   const [showTransactionFilterDropdown, setShowTransactionFilterDropdown] = useState(false);
   const [showTransactionDateModal, setShowTransactionDateModal] = useState(false);
+  const [transactionDateModalAnchorStyle, setTransactionDateModalAnchorStyle] = useState<{ top: number; left: number } | null>(null);
   const [transactionDateFilter, setTransactionDateFilter] = useState<string>("Today (48)");
   const [transactionCalendarPreset, setTransactionCalendarPreset] = useState<string>("Any Time");
   const [transactionRangeStart, setTransactionRangeStart] = useState<Date | null>(null);
@@ -270,12 +285,15 @@ const OriginCreditsDashboard: React.FC = () => {
   const [assessmentsConducted, setAssessmentsConducted] = useState<number>(75);
   const [totalCreditsUsed, setTotalCreditsUsed] = useState<number>(750);
   const [usageData, setUsageData] = useState<UsagePoint[]>(DEFAULT_USAGE_DATA);
+  const [hoveredUsageBar, setHoveredUsageBar] = useState<{ index: number; series: "student" | "employee" } | null>(null);
   const [isBuyCreditsOpen, setIsBuyCreditsOpen] = useState(false);
   const [perCreditCost, setPerCreditCost] = useState<number | undefined>(undefined);
   const usageEntriesRef = useRef<HTMLDivElement | null>(null);
   const usageFilterRef = useRef<HTMLDivElement | null>(null);
+  const usageDateFilterButtonRef = useRef<HTMLButtonElement | null>(null);
   const transactionEntriesRef = useRef<HTMLDivElement | null>(null);
   const transactionFilterRef = useRef<HTMLDivElement | null>(null);
+  const transactionDateFilterButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -312,25 +330,27 @@ const OriginCreditsDashboard: React.FC = () => {
           setTotalCreditsUsed(used);
         }
 
-        const insights = Array.isArray(stats?.assessmentInsights)
-          ? stats.assessmentInsights
-          : [];
+        if (!USE_MOCK_USAGE_DATA) {
+          const insights = Array.isArray(stats?.assessmentInsights)
+            ? stats.assessmentInsights
+            : [];
 
-        if (insights.length > 0) {
-          const mapped: UsagePoint[] = insights.slice(-12).map((item: any) => {
-            const student = toNumber(item.completed) ?? 0;
-            const employee = toNumber(item.assigned) ?? 0;
-            const other = Math.max(0, (toNumber(item.inProgress) ?? 0));
+          if (insights.length > 0) {
+            const mapped: UsagePoint[] = insights.slice(-12).map((item: any) => {
+              const student = toNumber(item.completed) ?? 0;
+              const employee = toNumber(item.assigned) ?? 0;
+              const other = Math.max(0, (toNumber(item.inProgress) ?? 0));
 
-            return {
-              month: toMonthShort(String(item.month ?? "")) || "-",
-              studentProgram: student,
-              employeeProgram: employee,
-              otherProgram: other,
-            };
-          });
+              return {
+                month: toMonthShort(String(item.month ?? "")) || "-",
+                studentProgram: student,
+                employeeProgram: employee,
+                otherProgram: other,
+              };
+            });
 
-          setUsageData(mapped);
+            setUsageData(mapped);
+          }
         }
       } catch (error) {
         console.error("Failed to load Origin Credits data", error);
@@ -349,15 +369,40 @@ const OriginCreditsDashboard: React.FC = () => {
     return usageData.slice(-count);
   }, [usageData, selectedRange]);
 
-  const maxUsage = useMemo(() => {
-    const max = Math.max(
-      500,
+  const chartScaleFactor = useMemo(() => {
+    const rawPeak = Math.max(
+      0,
       ...visibleUsageData.map((item) =>
         Math.max(item.studentProgram, item.employeeProgram, item.otherProgram),
       ),
     );
-    return Math.ceil(max / 100) * 100;
+
+    if (rawPeak <= 0 || rawPeak >= 120) return 1;
+    return Math.min(20, 500 / rawPeak);
   }, [visibleUsageData]);
+
+  const scaledUsageData = useMemo(
+    () =>
+      visibleUsageData.map((item) => ({
+        ...item,
+        chartStudentProgram: item.studentProgram * chartScaleFactor,
+        chartEmployeeProgram: item.employeeProgram * chartScaleFactor,
+        chartOtherProgram: item.otherProgram * chartScaleFactor,
+      })),
+    [visibleUsageData, chartScaleFactor],
+  );
+
+  const maxUsage = useMemo(() => {
+    const peak = Math.max(
+      0,
+      ...scaledUsageData.map((item) =>
+        Math.max(item.chartStudentProgram, item.chartEmployeeProgram, item.chartOtherProgram),
+      ),
+    );
+
+    if (peak <= 0) return 500;
+    return Math.max(500, Math.ceil(peak / 100) * 100);
+  }, [scaledUsageData]);
 
   const yAxisTicks = useMemo(
     () => [maxUsage, maxUsage * 0.8, maxUsage * 0.6, maxUsage * 0.4, maxUsage * 0.2],
@@ -372,11 +417,30 @@ const OriginCreditsDashboard: React.FC = () => {
   };
 
   const chartTrackWidth = useMemo(
-    () =>
-      visibleUsageData.length * GROUP_WIDTH_PX +
-      Math.max(0, visibleUsageData.length - 1) * GROUP_GAP_PX,
+    () => {
+      const computedWidth =
+        visibleUsageData.length * GROUP_WIDTH_PX +
+        Math.max(0, visibleUsageData.length - 1) * GROUP_GAP_PX;
+
+      const baselineWidth =
+        CHART_BASE_VISIBLE_GROUPS * GROUP_WIDTH_PX +
+        Math.max(0, CHART_BASE_VISIBLE_GROUPS - 1) * GROUP_GAP_PX;
+
+      if (visibleUsageData.length >= 5) {
+        return Math.max(computedWidth, baselineWidth);
+      }
+
+      return computedWidth;
+    },
     [visibleUsageData],
   );
+
+  const shouldStretchChartGroups = visibleUsageData.length >= 5;
+
+  const toFullMonthLabel = (month: string) => {
+    const key = month.slice(0, 3);
+    return MONTH_FULL_LABELS[key] ?? month;
+  };
 
   const normalizeUsageDate = (date: Date) =>
     new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
@@ -434,6 +498,62 @@ const OriginCreditsDashboard: React.FC = () => {
     ? usageDateFilter
     : "Applied Date";
   const isUsageDateFilterActive = Boolean(usageDateFilter && usageDateFilter !== "Applied Date");
+
+  const openUsageDateModal = () => {
+    const presetByFilter: Record<string, string> = {
+      "Applied Date": "Any Time",
+      "Any Time": "Any Time",
+      "Today": "Today",
+      "Yesterday": "Yesterday",
+      "Past Week": "Last 7 Days",
+      "Past Month": "Last 30 Days",
+      "This Month": "This Month",
+      "Last Month": "Last Month",
+    };
+
+    const preset = presetByFilter[usageDateFilter ?? "Applied Date"] ?? "Custom Range";
+    setUsageCalendarPreset(preset);
+
+    const trigger = usageDateFilterButtonRef.current;
+    if (trigger && typeof window !== "undefined") {
+      const rect = trigger.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const modalWidth = Math.min(900, viewportWidth - 24);
+      const modalHeight = 480;
+      const gap = 12;
+
+      const left = Math.max(12, Math.min(rect.right - modalWidth, viewportWidth - modalWidth - 12));
+      const top = Math.max(88, Math.min(rect.bottom + gap, viewportHeight - modalHeight - 12));
+      setUsageDateModalAnchorStyle({ top, left });
+    }
+
+    setShowUsageDateModal(true);
+  };
+
+  useEffect(() => {
+    if (!showUsageDateModal) return;
+
+    const updateAnchorPosition = () => {
+      const trigger = usageDateFilterButtonRef.current;
+      if (!trigger || typeof window === "undefined") return;
+
+      const rect = trigger.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const modalWidth = Math.min(900, viewportWidth - 24);
+      const modalHeight = 480;
+      const gap = 12;
+
+      const left = Math.max(12, Math.min(rect.right - modalWidth, viewportWidth - modalWidth - 12));
+      const top = Math.max(88, Math.min(rect.bottom + gap, viewportHeight - modalHeight - 12));
+      setUsageDateModalAnchorStyle({ top, left });
+    };
+
+    updateAnchorPosition();
+    window.addEventListener("resize", updateAnchorPosition);
+    return () => window.removeEventListener("resize", updateAnchorPosition);
+  }, [showUsageDateModal]);
 
   const handleUsageDateCellClick = (date: Date) => {
     setUsageCalendarPreset("Custom Range");
@@ -547,46 +667,59 @@ const OriginCreditsDashboard: React.FC = () => {
     const cells = buildUsageMonthGrid(year, month);
 
     return (
-      <div className="w-[344px] h-[300px] rounded-[12px] bg-white/[0.08] border border-white/[0.12] px-5 py-3.5">
-        <div className="flex items-center justify-between mb-3 text-white/90 pb-3.5 border-b border-white/[0.12]">
+      <div className="w-[344px] h-[300px] rounded-[12px] bg-[#F6F9F7] dark:bg-white/[0.08] border border-[#DDE6E1] dark:border-white/[0.12] px-4 py-3 overflow-hidden">
+        <div className="flex items-center justify-between mb-2.5 text-[#22302A] dark:text-white/90 pb-2.5 border-b border-[#DDE6E1] dark:border-white/[0.12]">
           <button
             type="button"
             onClick={() => setUsageLeftCalendarMonth((prev) => addUsageMonths(prev, -1))}
-            className="p-1 text-white/60 hover:text-white transition-colors"
+            className="p-1 text-[#63716B] hover:text-[#22302A] dark:text-white/60 dark:hover:text-white transition-colors"
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M7.5 2L3.5 6L7.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
-          <p className="text-[14px] leading-[18px] font-semibold text-[#E7EFEB]">{title}</p>
+          <p className="text-[14px] leading-[18px] font-normal text-[#22302A] dark:text-[#E7EFEB]">{title}</p>
           <button
             type="button"
             onClick={() => setUsageLeftCalendarMonth((prev) => addUsageMonths(prev, 1))}
-            className="p-1 text-white/60 hover:text-white transition-colors"
+            className="p-1 text-[#63716B] hover:text-[#22302A] dark:text-white/60 dark:hover:text-white transition-colors"
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 2L8.5 6L4.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
         </div>
-        <div className="grid grid-cols-7 gap-y-2 mb-2">
+        <div className="grid grid-cols-7 mb-1.5">
           {USAGE_WEEK_DAYS.map((day) => (
-            <span key={`${title}-${day}`} className="text-center text-[13px] leading-[17px] font-normal text-white/80">{day}</span>
+            <span key={`${title}-${day}`} className="text-center text-[12px] leading-[16px] font-light text-[#63716B] dark:text-white/75">{day}</span>
           ))}
         </div>
-        <div className="grid grid-cols-7 gap-y-1.5">
-          {cells.map((cell) => {
+        <div className="h-[202px] grid grid-cols-7 grid-rows-6 gap-y-[2px]">
+          {cells.map((cell, index) => {
             const day = cell.date.getDate();
             const inRange = isUsageDateInRange(cell.date);
             const start = isUsageRangeStart(cell.date);
             const end = isUsageRangeEnd(cell.date);
             const isMuted = !cell.inCurrentMonth;
+            const colIndex = index % 7;
+            const prevCell = colIndex > 0 ? cells[index - 1] : null;
+            const nextCell = colIndex < 6 ? cells[index + 1] : null;
+            const prevInRange = Boolean(prevCell && isUsageDateInRange(prevCell.date));
+            const nextInRange = Boolean(nextCell && isUsageDateInRange(nextCell.date));
+            const isRangeSegmentStart = inRange && !prevInRange;
+            const isRangeSegmentEnd = inRange && !nextInRange;
             const rangePillClass = inRange
-              ? `${start ? "rounded-l-[24px]" : ""} ${end ? "rounded-r-[100px]" : ""} ${!start && !end ? "rounded-none" : ""}`
+              ? `${isRangeSegmentStart ? "rounded-l-[100px]" : ""} ${isRangeSegmentEnd ? "rounded-r-[100px]" : ""}`
               : "";
 
             return (
-              <div key={`${title}-${cell.date.toISOString()}`} className={`h-[28px] flex items-center justify-center text-[13px] leading-[17px] ${inRange ? "bg-[#1ED36A]/[0.16]" : ""} ${rangePillClass}`}>
+              <div key={`${title}-${cell.date.toISOString()}`} className="h-full relative flex items-center justify-center text-[12px] leading-[16px] isolate">
+                {inRange && (
+                  <div className={`absolute inset-y-[5px] z-0 bg-[#DDEFE5] dark:bg-[#204E35] ${rangePillClass}`} style={{
+                    left: isRangeSegmentStart ? "4px" : "0px",
+                    right: isRangeSegmentEnd ? "4px" : "0px",
+                  }} />
+                )}
                 <button
                   type="button"
                   onClick={() => handleUsageDateCellClick(new Date(cell.date.getFullYear(), cell.date.getMonth(), cell.date.getDate()))}
-                  className={`h-9 w-9 flex items-center justify-center font-normal ${start || end ? "rounded-full bg-[#1ED36A] text-white shadow-[0px_4px_6.7px_rgba(0,0,0,0.4),0px_2px_17.9px_rgba(30,211,106,0.4)]" : ""} ${!start && !end && inRange ? "text-white" : ""} ${!inRange && !isMuted ? "text-white" : ""} ${isMuted ? "text-white/40" : ""}`}
+                  className={`relative z-10 h-8 w-8 flex items-center justify-center text-[12px] leading-[16px] font-light text-[#22302A] dark:text-white ${start || end ? "rounded-full bg-[#1ED36A] text-white shadow-[0px_2px_10px_rgba(30,211,106,0.28)] dark:shadow-[0px_4px_6.7px_rgba(0,0,0,0.4),0px_2px_17.9px_rgba(30,211,106,0.4)]" : "rounded-full"} ${!start && !end && inRange ? "text-[#1F6A45] dark:text-white" : ""} ${!inRange && !isMuted ? "text-[#22302A] dark:text-white" : ""} ${isMuted ? "text-[#A3B1AA] dark:text-white/40" : ""}`}
                 >
                   {day}
                 </button>
@@ -685,9 +818,22 @@ const OriginCreditsDashboard: React.FC = () => {
     return rows;
   }, [filteredUsageHistoryRows, usageSortColumn, usageSortDirection]);
 
+  const usageTotalEntries = sortedUsageHistoryRows.length;
+  const usageTotalPages = Math.max(1, Math.ceil(usageTotalEntries / usageEntriesPerPage));
+  const safeUsageCurrentPage = Math.min(usageCurrentPage, usageTotalPages);
+
+  useEffect(() => {
+    if (usageCurrentPage > usageTotalPages) {
+      setUsageCurrentPage(usageTotalPages);
+    }
+  }, [usageCurrentPage, usageTotalPages]);
+
   const visibleUsageHistoryRows = useMemo(
-    () => sortedUsageHistoryRows.slice(0, usageEntriesPerPage),
-    [sortedUsageHistoryRows, usageEntriesPerPage],
+    () => {
+      const startIndex = (safeUsageCurrentPage - 1) * usageEntriesPerPage;
+      return sortedUsageHistoryRows.slice(startIndex, startIndex + usageEntriesPerPage);
+    },
+    [sortedUsageHistoryRows, safeUsageCurrentPage, usageEntriesPerPage],
   );
 
   const downloadUsageCSV = (
@@ -843,9 +989,22 @@ const OriginCreditsDashboard: React.FC = () => {
     return rows;
   }, [filteredTransactionRows, transactionSortColumn, transactionSortDirection]);
 
+  const transactionTotalEntries = sortedTransactionRows.length;
+  const transactionTotalPages = Math.max(1, Math.ceil(transactionTotalEntries / transactionEntriesPerPage));
+  const safeTransactionCurrentPage = Math.min(transactionCurrentPage, transactionTotalPages);
+
+  useEffect(() => {
+    if (transactionCurrentPage > transactionTotalPages) {
+      setTransactionCurrentPage(transactionTotalPages);
+    }
+  }, [transactionCurrentPage, transactionTotalPages]);
+
   const visibleTransactionRows = useMemo(
-    () => sortedTransactionRows.slice(0, transactionEntriesPerPage),
-    [sortedTransactionRows, transactionEntriesPerPage],
+    () => {
+      const startIndex = (safeTransactionCurrentPage - 1) * transactionEntriesPerPage;
+      return sortedTransactionRows.slice(startIndex, startIndex + transactionEntriesPerPage);
+    },
+    [sortedTransactionRows, safeTransactionCurrentPage, transactionEntriesPerPage],
   );
 
   const handleTransactionExport = async () => {
@@ -958,6 +1117,63 @@ const OriginCreditsDashboard: React.FC = () => {
     : "Today (48)";
   const isTransactionDateFilterActive = Boolean(transactionDateFilter && transactionDateFilter !== "Applied Date");
 
+  const openTransactionDateModal = () => {
+    const presetByFilter: Record<string, string> = {
+      "Applied Date": "Any Time",
+      "Any Time": "Any Time",
+      "Today": "Today",
+      "Today (48)": "Today",
+      "Yesterday": "Yesterday",
+      "Past Week": "Last 7 Days",
+      "Past Month": "Last 30 Days",
+      "This Month": "This Month",
+      "Last Month": "Last Month",
+    };
+
+    const preset = presetByFilter[transactionDateFilter ?? "Today (48)"] ?? "Custom Range";
+    setTransactionCalendarPreset(preset);
+
+    const trigger = transactionDateFilterButtonRef.current;
+    if (trigger && typeof window !== "undefined") {
+      const rect = trigger.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const modalWidth = Math.min(900, viewportWidth - 24);
+      const modalHeight = 480;
+      const gap = 12;
+
+      const left = Math.max(12, Math.min(rect.right - modalWidth, viewportWidth - modalWidth - 12));
+      const top = Math.max(88, Math.min(rect.bottom + gap, viewportHeight - modalHeight - 12));
+      setTransactionDateModalAnchorStyle({ top, left });
+    }
+
+    setShowTransactionDateModal(true);
+  };
+
+  useEffect(() => {
+    if (!showTransactionDateModal) return;
+
+    const updateAnchorPosition = () => {
+      const trigger = transactionDateFilterButtonRef.current;
+      if (!trigger || typeof window === "undefined") return;
+
+      const rect = trigger.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const modalWidth = Math.min(900, viewportWidth - 24);
+      const modalHeight = 480;
+      const gap = 12;
+
+      const left = Math.max(12, Math.min(rect.right - modalWidth, viewportWidth - modalWidth - 12));
+      const top = Math.max(88, Math.min(rect.bottom + gap, viewportHeight - modalHeight - 12));
+      setTransactionDateModalAnchorStyle({ top, left });
+    };
+
+    updateAnchorPosition();
+    window.addEventListener("resize", updateAnchorPosition);
+    return () => window.removeEventListener("resize", updateAnchorPosition);
+  }, [showTransactionDateModal]);
+
   const handleTransactionDateCellClick = (date: Date) => {
     setTransactionCalendarPreset("Custom Range");
 
@@ -992,46 +1208,59 @@ const OriginCreditsDashboard: React.FC = () => {
     const cells = buildUsageMonthGrid(year, month);
 
     return (
-      <div className="w-[344px] h-[300px] rounded-[12px] bg-white/[0.08] border border-white/[0.12] px-5 py-3.5">
-        <div className="flex items-center justify-between mb-3 text-white/90 pb-3.5 border-b border-white/[0.12]">
+      <div className="w-[344px] h-[300px] rounded-[12px] bg-[#F6F9F7] dark:bg-white/[0.08] border border-[#DDE6E1] dark:border-white/[0.12] px-4 py-3 overflow-hidden">
+        <div className="flex items-center justify-between mb-2.5 text-[#22302A] dark:text-white/90 pb-2.5 border-b border-[#DDE6E1] dark:border-white/[0.12]">
           <button
             type="button"
             onClick={() => setTransactionLeftCalendarMonth((prev) => addUsageMonths(prev, -1))}
-            className="p-1 text-white/60 hover:text-white transition-colors"
+            className="p-1 text-[#63716B] hover:text-[#22302A] dark:text-white/60 dark:hover:text-white transition-colors"
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M7.5 2L3.5 6L7.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
-          <p className="text-[14px] leading-[18px] font-semibold text-[#E7EFEB]">{title}</p>
+          <p className="text-[14px] leading-[18px] font-normal text-[#22302A] dark:text-[#E7EFEB]">{title}</p>
           <button
             type="button"
             onClick={() => setTransactionLeftCalendarMonth((prev) => addUsageMonths(prev, 1))}
-            className="p-1 text-white/60 hover:text-white transition-colors"
+            className="p-1 text-[#63716B] hover:text-[#22302A] dark:text-white/60 dark:hover:text-white transition-colors"
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 2L8.5 6L4.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
         </div>
-        <div className="grid grid-cols-7 gap-y-2 mb-2">
+        <div className="grid grid-cols-7 mb-1.5">
           {USAGE_WEEK_DAYS.map((day) => (
-            <span key={`${title}-${day}`} className="text-center text-[13px] leading-[17px] font-normal text-white/80">{day}</span>
+            <span key={`${title}-${day}`} className="text-center text-[12px] leading-[16px] font-light text-[#63716B] dark:text-white/75">{day}</span>
           ))}
         </div>
-        <div className="grid grid-cols-7 gap-y-1.5">
-          {cells.map((cell) => {
+        <div className="h-[202px] grid grid-cols-7 grid-rows-6 gap-y-[2px]">
+          {cells.map((cell, index) => {
             const day = cell.date.getDate();
             const inRange = isTransactionDateInRange(cell.date);
             const start = isTransactionRangeStart(cell.date);
             const end = isTransactionRangeEnd(cell.date);
             const isMuted = !cell.inCurrentMonth;
+            const colIndex = index % 7;
+            const prevCell = colIndex > 0 ? cells[index - 1] : null;
+            const nextCell = colIndex < 6 ? cells[index + 1] : null;
+            const prevInRange = Boolean(prevCell && isTransactionDateInRange(prevCell.date));
+            const nextInRange = Boolean(nextCell && isTransactionDateInRange(nextCell.date));
+            const isRangeSegmentStart = inRange && !prevInRange;
+            const isRangeSegmentEnd = inRange && !nextInRange;
             const rangePillClass = inRange
-              ? `${start ? "rounded-l-[24px]" : ""} ${end ? "rounded-r-[100px]" : ""} ${!start && !end ? "rounded-none" : ""}`
+              ? `${isRangeSegmentStart ? "rounded-l-[100px]" : ""} ${isRangeSegmentEnd ? "rounded-r-[100px]" : ""}`
               : "";
 
             return (
-              <div key={`${title}-${cell.date.toISOString()}`} className={`h-[28px] flex items-center justify-center text-[13px] leading-[17px] ${inRange ? "bg-[#1ED36A]/[0.16]" : ""} ${rangePillClass}`}>
+              <div key={`${title}-${cell.date.toISOString()}`} className="h-full relative flex items-center justify-center text-[12px] leading-[16px] isolate">
+                {inRange && (
+                  <div className={`absolute inset-y-[5px] z-0 bg-[#DDEFE5] dark:bg-[#204E35] ${rangePillClass}`} style={{
+                    left: isRangeSegmentStart ? "4px" : "0px",
+                    right: isRangeSegmentEnd ? "4px" : "0px",
+                  }} />
+                )}
                 <button
                   type="button"
                   onClick={() => handleTransactionDateCellClick(new Date(cell.date.getFullYear(), cell.date.getMonth(), cell.date.getDate()))}
-                  className={`h-9 w-9 flex items-center justify-center font-normal ${start || end ? "rounded-full bg-[#1ED36A] text-white shadow-[0px_4px_6.7px_rgba(0,0,0,0.4),0px_2px_17.9px_rgba(30,211,106,0.4)]" : ""} ${!start && !end && inRange ? "text-white" : ""} ${!inRange && !isMuted ? "text-white" : ""} ${isMuted ? "text-white/40" : ""}`}
+                  className={`relative z-10 h-8 w-8 flex items-center justify-center text-[12px] leading-[16px] font-light text-[#22302A] dark:text-white ${start || end ? "rounded-full bg-[#1ED36A] text-white shadow-[0px_2px_10px_rgba(30,211,106,0.28)] dark:shadow-[0px_4px_6.7px_rgba(0,0,0,0.4),0px_2px_17.9px_rgba(30,211,106,0.4)]" : "rounded-full"} ${!start && !end && inRange ? "text-[#1F6A45] dark:text-white" : ""} ${!inRange && !isMuted ? "text-[#22302A] dark:text-white" : ""} ${isMuted ? "text-[#A3B1AA] dark:text-white/40" : ""}`}
                 >
                   {day}
                 </button>
@@ -1214,6 +1443,7 @@ const OriginCreditsDashboard: React.FC = () => {
                       type="button"
                       onClick={() => {
                         setUsageEntriesPerPage(size);
+                        setUsageCurrentPage(1);
                         setUsageEntriesMenuOpen(false);
                       }}
                       className={`w-full text-left px-3 py-2 text-[12px] transition-colors ${usageEntriesPerPage === size
@@ -1227,17 +1457,27 @@ const OriginCreditsDashboard: React.FC = () => {
                 </div>
               )}
             </div>
-            <span className="whitespace-nowrap font-light">of {USAGE_HISTORY_TOTAL_ENTRIES.toLocaleString()} entries</span>
+            <span className="whitespace-nowrap font-light">of {usageTotalEntries.toLocaleString()} entries</span>
             <div className="flex items-center gap-1.5 ml-1">
               <button
                 type="button"
-                className="w-10 h-10 rounded-full bg-[#EEF1EE] dark:bg-white/10 flex items-center justify-center transition-all text-[#19211C]/70 dark:text-white/70 hover:bg-[#1ED36A] hover:text-white"
+                onClick={() => setUsageCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={safeUsageCurrentPage === 1}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${safeUsageCurrentPage === 1
+                    ? "bg-[#EEF1EE] dark:bg-white/10 text-[#19211C]/35 dark:text-white/35 cursor-not-allowed"
+                    : "bg-[#EEF1EE] dark:bg-white/10 text-[#19211C]/70 dark:text-white/70 hover:bg-[#1ED36A] hover:text-white"
+                  }`}
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 type="button"
-                className="w-10 h-10 rounded-full bg-[#1ED36A] text-white flex items-center justify-center transition-all hover:bg-[#16BD5C]"
+                onClick={() => setUsageCurrentPage((prev) => Math.min(usageTotalPages, prev + 1))}
+                disabled={safeUsageCurrentPage === usageTotalPages}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${safeUsageCurrentPage === usageTotalPages
+                    ? "bg-[#BDECCC] dark:bg-white/20 text-white/70 cursor-not-allowed"
+                    : "bg-[#1ED36A] text-white hover:bg-[#16BD5C]"
+                  }`}
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -1294,21 +1534,24 @@ const OriginCreditsDashboard: React.FC = () => {
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setShowUsageDateModal(true)}
-                  className={`h-[44px] rounded-xl px-4 text-[13px] flex items-center gap-2 font-medium cursor-pointer transition-all whitespace-nowrap border ${isUsageDateFilterActive
-                    ? "border-[#1ED36A]/50 bg-[#E7F8EE]/60 text-[#1F3B2A] hover:bg-[#DDF4E7]/80 dark:border-transparent dark:bg-[#1ED36A33] dark:text-white dark:hover:bg-[#1ED36A45]"
-                    : "border-gray-300/80 bg-transparent text-[#33413B] hover:bg-black/[0.04] dark:border-transparent dark:bg-white/[0.12] dark:text-white/90 dark:hover:bg-white/[0.16]"
-                    }`}
-                >
-                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-[18px] h-[18px] shrink-0 text-[#1ED36A]">
-                    <path d="M15.3 2.7H14.4V0.9C14.4 0.661305 14.3052 0.432387 14.1364 0.263604C13.9676 0.0948211 13.7387 0 13.5 0C13.2613 0 13.0324 0.0948211 12.8636 0.263604C12.6948 0.432387 12.6 0.661305 12.6 0.9V2.7H5.4V0.9C5.4 0.661305 5.30518 0.432387 5.1364 0.263604C4.96761 0.0948211 4.73869 0 4.5 0C4.2613 0 4.03239 0.0948211 3.8636 0.263604C3.69482 0.432387 3.6 0.661305 3.6 0.9V2.7H2.7C1.98392 2.7 1.29716 2.98446 0.790812 3.49081C0.284464 3.99716 0 4.68392 0 5.4V6.3H18V5.4C18 4.68392 17.7155 3.99716 17.2092 3.49081C16.7028 2.98446 16.0161 2.7 15.3 2.7Z" fill="currentColor"/>
-                    <path d="M0 15.3C0 16.0161 0.284464 16.7028 0.790812 17.2092C1.29716 17.7155 1.98392 18 2.7 18H15.3C16.0161 18 16.7028 17.7155 17.2092 17.2092C17.7155 16.7028 18 16.0161 18 15.3V8.09998H0V15.3Z" fill="currentColor"/>
-                  </svg>
-                  <span>{appliedDateLabel}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-[#19211C]/70 dark:text-white/70" />
-                </button>
+                <div className={`relative ${showUsageDateModal ? "z-[90]" : ""}`}>
+                  <button
+                    type="button"
+                    ref={usageDateFilterButtonRef}
+                    onClick={openUsageDateModal}
+                    className={`h-[44px] rounded-[8px] px-4 py-[9px] text-[14px] flex items-center gap-2 font-normal cursor-pointer transition-all whitespace-nowrap border shadow-sm dark:shadow-none ${isUsageDateFilterActive
+                      ? "border-[#1ED36A]/50 bg-[#E7F8EE]/60 text-[#1F3B2A] hover:bg-[#DDF4E7]/80 dark:border-transparent dark:bg-[#1ED36A33] dark:text-white dark:hover:bg-[#1ED36A45]"
+                      : "bg-white dark:bg-[#23302A] border-gray-200 dark:border-[#355041] hover:border-brand-green dark:hover:border-brand-green/60 text-gray-900 dark:text-white"
+                      }`}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-[18px] h-[18px] shrink-0 text-[#1ED36A]">
+                      <path d="M15.3 2.7H14.4V0.9C14.4 0.661305 14.3052 0.432387 14.1364 0.263604C13.9676 0.0948211 13.7387 0 13.5 0C13.2613 0 13.0324 0.0948211 12.8636 0.263604C12.6948 0.432387 12.6 0.661305 12.6 0.9V2.7H5.4V0.9C5.4 0.661305 5.30518 0.432387 5.1364 0.263604C4.96761 0.0948211 4.73869 0 4.5 0C4.2613 0 4.03239 0.0948211 3.8636 0.263604C3.69482 0.432387 3.6 0.661305 3.6 0.9V2.7H2.7C1.98392 2.7 1.29716 2.98446 0.790812 3.49081C0.284464 3.99716 0 4.68392 0 5.4V6.3H18V5.4C18 4.68392 17.7155 3.99716 17.2092 3.49081C16.7028 2.98446 16.0161 2.7 15.3 2.7Z" fill="currentColor"/>
+                      <path d="M0 15.3C0 16.0161 0.284464 16.7028 0.790812 17.2092C1.29716 17.7155 1.98392 18 2.7 18H15.3C16.0161 18 16.7028 17.7155 17.2092 17.2092C17.7155 16.7028 18 16.0161 18 15.3V8.09998H0V15.3Z" fill="currentColor"/>
+                    </svg>
+                    <span>{appliedDateLabel}</span>
+                    <ChevronDown className={`w-2.5 h-2.5 ${isUsageDateFilterActive ? "text-[#1F3B2A]/70 dark:text-white/80" : "text-gray-500 dark:text-white/60"}`} />
+                  </button>
+                </div>
 
                 <ExcelExportButton
                   onClick={handleUsageExport}
@@ -1320,19 +1563,25 @@ const OriginCreditsDashboard: React.FC = () => {
 
             {showUsageDateModal && (
               <div
-                className="fixed inset-0 z-[80] bg-[#08120E]/80 backdrop-blur-[1.5px] flex items-center justify-center px-3"
+                className="fixed inset-0 z-[80] bg-[#19211C33] dark:bg-[#19211CCC] backdrop-blur-[1.5px]"
                 onClick={() => setShowUsageDateModal(false)}
               >
                 <div
-                  className="w-[900px] h-[480px] max-w-[95vw] rounded-[24px] border border-white/[0.2] bg-[#19211C]/40 shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-5"
+                  className="fixed"
+                  style={{
+                    top: `${usageDateModalAnchorStyle?.top ?? 188}px`,
+                    left: `${usageDateModalAnchorStyle?.left ?? 12}px`,
+                    width: "min(900px, calc(100vw - 24px))",
+                  }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="w-[860px] max-w-full mx-auto flex items-center justify-between pb-3.5 border-b border-white/[0.12]">
-                    <p className="text-[18px] leading-[23px] font-semibold text-white">Select Date Range</p>
+                  <div className="w-full h-[480px] rounded-[24px] border border-[#D7E3DD] dark:border-white/[0.18] bg-white/95 dark:bg-[#19211CCC] shadow-[0px_16px_40px_rgba(25,33,28,0.18)] dark:shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-5">
+                  <div className="w-[860px] max-w-full mx-auto flex items-center justify-between pb-3.5 border-b border-[#E1E9E4] dark:border-white/[0.12]">
+                    <p className="text-[18px] leading-[23px] font-normal text-[#19211C] dark:text-white">Select Date Range</p>
                     <button
                       type="button"
                       onClick={() => setShowUsageDateModal(false)}
-                      className="w-8 h-8 rounded-full bg-white/[0.12] text-[#1ED36A] hover:bg-[#1ED36A]/30 hover:text-white transition-colors flex items-center justify-center"
+                      className="w-8 h-8 rounded-full bg-[#F2F6F4] dark:bg-[rgba(50,64,57,0.82)] border border-[#DDE6E1] dark:border-white/[0.08] text-[#1ED36A] hover:bg-[#E7F3ED] dark:hover:bg-[#1ED36A]/25 hover:text-[#139555] dark:hover:text-white transition-colors flex items-center justify-center"
                       aria-label="Close date range picker"
                     >
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1343,7 +1592,7 @@ const OriginCreditsDashboard: React.FC = () => {
                   </div>
 
                   <div className="w-[860px] max-w-full mx-auto pt-3.5 flex gap-4 h-[318px]">
-                    <div className="w-[126px] shrink-0 border-r border-white/[0.12] pr-2.5">
+                    <div className="w-[126px] shrink-0 border-r border-[#E1E9E4] dark:border-white/[0.12] pr-2.5">
                       {USAGE_CALENDAR_PRESETS.map((preset) => {
                         const isActivePreset = usageCalendarPreset === preset;
                         return (
@@ -1354,7 +1603,7 @@ const OriginCreditsDashboard: React.FC = () => {
                               setUsageCalendarPreset(preset);
                               applyUsagePresetRange(preset);
                             }}
-                            className={`w-full text-left px-3 py-1.5 rounded-r-[4px] text-[13px] leading-[17px] transition-colors mb-[2px] ${isActivePreset ? "bg-[#1ED36A] text-white font-semibold" : "text-white/60 font-normal hover:bg-white/[0.08] hover:text-white"}`}
+                            className={`w-full text-left px-3 py-1.5 rounded-r-[4px] text-[13px] leading-[17px] transition-colors mb-[2px] ${isActivePreset ? "bg-[#E7F8EE] dark:bg-[#1ED36A] text-[#1F6A45] dark:text-white font-normal" : "text-[#5F6E67] dark:text-white/60 font-light hover:bg-[#F3F7F5] dark:hover:bg-white/[0.08] hover:text-[#19211C] dark:hover:text-white"}`}
                           >
                             {preset}
                           </button>
@@ -1377,8 +1626,8 @@ const OriginCreditsDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="w-[860px] max-w-full mx-auto pt-3 mt-3 border-t border-white/[0.12] flex items-center justify-between gap-3">
-                    <p className="text-[12px] leading-[16px] font-normal text-white">Selected Range : {usageSelectedRangeText}</p>
+                  <div className="w-[860px] max-w-full mx-auto pt-3 mt-3 border-t border-[#E1E9E4] dark:border-white/[0.12] flex items-center justify-between gap-3">
+                    <p className="text-[12px] leading-[16px] font-light text-[#4A5B53] dark:text-white">Selected Range : {usageSelectedRangeText}</p>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
@@ -1389,7 +1638,7 @@ const OriginCreditsDashboard: React.FC = () => {
                           setUsageDateFilter("Any Time");
                           setShowUsageDateModal(false);
                         }}
-                        className="h-7 px-4 rounded-full border border-white text-white text-[12px] leading-[16px] font-medium hover:bg-white/10 transition-colors"
+                        className="h-7 px-4 rounded-full border border-[#CAD8D0] dark:border-white text-[#19211C] dark:text-white text-[12px] leading-[16px] font-normal hover:bg-[#EEF5F1] dark:hover:bg-white/10 transition-colors"
                       >
                         Clear
                       </button>
@@ -1405,11 +1654,12 @@ const OriginCreditsDashboard: React.FC = () => {
                           }
                           setShowUsageDateModal(false);
                         }}
-                        className="h-7 px-4 rounded-full bg-[#1ED36A] text-white text-[12px] leading-[16px] font-medium hover:bg-[#16BD5C] transition-colors"
+                        className="h-7 px-4 rounded-full bg-[#1ED36A] text-white text-[12px] leading-[16px] font-normal hover:bg-[#16BD5C] transition-colors"
                       >
                         Apply changes
                       </button>
                     </div>
+                  </div>
                   </div>
                 </div>
               </div>
@@ -1482,14 +1732,14 @@ const OriginCreditsDashboard: React.FC = () => {
                                   : "green";
 
                           const toneClass = tone === "green"
-                            ? "border-[#10B981] text-white bg-[#1F6D4F]"
+                            ? "border-[#1ED36A] bg-[rgba(30,211,106,0.24)]"
                             : tone === "yellow"
-                              ? "border-[#D1A100] text-white bg-[#8A6E12]"
-                              : "border-[#EF4444] text-white bg-[#8C3333]";
+                              ? "border-[#FFB703] bg-[rgba(255,183,3,0.24)]"
+                              : "border-[#ED2F34] bg-[rgba(237,47,52,0.24)]";
 
                           return (
                         <span
-                          className={`inline-flex min-w-[114px] justify-center rounded-[6px] border px-3 py-2 text-[13px] font-light ${toneClass}`}
+                          className={`inline-flex w-[114px] h-[34px] items-center justify-center rounded-[4px] border px-3 py-2 text-[13px] font-light text-black dark:text-white ${toneClass}`}
                         >
                           {row.examStatus}
                         </span>
@@ -1501,7 +1751,7 @@ const OriginCreditsDashboard: React.FC = () => {
                           type="button"
                           className="group/eye flex items-center justify-center w-[34px] h-[24px] rounded-[4px] bg-transparent transition-all duration-150 cursor-pointer"
                         >
-                          <EyeIcon width={24} height={24} />
+                          <EyeIcon width={31} height={20} />
                         </button>
                       </td>
                     </tr>
@@ -1532,6 +1782,7 @@ const OriginCreditsDashboard: React.FC = () => {
                       type="button"
                       onClick={() => {
                         setTransactionEntriesPerPage(size);
+                        setTransactionCurrentPage(1);
                         setTransactionEntriesMenuOpen(false);
                       }}
                       className={`w-full text-left px-3 py-2 text-[12px] transition-colors ${transactionEntriesPerPage === size
@@ -1545,17 +1796,27 @@ const OriginCreditsDashboard: React.FC = () => {
                 </div>
               )}
             </div>
-            <span className="whitespace-nowrap font-light">of {TRANSACTION_HISTORY_TOTAL_ENTRIES.toLocaleString()} entries</span>
+            <span className="whitespace-nowrap font-light">of {transactionTotalEntries.toLocaleString()} entries</span>
             <div className="flex items-center gap-1.5 ml-1">
               <button
                 type="button"
-                className="w-10 h-10 rounded-full bg-[#EEF1EE] dark:bg-white/10 flex items-center justify-center transition-all text-[#19211C]/70 dark:text-white/70 hover:bg-[#1ED36A] hover:text-white"
+                onClick={() => setTransactionCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={safeTransactionCurrentPage === 1}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${safeTransactionCurrentPage === 1
+                    ? "bg-[#EEF1EE] dark:bg-white/10 text-[#19211C]/35 dark:text-white/35 cursor-not-allowed"
+                    : "bg-[#EEF1EE] dark:bg-white/10 text-[#19211C]/70 dark:text-white/70 hover:bg-[#1ED36A] hover:text-white"
+                  }`}
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 type="button"
-                className="w-10 h-10 rounded-full bg-[#1ED36A] text-white flex items-center justify-center transition-all hover:bg-[#16BD5C]"
+                onClick={() => setTransactionCurrentPage((prev) => Math.min(transactionTotalPages, prev + 1))}
+                disabled={safeTransactionCurrentPage === transactionTotalPages}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${safeTransactionCurrentPage === transactionTotalPages
+                    ? "bg-[#BDECCC] dark:bg-white/20 text-white/70 cursor-not-allowed"
+                    : "bg-[#1ED36A] text-white hover:bg-[#16BD5C]"
+                  }`}
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -1613,21 +1874,24 @@ const OriginCreditsDashboard: React.FC = () => {
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setShowTransactionDateModal(true)}
-                  className={`h-[44px] rounded-xl px-4 text-[13px] flex items-center gap-2 font-medium cursor-pointer transition-all whitespace-nowrap border ${isTransactionDateFilterActive
-                    ? "border-[#1ED36A]/50 bg-[#E7F8EE]/60 text-[#1F3B2A] hover:bg-[#DDF4E7]/80 dark:border-transparent dark:bg-[#1ED36A33] dark:text-white dark:hover:bg-[#1ED36A45]"
-                    : "border-gray-300/80 bg-transparent text-[#33413B] hover:bg-black/[0.04] dark:border-transparent dark:bg-white/[0.12] dark:text-white/90 dark:hover:bg-white/[0.16]"
-                    }`}
-                >
-                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-[18px] h-[18px] shrink-0 text-[#1ED36A]">
-                    <path d="M15.3 2.7H14.4V0.9C14.4 0.661305 14.3052 0.432387 14.1364 0.263604C13.9676 0.0948211 13.7387 0 13.5 0C13.2613 0 13.0324 0.0948211 12.8636 0.263604C12.6948 0.432387 12.6 0.661305 12.6 0.9V2.7H5.4V0.9C5.4 0.661305 5.30518 0.432387 5.1364 0.263604C4.96761 0.0948211 4.73869 0 4.5 0C4.2613 0 4.03239 0.0948211 3.8636 0.263604C3.69482 0.432387 3.6 0.661305 3.6 0.9V2.7H2.7C1.98392 2.7 1.29716 2.98446 0.790812 3.49081C0.284464 3.99716 0 4.68392 0 5.4V6.3H18V5.4C18 4.68392 17.7155 3.99716 17.2092 3.49081C16.7028 2.98446 16.0161 2.7 15.3 2.7Z" fill="currentColor"/>
-                    <path d="M0 15.3C0 16.0161 0.284464 16.7028 0.790812 17.2092C1.29716 17.7155 1.98392 18 2.7 18H15.3C16.0161 18 16.7028 17.7155 17.2092 17.2092C17.7155 16.7028 18 16.0161 18 15.3V8.09998H0V15.3Z" fill="currentColor"/>
-                  </svg>
-                  <span>{transactionAppliedDateLabel}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-[#19211C]/70 dark:text-white/70" />
-                </button>
+                <div className={`relative ${showTransactionDateModal ? "z-[90]" : ""}`}>
+                  <button
+                    type="button"
+                    ref={transactionDateFilterButtonRef}
+                    onClick={openTransactionDateModal}
+                    className={`h-[44px] rounded-[8px] px-4 py-[9px] text-[14px] flex items-center gap-2 font-normal cursor-pointer transition-all whitespace-nowrap border shadow-sm dark:shadow-none ${isTransactionDateFilterActive
+                      ? "border-[#1ED36A]/50 bg-[#E7F8EE]/60 text-[#1F3B2A] hover:bg-[#DDF4E7]/80 dark:border-transparent dark:bg-[#1ED36A33] dark:text-white dark:hover:bg-[#1ED36A45]"
+                      : "bg-white dark:bg-[#23302A] border-gray-200 dark:border-[#355041] hover:border-brand-green dark:hover:border-brand-green/60 text-gray-900 dark:text-white"
+                      }`}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-[18px] h-[18px] shrink-0 text-[#1ED36A]">
+                      <path d="M15.3 2.7H14.4V0.9C14.4 0.661305 14.3052 0.432387 14.1364 0.263604C13.9676 0.0948211 13.7387 0 13.5 0C13.2613 0 13.0324 0.0948211 12.8636 0.263604C12.6948 0.432387 12.6 0.661305 12.6 0.9V2.7H5.4V0.9C5.4 0.661305 5.30518 0.432387 5.1364 0.263604C4.96761 0.0948211 4.73869 0 4.5 0C4.2613 0 4.03239 0.0948211 3.8636 0.263604C3.69482 0.432387 3.6 0.661305 3.6 0.9V2.7H2.7C1.98392 2.7 1.29716 2.98446 0.790812 3.49081C0.284464 3.99716 0 4.68392 0 5.4V6.3H18V5.4C18 4.68392 17.7155 3.99716 17.2092 3.49081C16.7028 2.98446 16.0161 2.7 15.3 2.7Z" fill="currentColor"/>
+                      <path d="M0 15.3C0 16.0161 0.284464 16.7028 0.790812 17.2092C1.29716 17.7155 1.98392 18 2.7 18H15.3C16.0161 18 16.7028 17.7155 17.2092 17.2092C17.7155 16.7028 18 16.0161 18 15.3V8.09998H0V15.3Z" fill="currentColor"/>
+                    </svg>
+                    <span>{transactionAppliedDateLabel}</span>
+                    <ChevronDown className={`w-2.5 h-2.5 ${isTransactionDateFilterActive ? "text-[#1F3B2A]/70 dark:text-white/80" : "text-gray-500 dark:text-white/60"}`} />
+                  </button>
+                </div>
 
                 <ExcelExportButton
                   onClick={handleTransactionExport}
@@ -1639,19 +1903,25 @@ const OriginCreditsDashboard: React.FC = () => {
 
             {showTransactionDateModal && (
               <div
-                className="fixed inset-0 z-[80] bg-[#08120E]/80 backdrop-blur-[1.5px] flex items-center justify-center px-3"
+                className="fixed inset-0 z-[80] bg-[#19211C33] dark:bg-[#19211CCC] backdrop-blur-[1.5px]"
                 onClick={() => setShowTransactionDateModal(false)}
               >
                 <div
-                  className="w-[900px] h-[480px] max-w-[95vw] rounded-[24px] border border-white/[0.2] bg-[#19211C]/40 shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-5"
+                  className="fixed"
+                  style={{
+                    top: `${transactionDateModalAnchorStyle?.top ?? 188}px`,
+                    left: `${transactionDateModalAnchorStyle?.left ?? 12}px`,
+                    width: "min(900px, calc(100vw - 24px))",
+                  }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="w-[860px] max-w-full mx-auto flex items-center justify-between pb-3.5 border-b border-white/[0.12]">
-                    <p className="text-[18px] leading-[23px] font-semibold text-white">Select Date Range</p>
+                  <div className="w-full h-[480px] rounded-[24px] border border-[#D7E3DD] dark:border-white/[0.18] bg-white/95 dark:bg-[#19211CCC] shadow-[0px_16px_40px_rgba(25,33,28,0.18)] dark:shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-5">
+                  <div className="w-[860px] max-w-full mx-auto flex items-center justify-between pb-3.5 border-b border-[#E1E9E4] dark:border-white/[0.12]">
+                    <p className="text-[18px] leading-[23px] font-normal text-[#19211C] dark:text-white">Select Date Range</p>
                     <button
                       type="button"
                       onClick={() => setShowTransactionDateModal(false)}
-                      className="w-8 h-8 rounded-full bg-white/[0.12] text-[#1ED36A] hover:bg-[#1ED36A]/30 hover:text-white transition-colors flex items-center justify-center"
+                      className="w-8 h-8 rounded-full bg-[#F2F6F4] dark:bg-[rgba(50,64,57,0.82)] border border-[#DDE6E1] dark:border-white/[0.08] text-[#1ED36A] hover:bg-[#E7F3ED] dark:hover:bg-[#1ED36A]/25 hover:text-[#139555] dark:hover:text-white transition-colors flex items-center justify-center"
                       aria-label="Close date range picker"
                     >
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1662,7 +1932,7 @@ const OriginCreditsDashboard: React.FC = () => {
                   </div>
 
                   <div className="w-[860px] max-w-full mx-auto pt-3.5 flex gap-4 h-[318px]">
-                    <div className="w-[126px] shrink-0 border-r border-white/[0.12] pr-2.5">
+                    <div className="w-[126px] shrink-0 border-r border-[#E1E9E4] dark:border-white/[0.12] pr-2.5">
                       {USAGE_CALENDAR_PRESETS.map((preset) => {
                         const isActivePreset = transactionCalendarPreset === preset;
                         return (
@@ -1673,7 +1943,7 @@ const OriginCreditsDashboard: React.FC = () => {
                               setTransactionCalendarPreset(preset);
                               applyTransactionPresetRange(preset);
                             }}
-                            className={`w-full text-left px-3 py-1.5 rounded-r-[4px] text-[13px] leading-[17px] transition-colors mb-[2px] ${isActivePreset ? "bg-[#1ED36A] text-white font-semibold" : "text-white/60 font-normal hover:bg-white/[0.08] hover:text-white"}`}
+                            className={`w-full text-left px-3 py-1.5 rounded-r-[4px] text-[13px] leading-[17px] transition-colors mb-[2px] ${isActivePreset ? "bg-[#E7F8EE] dark:bg-[#1ED36A] text-[#1F6A45] dark:text-white font-normal" : "text-[#5F6E67] dark:text-white/60 font-light hover:bg-[#F3F7F5] dark:hover:bg-white/[0.08] hover:text-[#19211C] dark:hover:text-white"}`}
                           >
                             {preset}
                           </button>
@@ -1696,8 +1966,8 @@ const OriginCreditsDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="w-[860px] max-w-full mx-auto pt-3 mt-3 border-t border-white/[0.12] flex items-center justify-between gap-3">
-                    <p className="text-[12px] leading-[16px] font-normal text-white">Selected Range : {transactionSelectedRangeText}</p>
+                  <div className="w-[860px] max-w-full mx-auto pt-3 mt-3 border-t border-[#E1E9E4] dark:border-white/[0.12] flex items-center justify-between gap-3">
+                    <p className="text-[12px] leading-[16px] font-light text-[#4A5B53] dark:text-white">Selected Range : {transactionSelectedRangeText}</p>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
@@ -1708,7 +1978,7 @@ const OriginCreditsDashboard: React.FC = () => {
                           setTransactionDateFilter("Any Time");
                           setShowTransactionDateModal(false);
                         }}
-                        className="h-7 px-4 rounded-full border border-white text-white text-[12px] leading-[16px] font-medium hover:bg-white/10 transition-colors"
+                        className="h-7 px-4 rounded-full border border-[#CAD8D0] dark:border-white text-[#19211C] dark:text-white text-[12px] leading-[16px] font-normal hover:bg-[#EEF5F1] dark:hover:bg-white/10 transition-colors"
                       >
                         Clear
                       </button>
@@ -1724,11 +1994,12 @@ const OriginCreditsDashboard: React.FC = () => {
                           }
                           setShowTransactionDateModal(false);
                         }}
-                        className="h-7 px-4 rounded-full bg-[#1ED36A] text-white text-[12px] leading-[16px] font-medium hover:bg-[#16BD5C] transition-colors"
+                        className="h-7 px-4 rounded-full bg-[#1ED36A] text-white text-[12px] leading-[16px] font-normal hover:bg-[#16BD5C] transition-colors"
                       >
                         Apply changes
                       </button>
                     </div>
+                  </div>
                   </div>
                 </div>
               </div>
@@ -1786,13 +2057,13 @@ const OriginCreditsDashboard: React.FC = () => {
                       <td className="px-5 py-5 whitespace-nowrap text-[#19211C] dark:text-white text-[16px] leading-[21px] font-light">{row.method}</td>
                       <td className="px-5 py-5 whitespace-nowrap">
                         <span
-                          className={`inline-flex min-w-[114px] justify-center rounded-[6px] border px-3 py-2 text-[13px] font-light ${row.paymentStatus === "Completed"
-                              ? "border-[#10B981] text-white bg-[#1F6D4F]"
+                          className={`inline-flex w-[114px] h-[34px] items-center justify-center rounded-[4px] border px-3 py-2 text-[13px] font-light text-black dark:text-white ${row.paymentStatus === "Completed"
+                              ? "border-[#1ED36A] bg-[rgba(30,211,106,0.24)]"
                               : row.paymentStatus === "Pending"
-                                ? "border-[#D1A100] text-white bg-[#8A6E12]"
+                                ? "border-[#FFB703] bg-[rgba(255,183,3,0.24)]"
                                 : row.paymentStatus === "Failed"
-                                  ? "border-[#EF4444] text-white bg-[#8C3333]"
-                                  : "border-[#0EA5E9] text-white bg-[#1E4E68]"
+                                  ? "border-[#ED2F34] bg-[rgba(237,47,52,0.24)]"
+                                  : "border-[#00ACEE] bg-[rgba(0,172,238,0.24)]"
                             }`}
                         >
                           {row.paymentStatus}
@@ -1835,10 +2106,10 @@ const OriginCreditsDashboard: React.FC = () => {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 max-w-[1220px]">
-            <div className="glass-card dashboard-glass-card rounded-[26px] p-7 sm:p-8 min-h-[340px] sm:min-h-[360px] relative overflow-hidden border-0">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 w-full max-w-[1260px]">
+            <div className="glass-card dashboard-glass-card rounded-[28px] p-8 sm:p-9 h-[332px] relative overflow-hidden border border-[#D7E3DD] dark:border-white/[0.1]">
               <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                <span className="absolute -top-[70px] left-[48px] font-['Haskoy'] text-[clamp(330px,23vw,460px)] font-extrabold text-[rgba(216,210,230,0.45)] dark:text-white/[0.04] leading-none tracking-[0] select-none">
+                <span className="absolute -top-[56px] right-[-28px] font-['Haskoy'] text-[clamp(312px,21.5vw,452px)] font-extrabold text-[rgba(216,210,230,0.36)] dark:text-white/[0.04] leading-none tracking-[-0.02em] select-none whitespace-nowrap">
                   {creditsBalance}
                 </span>
               </div>
@@ -1846,10 +2117,10 @@ const OriginCreditsDashboard: React.FC = () => {
               <div
                 className="absolute z-[2] opacity-95 hidden sm:block"
                 style={{
-                  width: "181px",
-                  height: "184px",
-                  right: "156px",
-                  top: "18px",
+                  width: "170px",
+                  height: "172px",
+                  right: "164px",
+                  top: "20px",
                 }}
               >
                 <img
@@ -1859,7 +2130,7 @@ const OriginCreditsDashboard: React.FC = () => {
                   className="pointer-events-none select-none object-contain w-full h-full"
                 />
               </div>
-              <div className="absolute -right-[12px] -bottom-[20px] z-[2] opacity-95 w-[220px] h-[220px] sm:w-[240px] sm:h-[240px]">
+              <div className="absolute -right-[10px] -bottom-[18px] z-[2] opacity-95 w-[236px] h-[236px] sm:w-[256px] sm:h-[256px]">
                 <img
                   src="/assets/coins/coin-bottom.png"
                   alt=""
@@ -1869,7 +2140,7 @@ const OriginCreditsDashboard: React.FC = () => {
               </div>
 
               <div
-                className="absolute z-[1] -bottom-[30%] -left-[10%] -right-[10%] h-[180px] blur-[50px] pointer-events-none opacity-100"
+                className="absolute z-[1] -bottom-[36%] -left-[10%] -right-[10%] h-[188px] blur-[50px] pointer-events-none opacity-100"
                 style={{
                   background: "linear-gradient(90deg, #ED2F34 0%, #EF5921 33%, #FDC00C 66%, #1ED36A 100%)",
                 }}
@@ -1877,14 +2148,14 @@ const OriginCreditsDashboard: React.FC = () => {
 
               <div className="relative z-10 h-full flex flex-col">
                 <h2 className="font-['Haskoy'] text-[20px] font-medium text-[#19211C] dark:text-white leading-none">Credits Balance</h2>
-                <div className="mt-12 font-['Haskoy'] font-medium text-[clamp(84px,5.6vw,118px)] text-[#150089] dark:text-white leading-[0.88] tracking-[0.01em]">
+                <div className="mt-10 font-['Haskoy'] font-medium text-[clamp(72px,5vw,98px)] text-[#150089] dark:text-white leading-[0.9] tracking-[0.01em]">
                   {creditsBalance}
                 </div>
-                <p className="font-['Haskoy'] font-light text-[14px] text-[#19211C]/88 dark:text-white/88 mt-5">
+                <p className="font-['Haskoy'] font-light text-[14px] text-[#19211C]/88 dark:text-white/88 mt-3">
                   Assesment Left {assessmentsLeft}
                 </p>
 
-                <div className="mt-auto pt-4">
+                <div className="mt-auto pt-3">
                   <button
                     onClick={() => setIsBuyCreditsOpen(true)}
                     className="font-['Haskoy'] inline-flex items-center rounded-full bg-[#1ED36A] hover:bg-[#16b058] px-5 py-2 text-[14px] leading-[18px] font-normal text-white shadow-md shadow-[#1ED36A]/20 transition-all"
@@ -1895,9 +2166,9 @@ const OriginCreditsDashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="glass-card dashboard-glass-card rounded-[26px] p-7 sm:p-8 min-h-[340px] sm:min-h-[360px] relative overflow-hidden border-0">
+            <div className="glass-card dashboard-glass-card rounded-[28px] p-8 sm:p-9 h-[332px] relative overflow-hidden border border-[#D7E3DD] dark:border-white/[0.1]">
               <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                <span className="absolute -top-[70px] left-[44px] font-['Haskoy'] text-[clamp(330px,23vw,460px)] font-extrabold text-[rgba(216,210,230,0.45)] dark:text-white/[0.04] leading-none tracking-[0] select-none">
+                <span className="absolute -top-[56px] right-[-18px] font-['Haskoy'] text-[clamp(312px,21.5vw,452px)] font-extrabold text-[rgba(216,210,230,0.36)] dark:text-white/[0.04] leading-none tracking-[-0.02em] select-none whitespace-nowrap">
                   {assessmentsConducted}
                 </span>
               </div>
@@ -1908,13 +2179,13 @@ const OriginCreditsDashboard: React.FC = () => {
                   {renderTimeRangeSelect()}
                 </div>
 
-                <div className="mt-12 font-['Haskoy'] font-medium text-[clamp(84px,5.6vw,118px)] text-[#150089] dark:text-white leading-[0.88] tracking-[0.01em]">
+                <div className="mt-10 font-['Haskoy'] font-medium text-[clamp(72px,5vw,98px)] text-[#150089] dark:text-white leading-[0.9] tracking-[0.01em]">
                   {assessmentsConducted}
                 </div>
 
-                <div className="mt-auto pt-5 flex items-end justify-between gap-4">
+                <div className="mt-auto pt-3 flex items-end justify-between gap-4">
                   <p className="font-['Haskoy'] font-regular text-[20px] text-[#19211C]/88 dark:text-white/88">
-                    Total credits used:{totalCreditsUsed}
+                    Total credits used: {totalCreditsUsed}
                   </p>
                   <button
                     onClick={() => router.push("/corporate/registrations")}
@@ -1928,7 +2199,7 @@ const OriginCreditsDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="glass-card dashboard-glass-card rounded-[24px] px-6 sm:px-7 pt-6 sm:pt-7 pb-6 sm:pb-7 min-h-[424px] overflow-visible bg-white/[0.08] border-0">
+          <div className="glass-card dashboard-glass-card rounded-[24px] px-6 sm:px-7 pt-6 sm:pt-7 pb-6 sm:pb-7 min-h-[420px] overflow-visible bg-white/[0.08] border-0">
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] items-center gap-4">
               <h2 className="text-[20px] leading-[26px] font-medium text-[#19211C] dark:text-white">Credit Usage</h2>
 
@@ -1953,15 +2224,18 @@ const OriginCreditsDashboard: React.FC = () => {
             </div>
 
             <div className="mt-6 flex gap-4 sm:gap-6">
-              <div className="hidden lg:flex min-w-[30px] flex-col justify-between h-[239px] mt-[20px] text-[16px] leading-[21px] font-light text-[#19211C]/65 dark:text-white/80">
+              <div className="hidden lg:flex min-w-[34px] flex-col justify-between h-[284px] mt-[20px] text-[16px] leading-[21px] font-light text-[#19211C]/65 dark:text-white/80">
                 {yAxisTicks.map((tick, index) => (
                   <span key={`${tick}-${index}`}>{Math.round(tick)}</span>
                 ))}
               </div>
 
-              <div className="relative flex-1 overflow-x-auto scrollbar-hide">
-                <div className="relative h-[320px]" style={{ width: `${chartTrackWidth}px` }}>
-                  <div className="absolute left-0 right-0 top-[20px] h-[300px] pointer-events-none">
+              <div className="relative flex-1 overflow-x-auto overflow-y-visible scrollbar-hide">
+                <div
+                  className="relative h-[360px]"
+                  style={{ width: shouldStretchChartGroups ? "100%" : `${Math.max(860, chartTrackWidth)}px` }}
+                >
+                  <div className="absolute left-0 right-0 top-[20px] h-[284px] pointer-events-none">
                     <div className="h-full flex flex-col justify-between">
                       {[0, 1, 2, 3].map((line) => (
                         <div
@@ -1972,44 +2246,119 @@ const OriginCreditsDashboard: React.FC = () => {
                       <div className="border-b border-[#AFC2B7]/45 dark:border-white/25" />
                     </div>
                   </div>
-                  <div className="absolute left-0 right-0 top-[320px] border-b border-[#AFC2B7]/45 dark:border-white/25 pointer-events-none" />
 
-                  <div className="absolute left-0 right-0 top-[20px] h-[284px] flex items-start gap-[131px]">
-                    {visibleUsageData.map((item) => (
-                      <div key={item.month} className="group relative h-[284px] w-[172px] shrink-0">
-                        <div className="absolute left-0 top-0 h-[300px] w-[172px]">
+                  <div className={`absolute left-0 right-0 top-[20px] h-[284px] flex items-start ${shouldStretchChartGroups ? "justify-between" : "gap-[131px]"}`}>
+                    {scaledUsageData.map((item, index) => {
+                      const studentHeightPx = Math.max(
+                        0,
+                        Math.round((item.chartStudentProgram / maxUsage) * GROUP_TOTAL_HEIGHT_PX),
+                      );
+                      const employeeHeightPx = Math.max(
+                        0,
+                        Math.round((item.chartEmployeeProgram / maxUsage) * GROUP_TOTAL_HEIGHT_PX),
+                      );
+                      const studentBarTopPx = GROUP_TOTAL_HEIGHT_PX - studentHeightPx;
+                      const employeeBarTopPx = GROUP_TOTAL_HEIGHT_PX - employeeHeightPx;
+                      const tooltipWidthPx = 236;
+                      const tooltipTopPx = 16;
+                      const tooltipPointerCenterY = 34;
+                      const isGroupActive = hoveredUsageBar?.index === index;
+                      const activeSeries = hoveredUsageBar?.series ?? "student";
+                      const activeBarTopPx = activeSeries === "employee" ? employeeBarTopPx : studentBarTopPx;
+                      const activeBarCenterX = activeSeries === "employee" ? 92 + BAR_WIDTH_PX / 2 : BAR_WIDTH_PX / 2;
+                      const markerCenterY = Math.max(8, activeBarTopPx);
+                      const studentBarHeight = item.chartStudentProgram > 0 ? getBarHeight(item.chartStudentProgram, 4) : "0px";
+                      const employeeBarHeight = item.chartEmployeeProgram > 0 ? getBarHeight(item.chartEmployeeProgram, 4) : "0px";
+                      const isNearRightEdge = index >= scaledUsageData.length - 1;
+                      const tooltipOffsetPx = activeSeries === "employee" ? 70 : 48;
+                      const tooltipLeftPx = isNearRightEdge ? -(tooltipWidthPx + 16) : tooltipOffsetPx;
+                      const tooltipEdgeX = isNearRightEdge ? tooltipLeftPx + tooltipWidthPx : tooltipLeftPx;
+                      const tooltipEdgeY = tooltipTopPx + tooltipPointerCenterY;
+                      const connectorDx = tooltipEdgeX - activeBarCenterX;
+                      const connectorDy = tooltipEdgeY - markerCenterY;
+                      const connectorLength = Math.max(8, Math.hypot(connectorDx, connectorDy));
+                      const connectorAngle = (Math.atan2(connectorDy, connectorDx) * 180) / Math.PI;
+                      const markerClass = activeSeries === "employee"
+                        ? "bg-[#1ED36A] border-white dark:border-[#1F2A25]"
+                        : "bg-[#150089] dark:bg-[#EDFFF4] border-white dark:border-[#1F2A25]";
+                      const tooltipPointerClass = isNearRightEdge
+                        ? "absolute -right-[6px] top-[28px] h-3 w-3 rotate-45 border-t border-r border-[#D5E1DB]/65 dark:border-white/10 bg-[#FDFEFD] dark:bg-[#1F2A25]"
+                        : "absolute -left-[6px] top-[28px] h-3 w-3 rotate-45 border-l border-b border-[#D5E1DB]/65 dark:border-white/10 bg-[#FDFEFD] dark:bg-[#1F2A25]";
+
+                      return (
+                      <div
+                        key={item.month}
+                        className="group relative h-[284px] w-[172px] shrink-0"
+                        onMouseLeave={() => {
+                          setHoveredUsageBar((current) => (current?.index === index ? null : current));
+                        }}
+                      >
+                        <div className="absolute left-0 top-0 h-[284px] w-[172px]">
                           <div
                             className="absolute left-0 bottom-0 w-[80px] rounded-[100px] bg-[#150089] dark:bg-[#EDFFF4]"
-                            style={{ height: getBarHeight(item.studentProgram) }}
+                            onMouseEnter={() => setHoveredUsageBar({ index, series: "student" })}
+                            style={{ height: studentBarHeight }}
                           />
                           <div
                             className="absolute left-[92px] bottom-0 w-[80px] rounded-[100px] bg-[#1ED36A]"
-                            style={{ height: getBarHeight(item.employeeProgram) }}
+                            onMouseEnter={() => setHoveredUsageBar({ index, series: "employee" })}
+                            style={{ height: employeeBarHeight }}
                           />
                         </div>
 
-                        <div className="pointer-events-none absolute left-1/2 top-[0px] z-20 hidden -translate-x-1/2 group-hover:block">
-                          <div className="relative w-[199px] rounded-[12px] border border-[#D4D8D5] dark:border-white/10 bg-white/80 dark:bg-[rgba(25,33,28,0.8)] px-3 py-2.5 text-[#19211C] dark:text-white shadow-[0px_8px_13.4px_-2px_rgba(0,0,0,0.25)] dark:shadow-[0px_8px_13.4px_-2px_rgba(0,0,0,0.4)] backdrop-blur-[20px]">
-                            <div className="text-[14px] leading-[18px] font-normal mb-2">{item.month}</div>
-                            <div className="border-b border-[#D4D8D5] dark:border-white/12 mb-2" />
+                        <div
+                          className={`pointer-events-none absolute z-10 ${isGroupActive ? "block" : "hidden"}`}
+                          style={{
+                            left: `${activeBarCenterX - 6}px`,
+                            top: `${Math.max(0, markerCenterY - 6)}px`,
+                          }}
+                        >
+                          <span className={`block h-3 w-3 rounded-full border ${markerClass} shadow-[0px_1px_6px_rgba(30,211,106,0.35)]`} />
+                        </div>
+
+                        <div
+                          className={`pointer-events-none absolute z-10 ${isGroupActive ? "block" : "hidden"}`}
+                          style={{
+                            left: `${activeBarCenterX}px`,
+                            top: `${markerCenterY}px`,
+                            width: `${connectorLength}px`,
+                            transform: `rotate(${connectorAngle}deg)`,
+                            transformOrigin: "0 0",
+                          }}
+                        >
+                          <span className="block h-px w-full bg-[#CADBD2]/80 dark:bg-white/35" />
+                        </div>
+
+                        <div
+                          className={`pointer-events-none absolute z-20 ${isGroupActive ? "block" : "hidden"}`}
+                          style={{
+                            left: `${tooltipLeftPx}px`,
+                            top: `${tooltipTopPx}px`,
+                          }}
+                        >
+                          <div className="relative w-[236px] rounded-[14px] border border-[#D5E1DB]/70 dark:border-white/10 bg-[#FDFEFD] dark:bg-[#1F2A25] px-4 py-3 text-[#19211C] dark:text-white shadow-[0px_14px_24px_-10px_rgba(10,22,14,0.45)] dark:shadow-[0px_14px_24px_-10px_rgba(0,0,0,0.55)]">
+                            <span className={tooltipPointerClass} />
+                            <div className="text-[14px] leading-[18px] font-medium mb-2">{toFullMonthLabel(item.month)}</div>
+                            <div className="h-px bg-[#D5E1DB]/55 dark:bg-white/10 mb-2" />
                             <div className="space-y-2 text-[14px] leading-[18px] font-normal">
                               <div className="flex items-center justify-between gap-3">
-                                <span className="inline-flex items-center gap-2"><span className="h-[10px] w-[10px] rounded-full bg-[#150089] dark:bg-[#EDFFF4]" />Student Program</span>
-                                <span>{item.studentProgram}</span>
+                                <span className="inline-flex items-center gap-2 whitespace-nowrap"><span className="h-[10px] w-[10px] rounded-full bg-[#150089] dark:bg-[#EDFFF4]" />Student Program</span>
+                                <span className="font-medium tabular-nums">{item.studentProgram}</span>
                               </div>
                               <div className="flex items-center justify-between gap-3">
-                                <span className="inline-flex items-center gap-2"><span className="h-[10px] w-[10px] rounded-full bg-[#1ED36A]" />Employee Program</span>
-                                <span>{item.employeeProgram}</span>
+                                <span className="inline-flex items-center gap-2 whitespace-nowrap"><span className="h-[10px] w-[10px] rounded-full bg-[#1ED36A]" />Employee Program</span>
+                                <span className="font-medium tabular-nums">{item.employeeProgram}</span>
                               </div>
                             </div>
                           </div>
                         </div>
 
-                        <span className="absolute left-0 right-0 top-[263px] text-center text-[16px] leading-[21px] font-light text-[#19211C]/80 dark:text-white/85">
+                        <span className="absolute left-0 right-0 top-[320px] text-center text-[16px] leading-[21px] font-light text-[#19211C]/80 dark:text-white/85">
                           {item.month}
                         </span>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>

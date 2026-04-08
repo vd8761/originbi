@@ -1,5 +1,5 @@
-﻿import React, { useMemo, useState } from "react";
-import { ChevronDownIcon, SearchIcon, ClockIcon, MapPinIcon } from "lucide-react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDownIcon, ClockIcon, MapPinIcon } from "lucide-react";
 import CandidateDetail from "../candidates/CandidateDetail";
 import { AnnualCtcJobIcon, EmploymentTypeJobIcon, ExperienceLevelJobIcon, ShiftJobIcon, WorkModeJobIcon } from "../../icons";
 
@@ -63,6 +63,7 @@ export interface Candidate {
     originId: string;
     location: string;
     postedTime: string;
+    stage: "new" | "shortlisted" | "hired" | "rejected";
     trait: string;
     traitColor: string;
     skills: string[];
@@ -77,8 +78,9 @@ const mockCandidates: Candidate[] = [
         originId: "202001256",
         location: "", // No location for this one in image
         postedTime: "2 days ago",
+        stage: "hired",
         trait: "Supportive Energizer",
-        traitColor: "border-[#FFB020]/80 bg-[#FFB0201A]",
+        traitColor: "border-[#FEF000] bg-[#FEF0001F]",
         skills: ["Figma", "UX Design", "Wire Framing", "+3 more"],
         alignment: "92%",
         avatar: "https://i.pravatar.cc/150?u=a042581f4e29026024d",
@@ -89,8 +91,9 @@ const mockCandidates: Candidate[] = [
         originId: "202001256",
         location: "Chennai, Tamil Nadu",
         postedTime: "2 days ago",
+        stage: "shortlisted",
         trait: "Analytical Leader",
-        traitColor: "border-[#33B6FF]/80 bg-[#33B6FF1A]",
+        traitColor: "border-[#00ACEE] bg-[#00ACEE1F]",
         skills: ["Figma", "UX Design", "Wire Framing"],
         alignment: "92%",
         avatar: "https://i.pravatar.cc/150?u=a042581f4e29026704d",
@@ -101,8 +104,9 @@ const mockCandidates: Candidate[] = [
         originId: "202001256",
         location: "",
         postedTime: "2 days ago",
+        stage: "rejected",
         trait: "Strategic Stabilizer",
-        traitColor: "border-[#FF7A00]/80 bg-[#FF7A001A]",
+        traitColor: "border-[#EF5921] bg-[#EF59211F]",
         skills: ["Figma", "UX Design", "Wire Framing"],
         alignment: "92%",
         avatar: "https://i.pravatar.cc/150?u=a04258a2462d826712d",
@@ -113,8 +117,9 @@ const mockCandidates: Candidate[] = [
         originId: "202001256",
         location: "",
         postedTime: "2 days ago",
+        stage: "shortlisted",
         trait: "Collaborative Optimist",
-        traitColor: "border-[#13C065]/80 bg-[#13C0651A]",
+        traitColor: "border-[#13C065] bg-[#13C0651F]",
         skills: ["Figma", "UX Design", "Wire Framing", "+1 more"],
         alignment: "92%",
         avatar: "https://i.pravatar.cc/150?u=a042581f4e29026702d",
@@ -125,8 +130,9 @@ const mockCandidates: Candidate[] = [
         originId: "202001256",
         location: "",
         postedTime: "2 days ago",
+        stage: "new",
         trait: "Dependable Specialist",
-        traitColor: "border-[#00E5FF]/80 bg-[#00E5FF1A]",
+        traitColor: "border-[#00D5FF] bg-[#00D5FF1F]",
         skills: ["Figma", "UX Design", "Wire Framing", "+2 more"],
         alignment: "92%",
         avatar: "https://i.pravatar.cc/150?u=a048581f4e29026701d",
@@ -137,8 +143,9 @@ const mockCandidates: Candidate[] = [
         originId: "202001256",
         location: "",
         postedTime: "2 days ago",
+        stage: "new",
         trait: "Structured Supporter",
-        traitColor: "border-[#FF4A8D]/80 bg-[#FF4A8D1A]",
+        traitColor: "border-[#C7205C] bg-[#C7205C1F]",
         skills: ["Figma", "UX Design", "Wire Framing"],
         alignment: "92%",
         avatar: "https://i.pravatar.cc/150?u=a042581f4e29026024e",
@@ -146,6 +153,7 @@ const mockCandidates: Candidate[] = [
 ];
 
 type TabKey = "job_details" | "all" | "new" | "shortlisted" | "hired" | "rejected";
+const CANDIDATES_PER_PAGE = 4;
 
 export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
     const [activeTab, setActiveTab] = useState<TabKey>("job_details");
@@ -155,11 +163,14 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
     const [showAlignmentDropdown, setShowAlignmentDropdown] = useState(false);
     const [appliedDateFilter, setAppliedDateFilter] = useState("Applied Date");
     const [alignmentFilter, setAlignmentFilter] = useState("All Alignments");
+    const [candidatePage, setCandidatePage] = useState(1);
     const [calendarPreset, setCalendarPreset] = useState("Any Time");
     const [rangeStart, setRangeStart] = useState<Date | null>(new Date(2025, 9, 9));
     const [rangeEnd, setRangeEnd] = useState<Date | null>(new Date(2025, 10, 17));
     const [leftCalendarMonth, setLeftCalendarMonth] = useState<Date>(new Date(2025, 9, 1));
     const [customDateLabel, setCustomDateLabel] = useState<string | null>(null);
+    const [dateModalAnchorStyle, setDateModalAnchorStyle] = useState<{ top: number; left: number } | null>(null);
+    const dateFilterButtonRef = useRef<HTMLButtonElement | null>(null);
 
     const calendarPresets = ["Any Time", "Today", "Yesterday", "Last 7 Days", "Last 30 Days", "This Month", "Last Month", "Custom Range"];
     const weekDays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
@@ -260,42 +271,46 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
         const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
         if (preset === "Any Time") {
-            setAppliedDateFilter("Applied Date");
-            setCustomDateLabel(null);
-            setShowDateModal(false);
+            setRangeStart(null);
+            setRangeEnd(null);
             return;
         }
         if (preset === "Today") {
-            setAppliedDateFilter("Today");
-            setCustomDateLabel(null);
-            setShowDateModal(false);
+            setRangeStart(todayDate);
+            setRangeEnd(todayDate);
+            setLeftCalendarMonth(new Date(todayDate.getFullYear(), todayDate.getMonth(), 1));
             return;
         }
         if (preset === "Yesterday") {
-            setAppliedDateFilter("Yesterday");
-            setCustomDateLabel(null);
-            setShowDateModal(false);
+            const yesterday = new Date(todayDate);
+            yesterday.setDate(yesterday.getDate() - 1);
+            setRangeStart(yesterday);
+            setRangeEnd(yesterday);
+            setLeftCalendarMonth(new Date(yesterday.getFullYear(), yesterday.getMonth(), 1));
             return;
         }
         if (preset === "Last 7 Days") {
-            setAppliedDateFilter("Last 7 Days");
-            setCustomDateLabel(null);
-            setShowDateModal(false);
+            const start = new Date(todayDate);
+            start.setDate(start.getDate() - 6);
+            setRangeStart(start);
+            setRangeEnd(todayDate);
+            setLeftCalendarMonth(new Date(start.getFullYear(), start.getMonth(), 1));
             return;
         }
         if (preset === "Last 30 Days") {
-            setAppliedDateFilter("Last 30 Days");
-            setCustomDateLabel(null);
-            setShowDateModal(false);
+            const start = new Date(todayDate);
+            start.setDate(start.getDate() - 29);
+            setRangeStart(start);
+            setRangeEnd(todayDate);
+            setLeftCalendarMonth(new Date(start.getFullYear(), start.getMonth(), 1));
             return;
         }
         if (preset === "This Month") {
             const start = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1);
-            const end = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0);
+            const end = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate());
             setRangeStart(start);
             setRangeEnd(end);
             setLeftCalendarMonth(new Date(start.getFullYear(), start.getMonth(), 1));
-            setCalendarPreset("Custom Range");
             return;
         }
         if (preset === "Last Month") {
@@ -304,49 +319,61 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
             setRangeStart(start);
             setRangeEnd(end);
             setLeftCalendarMonth(new Date(start.getFullYear(), start.getMonth(), 1));
-            setCalendarPreset("Custom Range");
             return;
         }
-
-        setCalendarPreset("Custom Range");
     };
 
     const renderCalendarMonth = (year: number, month: number, title: string) => {
         const cells = buildMonthGrid(year, month);
 
         return (
-            <div className="w-[344px] h-[300px] rounded-[12px] bg-white/[0.08] border border-white/[0.12] px-5 py-3.5">
-                <div className="flex items-center justify-between mb-3 text-white/90 pb-3.5 border-b border-white/[0.12]">
-                    <button type="button" onClick={() => setLeftCalendarMonth((prev) => addMonths(prev, -1))} className="p-1 text-white/60 hover:text-white transition-colors">
+            <div className="w-[344px] h-[300px] rounded-[12px] bg-[#F6F9F7] dark:bg-white/[0.08] border border-[#DDE6E1] dark:border-white/[0.12] px-4 py-3 overflow-hidden">
+                <div className="flex items-center justify-between mb-2.5 text-[#22302A] dark:text-white/90 pb-2.5 border-b border-[#DDE6E1] dark:border-white/[0.12]">
+                    <button type="button" onClick={() => setLeftCalendarMonth((prev) => addMonths(prev, -1))} className="p-1 text-[#63716B] hover:text-[#22302A] dark:text-white/60 dark:hover:text-white transition-colors">
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M7.5 2L3.5 6L7.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     </button>
-                    <p className="text-[14px] leading-[18px] font-semibold text-[#E7EFEB]">{title}</p>
-                    <button type="button" onClick={() => setLeftCalendarMonth((prev) => addMonths(prev, 1))} className="p-1 text-white/60 hover:text-white transition-colors">
+                    <p className="text-[14px] leading-[18px] font-normal text-[#22302A] dark:text-[#E7EFEB]">{title}</p>
+                    <button type="button" onClick={() => setLeftCalendarMonth((prev) => addMonths(prev, 1))} className="p-1 text-[#63716B] hover:text-[#22302A] dark:text-white/60 dark:hover:text-white transition-colors">
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 2L8.5 6L4.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     </button>
                 </div>
-                <div className="grid grid-cols-7 gap-y-2 mb-2">
+                <div className="grid grid-cols-7 mb-1.5">
                     {weekDays.map((day) => (
-                        <span key={`${title}-${day}`} className="text-center text-[13px] leading-[17px] font-normal text-white/80">{day}</span>
+                        <span key={`${title}-${day}`} className="text-center text-[12px] leading-[16px] font-light text-[#63716B] dark:text-white/75">{day}</span>
                     ))}
                 </div>
-                <div className="grid grid-cols-7 gap-y-1.5">
-                    {cells.map((cell) => {
+                <div className="h-[202px] grid grid-cols-7 grid-rows-6 gap-y-[2px]">
+                    {cells.map((cell, index) => {
                         const day = cell.date.getDate();
                         const inRange = isInRange(cell.date);
                         const start = isRangeStart(cell.date);
                         const end = isRangeEnd(cell.date);
                         const isMuted = !cell.inCurrentMonth;
+                        const colIndex = index % 7;
+                        const prevCell = colIndex > 0 ? cells[index - 1] : null;
+                        const nextCell = colIndex < 6 ? cells[index + 1] : null;
+                        const prevInRange = Boolean(prevCell && isInRange(prevCell.date));
+                        const nextInRange = Boolean(nextCell && isInRange(nextCell.date));
+                        const isRangeSegmentStart = inRange && !prevInRange;
+                        const isRangeSegmentEnd = inRange && !nextInRange;
                         const rangePillClass = inRange
-                            ? `${start ? "rounded-l-[24px]" : ""} ${end ? "rounded-r-[100px]" : ""} ${!start && !end ? "rounded-none" : ""}`
+                            ? `${isRangeSegmentStart ? "rounded-l-[100px]" : ""} ${isRangeSegmentEnd ? "rounded-r-[100px]" : ""}`
                             : "";
 
                         return (
-                            <div key={`${title}-${cell.date.toISOString()}`} className={`h-[28px] flex items-center justify-center text-[13px] leading-[17px] ${inRange ? "bg-[#1ED36A]/[0.16]" : ""} ${rangePillClass}`}>
+                            <div key={`${title}-${cell.date.toISOString()}`} className="h-full relative flex items-center justify-center text-[12px] leading-[16px] isolate">
+                                {inRange && (
+                                    <div className={`absolute inset-y-[5px] z-0 bg-[#DDEFE5] dark:bg-[#204E35] ${rangePillClass}`} style={
+                                        {
+                                            left: isRangeSegmentStart ? "4px" : "0px",
+                                            right: isRangeSegmentEnd ? "4px" : "0px"
+                                        }
+                                    } />
+                                )}
                                 <button
                                     type="button"
                                     onClick={() => handleDateCellClick(new Date(cell.date.getFullYear(), cell.date.getMonth(), cell.date.getDate()))}
-                                    className={`h-9 w-9 flex items-center justify-center font-normal ${start || end ? "rounded-full bg-[#1ED36A] text-white shadow-[0px_4px_6.7px_rgba(0,0,0,0.4),0px_2px_17.9px_rgba(30,211,106,0.4)]" : ""} ${!start && !end && inRange ? "text-white" : ""} ${!inRange && !isMuted ? "text-white" : ""} ${isMuted ? "text-white/40" : ""}`}
+                                    className={`relative z-10 h-8 w-8 flex items-center justify-center text-[12px] leading-[16px] font-light text-[#22302A] dark:text-white ${start || end ? "rounded-full bg-[#1ED36A] text-white shadow-[0px_2px_10px_rgba(30,211,106,0.28)] dark:shadow-[0px_4px_6.7px_rgba(0,0,0,0.4),0px_2px_17.9px_rgba(30,211,106,0.4)]" : "rounded-full"} ${!start && !end && inRange ? "text-[#1F6A45] dark:text-white" : ""} ${!inRange && !isMuted ? "text-[#22302A] dark:text-white" : ""} ${isMuted ? "text-[#A3B1AA] dark:text-white/40" : ""}`}
                                 >
                                     {day}
                                 </button>
@@ -364,6 +391,42 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
     const isAppliedDateActive = appliedDateFilter !== "Applied Date";
     const isAlignmentActive = alignmentFilter !== "All Alignments";
     const alignmentFilterLabel = isAlignmentActive ? alignmentFilter : "Alignment";
+
+    const openAppliedDateModal = () => {
+        const presetByFilter: Record<string, string> = {
+            "Applied Date": "Any Time",
+            "Today": "Today",
+            "Yesterday": "Yesterday",
+            "Last 7 Days": "Last 7 Days",
+            "Last 30 Days": "Last 30 Days",
+            "This Month": "This Month",
+            "Last Month": "Last Month",
+            "Custom Range": "Custom Range",
+        };
+
+        const preset = presetByFilter[appliedDateFilter] ?? "Any Time";
+        setCalendarPreset(preset);
+        if (preset !== "Custom Range") {
+            applyPresetRange(preset);
+        }
+
+        const trigger = dateFilterButtonRef.current;
+        if (trigger && typeof window !== "undefined") {
+            const rect = trigger.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            const modalWidth = Math.min(900, viewportWidth - 24);
+            const modalHeight = 480;
+            const gap = 12;
+
+            const left = Math.max(12, Math.min(rect.right - modalWidth, viewportWidth - modalWidth - 12));
+            const top = Math.max(88, Math.min(rect.bottom + gap, viewportHeight - modalHeight - 12));
+            setDateModalAnchorStyle({ top, left });
+        }
+
+        setShowDateModal(true);
+        setShowAlignmentDropdown(false);
+    };
 
     const filteredCandidates = useMemo(() => {
         const search = candidateSearchTerm.trim().toLowerCase();
@@ -427,9 +490,81 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                 }
             })();
 
-            return matchesSearch && matchesDate && matchesAlignment;
+            const matchesTab =
+                activeTab === "job_details" ||
+                activeTab === "all" ||
+                candidate.stage === activeTab;
+
+            return matchesSearch && matchesDate && matchesAlignment && matchesTab;
         });
-    }, [candidateSearchTerm, appliedDateFilter, alignmentFilter, rangeStart, rangeEnd]);
+    }, [activeTab, candidateSearchTerm, appliedDateFilter, alignmentFilter, rangeStart, rangeEnd]);
+
+    useEffect(() => {
+        setCandidatePage(1);
+    }, [activeTab, candidateSearchTerm, appliedDateFilter, alignmentFilter, rangeStart, rangeEnd]);
+
+    useEffect(() => {
+        if (!showDateModal) return;
+
+        const updateAnchorPosition = () => {
+            const trigger = dateFilterButtonRef.current;
+            if (!trigger || typeof window === "undefined") return;
+
+            const rect = trigger.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            const modalWidth = Math.min(900, viewportWidth - 24);
+            const modalHeight = 480;
+            const gap = 12;
+
+            const left = Math.max(12, Math.min(rect.right - modalWidth, viewportWidth - modalWidth - 12));
+            const top = Math.max(88, Math.min(rect.bottom + gap, viewportHeight - modalHeight - 12));
+            setDateModalAnchorStyle({ top, left });
+        };
+
+        updateAnchorPosition();
+        window.addEventListener("resize", updateAnchorPosition);
+        return () => window.removeEventListener("resize", updateAnchorPosition);
+    }, [showDateModal]);
+
+    const candidateTotalPages = Math.max(1, Math.ceil(filteredCandidates.length / CANDIDATES_PER_PAGE));
+    const safeCandidatePage = Math.min(candidatePage, candidateTotalPages);
+
+    useEffect(() => {
+        if (candidatePage > candidateTotalPages) {
+            setCandidatePage(candidateTotalPages);
+        }
+    }, [candidatePage, candidateTotalPages]);
+
+    const paginatedCandidates = useMemo(() => {
+        const startIndex = (safeCandidatePage - 1) * CANDIDATES_PER_PAGE;
+        return filteredCandidates.slice(startIndex, startIndex + CANDIDATES_PER_PAGE);
+    }, [filteredCandidates, safeCandidatePage]);
+
+    const candidatePaginationItems = useMemo<(number | "...")[]>(() => {
+        if (candidateTotalPages <= 7) {
+            return Array.from({ length: candidateTotalPages }, (_, index) => index + 1);
+        }
+
+        const start = Math.max(2, safeCandidatePage - 1);
+        const end = Math.min(candidateTotalPages - 1, safeCandidatePage + 1);
+        const items: (number | "...")[] = [1];
+
+        if (start > 2) {
+            items.push("...");
+        }
+
+        for (let page = start; page <= end; page += 1) {
+            items.push(page);
+        }
+
+        if (end < candidateTotalPages - 1) {
+            items.push("...");
+        }
+
+        items.push(candidateTotalPages);
+        return items;
+    }, [candidateTotalPages, safeCandidatePage]);
 
     // TODO: Fetch data from backend using jobId
     const job = mockJobDetail;
@@ -456,7 +591,7 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
     }
 
     return (
-        <div className="flex flex-col h-full w-full gap-5 font-sans p-4 sm:p-6 lg:p-8 min-h-screen bg-[#F9FAFB] dark:bg-[#19211C]">
+        <div className="thin-ui-page flex flex-col h-full w-full gap-6 font-sans p-4 sm:p-6 lg:p-10 min-h-screen bg-[#F9FAFB] dark:bg-[#19211C]">
 
             {/* Breadcrumb */}
             <div className="flex items-center text-xs text-gray-400 dark:text-white/70 mb-1.5 font-normal">
@@ -472,13 +607,13 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                         <path d="M3.75 2L6.75 5L3.75 8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                 </span>
-                <span className="text-brand-green font-semibold">Job Overview</span>
+                <span className="text-brand-green font-medium">Job Overview</span>
             </div>
 
             {/* Header: Title & Company Info & Edit Btn */}
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div>
-                    <h1 className="font-['Haskoy'] text-[38px] sm:text-[48px] font-medium text-[#19211C] dark:text-white mb-3 leading-[100%] tracking-[0px] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">
+                    <h1 className="font-['Haskoy'] text-[38px] sm:text-[48px] font-normal text-[#19211C] dark:text-white mb-3 leading-[100%] tracking-[0px] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">
                         {job.title}
                     </h1>
                     <div className="flex items-center gap-2.5 font-['Haskoy'] text-[16px] sm:text-[18px] leading-[100%] font-[300] text-gray-600 dark:text-white/90 tracking-[0px] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">
@@ -491,9 +626,9 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                         <span className="ml-4 font-[300] dark:text-white/92">Job ID : {job.jobId}</span>
                     </div>
                 </div>
-                <button className="flex items-center gap-1.5 px-3.5 py-[7px] bg-white dark:bg-[#313B36] hover:bg-[#343D38] border border-gray-200 dark:border-[#FFFFFF14] rounded-full font-['Haskoy'] text-[13px] leading-[100%] font-normal text-[#19211C] dark:text-white/90 transition-colors cursor-pointer shadow-sm dark:shadow-none">
+                <button className="flex items-center gap-2 px-5 py-2 bg-white dark:bg-[#313B36] hover:bg-[#343D38] border border-gray-200 dark:border-[#FFFFFF14] rounded-full font-['Haskoy'] text-[15px] leading-[100%] font-normal text-[#19211C] dark:text-white/90 transition-colors cursor-pointer shadow-sm dark:shadow-none">
                     Edit
-                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#1ED36A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="opacity-100">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#1ED36A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="opacity-100 shrink-0">
                         <path d="M2 10l2.1-.5L10 3.6 8.4 2 2.5 7.9 2 10z" />
                         <path d="M7.7 1.3L9.3 2.9" />
                     </svg>
@@ -515,16 +650,16 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                         <button
                             key={tab.key}
                             onClick={() => setActiveTab(tab.key)}
-                            className={`px-1 py-3 -mb-px mr-7 text-[15px] sm:text-[18px] border-b-[3px] transition-colors whitespace-nowrap cursor-pointer ${activeTab === tab.key
+                            className={`px-1 py-3.5 -mb-px mr-8 text-[18px] border-b-[3px] transition-colors whitespace-nowrap cursor-pointer font-['Haskoy'] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale] ${activeTab === tab.key
                                 ? "border-brand-green"
                                 : "border-transparent hover:border-gray-200 dark:hover:border-white/20"
                                 }`}
                         >
-                            <span className={activeTab === tab.key ? "font-semibold text-brand-green" : "font-normal text-gray-500 dark:text-white/70"}>
+                            <span className={activeTab === tab.key ? "font-medium text-brand-green" : "font-normal text-gray-500 dark:text-white/45"}>
                                 {tab.label}
                             </span>
                             {tab.count !== null && (
-                                <span className={activeTab === tab.key ? "text-brand-green font-semibold ml-1.5" : "text-gray-400 dark:text-white/60 font-normal ml-1.5"}>
+                                <span className={activeTab === tab.key ? "text-brand-green font-medium ml-1.5" : "text-gray-400 dark:text-white/45 font-normal ml-1.5"}>
                                     ({tab.count})
                                 </span>
                             )}
@@ -533,15 +668,15 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                 </div>
 
                 {/* Dates */}
-                <div className="flex items-center gap-6 py-2 w-full xl:w-auto justify-end flex-wrap font-['Haskoy'] text-[14px] sm:text-[16px] font-normal leading-[100%] tracking-[0px] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">
-                    <div className="flex items-center gap-2 text-gray-600 dark:text-white font-normal">
+                <div className="flex items-center gap-5 py-2 w-full xl:w-auto justify-end flex-wrap font-['Haskoy'] text-[14px] sm:text-[15px] font-[300] leading-[100%] tracking-[0px] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">
+                    <div className="flex items-center gap-2 text-[#566170] dark:text-[#D2DDD7] font-[300]">
                         <svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0 text-[#1ED36A]">
                             <path d="M15.3 2.7H14.4V0.9C14.4 0.661305 14.3052 0.432387 14.1364 0.263604C13.9676 0.0948211 13.7387 0 13.5 0C13.2613 0 13.0324 0.0948211 12.8636 0.263604C12.6948 0.432387 12.6 0.661305 12.6 0.9V2.7H5.4V0.9C5.4 0.661305 5.30518 0.432387 5.1364 0.263604C4.96761 0.0948211 4.73869 0 4.5 0C4.2613 0 4.03239 0.0948211 3.8636 0.263604C3.69482 0.432387 3.6 0.661305 3.6 0.9V2.7H2.7C1.98392 2.7 1.29716 2.98446 0.790812 3.49081C0.284464 3.99716 0 4.68392 0 5.4V6.3H18V5.4C18 4.68392 17.7155 3.99716 17.2092 3.49081C16.7028 2.98446 16.0161 2.7 15.3 2.7Z" fill="currentColor" />
                             <path d="M0 15.3C0 16.0161 0.284464 16.7028 0.790812 17.2092C1.29716 17.7155 1.98392 18 2.7 18H15.3C16.0161 18 16.7028 17.7155 17.2092 17.2092C17.7155 16.7028 18 16.0161 18 15.3V8.09998H0V15.3Z" fill="currentColor" />
                         </svg>
                         Posted on {job.postedDate}
                     </div>
-                    <div className="flex items-center gap-2 text-gray-600 dark:text-white font-normal">
+                    <div className="flex items-center gap-2 text-[#566170] dark:text-[#D2DDD7] font-[300]">
                         <span className="w-1.5 h-1.5 rounded-full bg-brand-green flex-shrink-0" />
                         Closes at {job.closingDate}
                     </div>
@@ -550,7 +685,7 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
 
             {/* Tab Content */}
             {activeTab === "job_details" && (
-                <div className="flex flex-col gap-6 mt-4 bg-white dark:bg-[#2A312D] border border-gray-200 dark:border-[#FFFFFF1F] rounded-[14px] px-6 py-6">
+                <div className="flex flex-col gap-6 mt-4 bg-white dark:bg-white/[0.08] border border-gray-200 dark:border-white/[0.08] rounded-[14px] px-6 py-6">
                     {/* Stats Ribbon */}
                     <div className="flex items-center justify-start py-2 gap-7 overflow-x-auto scrollbar-hide whitespace-nowrap">
 
@@ -565,7 +700,7 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                             </div>
                             <div className="flex flex-col">
                                 <span className="font-['Haskoy'] text-[12px] text-gray-500 dark:text-gray-300 mb-0.5 font-normal leading-[100%]">Employment Type</span>
-                                <span className="font-['Haskoy'] text-[15px] font-semibold text-[#19211C] dark:text-white leading-tight">{job.employmentType}</span>
+                                <span className="font-['Haskoy'] text-[15px] font-medium text-[#19211C] dark:text-white leading-tight">{job.employmentType}</span>
                             </div>
                         </div>
 
@@ -582,7 +717,7 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                             </div>
                             <div className="flex flex-col">
                                 <span className="font-['Haskoy'] text-[12px] text-gray-500 dark:text-gray-300 mb-0.5 font-normal leading-[100%]">Work Mode</span>
-                                <span className="font-['Haskoy'] text-[15px] font-semibold text-[#19211C] dark:text-white leading-tight">{job.workMode}</span>
+                                <span className="font-['Haskoy'] text-[15px] font-medium text-[#19211C] dark:text-white leading-tight">{job.workMode}</span>
                             </div>
                         </div>
 
@@ -599,7 +734,7 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                             </div>
                             <div className="flex flex-col">
                                 <span className="font-['Haskoy'] text-[12px] text-gray-500 dark:text-gray-300 mb-0.5 font-normal leading-[100%]">Shift</span>
-                                <span className="font-['Haskoy'] text-[15px] font-semibold text-[#19211C] dark:text-white leading-tight">{job.shift}</span>
+                                <span className="font-['Haskoy'] text-[15px] font-medium text-[#19211C] dark:text-white leading-tight">{job.shift}</span>
                             </div>
                         </div>
 
@@ -616,7 +751,7 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                             </div>
                             <div className="flex flex-col">
                                 <span className="font-['Haskoy'] text-[12px] text-gray-500 dark:text-gray-300 mb-0.5 font-normal leading-[100%]">Experience Level</span>
-                                <span className="font-['Haskoy'] text-[15px] font-semibold text-[#19211C] dark:text-white leading-tight">{job.experienceLevel}</span>
+                                <span className="font-['Haskoy'] text-[15px] font-medium text-[#19211C] dark:text-white leading-tight">{job.experienceLevel}</span>
                             </div>
                         </div>
 
@@ -635,28 +770,28 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                             </div>
                             <div className="flex flex-col">
                                 <span className="font-['Haskoy'] text-[12px] text-gray-500 dark:text-gray-300 mb-0.5 font-normal leading-[100%]">Annual CTC</span>
-                                <span className="font-['Haskoy'] text-[15px] font-semibold text-[#19211C] dark:text-white leading-tight">{job.annualCTC}</span>
+                                <span className="font-['Haskoy'] text-[15px] font-medium text-[#19211C] dark:text-white leading-tight">{job.annualCTC}</span>
                             </div>
                         </div>
                     </div>
 
                     {/* Job Details Body */}
-                    <div className="flex flex-col gap-8 max-w-4xl text-[14.5px] text-gray-800 dark:text-gray-200 mt-2 font-normal">
+                    <div className="flex flex-col gap-9 max-w-4xl text-[18px] leading-[1.75] text-gray-800 dark:text-gray-100 mt-2 font-[300]">
 
                         {/* Summary / Description */}
                         <div>
-                            <h3 className="text-[13px] font-semibold text-[#19211C] dark:text-white mb-2.5">Job Description</h3>
-                            <p className="leading-relaxed whitespace-pre-line text-gray-700 dark:text-gray-300 font-normal">
+                            <h3 className="text-[16px] font-medium leading-[1.2] text-[#19211C] dark:text-white mb-3">Job Description</h3>
+                            <p className="whitespace-pre-line text-gray-700 dark:text-gray-100 font-[300]">
                                 {job.jobDescription}
                             </p>
                         </div>
 
                         {/* Responsibilities */}
                         <div>
-                            <h3 className="text-[13px] font-semibold text-[#19211C] dark:text-white mb-2.5">Responsibilities</h3>
-                            <ul className="flex flex-col gap-2.5">
+                            <h3 className="text-[16px] font-medium leading-[1.2] text-[#19211C] dark:text-white mb-3">Responsibilities</h3>
+                            <ul className="flex flex-col gap-3.5">
                                 {job.responsibilities.map((resp, i) => (
-                                    <li key={i} className="flex flex-row items-start gap-2 text-gray-700 dark:text-gray-300 font-normal">
+                                    <li key={i} className="flex flex-row items-start gap-2.5 text-[18px] text-gray-700 dark:text-gray-100 font-[300] leading-[1.75]">
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="text-[#13C065] shrink-0 mt-0.5">
                                             <path d="M12 2L14.07 9.93L22 12L14.07 14.07L12 22L9.93 14.07L2 12L9.93 9.93L12 2Z" />
                                         </svg>
@@ -668,10 +803,10 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
 
                         {/* Eligibility */}
                         <div>
-                            <h3 className="text-[13px] font-semibold text-[#19211C] dark:text-white mb-2.5">Eligibility</h3>
-                            <ul className="flex flex-col gap-2.5">
+                            <h3 className="text-[16px] font-medium leading-[1.2] text-[#19211C] dark:text-white mb-3">Eligibility</h3>
+                            <ul className="flex flex-col gap-3.5">
                                 {job.eligibility.map((elig, i) => (
-                                    <li key={i} className="flex flex-row items-start gap-2 text-gray-700 dark:text-gray-300 font-normal">
+                                    <li key={i} className="flex flex-row items-start gap-2.5 text-[18px] text-gray-700 dark:text-gray-100 font-[300] leading-[1.75]">
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="text-[#13C065] shrink-0 mt-0.5">
                                             <path d="M12 2L14.07 9.93L22 12L14.07 14.07L12 22L9.93 14.07L2 12L9.93 9.93L12 2Z" />
                                         </svg>
@@ -683,10 +818,10 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
 
                         {/* Required Skills */}
                         <div>
-                            <h3 className="text-[13px] font-semibold text-[#19211C] dark:text-white mb-3">Required Skills (Mandatory for shortlisting)</h3>
-                            <div className="flex flex-wrap gap-2.5">
+                            <h3 className="text-[16px] font-medium leading-[1.2] text-[#19211C] dark:text-white mb-3.5">Required Skills (Mandatory for shortlisting)</h3>
+                            <div className="flex flex-wrap items-center gap-2.5">
                                 {job.requiredSkills.map((skill, i) => (
-                                    <span key={i} className="px-3.5 py-[5px] rounded-full border border-gray-200 shadow-sm bg-white text-[13px] font-normal text-[#2E3431]">
+                                    <span key={i} className="inline-flex items-center px-4 py-[7px] rounded-[12px] border border-[#E7ECE8] bg-white dark:bg-white dark:border-[#E7ECE8] text-[15px] sm:text-[16px] font-normal leading-[1.1] text-[#2E3431]">
                                         {skill}
                                     </span>
                                 ))}
@@ -695,18 +830,18 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
 
                         {/* Nice to Have */}
                         <div>
-                            <h3 className="text-[13px] font-semibold text-[#19211C] dark:text-white mb-2">Nice-to-Have Skills</h3>
-                            <p className="leading-relaxed text-gray-700 dark:text-gray-300 font-normal">
+                            <h3 className="text-[16px] font-medium leading-[1.2] text-[#19211C] dark:text-white mb-3">Nice-to-Have Skills</h3>
+                            <p className="text-gray-700 dark:text-gray-100 font-[300] leading-[1.75]">
                                 {job.niceToHaveSkills}
                             </p>
                         </div>
 
                         {/* What You Will Learn */}
                         <div>
-                            <h3 className="text-[13px] font-semibold text-[#19211C] dark:text-white mb-2.5">What You Will Learn</h3>
-                            <ul className="flex flex-col gap-2.5">
+                            <h3 className="text-[16px] font-medium leading-[1.2] text-[#19211C] dark:text-white mb-3">What You Will Learn</h3>
+                            <ul className="flex flex-col gap-3.5">
                                 {job.whatYouWillLearn.map((learn, i) => (
-                                    <li key={i} className="flex flex-row items-start gap-2 text-gray-700 dark:text-gray-300 font-normal">
+                                    <li key={i} className="flex flex-row items-start gap-2.5 text-[18px] text-gray-700 dark:text-gray-100 font-[300] leading-[1.75]">
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="text-[#13C065] shrink-0 mt-0.5">
                                             <path d="M12 2L14.07 9.93L22 12L14.07 14.07L12 22L9.93 14.07L2 12L9.93 9.93L12 2Z" />
                                         </svg>
@@ -718,8 +853,8 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
 
                         {/* Company Details */}
                         <div>
-                            <h3 className="text-[13px] font-semibold text-[#19211C] dark:text-white mb-2.5">Company Details</h3>
-                            <p className="leading-relaxed text-gray-700 dark:text-gray-300 font-normal">
+                            <h3 className="text-[16px] font-medium leading-[1.2] text-[#19211C] dark:text-white mb-3">Company Details</h3>
+                            <p className="text-gray-700 dark:text-gray-100 font-[300] leading-[1.75]">
                                 {job.companyDetails}
                             </p>
                         </div>
@@ -731,34 +866,31 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
             {activeTab !== "job_details" && (
                 <div className="flex-1 flex flex-col mt-4">
 
-                    <div className="bg-white dark:bg-[#2C3430] border border-gray-200 dark:border-white/10 rounded-[14px] p-5">
+                    <div className="bg-white dark:bg-white/[0.08] border border-gray-200 dark:border-white/[0.08] rounded-[14px] p-6">
 
                     {/* Filters Bar */}
                     <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-5 mb-5 border-b border-gray-200 dark:border-white/10 relative z-10">
                         {/* Search Input */}
                         <div className="relative w-full md:w-[410px]">
-                            <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-[#9EAAA4] w-[18px] h-[18px]" />
                             <input
                                 type="text"
                                 placeholder="Search by name, Skill..."
                                 value={candidateSearchTerm}
                                 onChange={(e) => setCandidateSearchTerm(e.target.value)}
-                                className="w-full h-11 bg-transparent border border-gray-300 dark:border-white/30 rounded-[12px] pl-12 pr-4 text-[13px] text-[#19211C] dark:text-white placeholder:text-gray-500 dark:placeholder:text-[#B7C1BC] focus:outline-none focus:border-brand-green transition-colors"
+                                className="w-full h-11 bg-transparent border border-gray-300 dark:border-white/30 rounded-[12px] pl-4 pr-4 text-[13px] text-[#19211C] dark:text-white placeholder:text-gray-500 dark:placeholder:text-[#B7C1BC] focus:outline-none focus:border-brand-green transition-colors"
                             />
                         </div>
 
                         {/* Dropdown Filters */}
                         <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto scrollbar-hide shrink-0 pb-1 md:pb-0">
-                            <div className="relative">
+                            <div className={`relative ${showDateModal ? "z-[90]" : ""}`}>
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        setShowDateModal(true);
-                                        setShowAlignmentDropdown(false);
-                                    }}
-                                    className={`h-11 flex items-center gap-2.5 px-4 rounded-[12px] text-[12px] font-semibold transition-colors whitespace-nowrap cursor-pointer ${isAppliedDateActive
-                                        ? "bg-[#1F6A45]/70 border border-[#2B8A59] hover:bg-[#257F54] text-[#19211C] dark:text-white"
-                                        : "bg-[#E5E8E6] dark:bg-[#2F3833] border border-[#D3D8D5] dark:border-white/15 hover:bg-[#DCE1DE] dark:hover:bg-[#3A433E] text-[#19211C] dark:text-white"
+                                    ref={dateFilterButtonRef}
+                                    onClick={openAppliedDateModal}
+                                    className={`h-[44px] flex items-center gap-2 px-4 py-[9px] rounded-[8px] text-[14px] font-normal border transition-all whitespace-nowrap cursor-pointer shadow-sm dark:shadow-none ${isAppliedDateActive
+                                        ? "border-[#1ED36A]/50 bg-[#E7F8EE]/60 text-[#1F3B2A] hover:bg-[#DDF4E7]/80 dark:border-transparent dark:bg-[#1ED36A33] dark:text-white dark:hover:bg-[#1ED36A45]"
+                                        : "bg-white dark:bg-[#23302A] border-gray-200 dark:border-[#355041] hover:border-brand-green dark:hover:border-brand-green/60 text-gray-900 dark:text-white"
                                         }`}
                                 >
                                     <svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-[18px] h-[18px] shrink-0 text-[#1ED36A]">
@@ -766,7 +898,7 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                                         <path d="M0 15.3C0 16.0161 0.284464 16.7028 0.790812 17.2092C1.29716 17.7155 1.98392 18 2.7 18H15.3C16.0161 18 16.7028 17.7155 17.2092 17.2092C17.7155 16.7028 18 16.0161 18 15.3V8.09998H0V15.3Z" fill="currentColor" />
                                     </svg>
                                     {appliedDateLabel}
-                                    <ChevronDownIcon className={`w-4 h-4 ml-0.5 ${isAppliedDateActive ? "text-[#19211C]/70 dark:text-white/80" : "text-[#19211C]/65 dark:text-white/75"}`} />
+                                    <ChevronDownIcon className={`w-2.5 h-2.5 ${isAppliedDateActive ? "text-[#1F3B2A]/70 dark:text-white/80" : "text-gray-500 dark:text-white/60"}`} />
                                 </button>
                             </div>
 
@@ -778,15 +910,15 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                                         setShowDateModal(false);
                                     }}
                                     className={`h-11 flex items-center gap-2.5 px-4 rounded-[12px] text-[12px] font-semibold transition-colors whitespace-nowrap cursor-pointer ${isAlignmentActive
-                                        ? "bg-[#1F6A45]/70 border border-[#2B8A59] hover:bg-[#257F54] text-[#19211C] dark:text-white"
-                                        : "bg-[#E5E8E6] dark:bg-[#2F3833] border border-[#D3D8D5] dark:border-white/15 hover:bg-[#DCE1DE] dark:hover:bg-[#3A433E] text-[#19211C] dark:text-white"
+                                        ? "bg-[#E7F8EE] dark:bg-[#1F6A45]/70 border border-[#65CB95] dark:border-[#2B8A59] hover:bg-[#DCF3E6] dark:hover:bg-[#257F54] text-[#1F6A45] dark:text-white"
+                                        : "bg-[#F3F7F4] dark:bg-[#2F3833] border border-[#DCE6E0] dark:border-white/15 hover:bg-[#EBF2ED] dark:hover:bg-[#3A433E] text-[#22302A] dark:text-white"
                                         }`}
                                 >
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 shrink-0 text-[#1ED36A]" stroke="none">
                                         <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                                     </svg>
                                     {alignmentFilterLabel}
-                                    <ChevronDownIcon className={`w-4 h-4 ml-0.5 ${isAlignmentActive ? "text-[#19211C]/70 dark:text-white/80" : "text-[#19211C]/65 dark:text-white/75"}`} />
+                                    <ChevronDownIcon className={`w-4 h-4 ml-0.5 ${isAlignmentActive ? "text-[#1F6A45]/75 dark:text-white/80" : "text-[#19211C]/65 dark:text-white/75"}`} />
                                 </button>
                                 {showAlignmentDropdown && (
                                     <div className="absolute top-full mt-2 right-0 w-52 bg-white dark:bg-[#27322C] border border-gray-200 dark:border-white/10 rounded-[10px] shadow-lg z-50 overflow-hidden py-1 text-left">
@@ -814,8 +946,8 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
 
                     {/* Grid */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
-                        {filteredCandidates.map((cad) => (
-                            <div key={cad.id} className="bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-[12px] px-6 py-4 min-h-[286px] hover:border-white/15 hover:shadow-[0_8px_24px_rgba(0,0,0,0.18)] transition-all flex flex-col gap-3">
+                        {paginatedCandidates.map((cad) => (
+                            <div key={cad.id} className="bg-white dark:bg-[#303934] border border-gray-200 dark:border-white/[0.08] rounded-[12px] px-6 py-5 min-h-[286px] hover:border-white/15 hover:shadow-[0_8px_24px_rgba(0,0,0,0.18)] transition-all flex flex-col gap-3">
 
                                 {/* Top Section */}
                                 <div className="flex items-start justify-between">
@@ -826,7 +958,7 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                                         </div>
                                         {/* Name & Details */}
                                         <div className="flex flex-col mt-0.5">
-                                            <h3 className="text-[24px] leading-[100%] font-[600] text-[#19211C] dark:text-white mb-2">{cad.name}</h3>
+                                            <h3 className="text-[24px] leading-[100%] font-medium text-[#19211C] dark:text-white mb-2">{cad.name}</h3>
                                             <p className="text-[14px] leading-[100%] text-gray-500 dark:text-gray-300 font-normal mb-1.5">Origin ID : {cad.originId}</p>
                                             {cad.location && (
                                                 <p className="text-[14px] leading-[100%] text-gray-500 dark:text-gray-300 font-normal flex items-center gap-1.5 mt-0.5">
@@ -849,14 +981,14 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                                 <div className="flex items-end justify-between mt-1">
                                     <div className="flex flex-wrap items-center gap-2 max-w-[72%]">
                                         {cad.skills.map((s, idx) => (
-                                            <span key={idx} className="bg-white border border-gray-200 shadow-sm text-[#2E3431] px-4 py-[6px] rounded-full text-[14px] leading-[100%] font-normal whitespace-nowrap">
+                                            <span key={idx} className="bg-white border border-[#E6ECE8] shadow-none text-[#2E3431] px-4 py-[7px] rounded-[12px] text-[14px] leading-[100%] font-normal whitespace-nowrap">
                                                 {s}
                                             </span>
                                         ))}
                                     </div>
                                     {/* Trait Badge */}
-                                    <div className={`inline-flex items-center gap-[10px] h-[43px] px-[10px] rounded-[12px] border text-[14px] leading-[100%] font-normal text-[#19211C] dark:text-white whitespace-nowrap shrink-0 ${cad.traitColor}`}>
-                                        <span className="opacity-85 font-normal text-[#19211C] dark:text-white">Trait:</span> <span className="font-normal text-[#19211C] dark:text-white">{cad.trait}</span>
+                                    <div className={`inline-flex items-center gap-[10px] h-[43px] px-[10px] -mt-1 rounded-[12px] border text-[14px] leading-[100%] font-[300] text-[#19211C] dark:text-white whitespace-nowrap shrink-0 ${cad.traitColor}`}>
+                                        <span className="opacity-85 font-[300] text-[#19211C] dark:text-white">Trait:</span> <span className="font-normal text-[#19211C] dark:text-white">{cad.trait}</span>
                                     </div>
                                 </div>
 
@@ -868,8 +1000,8 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                                 <div className="flex items-center justify-between">
                                     {/* Alignment Score */}
                                     <div className="flex flex-col gap-2.5">
-                                        <p className="text-[16px] leading-[100%] font-medium text-[#19211C] dark:text-white">
-                                            Role Alignment : <span className="text-[#1ED36A] font-semibold text-[16px]">{cad.alignment}</span>
+                                        <p className="text-[16px] leading-[100%] font-normal text-[#19211C] dark:text-white">
+                                            Role Alignment : <span className="text-[#1ED36A] font-medium text-[16px]">{cad.alignment}</span>
                                         </p>
                                         <div className="flex gap-2 text-[#1ED36A]">
                                             {[1, 2, 3, 4, 5].map((star) => (
@@ -882,18 +1014,18 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
 
                                     {/* Action Buttons */}
                                     <div className="flex items-center gap-4 shrink-0">
-                                        <button className={`w-[96.6056px] h-[55px] flex items-center justify-center gap-2 rounded-[27.5px] text-[14px] leading-none font-normal transition-colors cursor-pointer ${activeTab === 'hired' ? 'bg-[#1ED36A] text-white border border-[#1ED36A] shadow-[0_6px_14px_rgba(30,211,106,0.28)]' : 'bg-white hover:bg-gray-50 text-[#1F2723] border border-gray-200 shadow-sm dark:bg-[#3A433E] dark:hover:bg-[#46514B] dark:text-white dark:border-[#56625B]'}`}>
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={activeTab === 'hired' ? '#FFFFFF' : '#1ED36A'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+                                        <button className={`w-[96.6056px] h-[55px] flex items-center justify-center gap-2 rounded-[27.5px] text-[16px] leading-none font-normal transition-colors cursor-pointer ${(activeTab === 'all' ? cad.stage === 'hired' : activeTab === 'hired') ? 'bg-[#1ED36A] text-white border border-[#1ED36A] shadow-[0_6px_14px_rgba(30,211,106,0.28)]' : 'bg-white hover:bg-gray-50 text-[#1F2723] border border-gray-200 shadow-sm dark:bg-[#3A433E] dark:hover:bg-[#46514B] dark:text-white dark:border-[#56625B]'}`}>
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={(activeTab === 'all' ? cad.stage === 'hired' : activeTab === 'hired') ? '#FFFFFF' : '#1ED36A'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
                                             Hire
                                         </button>
-                                        <button className={`w-[127.791px] h-[55px] flex items-center justify-center gap-2 rounded-[27.5px] text-[14px] leading-none font-normal transition-colors cursor-pointer ${activeTab === 'shortlisted' ? 'bg-[#FFB020] text-white border border-[#FFB020] shadow-[0_6px_14px_rgba(255,176,32,0.26)]' : 'bg-white hover:bg-gray-50 text-[#1F2723] border border-gray-200 shadow-sm dark:bg-[#3A433E] dark:hover:bg-[#46514B] dark:text-white dark:border-[#56625B]'}`}>
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" className={`${activeTab === 'shortlisted' ? 'text-white' : 'text-[#FFB020]'}`}>
+                                        <button className={`w-[127.791px] h-[55px] flex items-center justify-center gap-2 rounded-[27.5px] text-[16px] leading-none font-normal transition-colors cursor-pointer ${(activeTab === 'all' ? cad.stage === 'shortlisted' : activeTab === 'shortlisted') ? 'bg-[#FFB020] text-white border border-[#FFB020] shadow-[0_6px_14px_rgba(255,176,32,0.26)]' : 'bg-white hover:bg-gray-50 text-[#1F2723] border border-gray-200 shadow-sm dark:bg-[#3A433E] dark:hover:bg-[#46514B] dark:text-white dark:border-[#56625B]'}`}>
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" className={`${(activeTab === 'all' ? cad.stage === 'shortlisted' : activeTab === 'shortlisted') ? 'text-white' : 'text-[#FFB020]'}`}>
                                                 <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                                             </svg>
                                             Shortlist
                                         </button>
-                                        <button className={`w-[109.001px] h-[55px] flex items-center justify-center gap-2 rounded-[27.5px] text-[14px] leading-none font-normal transition-colors cursor-pointer ${activeTab === 'rejected' ? 'bg-[#FF4A4A] text-white border border-[#FF4A4A] shadow-[0_6px_14px_rgba(255,74,74,0.24)]' : 'bg-white hover:bg-gray-50 text-[#1F2723] border border-gray-200 shadow-sm dark:bg-[#3A433E] dark:hover:bg-[#46514B] dark:text-white dark:border-[#56625B]'}`}>
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={activeTab === 'rejected' ? '#FFFFFF' : '#FF4A4A'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                                        <button className={`w-[109.001px] h-[55px] flex items-center justify-center gap-2 rounded-[27.5px] text-[16px] leading-none font-normal transition-colors cursor-pointer ${(activeTab === 'all' ? cad.stage === 'rejected' : activeTab === 'rejected') ? 'bg-[#FF4A4A] text-white border border-[#FF4A4A] shadow-[0_6px_14px_rgba(255,74,74,0.24)]' : 'bg-white hover:bg-gray-50 text-[#1F2723] border border-gray-200 shadow-sm dark:bg-[#3A433E] dark:hover:bg-[#46514B] dark:text-white dark:border-[#56625B]'}`}>
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={(activeTab === 'all' ? cad.stage === 'rejected' : activeTab === 'rejected') ? '#FFFFFF' : '#FF4A4A'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
                                             Reject
                                         </button>
                                     </div>
@@ -911,28 +1043,68 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                     </div>
 
                     {/* Pagination */}
-                    <div className="flex items-center justify-center gap-2 mt-2 mb-10 pb-8 text-[13px] font-medium text-gray-500 dark:text-gray-400">
-                        <button className="w-8 h-8 rounded flex items-center justify-center hover:bg-white/5 transition-colors cursor-pointer">&lt;</button>
-                        <button className="w-8 h-8 rounded flex items-center justify-center bg-[#13C065] text-[#111412] font-bold">1</button>
-                        <button className="w-8 h-8 rounded flex items-center justify-center hover:bg-white/5 hover:text-[#19211C] dark:text-white transition-colors cursor-pointer border border-transparent hover:border-white/10">2</button>
-                        <button className="w-8 h-8 rounded flex items-center justify-center hover:bg-white/5 hover:text-[#19211C] dark:text-white transition-colors cursor-pointer border border-transparent hover:border-white/10">3</button>
-                        <button className="w-8 h-8 rounded flex items-center justify-center hover:bg-white/5 hover:text-[#19211C] dark:text-white transition-colors cursor-pointer border border-transparent hover:border-white/10">4</button>
-                        <button className="w-8 h-8 rounded flex items-center justify-center hover:bg-white/5 hover:text-[#19211C] dark:text-white transition-colors cursor-pointer border border-transparent hover:border-white/10">5</button>
-                        <button className="w-8 h-8 rounded flex items-center justify-center hover:bg-white/5 hover:text-[#19211C] dark:text-white transition-colors cursor-pointer border border-transparent hover:border-white/10">6</button>
-                        <span className="px-1 text-gray-600">...</span>
-                        <button className="min-w-8 px-2 h-8 rounded flex items-center justify-center hover:bg-white/5 hover:text-[#19211C] dark:text-white transition-colors cursor-pointer border border-transparent hover:border-white/10">144</button>
-                        <button className="w-8 h-8 rounded flex items-center justify-center hover:bg-white/5 transition-colors cursor-pointer">&gt;</button>
-                    </div>
+                    {filteredCandidates.length > 0 && (
+                        <div className="flex items-center justify-center gap-2 mt-2 mb-10 pb-8 text-[13px] font-medium text-gray-500 dark:text-gray-400">
+                            <button
+                                type="button"
+                                onClick={() => setCandidatePage((prev) => Math.max(1, prev - 1))}
+                                disabled={safeCandidatePage === 1}
+                                className={`w-8 h-8 rounded flex items-center justify-center border transition-colors ${safeCandidatePage === 1
+                                    ? "border-transparent opacity-45 cursor-not-allowed"
+                                    : "border-transparent hover:border-[#DCE6E0] dark:hover:border-white/15 hover:bg-[#EEF4F0] dark:hover:bg-white/5 text-[#19211C] dark:text-white cursor-pointer"
+                                    }`}
+                            >
+                                &lt;
+                            </button>
+                            {candidatePaginationItems.map((item, index) => (
+                                item === "..." ? (
+                                    <span key={`candidate-pagination-ellipsis-${index}`} className="px-1 text-gray-600 dark:text-gray-400">...</span>
+                                ) : (
+                                    <button
+                                        key={`candidate-page-${item}`}
+                                        type="button"
+                                        onClick={() => setCandidatePage(item)}
+                                        className={`min-w-8 px-2 h-8 rounded flex items-center justify-center border transition-colors ${safeCandidatePage === item
+                                            ? "bg-[#13C065] border-[#13C065] text-[#111412] font-bold"
+                                            : "border-transparent hover:border-[#DCE6E0] dark:hover:border-white/15 hover:bg-[#EEF4F0] dark:hover:bg-white/5 text-[#19211C] dark:text-white cursor-pointer"
+                                            }`}
+                                    >
+                                        {item}
+                                    </button>
+                                )
+                            ))}
+                            <button
+                                type="button"
+                                onClick={() => setCandidatePage((prev) => Math.min(candidateTotalPages, prev + 1))}
+                                disabled={safeCandidatePage === candidateTotalPages}
+                                className={`w-8 h-8 rounded flex items-center justify-center border transition-colors ${safeCandidatePage === candidateTotalPages
+                                    ? "border-transparent opacity-45 cursor-not-allowed"
+                                    : "border-transparent hover:border-[#DCE6E0] dark:hover:border-white/15 hover:bg-[#EEF4F0] dark:hover:bg-white/5 text-[#19211C] dark:text-white cursor-pointer"
+                                    }`}
+                            >
+                                &gt;
+                            </button>
+                        </div>
+                    )}
 
                 </div>
             )}
 
             {showDateModal && (
-                <div className="fixed inset-0 z-[80] bg-[#08120E]/80 backdrop-blur-[1.5px] flex items-center justify-center px-3" onClick={() => setShowDateModal(false)}>
-                    <div className="w-[900px] h-[480px] max-w-[95vw] rounded-[24px] border border-white/[0.2] bg-[#19211C]/40 shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-5" onClick={(e) => e.stopPropagation()}>
-                        <div className="w-[860px] max-w-full mx-auto flex items-center justify-between pb-3.5 border-b border-white/[0.12]">
-                            <p className="text-[18px] leading-[23px] font-semibold text-white">Select Date Range</p>
-                            <button type="button" onClick={() => setShowDateModal(false)} className="w-8 h-8 rounded-full bg-white/[0.12] text-[#1ED36A] hover:bg-[#1ED36A]/30 hover:text-white transition-colors flex items-center justify-center" aria-label="Close date range picker">
+                <div className="fixed inset-0 z-[80] bg-[#19211C33] dark:bg-[#19211CCC] backdrop-blur-[1.5px]" onClick={() => setShowDateModal(false)}>
+                    <div
+                        className="fixed"
+                        style={{
+                            top: `${dateModalAnchorStyle?.top ?? 188}px`,
+                            left: `${dateModalAnchorStyle?.left ?? 12}px`,
+                            width: "min(900px, calc(100vw - 24px))",
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                    <div className="w-full h-[480px] rounded-[24px] border border-[#D7E3DD] dark:border-white/[0.2] bg-white/95 dark:bg-[#19211C]/40 shadow-[0px_16px_40px_rgba(25,33,28,0.18)] dark:shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-5">
+                        <div className="w-[860px] max-w-full mx-auto flex items-center justify-between pb-3.5 border-b border-[#E1E9E4] dark:border-white/[0.12]">
+                            <p className="text-[18px] leading-[23px] font-normal text-[#19211C] dark:text-white">Select Date Range</p>
+                            <button type="button" onClick={() => setShowDateModal(false)} className="w-8 h-8 rounded-full bg-[#F2F6F4] dark:bg-white/[0.12] border border-[#DDE6E1] dark:border-transparent text-[#1ED36A] hover:bg-[#E7F3ED] dark:hover:bg-[#1ED36A]/30 hover:text-[#139555] dark:hover:text-white transition-colors flex items-center justify-center" aria-label="Close date range picker">
                                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M10.5 3.5L3.5 10.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                                     <path d="M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -940,7 +1112,7 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                             </button>
                         </div>
                         <div className="w-[860px] max-w-full mx-auto pt-3.5 flex gap-4 h-[318px]">
-                            <div className="w-[126px] shrink-0 border-r border-white/[0.12] pr-2.5">
+                            <div className="w-[126px] shrink-0 border-r border-[#E1E9E4] dark:border-white/[0.12] pr-2.5">
                                 {calendarPresets.map((preset) => {
                                     const isActivePreset = calendarPreset === preset;
                                     return (
@@ -951,7 +1123,7 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                                                 setCalendarPreset(preset);
                                                 applyPresetRange(preset);
                                             }}
-                                            className={`w-full text-left px-3 py-1.5 rounded-r-[4px] text-[13px] leading-[17px] transition-colors mb-[2px] ${isActivePreset ? "bg-[#1ED36A] text-white font-semibold" : "text-white/60 font-normal hover:bg-white/[0.08] hover:text-white"}`}
+                                            className={`w-full text-left px-3 py-1.5 rounded-r-[4px] text-[13px] leading-[17px] transition-colors mb-[2px] ${isActivePreset ? "bg-[#E7F8EE] dark:bg-[#1ED36A] text-[#1F6A45] dark:text-white font-normal" : "text-[#5F6E67] dark:text-white/60 font-light hover:bg-[#F3F7F5] dark:hover:bg-white/[0.08] hover:text-[#19211C] dark:hover:text-white"}`}
                                         >
                                             {preset}
                                         </button>
@@ -965,8 +1137,8 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                                 </div>
                             </div>
                         </div>
-                        <div className="w-[860px] max-w-full mx-auto pt-3 mt-3 border-t border-white/[0.12] flex items-center justify-between gap-3">
-                            <p className="text-[12px] leading-[16px] font-normal text-white">Selected Range : {selectedRangeText}</p>
+                        <div className="w-[860px] max-w-full mx-auto pt-3 mt-3 border-t border-[#E1E9E4] dark:border-white/[0.12] flex items-center justify-between gap-3">
+                            <p className="text-[12px] leading-[16px] font-light text-[#4A5B53] dark:text-white">Selected Range : {selectedRangeText}</p>
                             <div className="flex items-center gap-2">
                                 <button
                                     type="button"
@@ -978,7 +1150,7 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                                         setCustomDateLabel(null);
                                         setShowDateModal(false);
                                     }}
-                                    className="h-7 px-4 rounded-full border border-white text-white text-[12px] leading-[16px] font-medium hover:bg-white/10 transition-colors"
+                                    className="h-7 px-4 rounded-full border border-[#CAD8D0] dark:border-white text-[#19211C] dark:text-white text-[12px] leading-[16px] font-normal hover:bg-[#EEF5F1] dark:hover:bg-white/10 transition-colors"
                                 >
                                     Clear
                                 </button>
@@ -987,6 +1159,24 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                                     onClick={() => {
                                         if (calendarPreset === "Any Time" || !rangeStart) {
                                             setAppliedDateFilter("Applied Date");
+                                            setCustomDateLabel(null);
+                                        } else if (calendarPreset === "Today") {
+                                            setAppliedDateFilter("Today");
+                                            setCustomDateLabel(null);
+                                        } else if (calendarPreset === "Yesterday") {
+                                            setAppliedDateFilter("Yesterday");
+                                            setCustomDateLabel(null);
+                                        } else if (calendarPreset === "Last 7 Days") {
+                                            setAppliedDateFilter("Last 7 Days");
+                                            setCustomDateLabel(null);
+                                        } else if (calendarPreset === "Last 30 Days") {
+                                            setAppliedDateFilter("Last 30 Days");
+                                            setCustomDateLabel(null);
+                                        } else if (calendarPreset === "This Month") {
+                                            setAppliedDateFilter("This Month");
+                                            setCustomDateLabel(null);
+                                        } else if (calendarPreset === "Last Month") {
+                                            setAppliedDateFilter("Last Month");
                                             setCustomDateLabel(null);
                                         } else if (rangeStart && !rangeEnd) {
                                             setAppliedDateFilter("Custom Range");
@@ -1003,6 +1193,7 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
                                 </button>
                             </div>
                         </div>
+                    </div>
                     </div>
                 </div>
             )}

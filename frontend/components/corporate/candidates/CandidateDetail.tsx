@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDownIcon, Check, X, Download } from "lucide-react";
 
 // â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -199,14 +199,16 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
     const [activeFilterMenu, setActiveFilterMenu] = useState<string | null>(null);
     const [selectedStatus, setSelectedStatus] = useState<string>("All Status");
     const [selectedDateRange, setSelectedDateRange] = useState<string>("Any Time");
-    const [selectedAlignmentRange, setSelectedAlignmentRange] = useState<string>("All Alignment");
-    const [calendarPreset, setCalendarPreset] = useState<string>("Custom Range");
-    const [rangeStart, setRangeStart] = useState<Date | null>(new Date(2025, 9, 9));
-    const [rangeEnd, setRangeEnd] = useState<Date | null>(new Date(2025, 10, 17));
-    const [leftCalendarMonth, setLeftCalendarMonth] = useState<Date>(new Date(2025, 9, 1));
+    const [selectedAlignmentRange, setSelectedAlignmentRange] = useState<string>("All Alignments");
+    const [calendarPreset, setCalendarPreset] = useState<string>("Any Time");
+    const [rangeStart, setRangeStart] = useState<Date | null>(null);
+    const [rangeEnd, setRangeEnd] = useState<Date | null>(null);
+    const [leftCalendarMonth, setLeftCalendarMonth] = useState<Date>(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+    const [dateModalAnchorStyle, setDateModalAnchorStyle] = useState<{ top: number; left: number } | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [sortColumn, setSortColumn] = useState<SortColumn>("posted_date");
     const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+    const dateFilterButtonRef = useRef<HTMLButtonElement | null>(null);
 
     useEffect(() => {
         const handleOutsideClick = (event: MouseEvent) => {
@@ -242,6 +244,8 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
     const traitImageKey = normalizeTraitKey(traitDisplayName);
     const traitCharacterImage = report.traitImage || `/traits/Corporate_${traitImageKey}.png`;
     const traitStrengthChartImage = report.strengthChartImage || `/charts/${traitImageKey}_Strength_Chart.png`;
+    const primarySkillRow = candidate.skills.slice(0, 4);
+    const secondarySkillRow = candidate.skills.slice(4, 7);
 
     const tabs: { key: TabKey; label: string; count?: number }[] = [
         { key: "origin_report", label: "Origin Report" },
@@ -253,9 +257,16 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
 
     const filteredAppliedJobs = useMemo(() => {
         const query = searchQuery.trim().toLowerCase();
-        if (!query) {
-            return appliedJobs;
-        }
+        const toComparableDate = (date: Date) => {
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            return year * 10000 + month * 100 + day;
+        };
+
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const todayComparable = toComparableDate(today);
 
         return appliedJobs.filter((job) => {
             const searchable = [
@@ -272,9 +283,80 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                 .join(" ")
                 .toLowerCase();
 
-            return searchable.includes(query);
+            const matchesSearch = !query || searchable.includes(query);
+
+            const matchesStatus =
+                selectedStatus === "All Status" ||
+                job.status === selectedStatus;
+
+            const matchesAlignment = (() => {
+                switch (selectedAlignmentRange) {
+                    case "Alignment (90% - 100%)":
+                        return job.alignmentPercent >= 90 && job.alignmentPercent <= 100;
+                    case "Alignment (80% - 89%)":
+                        return job.alignmentPercent >= 80 && job.alignmentPercent <= 89;
+                    case "Alignment (Below 80%)":
+                        return job.alignmentPercent < 80;
+                    case "All Alignments":
+                    default:
+                        return true;
+                }
+            })();
+
+            const matchesDate = (() => {
+                if (selectedDateRange === "Any Time") {
+                    return true;
+                }
+
+                const appliedComparable = parseDisplayDate(job.appliedDate);
+
+                switch (selectedDateRange) {
+                    case "Today":
+                        return appliedComparable === todayComparable;
+                    case "Yesterday": {
+                        const yesterday = new Date(today);
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        return appliedComparable === toComparableDate(yesterday);
+                    }
+                    case "Last 7 Days": {
+                        const start = new Date(today);
+                        start.setDate(start.getDate() - 6);
+                        return appliedComparable >= toComparableDate(start) && appliedComparable <= todayComparable;
+                    }
+                    case "Last 30 Days": {
+                        const start = new Date(today);
+                        start.setDate(start.getDate() - 29);
+                        return appliedComparable >= toComparableDate(start) && appliedComparable <= todayComparable;
+                    }
+                    case "This Month": {
+                        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                        return appliedComparable >= toComparableDate(monthStart) && appliedComparable <= todayComparable;
+                    }
+                    case "Last Month": {
+                        const monthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                        const monthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+                        return appliedComparable >= toComparableDate(monthStart) && appliedComparable <= toComparableDate(monthEnd);
+                    }
+                    default: {
+                        if (rangeStart && rangeEnd) {
+                            return (
+                                appliedComparable >= toComparableDate(rangeStart) &&
+                                appliedComparable <= toComparableDate(rangeEnd)
+                            );
+                        }
+
+                        if (rangeStart && !rangeEnd) {
+                            return appliedComparable === toComparableDate(rangeStart);
+                        }
+
+                        return true;
+                    }
+                }
+            })();
+
+            return matchesSearch && matchesStatus && matchesAlignment && matchesDate;
         });
-    }, [appliedJobs, searchQuery]);
+    }, [appliedJobs, rangeEnd, rangeStart, searchQuery, selectedAlignmentRange, selectedDateRange, selectedStatus]);
 
     const sortedAppliedJobs = useMemo(() => {
         const sorted = [...filteredAppliedJobs].sort((a, b) => {
@@ -323,6 +405,78 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
         setSortDirection("asc");
     };
 
+    const handleAppliedJobsSearch = () => {
+        setSearchQuery((prev) => prev.trim());
+    };
+
+    const openDateFilterModal = () => {
+        if (activeFilterMenu === "date") {
+            setActiveFilterMenu(null);
+            return;
+        }
+
+        const presetByFilterLabel: Record<string, string> = {
+            "Any Time": "Any Time",
+            Today: "Today",
+            Yesterday: "Yesterday",
+            "Last 7 Days": "Last 7 Days",
+            "Last 30 Days": "Last 30 Days",
+            "This Month": "This Month",
+            "Last Month": "Last Month",
+        };
+
+        const preset = presetByFilterLabel[selectedDateRange] ?? "Custom Range";
+        setCalendarPreset(preset);
+
+        if (preset !== "Custom Range") {
+            applyPresetRange(preset);
+        }
+
+        const trigger = dateFilterButtonRef.current;
+        if (trigger && typeof window !== "undefined") {
+            const rect = trigger.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            const modalWidth = Math.min(900, viewportWidth - 24);
+            const modalHeight = 480;
+            const gap = 12;
+
+            const left = Math.max(12, Math.min(rect.right - modalWidth, viewportWidth - modalWidth - 12));
+            const top = Math.max(88, Math.min(rect.bottom + gap, viewportHeight - modalHeight - 12));
+            setDateModalAnchorStyle({ top, left });
+        }
+
+        setActiveFilterMenu("date");
+    };
+
+    useEffect(() => {
+        if (activeFilterMenu !== "date") {
+            return;
+        }
+
+        const updateAnchorPosition = () => {
+            const trigger = dateFilterButtonRef.current;
+            if (!trigger || typeof window === "undefined") {
+                return;
+            }
+
+            const rect = trigger.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            const modalWidth = Math.min(900, viewportWidth - 24);
+            const modalHeight = 480;
+            const gap = 12;
+
+            const left = Math.max(12, Math.min(rect.right - modalWidth, viewportWidth - modalWidth - 12));
+            const top = Math.max(88, Math.min(rect.bottom + gap, viewportHeight - modalHeight - 12));
+            setDateModalAnchorStyle({ top, left });
+        };
+
+        updateAnchorPosition();
+        window.addEventListener("resize", updateAnchorPosition);
+        return () => window.removeEventListener("resize", updateAnchorPosition);
+    }, [activeFilterMenu]);
+
     const renderSortLabel = (label: string, column: SortColumn) => {
         const isActive = sortColumn === column;
         const upColor = isActive && sortDirection === "asc" ? "#1ED36A" : "#93A19A";
@@ -348,7 +502,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
             ? "flex items-center gap-2 h-[44px] bg-[#E7F8EE] dark:bg-[#1ED36A]/20 border border-[#1ED36A]/50 dark:border-[#1ED36A]/45 hover:bg-[#DDF4E7] dark:hover:bg-[#1ED36A]/25 text-[#1F3B2A] dark:text-white px-4 rounded-xl text-[13px] leading-[18px] font-medium transition-colors whitespace-nowrap cursor-pointer shrink-0"
             : "flex items-center gap-2 h-[44px] bg-transparent border border-gray-300 dark:border-white/[0.24] hover:bg-black/[0.04] dark:hover:bg-white/5 text-[#33413B] dark:text-white/85 px-4 rounded-xl text-[13px] leading-[18px] font-medium transition-colors whitespace-nowrap cursor-pointer shrink-0";
 
-    const calendarPresets = ["All", "Today", "Yesterday", "Last 7 Days", "Last 30 Days", "This Month", "Last Month", "Custom Range"];
+    const calendarPresets = ["Any Time", "Today", "Yesterday", "Last 7 Days", "Last 30 Days", "This Month", "Last Month", "Custom Range"];
     const weekDays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 
     const normalizeDate = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
@@ -403,7 +557,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
         const today = new Date();
         const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
-        if (preset === "All") {
+        if (preset === "Any Time") {
             setRangeStart(null);
             setRangeEnd(null);
             return;
@@ -445,7 +599,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
 
         if (preset === "This Month") {
             const start = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1);
-            const end = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0);
+            const end = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate());
             setRangeStart(start);
             setRangeEnd(end);
             setLeftCalendarMonth(new Date(start.getFullYear(), start.getMonth(), 1));
@@ -508,48 +662,64 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
         const cells = buildMonthGrid(year, month);
 
         return (
-            <div className="w-[344px] h-[300px] rounded-[12px] bg-white/[0.08] border border-white/[0.12] px-5 py-3.5">
-                <div className="flex items-center justify-between mb-3 text-white/90 pb-3.5 border-b border-white/[0.12]">
+            <div className="w-[344px] h-[300px] rounded-[12px] bg-[#F6F9F7] dark:bg-white/[0.08] border border-[#DDE6E1] dark:border-white/[0.12] px-4 py-3 overflow-hidden">
+                <div className="flex items-center justify-between mb-2.5 text-[#22302A] dark:text-white/90 pb-2.5 border-b border-[#DDE6E1] dark:border-white/[0.12]">
                     <button
                         type="button"
                         onClick={() => setLeftCalendarMonth((prev) => addMonths(prev, -1))}
-                        className="p-1 text-white/60 hover:text-white transition-colors"
+                        className="p-1 text-[#63716B] hover:text-[#22302A] dark:text-white/60 dark:hover:text-white transition-colors"
                     >
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M7.5 2L3.5 6L7.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     </button>
-                    <p className="text-[14px] leading-[18px] font-semibold text-[#E7EFEB]">{title}</p>
+                    <p className="text-[14px] leading-[18px] font-normal text-[#22302A] dark:text-[#E7EFEB]">{title}</p>
                     <button
                         type="button"
                         onClick={() => setLeftCalendarMonth((prev) => addMonths(prev, 1))}
-                        className="p-1 text-white/60 hover:text-white transition-colors"
+                        className="p-1 text-[#63716B] hover:text-[#22302A] dark:text-white/60 dark:hover:text-white transition-colors"
                     >
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 2L8.5 6L4.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     </button>
                 </div>
 
-                <div className="grid grid-cols-7 gap-y-2 mb-2">
+                <div className="grid grid-cols-7 mb-1.5">
                     {weekDays.map((day) => (
-                        <span key={`${title}-${day}`} className="text-center text-[13px] leading-[17px] font-normal text-white/80">{day}</span>
+                        <span key={`${title}-${day}`} className="text-center text-[12px] leading-[16px] font-light text-[#63716B] dark:text-white/75">{day}</span>
                     ))}
                 </div>
 
-                <div className="grid grid-cols-7 gap-y-1.5">
-                    {cells.map((cell) => {
+                <div className="h-[202px] grid grid-cols-7 grid-rows-6 gap-y-[2px]">
+                    {cells.map((cell, index) => {
                         const day = cell.date.getDate();
                         const inRange = isInRange(cell.date);
                         const start = isRangeStart(cell.date);
                         const end = isRangeEnd(cell.date);
                         const isMuted = !cell.inCurrentMonth;
+                        const colIndex = index % 7;
+                        const prevCell = colIndex > 0 ? cells[index - 1] : null;
+                        const nextCell = colIndex < 6 ? cells[index + 1] : null;
+                        const prevInRange = Boolean(prevCell && isInRange(prevCell.date));
+                        const nextInRange = Boolean(nextCell && isInRange(nextCell.date));
+                        const isRangeSegmentStart = inRange && !prevInRange;
+                        const isRangeSegmentEnd = inRange && !nextInRange;
                         const rangePillClass = inRange
-                            ? `${start ? "rounded-l-[24px]" : ""} ${end ? "rounded-r-[100px]" : ""} ${!start && !end ? "rounded-none" : ""}`
+                            ? `${isRangeSegmentStart ? "rounded-l-[100px]" : ""} ${isRangeSegmentEnd ? "rounded-r-[100px]" : ""}`
                             : "";
 
                         return (
-                            <div key={`${title}-${cell.date.toISOString()}-${monthOffset}`} className={`h-[28px] flex items-center justify-center text-[13px] leading-[17px] ${inRange ? "bg-[#1ED36A]/[0.16]" : ""} ${rangePillClass}`}>
+                            <div key={`${title}-${cell.date.toISOString()}-${monthOffset}`} className="h-full relative flex items-center justify-center text-[12px] leading-[16px] isolate">
+                                {inRange && (
+                                    <div
+                                        className={`absolute inset-y-[5px] z-0 bg-[#DDEFE5] dark:bg-[#204E35] ${rangePillClass}`}
+                                        style={{
+                                            left: isRangeSegmentStart ? "4px" : "0px",
+                                            right: isRangeSegmentEnd ? "4px" : "0px",
+                                        }}
+                                    />
+                                )}
                                 <button
                                     type="button"
                                     onClick={() => handleDateCellClick(new Date(cell.date.getFullYear(), cell.date.getMonth(), cell.date.getDate()))}
-                                    className={`h-9 w-9 flex items-center justify-center font-normal ${start || end ? "rounded-full bg-[#1ED36A] text-white shadow-[0px_4px_6.7px_rgba(0,0,0,0.4),0px_2px_17.9px_rgba(30,211,106,0.4)]" : ""} ${!start && !end && inRange ? "text-white" : ""} ${!inRange && !isMuted ? "text-white" : ""} ${isMuted ? "text-white/40" : ""}`}
+                                    className={`relative z-10 h-8 w-8 flex items-center justify-center text-[12px] leading-[16px] font-light text-[#22302A] dark:text-white ${start || end ? "rounded-full bg-[#1ED36A] text-white shadow-[0px_2px_10px_rgba(30,211,106,0.28)] dark:shadow-[0px_4px_6.7px_rgba(0,0,0,0.4),0px_2px_17.9px_rgba(30,211,106,0.4)]" : "rounded-full"} ${!start && !end && inRange ? "text-[#1F6A45] dark:text-white" : ""} ${!inRange && !isMuted ? "text-[#22302A] dark:text-white" : ""} ${isMuted ? "text-[#A3B1AA] dark:text-white/40" : ""}`}
                                 >
                                     {day}
                                 </button>
@@ -562,7 +732,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
     };
 
     return (
-        <div className="thin-ui-page relative flex flex-col w-full max-w-[1920px] min-h-0 mx-auto gap-4 font-sans p-4 sm:p-6 lg:p-8 bg-[#F7FAF8] dark:bg-[#19211C]">
+        <div className="thin-ui-page relative flex flex-col w-full max-w-[1920px] h-[calc(100vh-96px)] min-h-[calc(100vh-96px)] overflow-y-scroll overflow-x-hidden mx-auto gap-4 font-['Haskoy'] p-4 sm:p-6 lg:p-8 bg-[#F7FAF8] dark:bg-[#19211C]">
 
             {/* Breadcrumb */}
             <div className="flex items-center text-xs text-[#5F6B65] dark:text-white/70 mb-1.5 font-normal">
@@ -596,7 +766,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
 
                 {/* â”€â”€â”€ Left Sidebar (Profile Card) â”€â”€â”€ */}
                 <div className="w-full max-w-[435px] xl:w-[435px] shrink-0 mx-auto xl:mx-0">
-                    <div className="bg-white border border-gray-200 dark:bg-white/[0.08] dark:border-white/[0.2] shadow-[0_4px_40px_rgba(0,0,0,0.18)] dark:shadow-[0_4px_40px_rgba(0,0,0,0.4)] rounded-xl px-5 sm:px-6 xl:px-8 py-5 xl:py-6 flex flex-col items-center gap-6">
+                    <div className="bg-white dark:bg-white/[0.08] border border-gray-200 dark:border-white/[0.08] shadow-[0_4px_40px_rgba(0,0,0,0.18)] dark:shadow-[0_4px_40px_rgba(0,0,0,0.4)] rounded-xl px-5 sm:px-6 xl:px-8 py-6 xl:py-7 flex flex-col items-center gap-6">
                         {/* Avatar */}
                         <div className="w-[104px] h-[104px] rounded-full overflow-hidden border border-[#FFFFFF40]">
                             <img src={candidate.avatar} alt={candidate.name} className="w-full h-full object-cover" />
@@ -605,27 +775,38 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                         {/* Name & ID */}
                         <div className="text-center flex flex-col gap-2">
                             <h2 className="text-[24px] leading-[31px] font-medium text-[#19211C] dark:text-white">{candidate.name}</h2>
-                            <p className="text-[16px] leading-[21px] font-normal text-[#3B4741] dark:text-white">Origin ID : {candidate.originId}</p>
+                            <p className="text-[16px] leading-[21px] font-light text-[#3B4741] dark:text-white">Origin ID : {candidate.originId}</p>
                         </div>
 
                         {/* Trait */}
-                        <div className="h-[43px] px-[10px] rounded-xl border border-[#FEF000] bg-[#FEF0001F] flex items-center justify-center whitespace-nowrap">
-                            <span className="text-[14px] leading-[18px] font-thin text-[#19211C] dark:text-white">Trait: </span>
-                            <span className="text-[14px] leading-[18px] font-normal text-[#19211C] dark:text-white">{candidate.trait}</span>
+                        <div className="h-[43px] px-[12px] rounded-xl border border-[#FEF000] bg-[#FEF0001F] flex items-center justify-center gap-1 whitespace-nowrap">
+                            <span className="text-[14px] leading-[18px] font-light text-[#19211C] dark:text-white">Trait:</span>
+                            <span className="text-[15px] leading-[19px] font-normal text-[#19211C] dark:text-white">{candidate.trait}</span>
                         </div>
 
                         {/* Skills */}
-                        <div className="flex flex-wrap justify-center gap-2 max-w-[371px]">
-                            {candidate.skills.map((skill, i) => (
-                                <span key={i} className="px-3.5 py-[5px] rounded-full border border-gray-200 shadow-sm bg-white text-[13px] font-normal text-[#2E3431]">
-                                    {skill}
-                                </span>
-                            ))}
+                        <div className="flex flex-col items-center gap-2 w-full max-w-[371px]">
+                            <div className="flex flex-wrap justify-center gap-2 w-full">
+                                {primarySkillRow.map((skill, i) => (
+                                    <span key={i} className="h-[28px] px-3 rounded-full border border-gray-200 bg-white text-[13px] leading-[16px] font-normal text-[#2E3431] shadow-[0_1px_3px_rgba(0,0,0,0.08)] flex items-center">
+                                        {skill}
+                                    </span>
+                                ))}
+                            </div>
+                            {secondarySkillRow.length > 0 && (
+                                <div className="flex flex-wrap justify-center gap-2 w-full">
+                                    {secondarySkillRow.map((skill, i) => (
+                                        <span key={`secondary-${i}`} className="h-[28px] px-3 rounded-full border border-gray-200 bg-white text-[13px] leading-[16px] font-normal text-[#2E3431] shadow-[0_1px_3px_rgba(0,0,0,0.08)] flex items-center">
+                                            {skill}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         {/* Social Links */}
                         <div className="flex gap-3 w-full justify-center">
-                            <a href={candidate.linkedIn} target="_blank" rel="noopener noreferrer" className="h-[37px] min-w-[165px] flex items-center justify-center gap-2 px-4 bg-[#007EBB] text-white rounded-xl text-[16px] leading-[21px] font-medium hover:opacity-90 transition-opacity whitespace-nowrap">
+                            <a href={candidate.linkedIn} target="_blank" rel="noopener noreferrer" className="h-[46px] min-w-[165px] flex items-center justify-center gap-2 px-4 bg-[#007EBB] text-white rounded-xl text-[16px] leading-[21px] font-medium hover:opacity-90 transition-opacity whitespace-nowrap">
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
                                     <path d="M15.9963 16.0001V10.1401C15.9963 7.26006 15.3763 5.06006 12.0163 5.06006C10.3962 5.06006 9.31625 5.94006 8.87625 6.78006H8.83625V5.32006H5.65625V16.0001H8.97625V10.7001C8.97625 9.30006 9.23625 7.96006 10.9563 7.96006C12.6563 7.96006 12.6763 9.54006 12.6763 10.7801V15.9801H15.9963V16.0001Z" fill="white"/>
                                     <path d="M0.257812 5.31995H3.57781V15.9999H0.257812V5.31995Z" fill="white"/>
@@ -633,7 +814,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                 </svg>
                                 LinkedIn Profile
                             </a>
-                            <a href={candidate.github} target="_blank" rel="noopener noreferrer" className="h-[37px] min-w-[165px] flex items-center justify-center gap-2 px-4 bg-[#1B1F23] text-white border border-white/[0.16] rounded-xl text-[16px] leading-[21px] font-medium hover:opacity-90 transition-opacity whitespace-nowrap">
+                            <a href={candidate.github} target="_blank" rel="noopener noreferrer" className="h-[46px] min-w-[165px] flex items-center justify-center gap-2 px-4 bg-[#1B1F23] text-white border border-white/[0.16] rounded-xl text-[16px] leading-[21px] font-medium hover:opacity-90 transition-opacity whitespace-nowrap">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="shrink-0"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" /></svg>
                                 GitHub Profile
                             </a>
@@ -648,7 +829,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
 
                             {/* Alignment */}
                             <p className="text-[18px] leading-[23px] font-normal text-[#19211C] dark:text-white">
-                                Role Alignment : <span className="text-[#1ED36A]">{candidate.alignment}</span>
+                                Role Alignment : <span className="text-[#1ED36A] font-medium">{candidate.alignment}</span>
                             </p>
 
                             {/* Star Rating */}
@@ -679,32 +860,34 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                 <div className="w-full min-w-0">
 
                     {/* Tab and Content Container - Wrapped with Border */}
-                    <div className="bg-white border border-gray-200 dark:bg-white/[0.08] dark:border-white/[0.2] shadow-[0_4px_40px_rgba(0,0,0,0.18)] dark:shadow-[0_4px_40px_rgba(0,0,0,0.4)] rounded-xl w-full max-w-[1372px] flex flex-col overflow-hidden">
+                    <div className="bg-white dark:bg-white/[0.08] border-0 shadow-[0_4px_40px_rgba(0,0,0,0.18)] dark:shadow-[0_4px_40px_rgba(0,0,0,0.4)] rounded-xl w-full max-w-[1372px] flex flex-col overflow-hidden">
                         {/* Tabs */}
-                        <div className="flex items-center gap-0 border-b border-gray-200 dark:border-white/[0.1] overflow-x-auto scrollbar-hide shrink-0 px-6 pt-6">
-                            {tabs.map((tab) => (
-                                <button
-                                    key={tab.key}
-                                    onClick={() => setActiveTab(tab.key)}
-                                    className="relative px-1 pt-3 pb-5 mr-8 text-[18px] leading-[23px] transition-colors whitespace-nowrap cursor-pointer"
-                                >
-                                    <span className={activeTab === tab.key ? "font-medium dark:font-medium text-[#1ED36A]" : "font-normal dark:font-light text-[#63716B] dark:text-white/60"}>
-                                        {tab.label}
-                                    </span>
-                                    {tab.count !== undefined && (
-                                        <span className={activeTab === tab.key ? "text-[#1ED36A] font-medium dark:font-medium ml-1.5" : "text-[#63716B] dark:text-white/60 font-normal dark:font-light ml-1.5"}>
-                                            ({tab.count})
+                        <div className="px-6 pt-6">
+                            <div className="flex items-center gap-0 border-b border-gray-200 dark:border-white/[0.1] overflow-x-auto scrollbar-hide shrink-0">
+                                {tabs.map((tab) => (
+                                    <button
+                                        key={tab.key}
+                                        onClick={() => setActiveTab(tab.key)}
+                                        className="relative px-1 pt-3 pb-5 mr-8 text-[18px] leading-[23px] transition-colors whitespace-nowrap cursor-pointer"
+                                    >
+                                        <span className={activeTab === tab.key ? "font-normal dark:font-normal text-[#1ED36A]" : "font-light dark:font-light text-[#63716B] dark:text-white/60"}>
+                                            {tab.label}
                                         </span>
-                                    )}
-                                    {activeTab === tab.key && (
-                                        <span className="absolute left-0 right-0 -bottom-[1px] h-[3px] bg-[#1ED36A] shadow-[0_2px_8px_rgba(30,211,106,0.4)] rounded-full" />
-                                    )}
-                                </button>
-                            ))}
+                                        {tab.count !== undefined && (
+                                            <span className={activeTab === tab.key ? "text-[#1ED36A] font-normal dark:font-normal ml-1.5" : "text-[#63716B] dark:text-white/60 font-light dark:font-light ml-1.5"}>
+                                                ({tab.count})
+                                            </span>
+                                        )}
+                                        {activeTab === tab.key && (
+                                            <span className="absolute left-0 right-0 -bottom-[1px] h-[4px] bg-[#1ED36A] shadow-[0_2px_8px_rgba(30,211,106,0.4)] rounded-full" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
 
                         {/* Content Area */}
-                        <div className="p-5 sm:p-6 overflow-y-auto overflow-x-hidden scrollbar-hide flex-1 relative">
+                        <div className="p-5 sm:p-6 overflow-visible overflow-x-hidden relative">
                             {/* â”€â”€â”€ Origin Report Tab â”€â”€â”€ */}
                             {activeTab === "origin_report" && (
                                 <div className="pt-2">
@@ -772,7 +955,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                     </div>
 
                                     {/* Bottom Section: Role Alignment and Career Growth Tips */}
-                                    <div className="border border-gray-200 dark:border-white/10 rounded-lg overflow-hidden mt-6">
+                                    <div className="rounded-lg overflow-hidden mt-6 border-x border-b border-gray-200 dark:border-white/10">
                                         <div className="flex flex-col lg:flex-row">
                                             {/* Left Column: Role Alignment */}
                                             <div className="lg:w-[38%] flex flex-col border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-white/10">
@@ -902,20 +1085,27 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                             {activeTab === "applied_jobs" && (
                                 <div className="flex flex-col gap-0 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] w-full max-w-[1324px] min-h-0 mx-auto">
                                     {/* Filters */}
-                                    <div className="flex flex-col lg:flex-row items-start lg:items-center gap-3 px-4 sm:px-6 pt-4 sm:pt-5 pb-4 border-b border-gray-200 dark:border-white/[0.08]">
+                                    <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 px-5 sm:px-6 pt-5 pb-4 border-b border-gray-200 dark:border-white/[0.08]">
                                         {/* Search */}
-                                        <div className="relative w-full lg:w-[410px] shrink-0">
-                                            <input
-                                                type="text"
-                                                placeholder="Search by name, mobile, or Origin BI ID..."
-                                                value={searchQuery}
-                                                onChange={(e) => setSearchQuery(e.target.value)}
-                                                className="w-full h-[44px] bg-transparent border border-gray-300 dark:border-white/[0.24] rounded-xl px-5 text-[13px] leading-[18px] font-light text-[#2B3832] dark:text-white/90 placeholder:text-[#7A8781] dark:placeholder:text-white/70 focus:outline-none focus:border-[#1ED36A] transition-colors"
-                                            />
+                                        <div className="relative w-full lg:w-[420px] shrink-0">
+                                            <div className="flex items-center w-full h-[44px] px-5 bg-transparent border border-gray-300 dark:border-white/[0.30] rounded-xl focus-within:ring-1 focus-within:ring-[#1ED36A]/60 focus-within:border-[#1ED36A]/60 transition-all">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Search by name, mobile, or Origin BI ID..."
+                                                    value={searchQuery}
+                                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === "Enter") {
+                                                            handleAppliedJobsSearch();
+                                                        }
+                                                    }}
+                                                    className="w-full bg-transparent border-none h-full px-0 text-[13px] leading-[18px] font-normal text-[#19211C] dark:text-white placeholder:text-[#8A9791] dark:placeholder:text-white/38 focus:outline-none focus:ring-0"
+                                                />
+                                            </div>
                                         </div>
 
                                         {/* Filter Buttons */}
-                                        <div className="flex w-full lg:w-auto items-center gap-3 flex-wrap lg:flex-nowrap lg:ml-auto">
+                                        <div className="flex w-full lg:w-auto items-center gap-3 flex-wrap sm:flex-nowrap lg:ml-auto">
                                             {/* Status Filter */}
                                             <div className="relative">
                                                 {(() => {
@@ -950,13 +1140,17 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                             </div>
 
                                             {/* Date Filter */}
-                                            <div className="relative">
+                                            <div className={`relative ${activeFilterMenu === 'date' ? 'z-[90]' : ''}`}>
                                                 {(() => {
                                                     const isDateSelected = selectedDateRange !== "Any Time";
                                                     return (
                                                 <button
-                                                    onClick={() => setActiveFilterMenu(activeFilterMenu === 'date' ? null : 'date')}
-                                                    className={getFilterButtonClass(isDateSelected)}
+                                                    onClick={openDateFilterModal}
+                                                    ref={dateFilterButtonRef}
+                                                    className={`h-[44px] flex items-center gap-2 px-4 py-[9px] rounded-[8px] text-[14px] font-normal border transition-all whitespace-nowrap cursor-pointer shadow-sm dark:shadow-none ${isDateSelected
+                                                        ? "border-[#1ED36A]/50 bg-[#E7F8EE]/60 text-[#1F3B2A] hover:bg-[#DDF4E7]/80 dark:border-transparent dark:bg-[#1ED36A33] dark:text-white dark:hover:bg-[#1ED36A45]"
+                                                        : "bg-white dark:bg-[#23302A] border-gray-200 dark:border-[#355041] hover:border-brand-green dark:hover:border-brand-green/60 text-gray-900 dark:text-white"
+                                                        }`}
                                                 >
                                                     <svg
                                                         width="14"
@@ -964,7 +1158,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                         viewBox="0 0 18 18"
                                                         fill="none"
                                                         xmlns="http://www.w3.org/2000/svg"
-                                                        className={isDateSelected ? "text-[#1ED36A]" : "text-[#7B8A84] dark:text-white/65"}
+                                                        className="w-[18px] h-[18px] shrink-0 text-[#1ED36A]"
                                                     >
                                                         <path
                                                             d="M15.3 2.7H14.4V0.9C14.4 0.661305 14.3052 0.432387 14.1364 0.263604C13.9676 0.0948211 13.7387 0 13.5 0C13.2613 0 13.0324 0.0948211 12.8636 0.263604C12.6948 0.432387 12.6 0.661305 12.6 0.9V2.7H5.4V0.9C5.4 0.661305 5.30518 0.432387 5.1364 0.263604C4.96761 0.0948211 4.73869 0 4.5 0C4.2613 0 4.03239 0.0948211 3.8636 0.263604C3.69482 0.432387 3.6 0.661305 3.6 0.9V2.7H2.7C1.98392 2.7 1.29716 2.98446 0.790812 3.49081C0.284464 3.99716 0 4.68392 0 5.4V6.3H18V5.4C18 4.68392 17.7155 3.99716 17.2092 3.49081C16.7028 2.98446 16.0161 2.7 15.3 2.7Z"
@@ -976,33 +1170,39 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                         />
                                                     </svg>
                                                     {selectedDateRange}
-                                                    <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isDateSelected ? 'text-[#1ED36A] dark:text-[#1ED36A]' : 'text-[#7B8A84] dark:text-white/65'} ${activeFilterMenu === 'date' ? 'rotate-180' : ''}`} />
+                                                    <ChevronDownIcon className={`w-2.5 h-2.5 transition-transform ${isDateSelected ? "text-[#1F3B2A]/70 dark:text-white/80" : "text-gray-500 dark:text-white/60"} ${activeFilterMenu === 'date' ? 'rotate-180' : ''}`} />
                                                 </button>
                                                     );
                                                 })()}
 
                                                 {activeFilterMenu === 'date' && (
                                                     <div
-                                                        className="fixed inset-0 z-[80] bg-[#08120E]/80 backdrop-blur-[1.5px] flex items-center justify-center px-3"
+                                                        className="fixed inset-0 z-[80] bg-[#19211C33] dark:bg-[#08120E]/80 backdrop-blur-[1.5px]"
                                                         onClick={() => setActiveFilterMenu(null)}
                                                     >
                                                         <div
-                                                            className="w-[900px] h-[480px] max-w-[95vw] rounded-[24px] border border-white/[0.2] bg-[#19211C]/40 shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-5"
+                                                            className="fixed"
+                                                            style={{
+                                                                top: `${dateModalAnchorStyle?.top ?? 188}px`,
+                                                                left: `${dateModalAnchorStyle?.left ?? 12}px`,
+                                                                width: "min(900px, calc(100vw - 24px))",
+                                                            }}
                                                             onClick={(e) => e.stopPropagation()}
                                                         >
-                                                            <div className="w-[860px] max-w-full mx-auto flex items-center justify-between pb-3.5 border-b border-white/[0.12]">
-                                                                <p className="text-[18px] leading-[23px] font-semibold text-white">Select Date Range</p>
+                                                            <div className="w-full h-[480px] rounded-[24px] border border-[#D7E3DD] dark:border-white/[0.2] bg-white/95 dark:bg-[#19211C]/40 shadow-[0px_16px_40px_rgba(25,33,28,0.18)] dark:shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-5">
+                                                            <div className="w-[860px] max-w-full mx-auto flex items-center justify-between pb-3.5 border-b border-[#E1E9E4] dark:border-white/[0.12]">
+                                                                <p className="text-[18px] leading-[23px] font-normal text-[#19211C] dark:text-white">Select Date Range</p>
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => setActiveFilterMenu(null)}
-                                                                    className="w-8 h-8 rounded-full bg-white/[0.12] text-[#1ED36A] hover:bg-[#1ED36A]/30 hover:text-white transition-colors flex items-center justify-center"
+                                                                    className="w-8 h-8 rounded-full bg-[#F2F6F4] dark:bg-white/[0.12] border border-[#DDE6E1] dark:border-transparent text-[#1ED36A] hover:bg-[#E7F3ED] dark:hover:bg-[#1ED36A]/30 hover:text-[#139555] dark:hover:text-white transition-colors flex items-center justify-center"
                                                                 >
                                                                     <X size={16} />
                                                                 </button>
                                                             </div>
 
                                                             <div className="w-[860px] max-w-full mx-auto pt-3.5 flex gap-4 h-[318px]">
-                                                                <div className="w-[126px] shrink-0 border-r border-white/[0.12] pr-2.5">
+                                                                <div className="w-[126px] shrink-0 border-r border-[#E1E9E4] dark:border-white/[0.12] pr-2.5">
                                                                     {calendarPresets.map((preset) => {
                                                                         const isActivePreset = calendarPreset === preset;
 
@@ -1014,7 +1214,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                                                     setCalendarPreset(preset);
                                                                                     applyPresetRange(preset);
                                                                                 }}
-                                                                                className={`w-full text-left px-3 py-1.5 rounded-r-[4px] text-[13px] leading-[17px] transition-colors mb-[2px] ${isActivePreset ? "bg-[#1ED36A] text-white font-semibold" : "text-white/60 font-normal hover:bg-white/[0.08] hover:text-white"}`}
+                                                                                className={`w-full text-left px-3 py-1.5 rounded-r-[4px] text-[13px] leading-[17px] transition-colors mb-[2px] ${isActivePreset ? "bg-[#E7F8EE] dark:bg-[#1ED36A] text-[#1F6A45] dark:text-white font-normal" : "text-[#5F6E67] dark:text-white/60 font-light hover:bg-[#F3F7F5] dark:hover:bg-white/[0.08] hover:text-[#19211C] dark:hover:text-white"}`}
                                                                             >
                                                                                 {preset}
                                                                             </button>
@@ -1030,27 +1230,39 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                                 </div>
                                                             </div>
 
-                                                            <div className="w-[860px] max-w-full mx-auto pt-3 mt-3 border-t border-white/[0.12] flex items-center justify-between gap-3">
-                                                                <p className="text-[12px] leading-[16px] font-normal text-white">Selected Range : {selectedRangeText}</p>
+                                                            <div className="w-[860px] max-w-full mx-auto pt-3 mt-3 border-t border-[#E1E9E4] dark:border-white/[0.12] flex items-center justify-between gap-3">
+                                                                <p className="text-[12px] leading-[16px] font-light text-[#4A5B53] dark:text-white">Selected Range : {selectedRangeText}</p>
                                                                 <div className="flex items-center gap-2">
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => {
-                                                                            setCalendarPreset("All");
+                                                                            setCalendarPreset("Any Time");
                                                                             setRangeStart(null);
                                                                             setRangeEnd(null);
                                                                             setSelectedDateRange("Any Time");
                                                                             setActiveFilterMenu(null);
                                                                         }}
-                                                                        className="h-7 px-4 rounded-full border border-white text-white text-[12px] leading-[16px] font-medium hover:bg-white/10 transition-colors"
+                                                                        className="h-7 px-4 rounded-full border border-[#CAD8D0] dark:border-white text-[#19211C] dark:text-white text-[12px] leading-[16px] font-normal hover:bg-[#EEF5F1] dark:hover:bg-white/10 transition-colors"
                                                                     >
                                                                         Clear
                                                                     </button>
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => {
-                                                                            if (calendarPreset === "All" || !rangeStart) {
+                                                                            if (calendarPreset === "Any Time" || !rangeStart) {
                                                                                 setSelectedDateRange("Any Time");
+                                                                            } else if (calendarPreset === "Today") {
+                                                                                setSelectedDateRange("Today");
+                                                                            } else if (calendarPreset === "Yesterday") {
+                                                                                setSelectedDateRange("Yesterday");
+                                                                            } else if (calendarPreset === "Last 7 Days") {
+                                                                                setSelectedDateRange("Last 7 Days");
+                                                                            } else if (calendarPreset === "Last 30 Days") {
+                                                                                setSelectedDateRange("Last 30 Days");
+                                                                            } else if (calendarPreset === "This Month") {
+                                                                                setSelectedDateRange("This Month");
+                                                                            } else if (calendarPreset === "Last Month") {
+                                                                                setSelectedDateRange("Last Month");
                                                                             } else if (rangeStart && !rangeEnd) {
                                                                                 setSelectedDateRange(formatFilterRangeLabel(rangeStart, rangeStart));
                                                                             } else if (rangeStart && rangeEnd) {
@@ -1064,6 +1276,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                                     </button>
                                                                 </div>
                                                             </div>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 )}
@@ -1072,7 +1285,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                             {/* Alignment Filter */}
                                             <div className="relative">
                                                 {(() => {
-                                                    const isAlignmentSelected = selectedAlignmentRange !== "All Alignment";
+                                                    const isAlignmentSelected = selectedAlignmentRange !== "All Alignments";
                                                     return (
                                                 <button
                                                     onClick={() => setActiveFilterMenu(activeFilterMenu === 'alignment' ? null : 'alignment')}
@@ -1089,7 +1302,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
 
                                                 {activeFilterMenu === 'alignment' && (
                                                     <div className="absolute left-0 top-full mt-2 w-48 bg-white/14 dark:bg-[rgba(25,33,28,0.12)] border border-[rgba(25,33,28,0.08)] dark:border-[rgba(255,255,255,0.2)] rounded-lg shadow-[0_16px_40px_rgba(25,33,28,0.05)] dark:shadow-[0_16px_40px_rgba(25,33,28,0.6)] backdrop-blur-[20px] z-50 overflow-hidden py-1 box-border">
-                                                        {['All Alignment', 'Alignment (90% - 100%)', 'Alignment (70% - 89%)', 'Alignment (50% - 69%)', 'Alignment (Below 50%)'].map((align) => (
+                                                        {['All Alignments', 'Alignment (90% - 100%)', 'Alignment (80% - 89%)', 'Alignment (Below 80%)'].map((align) => (
                                                             <button
                                                                 key={align}
                                                                 onClick={() => {
@@ -1127,7 +1340,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                             <td className="px-4 py-4">
                                                                 <div>
                                                                     <p className="font-medium text-[16px] leading-[20px] text-[#19211C] dark:text-white">{job.title}</p>
-                                                                    <p className="text-[12px] leading-[16px] font-light text-[#4E5B55] dark:text-white/80 mt-1">{job.company} Â· Chennai Â· {job.employmentType}</p>
+                                                                    <p className="text-[12px] leading-[16px] font-light text-[#4E5B55] dark:text-white/80 mt-1">{job.company} &middot; Chennai &middot; {job.employmentType}</p>
                                                                 </div>
                                                             </td>
                                                             <td className="px-4 py-4">

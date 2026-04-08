@@ -272,7 +272,7 @@ function ThreeDotMenu({ onAction }: { onAction: (action: string) => void }) {
         <div className="relative" ref={ref}>
             <button
                 onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-                className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer group/btn ${open ? "bg-brand-green shadow-sm text-white" : "bg-gray-100 dark:bg-[#2A312D] border border-gray-200 dark:border-white/15 hover:bg-brand-green dark:hover:bg-brand-green hover:shadow-sm hover:border-transparent dark:hover:border-transparent text-gray-500 dark:text-white/50 hover:text-white dark:hover:text-white"}`}
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer group/btn ${open ? "bg-brand-green shadow-sm text-white" : "bg-gray-100 dark:bg-white/[0.08] border border-gray-200 dark:border-white/[0.08] hover:bg-brand-green dark:hover:bg-brand-green hover:shadow-sm hover:border-transparent dark:hover:border-transparent text-gray-500 dark:text-white/60 hover:text-white dark:hover:text-white"}`}
             >
                 {/* Horizontal three dots */}
                 <svg width="14" height="4" viewBox="0 0 14 4" fill="currentColor" className="transition-colors">
@@ -325,12 +325,12 @@ function JobCard({ job, onStatusChange, onAction }: {
     return (
         <div
             onClick={handleClick}
-            className={`bg-white dark:bg-[#2A312D] border rounded-xl px-6 py-5 transition-all duration-200 group cursor-pointer ${clicked
+            className={`bg-white dark:bg-white/[0.08] border rounded-xl px-6 py-5 min-h-[179px] transition-all duration-200 group cursor-pointer ${clicked
                 ? "border-[#13D669] shadow-[0_0_8px_rgba(19,214,105,0.2)]"
-                : "border-gray-200 dark:border-[#3A4A3F] hover:border-brand-green dark:hover:border-white/30"
+                : "border-gray-200 dark:border-white/[0.08] hover:border-brand-green dark:hover:border-white/30"
                 }`}>
             {/* Top row: Job ID + Status + Menu */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
                 <h3 className="font-['Haskoy'] text-[20px] sm:text-[24px] font-normal text-gray-900 dark:text-white/95 leading-[100%] tracking-[0px] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">
                     {job.title}
                 </h3>
@@ -347,12 +347,12 @@ function JobCard({ job, onStatusChange, onAction }: {
             </div>
 
             {/* Company info */}
-            <p className="font-['Haskoy'] text-[18px] text-white/82 mb-4 font-[300] leading-[100%] tracking-[0px] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">
+            <p className="font-['Haskoy'] text-[18px] text-white/82 mb-5 font-[300] leading-[100%] tracking-[0px] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">
                 {job.company} | {job.location}, {job.employmentType}
             </p>
 
             {/* Bottom row: Dates on left, Stats on right */}
-            <div className="flex flex-col xl:flex-row items-start xl:items-end justify-between gap-4 mt-auto w-full overflow-hidden">
+            <div className="flex flex-col xl:flex-row items-start xl:items-end justify-between gap-5 mt-auto w-full overflow-hidden">
                 {/* Dates */}
                 <div className="flex flex-col gap-2 shrink-0">
                     {job.expiresIn && (
@@ -378,7 +378,7 @@ function JobCard({ job, onStatusChange, onAction }: {
                 </div>
 
                 {/* Stats strip */}
-                <div className="grid grid-cols-5 items-center bg-[#F6F4F7] dark:bg-white/[0.08] rounded-[4px] px-3 py-2.5 w-full xl:w-auto xl:min-w-[829px] xl:ml-auto border border-gray-100 dark:border-transparent overflow-x-auto scrollbar-hide">
+                <div className="grid grid-cols-5 items-center bg-[#F6F4F7] dark:bg-white/[0.08] rounded-[4px] px-4 h-[93px] w-full xl:w-auto xl:min-w-[829px] xl:ml-auto border border-gray-100 dark:border-transparent overflow-x-auto scrollbar-hide">
                     <div className="text-center px-3 min-w-[118px]">
                         <div className="font-['Haskoy'] w-[99px] h-[41px] mx-auto text-center text-[32px] leading-[41px] font-semibold text-[#150089] dark:text-white [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">{job.totalApplicants}</div>
                         <div className="font-['Haskoy'] text-[11px] sm:text-[12px] font-[300] text-[#2E2E2E] dark:text-white/65 leading-tight whitespace-nowrap [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]">Total Applicants</div>
@@ -420,7 +420,7 @@ function FilterItem({
 }) {
     return (
         <div className="border-b border-gray-100 dark:border-white/5 last:border-0 pb-1 mb-1">
-            <button onClick={onChange} className="flex items-center gap-3 cursor-pointer group py-2.5 px-2 w-full text-left transition-all hover:bg-gray-50/80 dark:hover:bg-white/5 rounded-md">
+            <button onClick={onChange} className="flex items-center gap-3 cursor-pointer group py-2.5 px-1.5 w-full text-left transition-all hover:bg-gray-50/80 dark:hover:bg-white/5 rounded-md">
                 <span
                     className={`w-[16px] h-[16px] rounded-[2px] shrink-0 transition-colors border ${checked
                         ? "bg-brand-green border-brand-green"
@@ -457,14 +457,14 @@ function FilterSection({
         <div className="mb-4 overflow-hidden bg-transparent rounded-[10px] border border-gray-200 dark:border-[#FFFFFF1F]">
             <button
                 onClick={() => setOpen(!open)}
-                className="flex items-center justify-between w-full px-4 py-3.5 text-[14px] font-medium text-gray-900 dark:text-white cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                className="flex items-center justify-between w-full px-4 py-3 text-[14px] font-medium text-gray-900 dark:text-white cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
             >
                 {title}
                 <ChevronDownIcon className={`w-3.5 h-3.5 text-gray-400 dark:text-white/60 transition-transform ${open ? "" : "-rotate-90"}`} />
             </button>
             <div className="border-t border-gray-100 dark:border-white/10 mx-4" />
             {open && (
-                <div className="px-4 pb-3 pt-2.5 flex flex-col gap-1">
+                <div className="px-4 pb-3.5 pt-2.5 flex flex-col gap-1">
                     {children}
                 </div>
             )}
@@ -506,8 +506,8 @@ function FiltersSidebar({
 
     return (
         <div className="w-full">
-            <div className="flex items-center justify-between mb-3">
-                <h3 className="text-[16px] font-medium text-gray-900 dark:text-white">Filters</h3>
+            <div className="flex items-center justify-between mb-3.5">
+                <h3 className="text-[17px] font-medium text-gray-900 dark:text-white">Filters</h3>
                 <button
                     onClick={onClearAll}
                     className={`text-[13px] transition-colors cursor-pointer ${hasFilters ? "text-gray-600 dark:text-white hover:text-brand-green dark:hover:text-brand-green" : "text-gray-400 dark:text-white hover:text-brand-green dark:hover:text-brand-green"}`}
@@ -640,6 +640,7 @@ export default function JobsPortal() {
     const [showEntriesDropdown, setShowEntriesDropdown] = useState(false);
     const [dateFilter, setDateFilter] = useState<DateFilter>("today");
     const [showDateModal, setShowDateModal] = useState(false);
+    const [dateModalAnchorStyle, setDateModalAnchorStyle] = useState<{ top: number; left: number } | null>(null);
     const [calendarPreset, setCalendarPreset] = useState("Any Time");
     const [rangeStart, setRangeStart] = useState<Date | null>(new Date(2025, 9, 9));
     const [rangeEnd, setRangeEnd] = useState<Date | null>(new Date(2025, 10, 17));
@@ -653,6 +654,7 @@ export default function JobsPortal() {
     // Refs
     const sortRef = useRef<HTMLDivElement>(null);
     const entriesRef = useRef<HTMLDivElement>(null);
+    const dateFilterButtonRef = useRef<HTMLButtonElement | null>(null);
     useClickOutside(sortRef, () => setShowSortDropdown(false));
     useClickOutside(entriesRef, () => setShowEntriesDropdown(false));
 
@@ -736,42 +738,46 @@ export default function JobsPortal() {
         const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
         if (preset === "Any Time") {
-            setDateFilter("all");
-            setCustomDateLabel(null);
-            setShowDateModal(false);
+            setRangeStart(null);
+            setRangeEnd(null);
             return;
         }
         if (preset === "Today") {
-            setDateFilter("today");
-            setCustomDateLabel(null);
-            setShowDateModal(false);
+            setRangeStart(todayDate);
+            setRangeEnd(todayDate);
+            setLeftCalendarMonth(new Date(todayDate.getFullYear(), todayDate.getMonth(), 1));
             return;
         }
         if (preset === "Yesterday") {
-            setDateFilter("yesterday");
-            setCustomDateLabel(null);
-            setShowDateModal(false);
+            const yesterday = new Date(todayDate);
+            yesterday.setDate(yesterday.getDate() - 1);
+            setRangeStart(yesterday);
+            setRangeEnd(yesterday);
+            setLeftCalendarMonth(new Date(yesterday.getFullYear(), yesterday.getMonth(), 1));
             return;
         }
         if (preset === "Last 7 Days") {
-            setDateFilter("last_7_days");
-            setCustomDateLabel(null);
-            setShowDateModal(false);
+            const start = new Date(todayDate);
+            start.setDate(start.getDate() - 6);
+            setRangeStart(start);
+            setRangeEnd(todayDate);
+            setLeftCalendarMonth(new Date(start.getFullYear(), start.getMonth(), 1));
             return;
         }
         if (preset === "Last 30 Days") {
-            setDateFilter("last_30_days");
-            setCustomDateLabel(null);
-            setShowDateModal(false);
+            const start = new Date(todayDate);
+            start.setDate(start.getDate() - 29);
+            setRangeStart(start);
+            setRangeEnd(todayDate);
+            setLeftCalendarMonth(new Date(start.getFullYear(), start.getMonth(), 1));
             return;
         }
         if (preset === "This Month") {
             const start = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1);
-            const end = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0);
+            const end = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate());
             setRangeStart(start);
             setRangeEnd(end);
             setLeftCalendarMonth(new Date(start.getFullYear(), start.getMonth(), 1));
-            setCalendarPreset("Custom Range");
             return;
         }
         if (preset === "Last Month") {
@@ -780,49 +786,61 @@ export default function JobsPortal() {
             setRangeStart(start);
             setRangeEnd(end);
             setLeftCalendarMonth(new Date(start.getFullYear(), start.getMonth(), 1));
-            setCalendarPreset("Custom Range");
             return;
         }
-
-        setCalendarPreset("Custom Range");
     };
 
     const renderCalendarMonth = (year: number, month: number, title: string) => {
         const cells = buildMonthGrid(year, month);
 
         return (
-            <div className="w-[344px] h-[300px] rounded-[12px] bg-white/[0.08] border border-white/[0.12] px-5 py-3.5">
-                <div className="flex items-center justify-between mb-3 text-white/90 pb-3.5 border-b border-white/[0.12]">
-                    <button type="button" onClick={() => setLeftCalendarMonth((prev) => addMonths(prev, -1))} className="p-1 text-white/60 hover:text-white transition-colors">
+            <div className="w-[344px] h-[300px] rounded-[12px] bg-[#F6F9F7] dark:bg-white/[0.08] border border-[#DDE6E1] dark:border-white/[0.12] px-4 py-3 overflow-hidden">
+                <div className="flex items-center justify-between mb-2.5 text-[#22302A] dark:text-white/90 pb-2.5 border-b border-[#DDE6E1] dark:border-white/[0.12]">
+                    <button type="button" onClick={() => setLeftCalendarMonth((prev) => addMonths(prev, -1))} className="p-1 text-[#63716B] hover:text-[#22302A] dark:text-white/60 dark:hover:text-white transition-colors">
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M7.5 2L3.5 6L7.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     </button>
-                    <p className="text-[14px] leading-[18px] font-semibold text-[#E7EFEB]">{title}</p>
-                    <button type="button" onClick={() => setLeftCalendarMonth((prev) => addMonths(prev, 1))} className="p-1 text-white/60 hover:text-white transition-colors">
+                    <p className="text-[14px] leading-[18px] font-normal text-[#22302A] dark:text-[#E7EFEB]">{title}</p>
+                    <button type="button" onClick={() => setLeftCalendarMonth((prev) => addMonths(prev, 1))} className="p-1 text-[#63716B] hover:text-[#22302A] dark:text-white/60 dark:hover:text-white transition-colors">
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 2L8.5 6L4.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     </button>
                 </div>
-                <div className="grid grid-cols-7 gap-y-2 mb-2">
+                <div className="grid grid-cols-7 mb-1.5">
                     {weekDays.map((day) => (
-                        <span key={`${title}-${day}`} className="text-center text-[13px] leading-[17px] font-normal text-white/80">{day}</span>
+                        <span key={`${title}-${day}`} className="text-center text-[12px] leading-[16px] font-light text-[#63716B] dark:text-white/75">{day}</span>
                     ))}
                 </div>
-                <div className="grid grid-cols-7 gap-y-1.5">
-                    {cells.map((cell) => {
+                <div className="h-[202px] grid grid-cols-7 grid-rows-6 gap-y-[2px]">
+                    {cells.map((cell, index) => {
                         const day = cell.date.getDate();
                         const inRange = isInRange(cell.date);
                         const start = isRangeStart(cell.date);
                         const end = isRangeEnd(cell.date);
                         const isMuted = !cell.inCurrentMonth;
+                        const colIndex = index % 7;
+                        const prevCell = colIndex > 0 ? cells[index - 1] : null;
+                        const nextCell = colIndex < 6 ? cells[index + 1] : null;
+                        const prevInRange = Boolean(prevCell && isInRange(prevCell.date));
+                        const nextInRange = Boolean(nextCell && isInRange(nextCell.date));
+                        const isRangeSegmentStart = inRange && !prevInRange;
+                        const isRangeSegmentEnd = inRange && !nextInRange;
                         const rangePillClass = inRange
-                            ? `${start ? "rounded-l-[24px]" : ""} ${end ? "rounded-r-[100px]" : ""} ${!start && !end ? "rounded-none" : ""}`
+                            ? `${isRangeSegmentStart ? "rounded-l-[100px]" : ""} ${isRangeSegmentEnd ? "rounded-r-[100px]" : ""}`
                             : "";
 
                         return (
-                            <div key={`${title}-${cell.date.toISOString()}`} className={`h-[28px] flex items-center justify-center text-[13px] leading-[17px] ${inRange ? "bg-[#1ED36A]/[0.16]" : ""} ${rangePillClass}`}>
+                            <div key={`${title}-${cell.date.toISOString()}`} className="h-full relative flex items-center justify-center text-[12px] leading-[16px] isolate">
+                                {inRange && (
+                                    <div className={`absolute inset-y-[5px] z-0 bg-[#DDEFE5] dark:bg-[#204E35] ${rangePillClass}`} style={
+                                        {
+                                            left: isRangeSegmentStart ? "4px" : "0px",
+                                            right: isRangeSegmentEnd ? "4px" : "0px"
+                                        }
+                                    } />
+                                )}
                                 <button
                                     type="button"
                                     onClick={() => handleDateCellClick(new Date(cell.date.getFullYear(), cell.date.getMonth(), cell.date.getDate()))}
-                                    className={`h-9 w-9 flex items-center justify-center font-normal ${start || end ? "rounded-full bg-[#1ED36A] text-white shadow-[0px_4px_6.7px_rgba(0,0,0,0.4),0px_2px_17.9px_rgba(30,211,106,0.4)]" : ""} ${!start && !end && inRange ? "text-white" : ""} ${!inRange && !isMuted ? "text-white" : ""} ${isMuted ? "text-white/40" : ""}`}
+                                    className={`relative z-10 h-8 w-8 flex items-center justify-center text-[12px] leading-[16px] font-light text-[#22302A] dark:text-white ${start || end ? "rounded-full bg-[#1ED36A] text-white shadow-[0px_2px_10px_rgba(30,211,106,0.28)] dark:shadow-[0px_4px_6.7px_rgba(0,0,0,0.4),0px_2px_17.9px_rgba(30,211,106,0.4)]" : "rounded-full"} ${!start && !end && inRange ? "text-[#1F6A45] dark:text-white" : ""} ${!inRange && !isMuted ? "text-[#22302A] dark:text-white" : ""} ${isMuted ? "text-[#A3B1AA] dark:text-white/40" : ""}`}
                                 >
                                     {day}
                                 </button>
@@ -837,6 +855,54 @@ export default function JobsPortal() {
     const dateFilterLabel = dateFilter === "custom_range"
         ? (customDateLabel ?? "Custom Range")
         : (DATE_FILTER_OPTIONS.find((o) => o.value === dateFilter)?.label ?? "All Time");
+    const isDateFilterActive = dateFilter !== "all";
+
+    const updateDateModalPosition = useCallback(() => {
+        const trigger = dateFilterButtonRef.current;
+        if (!trigger || typeof window === "undefined") return;
+
+        const rect = trigger.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+
+        const modalWidth = Math.min(900, viewportWidth - 24);
+        const modalHeight = 480;
+        const gap = 12;
+
+        const left = Math.max(12, Math.min(rect.right - modalWidth, viewportWidth - modalWidth - 12));
+        const top = Math.max(88, Math.min(rect.bottom + gap, viewportHeight - modalHeight - 12));
+
+        setDateModalAnchorStyle({ top, left });
+    }, []);
+
+    const openDateModal = () => {
+        const presetByFilter: Record<DateFilter, string> = {
+            all: "Any Time",
+            today: "Today",
+            yesterday: "Yesterday",
+            last_7_days: "Last 7 Days",
+            this_month: "This Month",
+            last_month: "Last Month",
+            last_30_days: "Last 30 Days",
+            custom_range: "Custom Range",
+        };
+
+        const preset = presetByFilter[dateFilter] ?? "Any Time";
+        setCalendarPreset(preset);
+        if (preset !== "Custom Range") {
+            applyPresetRange(preset);
+        }
+        updateDateModalPosition();
+        setShowDateModal(true);
+    };
+
+    useEffect(() => {
+        if (!showDateModal) return;
+
+        updateDateModalPosition();
+        window.addEventListener("resize", updateDateModalPosition);
+        return () => window.removeEventListener("resize", updateDateModalPosition);
+    }, [showDateModal, updateDateModalPosition]);
 
     // Tab counts
     const tabCounts = {
@@ -1028,7 +1094,7 @@ export default function JobsPortal() {
     }
 
     return (
-        <div className="thin-ui-page flex flex-col h-full w-full gap-5 font-sans antialiased p-4 sm:p-6 lg:p-8 bg-[#F9FAFB] dark:bg-[#19211C] min-h-screen">
+        <div className="thin-ui-page flex flex-col h-full w-full gap-6 font-sans antialiased p-4 sm:p-6 lg:p-10 bg-[#F9FAFB] dark:bg-[#19211C] min-h-screen">
             {/* Toast */}
             {toast && (
                 <ToastNotification
@@ -1068,19 +1134,19 @@ export default function JobsPortal() {
                         <button
                             key={tab.key}
                             onClick={() => { setActiveTab(tab.key); setCurrentPage(1); }}
-                            className={`px-1 py-3 -mb-px mr-8 text-[18px] border-b-[3px] transition-colors whitespace-nowrap cursor-pointer font-['Haskoy'] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale] ${activeTab === tab.key
+                            className={`px-1 py-3.5 -mb-px mr-9 text-[19px] border-b-[3px] transition-colors whitespace-nowrap cursor-pointer font-['Haskoy'] [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale] ${activeTab === tab.key
                                 ? "border-brand-green"
                                 : "border-transparent hover:border-gray-300 dark:hover:border-white/20"
                                 }`}
                         >
-                            <span className={activeTab === tab.key ? "font-normal text-gray-900 dark:text-white/90" : "font-[300] text-gray-500 dark:text-white/40"}>{tab.label}</span>
-                            <span className={activeTab === tab.key ? "text-brand-green font-normal ml-1" : "text-gray-400 dark:text-white/40 font-[300] ml-1"}>({tab.count})</span>
+                            <span className={activeTab === tab.key ? "font-medium text-gray-900 dark:text-white/95" : "font-normal text-gray-500 dark:text-white/45"}>{tab.label}</span>
+                            <span className={activeTab === tab.key ? "text-brand-green font-medium ml-1" : "text-gray-400 dark:text-white/45 font-normal ml-1"}>({tab.count})</span>
                         </button>
                     ))}
                 </div>
 
                 {/* Sort + Today + Create Job */}
-                <div className="flex flex-wrap md:flex-nowrap items-center gap-[27px] py-2 w-full xl:w-auto justify-end">
+                <div className="flex flex-wrap md:flex-nowrap items-center gap-5 py-2 w-full xl:w-auto justify-end">
                     {/* Sort Dropdown */}
                     <div className="relative" ref={sortRef}>
                         <button
@@ -1120,17 +1186,21 @@ export default function JobsPortal() {
                     </div>
 
                     {/* Today/Date Filter Button */}
-                    <div className="relative">
+                    <div className={`relative ${showDateModal ? "z-[90]" : ""}`}>
                         <button
-                            onClick={() => setShowDateModal(true)}
-                            className="flex items-center gap-2 bg-white dark:bg-[#23302A] px-4 py-[9px] rounded-[8px] text-[14px] font-normal border border-gray-200 dark:border-[#355041] hover:border-brand-green dark:hover:border-brand-green/60 transition-all text-gray-900 dark:text-white cursor-pointer h-[44px] shadow-sm dark:shadow-none"
+                            onClick={openDateModal}
+                            ref={dateFilterButtonRef}
+                            className={`flex items-center gap-2 px-4 py-[9px] rounded-[8px] text-[14px] font-normal border transition-all cursor-pointer h-[44px] shadow-sm dark:shadow-none ${isDateFilterActive
+                                ? "border-[#1ED36A]/50 bg-[#E7F8EE]/60 text-[#1F3B2A] hover:bg-[#DDF4E7]/80 dark:border-transparent dark:bg-[#1ED36A33] dark:text-white dark:hover:bg-[#1ED36A45]"
+                                : "bg-white dark:bg-[#23302A] border-gray-200 dark:border-[#355041] hover:border-brand-green dark:hover:border-brand-green/60 text-gray-900 dark:text-white"
+                                }`}
                         >
                             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
                                 <path d="M15.3 2.7H14.4V0.9C14.4 0.661305 14.3052 0.432387 14.1364 0.263604C13.9676 0.0948211 13.7387 0 13.5 0C13.2613 0 13.0324 0.0948211 12.8636 0.263604C12.6948 0.432387 12.6 0.661305 12.6 0.9V2.7H5.4V0.9C5.4 0.661305 5.30518 0.432387 5.1364 0.263604C4.96761 0.0948211 4.73869 0 4.5 0C4.2613 0 4.03239 0.0948211 3.8636 0.263604C3.69482 0.432387 3.6 0.661305 3.6 0.9V2.7H2.7C1.98392 2.7 1.29716 2.98446 0.790812 3.49081C0.284464 3.99716 0 4.68392 0 5.4V6.3H18V5.4C18 4.68392 17.7155 3.99716 17.2092 3.49081C16.7028 2.98446 16.0161 2.7 15.3 2.7Z" fill="#1ED36A" />
                                 <path d="M0 15.3C0 16.0161 0.284464 16.7028 0.790812 17.2092C1.29716 17.7155 1.98392 18 2.7 18H15.3C16.0161 18 16.7028 17.7155 17.2092 17.2092C17.7155 16.7028 18 16.0161 18 15.3V8.09998H0V15.3Z" fill="#1ED36A" />
                             </svg>
                             {dateFilterLabel}
-                            <ChevronDownIcon className="w-2.5 h-2.5 text-gray-500 dark:text-white/60" />
+                            <ChevronDownIcon className={`w-2.5 h-2.5 ${isDateFilterActive ? "text-[#1F3B2A]/70 dark:text-white/80" : "text-gray-500 dark:text-white/60"}`} />
                         </button>
                     </div>
 
@@ -1146,10 +1216,10 @@ export default function JobsPortal() {
             </div>
 
             {/* Main Content: Sidebar + Jobs List */}
-            <div className="flex gap-6 flex-1 min-h-0">
+            <div className="flex gap-8 flex-1 min-h-0 items-start">
                 {/* Filters Sidebar */}
-                <div className="hidden lg:block w-[250px] xl:w-[280px] shrink-0">
-                    <div className="bg-white dark:bg-[#212A25] rounded-xl p-5 sticky top-6 shadow-sm dark:shadow-none">
+                <div className="hidden lg:block w-[280px] shrink-0">
+                    <div className="bg-white dark:bg-white/[0.08] rounded-xl border border-gray-200 dark:border-white/[0.08] p-5 min-h-[541px] h-auto overflow-visible shadow-sm dark:shadow-none">
                         <FiltersSidebar
                             filters={filters}
                             onFilterChange={setFilters}
@@ -1159,16 +1229,16 @@ export default function JobsPortal() {
                 </div>
 
                 {/* Jobs Content */}
-                <div className="flex-1 min-w-0 flex flex-col gap-3 bg-white dark:bg-[#212A25] rounded-xl p-5 h-fit shadow-sm dark:shadow-none">
+                <div className="w-full xl:w-[1528px] xl:min-w-[1528px] xl:flex-none min-h-[1107px] min-w-0 flex flex-col gap-4 bg-white dark:bg-white/[0.08] rounded-xl border border-gray-200 dark:border-white/[0.08] p-6 shadow-sm dark:shadow-none">
                     {/* Search + Pagination Bar */}
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-1">
                         {/* Search */}
                         <div className="relative w-full sm:max-w-[420px]">
                             <input
                                 type="text"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Search by job title, company, or Job ID..."
+                                placeholder="Search By Job Title or Description..."
                                 className="w-full bg-white dark:bg-transparent border border-gray-300 dark:border-white/35 rounded-xl py-2.5 pl-4 pr-4 text-[14px] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/35 placeholder:font-normal focus:outline-none hover:border-gray-400 dark:hover:border-white/55 focus:border-brand-green transition-colors shadow-sm dark:shadow-none"
                             />
                         </div>
@@ -1181,7 +1251,7 @@ export default function JobsPortal() {
                             <div className="relative" ref={entriesRef}>
                                 <button
                                     onClick={() => setShowEntriesDropdown(!showEntriesDropdown)}
-                                    className="flex items-center gap-1.5 bg-gray-50 dark:bg-white/10 border border-gray-200 dark:border-white/10 px-3 py-1.5 rounded-[8px] text-[14px] text-brand-green font-medium min-w-[52px] justify-between transition-all cursor-pointer hover:border-brand-green/55 shadow-sm dark:shadow-none"
+                                    className="flex items-center gap-1.5 bg-[#EDF3EE] dark:bg-[#3B4540] border border-gray-200 dark:border-[#4A5550] px-3 h-[32px] rounded-[8px] text-[14px] text-brand-green font-medium min-w-[52px] justify-between transition-all cursor-pointer hover:border-brand-green/55 shadow-sm dark:shadow-none"
                                 >
                                     {entriesPerPage}
                                     <ChevronDownIcon className={`w-3 h-3 text-gray-400 dark:text-white/50 hover:text-brand-green transition-transform ${showEntriesDropdown ? 'rotate-180' : ''}`} />
@@ -1234,7 +1304,7 @@ export default function JobsPortal() {
                     </div>
 
                     {/* Job Cards */}
-                    <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-3.5">
                         {paginatedJobs.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-20 text-center">
                                 <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="mb-4 text-gray-300 dark:text-gray-600">
@@ -1317,11 +1387,20 @@ export default function JobsPortal() {
             </div>
 
             {showDateModal && (
-                <div className="fixed inset-0 z-[80] bg-[#08120E]/80 backdrop-blur-[1.5px] flex items-center justify-center px-3" onClick={() => setShowDateModal(false)}>
-                    <div className="w-[900px] h-[480px] max-w-[95vw] rounded-[24px] border border-white/[0.2] bg-[#19211C]/40 shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-5" onClick={(e) => e.stopPropagation()}>
-                        <div className="w-[860px] max-w-full mx-auto flex items-center justify-between pb-3.5 border-b border-white/[0.12]">
-                            <p className="text-[18px] leading-[23px] font-semibold text-white">Select Date Range</p>
-                            <button type="button" onClick={() => setShowDateModal(false)} className="w-8 h-8 rounded-full bg-white/[0.12] text-[#1ED36A] hover:bg-[#1ED36A]/30 hover:text-white transition-colors flex items-center justify-center" aria-label="Close date range picker">
+                <div className="fixed inset-0 z-[80] bg-[#19211C33] dark:bg-[#19211CCC] backdrop-blur-[1.5px]" onClick={() => setShowDateModal(false)}>
+                    <div
+                        className="fixed"
+                        style={{
+                            top: `${dateModalAnchorStyle?.top ?? 188}px`,
+                            left: `${dateModalAnchorStyle?.left ?? 12}px`,
+                            width: "min(900px, calc(100vw - 24px))",
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                    <div className="w-full h-[480px] rounded-[24px] border border-[#D7E3DD] dark:border-white/[0.18] bg-white/95 dark:bg-[#19211CCC] shadow-[0px_16px_40px_rgba(25,33,28,0.18)] dark:shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-5">
+                        <div className="w-[860px] max-w-full mx-auto flex items-center justify-between pb-3.5 border-b border-[#E1E9E4] dark:border-white/[0.12]">
+                            <p className="text-[18px] leading-[23px] font-normal text-[#19211C] dark:text-white">Select Date Range</p>
+                            <button type="button" onClick={() => setShowDateModal(false)} className="w-8 h-8 rounded-full bg-[#F2F6F4] dark:bg-[rgba(50,64,57,0.82)] border border-[#DDE6E1] dark:border-white/[0.08] text-[#1ED36A] hover:bg-[#E7F3ED] dark:hover:bg-[#1ED36A]/25 hover:text-[#139555] dark:hover:text-white transition-colors flex items-center justify-center" aria-label="Close date range picker">
                                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M10.5 3.5L3.5 10.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                                     <path d="M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -1329,7 +1408,7 @@ export default function JobsPortal() {
                             </button>
                         </div>
                         <div className="w-[860px] max-w-full mx-auto pt-3.5 flex gap-4 h-[318px]">
-                            <div className="w-[126px] shrink-0 border-r border-white/[0.12] pr-2.5">
+                            <div className="w-[126px] shrink-0 border-r border-[#E1E9E4] dark:border-white/[0.12] pr-2.5">
                                 {calendarPresets.map((preset) => {
                                     const isActivePreset = calendarPreset === preset;
                                     return (
@@ -1340,7 +1419,7 @@ export default function JobsPortal() {
                                                 setCalendarPreset(preset);
                                                 applyPresetRange(preset);
                                             }}
-                                            className={`w-full text-left px-3 py-1.5 rounded-r-[4px] text-[13px] leading-[17px] transition-colors mb-[2px] ${isActivePreset ? "bg-[#1ED36A] text-white font-semibold" : "text-white/60 font-normal hover:bg-white/[0.08] hover:text-white"}`}
+                                            className={`w-full text-left px-3 py-1.5 rounded-r-[4px] text-[13px] leading-[17px] transition-colors mb-[2px] ${isActivePreset ? "bg-[#E7F8EE] dark:bg-[#1ED36A] text-[#1F6A45] dark:text-white font-normal" : "text-[#5F6E67] dark:text-white/60 font-light hover:bg-[#F3F7F5] dark:hover:bg-white/[0.08] hover:text-[#19211C] dark:hover:text-white"}`}
                                         >
                                             {preset}
                                         </button>
@@ -1354,8 +1433,8 @@ export default function JobsPortal() {
                                 </div>
                             </div>
                         </div>
-                        <div className="w-[860px] max-w-full mx-auto pt-3 mt-3 border-t border-white/[0.12] flex items-center justify-between gap-3">
-                            <p className="text-[12px] leading-[16px] font-normal text-white">Selected Range : {selectedRangeText}</p>
+                        <div className="w-[860px] max-w-full mx-auto pt-3 mt-3 border-t border-[#E1E9E4] dark:border-white/[0.12] flex items-center justify-between gap-3">
+                            <p className="text-[12px] leading-[16px] font-light text-[#4A5B53] dark:text-white">Selected Range : {selectedRangeText}</p>
                             <div className="flex items-center gap-2">
                                 <button
                                     type="button"
@@ -1367,7 +1446,7 @@ export default function JobsPortal() {
                                         setCustomDateLabel(null);
                                         setShowDateModal(false);
                                     }}
-                                    className="h-7 px-4 rounded-full border border-white text-white text-[12px] leading-[16px] font-medium hover:bg-white/10 transition-colors"
+                                    className="h-7 px-4 rounded-full border border-[#CAD8D0] dark:border-white text-[#19211C] dark:text-white text-[12px] leading-[16px] font-normal hover:bg-[#EEF5F1] dark:hover:bg-white/10 transition-colors"
                                 >
                                     Clear
                                 </button>
@@ -1376,6 +1455,24 @@ export default function JobsPortal() {
                                     onClick={() => {
                                         if (calendarPreset === "Any Time" || !rangeStart) {
                                             setDateFilter("all");
+                                            setCustomDateLabel(null);
+                                        } else if (calendarPreset === "Today") {
+                                            setDateFilter("today");
+                                            setCustomDateLabel(null);
+                                        } else if (calendarPreset === "Yesterday") {
+                                            setDateFilter("yesterday");
+                                            setCustomDateLabel(null);
+                                        } else if (calendarPreset === "Last 7 Days") {
+                                            setDateFilter("last_7_days");
+                                            setCustomDateLabel(null);
+                                        } else if (calendarPreset === "Last 30 Days") {
+                                            setDateFilter("last_30_days");
+                                            setCustomDateLabel(null);
+                                        } else if (calendarPreset === "This Month") {
+                                            setDateFilter("this_month");
+                                            setCustomDateLabel(null);
+                                        } else if (calendarPreset === "Last Month") {
+                                            setDateFilter("last_month");
                                             setCustomDateLabel(null);
                                         } else if (rangeStart && !rangeEnd) {
                                             setDateFilter("custom_range");
@@ -1386,12 +1483,13 @@ export default function JobsPortal() {
                                         }
                                         setShowDateModal(false);
                                     }}
-                                    className="h-7 px-4 rounded-full bg-[#1ED36A] text-white text-[12px] leading-[16px] font-medium hover:bg-[#16BD5C] transition-colors"
+                                    className="h-7 px-4 rounded-full bg-[#1ED36A] text-white text-[12px] leading-[16px] font-normal hover:bg-[#16BD5C] transition-colors"
                                 >
                                     Apply changes
                                 </button>
                             </div>
                         </div>
+                    </div>
                     </div>
                 </div>
             )}
