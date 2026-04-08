@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 /**
  * cxoReportJSON.ts
  * ----------------
@@ -221,10 +221,9 @@ function buildWordSketch(data: CxoData) {
 // ─── Helper: Build ACI Section ───────────────────────────────────────────────
 
 function buildACI(data: CxoData) {
-  const traitCode = getTopTwoTraits(
-    data.most_answered_answer_type,
-    data,
-  ).join('');
+  const traitCode = getTopTwoTraits(data.most_answered_answer_type, data).join(
+    '',
+  );
 
   const contentBlock = ACI[traitCode];
   if (!contentBlock) return null;
@@ -342,7 +341,10 @@ function buildRespondParameterTable(dominantType: string) {
 
 // ─── Main Builder ────────────────────────────────────────────────────────────
 
-export async function buildCxoReportJSON(data: CxoData): Promise<any> {
+// eslint-disable-next-line @typescript-eslint/require-await
+export async function buildCxoReportJSON(
+  data: CxoData,
+): Promise<Record<string, unknown>> {
   logger.info('[CxoReportJSON] Building JSON report...');
 
   // ── 1. DISC Computation ──
@@ -425,8 +427,7 @@ export async function buildCxoReportJSON(data: CxoData): Promise<any> {
           CXO_CONTENT.benefits_identifying_strategic_business_paths,
         benefitsPara2:
           CXO_CONTENT.benefits_identifying_strategic_business_paths_para_2,
-        whyRightStrategicPath:
-          CXO_CONTENT.why_identifying_right_strategic_path,
+        whyRightStrategicPath: CXO_CONTENT.why_identifying_right_strategic_path,
         whyRightStrategicPathPara2:
           CXO_CONTENT.why_identifying_right_strategic_path_para_2,
         howThisReportHelps: CXO_CONTENT.how_this_report_helps_you,
@@ -454,10 +455,7 @@ export async function buildCxoReportJSON(data: CxoData): Promise<any> {
             title: 'Your Key Strengths – How You Drive Impact',
             intro: contentBlock.key_strengths_1,
             list: contentBlock.key_strengths_2,
-            natureStyleChartData: buildNatureStyleChartData(
-              dominantType,
-              data,
-            ),
+            natureStyleChartData: buildNatureStyleChartData(dominantType, data),
           }
         : null,
 
@@ -466,12 +464,12 @@ export async function buildCxoReportJSON(data: CxoData): Promise<any> {
         ? {
             title:
               'What Drives You – Motivations and Needs for Strategic Growth',
-            intro: contentBlock.motivations_1.replace(
+            intro: String(contentBlock.motivations_1).replace(
               '$full_name',
               data.full_name,
             ),
             whatDrives: {
-              title: contentBlock.what_drives.replace(
+              title: String(contentBlock.what_drives).replace(
                 '$full_name',
                 data.full_name,
               ),
@@ -505,8 +503,7 @@ export async function buildCxoReportJSON(data: CxoData): Promise<any> {
               contentBlock.your_personalized_behavioral_understanding_the_graphs,
             understandingGraphsList:
               contentBlock.your_personalized_behavioral_understanding_the_graphs_list,
-            keyInsights:
-              contentBlock.your_personalized_behavioral_key_insights,
+            keyInsights: contentBlock.your_personalized_behavioral_key_insights,
             keyInsightsList:
               contentBlock.your_personalized_behavioral_key_insights_list,
             adaptedStyleData: [

@@ -698,7 +698,7 @@ function buildStreamSelectionContent() {
   for (const [id, streamShortName] of Object.entries(STREAM_NAMES)) {
     const content = STREAM_SELECTION_CONTENT[streamShortName];
     if (!content) continue;
-    
+
     // Add odyssey roadmap
     const roadmap = CAREER_ODYSSEY_ROADMAP[id] || CAREER_ODYSSEY_ROADMAP['0'];
 
@@ -711,11 +711,13 @@ function buildStreamSelectionContent() {
         vibe: f.vibe,
         mappedDegrees: f.mappedDegrees,
       })),
-      odysseyRoadmap: roadmap ? {
-        streamTitle: roadmap.streamTitle,
-        tagline: roadmap.tagline,
-        nodes: roadmap.nodes,
-      } : null,
+      odysseyRoadmap: roadmap
+        ? {
+            streamTitle: roadmap.streamTitle,
+            tagline: roadmap.tagline,
+            nodes: roadmap.nodes,
+          }
+        : null,
     });
   }
 
@@ -833,12 +835,11 @@ export async function buildSchoolReportJSON(data: SchoolData) {
 
   // ── 7. Determine Pathway & Fetch conditional section data ──
   const isIGCSE = Boolean(
-    data.school_level_id === 1 && (
-      data.student_board?.toUpperCase() === 'IGSCE' ||
+    data.school_level_id === 1 &&
+    (data.student_board?.toUpperCase() === 'IGSCE' ||
       data.student_board?.toUpperCase() === 'IGCSE' ||
       data.group_name?.toUpperCase() === 'IGCSE' ||
-      data.dept_code?.toUpperCase() === 'IGCSE'
-    )
+      data.dept_code?.toUpperCase() === 'IGCSE'),
   );
   const isSSLC = !isIGCSE && data.school_level_id === 1;
   const isHSC = !isIGCSE && data.school_level_id !== 1;
@@ -1067,7 +1068,10 @@ export async function buildSchoolReportJSON(data: SchoolData) {
                   }
                 : null,
             careerFlightPath: buildCareerFlightPath(data),
-            careerOdysseyRoadmap: CAREER_ODYSSEY_ROADMAP[String(data.school_stream_id ?? '0')] || CAREER_ODYSSEY_ROADMAP['0'] || null,
+            careerOdysseyRoadmap:
+              CAREER_ODYSSEY_ROADMAP[String(data.school_stream_id ?? '0')] ||
+              CAREER_ODYSSEY_ROADMAP['0'] ||
+              null,
             topColleges: topColleges.length > 0 ? topColleges : null,
           }
         : {}),

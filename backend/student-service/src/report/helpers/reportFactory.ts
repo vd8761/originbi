@@ -3,7 +3,13 @@ import { SchoolReport } from '../reports/school/schoolReport';
 import { CollegeReport } from '../reports/college/collegeReport';
 import { EmployeeReport } from '../reports/employee/employeeReport';
 import { CxoReport } from '../reports/cxo/cxoReport';
-import { CollegeData, SchoolData, EmployeeData, CxoData, MergedReportData } from '../types/types';
+import {
+  CollegeData,
+  SchoolData,
+  EmployeeData,
+  CxoData,
+  MergedReportData,
+} from '../types/types';
 import { logger } from './logger';
 import { updateReportPassword } from './sqlHelper';
 import { buildSchoolReportJSON } from '../reports/school/schoolReportJSON';

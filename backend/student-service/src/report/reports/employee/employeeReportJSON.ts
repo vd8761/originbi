@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 /**
  * employeeReportJSON.ts
  * ---------------------
@@ -73,7 +73,10 @@ function getWordSketchLevel(score: number): number {
 // Mirrors the fixed chart data logic from employeeReport.ts lines 366-404
 
 function buildNatureStyleChartData(topTrait: string, data: EmployeeData) {
-  const chartMap: Record<string, { label: string; value: number; color: number[] }[]> = {
+  const chartMap: Record<
+    string,
+    { label: string; value: number; color: number[] }[]
+  > = {
     D: [
       { label: 'D', value: 85, color: [...COLORS.D] },
       { label: 'I', value: 30, color: [...COLORS.I] },
@@ -219,10 +222,9 @@ function buildWordSketch(data: EmployeeData) {
 // ─── Helper: Build ACI Section ───────────────────────────────────────────────
 
 function buildACI(data: EmployeeData) {
-  const traitCode = getTopTwoTraits(
-    data.most_answered_answer_type,
-    data,
-  ).join('');
+  const traitCode = getTopTwoTraits(data.most_answered_answer_type, data).join(
+    '',
+  );
 
   const contentBlock = ACI[traitCode];
   if (!contentBlock) return null;
@@ -341,7 +343,10 @@ function buildRespondParameterTable(dominantType: string) {
 
 // ─── Main Builder ────────────────────────────────────────────────────────────
 
-export async function buildEmployeeReportJSON(data: EmployeeData): Promise<any> {
+// eslint-disable-next-line @typescript-eslint/require-await
+export async function buildEmployeeReportJSON(
+  data: EmployeeData,
+): Promise<Record<string, unknown>> {
   logger.info('[EmployeeReportJSON] Building JSON report...');
 
   // ── 1. DISC Computation ──
@@ -453,10 +458,7 @@ export async function buildEmployeeReportJSON(data: EmployeeData): Promise<any> 
             title: 'Your Key Strengths – How You Drive Impact',
             intro: contentBlock.key_strengths_1,
             list: contentBlock.key_strengths_2,
-            natureStyleChartData: buildNatureStyleChartData(
-              dominantType,
-              data,
-            ),
+            natureStyleChartData: buildNatureStyleChartData(dominantType, data),
           }
         : null,
 
@@ -465,12 +467,12 @@ export async function buildEmployeeReportJSON(data: EmployeeData): Promise<any> 
         ? {
             title:
               'What Drives You – Motivations and Needs for Strategic Growth',
-            intro: contentBlock.motivations_1.replace(
+            intro: String(contentBlock.motivations_1).replace(
               '$full_name',
               data.full_name,
             ),
             whatDrives: {
-              title: contentBlock.what_drives.replace(
+              title: String(contentBlock.what_drives).replace(
                 '$full_name',
                 data.full_name,
               ),
@@ -504,8 +506,7 @@ export async function buildEmployeeReportJSON(data: EmployeeData): Promise<any> 
               contentBlock.your_personalized_behavioral_understanding_the_graphs,
             understandingGraphsList:
               contentBlock.your_personalized_behavioral_understanding_the_graphs_list,
-            keyInsights:
-              contentBlock.your_personalized_behavioral_key_insights,
+            keyInsights: contentBlock.your_personalized_behavioral_key_insights,
             keyInsightsList:
               contentBlock.your_personalized_behavioral_key_insights_list,
             adaptedStyleData: [

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 /**
  * collegeReportJSON.ts
  * --------------------
@@ -182,10 +182,9 @@ function buildWordSketch(data: CollegeData) {
 // ─── Helper: Build ACI Section ───────────────────────────────────────────────
 
 function buildACI(data: CollegeData) {
-  const traitCode = getTopTwoTraits(
-    data.most_answered_answer_type,
-    data,
-  ).join('');
+  const traitCode = getTopTwoTraits(data.most_answered_answer_type, data).join(
+    '',
+  );
 
   const contentBlock = ACI[traitCode];
   if (!contentBlock) return null;
@@ -371,7 +370,9 @@ function buildCareerGuidance(
 
 // ─── Main Builder ────────────────────────────────────────────────────────────
 
-export async function buildCollegeReportJSON(data: CollegeData): Promise<any> {
+export async function buildCollegeReportJSON(
+  data: CollegeData,
+): Promise<Record<string, unknown>> {
   logger.info('[CollegeReportJSON] Building JSON report...');
 
   // ── 1. DISC Computation ──
@@ -571,8 +572,7 @@ export async function buildCollegeReportJSON(data: CollegeData): Promise<any> {
               contentBlock.your_personalized_behavioral_understanding_the_graphs,
             understandingGraphsList:
               contentBlock.your_personalized_behavioral_understanding_the_graphs_list,
-            keyInsights:
-              contentBlock.your_personalized_behavioral_key_insights,
+            keyInsights: contentBlock.your_personalized_behavioral_key_insights,
             keyInsightsList:
               contentBlock.your_personalized_behavioral_key_insights_list,
             adaptedStyleData: [
