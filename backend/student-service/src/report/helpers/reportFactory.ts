@@ -3,11 +3,19 @@ import { SchoolReport } from '../reports/school/schoolReport';
 import { CollegeReport } from '../reports/college/collegeReport';
 import { EmployeeReport } from '../reports/employee/employeeReport';
 import { CxoReport } from '../reports/cxo/cxoReport';
-import { CollegeData, SchoolData, MergedReportData } from '../types/types';
+import {
+  CollegeData,
+  SchoolData,
+  EmployeeData,
+  CxoData,
+  MergedReportData,
+} from '../types/types';
 import { logger } from './logger';
 import { updateReportPassword } from './sqlHelper';
 import { buildSchoolReportJSON } from '../reports/school/schoolReportJSON';
-
+import { buildCollegeReportJSON } from '../reports/college/collegeReportJSON';
+import { buildEmployeeReportJSON } from '../reports/employee/employeeReportJSON';
+import { buildCxoReportJSON } from '../reports/cxo/cxoReportJSON';
 /** Program type IDs — keep in sync with the `programs` table. */
 export const ProgramType = {
   SCHOOL: 1,
@@ -112,12 +120,12 @@ export async function generateReportForUser(
       break;
     case ProgramType.EMPLOYEE:
       await new EmployeeReport(
-        user as unknown as CollegeData,
+        user as unknown as EmployeeData,
         pdfOptions,
       ).generate(filePath);
       break;
     case ProgramType.CXO:
-      await new CxoReport(user as unknown as CollegeData, pdfOptions).generate(
+      await new CxoReport(user as unknown as CxoData, pdfOptions).generate(
         filePath,
       );
       break;
@@ -150,9 +158,15 @@ export async function buildReportJSON(
   switch (user.program_type) {
     case ProgramType.SCHOOL:
       return await buildSchoolReportJSON(user as unknown as SchoolData);
+    case ProgramType.COLLEGE:
+      return await buildCollegeReportJSON(user as unknown as CollegeData);
+    case ProgramType.EMPLOYEE:
+      return await buildEmployeeReportJSON(user as unknown as EmployeeData);
+    case ProgramType.CXO:
+      return await buildCxoReportJSON(user as unknown as CxoData);
     default:
       throw new Error(
-        `JSON API not yet supported for program_type: ${user.program_type}. Currently only School (1) is supported.`,
+        `JSON API not yet supported for program_type: ${user.program_type}.`,
       );
   }
 }
