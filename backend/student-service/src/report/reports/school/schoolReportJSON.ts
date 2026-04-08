@@ -30,6 +30,8 @@ import {
   ProfilePatterns,
   GCSE,
   AICE,
+  CAREER_ODYSSEY_ROADMAP,
+  DISC_AGILE_CAREER_PACE,
 } from './schoolConstants';
 import {
   getCompatibilityMatrixDetails,
@@ -282,8 +284,7 @@ function getGCSEDiscTraits(discType: string): number[] {
   return table[discType] || table['DC'];
 }
 
-function computeIGCSEFitment(data: SchoolData, subjects: any[]): any[] {
-  // 1. DISC Base Vector Selection
+function computeIGCSEFinalVector(data: SchoolData): number[] {
   const topTwo = getTopTwoTraits(data.most_answered_answer_type, data);
   const traitCode = topTwo[0] + topTwo[1];
   const baseVector = getGCSEDiscTraits(traitCode);
@@ -291,7 +292,6 @@ function computeIGCSEFitment(data: SchoolData, subjects: any[]): any[] {
   const [analytical, numerical, verbal, creative, interpersonal, structured] =
     baseVector;
 
-  // 2. Agile Input Dimensions (0-1 Normalization)
   const agile = data.agile_scores?.[0];
   const focus = Math.min(1.0, (agile?.focus ?? 0) / 25);
   const commitment = Math.min(1.0, (agile?.commitment ?? 0) / 25);
@@ -299,7 +299,6 @@ function computeIGCSEFitment(data: SchoolData, subjects: any[]): any[] {
   const respect = Math.min(1.0, (agile?.respect ?? 0) / 25);
   const courage = Math.min(1.0, (agile?.courage ?? 0) / 25);
 
-  // 3. Axis Adjustment Formulas
   const adjAnalytical = analytical + focus * 0.1;
   const adjNumerical = numerical + commitment * 0.05;
   const adjVerbal = verbal + openness * 0.08;
@@ -307,8 +306,7 @@ function computeIGCSEFitment(data: SchoolData, subjects: any[]): any[] {
   const adjInterpersonal = interpersonal + ((respect + courage) / 2) * 0.1;
   const adjStructured = structured + ((focus + commitment + respect) / 3) * 0.1;
 
-  // 4. Final Student Vector (80% DISC base + 20% Agile-adjusted)
-  const finalVector = [
+  return [
     Math.min(1.0, Math.max(0.0, analytical * 0.8 + adjAnalytical * 0.2)),
     Math.min(1.0, Math.max(0.0, numerical * 0.8 + adjNumerical * 0.2)),
     Math.min(1.0, Math.max(0.0, verbal * 0.8 + adjVerbal * 0.2)),
@@ -316,8 +314,14 @@ function computeIGCSEFitment(data: SchoolData, subjects: any[]): any[] {
     Math.min(1.0, Math.max(0.0, interpersonal * 0.8 + adjInterpersonal * 0.2)),
     Math.min(1.0, Math.max(0.0, structured * 0.8 + adjStructured * 0.2)),
   ];
+}
+
+function computeIGCSEFitment(data: SchoolData, subjects: any[]): any[] {
+  // 1. Final Student Vector (80% DISC base + 20% Agile-adjusted)
+  const finalVector = computeIGCSEFinalVector(data);
 
   // 5. ACI percentage
+  const agile = data.agile_scores?.[0];
   const totalAci =
     (agile?.focus ?? 0) +
     (agile?.courage ?? 0) +
@@ -691,9 +695,13 @@ function buildSkillHeatmap(patterns: ProfilePatterns) {
 
 function buildStreamSelectionContent() {
   const streams: any[] = [];
-  for (const [, streamShortName] of Object.entries(STREAM_NAMES)) {
+  for (const [id, streamShortName] of Object.entries(STREAM_NAMES)) {
     const content = STREAM_SELECTION_CONTENT[streamShortName];
     if (!content) continue;
+    
+    // Add odyssey roadmap
+    const roadmap = CAREER_ODYSSEY_ROADMAP[id] || CAREER_ODYSSEY_ROADMAP['0'];
+
     streams.push({
       shortName: content.shortName,
       title: content.title,
@@ -703,10 +711,64 @@ function buildStreamSelectionContent() {
         vibe: f.vibe,
         mappedDegrees: f.mappedDegrees,
       })),
+      odysseyRoadmap: roadmap ? {
+        streamTitle: roadmap.streamTitle,
+        tagline: roadmap.tagline,
+        nodes: roadmap.nodes,
+      } : null,
     });
   }
 
   return streams;
+}
+
+// ─── Helper: Career Flight Path ──────────────────────────────────────────────
+
+function buildCareerFlightPath(data: SchoolData) {
+  const [primaryTrait] = getTopTwoTraits(data.most_answered_answer_type, data);
+
+  const agile = data.agile_scores?.[0] ?? {
+    focus: 0,
+    courage: 0,
+    respect: 0,
+    openness: 0,
+    commitment: 0,
+  };
+
+  const agileKeyMap: Record<string, keyof typeof agile> = {
+    Commitment: 'commitment',
+    Courage: 'courage',
+    Focus: 'focus',
+    Openness: 'openness',
+    Respect: 'respect',
+  };
+
+  let topAgileValue = 'Commitment';
+  let topAgileScore = -1;
+  for (const [label, key] of Object.entries(agileKeyMap)) {
+    const score = agile[key] ?? 0;
+    if (score > topAgileScore) {
+      topAgileScore = score;
+      topAgileValue = label;
+    }
+  }
+
+  const group = DISC_AGILE_CAREER_PACE[primaryTrait];
+  const entry =
+    group?.entries.find((e: any) => e.agileValue === topAgileValue) ??
+    group?.entries[0];
+
+  if (!entry) return null;
+
+  return {
+    traitName: group.traitName,
+    agileValue: topAgileValue,
+    motivation: entry.motivation,
+    challengeTitle: entry.challengeTitle,
+    challengeDesc: entry.challengeDesc,
+    predictedPace: entry.predictedPace,
+    industryAvg: entry.industryAvg,
+  };
 }
 
 // ─── Main Builder ────────────────────────────────────────────────────────────
@@ -771,9 +833,12 @@ export async function buildSchoolReportJSON(data: SchoolData) {
 
   // ── 7. Determine Pathway & Fetch conditional section data ──
   const isIGCSE = Boolean(
-    data.student_board?.toUpperCase() === 'IGCSE' ||
-    data.group_name?.toUpperCase() === 'IGCSE' ||
-    data.dept_code?.toUpperCase() === 'IGCSE',
+    data.school_level_id === 1 && (
+      data.student_board?.toUpperCase() === 'IGSCE' ||
+      data.student_board?.toUpperCase() === 'IGCSE' ||
+      data.group_name?.toUpperCase() === 'IGCSE' ||
+      data.dept_code?.toUpperCase() === 'IGCSE'
+    )
   );
   const isSSLC = !isIGCSE && data.school_level_id === 1;
   const isHSC = !isIGCSE && data.school_level_id !== 1;
@@ -979,6 +1044,7 @@ export async function buildSchoolReportJSON(data: SchoolData) {
         ? {
             whereYouFitBest: computeWhereYouFitBest(data),
             streamSelectionContent: buildStreamSelectionContent(),
+            careerFlightPath: buildCareerFlightPath(data),
             courseCompatibility:
               courseCompatibility.length > 0
                 ? {
@@ -1000,6 +1066,8 @@ export async function buildSchoolReportJSON(data: SchoolData) {
                       'The course compatibility you\u2019ve received is based on your unique personality Report results, aiming to highlight programs that align well with your strengths and traits. However, this is not a fixed or singular recommendation. Your personal interests, evolving passions, and exposure to different fields also play a crucial role in shaping the right career path for you. We\u2019ve combined your profile with real-time industry data to give you a future-oriented perspective. Please keep in mind that course trends and career opportunities can shift from year to year as the world continues to evolve-new fields emerge, and existing ones transform. Use this as a guide, not a rulebook, to explore and make informed choices about your educational journey.',
                   }
                 : null,
+            careerFlightPath: buildCareerFlightPath(data),
+            careerOdysseyRoadmap: CAREER_ODYSSEY_ROADMAP[String(data.school_stream_id ?? '0')] || CAREER_ODYSSEY_ROADMAP['0'] || null,
             topColleges: topColleges.length > 0 ? topColleges : null,
           }
         : {}),
@@ -1007,6 +1075,7 @@ export async function buildSchoolReportJSON(data: SchoolData) {
       ...(isIGCSE
         ? {
             igcse: {
+              academicStrengthsProfile: computeIGCSEFinalVector(data),
               asFitments: computeIGCSEFitment(data, GCSE),
               aiceFitments: computeIGCSEFitment(data, AICE),
             },
