@@ -9,7 +9,7 @@ const ExploreRoadmapCard: React.FC<{ item: RoadmapCardData; onSelect: (id: strin
         <div
             className={`group relative py-4 px-5 transition-all duration-300 cursor-pointer rounded-[8px] border ${isActive
                 ? 'bg-[#19211C]/5 dark:bg-white/[0.12] border-[#19211C]/10 dark:border-white/[0.08]' // Active
-                : 'bg-transparent border-transparent hover:bg-[#19211C]/5 dark:hover:bg-white/[0.05]' // Inactive
+                : 'bg-transparent border-transparent hover:border-white hover:bg-[#19211C]/5 dark:hover:bg-white/[0.05]' // Inactive
                 }`}
             onClick={() => onSelect(item.id)}
         >
@@ -49,46 +49,39 @@ interface RoadmapDetailViewProps {
 
 const RoadmapDetailView: React.FC<RoadmapDetailViewProps> = ({ roadmap, allRoadmaps, onBack, onSelectRoadmap }) => {
     return (
-        <div className="min-h-screen bg-[url('/Background_Light_Theme.svg')] bg-cover bg-center bg-no-repeat bg-fixed dark:bg-none dark:bg-brand-dark-primary">
-            <div className="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-12 lg:py-10 max-w-[1920px] mx-auto">
-                {/* Breadcrumb */}
-                <nav className="mb-6">
-                    <ol className="flex items-center gap-2 text-[clamp(12px,0.73vw,14px)]">
-                        <li>
-                            <Link
-                                href="/student/dashboard"
-                                className="text-gray-500 dark:text-white hover:text-gray-700 dark:hover:text-[#1ED36A] transition-colors font-normal font-sans"
-                            >
-                                Dashboard
-                            </Link>
-                        </li>
-                        <li className="flex items-center justify-center text-gray-400 dark:text-gray-600">
-                            <ArrowRightWithoutLineIcon className="w-3 h-3" />
-                        </li>
-                        <li>
-                            <button
-                                onClick={onBack}
-                                className="text-gray-500 cursor-pointer dark:text-white hover:text-gray-700 dark:hover:text-brand-green transition-colors font-normal font-sans"
-                            >
-                                Your Roadmaps
-                            </button>
-                        </li>
-                        <li className="flex items-center justify-center text-gray-400 dark:text-gray-600">
-                            <ArrowRightWithoutLineIcon className="w-3 h-3" />
-                        </li>
-                        <li className="text-brand-green font-normal font-sans">{roadmap.category}</li>
-                    </ol>
-                </nav>
+        <div className="w-full px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8 max-w-[1600px] mx-auto">
+            {/* Breadcrumb */}
+            <div className="flex items-center text-xs text-black dark:text-white mb-1.5 font-normal flex-wrap">
+                <Link
+                    href="/student/dashboard"
+                    className="hover:text-gray-700 dark:hover:text-[#1ED36A] transition-colors"
+                >
+                    Dashboard
+                </Link>
+                <span className="mx-2 text-gray-400 dark:text-gray-600">
+                    <ArrowRightWithoutLineIcon className="w-3 h-3 text-black dark:text-white" />
+                </span>
+                <button
+                    onClick={onBack}
+                    className="hover:text-gray-700 dark:hover:text-[#1ED36A] transition-colors cursor-pointer"
+                >
+                    Your Roadmaps
+                </button>
+                <span className="mx-2 text-gray-400 dark:text-gray-600">
+                    <ArrowRightWithoutLineIcon className="w-3 h-3 text-black dark:text-white" />
+                </span>
+                <span className="text-brand-green font-semibold">{roadmap.category}</span>
+            </div>
+
+            {/* Title */}
+            <h1 className="text-2xl sm:text-3xl font-semibold text-[#19211C] dark:text-white mb-6 lg:mb-8 font-sans">
+                {roadmap.title}
+            </h1>
 
                 {/* Main Content Grid */}
                 <div className="flex flex-col lg:flex-row gap-6 lg:gap-[5vw]">
                     {/* Left Content - Detail Section */}
                     <div className="flex-1 min-w-0">
-                        {/* Title */}
-                        <h1 className="text-[clamp(24px,2.5vw,40px)] font-semibold text-[#19211C] dark:text-brand-text-primary mb-6 lg:mb-8 font-sans leading-none">
-                            {roadmap.title}
-                        </h1>
-
                         {/* Tools to Learn */}
                         <section className="mb-6 lg:mb-8">
                             <h2 className="text-[clamp(16px,1.15vw,22px)] font-semibold text-[#19211C] dark:text-white mb-3 font-sans leading-tight">
@@ -203,8 +196,7 @@ const RoadmapDetailView: React.FC<RoadmapDetailViewProps> = ({ roadmap, allRoadm
                     </aside>
                 </div>
             </div>
-        </div>
-    );
-};
+        );
+    };
 
 export default RoadmapDetailView;

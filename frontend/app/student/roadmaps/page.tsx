@@ -42,8 +42,8 @@ export default function StudentRoadmapsPage() {
                     </div>
 
                     {/* Content Area with Top Padding for Fixed Header */}
-                    <main className="relative z-10 w-full min-h-screen pt-[90px] sm:pt-[98px] lg:pt-[105px] pb-10 bg-[url('/Background_Light_Theme.svg')] dark:bg-[url('/Background_Dark_Theme.svg')] bg-cover bg-top bg-no-repeat">
-                        <div className="w-full h-full px-4 sm:px-6 lg:px-8 2xl:px-12 max-w-[2000px] mx-auto transition-all duration-300 relative">
+                    <main className="relative z-10 w-full min-h-screen pt-[70px] sm:pt-[78px] lg:pt-[85px] pb-10">
+                        <div className="w-full h-full mx-auto transition-all duration-300 relative">
                             <RoadmapsPage />
                         </div>
                     </main>
