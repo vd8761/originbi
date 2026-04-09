@@ -73,15 +73,15 @@ const RoadmapDetailView: React.FC<RoadmapDetailViewProps> = ({ roadmap, allRoadm
                 <span className="text-brand-green font-semibold">{roadmap.category}</span>
             </div>
 
-            {/* Title */}
-            <h1 className="text-2xl sm:text-3xl font-semibold text-[#19211C] dark:text-white mb-6 lg:mb-8 font-sans">
-                {roadmap.title}
-            </h1>
-
                 {/* Main Content Grid */}
                 <div className="flex flex-col lg:flex-row gap-6 lg:gap-[5vw]">
                     {/* Left Content - Detail Section */}
                     <div className="flex-1 min-w-0">
+                        {/* Roadmap Title */}
+                        <h1 className="text-[clamp(24px,2.5vw,48px)] font-bold text-[#19211C] dark:text-brand-text-primary mb-6 lg:mb-[3.33vw] font-sans leading-tight">
+                            {roadmap.title}
+                        </h1>
+
                         {/* Tools to Learn */}
                         {roadmap.toolsToLearn.length > 0 && (
                             <section className="mb-6 lg:mb-8">
