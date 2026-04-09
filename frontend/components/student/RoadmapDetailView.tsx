@@ -83,19 +83,21 @@ const RoadmapDetailView: React.FC<RoadmapDetailViewProps> = ({ roadmap, allRoadm
                     {/* Left Content - Detail Section */}
                     <div className="flex-1 min-w-0">
                         {/* Tools to Learn */}
-                        <section className="mb-6 lg:mb-8">
-                            <h2 className="text-[clamp(16px,1.15vw,22px)] font-semibold text-[#19211C] dark:text-white mb-3 font-sans leading-tight">
-                                Tools to Learn
-                            </h2>
-                            <div className="space-y-1">
-                                {roadmap.toolsToLearn.map((tool, idx) => (
-                                    <p key={idx} className="text-[clamp(16px,1.15vw,22px)] text-[#19211C] dark:text-white leading-none mb-2">
-                                        <span className="font-semibold">{tool.name}</span>
-                                        <span className="font-normal"> ({tool.category})</span>
-                                    </p>
-                                ))}
-                            </div>
-                        </section>
+                        {roadmap.toolsToLearn.length > 0 && (
+                            <section className="mb-6 lg:mb-8">
+                                <h2 className="text-[clamp(16px,1.15vw,22px)] font-semibold text-[#19211C] dark:text-white mb-3 font-sans leading-tight">
+                                    Tools to Learn
+                                </h2>
+                                <div className="space-y-1">
+                                    {roadmap.toolsToLearn.map((tool, idx) => (
+                                        <p key={idx} className="text-[clamp(16px,1.15vw,22px)] text-[#19211C] dark:text-white leading-none mb-2">
+                                            <span className="font-semibold">{tool.name}</span>
+                                            <span className="font-normal"> ({tool.category})</span>
+                                        </p>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
 
                         {/* Overview */}
                         <section className="mb-6 lg:mb-8">
@@ -107,15 +109,17 @@ const RoadmapDetailView: React.FC<RoadmapDetailViewProps> = ({ roadmap, allRoadm
                             </p>
                         </section>
 
-                        {/* Trait Alignment */}
-                        <section className="mb-6 lg:mb-8">
-                            <h2 className="text-[clamp(16px,1.15vw,22px)] font-semibold text-[#19211C] dark:text-brand-text-primary mb-3 font-sans leading-tight">
-                                Trait Alignment
-                            </h2>
-                            <p className="text-[clamp(16px,1.15vw,22px)] text-black dark:text-white leading-tight font-normal">
-                                {roadmap.traitAlignment}
-                            </p>
-                        </section>
+                        {/* Natural Strengths */}
+                        {roadmap.naturalStrengths && (
+                            <section className="mb-6 lg:mb-8">
+                                <h2 className="text-[clamp(16px,1.15vw,22px)] font-semibold text-[#19211C] dark:text-brand-text-primary mb-3 font-sans leading-tight">
+                                    Natural Strengths
+                                </h2>
+                                <p className="text-[clamp(16px,1.15vw,22px)] text-black dark:text-white leading-tight font-normal">
+                                    {roadmap.naturalStrengths}
+                                </p>
+                            </section>
+                        )}
 
                         {/* Roadmap & Fundamental Learning */}
                         <section className="mb-6 lg:mb-8">
@@ -135,7 +139,6 @@ const RoadmapDetailView: React.FC<RoadmapDetailViewProps> = ({ roadmap, allRoadm
                             </div>
                         </section>
 
-                        {/* Detailed Guidelines */}
                         <section className="mb-6 lg:mb-8">
                             <h2 className="text-[clamp(16px,1.15vw,22px)] font-semibold text-[#19211C] dark:text-brand-text-primary mb-4 font-sans leading-tight">
                                 Detailed Guidelines
@@ -143,33 +146,60 @@ const RoadmapDetailView: React.FC<RoadmapDetailViewProps> = ({ roadmap, allRoadm
                             <div className="space-y-6">
                                 {roadmap.guidelines.map((guideline, gIdx) => (
                                     <div key={gIdx}>
-                                        <h3 className="text-[clamp(16px,1.15vw,22px)] font-semibold text-[#19211C] dark:text-brand-text-primary mb-3 leading-tight">
-                                            {gIdx + 1}. {guideline.title}
-                                        </h3>
-                                        <ul className="space-y-2 ml-1">
-                                            {guideline.points.map((point, pIdx) => (
-                                                <li key={pIdx} className="flex items-start gap-3">
-                                                    <span className="w-2 h-2 mt-2 rounded-full bg-brand-green flex-shrink-0"></span>
-                                                    <span className="text-[clamp(16px,1.15vw,22px)] text-black dark:text-white leading-tight font-normal">
-                                                        {point}
-                                                    </span>
-                                                </li>
-                                            ))}
-                                        </ul>
+                                        {guideline.title.toLowerCase() !== 'detailed guidelines' && (
+                                            <h3 className="text-[clamp(16px,1.15vw,22px)] font-semibold text-[#19211C] dark:text-brand-text-primary mb-4 leading-tight border-b border-[#19211C]/10 pb-1">
+                                                {guideline.title}
+                                            </h3>
+                                        )}
+                                        
+                                        {/* Nested Sections */}
+                                        {guideline.sections && guideline.sections.map((sub, sIdx) => (
+                                            <div key={sIdx} className="mb-6 last:mb-0">
+                                                <h4 className="text-[clamp(15px,1vw,18px)] font-bold text-black dark:text-white mb-3 leading-tight">
+                                                    {sub.subtitle}
+                                                </h4>
+                                                <ul className="space-y-3 ml-2">
+                                                    {sub.points.map((point, pIdx) => (
+                                                        <li key={pIdx} className="flex items-start gap-3">
+                                                            <span className="w-1.5 h-1.5 mt-2 rounded-full bg-brand-green flex-shrink-0"></span>
+                                                            <span className="text-[clamp(16px,1.15vw,21px)] text-black dark:text-white leading-tight font-normal opacity-90">
+                                                                {point}
+                                                            </span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        ))}
+
+                                        {/* Flat Points (Fallback) */}
+                                        {!guideline.sections && guideline.points.length > 0 && (
+                                            <ul className="space-y-3 ml-1">
+                                                {guideline.points.map((point, pIdx) => (
+                                                    <li key={pIdx} className="flex items-start gap-3">
+                                                        <span className="w-1.5 h-1.5 mt-2 rounded-full bg-brand-green flex-shrink-0"></span>
+                                                        <span className="text-[clamp(16px,1.15vw,21px)] text-black dark:text-white leading-tight font-normal opacity-90">
+                                                            {point}
+                                                        </span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
                                     </div>
                                 ))}
                             </div>
                         </section>
 
                         {/* Guidance Tip */}
-                        <section className="mt-2 lg:mt-2">
-                            <h2 className="text-[clamp(16px,1.15vw,22px)] font-semibold text-[#19211C] dark:text-brand-text-primary mb-4 font-sans leading-tight">
-                                Guidance Tip
-                            </h2>
-                            <p className="text-[clamp(16px,1.15vw,22px)] text-black dark:text-white leading-tight font-normal">
-                                {roadmap.guidanceTip}
-                            </p>
-                        </section>
+                        {roadmap.guidanceTip && (
+                            <section className="mt-2 lg:mt-2">
+                                <h2 className="text-[clamp(16px,1.15vw,22px)] font-semibold text-[#19211C] dark:text-brand-text-primary mb-4 font-sans leading-tight">
+                                    Guidance Tip
+                                </h2>
+                                <p className="text-[clamp(16px,1.15vw,22px)] text-black dark:text-white leading-tight font-normal">
+                                    {roadmap.guidanceTip}
+                                </p>
+                            </section>
+                        )}
                     </div>
 
                     {/* Right Sidebar - Explore Other Roadmaps */}

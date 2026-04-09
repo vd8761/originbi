@@ -242,9 +242,13 @@ export interface RoadmapDetailData {
   category: string;
   toolsToLearn: { name: string; category: string }[];
   overview: string;
-  traitAlignment: string;
+  naturalStrengths?: string;
   roadmapSteps: { label: string; type: 'foundation' | 'action' | 'advancement' | 'career'; content: string }[];
-  guidelines: { title: string; points: string[] }[];
+  guidelines: { 
+    title: string; 
+    points: string[];
+    sections?: { subtitle: string; points: string[] }[];
+  }[];
   guidanceTip: string;
 }
 

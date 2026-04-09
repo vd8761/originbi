@@ -96,7 +96,7 @@ const Dashboard: React.FC = () => {
                         <ConsultantCallCard />
                     </div>
                     <div className="col-span-1 md:col-span-1 lg:col-span-3 h-full">
-                        <RoadmapsCard />
+                        <RoadmapsCard reportData={reportData} isLoadingReport={isLoadingReport} />
                     </div>
                 </>
             )}
@@ -104,7 +104,7 @@ const Dashboard: React.FC = () => {
             {/* Row 2 */}
             <div className="col-span-1 md:col-span-2 lg:col-span-4 h-full">
                 {isSchool ? (
-                    <RoadmapsCard />
+                    <RoadmapsCard reportData={reportData} isLoadingReport={isLoadingReport} />
                 ) : (
                     <MoodCard />
                 )}

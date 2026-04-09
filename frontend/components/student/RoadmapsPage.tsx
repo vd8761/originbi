@@ -91,12 +91,34 @@ const RoadmapsPage: React.FC = () => {
                     const steps: any[] = [];
                     const guidelines: any[] = [];
                     let guidanceTip = "";
+                    let overview = role.shortDescription;
+                    let naturalStrengths = "";
 
                     (role.guidanceSections || []).forEach((section: any) => {
                         const titleLower = section.title.toLowerCase();
                         const content = section.content;
 
-                        // Check if it's a roadmap step
+                        // Case: Overview
+                        if (titleLower.includes('overview')) {
+                            if (typeof content === 'string') {
+                                overview = content;
+                            } else if (Array.isArray(content)) {
+                                overview = content.map(c => c.text || c.subtitle || c.bullets?.join(' ') || "").filter(Boolean).join(' ');
+                            }
+                            return;
+                        }
+
+                        // Case: Natural Strengths
+                        if (titleLower.includes('natural strength')) {
+                            if (typeof content === 'string') {
+                                naturalStrengths = content;
+                            } else if (Array.isArray(content)) {
+                                naturalStrengths = content.map(c => c.text || c.subtitle || c.bullets?.join(' ') || "").filter(Boolean).join(' ');
+                            }
+                            return;
+                        }
+
+                        // Check if it's a roadmap step or a container for roadmap steps
                         if (titleLower.includes('foundation') || 
                             titleLower.includes('action') || 
                             titleLower.includes('advancement') || 
@@ -107,25 +129,63 @@ const RoadmapsPage: React.FC = () => {
                                 type: titleLower.includes('foundation') ? 'foundation' : 
                                       titleLower.includes('action') ? 'action' :
                                       titleLower.includes('advancement') ? 'advancement' : 'career',
-                                content: typeof content === 'string' ? content : (content[0]?.text || content[0]?.bullets?.join(' ') || "")
+                                content: typeof content === 'string' ? content : (content[0]?.text || content[0]?.subtitle || content[0]?.bullets?.join(' ') || "")
                             });
+                        } else if (titleLower.includes('roadmap')) {
+                            
+                            if (Array.isArray(content)) {
+                                content.forEach((sub: any) => {
+                                    const subTitle = (sub.subtitle || sub.text || "").toLowerCase();
+                                    steps.push({
+                                        label: sub.subtitle || sub.text || "Step",
+                                        type: subTitle.includes('foundation') ? 'foundation' : 
+                                              subTitle.includes('action') ? 'action' :
+                                              subTitle.includes('advancement') ? 'advancement' : 'career',
+                                        content: sub.text || sub.bullets?.join(' ') || ""
+                                    });
+                                });
+                            }
+                        } else if (titleLower.includes('guidance tip')) {
+                            // Extract to standalone guidanceTip instead of guidelines
+                            if (typeof content === 'string') {
+                                guidanceTip = content;
+                            } else if (Array.isArray(content)) {
+                                guidanceTip = content.map(c => c.text || c.bullets?.join(' ') || c.tip || "").join(' ');
+                            }
                         } else {
                             // Professional Guidelines
                             const points: string[] = [];
+                            const subSections: { subtitle: string, points: string[] }[] = [];
+                            
                             if (Array.isArray(content)) {
                                 content.forEach((sub: any) => {
-                                    if (sub.bullets) points.push(...sub.bullets);
-                                    if (sub.text) points.push(sub.text);
+                                    const subTitle = (sub.subtitle || sub.text || "").toLowerCase();
+                                    
+                                    if (subTitle.includes('overview') || subTitle.includes('roadmap') || subTitle.includes('natural strength')) return;
+
+                                    if (sub.bullets && (sub.subtitle || sub.text)) {
+                                        subSections.push({
+                                            subtitle: sub.subtitle || sub.text,
+                                            points: sub.bullets
+                                        });
+                                    } else if (sub.bullets) {
+                                        points.push(...sub.bullets);
+                                    } else if (sub.text) {
+                                        points.push(sub.text);
+                                    }
                                     if (sub.tip) guidanceTip = sub.tip;
                                 });
                             } else if (typeof content === 'string') {
                                 points.push(content);
                             }
                             
-                            guidelines.push({
-                                title: section.title,
-                                points: points
-                            });
+                            if (points.length > 0 || subSections.length > 0) {
+                                guidelines.push({
+                                    title: section.title,
+                                    points: points,
+                                    sections: subSections.length > 0 ? subSections : undefined
+                                });
+                            }
                         }
                     });
 
@@ -133,12 +193,12 @@ const RoadmapsPage: React.FC = () => {
                         id,
                         title: role.roleName,
                         category: role.roleName,
-                        toolsToLearn: (role.tools || []).map((t: string) => ({ name: t, category: 'Technology' })),
-                        overview: role.shortDescription,
-                        traitAlignment: `This career path aligns with your ${report.discProfile?.traitTitle || 'personality'} profile, utilizing your natural strengths.`,
+                        toolsToLearn: (role.tools || []).map((t: string) => ({ name: t, category: 'Skill/Tool' })),
+                        overview: overview,
+                        naturalStrengths: naturalStrengths,
                         roadmapSteps: steps,
                         guidelines: guidelines,
-                        guidanceTip: guidanceTip || "Leverage these steps to build a successful career in this field."
+                        guidanceTip: guidanceTip
                     };
                 });
 
@@ -205,7 +265,6 @@ const RoadmapsPage: React.FC = () => {
         );
     }
 
-    // Otherwise, show the grid view
     return (
         <div className="w-full px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8 max-w-[1600px] mx-auto">
             {/* Breadcrumb */}
