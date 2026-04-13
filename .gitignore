@@ -49,6 +49,7 @@ logs
 *.log
 *.log.*
 /tmp
+/tmp2
 
 # EDITOR FOLDERS
 .vscode/
@@ -70,6 +71,7 @@ run-all-private.ps1
 /originbi-schools
 /originbi-employee
 /originbi-app
+
 
 dev.ps1
 dev-start.ps1
