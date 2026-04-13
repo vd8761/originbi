@@ -202,10 +202,12 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
   const programOptions = programs.map((p) => ({ value: p.id, label: p.name }));
   //console.log("programOptions:", programOptions);
 
-  const departmentOptions = departments.map((d) => ({
-    value: d.id,
-    label: d.name,
-  }));
+  const departmentOptions = departments
+    .filter((d) => d.is_active)
+    .map((d) => ({
+      value: d.id,
+      label: d.name,
+    }));
 
   const generatePassword = () => {
     const chars =

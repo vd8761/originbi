@@ -403,10 +403,12 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                   <CustomSelect
                     label="Department"
                     required
-                    options={departments.map((d) => ({
-                      label: d.department?.name || d.name || "Unknown",
-                      value: d.id,
-                    }))}
+                    options={departments
+                      .filter((d) => d.is_active)
+                      .map((d) => ({
+                        label: d.department?.name || d.name || "Unknown",
+                        value: d.id,
+                      }))}
                     value={formData.department_id || ""}
                     onChange={(val) => {
                       handleInputChange("department_id", val);
