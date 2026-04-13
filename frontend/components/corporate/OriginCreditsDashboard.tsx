@@ -4,8 +4,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Plus,
 } from "lucide-react";
 import BuyCreditsModal from "./BuyCreditsModal";
@@ -262,7 +260,7 @@ const OriginCreditsDashboard: React.FC = () => {
   );
   const [isUsageExporting, setIsUsageExporting] = useState(false);
   const [usageSortColumn, setUsageSortColumn] = useState<UsageSortKey>("date");
-  const [usageSortDirection, setUsageSortDirection] = useState<"asc" | "desc">("desc");
+  const [usageSortDirection, setUsageSortDirection] = useState<"asc" | "desc">("asc");
   const [transactionSearchTerm, setTransactionSearchTerm] = useState("");
   const [transactionEntriesPerPage, setTransactionEntriesPerPage] = useState(10);
   const [transactionCurrentPage, setTransactionCurrentPage] = useState(1);
@@ -271,7 +269,7 @@ const OriginCreditsDashboard: React.FC = () => {
   const [showTransactionFilterDropdown, setShowTransactionFilterDropdown] = useState(false);
   const [showTransactionDateModal, setShowTransactionDateModal] = useState(false);
   const [transactionDateModalAnchorStyle, setTransactionDateModalAnchorStyle] = useState<{ top: number; left: number } | null>(null);
-  const [transactionDateFilter, setTransactionDateFilter] = useState<string>("Today (48)");
+  const [transactionDateFilter, setTransactionDateFilter] = useState<string>("Any Time");
   const [transactionCalendarPreset, setTransactionCalendarPreset] = useState<string>("Any Time");
   const [transactionRangeStart, setTransactionRangeStart] = useState<Date | null>(null);
   const [transactionRangeEnd, setTransactionRangeEnd] = useState<Date | null>(null);
@@ -497,7 +495,11 @@ const OriginCreditsDashboard: React.FC = () => {
   const appliedDateLabel = usageDateFilter && usageDateFilter !== "Applied Date"
     ? usageDateFilter
     : "Applied Date";
-  const isUsageDateFilterActive = Boolean(usageDateFilter && usageDateFilter !== "Applied Date");
+  const isUsageDateFilterActive = Boolean(
+    usageDateFilter
+    && usageDateFilter !== "Applied Date"
+    && usageDateFilter !== "Any Time",
+  );
 
   const openUsageDateModal = () => {
     const presetByFilter: Record<string, string> = {
@@ -520,7 +522,7 @@ const OriginCreditsDashboard: React.FC = () => {
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       const modalWidth = Math.min(900, viewportWidth - 24);
-      const modalHeight = 480;
+      const modalHeight = 446;
       const gap = 12;
 
       const left = Math.max(12, Math.min(rect.right - modalWidth, viewportWidth - modalWidth - 12));
@@ -542,7 +544,7 @@ const OriginCreditsDashboard: React.FC = () => {
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       const modalWidth = Math.min(900, viewportWidth - 24);
-      const modalHeight = 480;
+      const modalHeight = 446;
       const gap = 12;
 
       const left = Math.max(12, Math.min(rect.right - modalWidth, viewportWidth - modalWidth - 12));
@@ -552,7 +554,11 @@ const OriginCreditsDashboard: React.FC = () => {
 
     updateAnchorPosition();
     window.addEventListener("resize", updateAnchorPosition);
-    return () => window.removeEventListener("resize", updateAnchorPosition);
+    window.addEventListener("scroll", updateAnchorPosition, true);
+    return () => {
+      window.removeEventListener("resize", updateAnchorPosition);
+      window.removeEventListener("scroll", updateAnchorPosition, true);
+    };
   }, [showUsageDateModal]);
 
   const handleUsageDateCellClick = (date: Date) => {
@@ -819,6 +825,14 @@ const OriginCreditsDashboard: React.FC = () => {
   }, [filteredUsageHistoryRows, usageSortColumn, usageSortDirection]);
 
   const usageTotalEntries = sortedUsageHistoryRows.length;
+  const usageSuggestedEntriesOptions = useMemo(() => {
+    if (usageTotalEntries <= 0) {
+      return [usageEntriesPerPage];
+    }
+
+    const baseOptions = [10, 25, 50].filter((size) => size < usageTotalEntries);
+    return Array.from(new Set([...baseOptions, usageTotalEntries, usageEntriesPerPage])).sort((a, b) => a - b);
+  }, [usageTotalEntries, usageEntriesPerPage]);
   const usageTotalPages = Math.max(1, Math.ceil(usageTotalEntries / usageEntriesPerPage));
   const safeUsageCurrentPage = Math.min(usageCurrentPage, usageTotalPages);
 
@@ -990,6 +1004,14 @@ const OriginCreditsDashboard: React.FC = () => {
   }, [filteredTransactionRows, transactionSortColumn, transactionSortDirection]);
 
   const transactionTotalEntries = sortedTransactionRows.length;
+  const transactionSuggestedEntriesOptions = useMemo(() => {
+    if (transactionTotalEntries <= 0) {
+      return [transactionEntriesPerPage];
+    }
+
+    const baseOptions = [10, 25, 50].filter((size) => size < transactionTotalEntries);
+    return Array.from(new Set([...baseOptions, transactionTotalEntries, transactionEntriesPerPage])).sort((a, b) => a - b);
+  }, [transactionTotalEntries, transactionEntriesPerPage]);
   const transactionTotalPages = Math.max(1, Math.ceil(transactionTotalEntries / transactionEntriesPerPage));
   const safeTransactionCurrentPage = Math.min(transactionCurrentPage, transactionTotalPages);
 
@@ -1114,8 +1136,12 @@ const OriginCreditsDashboard: React.FC = () => {
 
   const transactionAppliedDateLabel = transactionDateFilter && transactionDateFilter !== "Applied Date"
     ? transactionDateFilter
-    : "Today (48)";
-  const isTransactionDateFilterActive = Boolean(transactionDateFilter && transactionDateFilter !== "Applied Date");
+    : "Any Time";
+  const isTransactionDateFilterActive = Boolean(
+    transactionDateFilter
+    && transactionDateFilter !== "Applied Date"
+    && transactionDateFilter !== "Any Time",
+  );
 
   const openTransactionDateModal = () => {
     const presetByFilter: Record<string, string> = {
@@ -1130,7 +1156,7 @@ const OriginCreditsDashboard: React.FC = () => {
       "Last Month": "Last Month",
     };
 
-    const preset = presetByFilter[transactionDateFilter ?? "Today (48)"] ?? "Custom Range";
+    const preset = presetByFilter[transactionDateFilter ?? "Any Time"] ?? "Custom Range";
     setTransactionCalendarPreset(preset);
 
     const trigger = transactionDateFilterButtonRef.current;
@@ -1139,7 +1165,7 @@ const OriginCreditsDashboard: React.FC = () => {
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       const modalWidth = Math.min(900, viewportWidth - 24);
-      const modalHeight = 480;
+      const modalHeight = 446;
       const gap = 12;
 
       const left = Math.max(12, Math.min(rect.right - modalWidth, viewportWidth - modalWidth - 12));
@@ -1161,7 +1187,7 @@ const OriginCreditsDashboard: React.FC = () => {
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       const modalWidth = Math.min(900, viewportWidth - 24);
-      const modalHeight = 480;
+      const modalHeight = 446;
       const gap = 12;
 
       const left = Math.max(12, Math.min(rect.right - modalWidth, viewportWidth - modalWidth - 12));
@@ -1171,8 +1197,24 @@ const OriginCreditsDashboard: React.FC = () => {
 
     updateAnchorPosition();
     window.addEventListener("resize", updateAnchorPosition);
-    return () => window.removeEventListener("resize", updateAnchorPosition);
+    window.addEventListener("scroll", updateAnchorPosition, true);
+    return () => {
+      window.removeEventListener("resize", updateAnchorPosition);
+      window.removeEventListener("scroll", updateAnchorPosition, true);
+    };
   }, [showTransactionDateModal]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (!showUsageDateModal && !showTransactionDateModal) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [showUsageDateModal, showTransactionDateModal]);
 
   const handleTransactionDateCellClick = (date: Date) => {
     setTransactionCalendarPreset("Custom Range");
@@ -1352,14 +1394,14 @@ const OriginCreditsDashboard: React.FC = () => {
         <button
           type="button"
           onClick={() => setOpenRangeDropdown(isOpen ? null : variant)}
-          className="h-[30px] w-[128px] rounded-[100px] border border-[#D4D8D5] bg-white/50 backdrop-blur-[8px] px-3 text-left text-[14px] leading-[18px] font-normal text-[#19211C] dark:border-white/10 dark:bg-white/[0.08] dark:text-white flex items-center justify-between"
+          className="h-[30px] w-[128px] rounded-[100px] border border-[#C9D7CF] bg-white px-3 text-left text-[14px] leading-[18px] font-medium text-[#19211C] dark:border-white/[0.12] dark:bg-white/[0.16] dark:text-white/[0.95] flex items-center justify-between transition-colors hover:bg-[#F3F7F5] dark:hover:bg-white/[0.22]"
         >
           <span className="truncate">{RANGE_LABELS[selectedRange]}</span>
-          <ChevronDown className={`h-3.5 w-3.5 text-[#19211C]/70 dark:text-white/80 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+          <ChevronDown className={`h-3.5 w-3.5 text-[#19211C]/80 dark:text-white/80 transition-transform ${isOpen ? "rotate-180" : ""}`} />
         </button>
 
         {isOpen && (
-          <div className="absolute top-full right-0 mt-2 w-[148px] bg-white/40 dark:bg-[rgba(25,33,28,0.16)] border border-[#D4D8D5] dark:border-[rgba(255,255,255,0.2)] rounded-[10px] shadow-[0_10px_28px_rgba(25,33,28,0.08)] dark:shadow-[0_16px_40px_rgba(25,33,28,0.6)] backdrop-blur-[20px] z-50 overflow-hidden box-border">
+          <div className="absolute top-full right-0 mt-2 w-[148px] bg-white dark:bg-[#1B2621] border border-[#C9D7CF] dark:border-white/[0.3] rounded-[10px] shadow-[0_10px_24px_rgba(25,33,28,0.16)] dark:shadow-[0_14px_30px_rgba(0,0,0,0.5)] z-50 overflow-hidden box-border">
             {(["3m", "6m", "12m"] as RangeKey[]).map((key) => (
               <button
                 key={key}
@@ -1369,8 +1411,8 @@ const OriginCreditsDashboard: React.FC = () => {
                   setOpenRangeDropdown(null);
                 }}
                 className={`w-full text-left px-4 py-2.5 text-[14px] leading-[18px] transition-colors ${selectedRange === key
-                    ? "bg-[#A2E0BA]/35 dark:bg-[#32925B]/70 text-[#19211C] dark:text-white font-medium"
-                    : "text-[#19211C] dark:text-white/90 font-normal hover:bg-white/18 dark:hover:bg-white/10"
+                    ? "bg-[#D9F1E4] dark:bg-[#2E9B62] text-[#173526] dark:text-white font-semibold"
+                    : "text-[#1E2A24] dark:text-[#E8F4EE] font-medium hover:bg-[#EFF5F1] dark:hover:bg-[#24322C]"
                   }`}
               >
                 {RANGE_LABELS[key]}
@@ -1402,89 +1444,151 @@ const OriginCreditsDashboard: React.FC = () => {
       </div>
 
       <div className="mb-6 border-b border-[#D9E3DC] dark:border-white/10">
-        <div className="flex items-center gap-6 overflow-x-auto scrollbar-hide">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`relative pb-3 text-[14px] whitespace-nowrap transition-colors ${
-                activeTab === tab.key
-                  ? "text-[#19211C] dark:text-white"
-                  : "text-[#19211C]/50 dark:text-white/45 hover:text-[#19211C] dark:hover:text-white"
-              }`}
-            >
-              {tab.label}
-              {activeTab === tab.key && (
-                <span className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full bg-[#1ED36A]" />
-              )}
-            </button>
-          ))}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex items-center gap-4 sm:gap-6 overflow-x-auto scrollbar-hide pb-1">
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`relative pb-3 text-[16px] whitespace-nowrap transition-colors ${
+                  activeTab === tab.key
+                    ? "text-[#19211C] dark:text-white"
+                    : "text-[#19211C]/50 dark:text-white/45 hover:text-[#19211C] dark:hover:text-white"
+                }`}
+              >
+                {tab.label}
+                {activeTab === tab.key && (
+                  <span className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full bg-[#1ED36A]" />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === "usage-history" && (
+            <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2.5 pb-2 text-[13px] text-[#19211C]/80 dark:text-white/60">
+              <span className="font-light">Showing</span>
+              <div className="relative" ref={usageEntriesRef}>
+                <button
+                  type="button"
+                  onClick={() => setUsageEntriesMenuOpen((prev) => !prev)}
+                  className="flex items-center gap-1.5 bg-white dark:bg-white/10 border border-[#C9D7CF] dark:border-white/15 px-2.5 py-1 rounded-[7px] text-[13px] text-[#1ED36A] font-medium min-w-[46px] justify-between transition-colors hover:bg-[#EEF5F1] dark:hover:bg-white/[0.16]"
+                >
+                  {usageEntriesPerPage}
+                  <ChevronDown className={`w-3 h-3 text-[#19211C]/50 dark:text-white/50 transition-transform ${usageEntriesMenuOpen ? "rotate-180" : ""}`} />
+                </button>
+                {usageEntriesMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1.5 w-[72px] bg-white dark:bg-[#1F2823] border border-[#D4D8D5]/55 dark:border-white/15 rounded-lg shadow-lg z-50 py-1">
+                    {usageSuggestedEntriesOptions.map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => {
+                          setUsageEntriesPerPage(size);
+                          setUsageCurrentPage(1);
+                          setUsageEntriesMenuOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-[12px] transition-colors ${usageEntriesPerPage === size
+                            ? "text-[#1ED36A] font-semibold"
+                            : "text-[#19211C]/70 dark:text-gray-300 hover:bg-[#EAF4EE] dark:hover:bg-[#2A3A33] dark:hover:text-white"
+                          }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <span className="whitespace-nowrap font-light">of {usageTotalEntries.toLocaleString()} entries</span>
+              <div className="flex items-center gap-1.5 ml-0 sm:ml-1">
+                <button
+                  type="button"
+                  onClick={() => setUsageCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={safeUsageCurrentPage === 1}
+                  className="w-10 h-10 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center transition-colors cursor-pointer text-gray-600 dark:text-white/70 hover:bg-brand-green dark:hover:bg-brand-green hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
+                    <path d="M7.5 3L4.5 6L7.5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUsageCurrentPage((prev) => Math.min(usageTotalPages, prev + 1))}
+                  disabled={safeUsageCurrentPage === usageTotalPages}
+                  className="w-10 h-10 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center transition-colors cursor-pointer text-gray-600 dark:text-white/70 hover:bg-brand-green dark:hover:bg-brand-green hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
+                    <path d="M4.5 3L7.5 6L4.5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "transaction-history" && (
+            <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2.5 pb-2 text-[13px] text-[#19211C]/80 dark:text-white/60">
+              <span className="font-light">Showing</span>
+              <div className="relative" ref={transactionEntriesRef}>
+                <button
+                  type="button"
+                  onClick={() => setTransactionEntriesMenuOpen((prev) => !prev)}
+                  className="flex items-center gap-1.5 bg-white dark:bg-white/10 border border-[#C9D7CF] dark:border-white/15 px-2.5 py-1 rounded-[7px] text-[13px] text-[#1ED36A] font-medium min-w-[46px] justify-between transition-colors hover:bg-[#EEF5F1] dark:hover:bg-white/[0.16]"
+                >
+                  {transactionEntriesPerPage}
+                  <ChevronDown className={`w-3 h-3 text-[#19211C]/50 dark:text-white/50 transition-transform ${transactionEntriesMenuOpen ? "rotate-180" : ""}`} />
+                </button>
+                {transactionEntriesMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1.5 w-[72px] bg-white dark:bg-[#1F2823] border border-[#D4D8D5]/55 dark:border-white/15 rounded-lg shadow-lg z-50 py-1">
+                    {transactionSuggestedEntriesOptions.map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => {
+                          setTransactionEntriesPerPage(size);
+                          setTransactionCurrentPage(1);
+                          setTransactionEntriesMenuOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-[12px] transition-colors ${transactionEntriesPerPage === size
+                            ? "text-[#1ED36A] font-semibold"
+                            : "text-[#19211C]/70 dark:text-gray-300 hover:bg-[#EAF4EE] dark:hover:bg-[#2A3A33] dark:hover:text-white"
+                          }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <span className="whitespace-nowrap font-light">of {transactionTotalEntries.toLocaleString()} entries</span>
+              <div className="flex items-center gap-1.5 ml-0 sm:ml-1">
+                <button
+                  type="button"
+                  onClick={() => setTransactionCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={safeTransactionCurrentPage === 1}
+                  className="w-10 h-10 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center transition-colors cursor-pointer text-gray-600 dark:text-white/70 hover:bg-brand-green dark:hover:bg-brand-green hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
+                    <path d="M7.5 3L4.5 6L7.5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTransactionCurrentPage((prev) => Math.min(transactionTotalPages, prev + 1))}
+                  disabled={safeTransactionCurrentPage === transactionTotalPages}
+                  className="w-10 h-10 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center transition-colors cursor-pointer text-gray-600 dark:text-white/70 hover:bg-brand-green dark:hover:bg-brand-green hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
+                    <path d="M4.5 3L7.5 6L4.5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {activeTab === "usage-history" ? (
         <div className="space-y-5">
-          <div className="flex items-center justify-end gap-2.5 text-[13px] text-[#19211C]/80 dark:text-white/60">
-            <span className="font-light">Showing</span>
-            <div className="relative" ref={usageEntriesRef}>
-              <button
-                type="button"
-                onClick={() => setUsageEntriesMenuOpen((prev) => !prev)}
-                className="flex items-center gap-1.5 bg-white/[0.04] dark:bg-white/10 border border-[#D4D8D5]/35 dark:border-white/10 px-2.5 py-1 rounded-[7px] text-[13px] text-[#1ED36A] font-medium min-w-[46px] justify-between transition-all backdrop-blur-[10px]"
-              >
-                {usageEntriesPerPage}
-                <ChevronDown className={`w-3 h-3 text-[#19211C]/50 dark:text-white/50 transition-transform ${usageEntriesMenuOpen ? "rotate-180" : ""}`} />
-              </button>
-              {usageEntriesMenuOpen && (
-                <div className="absolute right-0 top-full mt-1.5 w-[72px] bg-white/18 dark:bg-[rgba(31,40,35,0.45)] border border-[#D4D8D5]/55 dark:border-white/15 rounded-lg shadow-lg z-50 py-1 backdrop-blur-[18px]">
-                  {[10, 25, 50].map((size) => (
-                    <button
-                      key={size}
-                      type="button"
-                      onClick={() => {
-                        setUsageEntriesPerPage(size);
-                        setUsageCurrentPage(1);
-                        setUsageEntriesMenuOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 text-[12px] transition-colors ${usageEntriesPerPage === size
-                          ? "text-[#1ED36A] font-semibold"
-                          : "text-[#19211C]/70 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5"
-                        }`}
-                    >
-                      {size}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <span className="whitespace-nowrap font-light">of {usageTotalEntries.toLocaleString()} entries</span>
-            <div className="flex items-center gap-1.5 ml-1">
-              <button
-                type="button"
-                onClick={() => setUsageCurrentPage((prev) => Math.max(1, prev - 1))}
-                disabled={safeUsageCurrentPage === 1}
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${safeUsageCurrentPage === 1
-                    ? "bg-[#EEF1EE] dark:bg-white/10 text-[#19211C]/35 dark:text-white/35 cursor-not-allowed"
-                    : "bg-[#EEF1EE] dark:bg-white/10 text-[#19211C]/70 dark:text-white/70 hover:bg-[#1ED36A] hover:text-white"
-                  }`}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setUsageCurrentPage((prev) => Math.min(usageTotalPages, prev + 1))}
-                disabled={safeUsageCurrentPage === usageTotalPages}
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${safeUsageCurrentPage === usageTotalPages
-                    ? "bg-[#BDECCC] dark:bg-white/20 text-white/70 cursor-not-allowed"
-                    : "bg-[#1ED36A] text-white hover:bg-[#16BD5C]"
-                  }`}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="rounded-[16px] border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] overflow-hidden">
+          <div className="rounded-[16px] border border-transparent bg-white dark:bg-white/[0.08] overflow-hidden">
             <div className="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center lg:justify-between border-b border-gray-200 dark:border-white/[0.08]">
               <div className="relative w-full lg:w-[420px]">
                 <input
@@ -1496,12 +1600,12 @@ const OriginCreditsDashboard: React.FC = () => {
                 />
               </div>
 
-              <div className="flex w-full flex-wrap items-center justify-end gap-2 lg:w-auto">
+              <div className="flex w-full flex-wrap items-center justify-end gap-5 lg:gap-6 lg:w-auto">
                 <div className="relative" ref={usageFilterRef}>
                   <button
                     type="button"
                     onClick={() => setShowUsageFilterDropdown((prev) => !prev)}
-                    className="h-[44px] rounded-xl px-4 text-[13px] flex items-center gap-2 font-medium cursor-pointer transition-all whitespace-nowrap border border-[#D4D8D5]/35 dark:border-white/10 bg-white/[0.03] dark:bg-white/[0.12] backdrop-blur-[10px] text-[#33413B] dark:text-white/90 hover:bg-white/[0.08] dark:hover:bg-white/[0.16]"
+                    className="h-[44px] rounded-xl px-4 text-[13px] flex items-center gap-2 font-medium cursor-pointer transition-colors whitespace-nowrap border border-[#D4D8D5]/35 dark:border-white/10 bg-white dark:bg-white/[0.12] text-[#33413B] dark:text-white/90 hover:bg-[#EEF5F1] dark:hover:bg-white/[0.2]"
                   >
                     <svg width="20" height="18" viewBox="0 0 20 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-[18px] shrink-0">
                       <path d="M17.0773 0H1.97844C1.59514 0.000301844 1.22016 0.111854 0.899022 0.321118C0.577883 0.530383 0.324388 0.828361 0.169304 1.17889C0.0142188 1.52942 -0.0357883 1.91743 0.0253517 2.29582C0.0864917 2.67422 0.25615 3.02673 0.513736 3.31059L7.05726 10.5071V17.2941C7.05732 17.4268 7.09476 17.5567 7.1653 17.6691C7.23584 17.7815 7.33662 17.8717 7.45608 17.9294C7.55156 17.9765 7.65669 18.0006 7.76314 18C7.92358 17.9999 8.07918 17.9451 8.20432 17.8447L9.52785 16.7859L11.7337 15.0212C11.8163 14.9551 11.8829 14.8713 11.9287 14.776C11.9745 14.6807 11.9984 14.5763 11.9984 14.4706V10.5071L18.542 3.31059C18.7995 3.02673 18.9692 2.67422 19.0303 2.29582C19.0915 1.91743 19.0415 1.52942 18.8864 1.17889C18.7313 0.828361 18.4778 0.530383 18.1567 0.321118C17.8355 0.111854 17.4606 0.000301844 17.0773 0Z" fill="#1ED36A"/>
@@ -1510,7 +1614,7 @@ const OriginCreditsDashboard: React.FC = () => {
                     <ChevronDown className={`w-3.5 h-3.5 text-[#19211C]/70 dark:text-white/70 transition-transform ${showUsageFilterDropdown ? "rotate-180" : ""}`} />
                   </button>
                   {showUsageFilterDropdown && (
-                    <div className="absolute top-full right-0 mt-2 w-52 bg-white/16 dark:bg-[rgba(25,33,28,0.35)] border border-[#D4D8D5]/55 dark:border-white/15 rounded-xl shadow-[0_12px_28px_rgba(25,33,28,0.08)] dark:shadow-[0_16px_40px_rgba(25,33,28,0.6)] z-50 overflow-hidden py-1 backdrop-blur-[18px]">
+                    <div className="absolute top-full right-0 mt-2 w-52 bg-white dark:bg-[#1F2823] border border-[#D4D8D5]/55 dark:border-white/15 rounded-xl shadow-[0_12px_28px_rgba(25,33,28,0.12)] dark:shadow-[0_16px_40px_rgba(25,33,28,0.6)] z-50 overflow-hidden py-1">
                       {(["All", "Completed", "Partially Exp", "Expired"] as const).map((option) => (
                         <button
                           key={option}
@@ -1519,9 +1623,9 @@ const OriginCreditsDashboard: React.FC = () => {
                             setUsageStatusFilter(option);
                             setShowUsageFilterDropdown(false);
                           }}
-                          className={`w-full flex items-center justify-between px-4 py-2.5 text-[13px] transition-colors ${usageStatusFilter === option
-                              ? "text-[#1ED36A] bg-white/10 dark:bg-white/10"
-                              : "text-[#33413B] dark:text-white/90 hover:bg-white/10 dark:hover:bg-white/10"
+                            className={`w-full flex items-center justify-between px-4 py-2.5 text-[13px] transition-colors ${usageStatusFilter === option
+                              ? "text-[#1ED36A] bg-[#E7F8EE] dark:bg-[#1ED36A]/20"
+                              : "text-[#33413B] dark:text-white/90 hover:bg-[#EAF4EE] hover:text-[#19211C] dark:hover:bg-white/[0.14] dark:hover:text-white"
                             }`}
                         >
                           <span>{option}</span>
@@ -1539,9 +1643,9 @@ const OriginCreditsDashboard: React.FC = () => {
                     type="button"
                     ref={usageDateFilterButtonRef}
                     onClick={openUsageDateModal}
-                    className={`h-[44px] rounded-[8px] px-4 py-[9px] text-[14px] flex items-center gap-2 font-normal cursor-pointer transition-all whitespace-nowrap border shadow-sm dark:shadow-none ${isUsageDateFilterActive
+                    className={`h-[44px] rounded-[8px] px-4 py-[9px] text-[14px] flex items-center gap-2 font-normal cursor-pointer transition-colors whitespace-nowrap border shadow-sm dark:shadow-none ${isUsageDateFilterActive
                       ? "border-[#1ED36A]/50 bg-[#E7F8EE]/60 text-[#1F3B2A] hover:bg-[#DDF4E7]/80 dark:border-transparent dark:bg-[#1ED36A33] dark:text-white dark:hover:bg-[#1ED36A45]"
-                      : "bg-white dark:bg-[#23302A] border-gray-200 dark:border-[#355041] hover:border-brand-green dark:hover:border-brand-green/60 text-gray-900 dark:text-white"
+                      : "border-[#D4D8D5]/35 dark:border-white/10 bg-white dark:bg-white/[0.12] text-[#33413B] dark:text-white/90 hover:bg-[#EEF5F1] dark:hover:bg-white/[0.2]"
                       }`}
                   >
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-[18px] h-[18px] shrink-0 text-[#1ED36A]">
@@ -1563,7 +1667,7 @@ const OriginCreditsDashboard: React.FC = () => {
 
             {showUsageDateModal && (
               <div
-                className="fixed inset-0 z-[80] bg-[#19211C33] dark:bg-[#19211CCC] backdrop-blur-[1.5px]"
+                className="fixed inset-0 z-[80] bg-[#FFFFFF99] dark:bg-[#19211CCC]"
                 onClick={() => setShowUsageDateModal(false)}
               >
                 <div
@@ -1575,7 +1679,7 @@ const OriginCreditsDashboard: React.FC = () => {
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="w-full h-[480px] rounded-[24px] border border-[#D7E3DD] dark:border-white/[0.18] bg-white/95 dark:bg-[#19211CCC] shadow-[0px_16px_40px_rgba(25,33,28,0.18)] dark:shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-5">
+                  <div className="w-full h-[446px] rounded-[24px] border border-[#D7E3DD] dark:border-white/[0.18] bg-white/95 dark:bg-[#19211CCC] shadow-[0px_16px_40px_rgba(25,33,28,0.18)] dark:shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-5">
                   <div className="w-[860px] max-w-full mx-auto flex items-center justify-between pb-3.5 border-b border-[#E1E9E4] dark:border-white/[0.12]">
                     <p className="text-[18px] leading-[23px] font-normal text-[#19211C] dark:text-white">Select Date Range</p>
                     <button
@@ -1668,7 +1772,7 @@ const OriginCreditsDashboard: React.FC = () => {
             <div className="w-full overflow-x-auto">
               <table className="w-full min-w-[1180px] text-[14px]">
                 <thead>
-                  <tr className="border-b border-gray-200 dark:border-white/[0.08] bg-black/[0.04] dark:bg-white/[0.1]">
+                  <tr className="border-b-0 bg-[#F2F5F3] dark:bg-[#FFFFFF1F]">
                     {[
                       "Date",
                       "Employee / Assessment",
@@ -1681,10 +1785,10 @@ const OriginCreditsDashboard: React.FC = () => {
                     ].map((header) => (
                       <th
                         key={header}
-                        className="text-left px-5 py-3.5 whitespace-nowrap text-[12px] font-semibold text-[#3A4741] dark:text-white/70"
+                        className={`${header === "Action" ? "text-center" : "text-left"} px-5 py-3.5 whitespace-nowrap text-[12px] font-semibold text-[#3A4741] dark:text-white`}
                       >
                         {header === "Action" ? (
-                          <span>{header}</span>
+                          <span className="text-[#3A4741] dark:text-white">{header}</span>
                         ) : (
                           renderUsageSortHeader(
                             header,
@@ -1711,7 +1815,7 @@ const OriginCreditsDashboard: React.FC = () => {
                   {visibleUsageHistoryRows.map((row, idx) => (
                     <tr
                       key={`${row.examRefNo}-${idx}`}
-                      className="border-b border-gray-200 dark:border-white/[0.08] transition-colors last:border-b-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
+                      className="border-b border-[#E3ECE6] dark:border-[#FFFFFF26] transition-colors last:border-b-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
                     >
                       <td className="px-5 py-5 whitespace-nowrap text-[#19211C] dark:text-white text-[16px] leading-[21px] font-light">{row.date}</td>
                       <td className="px-5 py-5 whitespace-nowrap text-[#19211C] dark:text-white text-[16px] leading-[21px] font-light">{row.employeeAssessment}</td>
@@ -1763,67 +1867,7 @@ const OriginCreditsDashboard: React.FC = () => {
         </div>
       ) : activeTab === "transaction-history" ? (
         <div className="space-y-5">
-          <div className="flex items-center justify-end gap-2.5 text-[13px] text-[#19211C]/80 dark:text-white/60">
-            <span className="font-light">Showing</span>
-            <div className="relative" ref={transactionEntriesRef}>
-              <button
-                type="button"
-                onClick={() => setTransactionEntriesMenuOpen((prev) => !prev)}
-                className="flex items-center gap-1.5 bg-white/[0.04] dark:bg-white/10 border border-[#D4D8D5]/35 dark:border-white/10 px-2.5 py-1 rounded-[7px] text-[13px] text-[#1ED36A] font-medium min-w-[46px] justify-between transition-all backdrop-blur-[10px]"
-              >
-                {transactionEntriesPerPage}
-                <ChevronDown className={`w-3 h-3 text-[#19211C]/50 dark:text-white/50 transition-transform ${transactionEntriesMenuOpen ? "rotate-180" : ""}`} />
-              </button>
-              {transactionEntriesMenuOpen && (
-                <div className="absolute right-0 top-full mt-1.5 w-[72px] bg-white/18 dark:bg-[rgba(31,40,35,0.45)] border border-[#D4D8D5]/55 dark:border-white/15 rounded-lg shadow-lg z-50 py-1 backdrop-blur-[18px]">
-                  {[10, 25, 50].map((size) => (
-                    <button
-                      key={size}
-                      type="button"
-                      onClick={() => {
-                        setTransactionEntriesPerPage(size);
-                        setTransactionCurrentPage(1);
-                        setTransactionEntriesMenuOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 text-[12px] transition-colors ${transactionEntriesPerPage === size
-                          ? "text-[#1ED36A] font-semibold"
-                          : "text-[#19211C]/70 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5"
-                        }`}
-                    >
-                      {size}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <span className="whitespace-nowrap font-light">of {transactionTotalEntries.toLocaleString()} entries</span>
-            <div className="flex items-center gap-1.5 ml-1">
-              <button
-                type="button"
-                onClick={() => setTransactionCurrentPage((prev) => Math.max(1, prev - 1))}
-                disabled={safeTransactionCurrentPage === 1}
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${safeTransactionCurrentPage === 1
-                    ? "bg-[#EEF1EE] dark:bg-white/10 text-[#19211C]/35 dark:text-white/35 cursor-not-allowed"
-                    : "bg-[#EEF1EE] dark:bg-white/10 text-[#19211C]/70 dark:text-white/70 hover:bg-[#1ED36A] hover:text-white"
-                  }`}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setTransactionCurrentPage((prev) => Math.min(transactionTotalPages, prev + 1))}
-                disabled={safeTransactionCurrentPage === transactionTotalPages}
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${safeTransactionCurrentPage === transactionTotalPages
-                    ? "bg-[#BDECCC] dark:bg-white/20 text-white/70 cursor-not-allowed"
-                    : "bg-[#1ED36A] text-white hover:bg-[#16BD5C]"
-                  }`}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="rounded-[16px] border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] overflow-hidden">
+          <div className="rounded-[16px] border border-transparent bg-white dark:bg-white/[0.08] overflow-hidden">
             <div className="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center lg:justify-between border-b border-gray-200 dark:border-white/[0.08]">
               <div className="relative w-full lg:w-[420px]">
                 <input
@@ -1835,12 +1879,12 @@ const OriginCreditsDashboard: React.FC = () => {
                 />
               </div>
 
-              <div className="flex w-full flex-wrap items-center justify-end gap-2 lg:w-auto">
+              <div className="flex w-full flex-wrap items-center justify-end gap-5 lg:gap-6 lg:w-auto">
                 <div className="relative" ref={transactionFilterRef}>
                   <button
                     type="button"
                     onClick={() => setShowTransactionFilterDropdown((prev) => !prev)}
-                    className="h-[44px] rounded-xl px-4 text-[13px] flex items-center gap-2 font-medium cursor-pointer transition-all whitespace-nowrap border border-[#D4D8D5]/35 dark:border-white/10 bg-white/[0.03] dark:bg-white/[0.12] backdrop-blur-[10px] text-[#33413B] dark:text-white/90 hover:bg-white/[0.08] dark:hover:bg-white/[0.16]"
+                    className="h-[44px] rounded-xl px-4 text-[13px] flex items-center gap-2 font-medium cursor-pointer transition-colors whitespace-nowrap border border-[#D4D8D5]/35 dark:border-white/10 bg-white dark:bg-white/[0.12] text-[#33413B] dark:text-white/90 hover:bg-[#EEF5F1] dark:hover:bg-white/[0.2]"
                   >
                     <svg width="20" height="18" viewBox="0 0 20 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-[18px] shrink-0">
                       <path d="M17.0773 0H1.97844C1.59514 0.000301844 1.22016 0.111854 0.899022 0.321118C0.577883 0.530383 0.324388 0.828361 0.169304 1.17889C0.0142188 1.52942 -0.0357883 1.91743 0.0253517 2.29582C0.0864917 2.67422 0.25615 3.02673 0.513736 3.31059L7.05726 10.5071V17.2941C7.05732 17.4268 7.09476 17.5567 7.1653 17.6691C7.23584 17.7815 7.33662 17.8717 7.45608 17.9294C7.55156 17.9765 7.65669 18.0006 7.76314 18C7.92358 17.9999 8.07918 17.9451 8.20432 17.8447L9.52785 16.7859L11.7337 15.0212C11.8163 14.9551 11.8829 14.8713 11.9287 14.776C11.9745 14.6807 11.9984 14.5763 11.9984 14.4706V10.5071L18.542 3.31059C18.7995 3.02673 18.9692 2.67422 19.0303 2.29582C19.0915 1.91743 19.0415 1.52942 18.8864 1.17889C18.7313 0.828361 18.4778 0.530383 18.1567 0.321118C17.8355 0.111854 17.4606 0.000301844 17.0773 0Z" fill="#1ED36A"/>
@@ -1850,7 +1894,7 @@ const OriginCreditsDashboard: React.FC = () => {
                   </button>
 
                   {showTransactionFilterDropdown && (
-                    <div className="absolute top-full right-0 mt-2 w-52 bg-white/16 dark:bg-[rgba(25,33,28,0.35)] border border-[#D4D8D5]/55 dark:border-white/15 rounded-xl shadow-[0_12px_28px_rgba(25,33,28,0.08)] dark:shadow-[0_16px_40px_rgba(25,33,28,0.6)] z-50 overflow-hidden py-1 backdrop-blur-[18px]">
+                    <div className="absolute top-full right-0 mt-2 w-52 bg-white dark:bg-[#1F2823] border border-[#D4D8D5]/55 dark:border-white/15 rounded-xl shadow-[0_12px_28px_rgba(25,33,28,0.12)] dark:shadow-[0_16px_40px_rgba(25,33,28,0.6)] z-50 overflow-hidden py-1">
                       {(["All", "Completed", "Pending", "Failed", "Refunded"] as const).map((option) => (
                         <button
                           key={option}
@@ -1859,9 +1903,9 @@ const OriginCreditsDashboard: React.FC = () => {
                             setTransactionStatusFilter(option);
                             setShowTransactionFilterDropdown(false);
                           }}
-                          className={`w-full flex items-center justify-between px-4 py-2.5 text-[13px] transition-colors ${transactionStatusFilter === option
-                              ? "text-[#1ED36A] bg-white/10 dark:bg-white/10"
-                              : "text-[#33413B] dark:text-white/90 hover:bg-white/10 dark:hover:bg-white/10"
+                            className={`w-full flex items-center justify-between px-4 py-2.5 text-[13px] transition-colors ${transactionStatusFilter === option
+                              ? "text-[#1ED36A] bg-[#E7F8EE] dark:bg-[#1ED36A]/20"
+                              : "text-[#33413B] dark:text-white/90 hover:bg-[#EAF4EE] hover:text-[#19211C] dark:hover:bg-white/[0.14] dark:hover:text-white"
                             }`}
                         >
                           <span>{option}</span>
@@ -1879,9 +1923,9 @@ const OriginCreditsDashboard: React.FC = () => {
                     type="button"
                     ref={transactionDateFilterButtonRef}
                     onClick={openTransactionDateModal}
-                    className={`h-[44px] rounded-[8px] px-4 py-[9px] text-[14px] flex items-center gap-2 font-normal cursor-pointer transition-all whitespace-nowrap border shadow-sm dark:shadow-none ${isTransactionDateFilterActive
+                    className={`h-[44px] rounded-[8px] px-4 py-[9px] text-[14px] flex items-center gap-2 font-normal cursor-pointer transition-colors whitespace-nowrap border shadow-sm dark:shadow-none ${isTransactionDateFilterActive
                       ? "border-[#1ED36A]/50 bg-[#E7F8EE]/60 text-[#1F3B2A] hover:bg-[#DDF4E7]/80 dark:border-transparent dark:bg-[#1ED36A33] dark:text-white dark:hover:bg-[#1ED36A45]"
-                      : "bg-white dark:bg-[#23302A] border-gray-200 dark:border-[#355041] hover:border-brand-green dark:hover:border-brand-green/60 text-gray-900 dark:text-white"
+                      : "border-[#D4D8D5]/35 dark:border-white/10 bg-white dark:bg-white/[0.12] text-[#33413B] dark:text-white/90 hover:bg-[#EEF5F1] dark:hover:bg-white/[0.2]"
                       }`}
                   >
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-[18px] h-[18px] shrink-0 text-[#1ED36A]">
@@ -1903,7 +1947,7 @@ const OriginCreditsDashboard: React.FC = () => {
 
             {showTransactionDateModal && (
               <div
-                className="fixed inset-0 z-[80] bg-[#19211C33] dark:bg-[#19211CCC] backdrop-blur-[1.5px]"
+                className="fixed inset-0 z-[80] bg-[#FFFFFF99] dark:bg-[#19211CCC]"
                 onClick={() => setShowTransactionDateModal(false)}
               >
                 <div
@@ -1915,7 +1959,7 @@ const OriginCreditsDashboard: React.FC = () => {
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="w-full h-[480px] rounded-[24px] border border-[#D7E3DD] dark:border-white/[0.18] bg-white/95 dark:bg-[#19211CCC] shadow-[0px_16px_40px_rgba(25,33,28,0.18)] dark:shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-5">
+                  <div className="w-full h-[446px] rounded-[24px] border border-[#D7E3DD] dark:border-white/[0.18] bg-white/95 dark:bg-[#19211CCC] shadow-[0px_16px_40px_rgba(25,33,28,0.18)] dark:shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-5">
                   <div className="w-[860px] max-w-full mx-auto flex items-center justify-between pb-3.5 border-b border-[#E1E9E4] dark:border-white/[0.12]">
                     <p className="text-[18px] leading-[23px] font-normal text-[#19211C] dark:text-white">Select Date Range</p>
                     <button
@@ -2008,7 +2052,7 @@ const OriginCreditsDashboard: React.FC = () => {
             <div className="w-full overflow-x-auto">
               <table className="w-full min-w-[1180px] text-[14px]">
                 <thead>
-                  <tr className="border-b border-gray-200 dark:border-white/[0.08] bg-black/[0.04] dark:bg-white/[0.1]">
+                  <tr className="border-b-0 bg-[#F2F5F3] dark:bg-[#FFFFFF1F]">
                     {[
                       "Date",
                       "Transaction ID",
@@ -2020,10 +2064,10 @@ const OriginCreditsDashboard: React.FC = () => {
                     ].map((header) => (
                       <th
                         key={header}
-                        className="text-left px-5 py-3.5 whitespace-nowrap text-[12px] font-semibold text-[#3A4741] dark:text-white/70"
+                        className={`text-left px-5 py-3.5 whitespace-nowrap text-[12px] font-semibold text-[#3A4741] dark:text-white`}
                       >
                         {header === "Invoice" ? (
-                          <span>{header}</span>
+                          <span className="inline-block pl-1 text-[#3A4741] dark:text-white">{header}</span>
                         ) : (
                           renderTransactionSortHeader(
                             header,
@@ -2048,7 +2092,7 @@ const OriginCreditsDashboard: React.FC = () => {
                   {visibleTransactionRows.map((row, idx) => (
                     <tr
                       key={`${row.transactionId}-${idx}`}
-                      className="border-b border-gray-200 dark:border-white/[0.08] transition-colors last:border-b-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
+                      className="border-b border-[#E3ECE6] dark:border-[#FFFFFF26] transition-colors last:border-b-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
                     >
                       <td className="px-5 py-5 whitespace-nowrap text-[#19211C] dark:text-white text-[16px] leading-[21px] font-light">{row.date}</td>
                       <td className="px-5 py-5 whitespace-nowrap text-[#19211C] dark:text-white text-[16px] leading-[21px] font-light">{row.transactionId}</td>
@@ -2107,9 +2151,9 @@ const OriginCreditsDashboard: React.FC = () => {
       ) : (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 w-full max-w-[1260px]">
-            <div className="glass-card dashboard-glass-card rounded-[28px] p-8 sm:p-9 h-[332px] relative overflow-hidden border border-[#D7E3DD] dark:border-white/[0.1]">
+            <div className="glass-card dashboard-glass-card rounded-[34px] p-8 sm:p-9 h-[332px] relative overflow-hidden border border-[#D7E3DD] dark:border-white/[0.1]">
               <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                <span className="absolute -top-[56px] right-[-28px] font-['Haskoy'] text-[clamp(312px,21.5vw,452px)] font-extrabold text-[rgba(216,210,230,0.36)] dark:text-white/[0.04] leading-none tracking-[-0.02em] select-none whitespace-nowrap">
+                <span className="absolute -top-[72px] right-[-170px] font-['Haskoy'] text-[clamp(312px,21.5vw,452px)] font-extrabold text-[rgba(216,210,230,0.36)] dark:text-white/[0.04] leading-none tracking-[-0.02em] select-none whitespace-nowrap">
                   {creditsBalance}
                 </span>
               </div>
@@ -2166,9 +2210,9 @@ const OriginCreditsDashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="glass-card dashboard-glass-card rounded-[28px] p-8 sm:p-9 h-[332px] relative overflow-hidden border border-[#D7E3DD] dark:border-white/[0.1]">
+            <div className="glass-card dashboard-glass-card rounded-[34px] p-8 sm:p-9 h-[332px] relative overflow-hidden border border-[#D7E3DD] dark:border-white/[0.1]">
               <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                <span className="absolute -top-[56px] right-[-18px] font-['Haskoy'] text-[clamp(312px,21.5vw,452px)] font-extrabold text-[rgba(216,210,230,0.36)] dark:text-white/[0.04] leading-none tracking-[-0.02em] select-none whitespace-nowrap">
+                <span className="absolute -top-[72px] right-[10px] font-['Haskoy'] text-[clamp(312px,21.5vw,452px)] font-extrabold text-[rgba(216,210,230,0.36)] dark:text-white/[0.04] leading-none tracking-[-0.02em] select-none whitespace-nowrap">
                   {assessmentsConducted}
                 </span>
               </div>
@@ -2249,6 +2293,7 @@ const OriginCreditsDashboard: React.FC = () => {
 
                   <div className={`absolute left-0 right-0 top-[20px] h-[284px] flex items-start ${shouldStretchChartGroups ? "justify-between" : "gap-[131px]"}`}>
                     {scaledUsageData.map((item, index) => {
+                      const studentBarLeftPx = 0;
                       const studentHeightPx = Math.max(
                         0,
                         Math.round((item.chartStudentProgram / maxUsage) * GROUP_TOTAL_HEIGHT_PX),
@@ -2259,50 +2304,74 @@ const OriginCreditsDashboard: React.FC = () => {
                       );
                       const studentBarTopPx = GROUP_TOTAL_HEIGHT_PX - studentHeightPx;
                       const employeeBarTopPx = GROUP_TOTAL_HEIGHT_PX - employeeHeightPx;
-                      const tooltipWidthPx = 236;
-                      const tooltipTopPx = 16;
-                      const tooltipPointerCenterY = 34;
+                      const tooltipWidthPx = 204;
+                      const tooltipTopPx = -12;
+                      const tooltipPointerWidthPx = 16;
+                      const tooltipPointerHeightPx = 14;
+                      const tooltipPointerTopPx = 40;
+                      const tooltipPointerTipOffsetPx = tooltipPointerWidthPx / 2;
+                      const tooltipPointerCenterY = tooltipPointerTopPx + tooltipPointerHeightPx / 2;
                       const isGroupActive = hoveredUsageBar?.index === index;
-                      const activeSeries = hoveredUsageBar?.series ?? "student";
-                      const activeBarTopPx = activeSeries === "employee" ? employeeBarTopPx : studentBarTopPx;
-                      const activeBarCenterX = activeSeries === "employee" ? 92 + BAR_WIDTH_PX / 2 : BAR_WIDTH_PX / 2;
+                      const activeBarTopPx = studentBarTopPx;
+                      const activeBarCenterX = studentBarLeftPx + BAR_WIDTH_PX / 2;
                       const markerCenterY = Math.max(8, activeBarTopPx);
                       const studentBarHeight = item.chartStudentProgram > 0 ? getBarHeight(item.chartStudentProgram, 4) : "0px";
                       const employeeBarHeight = item.chartEmployeeProgram > 0 ? getBarHeight(item.chartEmployeeProgram, 4) : "0px";
                       const isNearRightEdge = index >= scaledUsageData.length - 1;
-                      const tooltipOffsetPx = activeSeries === "employee" ? 70 : 48;
-                      const tooltipLeftPx = isNearRightEdge ? -(tooltipWidthPx + 16) : tooltipOffsetPx;
-                      const tooltipEdgeX = isNearRightEdge ? tooltipLeftPx + tooltipWidthPx : tooltipLeftPx;
+                      const tooltipOffsetPx = 58;
+                      const tooltipLeftPx = isNearRightEdge ? -(tooltipWidthPx + 14) : tooltipOffsetPx;
+                      const tooltipEdgeX = isNearRightEdge
+                        ? tooltipLeftPx + tooltipWidthPx + tooltipPointerTipOffsetPx
+                        : tooltipLeftPx - tooltipPointerTipOffsetPx;
                       const tooltipEdgeY = tooltipTopPx + tooltipPointerCenterY;
                       const connectorDx = tooltipEdgeX - activeBarCenterX;
                       const connectorDy = tooltipEdgeY - markerCenterY;
                       const connectorLength = Math.max(8, Math.hypot(connectorDx, connectorDy));
                       const connectorAngle = (Math.atan2(connectorDy, connectorDx) * 180) / Math.PI;
-                      const markerClass = activeSeries === "employee"
-                        ? "bg-[#1ED36A] border-white dark:border-[#1F2A25]"
-                        : "bg-[#150089] dark:bg-[#EDFFF4] border-white dark:border-[#1F2A25]";
-                      const tooltipPointerClass = isNearRightEdge
-                        ? "absolute -right-[6px] top-[28px] h-3 w-3 rotate-45 border-t border-r border-[#D5E1DB]/65 dark:border-white/10 bg-[#FDFEFD] dark:bg-[#1F2A25]"
-                        : "absolute -left-[6px] top-[28px] h-3 w-3 rotate-45 border-l border-b border-[#D5E1DB]/65 dark:border-white/10 bg-[#FDFEFD] dark:bg-[#1F2A25]";
+                      const markerClass = "bg-[#150089] dark:bg-[#0F1713] border-white dark:border-[#DCE9E2]";
+                      const tooltipPointerClass = "absolute bg-[#FFFFFFEF] dark:bg-[rgba(22,33,28,0.88)]";
+                      const tooltipPointerStyle: React.CSSProperties = isNearRightEdge
+                        ? {
+                          right: -tooltipPointerTipOffsetPx,
+                          top: tooltipPointerTopPx,
+                          width: tooltipPointerWidthPx,
+                          height: tooltipPointerHeightPx,
+                          clipPath: "polygon(0 0, 100% 50%, 0 100%)",
+                        }
+                        : {
+                          left: -tooltipPointerTipOffsetPx,
+                          top: tooltipPointerTopPx,
+                          width: tooltipPointerWidthPx,
+                          height: tooltipPointerHeightPx,
+                          clipPath: "polygon(100% 0, 0 50%, 100% 100%)",
+                        };
+
+                      const setHoveredStudentBar = () => {
+                        setHoveredUsageBar((current) => (
+                          current?.index === index && current.series === "student"
+                            ? current
+                            : { index, series: "student" }
+                        ));
+                      };
 
                       return (
                       <div
                         key={item.month}
                         className="group relative h-[284px] w-[172px] shrink-0"
-                        onMouseLeave={() => {
-                          setHoveredUsageBar((current) => (current?.index === index ? null : current));
-                        }}
+                        onMouseLeave={() => setHoveredUsageBar(null)}
                       >
                         <div className="absolute left-0 top-0 h-[284px] w-[172px]">
                           <div
                             className="absolute left-0 bottom-0 w-[80px] rounded-[100px] bg-[#150089] dark:bg-[#EDFFF4]"
-                            onMouseEnter={() => setHoveredUsageBar({ index, series: "student" })}
                             style={{ height: studentBarHeight }}
+                            onMouseEnter={setHoveredStudentBar}
+                            onMouseMove={setHoveredStudentBar}
                           />
                           <div
                             className="absolute left-[92px] bottom-0 w-[80px] rounded-[100px] bg-[#1ED36A]"
-                            onMouseEnter={() => setHoveredUsageBar({ index, series: "employee" })}
                             style={{ height: employeeBarHeight }}
+                            onMouseEnter={setHoveredStudentBar}
+                            onMouseMove={setHoveredStudentBar}
                           />
                         </div>
 
@@ -2326,7 +2395,7 @@ const OriginCreditsDashboard: React.FC = () => {
                             transformOrigin: "0 0",
                           }}
                         >
-                          <span className="block h-px w-full bg-[#CADBD2]/80 dark:bg-white/35" />
+                          <span className="block h-px w-full bg-[#AABCB3]/85 dark:bg-white/18" />
                         </div>
 
                         <div
@@ -2336,18 +2405,18 @@ const OriginCreditsDashboard: React.FC = () => {
                             top: `${tooltipTopPx}px`,
                           }}
                         >
-                          <div className="relative w-[236px] rounded-[14px] border border-[#D5E1DB]/70 dark:border-white/10 bg-[#FDFEFD] dark:bg-[#1F2A25] px-4 py-3 text-[#19211C] dark:text-white shadow-[0px_14px_24px_-10px_rgba(10,22,14,0.45)] dark:shadow-[0px_14px_24px_-10px_rgba(0,0,0,0.55)]">
-                            <span className={tooltipPointerClass} />
-                            <div className="text-[14px] leading-[18px] font-medium mb-2">{toFullMonthLabel(item.month)}</div>
-                            <div className="h-px bg-[#D5E1DB]/55 dark:bg-white/10 mb-2" />
-                            <div className="space-y-2 text-[14px] leading-[18px] font-normal">
-                              <div className="flex items-center justify-between gap-3">
+                          <div className="relative w-[204px] rounded-[11px] border border-[#C9D6CF] dark:border-white/[0.12] bg-[#FFFFFFEF] dark:bg-[rgba(22,33,28,0.88)] backdrop-blur-[2px] px-3.5 py-3 text-[#19211C] dark:text-white shadow-[0px_10px_24px_rgba(15,23,18,0.22)] dark:shadow-[0px_12px_24px_rgba(0,0,0,0.42)]">
+                            <span className={tooltipPointerClass} style={tooltipPointerStyle} />
+                            <div className="text-[13px] leading-[17px] font-medium mb-2.5">{toFullMonthLabel(item.month)}</div>
+                            <div className="h-px bg-[#B8C9C0] dark:bg-white/10 mb-2.5" />
+                            <div className="space-y-2 text-[12px] leading-[16px] font-normal">
+                              <div className="grid grid-cols-[1fr_auto] items-center gap-3">
                                 <span className="inline-flex items-center gap-2 whitespace-nowrap"><span className="h-[10px] w-[10px] rounded-full bg-[#150089] dark:bg-[#EDFFF4]" />Student Program</span>
-                                <span className="font-medium tabular-nums">{item.studentProgram}</span>
+                                <span className="font-medium tabular-nums text-right">{item.studentProgram}</span>
                               </div>
-                              <div className="flex items-center justify-between gap-3">
+                              <div className="grid grid-cols-[1fr_auto] items-center gap-3">
                                 <span className="inline-flex items-center gap-2 whitespace-nowrap"><span className="h-[10px] w-[10px] rounded-full bg-[#1ED36A]" />Employee Program</span>
-                                <span className="font-medium tabular-nums">{item.employeeProgram}</span>
+                                <span className="font-medium tabular-nums text-right">{item.employeeProgram}</span>
                               </div>
                             </div>
                           </div>

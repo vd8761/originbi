@@ -438,7 +438,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
             const viewportWidth = window.innerWidth;
             const viewportHeight = window.innerHeight;
             const modalWidth = Math.min(900, viewportWidth - 24);
-            const modalHeight = 480;
+            const modalHeight = 446;
             const gap = 12;
 
             const left = Math.max(12, Math.min(rect.right - modalWidth, viewportWidth - modalWidth - 12));
@@ -464,7 +464,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
             const viewportWidth = window.innerWidth;
             const viewportHeight = window.innerHeight;
             const modalWidth = Math.min(900, viewportWidth - 24);
-            const modalHeight = 480;
+            const modalHeight = 446;
             const gap = 12;
 
             const left = Math.max(12, Math.min(rect.right - modalWidth, viewportWidth - modalWidth - 12));
@@ -474,7 +474,23 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
 
         updateAnchorPosition();
         window.addEventListener("resize", updateAnchorPosition);
-        return () => window.removeEventListener("resize", updateAnchorPosition);
+        window.addEventListener("scroll", updateAnchorPosition, true);
+        return () => {
+            window.removeEventListener("resize", updateAnchorPosition);
+            window.removeEventListener("scroll", updateAnchorPosition, true);
+        };
+    }, [activeFilterMenu]);
+
+    useEffect(() => {
+        if (typeof document === "undefined") return;
+        if (activeFilterMenu !== "date") return;
+
+        const originalOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+
+        return () => {
+            document.body.style.overflow = originalOverflow;
+        };
     }, [activeFilterMenu]);
 
     const renderSortLabel = (label: string, column: SortColumn) => {
@@ -500,7 +516,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
     const getFilterButtonClass = (isSelected: boolean) =>
         isSelected
             ? "flex items-center gap-2 h-[44px] bg-[#E7F8EE] dark:bg-[#1ED36A]/20 border border-[#1ED36A]/50 dark:border-[#1ED36A]/45 hover:bg-[#DDF4E7] dark:hover:bg-[#1ED36A]/25 text-[#1F3B2A] dark:text-white px-4 rounded-xl text-[13px] leading-[18px] font-medium transition-colors whitespace-nowrap cursor-pointer shrink-0"
-            : "flex items-center gap-2 h-[44px] bg-transparent border border-gray-300 dark:border-white/[0.24] hover:bg-black/[0.04] dark:hover:bg-white/5 text-[#33413B] dark:text-white/85 px-4 rounded-xl text-[13px] leading-[18px] font-medium transition-colors whitespace-nowrap cursor-pointer shrink-0";
+            : "flex items-center gap-2 h-[44px] bg-white border border-gray-300 dark:border-white/[0.24] hover:bg-[#EEF5F1] dark:bg-white/[0.12] dark:hover:bg-white/[0.16] text-[#33413B] dark:text-white/85 px-4 rounded-xl text-[13px] leading-[18px] font-medium transition-colors whitespace-nowrap cursor-pointer shrink-0";
 
     const calendarPresets = ["Any Time", "Today", "Yesterday", "Last 7 Days", "Last 30 Days", "This Month", "Last Month", "Custom Range"];
     const weekDays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
@@ -732,7 +748,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
     };
 
     return (
-        <div className="thin-ui-page relative flex flex-col w-full max-w-[1920px] h-[calc(100vh-96px)] min-h-[calc(100vh-96px)] overflow-y-scroll overflow-x-hidden mx-auto gap-4 font-['Haskoy'] p-4 sm:p-6 lg:p-8 bg-[#F7FAF8] dark:bg-[#19211C]">
+        <div className="thin-ui-page relative flex flex-col w-full max-w-[1920px] min-h-screen overflow-y-auto overflow-x-hidden mx-auto gap-4 font-['Haskoy'] p-4 sm:p-6 lg:p-8 bg-[#F7FAF8] dark:bg-[#19211C]">
 
             {/* Breadcrumb */}
             <div className="flex items-center text-xs text-[#5F6B65] dark:text-white/70 mb-1.5 font-normal">
@@ -805,8 +821,8 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                         </div>
 
                         {/* Social Links */}
-                        <div className="flex gap-3 w-full justify-center">
-                            <a href={candidate.linkedIn} target="_blank" rel="noopener noreferrer" className="h-[46px] min-w-[165px] flex items-center justify-center gap-2 px-4 bg-[#007EBB] text-white rounded-xl text-[16px] leading-[21px] font-medium hover:opacity-90 transition-opacity whitespace-nowrap">
+                        <div className="flex flex-col sm:flex-row gap-3 w-full justify-center">
+                            <a href={candidate.linkedIn} target="_blank" rel="noopener noreferrer" className="h-[44px] sm:h-[46px] w-full sm:w-auto sm:min-w-[165px] flex items-center justify-center gap-2 px-4 bg-[#007EBB] text-white rounded-xl text-[15px] sm:text-[16px] leading-[21px] font-medium hover:opacity-90 transition-opacity whitespace-nowrap">
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
                                     <path d="M15.9963 16.0001V10.1401C15.9963 7.26006 15.3763 5.06006 12.0163 5.06006C10.3962 5.06006 9.31625 5.94006 8.87625 6.78006H8.83625V5.32006H5.65625V16.0001H8.97625V10.7001C8.97625 9.30006 9.23625 7.96006 10.9563 7.96006C12.6563 7.96006 12.6763 9.54006 12.6763 10.7801V15.9801H15.9963V16.0001Z" fill="white"/>
                                     <path d="M0.257812 5.31995H3.57781V15.9999H0.257812V5.31995Z" fill="white"/>
@@ -814,7 +830,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                 </svg>
                                 LinkedIn Profile
                             </a>
-                            <a href={candidate.github} target="_blank" rel="noopener noreferrer" className="h-[46px] min-w-[165px] flex items-center justify-center gap-2 px-4 bg-[#1B1F23] text-white border border-white/[0.16] rounded-xl text-[16px] leading-[21px] font-medium hover:opacity-90 transition-opacity whitespace-nowrap">
+                            <a href={candidate.github} target="_blank" rel="noopener noreferrer" className="h-[44px] sm:h-[46px] w-full sm:w-auto sm:min-w-[165px] flex items-center justify-center gap-2 px-4 bg-[#1B1F23] text-white border border-white/[0.16] rounded-xl text-[15px] sm:text-[16px] leading-[21px] font-medium hover:opacity-90 transition-opacity whitespace-nowrap">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="shrink-0"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" /></svg>
                                 GitHub Profile
                             </a>
@@ -837,18 +853,18 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                         </div>
 
                         {/* Action Buttons */}
-                        <div className="flex items-center justify-center gap-4 mt-0 w-full">
-                            <button className="h-[55px] min-w-[96px] flex items-center justify-center gap-3 px-4 rounded-full text-[18px] leading-[23px] font-normal bg-gray-50 hover:bg-gray-100 dark:bg-[#343B36] dark:hover:bg-[#454D49] text-[#19211C] dark:text-white border border-gray-200 shadow-sm dark:border-white/[0.08] transition-colors cursor-pointer">
+                        <div className="flex flex-wrap sm:flex-nowrap items-center justify-center gap-3 sm:gap-4 mt-0 w-full">
+                            <button className="h-[48px] sm:h-[55px] min-w-[92px] sm:min-w-[96px] flex-1 sm:flex-none flex items-center justify-center gap-2.5 sm:gap-3 px-3 sm:px-4 rounded-full text-[16px] sm:text-[18px] leading-[23px] font-normal bg-gray-50 hover:bg-gray-100 dark:bg-[#343B36] dark:hover:bg-[#454D49] text-[#19211C] dark:text-white border border-gray-200 shadow-sm dark:border-white/[0.08] transition-colors cursor-pointer">
                                 <Check className="w-[20px] h-[20px] text-[#1ED36A]" strokeWidth={3} />
                                 Hire
                             </button>
-                            <button className="h-[55px] min-w-[128px] flex items-center justify-center gap-3 px-4 rounded-full text-[18px] leading-[23px] font-normal bg-gray-50 hover:bg-gray-100 dark:bg-[#343B36] dark:hover:bg-[#454D49] text-[#19211C] dark:text-white border border-gray-200 shadow-sm dark:border-white/[0.08] transition-colors cursor-pointer">
+                            <button className="h-[48px] sm:h-[55px] min-w-[118px] sm:min-w-[128px] flex-1 sm:flex-none flex items-center justify-center gap-2.5 sm:gap-3 px-3 sm:px-4 rounded-full text-[16px] sm:text-[18px] leading-[23px] font-normal bg-gray-50 hover:bg-gray-100 dark:bg-[#343B36] dark:hover:bg-[#454D49] text-[#19211C] dark:text-white border border-gray-200 shadow-sm dark:border-white/[0.08] transition-colors cursor-pointer">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none" className="text-[#FFB020]">
                                     <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                                 </svg>
                                 Shortlist
                             </button>
-                            <button className="h-[55px] min-w-[109px] flex items-center justify-center gap-3 px-4 rounded-full text-[18px] leading-[23px] font-normal bg-gray-50 hover:bg-gray-100 dark:bg-[#343B36] dark:hover:bg-[#454D49] text-[#19211C] dark:text-white border border-gray-200 shadow-sm dark:border-white/[0.08] transition-colors cursor-pointer">
+                            <button className="h-[48px] sm:h-[55px] min-w-[102px] sm:min-w-[109px] flex-1 sm:flex-none flex items-center justify-center gap-2.5 sm:gap-3 px-3 sm:px-4 rounded-full text-[16px] sm:text-[18px] leading-[23px] font-normal bg-gray-50 hover:bg-gray-100 dark:bg-[#343B36] dark:hover:bg-[#454D49] text-[#19211C] dark:text-white border border-gray-200 shadow-sm dark:border-white/[0.08] transition-colors cursor-pointer">
                                 <X className="w-[20px] h-[20px] text-[#FF4A4A]" strokeWidth={3} />
                                 Reject
                             </button>
@@ -862,13 +878,13 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                     {/* Tab and Content Container - Wrapped with Border */}
                     <div className="bg-white dark:bg-white/[0.08] border-0 shadow-[0_4px_40px_rgba(0,0,0,0.18)] dark:shadow-[0_4px_40px_rgba(0,0,0,0.4)] rounded-xl w-full max-w-[1372px] flex flex-col overflow-hidden">
                         {/* Tabs */}
-                        <div className="px-6 pt-6">
+                        <div className="px-4 sm:px-6 pt-5 sm:pt-6">
                             <div className="flex items-center gap-0 border-b border-gray-200 dark:border-white/[0.1] overflow-x-auto scrollbar-hide shrink-0">
                                 {tabs.map((tab) => (
                                     <button
                                         key={tab.key}
                                         onClick={() => setActiveTab(tab.key)}
-                                        className="relative px-1 pt-3 pb-5 mr-8 text-[18px] leading-[23px] transition-colors whitespace-nowrap cursor-pointer"
+                                        className="relative px-1 pt-3 pb-5 mr-4 sm:mr-8 text-[15px] sm:text-[18px] leading-[1.3] transition-colors whitespace-nowrap cursor-pointer"
                                     >
                                         <span className={activeTab === tab.key ? "font-normal dark:font-normal text-[#1ED36A]" : "font-light dark:font-light text-[#63716B] dark:text-white/60"}>
                                             {tab.label}
@@ -887,22 +903,22 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                         </div>
 
                         {/* Content Area */}
-                        <div className="p-5 sm:p-6 overflow-visible overflow-x-hidden relative">
+                        <div className="p-4 sm:p-6 overflow-visible overflow-x-hidden relative">
                             {/* â”€â”€â”€ Origin Report Tab â”€â”€â”€ */}
                             {activeTab === "origin_report" && (
                                 <div className="pt-2">
-                                    <div className="grid grid-cols-1 xl:grid-cols-[280px_340px_minmax(0,1fr)] gap-6 xl:gap-8 items-start mb-8 w-full">
+                                    <div className="grid grid-cols-1 xl:grid-cols-[280px_340px_minmax(0,1fr)] gap-5 lg:gap-6 xl:gap-8 items-start mb-8 w-full">
                                         {/* Left: Trait Name */}
-                                        <div className="flex items-center justify-start order-2 xl:order-1 px-3 xl:px-0 xl:pt-24">
-                                            <h2 className="text-[36px] leading-[46px] font-medium text-[#19211C] dark:text-white tracking-tight">
+                                        <div className="flex items-center justify-center xl:justify-start order-2 xl:order-1 px-0 sm:px-3 xl:px-0 xl:pt-24 text-center xl:text-left">
+                                            <h2 className="text-[30px] sm:text-[36px] leading-[1.2] sm:leading-[46px] font-medium text-[#19211C] dark:text-white tracking-tight">
                                                 {traitHeadingFirst} <br />
-                                                <span className="ml-20">{traitHeadingRest}</span>
+                                                <span className="ml-0 sm:ml-20">{traitHeadingRest}</span>
                                             </h2>
                                         </div>
 
                                         {/* Center: Character Image */}
                                         <div className="flex justify-center order-1 xl:order-2">
-                                            <div className="relative w-[340px] h-[340px] flex items-center justify-center">
+                                            <div className="relative w-full max-w-[340px] aspect-square flex items-center justify-center">
                                                 <img
                                                     src={traitCharacterImage}
                                                     alt={`${traitDisplayName} Character`}
@@ -915,7 +931,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                         </div>
 
                                         {/* Right: Info and Key Strengths */}
-                                        <div className="flex flex-col items-start order-3 px-4 xl:px-0 xl:pt-3">
+                                        <div className="flex flex-col items-start order-3 px-0 sm:px-4 xl:px-0 xl:pt-3">
                                             <div className="mb-6 w-full">
                                                 <h3 className="text-[22px] leading-[30px] font-medium text-[#19211C] dark:text-white">{report.characterName}</h3>
                                                 <p className="text-[14px] leading-[22px] text-[#1ED36A] font-light mt-1">{report.degreeInfo}</p>
@@ -925,7 +941,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                             {/* Divider */}
                                             <div className="w-full h-px bg-black/20 dark:bg-white/40 mb-5" />
 
-                                            <div className="flex gap-6 items-start w-full">
+                                            <div className="flex flex-col sm:flex-row gap-5 sm:gap-6 items-start w-full">
                                                 {/* Diamond Graphic */}
                                                 <div className="w-[98px] shrink-0 pt-1">
                                                     <img
@@ -1016,7 +1032,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                         <p className="text-[16px] text-[#666] mt-2 tracking-wide">Accountant</p>
 
                                         {/* Contact Info */}
-                                        <div className="flex flex-col gap-2.5 mt-6 ml-auto w-fit absolute right-16 top-[180px]" style={{ position: "relative", marginLeft: "auto" }}>
+                                        <div className="flex flex-col gap-2.5 mt-6 ml-auto w-fit">
                                             <div className="flex items-center gap-3 text-[13px] text-[#444]">
                                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#13C065" strokeWidth="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" /></svg>
                                                 +123-456-7890
@@ -1083,9 +1099,9 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
 
                             {/* â”€â”€â”€ Applied Jobs Tab â”€â”€â”€ */}
                             {activeTab === "applied_jobs" && (
-                                <div className="flex flex-col gap-0 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] w-full max-w-[1324px] min-h-0 mx-auto">
+                                <div className="flex flex-col gap-0 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] w-full max-w-[1324px] min-h-0 mx-auto overflow-visible">
                                     {/* Filters */}
-                                    <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 px-5 sm:px-6 pt-5 pb-4 border-b border-gray-200 dark:border-white/[0.08]">
+                                    <div className="relative z-[80] flex flex-col lg:flex-row items-start lg:items-center gap-5 px-5 sm:px-6 pt-5 pb-4 border-b border-gray-200 dark:border-white/[0.08] overflow-visible">
                                         {/* Search */}
                                         <div className="relative w-full lg:w-[420px] shrink-0">
                                             <div className="flex items-center w-full h-[44px] px-5 bg-transparent border border-gray-300 dark:border-white/[0.30] rounded-xl focus-within:ring-1 focus-within:ring-[#1ED36A]/60 focus-within:border-[#1ED36A]/60 transition-all">
@@ -1105,9 +1121,9 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                         </div>
 
                                         {/* Filter Buttons */}
-                                        <div className="flex w-full lg:w-auto items-center gap-3 flex-wrap sm:flex-nowrap lg:ml-auto">
+                                        <div className="relative z-[90] flex w-full lg:w-auto items-center gap-4 flex-wrap sm:flex-nowrap lg:ml-auto">
                                             {/* Status Filter */}
-                                            <div className="relative">
+                                            <div className={`relative ${activeFilterMenu === 'status' ? 'z-[120]' : ''}`}>
                                                 {(() => {
                                                     const isStatusSelected = selectedStatus !== "All Status";
                                                     return (
@@ -1122,7 +1138,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                 })()}
 
                                                 {activeFilterMenu === 'status' && (
-                                                    <div className="absolute left-0 top-full mt-2 w-40 bg-white/14 dark:bg-[rgba(25,33,28,0.12)] border border-[rgba(25,33,28,0.08)] dark:border-[rgba(255,255,255,0.2)] rounded-lg shadow-[0_16px_40px_rgba(25,33,28,0.05)] dark:shadow-[0_16px_40px_rgba(25,33,28,0.6)] backdrop-blur-[20px] z-50 overflow-hidden py-1 box-border">
+                                                    <div className="absolute left-0 top-full mt-2 w-40 bg-white dark:bg-[#1F2823] border border-[#D4DCD7] dark:border-[rgba(255,255,255,0.2)] rounded-lg shadow-[0_16px_40px_rgba(25,33,28,0.12)] dark:shadow-[0_16px_40px_rgba(25,33,28,0.6)] z-[130] overflow-hidden py-1 box-border">
                                                         {['All Status', 'Hired', 'Shortlisted', 'Rejected'].map((status) => (
                                                             <button
                                                                 key={status}
@@ -1130,7 +1146,10 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                                     setSelectedStatus(status);
                                                                     setActiveFilterMenu(null);
                                                                 }}
-                                                                className="w-full text-left px-4 py-2.5 text-[12px] text-[#33413B] dark:text-white/90 hover:bg-white/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                                                                className={`w-full text-left px-4 py-2.5 text-[12px] transition-colors cursor-pointer ${selectedStatus === status
+                                                                    ? "text-[#1F6A45] dark:text-white font-semibold bg-[#E7F8EE] dark:bg-[#1ED36A]/20"
+                                                                    : "text-[#33413B] dark:text-white/90 hover:bg-[#EAF4EE] hover:text-[#19211C] dark:hover:bg-white/[0.14] dark:hover:text-white"
+                                                                    }`}
                                                             >
                                                                 {status}
                                                             </button>
@@ -1140,16 +1159,16 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                             </div>
 
                                             {/* Date Filter */}
-                                            <div className={`relative ${activeFilterMenu === 'date' ? 'z-[90]' : ''}`}>
+                                            <div className={`relative ${activeFilterMenu === 'date' ? 'z-[120]' : ''}`}>
                                                 {(() => {
                                                     const isDateSelected = selectedDateRange !== "Any Time";
                                                     return (
                                                 <button
                                                     onClick={openDateFilterModal}
                                                     ref={dateFilterButtonRef}
-                                                    className={`h-[44px] flex items-center gap-2 px-4 py-[9px] rounded-[8px] text-[14px] font-normal border transition-all whitespace-nowrap cursor-pointer shadow-sm dark:shadow-none ${isDateSelected
+                                                    className={`h-[44px] flex items-center gap-2 px-4 py-[9px] rounded-[8px] text-[14px] font-normal border transition-colors whitespace-nowrap cursor-pointer shadow-sm dark:shadow-none ${isDateSelected
                                                         ? "border-[#1ED36A]/50 bg-[#E7F8EE]/60 text-[#1F3B2A] hover:bg-[#DDF4E7]/80 dark:border-transparent dark:bg-[#1ED36A33] dark:text-white dark:hover:bg-[#1ED36A45]"
-                                                        : "bg-white dark:bg-[#23302A] border-gray-200 dark:border-[#355041] hover:border-brand-green dark:hover:border-brand-green/60 text-gray-900 dark:text-white"
+                                                        : "border-[#D4D8D5]/35 dark:border-white/10 bg-white dark:bg-white/[0.12] text-[#33413B] dark:text-white/90 hover:bg-[#EEF5F1] dark:hover:bg-white/[0.2]"
                                                         }`}
                                                 >
                                                     <svg
@@ -1177,7 +1196,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
 
                                                 {activeFilterMenu === 'date' && (
                                                     <div
-                                                        className="fixed inset-0 z-[80] bg-[#19211C33] dark:bg-[#08120E]/80 backdrop-blur-[1.5px]"
+                                                        className="fixed inset-0 z-[80] bg-[#FFFFFF99] dark:bg-[#19211CCC]"
                                                         onClick={() => setActiveFilterMenu(null)}
                                                     >
                                                         <div
@@ -1189,7 +1208,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                             }}
                                                             onClick={(e) => e.stopPropagation()}
                                                         >
-                                                            <div className="w-full h-[480px] rounded-[24px] border border-[#D7E3DD] dark:border-white/[0.2] bg-white/95 dark:bg-[#19211C]/40 shadow-[0px_16px_40px_rgba(25,33,28,0.18)] dark:shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-5">
+                                                            <div className="w-full h-[446px] rounded-[24px] border border-[#D7E3DD] dark:border-white/[0.2] bg-white/95 dark:bg-[#19211CCC] shadow-[0px_16px_40px_rgba(25,33,28,0.18)] dark:shadow-[0px_16px_40px_#19211C] backdrop-blur-[50px] p-5">
                                                             <div className="w-[860px] max-w-full mx-auto flex items-center justify-between pb-3.5 border-b border-[#E1E9E4] dark:border-white/[0.12]">
                                                                 <p className="text-[18px] leading-[23px] font-normal text-[#19211C] dark:text-white">Select Date Range</p>
                                                                 <button
@@ -1283,7 +1302,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                             </div>
 
                                             {/* Alignment Filter */}
-                                            <div className="relative">
+                                            <div className={`relative ${activeFilterMenu === 'alignment' ? 'z-[120]' : ''}`}>
                                                 {(() => {
                                                     const isAlignmentSelected = selectedAlignmentRange !== "All Alignments";
                                                     return (
@@ -1301,7 +1320,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                 })()}
 
                                                 {activeFilterMenu === 'alignment' && (
-                                                    <div className="absolute left-0 top-full mt-2 w-48 bg-white/14 dark:bg-[rgba(25,33,28,0.12)] border border-[rgba(25,33,28,0.08)] dark:border-[rgba(255,255,255,0.2)] rounded-lg shadow-[0_16px_40px_rgba(25,33,28,0.05)] dark:shadow-[0_16px_40px_rgba(25,33,28,0.6)] backdrop-blur-[20px] z-50 overflow-hidden py-1 box-border">
+                                                    <div className="absolute left-0 top-full mt-2 w-48 bg-white dark:bg-[#1F2823] border border-[#D4DCD7] dark:border-[rgba(255,255,255,0.2)] rounded-lg shadow-[0_16px_40px_rgba(25,33,28,0.12)] dark:shadow-[0_16px_40px_rgba(25,33,28,0.6)] z-[130] overflow-hidden py-1 box-border">
                                                         {['All Alignments', 'Alignment (90% - 100%)', 'Alignment (80% - 89%)', 'Alignment (Below 80%)'].map((align) => (
                                                             <button
                                                                 key={align}
@@ -1309,7 +1328,10 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                                                     setSelectedAlignmentRange(align);
                                                                     setActiveFilterMenu(null);
                                                                 }}
-                                                                className="w-full text-left px-4 py-2.5 text-[12px] text-[#33413B] dark:text-white/90 hover:bg-white/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                                                                className={`w-full text-left px-4 py-2.5 text-[12px] transition-colors cursor-pointer ${selectedAlignmentRange === align
+                                                                    ? "text-[#1F6A45] dark:text-white font-semibold bg-[#E7F8EE] dark:bg-[#1ED36A]/20"
+                                                                    : "text-[#33413B] dark:text-white/90 hover:bg-[#EAF4EE] hover:text-[#19211C] dark:hover:bg-white/[0.14] dark:hover:text-white"
+                                                                    }`}
                                                             >
                                                                 {align}
                                                             </button>
@@ -1321,7 +1343,7 @@ export default function CandidateDetail({ candidateId, jobTitle, onBack, initial
                                     </div>
 
                                     {/* Table */}
-                                    <div className="w-full overflow-x-auto overflow-y-visible scrollbar-hide pb-2">
+                                    <div className="relative z-0 w-full overflow-x-auto overflow-y-visible scrollbar-hide pb-2">
                                         <table className="w-full min-w-[980px] text-[14px] text-[#19211C] dark:text-white">
                                                 <thead>
                                                     <tr className="border-b border-gray-200 dark:border-white/[0.08] bg-black/[0.06] dark:bg-white/[0.1]">

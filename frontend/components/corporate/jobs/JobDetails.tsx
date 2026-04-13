@@ -1091,7 +1091,7 @@ export default function JobDetails({ jobId: _jobId, onBack }: JobDetailsProps) {
             )}
 
             {showDateModal && (
-                <div className="fixed inset-0 z-[80] bg-[#19211C33] dark:bg-[#19211CCC] backdrop-blur-[1.5px]" onClick={() => setShowDateModal(false)}>
+                <div className="fixed inset-0 z-[80] bg-[#FFFFFF99] dark:bg-[#19211CCC]" onClick={() => setShowDateModal(false)}>
                     <div
                         className="fixed"
                         style={{

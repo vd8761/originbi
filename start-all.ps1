@@ -12,7 +12,7 @@ Write-Host "Launched Auth Service..."
 
 # 3. Corporate Service (Port 4003)
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend/corporate-service; npm run start:dev"
-Write-Host "Launched Corporate Service..."
+Write-Host "Launched Corporate Service..." 
 
 # 4. Student Service (Port 4004)
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend/student-service; npm run start:dev"
@@ -29,3 +29,4 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm 
 Write-Host "Launched Frontend..."
 
 Write-Host "All services started! You can close the original terminal if you wish." -ForegroundColor Cyan
+  
