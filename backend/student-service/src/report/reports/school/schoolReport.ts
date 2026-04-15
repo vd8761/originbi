@@ -5507,7 +5507,7 @@ export class SchoolReport extends BaseReport {
     const rows = careerData.domains.map((d) => {
       // Generate visual compatibility indicator
       const filledDots = Math.round(d.score / 20); // 0-5 dots
-      const dots = '-'.repeat(filledDots) + '-'.repeat(5 - filledDots);
+      const dots = '●'.repeat(filledDots) + '○'.repeat(5 - filledDots);
       const outlook =
         d.score >= 85
           ? 'Strong Fit'
