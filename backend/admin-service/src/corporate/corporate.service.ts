@@ -22,6 +22,7 @@ import { getCorporateWelcomeEmailTemplate } from '../mail/templates/corporate-we
 import * as nodemailer from 'nodemailer';
 import { NotificationService } from '../notification/notification.service';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
+import { SettingsService } from '../settings/settings.service';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as path from 'path'; // Actually removing this if truly unused?
 // I will just remove it.
@@ -46,6 +47,7 @@ export class CorporateService {
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
     private readonly notificationService: NotificationService,
+    private readonly settingsService: SettingsService,
   ) {
     this.authServiceBaseUrl =
       this.configService.get<string>('AUTH_SERVICE_URL') ?? '';
@@ -801,17 +803,22 @@ export class CorporateService {
           await manager.save(accessEntities);
         }
 
-        // Send Email
+        // Send Email (check global toggle)
         if (dto.sendEmail) {
           try {
-            await this.sendWelcomeEmail(
-              email,
-              dto.name,
-              dto.password,
-              dto.companyName,
-              dto.mobile,
-              dto.countryCode,
-            );
+            const sendEnabled = await this.settingsService.getValue<boolean>('email', 'send_corporate_welcome_email');
+            if (sendEnabled === false) {
+              this.logger.log('Corporate welcome email disabled via global settings. Skipping.');
+            } else {
+              await this.sendWelcomeEmail(
+                email,
+                dto.name,
+                dto.password,
+                dto.companyName,
+                dto.mobile,
+                dto.countryCode,
+              );
+            }
           } catch (e) {
             this.logger.error(`Failed to send email to ${email}`, e);
           }
@@ -862,13 +869,10 @@ export class CorporateService {
     const transporter = nodemailer.createTransport({
       SES: { sesClient, SendEmailCommand },
     } as any);
-    const ccEmail = process.env.EMAIL_CC || '';
+    const { fromName, fromAddress: fromEmail, ccAddresses } = await this.settingsService.getEmailConfig('corporate_welcome_email_config');
+    const ccEmail = ccAddresses.join(', ');
     const frontendUrl = process.env.FRONTEND_URL ?? '';
     const backendUrl = process.env.BACKEND_URL ?? '';
-
-    const fromName =
-      process.env.EMAIL_SEND_FROM_NAME || 'Origin BI (Corporate)';
-    const fromEmail = process.env.EMAIL_FROM || 'no-reply@originbi.com';
     const fromAddress = `"${fromName}" <${fromEmail}>`;
 
     const assets = {

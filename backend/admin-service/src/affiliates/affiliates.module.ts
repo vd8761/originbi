@@ -15,6 +15,7 @@ import { AffiliatesService } from './affiliates.service';
 import { AffiliatesController } from './affiliates.controller';
 import { AffiliatePortalController } from './affiliate-portal.controller';
 import { R2Module } from '../r2/r2.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { R2Module } from '../r2/r2.module';
     HttpModule,
     R2Module,
     NotificationModule,
+    SettingsModule,
   ],
   providers: [AffiliatesService],
   controllers: [AffiliatesController, AffiliatePortalController],

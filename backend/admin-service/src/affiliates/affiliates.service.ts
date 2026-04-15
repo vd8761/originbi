@@ -33,6 +33,7 @@ import { CreateSettlementDto } from './dto/create-settlement.dto';
 import { R2Service, R2UploadResult } from '../r2/r2.service';
 import { NotificationService } from '../notification/notification.service';
 import { getAffiliateWelcomeEmailTemplate } from '../mail/templates/affiliate-welcome.template';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class AffiliatesService {
@@ -56,6 +57,7 @@ export class AffiliatesService {
     private readonly http: HttpService,
     private readonly r2Service: R2Service,
     private readonly notificationService: NotificationService,
+    private readonly settingsService: SettingsService,
   ) { }
 
   async updateReadyToProcessStatus() {
@@ -254,27 +256,32 @@ export class AffiliatesService {
         return affiliateAccount;
       });
 
-      // Fire-and-forget: send email without blocking response
-      const referralBaseUrl = process.env.REFERAL_BASE_URL || '';
-      const fullReferralLink = `${referralBaseUrl}?ref=${referralCode}`;
-      const affiliateLoginUrl = 'https://mind.originbi.com/affiliate/login';
+      // Fire-and-forget: send email without blocking response (check global toggle)
+      const sendEnabled = await this.settingsService.getValue<boolean>('email', 'send_affiliate_email');
+      if (sendEnabled === false) {
+        this.logger.log('Affiliate email disabled via global settings. Skipping welcome email.');
+      } else {
+        const referralBaseUrl = process.env.REFERAL_BASE_URL || '';
+        const fullReferralLink = `${referralBaseUrl}?ref=${referralCode}`;
+        const affiliateLoginUrl = 'https://mind.originbi.com/affiliate/login';
 
-      this.sendWelcomeEmail(
-        dto.email,
-        dto.name,
-        dto.password,
-        dto.mobileNumber,
-        dto.countryCode ?? '+91',
-        fullReferralLink,
-        affiliateLoginUrl,
-      )
-        .then(() => this.logger.log(`Welcome email sent to: ${dto.email}`))
-        .catch((emailErr: any) =>
-          this.logger.error(
-            `Failed to send welcome email to ${dto.email}: ${emailErr.message}`,
-            emailErr.stack,
-          ),
-        );
+        this.sendWelcomeEmail(
+          dto.email,
+          dto.name,
+          dto.password,
+          dto.mobileNumber,
+          dto.countryCode ?? '+91',
+          fullReferralLink,
+          affiliateLoginUrl,
+        )
+          .then(() => this.logger.log(`Welcome email sent to: ${dto.email}`))
+          .catch((emailErr: any) =>
+            this.logger.error(
+              `Failed to send welcome email to ${dto.email}: ${emailErr.message}`,
+              emailErr.stack,
+            ),
+          );
+      }
 
       return affiliate;
     } catch (e: any) {
@@ -595,13 +602,10 @@ export class AffiliatesService {
       SES: { sesClient, SendEmailCommand },
     } as any);
 
-    const ccEmail = process.env.EMAIL_CC || '';
+    const { fromName, fromAddress: fromEmail, ccAddresses } = await this.settingsService.getEmailConfig('affiliate_email_config');
+    const ccEmail = ccAddresses.join(', ');
     const frontendUrl = process.env.FRONTEND_URL ?? '';
     const backendUrl = process.env.BACKEND_URL ?? '';
-
-    const fromName =
-      process.env.EMAIL_SEND_FROM_NAME || 'Origin BI (Affiliate)';
-    const fromEmail = process.env.EMAIL_FROM || 'no-reply@originbi.com';
     const fromAddress = `"${fromName}" <${fromEmail}>`;
 
     const assets = {

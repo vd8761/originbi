@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { NotificationModule } from '../notification/notification.module';
 import { HttpModule } from '@nestjs/axios';
+import { SettingsModule } from '../settings/settings.module';
 
 import { CorporateController } from './corporate.controller';
 import { CorporateService } from './corporate.service';
@@ -22,6 +23,7 @@ import {
     ]),
     HttpModule,
     NotificationModule,
+    SettingsModule,
   ],
   controllers: [CorporateController],
   providers: [CorporateService],

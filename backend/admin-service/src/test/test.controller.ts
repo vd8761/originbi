@@ -6,9 +6,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
+import { SettingsService } from '../settings/settings.service';
 
 @Controller('test')
 export class TestController {
+  constructor(private readonly settingsService: SettingsService) {}
   @Get('preview-email')
   previewEmail(@Res() res: Response) {
     // ... (existing preview logic) ...
@@ -127,14 +129,13 @@ export class TestController {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const transporter = nodemailer.createTransport({ SES: { sesClient, SendEmailCommand } } as any);
 
-    const fromName = process.env.EMAIL_SEND_FROM_NAME || 'Origin BI';
-    const fromEmail = process.env.EMAIL_FROM || 'no-reply@originbi.com';
+    const { fromName, fromAddress: fromEmail, ccAddresses } = await this.settingsService.getEmailConfig('registration_email_config');
     const fromAddress = `"${fromName}" <${fromEmail}>`;
 
     await transporter.sendMail({
       from: fromAddress,
       to: email,
-      cc: process.env.EMAIL_CC,
+      cc: ccAddresses.join(', ') || undefined,
       subject: 'Test Welcome Email - Mobile Responsive Check',
       html: html,
     });
@@ -179,22 +180,20 @@ export class TestController {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const transporter = nodemailer.createTransport({ SES: { sesClient, SendEmailCommand } } as any);
 
-    const fromName =
-      process.env.EMAIL_SEND_FROM_NAME || 'Origin BI (Corporate)';
-    const fromEmail = process.env.EMAIL_FROM || 'no-reply@originbi.com';
+    const { fromName, fromAddress: fromEmail, ccAddresses } = await this.settingsService.getEmailConfig('corporate_welcome_email_config');
     const fromAddress = `"${fromName}" <${fromEmail}>`;
 
     await transporter.sendMail({
       from: fromAddress,
       to: email,
-      cc: process.env.EMAIL_CC,
+      cc: ccAddresses.join(', ') || undefined,
       subject: 'Test Corporate Welcome Email',
       html: html,
     });
 
     return {
       success: true,
-      message: `Corporate email sent to ${email} (CC: ${process.env.EMAIL_CC || 'None'})`,
+      message: `Corporate email sent to ${email} (CC: ${ccAddresses.join(', ') || 'None'})`,
     };
   }
 }

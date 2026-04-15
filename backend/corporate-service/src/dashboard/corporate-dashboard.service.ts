@@ -27,6 +27,7 @@ import { Department, DepartmentDegree, DegreeType } from '@originbi/shared-entit
 import { CounsellingType } from '@originbi/shared-entities';
 import { CounsellingSession } from '@originbi/shared-entities';
 import { CounsellingResponse } from '@originbi/shared-entities';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class CorporateDashboardService {
@@ -64,6 +65,7 @@ export class CorporateDashboardService {
     private httpService: HttpService,
     private configService: ConfigService,
     private readonly dataSource: DataSource,
+    private readonly settingsService: SettingsService,
   ) {
     this.authServiceUrl =
       this.configService.get<string>('AUTH_SERVICE_URL') ?? '';
@@ -874,13 +876,14 @@ export class CorporateDashboardService {
       assets,
     );
 
+    const { fromName, fromAddress: fromEmail, ccAddresses } = await this.settingsService.getEmailConfig('corporate_welcome_email_config');
+    const source = `"${fromName}" <${fromEmail}>`;
+
     const params = {
-      Source: this.configService.get<string>('EMAIL_FROM'),
+      Source: source,
       Destination: {
         ToAddresses: [toAddress],
-        CcAddresses: this.configService.get<string>('EMAIL_CC')
-          ? [this.configService.get<string>('EMAIL_CC')]
-          : [],
+        CcAddresses: ccAddresses,
       },
       Message: {
         Subject: {
@@ -899,7 +902,7 @@ export class CorporateDashboardService {
     try {
       const command = new SendEmailCommand(params);
       await sesClient.send(command);
-      const cc = this.configService.get<string>('EMAIL_CC') || 'None';
+      const cc = ccAddresses.join(', ') || 'None';
       console.log(`Registration email sent to ${toAddress}, CC: ${cc}`);
     } catch (error) {
       console.error('Error sending registration SES email:', error);
@@ -1148,13 +1151,14 @@ export class CorporateDashboardService {
       assets,
     );
 
+    const { fromName, fromAddress: fromEmail, ccAddresses } = await this.settingsService.getEmailConfig('corporate_welcome_email_config');
+    const source = `"${fromName}" <${fromEmail}>`;
+
     const params = {
-      Source: this.configService.get<string>('EMAIL_FROM'),
+      Source: source,
       Destination: {
         ToAddresses: [toAddress],
-        CcAddresses: this.configService.get<string>('EMAIL_CC')
-          ? [this.configService.get<string>('EMAIL_CC')]
-          : [],
+        CcAddresses: ccAddresses,
       },
       Message: {
         Subject: {

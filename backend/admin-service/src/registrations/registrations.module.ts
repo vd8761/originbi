@@ -15,6 +15,7 @@ import { BulkRegistrationsService } from './bulk-registrations.service';
 import { RegistrationsController } from './registrations.controller';
 import { GroupsModule } from '../groups/groups.module';
 import { AssessmentModule } from '../assessment/assessment.module';
+import { SettingsModule } from '../settings/settings.module';
 
 import { BulkImport } from './entities/bulk-import.entity';
 import { BulkImportRow } from './entities/bulk-import-row.entity';
@@ -39,6 +40,7 @@ import { DegreeType } from '../departments/degree-type.entity';
     HttpModule,
     GroupsModule,
     AssessmentModule,
+    SettingsModule,
   ],
   providers: [RegistrationsService, BulkRegistrationsService],
   controllers: [RegistrationsController],

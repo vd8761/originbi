@@ -289,6 +289,7 @@ const Header: React.FC<HeaderProps> = ({
         if (pathname.includes("/programs")) return "programs";
         if (pathname.includes("/counselling")) return "counselling";
         if (pathname.includes("/dashboard")) return "dashboard";
+        if (pathname.includes("/settings")) return "settings";
         return currentView;
     })();
 
@@ -475,7 +476,9 @@ const Header: React.FC<HeaderProps> = ({
                     <NavItem
                         icon={<SettingsIcon />}
                         label="Settings"
+                        active={activeView === "settings"}
                         isMobile={isMobile}
+                        onClick={() => handleNavClick("settings")}
                     />
                 </>
             ) : portalMode === "corporate" ? (

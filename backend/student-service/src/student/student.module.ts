@@ -24,6 +24,7 @@ import {
   Groups,
   StudentSubscription,
 } from '@originbi/shared-entities';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import {
       SchoolStream,
     ]),
     HttpModule,
+    SettingsModule,
   ],
   controllers: [StudentController, SubscriptionController],
   providers: [StudentService, SubscriptionService, StudentProcessor],

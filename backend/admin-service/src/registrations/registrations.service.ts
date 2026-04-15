@@ -24,6 +24,7 @@ import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { GroupsService } from '../groups/groups.service';
 import { AssessmentGenerationService } from '../assessment/assessment-generation.service';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
+import { SettingsService } from '../settings/settings.service';
 
 import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
@@ -56,6 +57,7 @@ export class RegistrationsService {
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
+    private readonly settingsService: SettingsService,
   ) { }
 
   async withRetry<T>(
@@ -394,16 +396,21 @@ export class RegistrationsService {
         registration.status = 'COMPLETED';
         await manager.save(registration);
 
-        // H. Send Email (Best Effort)
+        // H. Send Email (Best Effort — check global toggle + per-request flag)
         if (dto.sendEmail && dto.password) {
           try {
-            await this.sendWelcomeEmail(
-              dto.email,
-              dto.name,
-              dto.password,
-              validFrom,
-              programTitle,
-            );
+            const sendEnabled = await this.settingsService.getValue<boolean>('email', 'send_registration_email');
+            if (sendEnabled === false) {
+              this.logger.log('Registration email disabled via global settings. Skipping.');
+            } else {
+              await this.sendWelcomeEmail(
+                dto.email,
+                dto.name,
+                dto.password,
+                validFrom,
+                programTitle,
+              );
+            }
           } catch (emailErr) {
             this.logger.error('Failed to send welcome email', emailErr);
             // Do not rollback
@@ -792,10 +799,8 @@ export class RegistrationsService {
     });
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const transporter = nodemailer.createTransport({ SES: { sesClient, SendEmailCommand } } as any);
-    const ccEmail = process.env.EMAIL_CC || '';
-
-    const fromName = process.env.EMAIL_SEND_FROM_NAME || 'Origin BI Mind Works';
-    const fromEmail = process.env.EMAIL_FROM || 'no-reply@originbi.com';
+    const { fromName, fromAddress: fromEmail, ccAddresses } = await this.settingsService.getEmailConfig('registration_email_config');
+    const ccEmail = ccAddresses.join(', ');
     const fromAddress = `"${fromName}" <${fromEmail}>`;
 
     const mailOptions = {
