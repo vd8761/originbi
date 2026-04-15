@@ -34,6 +34,7 @@ import { R2Service, R2UploadResult } from '../r2/r2.service';
 import { NotificationService } from '../notification/notification.service';
 import { getAffiliateWelcomeEmailTemplate } from '../mail/templates/affiliate-welcome.template';
 import { SettingsService } from '../settings/settings.service';
+import { WhatsAppService } from './whatsapp.service';
 
 @Injectable()
 export class AffiliatesService {
@@ -58,6 +59,7 @@ export class AffiliatesService {
     private readonly r2Service: R2Service,
     private readonly notificationService: NotificationService,
     private readonly settingsService: SettingsService,
+    private readonly whatsAppService: WhatsAppService,
   ) {}
 
   async updateReadyToProcessStatus() {
@@ -291,6 +293,25 @@ export class AffiliatesService {
             ),
           );
       }
+
+      // Fire-and-forget: send WhatsApp welcome posters (college, school, employee)
+      this.whatsAppService
+        .sendAllWelcomePosters(
+          dto.mobileNumber,
+          dto.countryCode ?? '+91',
+          referralCode,
+        )
+        .then(() =>
+          this.logger.log(
+            `WhatsApp welcome posters sent to: ${dto.mobileNumber}`,
+          ),
+        )
+        .catch((whatsappErr: any) =>
+          this.logger.error(
+            `Failed to send WhatsApp welcome posters to ${dto.mobileNumber}: ${whatsappErr.message}`,
+            whatsappErr.stack,
+          ),
+        );
 
       return affiliate;
     } catch (e: any) {

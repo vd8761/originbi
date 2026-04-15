@@ -166,4 +166,31 @@ export class R2Service {
 
     return (response.Contents || []).map((obj) => obj.Key!).filter(Boolean);
   }
+
+  /**
+   * Upload a raw buffer to R2 at an arbitrary key path.
+   * Used for generated assets like affiliate promo posters.
+   * Returns a presigned URL (valid for 7 days) so external services can fetch the image.
+   */
+  async uploadPosterBuffer(
+    key: string,
+    buffer: Buffer,
+    mimeType: string = 'image/png',
+  ): Promise<string> {
+    this.logger.log(
+      `Uploading poster to R2: ${key} (${mimeType}, ${buffer.length} bytes)`,
+    );
+
+    await this.s3.send(
+      new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+        Body: buffer,
+        ContentType: mimeType,
+      }),
+    );
+
+    // Return a presigned URL valid for 7 days (MSG91 needs to fetch the image)
+    return this.getPresignedUrl(key, 7 * 24 * 3600);
+  }
 }

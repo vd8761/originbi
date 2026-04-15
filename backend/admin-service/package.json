@@ -62,9 +62,11 @@
     "pg": "^8.16.3",
     "pg-boss": "^12.13.0",
     "pgvector": "^0.2.1",
+    "qrcode": "^1.5.4",
     "rechart": "^0.0.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "sharp": "^0.34.5",
     "typeorm": "^0.3.28"
   },
   "devDependencies": {
@@ -78,6 +80,7 @@
     "@types/multer": "^2.0.0",
     "@types/node": "^22.19.1",
     "@types/nodemailer": "^6.4.17",
+    "@types/qrcode": "^1.5.6",
     "@types/supertest": "^6.0.2",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
