@@ -24,6 +24,7 @@ import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { GroupsService } from '../groups/groups.service';
 import { AssessmentGenerationService } from '../assessment/assessment-generation.service';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
+import { SettingsService } from '../settings/settings.service';
 
 import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
@@ -56,7 +57,8 @@ export class RegistrationsService {
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
-  ) { }
+    private readonly settingsService: SettingsService,
+  ) {}
 
   async withRetry<T>(
     operation: () => Promise<T>,
@@ -142,10 +144,14 @@ export class RegistrationsService {
       : null;
   }
 
-  private normalizeSchoolLevel(level?: string | null): 'SSLC' | 'HSC' | 'GCSE' | null {
+  private normalizeSchoolLevel(
+    level?: string | null,
+  ): 'SSLC' | 'HSC' | 'GCSE' | null {
     if (!level) return null;
     const v = level.trim().toUpperCase();
-    return ['SSLC', 'HSC', 'GCSE'].includes(v) ? (v as 'SSLC' | 'HSC' | 'GCSE') : null;
+    return ['SSLC', 'HSC', 'GCSE'].includes(v)
+      ? (v as 'SSLC' | 'HSC' | 'GCSE')
+      : null;
   }
 
   private normalizeSchoolStream(
@@ -287,7 +293,8 @@ export class RegistrationsService {
           }
 
           programId = Number(selectedProgram.id);
-          programTitle = selectedProgram.assessmentTitle || selectedProgram.name;
+          programTitle =
+            selectedProgram.assessmentTitle || selectedProgram.name;
         }
 
         // D. Create Registration (INCOMPLETE)
@@ -394,16 +401,26 @@ export class RegistrationsService {
         registration.status = 'COMPLETED';
         await manager.save(registration);
 
-        // H. Send Email (Best Effort)
+        // H. Send Email (Best Effort — check global toggle + per-request flag)
         if (dto.sendEmail && dto.password) {
           try {
-            await this.sendWelcomeEmail(
-              dto.email,
-              dto.name,
-              dto.password,
-              validFrom,
-              programTitle,
+            const sendEnabled = await this.settingsService.getValue<boolean>(
+              'email',
+              'send_registration_email',
             );
+            if (sendEnabled === false) {
+              this.logger.log(
+                'Registration email disabled via global settings. Skipping.',
+              );
+            } else {
+              await this.sendWelcomeEmail(
+                dto.email,
+                dto.name,
+                dto.password,
+                validFrom,
+                programTitle,
+              );
+            }
           } catch (emailErr) {
             this.logger.error('Failed to send welcome email', emailErr);
             // Do not rollback
@@ -610,8 +627,18 @@ export class RegistrationsService {
         .leftJoinAndSelect('r.group', 'g')
         .leftJoinAndSelect('r.program', 'p')
         .leftJoin('DepartmentDegree', 'dd', 'r.departmentDegreeId = dd.id')
-        .leftJoinAndMapOne('r.deptRaw', 'Department', 'dept', 'dd.departmentId = dept.id')
-        .leftJoinAndMapOne('r.degRaw', 'DegreeType', 'deg', 'dd.degreeTypeId = deg.id')
+        .leftJoinAndMapOne(
+          'r.deptRaw',
+          'Department',
+          'dept',
+          'dd.departmentId = dept.id',
+        )
+        .leftJoinAndMapOne(
+          'r.degRaw',
+          'DegreeType',
+          'deg',
+          'dd.degreeTypeId = deg.id',
+        )
         .where('r.isDeleted = false');
 
       if (search) {
@@ -688,10 +715,15 @@ export class RegistrationsService {
         gender: r.gender,
         programType: r.metadata?.programType || r.program?.name,
         program_name: r.program?.name || r.metadata?.programType,
-        program_code: r.program?.code || 
-          (r.metadata?.programType?.toLowerCase().includes('college') ? 'COLLEGE_STUDENT' : 
-           r.metadata?.programType?.toLowerCase().includes('school') ? 'SCHOOL_STUDENT' : 
-           r.metadata?.programType?.toLowerCase().includes('employee') ? 'EMPLOYEE' : undefined),
+        program_code:
+          r.program?.code ||
+          (r.metadata?.programType?.toLowerCase().includes('college')
+            ? 'COLLEGE_STUDENT'
+            : r.metadata?.programType?.toLowerCase().includes('school')
+              ? 'SCHOOL_STUDENT'
+              : r.metadata?.programType?.toLowerCase().includes('employee')
+                ? 'EMPLOYEE'
+                : undefined),
         groupName: r.group?.name || r.metadata?.groupName,
         status: r.status,
         school_level: r.schoolLevel,
@@ -806,11 +838,15 @@ export class RegistrationsService {
       },
     });
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    const transporter = nodemailer.createTransport({ SES: { sesClient, SendEmailCommand } } as any);
-    const ccEmail = process.env.EMAIL_CC || '';
-
-    const fromName = process.env.EMAIL_SEND_FROM_NAME || 'Origin BI Mind Works';
-    const fromEmail = process.env.EMAIL_FROM || 'no-reply@originbi.com';
+    const transporter = nodemailer.createTransport({
+      SES: { sesClient, SendEmailCommand },
+    } as any);
+    const {
+      fromName,
+      fromAddress: fromEmail,
+      ccAddresses,
+    } = await this.settingsService.getEmailConfig('registration_email_config');
+    const ccEmail = ccAddresses.join(', ');
     const fromAddress = `"${fromName}" <${fromEmail}>`;
 
     const mailOptions = {

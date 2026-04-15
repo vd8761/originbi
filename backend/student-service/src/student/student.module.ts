@@ -27,6 +27,7 @@ import {
   DepartmentDegree,
   DegreeType,
 } from '@originbi/shared-entities';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import {
       DegreeType,
     ]),
     HttpModule,
+    SettingsModule,
   ],
   controllers: [StudentController, SubscriptionController],
   providers: [StudentService, SubscriptionService, StudentProcessor],

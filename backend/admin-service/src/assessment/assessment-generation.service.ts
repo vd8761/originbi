@@ -155,7 +155,9 @@ export class AssessmentGenerationService {
             levelId: attempt.assessmentLevelId,
           })
           .andWhere('q.personality_trait_id = :traitId', { traitId })
-          .andWhere('UPPER(q.category) = :category', { category: category.toUpperCase() })
+          .andWhere('UPPER(q.category) = :category', {
+            category: category.toUpperCase(),
+          })
           .andWhere('q.is_active = true')
           .andWhere('q.is_deleted = false');
 
@@ -181,7 +183,9 @@ export class AssessmentGenerationService {
               levelId: attempt.assessmentLevelId,
             })
             .andWhere('q.personality_trait_id = :traitId', { traitId })
-            .andWhere('UPPER(q.category) = :category', { category: category.toUpperCase() })
+            .andWhere('UPPER(q.category) = :category', {
+              category: category.toUpperCase(),
+            })
             .andWhere('q.is_active = true')
             .andWhere('q.is_deleted = false')
             .orderBy('RANDOM()')

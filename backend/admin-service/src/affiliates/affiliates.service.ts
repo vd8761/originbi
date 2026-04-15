@@ -33,6 +33,7 @@ import { CreateSettlementDto } from './dto/create-settlement.dto';
 import { R2Service, R2UploadResult } from '../r2/r2.service';
 import { NotificationService } from '../notification/notification.service';
 import { getAffiliateWelcomeEmailTemplate } from '../mail/templates/affiliate-welcome.template';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class AffiliatesService {
@@ -56,7 +57,8 @@ export class AffiliatesService {
     private readonly http: HttpService,
     private readonly r2Service: R2Service,
     private readonly notificationService: NotificationService,
-  ) { }
+    private readonly settingsService: SettingsService,
+  ) {}
 
   async updateReadyToProcessStatus() {
     const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
@@ -158,7 +160,9 @@ export class AffiliatesService {
     const authUrl = this.authServiceBaseUrl;
 
     if (!authUrl) {
-      this.logger.error('AUTH_SERVICE_URL is not configured. Cannot create Cognito user.');
+      this.logger.error(
+        'AUTH_SERVICE_URL is not configured. Cannot create Cognito user.',
+      );
       throw new InternalServerErrorException(
         'AUTH_SERVICE_URL is not configured. Cannot create Cognito user.',
       );
@@ -177,7 +181,9 @@ export class AffiliatesService {
       return res.data;
     } catch (err: any) {
       const authErr = err.response?.data || err.message || err;
-      this.logger.error(`Error creating Cognito user: ${JSON.stringify(authErr)}`);
+      this.logger.error(
+        `Error creating Cognito user: ${JSON.stringify(authErr)}`,
+      );
       throw new InternalServerErrorException(
         `Failed to create Cognito user: ${authErr.message || JSON.stringify(authErr)}`,
       );
@@ -254,27 +260,37 @@ export class AffiliatesService {
         return affiliateAccount;
       });
 
-      // Fire-and-forget: send email without blocking response
-      const referralBaseUrl = process.env.REFERAL_BASE_URL || '';
-      const fullReferralLink = `${referralBaseUrl}?ref=${referralCode}`;
-      const affiliateLoginUrl = 'https://mind.originbi.com/affiliate/login';
-
-      this.sendWelcomeEmail(
-        dto.email,
-        dto.name,
-        dto.password,
-        dto.mobileNumber,
-        dto.countryCode ?? '+91',
-        fullReferralLink,
-        affiliateLoginUrl,
-      )
-        .then(() => this.logger.log(`Welcome email sent to: ${dto.email}`))
-        .catch((emailErr: any) =>
-          this.logger.error(
-            `Failed to send welcome email to ${dto.email}: ${emailErr.message}`,
-            emailErr.stack,
-          ),
+      // Fire-and-forget: send email without blocking response (check global toggle)
+      const sendEnabled = await this.settingsService.getValue<boolean>(
+        'email',
+        'send_affiliate_email',
+      );
+      if (sendEnabled === false) {
+        this.logger.log(
+          'Affiliate email disabled via global settings. Skipping welcome email.',
         );
+      } else {
+        const referralBaseUrl = process.env.REFERAL_BASE_URL || '';
+        const fullReferralLink = `${referralBaseUrl}?ref=${referralCode}`;
+        const affiliateLoginUrl = 'https://mind.originbi.com/affiliate/login';
+
+        this.sendWelcomeEmail(
+          dto.email,
+          dto.name,
+          dto.password,
+          dto.mobileNumber,
+          dto.countryCode ?? '+91',
+          fullReferralLink,
+          affiliateLoginUrl,
+        )
+          .then(() => this.logger.log(`Welcome email sent to: ${dto.email}`))
+          .catch((emailErr: any) =>
+            this.logger.error(
+              `Failed to send welcome email to ${dto.email}: ${emailErr.message}`,
+              emailErr.stack,
+            ),
+          );
+      }
 
       return affiliate;
     } catch (e: any) {
@@ -532,17 +548,17 @@ export class AffiliatesService {
     const [aadharResults, panResults] = await Promise.all([
       aadharFiles.length > 0
         ? this.r2Service.uploadMultipleFiles(
-          aadharFiles,
-          affiliate.referralCode,
-          'aadhar',
-        )
+            aadharFiles,
+            affiliate.referralCode,
+            'aadhar',
+          )
         : Promise.resolve([]),
       panFiles.length > 0
         ? this.r2Service.uploadMultipleFiles(
-          panFiles,
-          affiliate.referralCode,
-          'pan',
-        )
+            panFiles,
+            affiliate.referralCode,
+            'pan',
+          )
         : Promise.resolve([]),
     ]);
 
@@ -576,8 +592,14 @@ export class AffiliatesService {
     referralLink: string,
     loginUrl: string,
   ) {
-    if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_REGION) {
-      this.logger.warn('AWS SES credentials missing in environment. Skipping welcome email sending.');
+    if (
+      !process.env.AWS_ACCESS_KEY_ID ||
+      !process.env.AWS_SECRET_ACCESS_KEY ||
+      !process.env.AWS_REGION
+    ) {
+      this.logger.warn(
+        'AWS SES credentials missing in environment. Skipping welcome email sending.',
+      );
       return;
     }
 
@@ -595,13 +617,14 @@ export class AffiliatesService {
       SES: { sesClient, SendEmailCommand },
     } as any);
 
-    const ccEmail = process.env.EMAIL_CC || '';
+    const {
+      fromName,
+      fromAddress: fromEmail,
+      ccAddresses,
+    } = await this.settingsService.getEmailConfig('affiliate_email_config');
+    const ccEmail = ccAddresses.join(', ');
     const frontendUrl = process.env.FRONTEND_URL ?? '';
     const backendUrl = process.env.BACKEND_URL ?? '';
-
-    const fromName =
-      process.env.EMAIL_SEND_FROM_NAME || 'Origin BI (Affiliate)';
-    const fromEmail = process.env.EMAIL_FROM || 'no-reply@originbi.com';
     const fromAddress = `"${fromName}" <${fromEmail}>`;
 
     const assets = {
@@ -1315,7 +1338,9 @@ export class AffiliatesService {
             },
           });
         } catch (err) {
-          this.logger.error(`Failed to notify affiliate of settlement processed: ${err.message}`);
+          this.logger.error(
+            `Failed to notify affiliate of settlement processed: ${err.message}`,
+          );
         }
 
         return {

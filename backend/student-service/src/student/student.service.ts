@@ -34,6 +34,7 @@ import {
 import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
+import { SettingsService } from '../settings/settings.service';
 
 export interface AssessmentProgressItem {
   id: number;
@@ -83,6 +84,7 @@ export class StudentService {
     @InjectRepository(DepartmentDegree)
     private readonly departmentDegreeRepo: Repository<DepartmentDegree>,
     private readonly configService: ConfigService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   /**
@@ -1446,12 +1448,12 @@ export class StudentService {
 
     const transporter = this.createEmailTransporter();
 
-    const ccEmail = this.configService.get<string>('EMAIL_CC') || '';
-    const fromName =
-      this.configService.get<string>('EMAIL_SEND_FROM_NAME') ||
-      'Origin BI Mind Works';
-    const fromEmail =
-      this.configService.get<string>('EMAIL_FROM') || 'no-reply@originbi.com';
+    const {
+      fromName,
+      fromAddress: fromEmail,
+      ccAddresses,
+    } = await this.settingsService.getEmailConfig('registration_email_config');
+    const ccEmail = ccAddresses.join(', ');
     const fromAddress = `"${fromName}" <${fromEmail}>`;
 
     this.logger.log(`[Email Debug] Sending from: ${fromAddress}, to: ${to}`);
@@ -1777,10 +1779,17 @@ export class StudentService {
 
       try {
         const transporter = this.createEmailTransporter();
+
+        const {
+          fromName,
+          fromAddress: fromEmail,
+          ccAddresses,
+        } = await this.settingsService.getEmailConfig('report_email_config');
+
         const mailOptions = {
-          from: `"${process.env.EMAIL_SEND_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
+          from: `"${fromName}" <${fromEmail}>`,
           to: user.email,
-          cc: [process.env.EMAIL_CC],
+          cc: ccAddresses,
           subject: `Your Assessment Report is Ready - ${((registration as any).program?.reportTitle as string) || 'Origin BI'}`,
           html: emailHtml,
           attachments: [
@@ -1975,10 +1984,18 @@ export class StudentService {
         ? `${registration.fullName || 'Student'}'s Assessment Report – ${reportTitle}`
         : `Your Assessment Report – ${reportTitle}`;
 
+      const {
+        fromName,
+        fromAddress: fromEmail,
+        ccAddresses,
+      } = await this.settingsService.getEmailConfig(
+        'manual_report_email_config',
+      );
+
       const mailOptions = {
-        from: `"${this.configService.get('EMAIL_SEND_FROM_NAME') || 'Origin BI Mind Works'}" <${this.configService.get('EMAIL_FROM') || 'no-reply@originbi.com'}>`,
+        from: `"${fromName}" <${fromEmail}>`,
         to: recipientEmail,
-        cc: [this.configService.get('EMAIL_CC') || ''],
+        cc: ccAddresses,
         subject,
         html: emailHtml,
         attachments: [
@@ -2037,12 +2054,13 @@ export class StudentService {
       // 2. Create email transporter
       const transporter = this.createEmailTransporter();
 
-      // 3. Build email using template
-      const fromName =
-        this.configService.get('EMAIL_SEND_FROM_NAME') ||
-        'Origin BI Mind Works';
-      const fromEmail =
-        this.configService.get('EMAIL_FROM') || 'no-reply@originbi.com';
+      const {
+        fromName,
+        fromAddress: fromEmail,
+        ccAddresses,
+      } = await this.settingsService.getEmailConfig(
+        'manual_report_email_config',
+      );
 
       const emailHtml = getPlacementReportEmailTemplate(
         studentCount,
@@ -2054,7 +2072,7 @@ export class StudentService {
       const mailOptions = {
         from: `"${fromName}" <${fromEmail}>`,
         to: toEmail,
-        cc: [this.configService.get('EMAIL_CC') || ''],
+        cc: ccAddresses,
         subject: `Students Handbook – ${degreeType} ${departmentName}`,
         html: emailHtml,
         attachments: [
