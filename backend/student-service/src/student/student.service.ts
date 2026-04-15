@@ -30,7 +30,6 @@ import {
   AffiliateReferralTransaction,
   Notification,
   DepartmentDegree,
-  DegreeType,
 } from '@originbi/shared-entities';
 import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
