@@ -127,9 +127,15 @@ export class TestController {
     });
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    const transporter = nodemailer.createTransport({ SES: { sesClient, SendEmailCommand } } as any);
+    const transporter = nodemailer.createTransport({
+      SES: { sesClient, SendEmailCommand },
+    } as any);
 
-    const { fromName, fromAddress: fromEmail, ccAddresses } = await this.settingsService.getEmailConfig('registration_email_config');
+    const {
+      fromName,
+      fromAddress: fromEmail,
+      ccAddresses,
+    } = await this.settingsService.getEmailConfig('registration_email_config');
     const fromAddress = `"${fromName}" <${fromEmail}>`;
 
     await transporter.sendMail({
@@ -178,9 +184,17 @@ export class TestController {
     });
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    const transporter = nodemailer.createTransport({ SES: { sesClient, SendEmailCommand } } as any);
+    const transporter = nodemailer.createTransport({
+      SES: { sesClient, SendEmailCommand },
+    } as any);
 
-    const { fromName, fromAddress: fromEmail, ccAddresses } = await this.settingsService.getEmailConfig('corporate_welcome_email_config');
+    const {
+      fromName,
+      fromAddress: fromEmail,
+      ccAddresses,
+    } = await this.settingsService.getEmailConfig(
+      'corporate_welcome_email_config',
+    );
     const fromAddress = `"${fromName}" <${fromEmail}>`;
 
     await transporter.sendMail({

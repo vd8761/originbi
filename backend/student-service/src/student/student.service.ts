@@ -1448,7 +1448,11 @@ export class StudentService {
 
     const transporter = this.createEmailTransporter();
 
-    const { fromName, fromAddress: fromEmail, ccAddresses } = await this.settingsService.getEmailConfig('registration_email_config');
+    const {
+      fromName,
+      fromAddress: fromEmail,
+      ccAddresses,
+    } = await this.settingsService.getEmailConfig('registration_email_config');
     const ccEmail = ccAddresses.join(', ');
     const fromAddress = `"${fromName}" <${fromEmail}>`;
 
@@ -1776,7 +1780,11 @@ export class StudentService {
       try {
         const transporter = this.createEmailTransporter();
 
-        const { fromName, fromAddress: fromEmail, ccAddresses } = await this.settingsService.getEmailConfig('report_email_config');
+        const {
+          fromName,
+          fromAddress: fromEmail,
+          ccAddresses,
+        } = await this.settingsService.getEmailConfig('report_email_config');
 
         const mailOptions = {
           from: `"${fromName}" <${fromEmail}>`,
@@ -1976,7 +1984,13 @@ export class StudentService {
         ? `${registration.fullName || 'Student'}'s Assessment Report – ${reportTitle}`
         : `Your Assessment Report – ${reportTitle}`;
 
-      const { fromName, fromAddress: fromEmail, ccAddresses } = await this.settingsService.getEmailConfig('manual_report_email_config');
+      const {
+        fromName,
+        fromAddress: fromEmail,
+        ccAddresses,
+      } = await this.settingsService.getEmailConfig(
+        'manual_report_email_config',
+      );
 
       const mailOptions = {
         from: `"${fromName}" <${fromEmail}>`,
@@ -2040,7 +2054,13 @@ export class StudentService {
       // 2. Create email transporter
       const transporter = this.createEmailTransporter();
 
-      const { fromName, fromAddress: fromEmail, ccAddresses } = await this.settingsService.getEmailConfig('manual_report_email_config');
+      const {
+        fromName,
+        fromAddress: fromEmail,
+        ccAddresses,
+      } = await this.settingsService.getEmailConfig(
+        'manual_report_email_config',
+      );
 
       const emailHtml = getPlacementReportEmailTemplate(
         studentCount,

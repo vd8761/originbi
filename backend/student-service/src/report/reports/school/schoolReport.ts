@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unused-vars, @typescript-eslint/require-await, @typescript-eslint/no-unsafe-return, no-irregular-whitespace */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unused-vars, @typescript-eslint/require-await, @typescript-eslint/no-unsafe-return */
 import * as fs from 'fs';
 import { SchoolData, AgileScore, COLORS } from '../../types/types';
 import {
@@ -2700,7 +2700,7 @@ export class SchoolReport extends BaseReport {
 
     this.ensureSpace(0.26, true);
 
-    //  Determine student data 
+    //  Determine student data
     const topTwoTraits = this.getTopTwoTraits(
       this.data.most_answered_answer_type,
       this.data,
@@ -2733,11 +2733,11 @@ export class SchoolReport extends BaseReport {
     const compatibility = rankedStreams[0].compat;
     const altStreams = rankedStreams.slice(1, 4); // top 3 alternatives
 
-    //  Title 
+    //  Title
     this.h1('Where You Fit Best');
     this.doc.moveDown(0.3);
 
-    //  Recommended Stream Card 
+    //  Recommended Stream Card
     const cardH = 130;
     const cardY = this.doc.y;
 
@@ -2753,7 +2753,7 @@ export class SchoolReport extends BaseReport {
       .strokeColor('#C5CAE9')
       .stroke();
 
-    //  Department icons (2-2 grid, glass circles, right side) 
+    //  Department icons (2-2 grid, glass circles, right side)
     const streamContent = STREAM_SELECTION_CONTENT[recommendedStream];
     const iconSize = 44;
     const iconGap = 12;
@@ -2811,7 +2811,7 @@ export class SchoolReport extends BaseReport {
       });
     }
 
-    //  Centered text block (left portion of card, excluding icon area) 
+    //  Centered text block (left portion of card, excluding icon area)
     const textAreaW = iconBlockX - margin - 20; // available width for text
     const textCenterX = margin + textAreaW / 2;
 
@@ -2931,7 +2931,7 @@ export class SchoolReport extends BaseReport {
     this.doc.y = cardY + cardH + 25;
     this.doc.x = margin;
 
-    //  Reasons Section 
+    //  Reasons Section
     this.doc
       .font(this.FONT_SORA_BOLD)
       .fontSize(14)
@@ -3010,7 +3010,7 @@ export class SchoolReport extends BaseReport {
     this.doc.y = pillRowY + (pillRowCount + 1) * (pillH + 8) + 15;
     this.doc.x = margin;
 
-    //  Alternative Streams Section 
+    //  Alternative Streams Section
     this.doc
       .font(this.FONT_SORA_BOLD)
       .fontSize(14)
@@ -3110,7 +3110,7 @@ export class SchoolReport extends BaseReport {
     this.doc.y = altY + altCardH + 15;
     this.doc.x = margin;
 
-    //  Future Direction Box 
+    //  Future Direction Box
     const topAlt = altStreams[0];
     if (topAlt) {
       const dirText = STREAM_FUTURE_DIRECTIONS[topAlt.name] || '';
@@ -5910,8 +5910,8 @@ export class SchoolReport extends BaseReport {
   /**
    * Draws a horizontal progress gauge with gradient fill.
    *
-   * 
-   * 
+   *
+   *
    *                                              12 / 15
    *
    * @param value Current value
@@ -6053,7 +6053,7 @@ export class SchoolReport extends BaseReport {
   /**
    * Draws a growth meter row for development areas.
    *
-   *    Emotional Flexibility                    
+   *    Emotional Flexibility
    *     May benefit from adapting communication...
    *
    * Shows a numbered badge, title, description, and a dual-tone bar

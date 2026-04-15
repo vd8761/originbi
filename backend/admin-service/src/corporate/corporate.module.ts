@@ -29,4 +29,4 @@ import {
   providers: [CorporateService],
   exports: [CorporateService],
 })
-export class CorporateModule { }
+export class CorporateModule {}

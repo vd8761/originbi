@@ -35,4 +35,4 @@ import { SettingsModule } from '../settings/settings.module';
   controllers: [AffiliatesController, AffiliatePortalController],
   exports: [AffiliatesService],
 })
-export class AffiliatesModule { }
+export class AffiliatesModule {}

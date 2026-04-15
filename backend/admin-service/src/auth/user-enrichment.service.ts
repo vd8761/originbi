@@ -84,8 +84,8 @@ export class UserEnrichmentService {
       cognitoSub,
       name:
         cognitoPayload.name ||
-          cognitoPayload['custom:name'] ||
-          email.split('@')[0],
+        cognitoPayload['custom:name'] ||
+        email.split('@')[0],
     };
 
     // Step 3: If CORPORATE, resolve the corporate_accounts.id

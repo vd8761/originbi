@@ -37,7 +37,7 @@ export class SettingsService {
         const globalFromAddress = await this.getValue<string>('email', 'from_address') || 'no-reply@originbi.com';
         const globalCcAddresses = await this.getValue<string[]>('email', 'cc_addresses') || [];
 
-        const localConfig = await this.getValue<any>('email', overrideKey);
+        const localConfig = await this.getValue<{ mode?: string; from_name?: string; from_address?: string; cc_addresses?: string[] }>('email', overrideKey);
 
         if (localConfig && localConfig.mode === 'local') {
             return {

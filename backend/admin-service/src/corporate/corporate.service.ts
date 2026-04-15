@@ -124,8 +124,8 @@ export class CorporateService {
         typeof authErr === 'string'
           ? authErr
           : (authErr as { message?: string })?.message ||
-          JSON.stringify(authErr) ||
-          'Failed to create Cognito user';
+            JSON.stringify(authErr) ||
+            'Failed to create Cognito user';
 
       if (status === 429) {
         throw new HttpException(errorMessage, 429);
@@ -412,7 +412,10 @@ export class CorporateService {
       if (dto.status !== undefined) account.isActive = dto.status;
 
       // 2.5 Update Credits
-      if (dto.credits !== undefined && dto.credits !== account.availableCredits) {
+      if (
+        dto.credits !== undefined &&
+        dto.credits !== account.availableCredits
+      ) {
         const newCredits = Number(dto.credits);
         if (!isNaN(newCredits)) {
           const diff = newCredits - account.availableCredits;
@@ -806,9 +809,14 @@ export class CorporateService {
         // Send Email (check global toggle)
         if (dto.sendEmail) {
           try {
-            const sendEnabled = await this.settingsService.getValue<boolean>('email', 'send_corporate_welcome_email');
+            const sendEnabled = await this.settingsService.getValue<boolean>(
+              'email',
+              'send_corporate_welcome_email',
+            );
             if (sendEnabled === false) {
-              this.logger.log('Corporate welcome email disabled via global settings. Skipping.');
+              this.logger.log(
+                'Corporate welcome email disabled via global settings. Skipping.',
+              );
             } else {
               await this.sendWelcomeEmail(
                 email,
@@ -869,7 +877,13 @@ export class CorporateService {
     const transporter = nodemailer.createTransport({
       SES: { sesClient, SendEmailCommand },
     } as any);
-    const { fromName, fromAddress: fromEmail, ccAddresses } = await this.settingsService.getEmailConfig('corporate_welcome_email_config');
+    const {
+      fromName,
+      fromAddress: fromEmail,
+      ccAddresses,
+    } = await this.settingsService.getEmailConfig(
+      'corporate_welcome_email_config',
+    );
     const ccEmail = ccAddresses.join(', ');
     const frontendUrl = process.env.FRONTEND_URL ?? '';
     const backendUrl = process.env.BACKEND_URL ?? '';

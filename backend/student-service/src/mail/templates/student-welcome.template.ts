@@ -112,7 +112,8 @@ export const getStudentWelcomeEmailTemplate = (
                 <div style="font-size: 14px; line-height: 1.5; color: #000000; margin-bottom: 24px;">
                   Thank you for registering with OriginBI! We're excited to welcome you and inform you that an online assessment ${
                     startDateTime &&
-                    new Date(startDateTime).getTime() > Date.now() + 10 * 60 * 1000
+                    new Date(startDateTime).getTime() >
+                      Date.now() + 10 * 60 * 1000
                       ? 'has been scheduled for you.'
                       : 'is now available for you.'
                   }
@@ -162,7 +163,8 @@ export const getStudentWelcomeEmailTemplate = (
                 <div style="font-size: 14px; line-height: 1.5; color: #000000; margin-bottom: 24px;">
                   ${
                     startDateTime &&
-                    new Date(startDateTime).getTime() > Date.now() + 10 * 60 * 1000
+                    new Date(startDateTime).getTime() >
+                      Date.now() + 10 * 60 * 1000
                       ? 'Please log in at least 15 minutes before the scheduled time to ensure everything works smoothly. The assessment is timed, so manage your time effectively to complete all the questions.'
                       : 'You can start your assessment immediately. The assessment is timed, so manage your time effectively to complete all the questions.'
                   }

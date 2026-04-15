@@ -128,4 +128,4 @@ import { SettingsModule } from './settings/settings.module';
   ],
   controllers: [TestController, MailAssetsController, HealthController],
 })
-export class AppModule { }
+export class AppModule {}
