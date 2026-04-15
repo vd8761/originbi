@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom";
 import {
     AFFILIATE_REFERRAL_DESTINATIONS,
@@ -24,6 +24,14 @@ const ReferralDestinationSelectorModal: React.FC<ReferralDestinationSelectorModa
     actionLabel,
     busy = false,
 }) => {
+    const [pendingAudience, setPendingAudience] = useState<AffiliateReferralAudience>(selectedAudience);
+
+    useEffect(() => {
+        if (open) {
+            setPendingAudience(selectedAudience);
+        }
+    }, [open, selectedAudience]);
+
     if (!open || typeof document === "undefined") {
         return null;
     }
@@ -48,18 +56,18 @@ const ReferralDestinationSelectorModal: React.FC<ReferralDestinationSelectorModa
                 <div className="mb-5 pr-10">
                     <h3 className="font-['Haskoy'] font-bold text-lg text-[#150089] dark:text-white">Choose Destination</h3>
                     <p className="text-sm text-[#19211C]/65 dark:text-white/60 mt-1">
-                        Select where your referral link should open before you {actionLabel.toLowerCase()}.
+                        Select your audience, then click {actionLabel.toLowerCase()}.
                     </p>
                 </div>
 
                 <div className="space-y-3">
                     {AFFILIATE_REFERRAL_DESTINATIONS.map((destination) => {
-                        const isSelected = destination.key === selectedAudience;
+                        const isSelected = destination.key === pendingAudience;
 
                         return (
                             <button
                                 key={destination.key}
-                                onClick={() => onSelect(destination.key)}
+                                onClick={() => setPendingAudience(destination.key)}
                                 disabled={busy}
                                 className={`w-full text-left px-4 py-3 rounded-2xl border transition-all ${isSelected
                                     ? "border-[#1ED36A] bg-[#1ED36A]/10"
@@ -69,7 +77,7 @@ const ReferralDestinationSelectorModal: React.FC<ReferralDestinationSelectorModa
                                 <div className="flex items-center justify-between gap-3">
                                     <div>
                                         <p className="font-semibold text-[#19211C] dark:text-white">{destination.label}</p>
-                                        <p className="text-xs text-[#19211C]/60 dark:text-white/60">{destination.host}</p>
+                                        <p className="text-xs text-[#19211C]/60 dark:text-white/60">{destination.description}</p>
                                     </div>
                                     {isSelected && (
                                         <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#1ED36A] text-white text-xs font-semibold">
@@ -80,6 +88,23 @@ const ReferralDestinationSelectorModal: React.FC<ReferralDestinationSelectorModa
                             </button>
                         );
                     })}
+                </div>
+
+                <div className="mt-5 flex items-center justify-end gap-3">
+                    <button
+                        onClick={onClose}
+                        disabled={busy}
+                        className="px-4 py-2.5 rounded-xl border border-[#E0E0E0] dark:border-white/15 text-[#19211C] dark:text-white font-medium hover:bg-[#F6F7FA] dark:hover:bg-white/10 transition-all disabled:opacity-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={() => onSelect(pendingAudience)}
+                        disabled={busy}
+                        className="px-5 py-2.5 rounded-xl bg-[#1ED36A] text-white font-semibold hover:bg-[#16b058] transition-all disabled:opacity-50"
+                    >
+                        {actionLabel}
+                    </button>
                 </div>
             </div>
         </div>,
