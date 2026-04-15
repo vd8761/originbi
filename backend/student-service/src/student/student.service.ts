@@ -20,6 +20,7 @@ import { AssessmentAnswer } from '../entities/assessment_answer.entity';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { Program } from '../entities/program.entity';
 import { SchoolStream } from '../entities/school-stream.entity';
+import { Department } from '@originbi/shared-entities';
 import {
   Registration,
   Gender,
@@ -76,6 +77,8 @@ export class StudentService {
     private readonly notificationRepo: Repository<Notification>,
     @InjectRepository(SchoolStream)
     private readonly schoolStreamRepo: Repository<SchoolStream>,
+    @InjectRepository(Department)
+    private readonly departmentRepo: Repository<Department>,
     private readonly configService: ConfigService,
   ) {}
 
@@ -1059,6 +1062,13 @@ export class StudentService {
   async getSchoolStreams() {
     return this.schoolStreamRepo.find({
       where: { isActive: true },
+      order: { id: 'ASC' },
+    });
+  }
+
+  async getDepartments() {
+    return this.departmentRepo.find({
+      where: { isActive: true, isDeleted: false },
       order: { id: 'ASC' },
     });
   }
