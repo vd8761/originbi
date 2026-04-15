@@ -607,6 +607,8 @@ export class RegistrationsService {
     sortOrder: 'ASC' | 'DESC' = 'DESC',
     startDate?: string,
     endDate?: string,
+    status?: string,
+    hasAiCounsellor?: boolean,
   ) {
     try {
       const qb = this.regRepo
@@ -637,6 +639,16 @@ export class RegistrationsService {
         });
       }
 
+      if (status) {
+        qb.andWhere('r.status = :status', { status });
+      }
+
+      if (hasAiCounsellor !== undefined) {
+        qb.andWhere('r.hasAiCounsellor = :hasAiCounsellor', {
+          hasAiCounsellor,
+        });
+      }
+
       // Sorting Logic
       if (sortBy) {
         let sortCol = '';
@@ -655,6 +667,9 @@ export class RegistrationsService {
             break;
           case 'mobile_number':
             sortCol = 'r.mobileNumber';
+            break;
+          case 'has_ai_counsellor':
+            sortCol = 'r.hasAiCounsellor';
             break;
           default:
             sortCol = 'r.createdAt';

@@ -622,6 +622,7 @@ const MyEmployeesContent: React.FC = () => {
                 isOpen={isDateModalOpen}
                 onClose={() => setIsDateModalOpen(false)}
                 onApply={handleDateModalApply}
+                placement="under-filter"
                 initialRange={{
                     start: startDate,
                     end: endDate,

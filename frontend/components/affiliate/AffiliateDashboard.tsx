@@ -5,6 +5,12 @@ import ReactDOM from "react-dom";
 import { useRouter } from "next/navigation";
 import { api } from "../../lib/api";
 import { TrendUpIcon, TrendDownIcon } from '../icons';
+import ReferralDestinationSelectorModal from "./ReferralDestinationSelectorModal";
+import {
+    AFFILIATE_DEFAULT_REFERRAL_AUDIENCE,
+    AffiliateReferralAudience,
+    buildAffiliateReferralLink,
+} from "../../lib/affiliateReferralLinks";
 
 // --- Types ---
 interface AffiliateStats {
@@ -203,11 +209,15 @@ const ReferralLinkCard = () => {
     const [showQRModal, setShowQRModal] = useState(false);
     const [showShareCardModal, setShowShareCardModal] = useState(false);
     const [mounted, setMounted] = useState(false);
-    const referralBaseUrl = process.env.NEXT_PUBLIC_REFERAL_BASE_URL || 'https://discover.originbi.com';
-    const [referralLink, setReferralLink] = useState(`${referralBaseUrl}?ref=affiliate`);
+    const [selectedAudience, setSelectedAudience] = useState<AffiliateReferralAudience>(AFFILIATE_DEFAULT_REFERRAL_AUDIENCE);
+    const [referralLink, setReferralLink] = useState(
+        buildAffiliateReferralLink(AFFILIATE_DEFAULT_REFERRAL_AUDIENCE, 'affiliate'),
+    );
     const [referralCode, setReferralCode] = useState('AFFILIATE');
     const [qrDataUrl, setQrDataUrl] = useState<string>('');
     const [shareCardImageUrl, setShareCardImageUrl] = useState<string | null>(null);
+    const [showDestinationModal, setShowDestinationModal] = useState(false);
+    const [destinationAction, setDestinationAction] = useState<'copy' | 'share-native' | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [sharingPlatform, setSharingPlatform] = useState<string | null>(null);
 
@@ -219,12 +229,14 @@ const ReferralLinkCard = () => {
                 const user = JSON.parse(storedUser);
                 if (user.referralCode) {
                     setReferralCode(user.referralCode);
-                    const baseUrl = process.env.NEXT_PUBLIC_REFERAL_BASE_URL || 'https://discover.originbi.com';
-                    setReferralLink(`${baseUrl}?ref=${user.referralCode}`);
                 }
             }
         } catch { /* empty */ }
     }, []);
+
+    useEffect(() => {
+        setReferralLink(buildAffiliateReferralLink(selectedAudience, referralCode));
+    }, [selectedAudience, referralCode]);
 
     // Generate QR code as base64 data URL (no CORS issues for html2canvas)
     useEffect(() => {
@@ -239,14 +251,40 @@ const ReferralLinkCard = () => {
         });
     }, [referralLink, mounted]);
 
+    const requestDestination = (action: 'copy' | 'share-native') => {
+        setDestinationAction(action);
+        setShowDestinationModal(true);
+    };
+
+    const applyDestinationAction = async (audience: AffiliateReferralAudience) => {
+        const link = buildAffiliateReferralLink(audience, referralCode);
+
+        setSelectedAudience(audience);
+        setReferralLink(link);
+        setShareCardImageUrl(null);
+        setShowDestinationModal(false);
+
+        const action = destinationAction;
+        setDestinationAction(null);
+
+        if (action === 'copy') {
+            await navigator.clipboard.writeText(link);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+            return;
+        }
+
+        if (action === 'share-native') {
+            await shareVia('native', link);
+        }
+    };
+
     const handleCopy = () => {
-        navigator.clipboard.writeText(referralLink);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        requestDestination('copy');
     };
 
     // --- Formatted share text templates ---
-    const getShareText = (format: 'whatsapp' | 'email' | 'telegram' | 'plain') => {
+    const getShareText = (format: 'whatsapp' | 'email' | 'telegram' | 'plain', link: string = referralLink) => {
         if (format === 'whatsapp') {
             return `🎯 *What Next After +2?*
 
@@ -262,7 +300,7 @@ Your Marks show your Past.
 💰 It's just *₹749* to reveal your future!
 
 👆 *Scan the QR code in the image above* or click below to register:
-👉 ${referralLink}`;
+👉 ${link}`;
         }
         if (format === 'email') {
             return `Hi,
@@ -281,7 +319,7 @@ What you will get:
 
 It's just ₹749 to reveal your future!
 
-👉 Register here: ${referralLink}
+👉 Register here: ${link}
 
 Please find the promotional card attached above. Scan the QR code in the image to register directly!
 
@@ -302,7 +340,7 @@ OriginBI reveals your Future.
 💰 It's just ₹749 to reveal your future!
 
 👆 Scan the QR code in the image or click below:
-👉 ${referralLink}`;
+👉 ${link}`;
         }
         // plain
         return `🎯 What Next After +2?
@@ -317,7 +355,7 @@ What you will get:
 
 It's just ₹749 to reveal your future!
 
-Scan the QR code in the image or register here: ${referralLink}`;
+Scan the QR code in the image or register here: ${link}`;
     };
 
     // Clear cached card when QR code regenerates
@@ -326,9 +364,9 @@ Scan the QR code in the image or register here: ${referralLink}`;
     }, [qrDataUrl]);
 
     // --- Generate promo card: load poster image + overlay QR code ---
-    const ensureCardGenerated = async (): Promise<string | null> => {
-        if (shareCardImageUrl) return shareCardImageUrl;
-        if (!referralLink) return null;
+    const ensureCardGenerated = async (targetLink: string = referralLink): Promise<string | null> => {
+        if (shareCardImageUrl && targetLink === referralLink) return shareCardImageUrl;
+        if (!targetLink) return null;
 
         try {
             const QRCode = await import('qrcode');
@@ -354,7 +392,7 @@ Scan the QR code in the image or register here: ${referralLink}`;
 
             // Generate QR code onto a temp canvas
             const qrTempCanvas = document.createElement('canvas');
-            await QRCode.toCanvas(qrTempCanvas, referralLink, {
+            await QRCode.toCanvas(qrTempCanvas, targetLink, {
                 width: 400,
                 margin: 1,
                 color: { dark: '#150089', light: '#ffffff' },
@@ -377,7 +415,9 @@ Scan the QR code in the image or register here: ${referralLink}`;
             ctx.drawImage(qrTempCanvas, qrX, qrY, qrSize, qrSize);
 
             const imgUrl = canvas.toDataURL('image/png');
-            setShareCardImageUrl(imgUrl);
+            if (targetLink === referralLink) {
+                setShareCardImageUrl(imgUrl);
+            }
             return imgUrl;
         } catch (e) {
             console.error('Promo card generation failed', e);
@@ -395,11 +435,14 @@ Scan the QR code in the image or register here: ${referralLink}`;
     };
 
     // Main share function — generates card, then shares via the chosen platform
-    const shareVia = async (platform: 'native' | 'whatsapp' | 'email' | 'linkedin' | 'telegram') => {
+    const shareVia = async (
+        platform: 'native' | 'whatsapp' | 'email' | 'linkedin' | 'telegram',
+        targetLink: string = referralLink,
+    ) => {
         setSharingPlatform(platform);
         setIsGenerating(true);
 
-        const imgUrl = await ensureCardGenerated();
+        const imgUrl = await ensureCardGenerated(targetLink);
         setIsGenerating(false);
         setSharingPlatform(null);
 
@@ -414,7 +457,7 @@ Scan the QR code in the image or register here: ${referralLink}`;
                     // Send image + text as one single message
                     await navigator.share({
                         title: 'What Next After +2? — OriginBI',
-                        text: getShareText('plain'),
+                        text: getShareText('plain', targetLink),
                         files: [file],
                     });
                     return;
@@ -425,8 +468,8 @@ Scan the QR code in the image or register here: ${referralLink}`;
                 try {
                     await navigator.share({
                         title: 'What Next After +2? — OriginBI',
-                        text: getShareText('plain'),
-                        url: referralLink,
+                        text: getShareText('plain', targetLink),
+                        url: targetLink,
                     });
                 } catch { /* cancelled */ }
             }
@@ -440,13 +483,13 @@ Scan the QR code in the image or register here: ${referralLink}`;
         await new Promise(r => setTimeout(r, 300));
 
         if (platform === 'whatsapp') {
-            window.open(`https://wa.me/?text=${encodeURIComponent(getShareText('whatsapp'))}`, '_blank');
+            window.open(`https://wa.me/?text=${encodeURIComponent(getShareText('whatsapp', targetLink))}`, '_blank');
         } else if (platform === 'email') {
-            window.location.href = `mailto:?subject=${encodeURIComponent('🎯 What Next After +2? — Discover your future with OriginBI')}&body=${encodeURIComponent(getShareText('email'))}`;
+            window.location.href = `mailto:?subject=${encodeURIComponent('🎯 What Next After +2? — Discover your future with OriginBI')}&body=${encodeURIComponent(getShareText('email', targetLink))}`;
         } else if (platform === 'linkedin') {
-            window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(referralLink)}`, '_blank');
+            window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(targetLink)}`, '_blank');
         } else if (platform === 'telegram') {
-            window.open(`https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(getShareText('telegram'))}`, '_blank');
+            window.open(`https://t.me/share/url?url=${encodeURIComponent(targetLink)}&text=${encodeURIComponent(getShareText('telegram', targetLink))}`, '_blank');
         }
     };
 
@@ -491,14 +534,14 @@ Scan the QR code in the image or register here: ${referralLink}`;
 
                 <div className="flex gap-3 mb-3">
                     <button
-                        onClick={() => { navigator.clipboard.writeText(referralLink); handleCopy(); }}
+                        onClick={handleCopy}
                         className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-full font-bold text-sm bg-[#150089] text-white hover:shadow-lg hover:-translate-y-0.5 transition-all"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
                         {copied ? 'Copied!' : 'Copy Link'}
                     </button>
                     <button
-                        onClick={() => shareVia('native')}
+                        onClick={() => requestDestination('share-native')}
                         disabled={isGenerating}
                         className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-full font-bold text-sm bg-gradient-to-r from-[#1ED36A] to-[#16b058] text-white hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50"
                     >
@@ -561,7 +604,7 @@ Scan the QR code in the image or register here: ${referralLink}`;
                 <div className="space-y-3">
                     {/* Native Share (Mobile) — sends image + text together */}
                     <button
-                        onClick={() => shareVia('native')}
+                        onClick={() => requestDestination('share-native')}
                         disabled={isGenerating}
                         className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-full font-bold text-sm bg-gradient-to-r from-[#1ED36A] to-[#16b058] text-white hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50"
                     >
@@ -590,6 +633,17 @@ Scan the QR code in the image or register here: ${referralLink}`;
 
     return (
         <>
+            <ReferralDestinationSelectorModal
+                open={showDestinationModal}
+                onClose={() => {
+                    setShowDestinationModal(false);
+                    setDestinationAction(null);
+                }}
+                onSelect={applyDestinationAction}
+                selectedAudience={selectedAudience}
+                actionLabel={destinationAction === 'share-native' ? 'Send' : 'Copy Link'}
+            />
+
             <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] border border-[#E0E0E0] dark:border-white/10 font-['Haskoy'] shadow-sm h-full flex flex-col">
                 <div className="p-6 h-full flex flex-col justify-between gap-6">
                     <div>
@@ -623,7 +677,7 @@ Scan the QR code in the image or register here: ${referralLink}`;
                             </button>
 
                             <button
-                                onClick={() => shareVia('native')}
+                                onClick={() => requestDestination('share-native')}
                                 disabled={isGenerating}
                                 className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm transition-all bg-[#1ED36A] hover:bg-[#16b058] text-white shadow-lg shadow-[#1ED36A]/20"
                             >

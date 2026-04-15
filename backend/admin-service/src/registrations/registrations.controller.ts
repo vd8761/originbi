@@ -104,6 +104,8 @@ export class RegistrationsController {
     @Query('limit') limit = '10',
     @Query('tab') tab?: string,
     @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('hasAiCounsellor') hasAiCounsellor?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
     @Query('startDate') startDate?: string,
@@ -111,6 +113,15 @@ export class RegistrationsController {
   ) {
     const pageNum = Number(page) || 1;
     const limitNum = Number(limit) || 10;
+    const hasAiCounsellorFilter =
+      hasAiCounsellor === undefined
+        ? undefined
+        : hasAiCounsellor.toLowerCase() === 'true'
+          ? true
+          : hasAiCounsellor.toLowerCase() === 'false'
+            ? false
+            : undefined;
+
     return this.registrationsService.findAll(
       pageNum,
       limitNum,
@@ -120,6 +131,8 @@ export class RegistrationsController {
       sortOrder,
       startDate,
       endDate,
+      status,
+      hasAiCounsellorFilter,
     );
   }
 

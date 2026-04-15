@@ -98,14 +98,20 @@ const RegistrationManagement: React.FC = () => {
 
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [aiCounsellorFilter, setAiCounsellorFilter] = useState<"ENABLED" | "DISABLED" | null>(null);
+  const [showAiCounsellorDropdown, setShowAiCounsellorDropdown] = useState(false);
 
   const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const aiCounsellorDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
         setShowStatusDropdown(false);
+      }
+      if (aiCounsellorDropdownRef.current && !aiCounsellorDropdownRef.current.contains(event.target as Node)) {
+        setShowAiCounsellorDropdown(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -165,7 +171,10 @@ const RegistrationManagement: React.FC = () => {
           debouncedSearchTerm,
           {
             ...dateFilters,
-            status: statusFilter as any
+            has_ai_counsellor:
+              aiCounsellorFilter === null
+                ? undefined
+                : aiCounsellorFilter === 'ENABLED',
           },
           activeTab === 'registrations' ? sortColumn : undefined,
           activeTab === 'registrations' ? sortOrder : undefined
@@ -233,7 +242,8 @@ const RegistrationManagement: React.FC = () => {
     endDate,
     sortColumn,
     sortOrder,
-    statusFilter
+    statusFilter,
+    aiCounsellorFilter
   ]);
 
   const handleSort = (column: string) => {
@@ -333,6 +343,8 @@ const RegistrationManagement: React.FC = () => {
     setCurrentPage(1);
     setSearchTerm("");
     setStatusFilter(null);
+    setAiCounsellorFilter(null);
+    setShowAiCounsellorDropdown(false);
   };
 
   const handleExport = async () => {
@@ -346,6 +358,10 @@ const RegistrationManagement: React.FC = () => {
           {
             start_date: startDate ? startDate.toISOString().split('T')[0] : undefined,
             end_date: endDate ? endDate.toISOString().split('T')[0] : undefined,
+            has_ai_counsellor:
+              aiCounsellorFilter === null
+                ? undefined
+                : aiCounsellorFilter === 'ENABLED',
           },
           sortColumn,
           sortOrder
@@ -840,6 +856,53 @@ const RegistrationManagement: React.FC = () => {
             selectedRange={dateRangeLabel}
             onRangeSelect={handleDateRangeSelect}
           />
+
+          {activeTab === 'registrations' && (
+            <div className="relative" ref={aiCounsellorDropdownRef}>
+              <button
+                onClick={() => setShowAiCounsellorDropdown(!showAiCounsellorDropdown)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-white/30 transition-all shadow-sm cursor-pointer text-[#19211C] dark:text-white"
+              >
+                <FilterFunnelIcon className="w-4 h-4" />
+                <span>
+                  {aiCounsellorFilter === null
+                    ? 'AI Counsellor'
+                    : aiCounsellorFilter === 'ENABLED'
+                      ? 'AI Counsellor: Enabled'
+                      : 'AI Counsellor: Disabled'}
+                </span>
+                <ChevronDownIcon className="w-3 h-3 text-gray-500 dark:text-white" />
+              </button>
+              {showAiCounsellorDropdown && (
+                <div className="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-[#303438] border border-gray-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden py-1">
+                  {[
+                    { label: 'All', value: null },
+                    { label: 'Enabled', value: 'ENABLED' },
+                    { label: 'Disabled', value: 'DISABLED' },
+                  ].map((option) => (
+                    <button
+                      key={option.label}
+                      onClick={() => {
+                        setAiCounsellorFilter(option.value as "ENABLED" | "DISABLED" | null);
+                        setShowAiCounsellorDropdown(false);
+                        setCurrentPage(1);
+                      }}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors
+                        ${aiCounsellorFilter === option.value
+                          ? 'text-brand-green bg-gray-50 dark:bg-white/5'
+                          : 'text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/5'
+                        }`}
+                    >
+                      <span>{option.label}</span>
+                      {aiCounsellorFilter === option.value && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-brand-green shadow-[0_0_8px_rgba(32,210,125,0.6)]"></div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Status Filter */}
           {/* Status Filter */}

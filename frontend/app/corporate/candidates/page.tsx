@@ -4,7 +4,7 @@ import CandidatesList from "../../../components/corporate/candidates/CandidatesL
 
 export default function CandidatesPage() {
     return (
-        <div className="h-full">
+        <div className="min-h-screen overflow-y-auto">
             <CandidatesList />
         </div>
     );

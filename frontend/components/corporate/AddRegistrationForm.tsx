@@ -9,6 +9,7 @@ import { corporateRegistrationService } from '../../lib/services/corporateRegist
 import { registrationService, CreateRegistrationDto } from '../../lib/services/registration.service';
 import { BulkUploadModal } from '../ui/BulkUploadModal';
 import { Department } from "../../lib/types";
+import { normalizeDepartmentDisplayName } from '../../lib/utils';
 import { useEffect } from "react";
 
 interface AddRegistrationFormProps {
@@ -406,7 +407,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                     options={departments
                       .filter((d) => d.is_active)
                       .map((d) => ({
-                        label: d.department?.name || d.name || "Unknown",
+                        label: normalizeDepartmentDisplayName(d.department?.name || d.name || "Unknown"),
                         value: d.id,
                       }))}
                     value={formData.department_id || ""}

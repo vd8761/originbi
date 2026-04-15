@@ -23,6 +23,9 @@ import {
   AffiliateSettlementTransaction,
   Groups,
   StudentSubscription,
+  Department,
+  DepartmentDegree,
+  DegreeType,
 } from '@originbi/shared-entities';
 import { SettingsModule } from '../settings/settings.module';
 
@@ -44,6 +47,9 @@ import { SettingsModule } from '../settings/settings.module';
       StudentSubscription,
       Notification,
       SchoolStream,
+      Department,
+      DepartmentDegree,
+      DegreeType,
     ]),
     HttpModule,
     SettingsModule,

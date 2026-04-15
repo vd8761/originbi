@@ -16,6 +16,21 @@ export { DegreeType } from './degree-type.entity';
 // Corporate entities
 export { CorporateAccount } from './corporate-account.entity';
 export { CorporateCreditLedger } from './corporate-credit-ledger.entity';
+export {
+	CorporateJob,
+	JobWorkMode,
+	JobEmploymentType,
+	JobShift,
+	JobExperienceLevel,
+	JobLifecycleStatus,
+} from './corporate-job.entity';
+export { CorporateJobSkill, JobSkillType } from './corporate-job-skill.entity';
+export {
+	JobApplication,
+	JobApplicationSource,
+	JobApplicationStatus,
+} from './job-application.entity';
+export { JobApplicationStatusHistory } from './job-application-status-history.entity';
 
 // Affiliate entities
 export { AffiliateAccount } from './affiliate-account.entity';
