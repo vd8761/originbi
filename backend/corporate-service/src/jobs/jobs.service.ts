@@ -234,7 +234,7 @@ export class JobsService {
     if (query.search?.trim()) {
       const s = `%${query.search.trim()}%`;
       qb.andWhere(
-        '(COALESCE(r.full_name, \"\") ILIKE :s OR u.email ILIKE :s OR CAST(r.id AS TEXT) ILIKE :s)',
+        '(COALESCE(r.full_name, "") ILIKE :s OR u.email ILIKE :s OR CAST(r.id AS TEXT) ILIKE :s)',
         { s },
       );
     }
@@ -763,7 +763,7 @@ export class JobsService {
     if (query.search?.trim()) {
       const s = `%${query.search.trim()}%`;
       qb.andWhere(
-        '(COALESCE(r.full_name, \"\") ILIKE :s OR u.email ILIKE :s OR CAST(r.id AS TEXT) ILIKE :s)',
+        '(COALESCE(r.full_name, "") ILIKE :s OR u.email ILIKE :s OR CAST(r.id AS TEXT) ILIKE :s)',
         { s },
       );
     }
