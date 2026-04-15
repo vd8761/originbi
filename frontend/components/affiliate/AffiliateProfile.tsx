@@ -2,6 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import { api } from "../../lib/api";
+import ReferralDestinationSelectorModal from "./ReferralDestinationSelectorModal";
+import {
+    AFFILIATE_DEFAULT_REFERRAL_AUDIENCE,
+    AffiliateReferralAudience,
+    buildAffiliateReferralLink,
+} from "../../lib/affiliateReferralLinks";
 
 // --- Types ---
 interface RecentTransaction {
@@ -50,6 +56,8 @@ const DetailItem = ({ label, value }: { label: string; value?: string | number |
 // --- Main Component ---
 const AffiliateProfile: React.FC = () => {
     const [copied, setCopied] = useState(false);
+    const [selectedAudience, setSelectedAudience] = useState<AffiliateReferralAudience>(AFFILIATE_DEFAULT_REFERRAL_AUDIENCE);
+    const [showDestinationModal, setShowDestinationModal] = useState(false);
     const [profile, setProfile] = useState<AffiliateProfileData | null>(null);
 
     useEffect(() => {
@@ -85,17 +93,32 @@ const AffiliateProfile: React.FC = () => {
             : 'Silver Affiliate';
     const status = profile.is_active ? 'active' : 'inactive';
 
-    const referralBaseUrl = process.env.NEXT_PUBLIC_REFERAL_BASE_URL || 'https://discover.originbi.com';
-    const referralLink = `${referralBaseUrl}?ref=${profile.referral_code}`;
+    const referralLink = buildAffiliateReferralLink(selectedAudience, profile.referral_code);
 
-    const handleCopy = () => {
-        navigator.clipboard.writeText(referralLink);
+    const applyDestinationCopy = async (audience: AffiliateReferralAudience) => {
+        const link = buildAffiliateReferralLink(audience, profile.referral_code);
+        setSelectedAudience(audience);
+        setShowDestinationModal(false);
+
+        await navigator.clipboard.writeText(link);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
 
+    const handleCopy = () => {
+        setShowDestinationModal(true);
+    };
+
     return (
         <div className="relative min-h-screen bg-transparent font-['Haskoy'] transition-colors duration-300 overflow-hidden p-4 sm:p-6 lg:p-8">
+            <ReferralDestinationSelectorModal
+                open={showDestinationModal}
+                onClose={() => setShowDestinationModal(false)}
+                onSelect={applyDestinationCopy}
+                selectedAudience={selectedAudience}
+                actionLabel="Copy Link"
+            />
+
             {/* Page Header */}
             <div className="mb-8">
                 <h1 className="text-[clamp(24px,2vw,36px)] font-bold text-[#150089] dark:text-white leading-tight">My Profile</h1>

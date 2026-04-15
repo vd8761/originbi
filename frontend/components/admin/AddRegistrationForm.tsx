@@ -13,6 +13,7 @@ import MobileInput from '../ui/MobileInput';
 import { registrationService } from '../../lib/services';
 import { CreateRegistrationDto } from '../../lib/services/registration.service';
 import { Program, Department } from '../../lib/types';
+import { normalizeDepartmentDisplayName } from '../../lib/utils';
 import BulkUploadRegistration from "./BulkUploadRegistration";
 import { getEnabledBoards } from '../../lib/constants';
 
@@ -199,7 +200,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
 
   const departmentOptions = departments.map((d) => ({
     value: d.id,
-    label: d.name,
+    label: normalizeDepartmentDisplayName(d.name),
   }));
 
   const generatePassword = () => {
