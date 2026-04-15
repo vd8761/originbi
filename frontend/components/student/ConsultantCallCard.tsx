@@ -127,9 +127,14 @@ const ConsultantCallCard: React.FC = () => {
     return (
         <>
             <div className="dashboard-glass-card p-6 lg:p-[1.25vw] h-auto lg:h-full flex flex-col">
-                <h3 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-lg lg:text-[1.25vw] mb-4 lg:mb-[0.8vw]">
-                    Consultant Call
-                </h3>
+                <div className="flex justify-between items-start mb-4 lg:mb-[0.8vw]">
+                    <h3 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-lg lg:text-[1.25vw]">
+                        Consultant Call
+                    </h3>
+                    <button className="font-medium font-sans text-brand-green text-xs lg:text-[0.833vw] hover:underline cursor-pointer bg-transparent border-none">
+                        View History
+                    </button>
+                </div>
 
                 <div className="flex-grow flex justify-center items-center my-4 lg:my-[0.8vw]">
                     <div className="w-full max-w-[320px] lg:max-w-[18vw]">
@@ -151,7 +156,10 @@ const ConsultantCallCard: React.FC = () => {
                     </div>
                     <div className="space-y-3 lg:space-y-[0.6vw] border-t border-brand-light-tertiary dark:border-white/10 pt-4 lg:pt-[0.833vw]">
                         {previewSessions.map((session, index) => (
-                            <SessionItem key={index} session={session} />
+                            <React.Fragment key={index}>
+                                <SessionItem session={session} />
+                                {index < previewSessions.length - 1 && <hr className="border-brand-light-tertiary dark:border-white/10" />}
+                            </React.Fragment>
                         ))}
                     </div>
                 </div>

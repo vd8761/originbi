@@ -45,7 +45,7 @@ export type SectorCode =
   | "OTHER";
 export type Gender = "MALE" | "FEMALE" | "OTHER";
 export type RegistrationSource = "SELF" | "ADMIN" | "CORPORATE" | "RESELLER";
-export type SchoolLevel = "SSLC" | "HSC";
+export type SchoolLevel = "SSLC" | "HSC" | "GCSE";
 export type SchoolStream = "SCIENCE" | "COMMERCE" | "HUMANITIES";
 export type PaymentStatus = "NOT_REQUIRED" | "PENDING" | "PAID" | "FAILED" | "REFUNDED";
 export type RegistrationStatus = "INCOMPLETE" | "COMPLETED" | "CANCELLED";
@@ -242,9 +242,13 @@ export interface RoadmapDetailData {
   category: string;
   toolsToLearn: { name: string; category: string }[];
   overview: string;
-  traitAlignment: string;
+  naturalStrengths?: string;
   roadmapSteps: { label: string; type: 'foundation' | 'action' | 'advancement' | 'career'; content: string }[];
-  guidelines: { title: string; points: string[] }[];
+  guidelines: { 
+    title: string; 
+    points: string[];
+    sections?: { subtitle: string; points: string[] }[];
+  }[];
   guidanceTip: string;
 }
 
