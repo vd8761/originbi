@@ -780,6 +780,7 @@ export class StudentService {
         schoolLevel: dto.school_level,
         schoolStream: dto.school_stream,
         programId: program.id,
+        departmentDegreeId: dto.department_degree_id || dto.departmentDegreeId,
         studentBoard: dto.student_board || dto.studentBoard, // Explicit assignment
         // metadata: { ... } below also stores it
         status: 'COMPLETED' as RegistrationStatus,
@@ -792,6 +793,7 @@ export class StudentService {
           groupCode: dto.group_code,
           studentBoard: dto.student_board || dto.studentBoard, // Store in metadata as well
           sendEmail: true,
+          currentYear: dto.current_year || dto.currentYear,
           ...(dto.metadata || {}), // Merge extra metadata
           currentRole: dto.current_role || dto.metadata?.current_role,
           roleDescription:
