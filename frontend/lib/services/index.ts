@@ -6,4 +6,5 @@ export * from './registration.service';
 export * from './report.service';
 export * from './assessment.service';
 export * from './corporateDashboard.service';
+export * from './corporateJobs.service';
 export type { ApiError, PaginatedResponse } from '../types';

@@ -101,16 +101,29 @@ export class AgentOrchestratorService {
     this.logger.log('🤖 Agentic RAG Orchestrator v2.0 (ReAct + Adaptive Chaining) initialized');
   }
 
+  private resolveGeminiModel(requestedModel: string | undefined, fallbackModel = 'gemini-2.5-flash'): string {
+    const normalized = (requestedModel || '').trim();
+    if (!normalized) return fallbackModel;
+
+    if (/^gemini-2\.0-flash$/i.test(normalized)) {
+      this.logger.warn(`Deprecated Gemini model "${normalized}" requested. Using "${fallbackModel}" instead.`);
+      return fallbackModel;
+    }
+
+    return normalized;
+  }
+
   // ─────────────── LLM Instances ───────────────
 
   private getPlannerLlm(): ChatGoogleGenerativeAI {
     if (!this.plannerLlm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
-      const plannerModel =
+      const requestedPlannerModel =
         process.env.GEMINI_PLANNER_MODEL ||
         process.env.GEMINI_LLM_MODEL ||
-        'gemini-2.0-flash';
+        'gemini-2.5-flash';
+      const plannerModel = this.resolveGeminiModel(requestedPlannerModel, 'gemini-2.5-flash');
       const plannerMaxTokens = Math.max(180, Number(process.env.AGENT_PLANNER_MAX_OUTPUT_TOKENS || 320));
       this.plannerLlm = new ChatGoogleGenerativeAI({
         apiKey,
@@ -178,10 +191,11 @@ export class AgentOrchestratorService {
     if (!this.reflectorLlm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
-      const reflectorModel =
+      const requestedReflectorModel =
         process.env.GEMINI_REFLECTOR_MODEL ||
         process.env.GEMINI_LLM_MODEL ||
-        'gemini-2.0-flash';
+        'gemini-2.5-flash';
+      const reflectorModel = this.resolveGeminiModel(requestedReflectorModel, 'gemini-2.5-flash');
       const reflectorMaxTokens = Math.max(120, Number(process.env.AGENT_REFLECTOR_MAX_OUTPUT_TOKENS || 180));
       this.reflectorLlm = new ChatGoogleGenerativeAI({
         apiKey,

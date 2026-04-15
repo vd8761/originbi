@@ -274,6 +274,18 @@ export class RagController {
     }
   }
 
+  private professionalizeAnswer(answer: string): string {
+    if (!answer) return answer;
+
+    const withoutEmoji = answer
+      .replace(/[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, '')
+      .replace(/[ \t]{2,}/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    return withoutEmoji;
+  }
+
   constructor(
     private readonly ragService: RagService,
     private readonly syncService: SyncService,
@@ -539,7 +551,11 @@ export class RagController {
         }
       }
 
-      const result = await this.ragService.query(question, user, convId, queryDto.mode);
+      const rawResult = await this.ragService.query(question, user, convId, queryDto.mode);
+      const result = {
+        ...rawResult,
+        answer: this.professionalizeAnswer(rawResult.answer),
+      };
       this.logger.log(`✅ RAG query completed`);
 
       // ── Generate follow-up suggestions ──
@@ -719,7 +735,11 @@ export class RagController {
 
       await this.ensureCorporateRagChatEnabled(user);
 
-      const result = await this.ragService.query(queryDto.question, user);
+      const rawResult = await this.ragService.query(queryDto.question, user);
+      const result = {
+        ...rawResult,
+        answer: this.professionalizeAnswer(rawResult.answer),
+      };
       const pdfBuffer = await this.ragService.generatePdf(
         result,
         queryDto.question,

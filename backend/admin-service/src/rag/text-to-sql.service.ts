@@ -67,6 +67,18 @@ export class TextToSqlService {
     this.logger.log('🧠 Text-to-SQL Jarvis Engine initialized');
   }
 
+  private resolveGeminiModel(requestedModel: string | undefined, fallbackModel = 'gemini-2.5-flash'): string {
+    const normalized = (requestedModel || '').trim();
+    if (!normalized) return fallbackModel;
+
+    if (/^gemini-2\.0-flash$/i.test(normalized)) {
+      this.logger.warn(`Deprecated Gemini model "${normalized}" requested. Using "${fallbackModel}" instead.`);
+      return fallbackModel;
+    }
+
+    return normalized;
+  }
+
   private getSqlLlm(): ChatGoogleGenerativeAI {
     if (!this.llm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
@@ -104,10 +116,11 @@ export class TextToSqlService {
     if (!this.formatterLlm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
-      const formatterModel =
+      const requestedFormatterModel =
         process.env.GEMINI_FORMATTER_MODEL ||
         process.env.GEMINI_LLM_MODEL ||
-        'gemini-2.0-flash';
+        'gemini-2.5-flash';
+      const formatterModel = this.resolveGeminiModel(requestedFormatterModel, 'gemini-2.5-flash');
       const formatterMaxTokens = Math.max(220, Number(process.env.FORMATTER_MAX_OUTPUT_TOKENS || 520));
       this.formatterLlm = new ChatGoogleGenerativeAI({
         apiKey,

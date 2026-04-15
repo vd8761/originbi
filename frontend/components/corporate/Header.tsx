@@ -552,7 +552,7 @@ const Header: React.FC<HeaderProps> = ({
           />
           <NavItem
             icon={<OriginDataIcon className="w-4 h-4" />}
-            label="Origin Data"
+            label="Origin Credits"
             active={activeView === "origindata"}
             isMobile={isMobile}
             onClick={() => handleNavClick("origindata")}
