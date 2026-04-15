@@ -24,6 +24,8 @@ import {
   Groups,
   StudentSubscription,
   Department,
+  DepartmentDegree,
+  DegreeType,
 } from '@originbi/shared-entities';
 
 @Module({
@@ -45,6 +47,8 @@ import {
       Notification,
       SchoolStream,
       Department,
+      DepartmentDegree,
+      DegreeType,
     ]),
     HttpModule,
   ],

@@ -69,6 +69,22 @@ export class CreateRegistrationDto {
 
   @IsString()
   @IsOptional()
+  department_degree_id: string;
+
+  @IsString()
+  @IsOptional()
+  departmentDegreeId: string;
+
+  @IsString()
+  @IsOptional()
+  current_year: string;
+
+  @IsString()
+  @IsOptional()
+  currentYear: string;
+
+  @IsString()
+  @IsOptional()
   group_code: string;
 
   @IsString()
