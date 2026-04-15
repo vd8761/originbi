@@ -404,7 +404,7 @@ Scan the QR code in the image or register here: ${link}`;
                 }}
                 onSelect={applyDestinationAction}
                 selectedAudience={selectedAudience}
-                actionLabel={destinationAction === 'share-native' ? 'Share Link' : 'Copy Link'}
+                actionLabel={destinationAction === 'share-native' ? 'Send' : 'Copy Link'}
             />
 
             {/* Page Header */}

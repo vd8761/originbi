@@ -3,15 +3,15 @@ export type AffiliateReferralAudience = "school" | "college" | "employee";
 export interface AffiliateReferralDestination {
     key: AffiliateReferralAudience;
     label: string;
-    host: string;
+    description: string;
 }
 
 export const AFFILIATE_DEFAULT_REFERRAL_AUDIENCE: AffiliateReferralAudience = "college";
 
 export const AFFILIATE_REFERRAL_DESTINATIONS: AffiliateReferralDestination[] = [
-    { key: "school", label: "School", host: "pickmycareer.originbi.com" },
-    { key: "college", label: "College", host: "discover.originbi.com" },
-    { key: "employee", label: "Employee", host: "grow.originbi.com" },
+    { key: "school", label: "School", description: "Perfect for 10th, +1, and +2 students." },
+    { key: "college", label: "College", description: "Future career-role guidance for college students." },
+    { key: "employee", label: "Employee", description: "Career growth and upskilling for working professionals." },
 ];
 
 const DEFAULT_REGISTER_URLS: Record<AffiliateReferralAudience, string> = {

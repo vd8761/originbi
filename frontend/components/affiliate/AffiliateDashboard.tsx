@@ -641,7 +641,7 @@ Scan the QR code in the image or register here: ${link}`;
                 }}
                 onSelect={applyDestinationAction}
                 selectedAudience={selectedAudience}
-                actionLabel={destinationAction === 'share-native' ? 'Share Link' : 'Copy Link'}
+                actionLabel={destinationAction === 'share-native' ? 'Send' : 'Copy Link'}
             />
 
             <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl dark:bg-[#FFFFFF]/[0.08] rounded-[32px] border border-[#E0E0E0] dark:border-white/10 font-['Haskoy'] shadow-sm h-full flex flex-col">
