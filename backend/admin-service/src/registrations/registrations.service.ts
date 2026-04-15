@@ -142,10 +142,10 @@ export class RegistrationsService {
       : null;
   }
 
-  private normalizeSchoolLevel(level?: string | null): 'SSLC' | 'HSC' | null {
+  private normalizeSchoolLevel(level?: string | null): 'SSLC' | 'HSC' | 'GCSE' | null {
     if (!level) return null;
     const v = level.trim().toUpperCase();
-    return ['SSLC', 'HSC'].includes(v) ? (v as 'SSLC' | 'HSC') : null;
+    return ['SSLC', 'HSC', 'GCSE'].includes(v) ? (v as 'SSLC' | 'HSC' | 'GCSE') : null;
   }
 
   private normalizeSchoolStream(

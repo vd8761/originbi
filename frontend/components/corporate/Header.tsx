@@ -74,11 +74,12 @@ const NavItem: React.FC<NavItemProps> = ({
       <button
         onClick={onClick}
         // SCALING:
-        // LG/XL: Ultra-Compact Mode (h-8, px-2.5) to fit 5 items on laptop
-        // 2XL: Robust Mode (h-10, px-6) for large screens
-        className={`flex items-center ${spacingClass} rounded-full transition-all duration-200 w-full ${isMobile ? "py-3.5" : "lg:h-8.5 2xl:h-10"} cursor-pointer ${active
-          ? `bg-brand-green text-white border border-transparent shadow-none ${isMobile ? "px-4.5" : "px-2 2xl:px-3.5"}`
-          : `bg-gray-50 border border-gray-200 text-[#19211C] hover:bg-gray-100 hover:text-black hover:border-gray-300 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white ${isMobile ? "px-4.5" : "px-2 2xl:px-3.5"}`
+        // LG: Ultra-Compact Mode (h-8.5, px-2) to fit 5 items
+        // XL: Medium-Compact Mode (px-3) for 125% zoom levels on larger screens
+        // 2XL: Robust Mode (h-10, px-3.5) for large screens
+        className={`flex items-center ${spacingClass} rounded-full transition-all duration-200 w-full ${isMobile ? "py-3.5" : "lg:h-8.5 xl:h-9 2xl:h-10"} cursor-pointer ${active
+          ? `bg-brand-green text-white border border-transparent shadow-none ${isMobile ? "px-4.5" : "px-2 xl:px-3 2xl:px-3.5"}`
+          : `bg-gray-50 border border-gray-200 text-[#19211C] hover:bg-gray-100 hover:text-black hover:border-gray-300 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white ${isMobile ? "px-4.5" : "px-2 xl:px-3 2xl:px-3.5"}`
           }`}
       >
         <div
@@ -87,8 +88,8 @@ const NavItem: React.FC<NavItemProps> = ({
           {icon}
         </div>
         <span
-          // TEXT SCALING: text-[10.5px] on Laptop, text-[11.5px] on 2XL
-          className={`font-medium ${isMobile ? "text-sm" : "text-[10.5px] 2xl:text-[11.5px]"} whitespace-nowrap ${isMobile ? "inline" : showDesktopText
+          // TEXT SCALING: text-[10.5px] on Laptop, text-[11.5px] on XL/2XL
+          className={`font-medium ${isMobile ? "text-sm" : "text-[10.5px] xl:text-[11.5px] 2xl:text-[11.5px]"} whitespace-nowrap ${isMobile ? "inline" : showDesktopText
             }`}
         >
           {label}
@@ -630,7 +631,7 @@ const Header: React.FC<HeaderProps> = ({
           />
 
           {!hideNav && (
-            <nav className="hidden md:flex items-center space-x-1 lg:space-x-1 2xl:space-x-1.5 ml-1.5 lg:ml-1.5 2xl:ml-3">
+            <nav className="hidden md:flex items-center space-x-1 lg:space-x-1 xl:space-x-1.5 2xl:space-x-1.5 ml-1.5 lg:ml-1.5 xl:ml-2.5 2xl:ml-3">
               {renderNavItems(false)}
             </nav>
           )}

@@ -35,7 +35,8 @@ export async function fetchGroupAssessmentData(
                 ar.report_number,
                 q.name as "group_name",
                 r.school_level,
-                r.school_stream
+                r.school_stream,
+                r.student_board
             FROM assessment_sessions s
             JOIN registrations r ON s.registration_id = r.id
             JOIN users u ON s.user_id = u.id
@@ -88,7 +89,8 @@ export async function fetchUserAssessmentData(
             u.email,
             ar.report_number,
             r.school_level,
-            r.school_stream
+            r.school_stream,
+            r.student_board
             FROM assessment_sessions s
             JOIN registrations r ON s.registration_id = r.id
             JOIN users u ON s.user_id = u.id
@@ -311,6 +313,7 @@ async function processSessionRows(
       const schoolData: SchoolData = {
         ...baseData,
         school_level_id: levelId,
+        student_board: session.student_board,
       };
 
       if (levelId === SCHOOL_LEVEL_ID.HSC && session.school_stream) {

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
 /**
  * schoolReportJSON.ts
  * -------------------
@@ -28,6 +28,10 @@ import {
   STREAM_AGILE_COMPATIBILITY,
   STREAM_FUTURE_DIRECTIONS,
   ProfilePatterns,
+  GCSE,
+  AICE,
+  CAREER_ODYSSEY_ROADMAP,
+  DISC_AGILE_CAREER_PACE,
 } from './schoolConstants';
 import {
   getCompatibilityMatrixDetails,
@@ -254,6 +258,158 @@ function computeWhereYouFitBest(data: SchoolData) {
       };
     }),
   };
+}
+
+// ─── Helper: GCSE/IGCSE Compute Fitment ──────────────────────────────────────
+
+function getGCSEDiscTraits(discType: string): number[] {
+  const table: Record<string, number[]> = {
+    DI: [0.7, 0.6, 0.9, 0.6, 0.8, 0.6],
+    DS: [0.8, 0.6, 0.6, 0.5, 0.6, 0.7],
+    DC: [0.9, 0.8, 0.4, 0.3, 0.3, 0.9],
+    ID: [0.6, 0.5, 0.9, 0.8, 0.8, 0.3],
+    IS: [0.4, 0.3, 0.8, 0.7, 0.8, 0.4],
+    IC: [0.6, 0.5, 0.8, 0.8, 0.8, 0.5],
+    SD: [0.7, 0.6, 0.5, 0.5, 0.6, 0.8],
+    SI: [0.4, 0.3, 0.8, 0.6, 0.9, 0.4],
+    SC: [0.5, 0.4, 0.7, 0.5, 0.8, 0.8],
+    CD: [0.9, 0.8, 0.4, 0.3, 0.3, 0.9],
+    CI: [0.7, 0.6, 0.7, 0.6, 0.6, 0.7],
+    CS: [0.6, 0.5, 0.5, 0.4, 0.7, 0.8],
+    D: [0.8, 0.7, 0.6, 0.5, 0.5, 0.8],
+    I: [0.5, 0.4, 0.9, 0.8, 0.9, 0.4],
+    S: [0.6, 0.5, 0.6, 0.5, 0.8, 0.7],
+    C: [0.9, 0.8, 0.5, 0.4, 0.4, 0.9],
+  };
+  return table[discType] || table['DC'];
+}
+
+function computeIGCSEFinalVector(data: SchoolData): number[] {
+  const topTwo = getTopTwoTraits(data.most_answered_answer_type, data);
+  const traitCode = topTwo[0] + topTwo[1];
+  const baseVector = getGCSEDiscTraits(traitCode);
+
+  const [analytical, numerical, verbal, creative, interpersonal, structured] =
+    baseVector;
+
+  const agile = data.agile_scores?.[0];
+  const focus = Math.min(1.0, (agile?.focus ?? 0) / 25);
+  const commitment = Math.min(1.0, (agile?.commitment ?? 0) / 25);
+  const openness = Math.min(1.0, (agile?.openness ?? 0) / 25);
+  const respect = Math.min(1.0, (agile?.respect ?? 0) / 25);
+  const courage = Math.min(1.0, (agile?.courage ?? 0) / 25);
+
+  const adjAnalytical = analytical + focus * 0.1;
+  const adjNumerical = numerical + commitment * 0.05;
+  const adjVerbal = verbal + openness * 0.08;
+  const adjCreative = creative + ((openness + courage) / 2) * 0.1;
+  const adjInterpersonal = interpersonal + ((respect + courage) / 2) * 0.1;
+  const adjStructured = structured + ((focus + commitment + respect) / 3) * 0.1;
+
+  return [
+    Math.min(1.0, Math.max(0.0, analytical * 0.8 + adjAnalytical * 0.2)),
+    Math.min(1.0, Math.max(0.0, numerical * 0.8 + adjNumerical * 0.2)),
+    Math.min(1.0, Math.max(0.0, verbal * 0.8 + adjVerbal * 0.2)),
+    Math.min(1.0, Math.max(0.0, creative * 0.8 + adjCreative * 0.2)),
+    Math.min(1.0, Math.max(0.0, interpersonal * 0.8 + adjInterpersonal * 0.2)),
+    Math.min(1.0, Math.max(0.0, structured * 0.8 + adjStructured * 0.2)),
+  ];
+}
+
+function computeIGCSEFitment(data: SchoolData, subjects: any[]): any[] {
+  // 1. Final Student Vector (80% DISC base + 20% Agile-adjusted)
+  const finalVector = computeIGCSEFinalVector(data);
+
+  // 5. ACI percentage
+  const agile = data.agile_scores?.[0];
+  const totalAci =
+    (agile?.focus ?? 0) +
+    (agile?.courage ?? 0) +
+    (agile?.respect ?? 0) +
+    (agile?.openness ?? 0) +
+    (agile?.commitment ?? 0);
+  const aciPct = Math.min(100, Math.max(0, (totalAci / 125) * 100));
+
+  // 6. Subject Matching Engine
+  const rawResults = subjects.map((sub) => {
+    const subVector = [
+      sub.analytical,
+      sub.numerical,
+      sub.verbal,
+      sub.creative,
+      sub.interpersonal,
+      sub.structured,
+    ];
+    let dotProduct = 0;
+    for (let i = 0; i < 6; i++) {
+      dotProduct += finalVector[i] * subVector[i];
+    }
+    const fDisc = (dotProduct / 6) * 100;
+    const fAci = aciPct * sub.agile_compatibility;
+    const rawFit = fDisc * 0.6 + fAci * 0.4;
+
+    return {
+      ...sub,
+      fDisc,
+      fAci,
+      rawFit,
+    };
+  });
+
+  // Sort by raw fit
+  rawResults.sort((a, b) => b.rawFit - a.rawFit);
+
+  // 7. Rank-based normalization
+  const n = rawResults.length;
+  const TOP_SCORE = 92;
+  const BOTTOM_SCORE = 42;
+
+  const results = rawResults.map((sub, idx) => {
+    const rankRatio = idx / Math.max(1, n - 1);
+    const fTotal = TOP_SCORE - rankRatio * (TOP_SCORE - BOTTOM_SCORE);
+
+    let interpretation = 'Explore';
+    if (fTotal >= 82) interpretation = 'Strong Match';
+    else if (fTotal >= 68) interpretation = 'Good Fit';
+    else if (fTotal >= 55) interpretation = 'Worth Considering';
+
+    // Identify strongest matching trait
+    const traitNames = [
+      'Analytical',
+      'Numerical',
+      'Verbal',
+      'Creative',
+      'Interpersonal',
+      'Structured',
+    ];
+    let bestTraitIdx = 0;
+    let bestTraitScore = 0;
+    for (let i = 0; i < 6; i++) {
+      const contribution =
+        finalVector[i] *
+        [
+          sub.analytical,
+          sub.numerical,
+          sub.verbal,
+          sub.creative,
+          sub.interpersonal,
+          sub.structured,
+        ][i];
+      if (contribution > bestTraitScore) {
+        bestTraitScore = contribution;
+        bestTraitIdx = i;
+      }
+    }
+
+    return {
+      ...sub,
+      fTotal: Math.round(fTotal),
+      interpretation,
+      matchReason: traitNames[bestTraitIdx],
+    };
+  });
+
+  return results;
 }
 
 // ─── Helper: Core Personality ────────────────────────────────────────────────
@@ -539,9 +695,13 @@ function buildSkillHeatmap(patterns: ProfilePatterns) {
 
 function buildStreamSelectionContent() {
   const streams: any[] = [];
-  for (const [, streamShortName] of Object.entries(STREAM_NAMES)) {
+  for (const [id, streamShortName] of Object.entries(STREAM_NAMES)) {
     const content = STREAM_SELECTION_CONTENT[streamShortName];
     if (!content) continue;
+
+    // Add odyssey roadmap
+    const roadmap = CAREER_ODYSSEY_ROADMAP[id] || CAREER_ODYSSEY_ROADMAP['0'];
+
     streams.push({
       shortName: content.shortName,
       title: content.title,
@@ -551,10 +711,66 @@ function buildStreamSelectionContent() {
         vibe: f.vibe,
         mappedDegrees: f.mappedDegrees,
       })),
+      odysseyRoadmap: roadmap
+        ? {
+            streamTitle: roadmap.streamTitle,
+            tagline: roadmap.tagline,
+            nodes: roadmap.nodes,
+          }
+        : null,
     });
   }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+
   return streams;
+}
+
+// ─── Helper: Career Flight Path ──────────────────────────────────────────────
+
+function buildCareerFlightPath(data: SchoolData) {
+  const [primaryTrait] = getTopTwoTraits(data.most_answered_answer_type, data);
+
+  const agile = data.agile_scores?.[0] ?? {
+    focus: 0,
+    courage: 0,
+    respect: 0,
+    openness: 0,
+    commitment: 0,
+  };
+
+  const agileKeyMap: Record<string, keyof typeof agile> = {
+    Commitment: 'commitment',
+    Courage: 'courage',
+    Focus: 'focus',
+    Openness: 'openness',
+    Respect: 'respect',
+  };
+
+  let topAgileValue = 'Commitment';
+  let topAgileScore = -1;
+  for (const [label, key] of Object.entries(agileKeyMap)) {
+    const score = agile[key] ?? 0;
+    if (score > topAgileScore) {
+      topAgileScore = score;
+      topAgileValue = label;
+    }
+  }
+
+  const group = DISC_AGILE_CAREER_PACE[primaryTrait];
+  const entry =
+    group?.entries.find((e: any) => e.agileValue === topAgileValue) ??
+    group?.entries[0];
+
+  if (!entry) return null;
+
+  return {
+    traitName: group.traitName,
+    agileValue: topAgileValue,
+    motivation: entry.motivation,
+    challengeTitle: entry.challengeTitle,
+    challengeDesc: entry.challengeDesc,
+    predictedPace: entry.predictedPace,
+    industryAvg: entry.industryAvg,
+  };
 }
 
 // ─── Main Builder ────────────────────────────────────────────────────────────
@@ -617,19 +833,30 @@ export async function buildSchoolReportJSON(data: SchoolData) {
     })),
   ];
 
-  // ── 7. Course Compatibility (DB call) ──
+  // ── 7. Determine Pathway & Fetch conditional section data ──
+  const isIGCSE = Boolean(
+    data.school_level_id === 1 &&
+    (data.student_board?.toUpperCase() === 'IGSCE' ||
+      data.student_board?.toUpperCase() === 'IGCSE' ||
+      data.group_name?.toUpperCase() === 'IGCSE' ||
+      data.dept_code?.toUpperCase() === 'IGCSE'),
+  );
+  const isSSLC = !isIGCSE && data.school_level_id === 1;
+  const isHSC = !isIGCSE && data.school_level_id !== 1;
+
   let courseCompatibility: CourseCompatibility[] = [];
   let topColleges: any[] = [];
+
   try {
-    if (data.school_level_id === 1) {
-      // SSLC → recommended stream
+    if (isSSLC) {
+      // SSLC -> recommended stream
       // For SSLC, pass undefined as schoolStreamId to get all streams
       courseCompatibility = await getCompatibilityMatrixDetails(
         dominantTrait,
         undefined,
       );
-    } else {
-      // HSC → specific stream
+    } else if (isHSC) {
+      // HSC -> specific stream
       courseCompatibility = await getCompatibilityMatrixDetails(
         dominantTrait,
         data.school_stream_id,
@@ -656,7 +883,7 @@ export async function buildSchoolReportJSON(data: SchoolData) {
     meta: {
       generatedAt: new Date().toISOString(),
       reportType: 'school',
-      schoolLevel: data.school_level_id === 1 ? 'SSLC' : 'HSC',
+      schoolLevel: isIGCSE ? 'IGCSE' : isSSLC ? 'SSLC' : 'HSC',
       schoolStreamId: data.school_stream_id ?? null,
     },
 
@@ -667,6 +894,7 @@ export async function buildSchoolReportJSON(data: SchoolData) {
       reportTitle: data.report_title,
       examStart: data.exam_start,
       examEnd: data.exam_end,
+      studentBoard: data.student_board,
     },
 
     discProfile: {
@@ -812,27 +1040,51 @@ export async function buildSchoolReportJSON(data: SchoolData) {
           }
         : null,
 
-      // ── Level-specific sections ──
-      ...(data.school_level_id === 1
+      // ── Level-specific sections (Mutually Exclusive) ──
+      ...(isSSLC
         ? {
-            // SSLC sections
             whereYouFitBest: computeWhereYouFitBest(data),
+            streamSelectionContent: buildStreamSelectionContent(),
+            careerFlightPath: buildCareerFlightPath(data),
+            courseCompatibility:
+              courseCompatibility.length > 0
+                ? {
+                    courses: courseCompatibility,
+                    description:
+                      'The course compatibility you\u2019ve received is based on your unique personality Report results, aiming to highlight programs that align well with your strengths and traits. However, this is not a fixed or singular recommendation. Your personal interests, evolving passions, and exposure to different fields also play a crucial role in shaping the right career path for you. We\u2019ve combined your profile with real-time industry data to give you a future-oriented perspective. Please keep in mind that course trends and career opportunities can shift from year to year as the world continues to evolve-new fields emerge, and existing ones transform. Use this as a guide, not a rulebook, to explore and make informed choices about your educational journey.',
+                  }
+                : null,
           }
         : {}),
 
-      courseCompatibility:
-        courseCompatibility.length > 0
-          ? {
-              courses: courseCompatibility,
-              description:
-                'The course compatibility you\u2019ve received is based on your unique personality Report results, aiming to highlight programs that align well with your strengths and traits. However, this is not a fixed or singular recommendation. Your personal interests, evolving passions, and exposure to different fields also play a crucial role in shaping the right career path for you. We\u2019ve combined your profile with real-time industry data to give you a future-oriented perspective. Please keep in mind that course trends and career opportunities can shift from year to year as the world continues to evolve-new fields emerge, and existing ones transform. Use this as a guide, not a rulebook, to explore and make informed choices about your educational journey.',
-            }
-          : null,
+      ...(isHSC
+        ? {
+            courseCompatibility:
+              courseCompatibility.length > 0
+                ? {
+                    courses: courseCompatibility,
+                    description:
+                      'The course compatibility you\u2019ve received is based on your unique personality Report results, aiming to highlight programs that align well with your strengths and traits. However, this is not a fixed or singular recommendation. Your personal interests, evolving passions, and exposure to different fields also play a crucial role in shaping the right career path for you. We\u2019ve combined your profile with real-time industry data to give you a future-oriented perspective. Please keep in mind that course trends and career opportunities can shift from year to year as the world continues to evolve-new fields emerge, and existing ones transform. Use this as a guide, not a rulebook, to explore and make informed choices about your educational journey.',
+                  }
+                : null,
+            careerFlightPath: buildCareerFlightPath(data),
+            careerOdysseyRoadmap:
+              CAREER_ODYSSEY_ROADMAP[String(data.school_stream_id ?? '0')] ||
+              CAREER_ODYSSEY_ROADMAP['0'] ||
+              null,
+            topColleges: topColleges.length > 0 ? topColleges : null,
+          }
+        : {}),
 
-      topColleges: topColleges.length > 0 ? topColleges : null,
-
-      streamSelectionContent:
-        data.school_level_id === 1 ? buildStreamSelectionContent() : null,
+      ...(isIGCSE
+        ? {
+            igcse: {
+              academicStrengthsProfile: computeIGCSEFinalVector(data),
+              asFitments: computeIGCSEFitment(data, GCSE),
+              aiceFitments: computeIGCSEFitment(data, AICE),
+            },
+          }
+        : {}),
     },
   };
 

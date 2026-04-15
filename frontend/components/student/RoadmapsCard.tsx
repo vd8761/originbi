@@ -5,7 +5,7 @@ import { ArrowUpRightIcon } from '../icons';
 
 const RoadmapItem: React.FC<{ item: RoadmapItemType & { id?: string } }> = ({ item }) => (
     <div
-        className="block -mx-6 px-6 lg:-mx-[1.25vw] lg:px-[1.25vw] even:bg-white/5 hover:bg-white/10 dark:hover:bg-brand-dark-tertiary transition-colors duration-200 group relative"
+        className="block -mx-6 px-6 lg:-mx-[1.25vw] lg:px-[1.25vw] even:bg-white/5 hover:bg-white/5 transition-colors duration-200 group relative"
     >
         <div className="flex justify-between items-center py-4 lg:py-[0.833vw]">
             <div className="pr-4">
@@ -26,40 +26,33 @@ const RoadmapItem: React.FC<{ item: RoadmapItemType & { id?: string } }> = ({ it
     </div>
 );
 
-const RoadmapsCard: React.FC = () => {
-    const roadmaps: (RoadmapItemType & { id: string })[] = [
-        {
-            id: '1',
-            title: 'UX/UI Designer',
-            description: 'Design intuitive and beautiful digital products',
-        },
-        {
-            id: '2',
-            title: 'Product Manager',
-            description: 'Lead cross-functional teams to build impactful products',
-        },
-        {
-            id: '3',
-            title: 'UX/UI Designer',
-            description: 'Deepen your skills in user research and interaction design',
-        },
-        {
-            id: '4',
-            title: 'Product Manager',
-            description: 'Own product strategy from discovery to delivery',
-        },
-        {
-            id: '5',
-            title: 'UX/UI Designer',
-            description: 'Grow into a senior creative leadership role',
-        },
-    ];
+interface RoadmapsCardProps {
+    reportData?: any;
+    isLoadingReport?: boolean;
+}
+
+const RoadmapsCard: React.FC<RoadmapsCardProps> = ({ reportData, isLoadingReport }) => {
+    // Extract real roadmaps from report data
+    const apiRoadmaps = reportData?.sections?.careerGuidance || [];
+    const roadmaps = apiRoadmaps.slice(0, 5).map((role: any, index: number) => ({
+        id: (index + 1).toString(),
+        title: role.roleName,
+        description: role.shortDescription,
+    }));
+
+    if (isLoadingReport) {
+        return (
+            <div className="dashboard-glass-card h-full flex items-center justify-center p-6">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-green"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="dashboard-glass-card h-full flex flex-col">
             <div className="px-6 pt-6 pb-4 lg:px-[1.25vw] lg:pt-[1.25vw] lg:pb-[0.833vw] flex justify-between items-center">
                 <h3 className="font-semibold font-sans text-[#19211C] dark:text-white text-[18px]">
-                    Your Roadmaps 2027-2035
+                    Your Roadmaps
                 </h3>
                 <Link
                     href="/student/roadmaps"
@@ -69,11 +62,17 @@ const RoadmapsCard: React.FC = () => {
                 </Link>
             </div>
             <hr className="border-[#19211C]/10 dark:border-white/10" />
-            <div className="px-6 pt-2 pb-2 lg:px-[1.25vw] lg:pt-[0.41vw] lg:pb-[0.41vw] flex-grow">
-                <div className="flex flex-col h-full justify-around">
-                    {roadmaps.map((item, index) => (
-                        <RoadmapItem key={index} item={item} />
-                    ))}
+            <div className="px-6 pt-2 pb-2 lg:px-[1.25vw] lg:pt-[0.41vw] lg:pb-[0.41vw] flex-grow overflow-auto no-scrollbar">
+                <div className="flex flex-col h-full justify-around min-h-[250px]">
+                    {roadmaps.length > 0 ? (
+                        roadmaps.map((item: any, index: number) => (
+                            <RoadmapItem key={index} item={item} />
+                        ))
+                    ) : (
+                        <div className="flex items-center justify-center h-full text-[#19211C]/50 dark:text-white/50 text-sm">
+                            {reportData ? "No roadmaps available." : "Complete assessment to view roadmaps."}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

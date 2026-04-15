@@ -737,7 +737,8 @@ export class StudentService {
           cognitoSub: cognitoSub, // Store in metadata if not in column
           ...(dto.metadata || {}), // Merge extra metadata
           currentRole: dto.current_role || dto.metadata?.current_role,
-          roleDescription: dto.role_description || dto.metadata?.role_description,
+          roleDescription:
+            dto.role_description || dto.metadata?.role_description,
         },
         createdAt: new Date(),
       });
@@ -757,7 +758,9 @@ export class StudentService {
 
       // 5. Calculate Registration Amount
       const configAmount = this.configService.get('REGISTRATION_COST') || 500;
-      const registrationAmountStr = (dto.payment_amount || configAmount).toString();
+      const registrationAmountStr = (
+        dto.payment_amount || configAmount
+      ).toString();
 
       // 6. Create Registration (Force TS Check)
       const registration = this.sessionRepo.manager.create(Registration, {
@@ -784,7 +787,8 @@ export class StudentService {
           sendEmail: true,
           ...(dto.metadata || {}), // Merge extra metadata
           currentRole: dto.current_role || dto.metadata?.current_role,
-          roleDescription: dto.role_description || dto.metadata?.role_description,
+          roleDescription:
+            dto.role_description || dto.metadata?.role_description,
         },
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -1532,7 +1536,7 @@ export class StudentService {
         registration.registrationSource !== 'AFFILIATE'
       ) {
         this.logger.log(
-          `Skipping automatic report generation and email for registration source: ${registration.registrationSource} (User: ${userId})`
+          `Skipping automatic report generation and email for registration source: ${registration.registrationSource} (User: ${userId})`,
         );
         return;
       }
@@ -1893,7 +1897,7 @@ export class StudentService {
       // 7. Send email
       const transporter = this.createEmailTransporter();
 
-      const subject = isThirdParty 
+      const subject = isThirdParty
         ? `${registration.fullName || 'Student'}'s Assessment Report – ${reportTitle}`
         : `Your Assessment Report – ${reportTitle}`;
 

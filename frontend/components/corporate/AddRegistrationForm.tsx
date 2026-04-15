@@ -130,9 +130,9 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
   };
 
   const getZIndex = (field: string) => {
-    if (openField === field) return "z-[60]";
-    if (activeField === field) return "z-50";
-    return "z-0";
+    if (openField === field) return "z-[100]";
+    if (activeField === field) return "z-[50]";
+    return "";
   };
 
   const handleSubmit = async () => {
@@ -254,7 +254,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
 
             {/* Full Name */}
-            <div className="space-y-2 z-0">
+            <div className="space-y-2">
               <label className={baseLabelClasses}>
                 Full Name <span className="text-red-500">*</span>
               </label>
@@ -268,7 +268,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
             </div>
 
             {/* Gender */}
-            <div className="space-y-2 z-0">
+            <div className="space-y-2">
               <label className={baseLabelClasses}>
                 Gender <span className="text-red-500">*</span>
               </label>
@@ -287,7 +287,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
             </div>
 
             {/* Email */}
-            <div className="space-y-2 z-0">
+            <div className="space-y-2">
               <label className={baseLabelClasses}>
                 Email Address <span className="text-red-500">*</span>
               </label>
@@ -404,10 +404,12 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                   <CustomSelect
                     label="Department"
                     required
-                    options={departments.map((d) => ({
-                      label: normalizeDepartmentDisplayName(d.department?.name || d.name || "Unknown"),
-                      value: d.id,
-                    }))}
+                    options={departments
+                      .filter((d) => d.is_active)
+                      .map((d) => ({
+                        label: normalizeDepartmentDisplayName(d.department?.name || d.name || "Unknown"),
+                        value: d.id,
+                      }))}
                     value={formData.department_id || ""}
                     onChange={(val) => {
                       handleInputChange("department_id", val);
@@ -453,7 +455,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
             )}
 
             {/* Group Name */}
-            <div className="space-y-2 relative z-0">
+            <div className="space-y-2 relative">
               <label className={baseLabelClasses}>Group Name</label>
               <input
                 type="text"

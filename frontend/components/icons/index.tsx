@@ -177,6 +177,14 @@ export const ClockIcon: React.FC<{ className?: string }> = ({
   </svg>
 );
 
+export const MoodClockIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4" }) => (
+  <svg className={className} viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M8.64828 17.2966C13.4164 17.2966 17.2966 13.4164 17.2966 8.64828C17.2966 3.8802 13.4164 0 8.64828 0C3.88016 0 0 3.8802 0 8.64828C0 13.4164 3.8802 17.2966 8.64828 17.2966ZM8.64828 1.15308C12.7821 1.15308 16.1435 4.51437 16.1435 8.64828C16.1435 12.7822 12.7822 16.1435 8.64828 16.1435C4.51437 16.1435 1.15308 12.7822 1.15308 8.64828C1.15308 4.51437 4.51442 1.15308 8.64828 1.15308Z" fill="white" />
+    <path d="M11.1712 11.4041C11.2779 11.4906 11.4047 11.531 11.5316 11.531C11.7017 11.531 11.8688 11.456 11.9813 11.3148C12.1802 11.0668 12.1398 10.7036 11.8919 10.5047L9.22535 8.37144V4.03577C9.22535 3.71866 8.96592 3.45923 8.64881 3.45923C8.3317 3.45923 8.07227 3.71866 8.07227 4.03577V8.64821C8.07227 8.82407 8.153 8.98838 8.28847 9.0979L11.1712 11.4041Z" fill="white" />
+  </svg>
+);
+
+
 export const HistoryIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />

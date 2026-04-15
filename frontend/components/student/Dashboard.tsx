@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { studentService } from '../../lib/services/student.service';
 import PersonalityCard from './PersonalityCard';
-import PublicVisibilityCard from './PublicVisibilityCard';
 import ConsultantCallCard from './ConsultantCallCard';
 import RoadmapsCard from './RoadmapsCard';
 import MoodCard from './MoodCard';
+import MyJobsCard from './MyJobsCard';
 import ImpactAssessmentCard from './ImpactAssessmentCard';
 import TopCollegesCard from './TopCollegesCard';
 
@@ -64,12 +64,12 @@ const Dashboard: React.FC = () => {
               
               Row 1:
               - Personality: 50% (6 cols) | Tablet: 100% (2 cols)
-              - Public Vis:  25% (3 cols) | Tablet: 50% (1 col)
               - Consultant:  25% (3 cols) | Tablet: 50% (1 col)
+              - Roadmaps:    25% (3 cols) | Tablet: 50% (1 col)
               
               Row 2 (College):
-              - Roadmaps:    33% (4 cols) | Tablet: 100% (2 cols)
-              - Mood:        66% (8 cols) | Tablet: 100% (2 cols)
+              - Mood:        33% (4 cols) | Tablet: 100% (2 cols)
+              - My Jobs:     66% (8 cols) | Tablet: 100% (2 cols)
 
               Row 2 (School):
               - Roadmaps:            33% (4 cols)
@@ -93,28 +93,33 @@ const Dashboard: React.FC = () => {
             ) : (
                 <>
                     <div className="col-span-1 md:col-span-1 lg:col-span-3 h-full">
-                        <PublicVisibilityCard />
+                        <ConsultantCallCard />
                     </div>
                     <div className="col-span-1 md:col-span-1 lg:col-span-3 h-full">
-                        <ConsultantCallCard />
+                        <RoadmapsCard reportData={reportData} isLoadingReport={isLoadingReport} />
                     </div>
                 </>
             )}
 
             {/* Row 2 */}
             <div className="col-span-1 md:col-span-2 lg:col-span-4 h-full">
-                <RoadmapsCard />
+                {isSchool ? (
+                    <RoadmapsCard reportData={reportData} isLoadingReport={isLoadingReport} />
+                ) : (
+                    <MoodCard />
+                )}
             </div>
 
-            {isSchool ? (
+            {isSchool && (
                 <div className="col-span-1 md:col-span-2 lg:col-span-8 h-full">
                     <TopCollegesCard reportData={reportData} isLoadingReport={isLoadingReport} />
                 </div>
-            ) : (
+            )}
+            {!isSchool && (
                 <div className="col-span-1 md:col-span-2 lg:col-span-8 h-full">
-                    <MoodCard />
+                    <MyJobsCard />
                 </div>
-                )}
+            )}
             </div>
         </div>
     );

@@ -32,7 +32,10 @@ export class DepartmentsService {
     // If you need specific ordering, you might need query builder or sort in JS
     const rows = await this.deptDegreeRepo.find({
       relations: ['department', 'degreeType'],
-      where: { isActive: true },
+      where: { 
+        isActive: true,
+        department: { isActive: true }
+      },
     });
 
     // Transform to simple list for dropdown
