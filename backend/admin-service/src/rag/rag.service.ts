@@ -435,6 +435,16 @@ export class RagService {
         includePersonality: true,
       };
     }
+
+    const completionCheckMatch = message.match(/\b(?:is|has|did)\s+(?:that\s+)?((?:[A-Za-z]+\.?\s*){1,4})\s+(?:completed|complete|finished|submitted)\b/i);
+    if (completionCheckMatch && /\b(assessment|assessments|test|tests|exam|exams)\b/.test(q)) {
+      return {
+        intent: 'person_lookup',
+        searchTerm: completionCheckMatch[1].trim(),
+        table: 'assessment_attempts',
+        includePersonality: true,
+      };
+    }
     if (/(\bhow\s+many\b|\bcount\b|\btotal\b)/.test(q)) {
       const assessmentCountSearchTerm = this.detectAssessmentCountSearchTerm(q);
       if (assessmentCountSearchTerm) {
@@ -457,15 +467,20 @@ export class RagService {
       }
     }
 
-    if (/\b(career\s*report|future\s*role|role\s*readiness)\b/.test(q) ||
-      (/\breport\b/.test(q) && /\b(for|of|about)\b/.test(q))) {
-      const name = this.extractName(message);
-      return { intent: 'career_report', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
-    }
-
     if (/\b(career\s*fitment|custom\s*report|my\s*fitment|personalized\s*report)\b/.test(q)) {
       const name = this.extractName(message);
       return { intent: 'custom_report', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    const bareNameReportPattern =
+      /^\s*(?:[a-z]+\.?\s*){1,4}\s+report\b/i.test(q)
+      && !/\b(test|assessment|exam|overall|custom|fitment|placement|program|batch|group)\b/.test(q);
+
+    if (/\b(career\s*report|future\s*role|role\s*readiness)\b/.test(q) ||
+      (/\breport\b/.test(q) && /\b(for|of|about)\b/.test(q)) ||
+      bareNameReportPattern) {
+      const name = this.extractName(message);
+      return { intent: 'career_report', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
     }
 
     if (/\b(list|show|get|display|view)\b\s+(my|our)?\s*\b(candidates?|students?|employees?|resources?|staff|members?|people|peoples|persons?)\b/.test(q)) {
@@ -518,6 +533,18 @@ export class RagService {
     }
 
     return null;
+  }
+
+  private getCompletedAttemptPredicateSql(alias: string): string {
+    return `(
+      TRIM(UPPER(COALESCE(${alias}.status, ''))) IN ('COMPLETED', 'COMPLETE', 'FINISHED', 'SUBMITTED')
+      OR ${alias}.completed_at IS NOT NULL
+    )`;
+  }
+
+  private isCompletedStatus(status: string | null | undefined): boolean {
+    const normalized = String(status || '').trim().toUpperCase();
+    return ['COMPLETED', 'COMPLETE', 'FINISHED', 'SUBMITTED'].includes(normalized);
   }
 
   private shouldForceDbAnswer(question: string, userRole: string): boolean {
@@ -836,12 +863,13 @@ export class RagService {
     if (!this.llm) {
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) throw new Error('GOOGLE_API_KEY/GEMINI_API_KEY not set');
-      const ragModel =
+      const requestedModel =
         process.env.GEMINI_ROUTER_MODEL ||
         process.env.GEMINI_FORMATTER_MODEL ||
         process.env.GEMINI_PLANNER_MODEL ||
         process.env.GEMINI_LLM_MODEL ||
-        'gemini-2.0-flash';
+        'gemini-2.5-flash';
+      const ragModel = this.resolveGeminiChatModel(requestedModel, 'gemini-2.5-flash');
       const ragMaxTokens = Math.max(
         120,
         Number(
@@ -883,6 +911,18 @@ export class RagService {
       });
     }
     return this.fallbackLlm;
+  }
+
+  private resolveGeminiChatModel(requestedModel: string | undefined, fallbackModel = 'gemini-2.5-flash'): string {
+    const normalized = (requestedModel || '').trim();
+    if (!normalized) return fallbackModel;
+
+    if (/^gemini-2\.0-flash$/i.test(normalized)) {
+      this.logger.warn(`Deprecated Gemini model "${normalized}" requested. Using "${fallbackModel}" instead.`);
+      return fallbackModel;
+    }
+
+    return normalized;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1203,11 +1243,44 @@ export class RagService {
       // Prevents ambiguous Text-to-SQL interpretations such as generic "records found".
       {
         const q = question.toLowerCase();
-        const wantsCount = /\bhow\s+many\b|\bcount\b|\btotal\b/.test(q);
+        const wantsCount = /\bhow\s+many\b|\bcount\b|\btotal\b/.test(q)
+          || (/\b(gender|male|female|men|women|boys?|girls?)\b/.test(q)
+            && /\b(distribution|breakdown|split|ratio|comparison|vs\.?|versus)\b/.test(q));
         const roleNow = (user?.role || 'STUDENT').toUpperCase();
         if (wantsCount && (roleNow === 'ADMIN' || roleNow === 'CORPORATE')) {
           let deterministic: { intent: string; searchTerm: string | null; table: string; includePersonality: boolean } | null = null;
           const assessmentCountSearchTerm = this.detectAssessmentCountSearchTerm(q);
+          const hasMale = /\b(male|males|men|boys?)\b/.test(q);
+          const hasFemale = /\b(female|females|women|girls?)\b/.test(q);
+
+          // Always route gender count/breakdown asks through deterministic DB count logic
+          // so responses are grounded in registrations (scoped by role).
+          if (hasMale && hasFemale) {
+            deterministic = {
+              intent: 'count',
+              searchTerm: 'candidates',
+              table: 'registrations',
+              includePersonality: false,
+              genderBreakdown: true,
+            } as any;
+          } else if (hasMale) {
+            deterministic = {
+              intent: 'count',
+              searchTerm: 'candidates',
+              table: 'registrations',
+              includePersonality: false,
+              gender: 'MALE',
+            } as any;
+          } else if (hasFemale) {
+            deterministic = {
+              intent: 'count',
+              searchTerm: 'candidates',
+              table: 'registrations',
+              includePersonality: false,
+              gender: 'FEMALE',
+            } as any;
+          }
+
           if (assessmentCountSearchTerm) {
             deterministic = {
               intent: 'count',
@@ -1215,11 +1288,11 @@ export class RagService {
               table: 'assessment_attempts',
               includePersonality: false,
             };
-          } else if (/\b(employee|employees|resource|resources|staff|member|members)\b/.test(q)) {
+          } else if (!deterministic && /\b(employee|employees|resource|resources|staff|member|members)\b/.test(q)) {
             deterministic = { intent: 'count', searchTerm: 'employees', table: 'registrations', includePersonality: false };
-          } else if (/\b(candidate|candidates|student|students)\b/.test(q)) {
+          } else if (!deterministic && /\b(candidate|candidates|student|students)\b/.test(q)) {
             deterministic = { intent: 'count', searchTerm: 'candidates', table: 'registrations', includePersonality: false };
-          } else if (/\b(user|users|account|accounts)\b/.test(q)) {
+          } else if (!deterministic && /\b(user|users|account|accounts)\b/.test(q)) {
             deterministic = { intent: 'count', searchTerm: 'users', table: 'users', includePersonality: false };
           }
 
@@ -1300,6 +1373,10 @@ export class RagService {
 
         if (roleAwareDirectInterpretation.intent === 'custom_report') {
           return await this.handleCustomReport(user, roleAwareDirectInterpretation.searchTerm, question);
+        }
+
+        if (roleAwareDirectInterpretation.intent === 'person_lookup' && roleAwareDirectInterpretation.searchTerm) {
+          return await this.handlePersonLookup(roleAwareDirectInterpretation.searchTerm, user);
         }
 
         const totalCount = await this.getTotalCount(roleAwareDirectInterpretation, user as UserContext);
@@ -3791,8 +3868,6 @@ Please tell me the target role first, for example:
         }
       }
 
-      response += `\n💡 *Want a detailed analysis? Try: "generate career report for ${person.full_name}"*`;
-
       return {
         answer: response,
         searchType: 'person_lookup',
@@ -4920,14 +4995,11 @@ Please tell me the target role first, for example:
 
     // Gender count follow-ups after candidate/resource count/list responses:
     // "male and female", "male vs female", "male", "female".
-    const asksGenderBreakdownFollowUp = /^(gender\s*(distribution|ratio|breakdown|split|comparison|count)?|(male|female|men|women|boys?|girls?)\s*(and|&|\/|vs\.?|versus)\s*(male|female|men|women|boys?|girls?)\s*(count|distribution|ratio|breakdown|split|comparison)?)\s*\??$/i.test(q);
+    const asksGenderBreakdownFollowUp = /^((list|show|get|tell|give)\s+)?((me\s+)?(how\s+many|count|total)\s+)?(gender\s*(distribution|ratio|breakdown|split|comparison|count)?|(male|female|men|women|boys?|girls?)\s*(and|&|\/|vs\.?|versus)\s*(male|female|men|women|boys?|girls?)\s*(count|distribution|ratio|breakdown|split|comparison)?)\s*\??$/i.test(q);
     const asksSingleGenderFollowUp = /^(male|female|males|females|men|women|boys?|girls?)\s*\??$/i.test(q)
       || /^(what\s+about|how\s+about|and|and\s+the)\s+(male|female|males|females|men|women|boys?|girls?)\s*\??$/i.test(q);
 
-    if (
-      ['count', 'list_candidates', 'test_results', 'data_query'].includes(lastIntent)
-      && /\b(candidate|candidates|student|students|employee|employees|resource|resources|registration|registrations|male|female|gender)\b/i.test(recentMessages)
-    ) {
+    if (/\b(candidate|candidates|student|students|employee|employees|resource|resources|registration|registrations|male|female|gender)\b/i.test(recentMessages)) {
       if (asksGenderBreakdownFollowUp) {
         this.logger.log(`🔁 Gender follow-up resolved: "${question}" → count gender breakdown`);
         return {
@@ -5133,7 +5205,7 @@ Please tell me the target role first, for example:
     // ═══════════════════════════════════════════════════════════════
 
     // "male and female" / "male vs female" / "gender breakdown"
-    if (/^(gender\s*(distribution|ratio|breakdown|split|comparison|count)?|(male|female|men|women|boys?|girls?)\s*(and|&|\/|vs\.?|versus)\s*(male|female|men|women|boys?|girls?)\s*(count|distribution|ratio|breakdown|split|comparison)?)\s*\??$/i.test(q.trim())) {
+    if (/^((list|show|get|tell|give)\s+)?((me\s+)?(how\s+many|count|total)\s+)?(gender\s*(distribution|ratio|breakdown|split|comparison|count)?|(male|female|men|women|boys?|girls?)\s*(and|&|\/|vs\.?|versus)\s*(male|female|men|women|boys?|girls?)\s*(count|distribution|ratio|breakdown|split|comparison)?)\s*\??$/i.test(q.trim())) {
       return { intent: 'count', searchTerm: 'candidates', table: 'registrations', includePersonality: false, genderBreakdown: true } as any;
     }
 
@@ -6063,6 +6135,8 @@ Please tell me the target role first, for example:
     const patterns = [
       // "jai test report" / "anjaly assessment report" → "jai" / "anjaly"
       /^\s*((?:[A-Za-z]+\.?\s*){1,4})\s+(?:test|assessment|exam)\s*report\b/i,
+      // "fasil report" → "fasil"
+      /^\s*((?:[A-Za-z]+\.?\s*){1,4})\s+report\b/i,
       // "for Jaya Krishna Reddy #1" → "Jaya Krishna Reddy #1"
       /(?:for|fot|fr|about|bout|of)\s+((?:[A-Za-z]+\.?\s*){1,4}(?:\s*#\s*\d+)?)/i,
       // "Jaya Krishna's score" → "Jaya Krishna"
@@ -6085,6 +6159,7 @@ Please tell me the target role first, for example:
       'career', 'report', 'details', 'data', 'profile',
       'candidate', 'candidates', 'student', 'students',
       'assessment', 'overall', 'custom', 'placement',
+      'fitment',
       // Domain terms that should NEVER be treated as person names
       'employee', 'employees', 'resource', 'resources',
       'member', 'members', 'staff', 'worker', 'workers',
@@ -6461,7 +6536,7 @@ Please tell me the target role first, for example:
 
             return 0;
           } else {
-            sql = `SELECT COUNT(*) as count FROM assessment_attempts WHERE status = 'COMPLETED' AND user_id = $1`;
+            sql = `SELECT COUNT(*) as count FROM assessment_attempts aa WHERE ${this.getCompletedAttemptPredicateSql('aa')} AND aa.user_id = $1`;
             params.push(userId);
           }
           break;
@@ -6722,7 +6797,7 @@ Please tell me the target role first, for example:
           JOIN registrations ON assessment_attempts.registration_id = registrations.id
           LEFT JOIN personality_traits ON assessment_attempts.dominant_trait_id = personality_traits.id
           LEFT JOIN programs ON assessment_attempts.program_id = programs.id
-          WHERE assessment_attempts.status = 'COMPLETED' AND registrations.is_deleted = false`;
+          WHERE ${this.getCompletedAttemptPredicateSql('assessment_attempts')} AND registrations.is_deleted = false`;
 
         const selfFallbackQueries: Array<{ sql: string; params: any[]; note: string }> = [];
 
@@ -6784,6 +6859,7 @@ Please tell me the target role first, for example:
             registrations.full_name,
             registrations.gender,
             registrations.mobile_number,
+            registrations.status as registration_status,
             assessment_attempts.total_score,
             ${lookupSincFields},
             assessment_attempts.status,
@@ -6795,7 +6871,7 @@ Please tell me the target role first, for example:
           FROM registrations
           LEFT JOIN users ON registrations.user_id = users.id
           LEFT JOIN assessment_attempts ON assessment_attempts.registration_id = registrations.id
-            AND assessment_attempts.status = 'COMPLETED'
+            AND ${this.getCompletedAttemptPredicateSql('assessment_attempts')}
           LEFT JOIN personality_traits ON assessment_attempts.dominant_trait_id = personality_traits.id
           LEFT JOIN programs ON assessment_attempts.program_id = programs.id
           WHERE registrations.is_deleted = false`;
@@ -8267,10 +8343,17 @@ Please tell me the target role first, for example:
       case 'person_lookup':
       case 'career_report':
         if (role === 'STUDENT') {
+          suggestions.push('Generate my career report');
           suggestions.push('Show my personality traits');
           suggestions.push('What careers suit me?');
           suggestions.push('Show my strongest role fit');
         } else {
+          const personName = this.extractName(question);
+          if (personName) {
+            suggestions.push(`Generate career report for ${personName}`);
+          } else {
+            suggestions.push('Generate career report for this person');
+          }
           suggestions.push('Show their personality traits');
           suggestions.push('What careers suit this person?');
           suggestions.push('Compare this person with a target role');

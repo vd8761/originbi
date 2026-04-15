@@ -20,6 +20,7 @@ import { AssessmentAnswer } from '../entities/assessment_answer.entity';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { Program } from '../entities/program.entity';
 import { SchoolStream } from '../entities/school-stream.entity';
+import { Department } from '@originbi/shared-entities';
 import {
   Registration,
   Gender,
@@ -28,6 +29,7 @@ import {
   AffiliateAccount,
   AffiliateReferralTransaction,
   Notification,
+  DepartmentDegree,
 } from '@originbi/shared-entities';
 import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
@@ -76,6 +78,10 @@ export class StudentService {
     private readonly notificationRepo: Repository<Notification>,
     @InjectRepository(SchoolStream)
     private readonly schoolStreamRepo: Repository<SchoolStream>,
+    @InjectRepository(Department)
+    private readonly departmentRepo: Repository<Department>,
+    @InjectRepository(DepartmentDegree)
+    private readonly departmentDegreeRepo: Repository<DepartmentDegree>,
     private readonly configService: ConfigService,
   ) {}
 
@@ -773,6 +779,7 @@ export class StudentService {
         schoolLevel: dto.school_level,
         schoolStream: dto.school_stream,
         programId: program.id,
+        departmentDegreeId: dto.department_degree_id || dto.departmentDegreeId,
         studentBoard: dto.student_board || dto.studentBoard, // Explicit assignment
         // metadata: { ... } below also stores it
         status: 'COMPLETED' as RegistrationStatus,
@@ -785,6 +792,7 @@ export class StudentService {
           groupCode: dto.group_code,
           studentBoard: dto.student_board || dto.studentBoard, // Store in metadata as well
           sendEmail: true,
+          currentYear: dto.current_year || dto.currentYear,
           ...(dto.metadata || {}), // Merge extra metadata
           currentRole: dto.current_role || dto.metadata?.current_role,
           roleDescription:
@@ -1061,6 +1069,72 @@ export class StudentService {
       where: { isActive: true },
       order: { id: 'ASC' },
     });
+  }
+
+  async getDepartments() {
+    const rows = await this.departmentDegreeRepo.find({
+      relations: ['department', 'degreeType'],
+      where: {
+        isActive: true,
+        department: { isActive: true, isDeleted: false },
+      },
+    });
+
+    const result = rows.map((row) => {
+      const degreeName = row.degreeType?.name || '';
+      const deptName = row.department?.name || '';
+      const fullName = `${degreeName} ${deptName}`.trim();
+      return {
+        id: row.id,
+        name: this.normalizeDepartmentDisplayName(fullName),
+        isActive: row.isActive,
+      };
+    });
+
+    return result.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  private normalizeDepartmentDisplayName(label: string | undefined | null) {
+    if (!label) return '';
+
+    let normalized = label.replace(/\s+/g, ' ').trim();
+
+    while (true) {
+      const words = normalized.split(' ');
+      const duplicatePrefixWordCount = this.getDuplicatePrefixWordCount(words);
+
+      if (!duplicatePrefixWordCount) break;
+
+      words.splice(duplicatePrefixWordCount, duplicatePrefixWordCount);
+      normalized = words.join(' ');
+    }
+
+    return normalized;
+  }
+
+  private getDuplicatePrefixWordCount(words: string[]) {
+    const maxPrefixWordCount = Math.min(Math.floor(words.length / 2), 6);
+
+    for (
+      let prefixWordCount = maxPrefixWordCount;
+      prefixWordCount >= 1;
+      prefixWordCount--
+    ) {
+      const firstPrefix = words
+        .slice(0, prefixWordCount)
+        .map((w) => w.toLowerCase().replace(/[.,;:!?-]+$/g, ''));
+      const repeatedPrefix = words
+        .slice(prefixWordCount, prefixWordCount * 2)
+        .map((w) => w.toLowerCase().replace(/[.,;:!?-]+$/g, ''));
+
+      const isDuplicate = firstPrefix.every(
+        (word, index) => word !== '' && word === repeatedPrefix[index],
+      );
+
+      if (isDuplicate) return prefixWordCount;
+    }
+
+    return 0;
   }
 
   // Helper to generate questions locally (simplified version of admin-service logic)

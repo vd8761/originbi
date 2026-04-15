@@ -20,6 +20,11 @@ export class StudentController {
     return this.studentService.getSchoolStreams();
   }
 
+  @Post('departments')
+  async getDepartments() {
+    return this.studentService.getDepartments();
+  }
+
   @Post('seed')
   seedStudent(@Body() body: { email: string; fullName: string }) {
     return this.studentService.createTestStudent(body.email, body.fullName);

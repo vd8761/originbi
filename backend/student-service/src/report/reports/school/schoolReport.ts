@@ -655,7 +655,7 @@ export class SchoolReport extends BaseReport {
     this.drawSingleBarChart(chartData, { percentageLabelOffset: -25 });
 
     // 4. Motivations
-    this.h1('Motivations and Needs â€“ Your Personalized Insights');
+    this.h1('Motivations and Needs - Your Personalized Insights');
     this.pHtml(
       content.motivations_intro.replace('$full_name', this.data.full_name),
     );
@@ -892,7 +892,7 @@ export class SchoolReport extends BaseReport {
   private ci_generate360Impact(): void {
     this.ensureSpace(0.3, true);
 
-    this.h2('360Â° Impact Assessment');
+    this.h2('360° Impact Assessment');
 
     this.p(
       'A holistic view of impact across personality, behavioural agility, and leadership dimensions.',
@@ -1090,7 +1090,7 @@ export class SchoolReport extends BaseReport {
     // Add contextual text for extreme scores
     // if (p.leadership > 75) {
     //   this.p(
-    //     'â˜… ' +
+    //     ' ' +
     //     (TEXT_VARIATIONS['skill-leadership-high']?.[p.textVariant] ?? ''),
     //     {
     //       color: CI_COLORS.STRONG_GREEN,
@@ -1100,7 +1100,7 @@ export class SchoolReport extends BaseReport {
     // }
     // if (p.collaboration < 50) {
     //   this.p(
-    //     'â–³ ' +
+    //     ' ' +
     //     (TEXT_VARIATIONS['skill-collaboration-low']?.[p.textVariant] ?? ''),
     //     {
     //       color: CI_COLORS.MODERATE_AMBER,
@@ -1235,7 +1235,7 @@ export class SchoolReport extends BaseReport {
       if (deptMap.size > 0) {
         this.h2('Compatible Courses for This Stream');
         this.pHtml(
-          '<b> How to read: </b>Bar colour shows trait alignment. Higher % means a stronger match - primary colour bars score â‰¥70%.',
+          '<b> How to read: </b>Bar colour shows trait alignment. Higher % means a stronger match - primary colour bars score 70%.',
         );
         // Compact legend - shown once above all departments
         const DISC_COLORS: Record<string, string> = {
@@ -1264,13 +1264,13 @@ export class SchoolReport extends BaseReport {
           .fontSize(7)
           .fillColor('#333333')
           .text(
-            `Primary trait - higher match (â‰¥${SSLC_THRESHOLD}%)`,
+            `Primary trait - higher match (${SSLC_THRESHOLD}%)`,
             cx,
             legendY + 1,
             { continued: false },
           );
         const w1 = this.doc.widthOfString(
-          `Primary trait - higher match (â‰¥${SSLC_THRESHOLD}%)`,
+          `Primary trait - higher match (${SSLC_THRESHOLD}%)`,
         );
         cx += w1 + 14;
 
@@ -1529,7 +1529,7 @@ export class SchoolReport extends BaseReport {
 
   /**
    * GCSE Fitment Engine
-   * Uses the original GCSE.md formula (dot-product / 6 Ã— 100) for DISC fitment,
+   * Uses the original GCSE.md formula (dot-product / 6 - 100) for DISC fitment,
    * combined with ACI-based fitment. Then applies rank-based normalization so that
    * top subjects land in the 78-92% range and bottom subjects drop to 40-55%.
    * This creates meaningful differentiation that students can actually interpret.
@@ -1596,7 +1596,7 @@ export class SchoolReport extends BaseReport {
         sub.structured,
       ];
 
-      // DISC-based fitment: dot-product / 6 Ã— 100 (Section 6)
+      // DISC-based fitment: dot-product / 6 - 100 (Section 6)
       let dotProduct = 0;
       for (let i = 0; i < 6; i++) {
         dotProduct += finalVector[i] * subVector[i];
@@ -1621,7 +1621,7 @@ export class SchoolReport extends BaseReport {
     rawResults.sort((a, b) => b.rawFit - a.rawFit);
 
     // 7. Rank-based normalization to create meaningful spread
-    // Top subject â†’ ~90%, bottom â†’ ~42%, smooth linear interpolation
+    // Top subject  ~90%, bottom  ~42%, smooth linear interpolation
     const n = rawResults.length;
     const TOP_SCORE = 92;
     const BOTTOM_SCORE = 42;
@@ -1831,7 +1831,7 @@ export class SchoolReport extends BaseReport {
       .fillColor('#FAFAFA')
       .fill();
 
-    // Left accent bar — clipped inside the card's rounded boundary
+    // Left accent bar - clipped inside the card's rounded boundary
     this.doc.save();
     this.doc.roundedRect(margin, cy, pageW, cardH, 8).clip();
     this.doc.rect(margin, cy, 6, cardH).fillColor(opt.accent).fill();
@@ -2187,7 +2187,7 @@ export class SchoolReport extends BaseReport {
         }
       }
 
-      // Score bar — scaled from 30% to 100% for better visual differentiation
+      // Score bar - scaled from 30% to 100% for better visual differentiation
       const barH = 8;
       const barY = sy + midY - barH / 2;
       const scaledPct = Math.max(0, (sub.fTotal - 30) / 70);
@@ -2326,7 +2326,7 @@ export class SchoolReport extends BaseReport {
           align: 'center',
         });
 
-        // Subject name — vertically centered within the row
+        // Subject name - vertically centered within the row
         this.doc.font(this.FONT_SORA_BOLD).fontSize(9.5).fillColor('#222222');
         const textH = this.doc.heightOfString(sub.name, { width: nameW });
         const nameY = curY + midY - textH / 2;
@@ -2700,7 +2700,7 @@ export class SchoolReport extends BaseReport {
 
     this.ensureSpace(0.26, true);
 
-    // â”€â”€ Determine student data â”€â”€
+    //  Determine student data 
     const topTwoTraits = this.getTopTwoTraits(
       this.data.most_answered_answer_type,
       this.data,
@@ -2733,15 +2733,15 @@ export class SchoolReport extends BaseReport {
     const compatibility = rankedStreams[0].compat;
     const altStreams = rankedStreams.slice(1, 4); // top 3 alternatives
 
-    // â”€â”€ Title â”€â”€
+    //  Title 
     this.h1('Where You Fit Best');
     this.doc.moveDown(0.3);
 
-    // â”€â”€ Recommended Stream Card â”€â”€
+    //  Recommended Stream Card 
     const cardH = 130;
     const cardY = this.doc.y;
 
-    // Gradient background (light blue â†’ light purple)
+    // Gradient background (light blue  light purple)
     const grad = this.doc.linearGradient(margin, cardY, margin + pageW, cardY);
     grad.stop(0, '#E8F0FE').stop(1, '#EDE7F6');
     this.doc.roundedRect(margin, cardY, pageW, cardH, 12).fill(grad);
@@ -2753,7 +2753,7 @@ export class SchoolReport extends BaseReport {
       .strokeColor('#C5CAE9')
       .stroke();
 
-    // â”€â”€ Department icons (2Ã—2 grid, glass circles, right side) â”€â”€
+    //  Department icons (2-2 grid, glass circles, right side) 
     const streamContent = STREAM_SELECTION_CONTENT[recommendedStream];
     const iconSize = 44;
     const iconGap = 12;
@@ -2811,7 +2811,7 @@ export class SchoolReport extends BaseReport {
       });
     }
 
-    // â”€â”€ Centered text block (left portion of card, excluding icon area) â”€â”€
+    //  Centered text block (left portion of card, excluding icon area) 
     const textAreaW = iconBlockX - margin - 20; // available width for text
     const textCenterX = margin + textAreaW / 2;
 
@@ -2931,7 +2931,7 @@ export class SchoolReport extends BaseReport {
     this.doc.y = cardY + cardH + 25;
     this.doc.x = margin;
 
-    // â”€â”€ Reasons Section â”€â”€
+    //  Reasons Section 
     this.doc
       .font(this.FONT_SORA_BOLD)
       .fontSize(14)
@@ -2949,7 +2949,7 @@ export class SchoolReport extends BaseReport {
 
     reasons.forEach((reason) => {
       this.doc.font(this.FONT_SORA_REGULAR).fontSize(8.5);
-      const textW = this.doc.widthOfString(`âœ“  ${reason}`);
+      const textW = this.doc.widthOfString(`  ${reason}`);
       const pillW = textW + 2 * pillPadH;
 
       // Wrap to next row if overflows
@@ -3010,7 +3010,7 @@ export class SchoolReport extends BaseReport {
     this.doc.y = pillRowY + (pillRowCount + 1) * (pillH + 8) + 15;
     this.doc.x = margin;
 
-    // â”€â”€ Alternative Streams Section â”€â”€
+    //  Alternative Streams Section 
     this.doc
       .font(this.FONT_SORA_BOLD)
       .fontSize(14)
@@ -3110,7 +3110,7 @@ export class SchoolReport extends BaseReport {
     this.doc.y = altY + altCardH + 15;
     this.doc.x = margin;
 
-    // â”€â”€ Future Direction Box â”€â”€
+    //  Future Direction Box 
     const topAlt = altStreams[0];
     if (topAlt) {
       const dirText = STREAM_FUTURE_DIRECTIONS[topAlt.name] || '';
@@ -3169,7 +3169,7 @@ export class SchoolReport extends BaseReport {
 
     this.h2('It is Not Just About Subjects-It is About Your Identity');
     this.pHtml(
-      'When choosing a stream for the 11th and 12th grades, it is helpful to look beyond the immediate syllabus and ask yourself: What kind of impact do I want to make? <br/>â€¢ Do you want to build the technology of tomorrow?<br/>â€¢ Are you driven to heal people and advance medical science?<br/>â€¢ Do you enjoy the dynamics of business, finance, and leadership?<br/>â€¢ Or are you passionate about understanding human behavior, law, and creative expression?',
+      'When choosing a stream for the 11th and 12th grades, it is helpful to look beyond the immediate syllabus and ask yourself: What kind of impact do I want to make? <br/>Do you want to build the technology of tomorrow?<br/>Are you driven to heal people and advance medical science?<br/>Do you enjoy the dynamics of business, finance, and leadership?<br/>Or are you passionate about understanding human behavior, law, and creative expression?',
     );
     this.pHtml(
       'Your natural interests and strengths are the best compass you have. When you align your studies with what you genuinely enjoy, building a highly successful career becomes a pursuit of purpose rather than just work.',
@@ -3491,7 +3491,7 @@ export class SchoolReport extends BaseReport {
       graphBottomPadding *= 0.9;
     }
 
-    // Since the path uses Math.cos over >1 periods, the exact bounds are always Â±amplitude.
+    // Since the path uses Math.cos over >1 periods, the exact bounds are always amplitude.
     const maxGraphY = amplitude;
     const minGraphY = -amplitude;
 
@@ -3838,13 +3838,13 @@ export class SchoolReport extends BaseReport {
       //   .text('How to read: ', legendMargin, legendY, { continued: true })
       //   .font(this.FONT_SORA_REGULAR)
       //   .fillColor('#333333')
-      //   .text('Bar colour shows trait alignment. Higher % means a stronger match - primary colour bars score â‰¥70%.', {
+      //   .text('Bar colour shows trait alignment. Higher % means a stronger match - primary colour bars score 70%.', {
       //     continued: false,
       //     width: this.PAGE_WIDTH - 2 * legendMargin - 4,
       //   });
 
       this.pHtml(
-        '<b> How to read: </b>Bar colour shows trait alignment. Higher % means a stronger match - primary colour bars score â‰¥70%.',
+        '<b> How to read: </b>Bar colour shows trait alignment. Higher % means a stronger match - primary colour bars score 70%.',
       );
 
       const labelY = this.doc.y + 4;
@@ -3861,14 +3861,14 @@ export class SchoolReport extends BaseReport {
         .font(this.FONT_SORA_SEMIBOLD)
         .fontSize(9)
         .fillColor('#333333')
-        // .text(`${highLabel} trait - higher match (â‰¥70%)`, curX, labelY + 1, { continued: false });
-        .text(`Primary trait - higher match (â‰¥70%)`, curX, labelY + 1, {
+        // .text(`${highLabel} trait - higher match (70%)`, curX, labelY + 1, { continued: false });
+        .text(`Primary trait - higher match (70%)`, curX, labelY + 1, {
           continued: false,
         });
 
       // Measure the first label width to place the second item next to it
       const firstLabelWidth = this.doc.widthOfString(
-        `${highLabel} trait - higher match (â‰¥70%)`,
+        `${highLabel} trait - higher match (70%)`,
       );
       curX += firstLabelWidth + itemGap;
 
@@ -5318,7 +5318,7 @@ export class SchoolReport extends BaseReport {
     const top1 = this.ci_sortedTraits[0];
     const top2 = this.ci_sortedTraits[1];
 
-    // Value-based indigo shades: higher trait score â†’ darker
+    // Value-based indigo shades: higher trait score  darker
     const getBarColor = (val: number): string => {
       if (val >= 75) return CI_COLORS.INDIGO;
       if (val >= 55) return CI_COLORS.INDIGO_MID;
@@ -5405,7 +5405,7 @@ export class SchoolReport extends BaseReport {
     const courage = agile?.courage ?? 0;
     const total = commitment + focus + openness + respect + courage;
 
-    // Draw Radar Chart for ACI values (scale 0-25 â†’ 0-10)
+    // Draw Radar Chart for ACI values (scale 0-25  0-10)
     const aciRadar: { [key: string]: number } = {
       'Completion Reliability': Math.round((commitment / 25) * 10),
       'Task Focus': Math.round((focus / 25) * 10),
@@ -5507,7 +5507,7 @@ export class SchoolReport extends BaseReport {
     const rows = careerData.domains.map((d) => {
       // Generate visual compatibility indicator
       const filledDots = Math.round(d.score / 20); // 0-5 dots
-      const dots = 'â—'.repeat(filledDots) + 'â—‹'.repeat(5 - filledDots);
+      const dots = '●'.repeat(filledDots) + '○'.repeat(5 - filledDots);
       const outlook =
         d.score >= 85
           ? 'Strong Fit'
@@ -5668,7 +5668,7 @@ export class SchoolReport extends BaseReport {
       },
     ];
 
-    // --- Sort high â†’ low ---
+    // --- Sort high  low ---
     fits.sort((a, b) => b.score - a.score);
 
     // --- Assign blue gradient: darkest for highest score, lightest for lowest ---
@@ -5686,7 +5686,7 @@ export class SchoolReport extends BaseReport {
       })),
     );
 
-    //     this.p(`âœ“ ${f.label}: Strong Fit`, { color: CI_COLORS.STRONG_GREEN, gap: 2 });
+    //     this.p(` ${f.label}: Strong Fit`, { color: CI_COLORS.STRONG_GREEN, gap: 2 });
     this.doc.y += 4;
     // this.drawSectionDivider(CI_COLORS.LIGHT_GRAY);
   }
@@ -5910,8 +5910,8 @@ export class SchoolReport extends BaseReport {
   /**
    * Draws a horizontal progress gauge with gradient fill.
    *
-   * â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–“â–“â–“â–“â–“â–“â–“â–“â–“â–“â–“â–“â–“â–“â–“â–“â–“â–“â–‘â–‘â–‘â–‘â–‘â–‘â–‘â–‘â”
-   * â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+   * 
+   * 
    *                                              12 / 15
    *
    * @param value Current value
@@ -5986,8 +5986,8 @@ export class SchoolReport extends BaseReport {
   /**
    * Draws a set of horizontal bars with labels and percentage fills.
    *
-   * Goal-Driven Decision Making     â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–‘â–‘â–‘â–‘  85%
-   * Collaborative Influence         â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–‘â–‘â–‘â–‘â–‘â–‘â–‘â–‘  65%
+   * Goal-Driven Decision Making       85%
+   * Collaborative Influence           65%
    *
    * @param data Array of { label, value (0-100), color }
    */
@@ -6053,7 +6053,7 @@ export class SchoolReport extends BaseReport {
   /**
    * Draws a growth meter row for development areas.
    *
-   *  â‘   Emotional Flexibility                    â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–‘â–‘â–‘â–‘â–‘â–‘â–‘â–‘â–‘â–‘â–‘â–‘
+   *    Emotional Flexibility                    
    *     May benefit from adapting communication...
    *
    * Shows a numbered badge, title, description, and a dual-tone bar
@@ -6188,7 +6188,7 @@ export class SchoolReport extends BaseReport {
    */
   /**
    * Renders a two-column panel split:
-   *  LEFT  - "Agile Strengths"        (indigo panel, scores â‰¥ threshold)
+   *  LEFT  - "Agile Strengths"        (indigo panel, scores  threshold)
    *  RIGHT - "Growth Opportunities"   (green panel,  scores < threshold)
    * Each row: dimension label (left) + pill score badge (right).
    */
@@ -6297,7 +6297,7 @@ export class SchoolReport extends BaseReport {
     // Left - Strengths (indigo)
     drawPanel(
       x,
-      'âœ¦  Agile Strengths',
+      '  Agile Strengths',
       strengths,
       CI_COLORS.INDIGO,
       CI_COLORS.INDIGO_MID,
@@ -6307,7 +6307,7 @@ export class SchoolReport extends BaseReport {
     // Right - Growth (green)
     drawPanel(
       x + panelW + gap,
-      'â†‘  Growth Opportunities',
+      '  Growth Opportunities',
       growth,
       CI_COLORS.GREEN_DARK,
       CI_COLORS.GREEN,
@@ -6478,9 +6478,9 @@ export class SchoolReport extends BaseReport {
       .fillAndStroke(CI_COLORS.TILE_BLUE, '#E0E0E0');
 
     const rows = [
-      { icon: 'âš¡', label: 'Superpower', value: superpower },
-      { icon: 'âš ', label: 'Risk Area', value: risk },
-      { icon: 'ðŸŒ', label: 'Environment', value: environment },
+      { icon: '', label: 'Superpower', value: superpower },
+      { icon: '', label: 'Risk Area', value: risk },
+      { icon: '', label: 'Environment', value: environment },
     ];
 
     rows.forEach((row, i) => {
@@ -6608,7 +6608,7 @@ export class SchoolReport extends BaseReport {
   }
 
   /**
-   * S3 helper: draws a 2Ã—3 heatmap grid with color intensity based on score.
+   * S3 helper: draws a 2-3 heatmap grid with color intensity based on score.
    */
   private drawSkillHeatmapGrid(
     skills: { label: string; value: number }[],
@@ -6819,9 +6819,9 @@ export class SchoolReport extends BaseReport {
       this.doc.circle(endCapX, endCapY, capR).fill(ring.color);
 
       // --- Curved text at the arc END, quadrant-aware ---
-      // â€¢ Lower half (sin(endRad) â‰¥ 0): chars go clockwise, last char near end cap.
-      // â€¢ Upper half (sin(endRad) < 0): chars reversed + counter-clockwise from end,
-      //   rotation flipped by Ï€ so text is never upside-down.
+      // Lower half (sin(endRad)  0): chars go clockwise, last char near end cap.
+      // Upper half (sin(endRad) < 0): chars reversed + counter-clockwise from end,
+      //   rotation flipped by  so text is never upside-down.
       const labelText = `${Math.round(pct)}%`;
       const labelFontSize = 6.5;
       this.doc.font(this.FONT_SORA_BOLD).fontSize(labelFontSize);
@@ -6832,8 +6832,8 @@ export class SchoolReport extends BaseReport {
       const totalLabelArc = charWidths.reduce((a, b) => a + b, 0);
 
       // Flip text in Q3 + Q4 (lower half of circle, sin > 0).
-      // Q1/Q2 (upper half, sin â‰¤ 0) â†’ standard clockwise rotation, readable.
-      // Q3/Q4 (lower half, sin > 0) â†’ flip: CCW + âˆ’Ï€/2 rotation so text stays right-side-up.
+      // Q1/Q2 (upper half, sin  0)  standard clockwise rotation, readable.
+      // Q3/Q4 (lower half, sin > 0)  flip: CCW + /2 rotation so text stays right-side-up.
       const isFlipped = Math.sin(endRad) > 0;
 
       // Chars always in normal order - CCW placement in the flipped zone naturally
@@ -6842,8 +6842,8 @@ export class SchoolReport extends BaseReport {
       const drawWidths = charWidths;
 
       // Anchor text right at the arc tip (endRad).
-      //   Normal  (CW)  â†’ start = endRad - totalSpan, so last char "%" lands at endRad
-      //   Flipped (CCW) â†’ start = endRad, so first char "5" is at the tip,
+      //   Normal  (CW)   start = endRad - totalSpan, so last char "%" lands at endRad
+      //   Flipped (CCW)  start = endRad, so first char "5" is at the tip,
       //                    "%" ends up displaced CCW (leftward in page coords) = reads "55%"
       const arcLabelSpanRad = totalLabelArc / radius;
       let charAnglePos = isFlipped
@@ -6859,8 +6859,8 @@ export class SchoolReport extends BaseReport {
         const py = centerY + radius * Math.sin(charMidAngle);
 
         // Tangent rotation:
-        //   Normal  â†’ clockwise  (+Ï€/2)
-        //   Flipped â†’ counter-clockwise (âˆ’Ï€/2) so text doesn't appear upside-down
+        //   Normal   clockwise  (+/2)
+        //   Flipped  counter-clockwise (/2) so text doesn't appear upside-down
         const rot = isFlipped
           ? charMidAngle - Math.PI / 2
           : charMidAngle + Math.PI / 2;
@@ -7167,7 +7167,7 @@ export class SchoolReport extends BaseReport {
   }
 
   /**
-   * Converts "ENGINEERING" â†’ "Engineering"
+   * Converts "ENGINEERING"  "Engineering"
    */
   private riTitleCase(str: string): string {
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
@@ -7222,7 +7222,7 @@ export class SchoolReport extends BaseReport {
     }
 
     this.h1('Career Flight Path');
-    // this.h2(`${group.traitName} Personality Ã— ${entry.agileValue} Agile Value`);
+    // this.h2(`${group.traitName} Personality - ${entry.agileValue} Agile Value`);
 
     this.pHtml(
       `Based on your personality trait and top Agile scrum value your career trajectory has been mapped below. ` +
