@@ -38,7 +38,9 @@ export class BulkRegistrationsService {
   private readonly logger = new Logger(BulkRegistrationsService.name);
 
   private normalizeEmail(email: string): string {
-    return String(email || '').trim().toLowerCase();
+    return String(email || '')
+      .trim()
+      .toLowerCase();
   }
 
   private normalizeMobile(mobile: string): string {
@@ -64,7 +66,7 @@ export class BulkRegistrationsService {
     private groupAssessmentRepo: Repository<GroupAssessment>,
     private dataSource: DataSource,
     private readonly registrationsService: RegistrationsService,
-  ) { }
+  ) {}
 
   /**
    * Phase 1: Preview & Validate
@@ -373,7 +375,6 @@ export class BulkRegistrationsService {
     await this.bulkImportRepo.save(job);
 
     try {
-
       // Pre-fetch reference data
       const allGroups = await this.groupsRepo.find({ select: ['id', 'name'] });
       const groupMap = new Map(allGroups.map((g) => [Number(g.id), g.name]));
@@ -553,7 +554,8 @@ export class BulkRegistrationsService {
                 source: 'BULK_UPLOAD',
               },
             });
-            const savedGA = await this.groupAssessmentRepo.save(groupAssessment);
+            const savedGA =
+              await this.groupAssessmentRepo.save(groupAssessment);
             groupAssessmentId = Number(savedGA.id);
             this.logger.log(`Created GroupAssessment ID: ${groupAssessmentId}`);
           } else {
@@ -600,103 +602,107 @@ export class BulkRegistrationsService {
               // This will fall through to the "Group Assessment ID is missing" check and fail rows individually/gracefully
             }
           }
-      } catch (err) {
-        this.logger.error(
-          `CRITICAL: Failed to create Group/Assessment Header for batch ${batch.groupName}. Stopping batch processing.`,
-          err,
-        );
-        for (const row of batch.rows) {
-          row.status = 'FAILED';
-          row.errorMessage = `System Error: Failed to create Group Assessment Header${err instanceof Error && err.message ? ` - ${err.message}` : ''
+        } catch (err) {
+          this.logger.error(
+            `CRITICAL: Failed to create Group/Assessment Header for batch ${batch.groupName}. Stopping batch processing.`,
+            err,
+          );
+          for (const row of batch.rows) {
+            row.status = 'FAILED';
+            row.errorMessage = `System Error: Failed to create Group Assessment Header${
+              err instanceof Error && err.message ? ` - ${err.message}` : ''
             }`;
-          row.resultType = 'FAILED_DB';
-          failCount++;
-        }
-        await this.bulkImportRowRepo.save(batch.rows);
-
-        await this.bulkImportRepo.increment(
-          { id: jobId },
-          'processedCount',
-          batch.rows.length,
-        );
-        continue;
-      }
-
-      // C. Process Rows
-      let batchProcessedCount = 0;
-      for (let i = 0; i < batch.rows.length; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 20));
-
-        const row = batch.rows[i];
-        const dto = batch.dtos[i];
-
-        try {
-          if (!groupAssessmentId) {
-            throw new Error(
-              'Group Assessment ID is missing despite successful header creation.',
-            );
+            row.resultType = 'FAILED_DB';
+            failCount++;
           }
-          dto.groupAssessmentId = groupAssessmentId;
+          await this.bulkImportRowRepo.save(batch.rows);
 
-          const existingUser = await this.userRepo
-            .createQueryBuilder('u')
-            .where('LOWER(u.email) = :email', {
-              email: this.normalizeEmail(dto.email),
-            })
-            .getOne();
-
-          if (existingUser) {
-            await this.registrationsService.createForExistingUser(
-              existingUser,
-              dto,
-            );
-            row.resultType = 'SKIPPED_USER_CREATE';
-          } else {
-            await this.registrationsService.create(dto);
-            row.resultType = 'CREATED';
-          }
-
-          row.status = 'SUCCESS';
-          successCount++;
-          await this.bulkImportRowRepo.save(row);
-        } catch (err: any) {
-          this.logger.error(`Row ${row.rowIndex} failed execution`, err);
-          row.status = 'FAILED';
-          row.errorMessage = err.message || 'Unknown error';
-          row.resultType = 'FAILED_DB';
-          failCount++;
-          await this.bulkImportRowRepo.save(row);
-        }
-
-        batchProcessedCount++;
-        if (batchProcessedCount % 5 === 0) {
           await this.bulkImportRepo.increment(
             { id: jobId },
             'processedCount',
-            5,
+            batch.rows.length,
+          );
+          continue;
+        }
+
+        // C. Process Rows
+        let batchProcessedCount = 0;
+        for (let i = 0; i < batch.rows.length; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+
+          const row = batch.rows[i];
+          const dto = batch.dtos[i];
+
+          try {
+            if (!groupAssessmentId) {
+              throw new Error(
+                'Group Assessment ID is missing despite successful header creation.',
+              );
+            }
+            dto.groupAssessmentId = groupAssessmentId;
+
+            const existingUser = await this.userRepo
+              .createQueryBuilder('u')
+              .where('LOWER(u.email) = :email', {
+                email: this.normalizeEmail(dto.email),
+              })
+              .getOne();
+
+            if (existingUser) {
+              await this.registrationsService.createForExistingUser(
+                existingUser,
+                dto,
+              );
+              row.resultType = 'SKIPPED_USER_CREATE';
+            } else {
+              await this.registrationsService.create(dto);
+              row.resultType = 'CREATED';
+            }
+
+            row.status = 'SUCCESS';
+            successCount++;
+            await this.bulkImportRowRepo.save(row);
+          } catch (err: any) {
+            this.logger.error(`Row ${row.rowIndex} failed execution`, err);
+            row.status = 'FAILED';
+            row.errorMessage = err.message || 'Unknown error';
+            row.resultType = 'FAILED_DB';
+            failCount++;
+            await this.bulkImportRowRepo.save(row);
+          }
+
+          batchProcessedCount++;
+          if (batchProcessedCount % 5 === 0) {
+            await this.bulkImportRepo.increment(
+              { id: jobId },
+              'processedCount',
+              5,
+            );
+          }
+        }
+
+        const remaining = batchProcessedCount % 5;
+        if (remaining > 0) {
+          await this.bulkImportRepo.increment(
+            { id: jobId },
+            'processedCount',
+            remaining,
           );
         }
       }
 
-      const remaining = batchProcessedCount % 5;
-      if (remaining > 0) {
-        await this.bulkImportRepo.increment(
-          { id: jobId },
-          'processedCount',
-          remaining,
-        );
-      }
-    }
-
-    job.status = 'COMPLETED';
-    job.processedCount = successCount + failCount;
-    job.completedAt = new Date();
-    await this.bulkImportRepo.save(job);
-    this.logger.log(
-      `Job ${jobId} Completed. Success: ${successCount}, Fail: ${failCount}`,
-    );
+      job.status = 'COMPLETED';
+      job.processedCount = successCount + failCount;
+      job.completedAt = new Date();
+      await this.bulkImportRepo.save(job);
+      this.logger.log(
+        `Job ${jobId} Completed. Success: ${successCount}, Fail: ${failCount}`,
+      );
     } catch (error: any) {
-      this.logger.error(`Critical overarching error in processing job ${jobId}`, error);
+      this.logger.error(
+        `Critical overarching error in processing job ${jobId}`,
+        error,
+      );
       job.status = 'FAILED';
       await this.bulkImportRepo.save(job);
     }
@@ -859,11 +865,11 @@ export class BulkRegistrationsService {
       degreeId: undefined, // Not used in registration directly, inferred via DepartmentDegree
       currentYear: isCollege
         ? this.getValue(rawData, [
-          'current_year',
-          'CurrentYear',
-          'Year',
-          'year',
-        ])
+            'current_year',
+            'CurrentYear',
+            'Year',
+            'year',
+          ])
         : undefined,
 
       password: this.getValue(rawData, ['Password', 'password']) || 'Admin@123',
@@ -956,7 +962,13 @@ export class BulkRegistrationsService {
     }
 
     // Group Matching Logic
-    const groupNameInput = this.getValue(rawData, ['GroupName', 'group_name', 'Corporate', 'corporate', 'Group']);
+    const groupNameInput = this.getValue(rawData, [
+      'GroupName',
+      'group_name',
+      'Corporate',
+      'corporate',
+      'Group',
+    ]);
     if (!groupNameInput) {
       rowEntity.status = 'INVALID';
       rowEntity.errorMessage = 'Group Name/Corporate is required';
@@ -1134,7 +1146,9 @@ export class BulkRegistrationsService {
 
     // Case: AdminUser Exists by Email
     if (existingByEmail) {
-      const dbMobile = this.normalizeMobile(existingByEmail.metadata?.mobile || '');
+      const dbMobile = this.normalizeMobile(
+        existingByEmail.metadata?.mobile || '',
+      );
       if (dbMobile !== inputMobile) {
         return `Email '${email}' already exists with a different mobile number`;
       }

@@ -75,6 +75,9 @@ export { StudentSubscription, SubscriptionPlan, SubscriptionStatus } from './stu
 // Notifications
 export { Notification } from './notification.entity';
 
+// Admin Settings
+export { OriginbiSetting } from './originbi-setting.entity';
+
 // ============================================
 // Usage in services:
 //

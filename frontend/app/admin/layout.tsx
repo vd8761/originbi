@@ -28,7 +28,16 @@ export default function AdminLayout({
     // Check if the current path is one of the public routes
     const isPublic = publicRoutes.some(route => pathname.includes(route));
 
+    const checkUnsavedChanges = () => {
+        if (typeof window !== 'undefined' && (window as any).hasUnsavedAdminChanges) {
+            return window.confirm("You have unsaved changes! Are you sure you want to leave without saving?");
+        }
+        return true;
+    };
+
     const handleNavigate = (view: string) => {
+        if (!checkUnsavedChanges()) return;
+
         switch (view) {
             case 'dashboard':
                 router.push('/admin/dashboard');
@@ -48,12 +57,17 @@ export default function AdminLayout({
             case 'affiliates':
                 router.push('/admin/affiliates');
                 break;
+            case 'settings':
+                router.push('/admin/settings');
+                break;
             default:
                 router.push(`/admin/${view}`);
         }
     };
 
     const handleLogout = async () => {
+        if (!checkUnsavedChanges()) return;
+
         try {
             await signOut();
         } catch (error) {
