@@ -23,6 +23,7 @@ import {
   AffiliateSettlementTransaction,
   Groups,
   StudentSubscription,
+  Department,
 } from '@originbi/shared-entities';
 
 @Module({
@@ -43,6 +44,7 @@ import {
       StudentSubscription,
       Notification,
       SchoolStream,
+      Department,
     ]),
     HttpModule,
   ],
