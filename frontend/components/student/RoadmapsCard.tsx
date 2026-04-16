@@ -29,9 +29,10 @@ const RoadmapItem: React.FC<{ item: RoadmapItemType & { id?: string } }> = ({ it
 interface RoadmapsCardProps {
     reportData?: any;
     isLoadingReport?: boolean;
+    isSchool?: boolean;
 }
 
-const RoadmapsCard: React.FC<RoadmapsCardProps> = ({ reportData, isLoadingReport }) => {
+const RoadmapsCard: React.FC<RoadmapsCardProps> = ({ reportData, isLoadingReport, isSchool }) => {
     // Extract real roadmaps from report data
     const apiRoadmaps = reportData?.sections?.careerGuidance || [];
     const roadmaps = apiRoadmaps.slice(0, 5).map((role: any, index: number) => ({
@@ -49,32 +50,51 @@ const RoadmapsCard: React.FC<RoadmapsCardProps> = ({ reportData, isLoadingReport
     }
 
     return (
-        <div className="dashboard-glass-card h-full flex flex-col">
+        <div className="relative dashboard-glass-card h-full flex flex-col group min-h-[300px]">
             <div className="px-6 pt-6 pb-4 lg:px-[1.25vw] lg:pt-[1.25vw] lg:pb-[0.833vw] flex justify-between items-center">
                 <h3 className="font-semibold font-sans text-[#19211C] dark:text-white text-[18px]">
                     Your Roadmaps
                 </h3>
-                <Link
-                    href="/student/roadmaps"
-                    className="font-medium font-sans text-brand-green text-xs lg:text-[0.833vw] hover:underline"
-                >
-                    View All
-                </Link>
+                {!isSchool && (
+                    <Link
+                        href="/student/roadmaps"
+                        className="font-medium font-sans text-brand-green text-xs lg:text-[0.833vw] hover:underline"
+                    >
+                        View All
+                    </Link>
+                )}
             </div>
             <hr className="border-[#19211C]/10 dark:border-white/10" />
-            <div className="px-6 pt-2 pb-2 lg:px-[1.25vw] lg:pt-[0.41vw] lg:pb-[0.41vw] flex-grow overflow-auto no-scrollbar">
-                <div className="flex flex-col h-full justify-around min-h-[250px]">
-                    {roadmaps.length > 0 ? (
-                        roadmaps.map((item: any, index: number) => (
-                            <RoadmapItem key={index} item={item} />
-                        ))
-                    ) : (
-                        <div className="flex items-center justify-center h-full text-[#19211C]/50 dark:text-white/50 text-sm">
-                            {reportData ? "No roadmaps available." : "Complete assessment to view roadmaps."}
-                        </div>
-                    )}
+
+            {isSchool ? (
+                <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-4">
+                    <div className="w-16 h-16 rounded-full bg-brand-green/5 flex items-center justify-center mb-2">
+                        <svg className="w-8 h-8 text-brand-green/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                        </svg>
+                    </div>
+                    <div className="bg-brand-green/10 text-brand-green px-6 py-2 rounded-full font-bold text-sm lg:text-[0.938vw] shadow-sm transform transition-transform hover:scale-105">
+                        Coming Soon
+                    </div>
+                    <p className="text-xs lg:text-[0.833vw] text-[#19211C]/40 dark:text-white/30 text-center max-w-[200px]">
+                        Personalized career roadmaps are being developed for you.
+                    </p>
                 </div>
-            </div>
+            ) : (
+                <div className="px-6 pt-2 pb-2 lg:px-[1.25vw] lg:pt-[0.41vw] lg:pb-[0.41vw] flex-grow overflow-auto no-scrollbar">
+                    <div className="flex flex-col h-full justify-around min-h-[250px]">
+                        {roadmaps.length > 0 ? (
+                            roadmaps.map((item: any, index: number) => (
+                                <RoadmapItem key={index} item={item} />
+                            ))
+                        ) : (
+                            <div className="flex items-center justify-center h-full text-[#19211C]/50 dark:text-white/50 text-sm">
+                                {reportData ? "No roadmaps available." : "Complete assessment to view roadmaps."}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
