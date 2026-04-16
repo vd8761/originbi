@@ -65,7 +65,11 @@ const SessionItem: React.FC<{ session: SessionItemType }> = ({ session }) => (
     </div>
 );
 
-const ConsultantCallCard: React.FC = () => {
+interface ConsultantCallCardProps {
+    isSchool?: boolean;
+}
+
+const ConsultantCallCard: React.FC<ConsultantCallCardProps> = ({ isSchool }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     // Sessions shown in preview (2 items)
@@ -126,44 +130,65 @@ const ConsultantCallCard: React.FC = () => {
 
     return (
         <>
-            <div className="dashboard-glass-card p-6 lg:p-[1.25vw] h-auto lg:h-full flex flex-col">
+            <div className="relative dashboard-glass-card p-6 lg:p-[1.25vw] h-auto lg:h-full flex flex-col group min-h-[300px]">
                 <div className="flex justify-between items-start mb-4 lg:mb-[0.8vw]">
                     <h3 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-lg lg:text-[1.25vw]">
                         Consultant Call
                     </h3>
-                    <button className="font-medium font-sans text-brand-green text-xs lg:text-[0.833vw] hover:underline cursor-pointer bg-transparent border-none">
-                        View History
-                    </button>
-                </div>
-
-                <div className="flex-grow flex justify-center items-center my-4 lg:my-[0.8vw]">
-                    <div className="w-full max-w-[320px] lg:max-w-[18vw]">
-                        <SemiCircularProgress progress={50} />
-                    </div>
-                </div>
-
-                <div className="mt-4 lg:mt-[0.8vw]">
-                    <div className="flex justify-between items-center mb-3 lg:mb-[0.6vw]">
-                        <h4 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-base lg:text-[1.25vw]">
-                            Recent Sessions
-                        </h4>
-                        <button
-                            onClick={() => setIsModalOpen(true)}
-                            className="font-medium font-sans text-brand-green text-xs lg:text-[0.833vw] hover:underline cursor-pointer bg-transparent border-none"
-                        >
-                            View All
+                    {!isSchool && (
+                        <button className="font-medium font-sans text-brand-green text-xs lg:text-[0.833vw] hover:underline cursor-pointer bg-transparent border-none">
+                            View History
                         </button>
-                    </div>
-                    <div className="space-y-3 lg:space-y-[0.6vw] border-t border-brand-light-tertiary dark:border-white/10 pt-4 lg:pt-[0.833vw]">
-                        {previewSessions.map((session, index) => (
-                            <React.Fragment key={index}>
-                                <SessionItem session={session} />
-                                {index < previewSessions.length - 1 && <hr className="border-brand-light-tertiary dark:border-white/10" />}
-                            </React.Fragment>
-                        ))}
-                    </div>
+                    )}
                 </div>
+
+                {isSchool ? (
+                    <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-4">
+                        <div className="w-16 h-16 rounded-full bg-brand-green/5 flex items-center justify-center mb-2">
+                             <svg className="w-8 h-8 text-brand-green/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a.75.75 0 0 1-1.154-.63 4.84 4.84 0 0 0 1.284-3.133C4.234 15.865 3 14.056 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
+                            </svg>
+                        </div>
+                        <div className="bg-brand-green/10 text-brand-green px-6 py-2 rounded-full font-bold text-sm lg:text-[0.938vw] shadow-sm transform transition-transform hover:scale-105">
+                            Coming Soon
+                        </div>
+                        <p className="text-xs lg:text-[0.833vw] text-[#19211C]/40 dark:text-white/30 text-center max-w-[200px]">
+                            Consultant sessions will be available shortly for your program.
+                        </p>
+                    </div>
+                ) : (
+                    <>
+                        <div className="flex-grow flex justify-center items-center my-4 lg:my-[0.8vw]">
+                            <div className="w-full max-w-[320px] lg:max-w-[18vw]">
+                                <SemiCircularProgress progress={50} />
+                            </div>
+                        </div>
+
+                        <div className="mt-4 lg:mt-[0.8vw]">
+                            <div className="flex justify-between items-center mb-3 lg:mb-[0.6vw]">
+                                <h4 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-base lg:text-[1.25vw]">
+                                    Recent Sessions
+                                </h4>
+                                <button
+                                    onClick={() => setIsModalOpen(true)}
+                                    className="font-medium font-sans text-brand-green text-xs lg:text-[0.833vw] hover:underline cursor-pointer bg-transparent border-none"
+                                >
+                                    View All
+                                </button>
+                            </div>
+                            <div className="space-y-3 lg:space-y-[0.6vw] border-t border-brand-light-tertiary dark:border-white/10 pt-4 lg:pt-[0.833vw]">
+                                {previewSessions.map((session, index) => (
+                                    <React.Fragment key={index}>
+                                        <SessionItem session={session} />
+                                        {index < previewSessions.length - 1 && <hr className="border-brand-light-tertiary dark:border-white/10" />}
+                                    </React.Fragment>
+                                ))}
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
+
 
             {/* Session Progress Modal */}
             <SessionProgressModal
