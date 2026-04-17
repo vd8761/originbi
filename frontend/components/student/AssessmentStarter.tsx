@@ -60,12 +60,15 @@ interface AssessmentRunnerProps {
   attemptId?: string;
 }
 
+const FINAL_ASSESSMENT_COMPLETION_NOTICE_KEY = "finalAssessmentCompletionNotice";
+const FINAL_ASSESSMENT_COUNT_THRESHOLD = 2;
+
 // --- Success Modal Component ---
 const SuccessModal: React.FC<{
   onBack: () => void;
   onDashboard: () => void;
-  isLastLevel?: boolean;
-}> = ({ onBack, onDashboard, isLastLevel = false }) => (
+  showDashboard?: boolean;
+}> = ({ onBack, onDashboard, showDashboard = false }) => (
   <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 animate-fade-in">
     <div className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" />
     <div className="relative bg-white dark:bg-[#1A1D21] rounded-3xl p-8 max-w-md w-full shadow-2xl border border-brand-light-tertiary dark:border-white/10 text-center flex flex-col items-center">
@@ -84,7 +87,7 @@ const SuccessModal: React.FC<{
       </p>
 
       <div className="flex flex-col gap-3 w-full">
-        {isLastLevel ? (
+        {showDashboard ? (
           <button
             onClick={onDashboard}
             className="w-full py-3.5 rounded-full bg-brand-green text-white font-bold text-sm hover:bg-brand-green/90 transition-colors shadow-lg shadow-brand-green/20"
@@ -305,6 +308,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
   const [isCompleted, setIsCompleted] = useState(false);
   const [changeCount, setChangeCount] = useState(0);
   const [isLastLevel, setIsLastLevel] = useState(false);
+  const [isFinalCompletion, setIsFinalCompletion] = useState<boolean | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Language Context
@@ -313,6 +317,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
   // Refs for logic
   const startTimeRef = useRef<number>(Date.now());
   const initialLoadRef = useRef(false);
+  const predictedCompletedCountRef = useRef(1);
 
   // Sync selectedOption when Question Index or Answers change
   useEffect(() => {
@@ -351,6 +356,41 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
 
       const studentId = Number(profile.id);
       const examId = Number(attemptId) || 0;
+
+      let hasProgressSnapshot = false;
+      let completedCountFromProgress = 0;
+      let currentAttemptStatus = '';
+      try {
+        const progressData = await studentService.getAssessmentProgress(email);
+        if (Array.isArray(progressData) && progressData.length > 0) {
+          hasProgressSnapshot = true;
+          completedCountFromProgress = progressData.filter(
+            (step: any) => String(step?.status || '').toUpperCase() === 'COMPLETED',
+          ).length;
+
+          const currentAttemptProgress = progressData.find((step: any) => {
+            const foundAttemptId = String(
+              step?.id || step?.attempt_id || step?.assessment_attempt_id || step?.uuid || '',
+            );
+            return foundAttemptId === String(examId);
+          });
+
+          currentAttemptStatus = String(currentAttemptProgress?.status || '').toUpperCase();
+        }
+      } catch (progressError) {
+        console.warn('[AssessmentRunner] Unable to fetch progress for final completion detection', progressError);
+      }
+
+      const predictedCompletedCount =
+        completedCountFromProgress + (currentAttemptStatus === 'COMPLETED' ? 0 : 1);
+      predictedCompletedCountRef.current = predictedCompletedCount;
+      if (hasProgressSnapshot) {
+        setIsFinalCompletion(
+          predictedCompletedCount >= FINAL_ASSESSMENT_COUNT_THRESHOLD,
+        );
+      } else {
+        setIsFinalCompletion(null);
+      }
 
       const payload = {
         student_id: studentId, // Real User ID
@@ -562,6 +602,22 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
       const unAnsweredCount = questions.filter(q => !checkAnswers[String(q.assessmentAnswerId)]).length;
 
       if (unAnsweredCount === 0) {
+        const shouldTriggerDashboardPopup =
+          isFinalCompletion === true ||
+          (isFinalCompletion === null && isLastLevel);
+
+        if (typeof window !== "undefined" && shouldTriggerDashboardPopup) {
+          sessionStorage.setItem(
+            FINAL_ASSESSMENT_COMPLETION_NOTICE_KEY,
+            JSON.stringify({
+              source: "final-assessment",
+              completedCount: predictedCompletedCountRef.current,
+              completionPercentage: 100,
+              completedAt: Date.now(),
+            }),
+          );
+        }
+
         setIsCompleted(true);
       } else {
         const nextUnansweredIndex = questions.findIndex((q, idx) => idx > currentQIndex && !checkAnswers[String(q.assessmentAnswerId)]);
@@ -589,6 +645,28 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
       startTimeRef.current = Date.now();
     } else {
       onBack();
+    }
+  };
+
+  const handleGoToDashboard = () => {
+    const shouldTriggerDashboardPopup =
+      isFinalCompletion === true ||
+      (isFinalCompletion === null && isLastLevel);
+
+    if (typeof window !== "undefined" && shouldTriggerDashboardPopup) {
+      sessionStorage.setItem(
+        FINAL_ASSESSMENT_COMPLETION_NOTICE_KEY,
+        JSON.stringify({
+          source: "final-assessment",
+          completedCount: predictedCompletedCountRef.current,
+          completionPercentage: 100,
+          completedAt: Date.now(),
+        }),
+      );
+    }
+
+    if (onGoToDashboard) {
+      onGoToDashboard();
     }
   };
 
@@ -666,8 +744,11 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
         {isCompleted && (
           <SuccessModal
             onBack={onBack}
-            onDashboard={() => onGoToDashboard && onGoToDashboard()}
-            isLastLevel={isLastLevel}
+            onDashboard={handleGoToDashboard}
+            showDashboard={
+              isFinalCompletion === true ||
+              (isFinalCompletion === null && isLastLevel)
+            }
           />
         )}
 

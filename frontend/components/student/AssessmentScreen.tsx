@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from 'next/link';
 import { useLanguage } from '../../contexts/LanguageContext';
 
 const translations = {
@@ -28,8 +29,42 @@ const translations = {
 };
 
 import { studentService } from '../../lib/services/student.service';
-import { Spinner } from '../icons';
+import { ArrowRightWithoutLineIcon, Spinner } from '../icons';
 import AssessmentModal from "./AssessmentModal";
+
+const REPORT_CACHE_VERSION = 'v1';
+const REPORT_READY_POLL_INTERVAL_MS = 1000;
+const REPORT_READY_POLL_MAX_ATTEMPTS = 300;
+const REPORT_FETCH_RETRY_EVERY_ATTEMPTS = 5;
+
+const getReportCacheKey = (email: string) =>
+  `student_report_preview:${email.toLowerCase()}:${REPORT_CACHE_VERSION}`;
+
+const loadReportFromCache = (email: string) => {
+  try {
+    const raw = localStorage.getItem(getReportCacheKey(email));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { report?: any };
+    return parsed?.report || null;
+  } catch {
+    return null;
+  }
+};
+
+const storeReportInCache = (email: string, studentId: number, report: any) => {
+  try {
+    localStorage.setItem(
+      getReportCacheKey(email),
+      JSON.stringify({
+        studentId,
+        cachedAt: new Date().toISOString(),
+        report,
+      }),
+    );
+  } catch (error) {
+    console.warn('Unable to cache report preview in local storage', error);
+  }
+};
 
 // --- Custom Lock Icon ---
 const CustomLockIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
@@ -404,6 +439,11 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   const [fetchedSteps, setFetchedSteps] = useState<any[]>([]);
   const [userName, setUserName] = useState("Student");
   const [loading, setLoading] = useState(true);
+  const [studentId, setStudentId] = useState<number | null>(null);
+  const [reportPreviewData, setReportPreviewData] = useState<any | null>(null);
+  const [isReportReady, setIsReportReady] = useState(false);
+  const [isReportLoading, setIsReportLoading] = useState(false);
+  const [showReportPreview, setShowReportPreview] = useState(false);
 
   // Dynamic API URL for Mobile Support
 
@@ -425,6 +465,9 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
           }
           if (profileData && profileData.metadata?.fullName) {
             setUserName(profileData.metadata.fullName);
+          }
+          if (profileData?.id) {
+            setStudentId(Number(profileData.id));
           }
         } catch (err) {
           console.error("Error fetching assessment data:", err);
@@ -474,6 +517,11 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     });
   }, [fetchedSteps]);
 
+  const completedAssessmentCount = useMemo(
+    () => assessments.filter((assessment) => assessment.status === 'completed').length,
+    [assessments],
+  );
+
   const { totalQuestions, totalCompleted } = useMemo(() => {
     return assessments.reduce(
       (acc, curr) => ({
@@ -485,6 +533,105 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   }, [assessments]);
 
   const overallPercentage = totalQuestions > 0 ? Math.round((totalCompleted / totalQuestions) * 100) : 0;
+
+  const canPreviewReport =
+    completedAssessmentCount >= 2 && isReportReady && Boolean(reportPreviewData);
+
+  useEffect(() => {
+    const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
+    if (!email || !studentId) return;
+
+    const cachedReport = loadReportFromCache(email);
+    if (cachedReport) {
+      setReportPreviewData(cachedReport);
+      setIsReportReady(true);
+      setIsReportLoading(false);
+    }
+
+    if (completedAssessmentCount < 2) return;
+
+    let cancelled = false;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+    let hasPreview = Boolean(cachedReport);
+
+    const scheduleNextPoll = () => {
+      if (cancelled) return;
+      pollTimer = setTimeout(() => {
+        void syncReportPreview();
+      }, REPORT_READY_POLL_INTERVAL_MS);
+    };
+
+    const syncReportPreview = async () => {
+      if (cancelled) return;
+      attempts += 1;
+
+      try {
+        const statusResponse = await studentService.getAssessmentStatus(studentId);
+        const statusReady = Boolean(statusResponse?.reportPassword);
+        const shouldTryReportFetch =
+          !hasPreview &&
+          (statusReady || attempts === 1 || attempts % REPORT_FETCH_RETRY_EVERY_ATTEMPTS === 0);
+
+        if (cancelled) return;
+
+        if (shouldTryReportFetch) {
+          if (!cancelled) {
+            setIsReportLoading(true);
+          }
+
+          const report = await studentService.getStudentReport(studentId);
+          if (!cancelled && report) {
+            hasPreview = true;
+            setReportPreviewData(report);
+            setIsReportReady(true);
+            storeReportInCache(email, studentId, report);
+            setIsReportLoading(false);
+            return;
+          }
+        }
+
+        if (!cancelled) {
+          setIsReportReady(statusReady || hasPreview);
+        }
+
+        if ((statusReady && hasPreview) || hasPreview) {
+          if (!cancelled) {
+            setIsReportLoading(false);
+          }
+          return;
+        }
+
+        if (attempts < REPORT_READY_POLL_MAX_ATTEMPTS) {
+          scheduleNextPoll();
+        } else if (!cancelled) {
+          setIsReportLoading(false);
+          console.warn('[AssessmentScreen] Report readiness polling stopped after max attempts.');
+        }
+      } catch (error) {
+        console.error('Failed to sync report preview availability', error);
+
+        if (attempts < REPORT_READY_POLL_MAX_ATTEMPTS) {
+          scheduleNextPoll();
+        } else if (!cancelled) {
+          setIsReportLoading(false);
+        }
+      }
+    };
+
+    if (!hasPreview) {
+      setIsReportLoading(true);
+    }
+
+    void syncReportPreview();
+
+    return () => {
+      cancelled = true;
+      if (pollTimer) {
+        clearTimeout(pollTimer);
+      }
+    };
+  }, [studentId, completedAssessmentCount]);
 
   const stepperSteps = useMemo(() => assessments.map((assessment) => {
     const isLocked = assessment.status === 'locked';
@@ -554,6 +701,19 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
 
   return (
     <div className="flex flex-col gap-4 w-full px-10 pb-10 max-w-[1920px] mx-auto pt-6 lg:pt-10">
+      <div className="flex items-center text-xs text-black dark:text-white mb-1.5 font-normal flex-wrap">
+        <Link
+          href="/student/dashboard"
+          className="hover:text-gray-700 dark:hover:text-[#1ED36A] transition-colors"
+        >
+          Dashboard
+        </Link>
+        <span className="mx-2 text-gray-400 dark:text-gray-600">
+          <ArrowRightWithoutLineIcon className="w-3 h-3 text-black dark:text-white" />
+        </span>
+        <span className="text-brand-green font-semibold">Assessments</span>
+      </div>
+
       <div className="mb-4 overflow-x-auto pb-4 px-4 scrollbar-hide md:overflow-visible md:pb-0 md:mx-0 md:px-0">
         <Stepper overallProgress={overallPercentage} steps={stepperSteps} />
       </div>
@@ -568,19 +728,42 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
           </p>
         </div>
 
-        <div
-          className="relative overflow-hidden rounded-r-2xl rounded-l-none p-3 min-w-[160px] text-white self-start md:self-center w-full md:w-auto text-right"
-          style={{
-            background: "linear-gradient(90deg, transparent 0%, #1ED36A 100%)",
-          }}
-        >
-          <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10 blur-xl"></div>
-          <p className="text-[clamp(8px,0.7vw,10px)] opacity-90 mb-0.5 text-white">
-            {t.overall}
-          </p>
-          <p className="text-[clamp(16px,1.5vw,22px)] font-semibold text-white">
-            {overallPercentage}%
-          </p>
+        <div className="w-full md:w-auto flex flex-col gap-2 md:items-end">
+          <div
+            className="relative overflow-hidden rounded-r-2xl rounded-l-none p-3 min-w-[160px] text-white self-start md:self-center w-full md:w-auto text-right"
+            style={{
+              background: "linear-gradient(90deg, transparent 0%, #1ED36A 100%)",
+            }}
+          >
+            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10 blur-xl"></div>
+            <p className="text-[clamp(8px,0.7vw,10px)] opacity-90 mb-0.5 text-white">
+              {t.overall}
+            </p>
+            <p className="text-[clamp(16px,1.5vw,22px)] font-semibold text-white">
+              {overallPercentage}%
+            </p>
+          </div>
+
+          {canPreviewReport && (
+            <button
+              onClick={() => setShowReportPreview(true)}
+              className="px-4 py-2 rounded-full bg-brand-green text-white hover:bg-brand-green/90 text-xs md:text-sm font-semibold shadow-lg shadow-brand-green/20 transition-colors cursor-pointer"
+            >
+              Preview Report
+            </button>
+          )}
+
+          {completedAssessmentCount >= 2 && isReportReady && !reportPreviewData && isReportLoading && (
+            <p className="text-[11px] text-brand-text-light-secondary dark:text-brand-text-secondary">
+              Report is ready. Preparing preview...
+            </p>
+          )}
+
+          {completedAssessmentCount >= 2 && !isReportReady && (
+            <p className="text-[11px] text-brand-text-light-secondary dark:text-brand-text-secondary">
+              Report is being generated. Preview button will appear automatically once ready.
+            </p>
+          )}
         </div>
       </div>
 
@@ -603,6 +786,89 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
         onClose={() => setSelectedAssessment(null)}
         onStart={handleStartAssessment}
       />
+
+      {showReportPreview && reportPreviewData && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowReportPreview(false)}
+          />
+
+          <div className="relative w-full max-w-3xl max-h-[85vh] overflow-y-auto rounded-2xl border border-brand-light-tertiary dark:border-white/10 bg-white dark:bg-[#1A1D21] shadow-2xl p-6">
+            <button
+              onClick={() => setShowReportPreview(false)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 transition-colors flex items-center justify-center"
+              aria-label="Close report preview"
+            >
+              <svg className="w-4 h-4 text-gray-600 dark:text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+
+            <h2 className="text-xl md:text-2xl font-semibold text-brand-text-light-primary dark:text-white mb-4 pr-10">
+              Assessment Report Preview
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+              <div className="rounded-xl border border-brand-light-tertiary dark:border-white/10 p-4">
+                <p className="text-xs uppercase tracking-wide text-brand-text-light-secondary dark:text-brand-text-secondary mb-1">
+                  Core Personality
+                </p>
+                <p className="text-sm font-semibold text-brand-text-light-primary dark:text-white">
+                  {reportPreviewData?.sections?.corePersonality?.archetype?.title || reportPreviewData?.coreIdentity?.title || 'Not available'}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-brand-light-tertiary dark:border-white/10 p-4">
+                <p className="text-xs uppercase tracking-wide text-brand-text-light-secondary dark:text-brand-text-secondary mb-1">
+                  Career Alignment
+                </p>
+                <p className="text-sm font-semibold text-brand-text-light-primary dark:text-white">
+                  {reportPreviewData?.sections?.careerAlignmentIndex ? `${reportPreviewData.sections.careerAlignmentIndex}%` : 'Not available'}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-brand-light-tertiary dark:border-white/10 p-4 mb-5">
+              <p className="text-xs uppercase tracking-wide text-brand-text-light-secondary dark:text-brand-text-secondary mb-2">
+                Report Summary
+              </p>
+              <p className="text-sm text-brand-text-light-primary dark:text-white/90 leading-relaxed">
+                {reportPreviewData?.sections?.corePersonality?.summary ||
+                  reportPreviewData?.sections?.corePersonality?.description ||
+                  reportPreviewData?.coreIdentity?.description ||
+                  'Your personalized report has been generated and is available for review.'}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-brand-light-tertiary dark:border-white/10 p-4">
+              <p className="text-xs uppercase tracking-wide text-brand-text-light-secondary dark:text-brand-text-secondary mb-3">
+                Recommended Career Paths
+              </p>
+
+              <div className="space-y-2">
+                {(reportPreviewData?.sections?.careerGuidance || []).slice(0, 3).map((role: any, index: number) => (
+                  <div key={index} className="rounded-lg border border-brand-light-tertiary/70 dark:border-white/10 p-3">
+                    <p className="text-sm font-semibold text-brand-text-light-primary dark:text-white">
+                      {role?.roleName || `Role ${index + 1}`}
+                    </p>
+                    <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary mt-1 leading-relaxed">
+                      {role?.shortDescription || 'Role summary not available.'}
+                    </p>
+                  </div>
+                ))}
+
+                {(!reportPreviewData?.sections?.careerGuidance || reportPreviewData.sections.careerGuidance.length === 0) && (
+                  <p className="text-sm text-brand-text-light-secondary dark:text-brand-text-secondary">
+                    Career guidance details are not available in this report preview.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
