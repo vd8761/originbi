@@ -123,7 +123,13 @@ export const getStudentWelcomeEmailTemplate = (
                 <div class="text-dark" style="font-size: 16px; color: #111111 !important; margin-bottom: 20px; font-weight: 400;">Dear <strong style="font-weight: 700;">${name}</strong>,</div>
                 
                 <div class="text-dark" style="font-size: 14px; line-height: 1.5; color: #111111 !important; margin-bottom: 24px;">
-                  Thank you for registering with OriginBI! We're excited to welcome you and inform you that an online assessment has been scheduled for you.
+                  Thank you for registering with OriginBI! We're excited to welcome you and inform you that an online assessment ${
+                    startDateTime &&
+                    new Date(startDateTime).getTime() >
+                      Date.now() + 10 * 60 * 1000
+                      ? 'has been scheduled for you.'
+                      : 'is now available for you.'
+                  }
                 </div>
 
                 <div class="text-accent" style="color: #0E8A3A !important; font-size: 14px; margin-bottom: 16px;">Here are your login details:</div>
@@ -135,26 +141,27 @@ export const getStudentWelcomeEmailTemplate = (
                   </tr>
                   <tr>
                     <td class="text-muted" style="font-size: 14px; color: #2F2F2F !important; padding: 5px 0;">Start Date and Time</td>
-                    <td class="text-dark" style="font-size: 14px; color: #111111 !important; padding: 5px 0;">${startDateTime
-    ? new Date(startDateTime).toLocaleString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'Asia/Kolkata',
-      hour12: true,
-    })
-    : new Date().toLocaleString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'Asia/Kolkata',
-      hour12: true,
-    })
-  }</td>
+                    <td class="text-dark" style="font-size: 14px; color: #111111 !important; padding: 5px 0;">${
+                      startDateTime
+                        ? new Date(startDateTime).toLocaleString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            timeZone: 'Asia/Kolkata',
+                            hour12: true,
+                          })
+                        : new Date().toLocaleString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            timeZone: 'Asia/Kolkata',
+                            hour12: true,
+                          })
+                    }</td>
                   </tr>
                   <tr>
                     <td class="text-muted" style="font-size: 14px; color: #2F2F2F !important; padding: 5px 0;">Username</td>
@@ -167,7 +174,13 @@ export const getStudentWelcomeEmailTemplate = (
                 </table>
 
                 <div class="text-dark" style="font-size: 14px; line-height: 1.5; color: #111111 !important; margin-bottom: 24px;">
-                  Please log in at least 15 minutes before the scheduled time to ensure everything works smoothly. The assessment is timed, so manage your time effectively to complete all the questions.
+                  ${
+                    startDateTime &&
+                    new Date(startDateTime).getTime() >
+                      Date.now() + 10 * 60 * 1000
+                      ? 'Please log in at least 15 minutes before the scheduled time to ensure everything works smoothly. The assessment is timed, so manage your time effectively to complete all the questions.'
+                      : 'You can start your assessment immediately. The assessment is timed, so manage your time effectively to complete all the questions.'
+                  }
                 </div>
 
                 <div style="margin-top: 10px; margin-bottom: 30px;">

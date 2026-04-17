@@ -269,18 +269,24 @@ export class AssessmentService {
 
       // Fetch email status from assessment_reports via raw query for all session IDs
       if (augmentedRows.length > 0) {
-        const ids = augmentedRows.map(r => r.id);
-        const emailData: Array<{ session_id: number; email_sent: boolean; email_sent_to: string }> =
-          await this.sessionRepo.manager.query(
-            `SELECT assessment_session_id as session_id, email_sent, email_sent_to
+        const ids = augmentedRows.map((r) => r.id);
+        const emailData: Array<{
+          session_id: number;
+          email_sent: boolean;
+          email_sent_to: string;
+        }> = await this.sessionRepo.manager.query(
+          `SELECT assessment_session_id as session_id, email_sent, email_sent_to
              FROM assessment_reports
              WHERE assessment_session_id = ANY($1::int[])`,
-            [ids],
-          );
-        const emailMap = emailData.reduce((acc, e) => {
-          acc[e.session_id] = e;
-          return acc;
-        }, {} as Record<number, typeof emailData[0]>);
+          [ids],
+        );
+        const emailMap = emailData.reduce(
+          (acc, e) => {
+            acc[e.session_id] = e;
+            return acc;
+          },
+          {} as Record<number, (typeof emailData)[0]>,
+        );
 
         augmentedRows.forEach((r: any) => {
           const e = emailMap[r.id];
@@ -362,9 +368,9 @@ export class AssessmentService {
             session.metadata.reportPassword = report[0].reportPassword;
           }
           if (report[0].emailSent !== undefined) {
-             session.metadata.emailSent = report[0].emailSent;
-             session.metadata.emailSentAt = report[0].emailSentAt;
-             session.metadata.emailSentTo = report[0].emailSentTo;
+            session.metadata.emailSent = report[0].emailSent;
+            session.metadata.emailSentAt = report[0].emailSentAt;
+            session.metadata.emailSentTo = report[0].emailSentTo;
           }
           if (report[0].agileScores) {
             reportAgileScores = report[0].agileScores;

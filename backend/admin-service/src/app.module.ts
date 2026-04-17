@@ -22,6 +22,7 @@ import { AffiliatesModule } from './affiliates/affiliates.module';
 import { AffiliateLoginModule } from './affiliatelogin/affiliatelogin.module';
 import { R2Module } from './r2/r2.module';
 import { NotificationModule } from './notification/notification.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -123,7 +124,8 @@ import { NotificationModule } from './notification/notification.module';
     AffiliateLoginModule,
     R2Module,
     NotificationModule,
+    SettingsModule,
   ],
   controllers: [TestController, MailAssetsController, HealthController],
 })
-export class AppModule { }
+export class AppModule {}

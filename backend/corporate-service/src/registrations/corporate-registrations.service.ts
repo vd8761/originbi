@@ -26,6 +26,7 @@ import {
 import { AssessmentGenerationService } from '../assessment/assessment-generation.service';
 import { getWelcomeEmailTemplate } from '../mail/templates/welcome.template';
 import { CreateCandidateDto } from './dto/create-candidate.dto';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class CorporateRegistrationsService {
@@ -80,6 +81,7 @@ export class CorporateRegistrationsService {
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
     private readonly assessmentGenService: AssessmentGenerationService,
+    private readonly settingsService: SettingsService,
   ) { }
 
   async registerCandidate(dto: CreateCandidateDto, corporateUserId: number) {
@@ -413,8 +415,8 @@ export class CorporateRegistrationsService {
         assessmentTitle,
       );
 
-      const fromName = process.env.EMAIL_SEND_FROM_NAME || 'Origin BI';
-      const fromEmail = process.env.EMAIL_FROM || 'no-reply@originbi.com';
+      const { fromName, fromAddress: fromEmail, ccAddresses } = await this.settingsService.getEmailConfig('corporate_welcome_email_config');
+      const ccEmail = ccAddresses.join(', ');
       const source = `"${fromName}" <${fromEmail}>`;
 
       const command = new SendEmailCommand({

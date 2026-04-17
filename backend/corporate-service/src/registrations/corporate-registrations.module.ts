@@ -4,6 +4,7 @@ import { HttpModule } from '@nestjs/axios';
 import { CorporateRegistrationsService } from './corporate-registrations.service';
 import { CorporateRegistrationsController } from './corporate-registrations.controller';
 import { AssessmentModule } from '../assessment/assessment.module';
+import { SettingsModule } from '../settings/settings.module';
 
 // Import from shared entities package
 import {
@@ -52,6 +53,7 @@ import { BulkCorporateRegistrationsController } from './bulk-corporate-registrat
     ]),
     HttpModule,
     AssessmentModule,
+    SettingsModule,
   ],
   controllers: [
     CorporateRegistrationsController,

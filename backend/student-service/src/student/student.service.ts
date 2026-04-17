@@ -29,10 +29,12 @@ import {
   AffiliateAccount,
   AffiliateReferralTransaction,
   Notification,
+  DepartmentDegree,
 } from '@originbi/shared-entities';
 import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
+import { SettingsService } from '../settings/settings.service';
 
 export interface AssessmentProgressItem {
   id: number;
@@ -79,7 +81,10 @@ export class StudentService {
     private readonly schoolStreamRepo: Repository<SchoolStream>,
     @InjectRepository(Department)
     private readonly departmentRepo: Repository<Department>,
+    @InjectRepository(DepartmentDegree)
+    private readonly departmentDegreeRepo: Repository<DepartmentDegree>,
     private readonly configService: ConfigService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   /**
@@ -776,6 +781,7 @@ export class StudentService {
         schoolLevel: dto.school_level,
         schoolStream: dto.school_stream,
         programId: program.id,
+        departmentDegreeId: dto.department_degree_id || dto.departmentDegreeId,
         studentBoard: dto.student_board || dto.studentBoard, // Explicit assignment
         // metadata: { ... } below also stores it
         status: 'COMPLETED' as RegistrationStatus,
@@ -788,6 +794,7 @@ export class StudentService {
           groupCode: dto.group_code,
           studentBoard: dto.student_board || dto.studentBoard, // Store in metadata as well
           sendEmail: true,
+          currentYear: dto.current_year || dto.currentYear,
           ...(dto.metadata || {}), // Merge extra metadata
           currentRole: dto.current_role || dto.metadata?.current_role,
           roleDescription:
@@ -1067,10 +1074,69 @@ export class StudentService {
   }
 
   async getDepartments() {
-    return this.departmentRepo.find({
-      where: { isActive: true, isDeleted: false },
-      order: { id: 'ASC' },
+    const rows = await this.departmentDegreeRepo.find({
+      relations: ['department', 'degreeType'],
+      where: {
+        isActive: true,
+        department: { isActive: true, isDeleted: false },
+      },
     });
+
+    const result = rows.map((row) => {
+      const degreeName = row.degreeType?.name || '';
+      const deptName = row.department?.name || '';
+      const fullName = `${degreeName} ${deptName}`.trim();
+      return {
+        id: row.id,
+        name: this.normalizeDepartmentDisplayName(fullName),
+        isActive: row.isActive,
+      };
+    });
+
+    return result.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  private normalizeDepartmentDisplayName(label: string | undefined | null) {
+    if (!label) return '';
+
+    let normalized = label.replace(/\s+/g, ' ').trim();
+
+    while (true) {
+      const words = normalized.split(' ');
+      const duplicatePrefixWordCount = this.getDuplicatePrefixWordCount(words);
+
+      if (!duplicatePrefixWordCount) break;
+
+      words.splice(duplicatePrefixWordCount, duplicatePrefixWordCount);
+      normalized = words.join(' ');
+    }
+
+    return normalized;
+  }
+
+  private getDuplicatePrefixWordCount(words: string[]) {
+    const maxPrefixWordCount = Math.min(Math.floor(words.length / 2), 6);
+
+    for (
+      let prefixWordCount = maxPrefixWordCount;
+      prefixWordCount >= 1;
+      prefixWordCount--
+    ) {
+      const firstPrefix = words
+        .slice(0, prefixWordCount)
+        .map((w) => w.toLowerCase().replace(/[.,;:!?-]+$/g, ''));
+      const repeatedPrefix = words
+        .slice(prefixWordCount, prefixWordCount * 2)
+        .map((w) => w.toLowerCase().replace(/[.,;:!?-]+$/g, ''));
+
+      const isDuplicate = firstPrefix.every(
+        (word, index) => word !== '' && word === repeatedPrefix[index],
+      );
+
+      if (isDuplicate) return prefixWordCount;
+    }
+
+    return 0;
   }
 
   // Helper to generate questions locally (simplified version of admin-service logic)
@@ -1382,12 +1448,12 @@ export class StudentService {
 
     const transporter = this.createEmailTransporter();
 
-    const ccEmail = this.configService.get<string>('EMAIL_CC') || '';
-    const fromName =
-      this.configService.get<string>('EMAIL_SEND_FROM_NAME') ||
-      'Origin BI Mind Works';
-    const fromEmail =
-      this.configService.get<string>('EMAIL_FROM') || 'no-reply@originbi.com';
+    const {
+      fromName,
+      fromAddress: fromEmail,
+      ccAddresses,
+    } = await this.settingsService.getEmailConfig('registration_email_config');
+    const ccEmail = ccAddresses.join(', ');
     const fromAddress = `"${fromName}" <${fromEmail}>`;
 
     this.logger.log(`[Email Debug] Sending from: ${fromAddress}, to: ${to}`);
@@ -1713,10 +1779,17 @@ export class StudentService {
 
       try {
         const transporter = this.createEmailTransporter();
+
+        const {
+          fromName,
+          fromAddress: fromEmail,
+          ccAddresses,
+        } = await this.settingsService.getEmailConfig('report_email_config');
+
         const mailOptions = {
-          from: `"${process.env.EMAIL_SEND_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
+          from: `"${fromName}" <${fromEmail}>`,
           to: user.email,
-          cc: [process.env.EMAIL_CC],
+          cc: ccAddresses,
           subject: `Your Assessment Report is Ready - ${((registration as any).program?.reportTitle as string) || 'Origin BI'}`,
           html: emailHtml,
           attachments: [
@@ -1911,10 +1984,18 @@ export class StudentService {
         ? `${registration.fullName || 'Student'}'s Assessment Report – ${reportTitle}`
         : `Your Assessment Report – ${reportTitle}`;
 
+      const {
+        fromName,
+        fromAddress: fromEmail,
+        ccAddresses,
+      } = await this.settingsService.getEmailConfig(
+        'manual_report_email_config',
+      );
+
       const mailOptions = {
-        from: `"${this.configService.get('EMAIL_SEND_FROM_NAME') || 'Origin BI Mind Works'}" <${this.configService.get('EMAIL_FROM') || 'no-reply@originbi.com'}>`,
+        from: `"${fromName}" <${fromEmail}>`,
         to: recipientEmail,
-        cc: [this.configService.get('EMAIL_CC') || ''],
+        cc: ccAddresses,
         subject,
         html: emailHtml,
         attachments: [
@@ -1973,12 +2054,13 @@ export class StudentService {
       // 2. Create email transporter
       const transporter = this.createEmailTransporter();
 
-      // 3. Build email using template
-      const fromName =
-        this.configService.get('EMAIL_SEND_FROM_NAME') ||
-        'Origin BI Mind Works';
-      const fromEmail =
-        this.configService.get('EMAIL_FROM') || 'no-reply@originbi.com';
+      const {
+        fromName,
+        fromAddress: fromEmail,
+        ccAddresses,
+      } = await this.settingsService.getEmailConfig(
+        'manual_report_email_config',
+      );
 
       const emailHtml = getPlacementReportEmailTemplate(
         studentCount,
@@ -1990,7 +2072,7 @@ export class StudentService {
       const mailOptions = {
         from: `"${fromName}" <${fromEmail}>`,
         to: toEmail,
-        cc: [this.configService.get('EMAIL_CC') || ''],
+        cc: ccAddresses,
         subject: `Students Handbook – ${degreeType} ${departmentName}`,
         html: emailHtml,
         attachments: [

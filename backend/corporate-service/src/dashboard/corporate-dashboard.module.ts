@@ -4,6 +4,7 @@ import { HttpModule } from '@nestjs/axios';
 import { CorporateDashboardController } from './corporate-dashboard.controller';
 import { CorporateDashboardService } from './corporate-dashboard.service';
 import { CounsellingReportService } from './counselling-report.service';
+import { SettingsModule } from '../settings/settings.module';
 
 // Import from shared entities package
 import {
@@ -52,6 +53,7 @@ import {
       DegreeType,
     ]),
     HttpModule,
+    SettingsModule,
   ],
   controllers: [CorporateDashboardController],
   providers: [CorporateDashboardService, CounsellingReportService],

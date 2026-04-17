@@ -24,7 +24,10 @@ import {
   Groups,
   StudentSubscription,
   Department,
+  DepartmentDegree,
+  DegreeType,
 } from '@originbi/shared-entities';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
@@ -45,8 +48,11 @@ import {
       Notification,
       SchoolStream,
       Department,
+      DepartmentDegree,
+      DegreeType,
     ]),
     HttpModule,
+    SettingsModule,
   ],
   controllers: [StudentController, SubscriptionController],
   providers: [StudentService, SubscriptionService, StudentProcessor],

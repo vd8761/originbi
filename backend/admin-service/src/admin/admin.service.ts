@@ -6,7 +6,6 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual, LessThan, In, And } from 'typeorm';
 
-
 import {
   User as AdminUser,
   GroupAssessment,
@@ -102,7 +101,6 @@ export class AdminService {
           weekStart: startOfWeek.format('YYYY-MM-DD'),
         },
       };
-
     } catch (error: any) {
       this.logger.error(
         `Error calculating dashboard stats: ${error.message}`,
@@ -214,17 +212,18 @@ export class AdminService {
     return this.sessionRepo.find({
       where: {
         validTo: And(LessThan(new Date()), MoreThanOrEqual(sevenDaysAgo)),
-        status: In(['NOT_STARTED', 'IN_PROGRESS', 'EXPIRED', 'PARTIALLY_EXPIRED']),
-
-
+        status: In([
+          'NOT_STARTED',
+          'IN_PROGRESS',
+          'EXPIRED',
+          'PARTIALLY_EXPIRED',
+        ]),
       },
       relations: ['user', 'program', 'registration'],
       order: { validTo: 'DESC' },
       take: 5,
     });
-
   }
-
 
   private async getTodaysRegistrations() {
     const startOfToday = dayjs().startOf('day').toDate();
@@ -236,12 +235,12 @@ export class AdminService {
       order: { createdAt: 'DESC' },
       take: 5,
     });
-
-
   }
 
   async extendAssessmentSession(sessionId: number, newDate: string) {
-    const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
+    const session = await this.sessionRepo.findOne({
+      where: { id: sessionId },
+    });
     if (!session) {
       throw new Error('Assessment session not found');
     }
@@ -250,15 +249,13 @@ export class AdminService {
 
     // If it was EXPIRED, we should reset it to ASSIGNED or STARTED to allow the user back in
     if (session.status === 'EXPIRED') {
-       session.status = 'IN_PROGRESS'; // Or appropriately 'NOT_STARTED' if never opened
+      session.status = 'IN_PROGRESS'; // Or appropriately 'NOT_STARTED' if never opened
     }
-    
+
     return this.sessionRepo.save(session);
   }
 
-
   getMessage() {
-
     return { message: 'Admin service working!' };
   }
 }
