@@ -28,7 +28,7 @@ import { useNotifications } from "../../lib/hooks/useNotifications";
 
 interface HeaderProps {
     onLogout: () => void;
-    currentView?: "dashboard" | "assessment" | "roadmaps";
+    currentView?: "dashboard" | "assessment" | "roadmaps" | "profile";
     onNavigate?: (view: "dashboard" | "assessment") => void;
     hideNav?: boolean;
     showAssessmentOnly?: boolean;
@@ -247,7 +247,11 @@ const Header: React.FC<HeaderProps> = ({
     const pathname = usePathname();
 
     const handleNavClick = (view: "dashboard" | "assessment") => {
-        onNavigate?.(view);
+        if (onNavigate) {
+            onNavigate(view);
+        } else {
+            router.push(`/student/${view}`);
+        }
         setMobileMenuOpen(false);
     };
 
@@ -261,9 +265,17 @@ const Header: React.FC<HeaderProps> = ({
         setMobileMenuOpen(false);
     };
 
-    // Determine if roadmaps is active based on pathname
+    const handleProfileAndSettingsClick = () => {
+        router.push('/student/profile-settings');
+        setMobileMenuOpen(false);
+    };
+
+    // Determine active states based on pathname or currentView prop
+    const isDashboardActive = pathname === '/student/dashboard' || currentView === 'dashboard';
+    const isAssessmentActive = pathname?.includes('/student/assessment') || currentView === 'assessment';
     const isRoadmapsActive = pathname?.includes('/student/roadmaps') || currentView === 'roadmaps';
     const isCounsellorActive = pathname?.includes('/student/counsellor');
+    const isProfileSettingsActive = pathname?.includes('/student/profile-settings') || currentView === 'profile';
 
     const getNotificationIcon = (type: string) => {
         const iconClass = "w-4 h-4 text-brand-green";
@@ -394,14 +406,14 @@ const Header: React.FC<HeaderProps> = ({
                 <NavItem
                     icon={<DashboardIcon />}
                     label="Dashboard"
-                    active={currentView === "dashboard"}
+                    active={isDashboardActive}
                     isMobile={isMobile}
                     onClick={() => handleNavClick("dashboard")}
                 />
                 <NavItem
                     icon={<JobsIcon />}
                     label="Assessments"
-                    active={currentView === "assessment"}
+                    active={isAssessmentActive}
                     isMobile={isMobile}
                     onClick={() => handleNavClick("assessment")}
                 />
@@ -410,10 +422,9 @@ const Header: React.FC<HeaderProps> = ({
                         <NavItem icon={<RoadmapIcon />} label="Road Map" active={isRoadmapsActive} isMobile={isMobile} onClick={handleRoadmapClick} />
                         <NavItem icon={<Brain className="w-4 h-4" />} label="AI Counsellor" active={isCounsellorActive} isMobile={isMobile} onClick={handleCounsellorClick} />
                         <NavItem icon={<VideosIcon />} label="Videos" isMobile={isMobile} />
-                        <NavItem icon={<ProfileIcon />} label="Profile" isMobile={isMobile} />
-                        <NavItem icon={<SettingsIcon />} label="Settings" isMobile={isMobile} />
                     </>
                 )}
+                <NavItem icon={<ProfileIcon />} label="Profile and Settings" active={isProfileSettingsActive} isMobile={isMobile} onClick={handleProfileAndSettingsClick} />
             </>
         );
     };

@@ -266,7 +266,7 @@ const RoadmapsPage: React.FC = () => {
     }
 
     return (
-        <div className="w-full px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8 max-w-[1600px] mx-auto">
+        <div className="w-full pb-10 mx-auto">
             {/* Breadcrumb */}
             <div className="flex items-center text-xs text-black dark:text-white mb-1.5 font-normal flex-wrap">
                 <Link

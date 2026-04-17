@@ -19,12 +19,8 @@ const AssessmentLayout: React.FC<AssessmentLayoutProps> = ({ onLogout, children,
           filter: 'blur(60px)',
         }}
       />
-      <Header
-        onLogout={onLogout}
-        currentView="assessment"
-        hideNav={hideNav}
-        showAssessmentOnly={showAssessmentOnly}
-      />
+      {/* Header removed and moved to shared StudentLayout */}
+
       {/* 
           Main Content Area:
           - pt-[72px] to clear Fixed Header

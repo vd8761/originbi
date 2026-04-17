@@ -57,7 +57,7 @@ const Dashboard: React.FC = () => {
     }, []);
 
     return (
-        <div className="relative min-h-screen bg-transparent dark:bg-[#19211C] font-sans transition-colors duration-300 overflow-hidden p-4 sm:p-6 lg:p-8">
+        <div className="relative bg-transparent dark:bg-[#19211C] font-sans transition-colors duration-300 overflow-hidden pb-10">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 lg:gap-[1.666vw] w-full auto-rows-auto">
             {/* 
               GRID SYSTEM (12 Columns Desktop / 2 Columns Tablet / 1 Column Mobile)
