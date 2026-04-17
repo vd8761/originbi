@@ -32,9 +32,7 @@ export class SettingsService {
    * Fetch the final email configuration by merging global settings with a specific local override.
    * @param overrideKey The key for the local override config (e.g. 'registration_email_config')
    */
-  async getEmailConfig(
-    overrideKey: string,
-  ): Promise<{
+  async getEmailConfig(overrideKey: string): Promise<{
     fromName: string;
     fromAddress: string;
     ccAddresses: string[];

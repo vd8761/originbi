@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 import * as crypto from 'crypto';
 import { SchoolReport } from '../reports/school/schoolReport';
 import { CollegeReport } from '../reports/college/collegeReport';
@@ -54,13 +55,15 @@ async function getReportPasswordSettings(): Promise<{
     const toggleResult = await pool.query(
       `SELECT value_boolean FROM originbi_settings WHERE category = 'report' AND setting_key = 'report_password_enabled' LIMIT 1`,
     );
-    const enabled = toggleResult.rows.length > 0 ? toggleResult.rows[0].value_boolean : true;
+    const enabled =
+      toggleResult.rows.length > 0 ? toggleResult.rows[0].value_boolean : true;
 
     // Fetch the admin password
     const pwResult = await pool.query(
       `SELECT value_string FROM originbi_settings WHERE category = 'report' AND setting_key = 'report_admin_password' LIMIT 1`,
     );
-    const adminPassword = pwResult.rows.length > 0 ? (pwResult.rows[0].value_string || '') : '';
+    const adminPassword =
+      pwResult.rows.length > 0 ? pwResult.rows[0].value_string || '' : '';
 
     return { enabled: enabled !== false, adminPassword };
   } catch (err) {
