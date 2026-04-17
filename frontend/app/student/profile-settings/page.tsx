@@ -27,6 +27,15 @@ interface UserProfile {
         name?: string;
     };
     mobile_number?: string;
+    programCode?: string;
+    academicDetails?: {
+        schoolLevel?: string;
+        schoolStream?: string;
+        studentBoard?: string;
+        departmentDegreeId?: number;
+        departmentName?: string;
+        currentYear?: string;
+    };
 }
 
 export default function ProfileSettingsPage() {
@@ -45,7 +54,9 @@ export default function ProfileSettingsPage() {
                             name: profile.metadata?.fullName || profile.metadata?.name || profile.email?.split('@')[0] || 'Student',
                             email: profile.email,
                             personalityTrait: profile.personalityTrait,
-                            mobile_number: profile.mobile_number || profile.metadata?.phone || profile.phone
+                            mobile_number: profile.mobile_number || profile.metadata?.phone || profile.phone,
+                            programCode: profile.programCode,
+                            academicDetails: profile.academicDetails
                         });
                     } else {
                         // Check cache
@@ -110,7 +121,7 @@ function ProfileSettingsContent({ user }: { user: UserProfile | null }) {
             {/* Profile Details Card */}
             <div className="bg-white dark:bg-white/[0.08] rounded-2xl p-6 shadow-md dark:shadow-none border border-gray-200 dark:border-white/[0.08] mb-6 relative">
                 {/* Change Password Button */}
-                <button 
+                <button
                     onClick={() => setIsPasswordModalOpen(true)}
                     className="absolute top-6 right-6 flex items-center gap-2 px-4 py-2 bg-[#1ED36A]/10 hover:bg-[#1ED36A]/20 text-[#1ED36A] rounded-xl transition-all text-sm font-semibold group"
                 >
@@ -120,19 +131,19 @@ function ProfileSettingsContent({ user }: { user: UserProfile | null }) {
 
                 <div className="flex items-start gap-6">
                     {/* Avatar */}
-                    <div 
+                    <div
                         className="w-28 h-28 rounded-full flex items-center justify-center text-white text-4xl font-bold flex-shrink-0"
                         style={{ backgroundColor: `#${getAvatarColor(user?.name || 'S')}` }}
                     >
                         {getInitials(user?.name)}
                     </div>
-                    
+
                     {/* Profile Info */}
                     <div className="flex-1 h-28 flex flex-col justify-center">
                         <h2 className="text-2xl font-semibold text-[#19211C] dark:text-white mb-2">
                             {capitalizeWords(user?.name) || 'Student'}
                         </h2>
-                        
+
                         <div className="flex items-center mb-3">
                             <div className="px-4 py-[5px] rounded-lg border border-[#FEF000] text-gray-900 dark:text-white text-sm font-medium bg-[#FEF000]/5 whitespace-nowrap">
                                 Trait: {traitName}
@@ -152,6 +163,98 @@ function ProfileSettingsContent({ user }: { user: UserProfile | null }) {
                     </div>
                 </div>
             </div>
+
+            {/* Academic Details Card - Hidden for employees */}
+            {user?.programCode !== 'EMPLOYEE' && (
+                <div className="bg-white dark:bg-white/[0.08] rounded-2xl p-6 shadow-md dark:shadow-none border border-gray-200 dark:border-white/[0.08] mb-6">
+                    <h3 className="text-xl font-semibold text-[#19211C] dark:text-white mb-4">Academic Details</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {/* School Student Fields */}
+                        {user?.programCode === 'SCHOOL_STUDENT' && (
+                            <>
+                                <div className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">School Level</p>
+                                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                        {user?.academicDetails?.schoolLevel || 'Not specified'}
+                                    </p>
+                                </div>
+                                {user?.academicDetails?.schoolLevel !== 'SSLC' && (
+                                    <div className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4">
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Stream</p>
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                            {user?.academicDetails?.schoolStream || 'Not specified'}
+                                        </p>
+                                    </div>
+                                )}
+                                <div className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Board</p>
+                                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                        {user?.academicDetails?.studentBoard || 'Not specified'}
+                                    </p>
+                                </div>
+                                {user?.academicDetails?.schoolLevel !== 'SSLC' && (
+                                    <div className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4">
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Standard</p>
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                            {user?.academicDetails?.currentYear || 'Not specified'}
+                                        </p>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                        {/* College Student Fields */}
+                        {user?.programCode === 'COLLEGE_STUDENT' && (
+                            <>
+                                <div className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Department</p>
+                                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                        {user?.academicDetails?.departmentName || 'Not specified'}
+                                    </p>
+                                </div>
+                                <div className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Year</p>
+                                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                        {user?.academicDetails?.currentYear || 'Not specified'}
+                                    </p>
+                                </div>
+                            </>
+                        )}
+                        {/* Default/Fallback */}
+                        {(!user?.programCode || user?.programCode === 'DEMO') && (
+                            <>
+                                <div className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">School Level</p>
+                                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                        {user?.academicDetails?.schoolLevel || 'Not specified'}
+                                    </p>
+                                </div>
+                                {user?.academicDetails?.schoolLevel !== 'SSLC' && (
+                                    <div className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4">
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Stream/Department</p>
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                            {user?.academicDetails?.departmentName || user?.academicDetails?.schoolStream || 'Not specified'}
+                                        </p>
+                                    </div>
+                                )}
+                                <div className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Board</p>
+                                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                        {user?.academicDetails?.studentBoard || 'Not specified'}
+                                    </p>
+                                </div>
+                                {user?.academicDetails?.schoolLevel !== 'SSLC' && (
+                                    <div className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4">
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Year/Standard</p>
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                            {user?.academicDetails?.currentYear || 'Not specified'}
+                                        </p>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Change Password Modal */}
             <ChangePasswordModal 
