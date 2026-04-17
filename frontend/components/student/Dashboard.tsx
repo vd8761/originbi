@@ -87,16 +87,16 @@ const Dashboard: React.FC = () => {
                         <ImpactAssessmentCard reportData={reportData} isLoadingReport={isLoadingReport} />
                     </div>
                     <div className="col-span-1 md:col-span-1 lg:col-span-3 h-full">
-                        <ConsultantCallCard />
+                        <ConsultantCallCard isSchool={isSchool} />
                     </div>
                 </>
             ) : (
                 <>
                     <div className="col-span-1 md:col-span-1 lg:col-span-3 h-full">
-                        <ConsultantCallCard />
+                        <ConsultantCallCard isSchool={isSchool} />
                     </div>
                     <div className="col-span-1 md:col-span-1 lg:col-span-3 h-full">
-                        <RoadmapsCard reportData={reportData} isLoadingReport={isLoadingReport} />
+                        <RoadmapsCard reportData={reportData} isLoadingReport={isLoadingReport} isSchool={isSchool} />
                     </div>
                 </>
             )}
@@ -104,7 +104,7 @@ const Dashboard: React.FC = () => {
             {/* Row 2 */}
             <div className="col-span-1 md:col-span-2 lg:col-span-4 h-full">
                 {isSchool ? (
-                    <RoadmapsCard reportData={reportData} isLoadingReport={isLoadingReport} />
+                    <RoadmapsCard reportData={reportData} isLoadingReport={isLoadingReport} isSchool={isSchool} />
                 ) : (
                     <MoodCard />
                 )}

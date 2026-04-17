@@ -159,6 +159,7 @@ const Header: React.FC<HeaderProps> = ({
     const mobileMenuRef = useRef<HTMLDivElement>(null);
 
     const [user, setUser] = useState<{ name: string; email: string } | null>(null);
+    const [isSchool, setIsSchool] = useState(false);
 
     useEffect(() => {
         const fetchUserProfile = async () => {
@@ -177,6 +178,19 @@ const Header: React.FC<HeaderProps> = ({
                             email: profile.email
                         });
                         localStorage.setItem('user', JSON.stringify({ ...profile, name: fullName })); // Update cache
+                        
+                        if (profile.programCode) {
+                            setIsSchool(profile.programCode.toUpperCase().includes('SCHOOL'));
+                        }
+                    } else {
+                        // Check cache if profile fetch fails
+                        const userStr = localStorage.getItem('user');
+                        if (userStr) {
+                            const cachedUser = JSON.parse(userStr);
+                            if (cachedUser.programCode) {
+                                setIsSchool(cachedUser.programCode.toUpperCase().includes('SCHOOL'));
+                            }
+                        }
                     }
                 } catch (e) {
                     console.error("Error loading profile", e);
@@ -390,11 +404,15 @@ const Header: React.FC<HeaderProps> = ({
                     isMobile={isMobile}
                     onClick={() => handleNavClick("assessment")}
                 />
-                <NavItem icon={<RoadmapIcon />} label="Road Map" active={isRoadmapsActive} isMobile={isMobile} onClick={handleRoadmapClick} />
-                <NavItem icon={<Brain className="w-4 h-4" />} label="AI Counsellor" active={isCounsellorActive} isMobile={isMobile} onClick={handleCounsellorClick} />
-                <NavItem icon={<VideosIcon />} label="Videos" isMobile={isMobile} />
-                <NavItem icon={<ProfileIcon />} label="Profile" isMobile={isMobile} />
-                <NavItem icon={<SettingsIcon />} label="Settings" isMobile={isMobile} />
+                {!isSchool && (
+                    <>
+                        <NavItem icon={<RoadmapIcon />} label="Road Map" active={isRoadmapsActive} isMobile={isMobile} onClick={handleRoadmapClick} />
+                        <NavItem icon={<Brain className="w-4 h-4" />} label="AI Counsellor" active={isCounsellorActive} isMobile={isMobile} onClick={handleCounsellorClick} />
+                        <NavItem icon={<VideosIcon />} label="Videos" isMobile={isMobile} />
+                        <NavItem icon={<ProfileIcon />} label="Profile" isMobile={isMobile} />
+                        <NavItem icon={<SettingsIcon />} label="Settings" isMobile={isMobile} />
+                    </>
+                )}
             </>
         );
     };
