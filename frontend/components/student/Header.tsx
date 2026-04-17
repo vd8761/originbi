@@ -23,12 +23,12 @@ import {
 
 import { useTheme } from '../../contexts/ThemeContext';
 import { Brain } from 'lucide-react';
-import { capitalizeWords, formatRelativeTime } from "../../lib/utils";
+import { capitalizeWords, formatRelativeTime, getAvatarColor } from "../../lib/utils";
 import { useNotifications } from "../../lib/hooks/useNotifications";
 
 interface HeaderProps {
     onLogout: () => void;
-    currentView?: "dashboard" | "assessment" | "roadmaps";
+    currentView?: "dashboard" | "assessment" | "roadmaps" | "profile";
     onNavigate?: (view: "dashboard" | "assessment") => void;
     hideNav?: boolean;
     showAssessmentOnly?: boolean;
@@ -247,7 +247,11 @@ const Header: React.FC<HeaderProps> = ({
     const pathname = usePathname();
 
     const handleNavClick = (view: "dashboard" | "assessment") => {
-        onNavigate?.(view);
+        if (onNavigate) {
+            onNavigate(view);
+        } else {
+            router.push(`/student/${view}`);
+        }
         setMobileMenuOpen(false);
     };
 
@@ -261,9 +265,17 @@ const Header: React.FC<HeaderProps> = ({
         setMobileMenuOpen(false);
     };
 
-    // Determine if roadmaps is active based on pathname
+    const handleProfileAndSettingsClick = () => {
+        router.push('/student/profile-settings');
+        setMobileMenuOpen(false);
+    };
+
+    // Determine active states based on pathname or currentView prop
+    const isDashboardActive = pathname === '/student/dashboard' || currentView === 'dashboard';
+    const isAssessmentActive = pathname?.includes('/student/assessment') || currentView === 'assessment';
     const isRoadmapsActive = pathname?.includes('/student/roadmaps') || currentView === 'roadmaps';
     const isCounsellorActive = pathname?.includes('/student/counsellor');
+    const isProfileSettingsActive = pathname?.includes('/student/profile-settings') || currentView === 'profile';
 
     const getNotificationIcon = (type: string) => {
         const iconClass = "w-4 h-4 text-brand-green";
@@ -290,7 +302,8 @@ const Header: React.FC<HeaderProps> = ({
                 const isWithin7Days =
                     new Date(n.createdAt).getTime() >=
                     Date.now() - 7 * 24 * 60 * 60 * 1000;
-                if (!isWithin7Days) return false;
+                // Don't filter out unread notifications even if older than 7 days
+                if (!isWithin7Days && n.isRead) return false;
 
                 if (activeTab === "History") return true;
 
@@ -393,14 +406,14 @@ const Header: React.FC<HeaderProps> = ({
                 <NavItem
                     icon={<DashboardIcon />}
                     label="Dashboard"
-                    active={currentView === "dashboard"}
+                    active={isDashboardActive}
                     isMobile={isMobile}
                     onClick={() => handleNavClick("dashboard")}
                 />
                 <NavItem
                     icon={<JobsIcon />}
                     label="Assessments"
-                    active={currentView === "assessment"}
+                    active={isAssessmentActive}
                     isMobile={isMobile}
                     onClick={() => handleNavClick("assessment")}
                 />
@@ -409,10 +422,9 @@ const Header: React.FC<HeaderProps> = ({
                         <NavItem icon={<RoadmapIcon />} label="Road Map" active={isRoadmapsActive} isMobile={isMobile} onClick={handleRoadmapClick} />
                         <NavItem icon={<Brain className="w-4 h-4" />} label="AI Counsellor" active={isCounsellorActive} isMobile={isMobile} onClick={handleCounsellorClick} />
                         <NavItem icon={<VideosIcon />} label="Videos" isMobile={isMobile} />
-                        <NavItem icon={<ProfileIcon />} label="Profile" isMobile={isMobile} />
-                        <NavItem icon={<SettingsIcon />} label="Settings" isMobile={isMobile} />
                     </>
                 )}
+                <NavItem icon={<ProfileIcon />} label="Profile and Settings" active={isProfileSettingsActive} isMobile={isMobile} onClick={handleProfileAndSettingsClick} />
             </>
         );
     };
@@ -601,7 +613,7 @@ const Header: React.FC<HeaderProps> = ({
                                 <div className="w-8 h-8 2xl:w-9 2xl:h-9 rounded-full bg-gray-200 dark:bg-gray-800 animate-pulse flex-shrink-0"></div>
                             ) : (
                                 <img
-                                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'Student')}&background=1ED36A&color=fff`}
+                                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'Student')}&background=${getAvatarColor(user.name || 'Student')}&color=fff&length=2`}
                                     alt="User Avatar"
                                     className="w-9 h-9 2xl:w-10 2xl:h-10 rounded-full border border-brand-light-tertiary dark:border-white/10"
                                 />
@@ -615,7 +627,7 @@ const Header: React.FC<HeaderProps> = ({
                                 ) : (
                                     <>
                                         <p className="font-semibold text-sm 2xl:text-sm leading-tight text-[#19211C] dark:text-brand-text-primary">
-                                            {user.name || 'Student'}
+                                            {capitalizeWords(user.name) || 'Student'}
                                         </p>
                                         <p className="text-xs 2xl:text-[12px] text-[#19211C] dark:text-brand-text-secondary leading-tight">
                                             {user.email || ''}
@@ -633,7 +645,7 @@ const Header: React.FC<HeaderProps> = ({
                             <div className="absolute right-0 top-full mt-2 w-72 bg-brand-light-secondary dark:bg-brand-dark-secondary rounded-xl shadow-2xl z-[100] border border-brand-light-tertiary dark:border-brand-dark-tertiary/50 overflow-hidden">
                                 <div className="px-4 py-3 border-b border-brand-light-tertiary dark:border-brand-dark-tertiary">
                                     <p className="text-sm font-semibold text-[#19211C] dark:text-brand-text-primary truncate">
-                                        {user?.name || 'Student'}
+                                        {capitalizeWords(user?.name) || 'Student'}
                                     </p>
                                     <p className="text-xs text-[#19211C]/60 dark:text-brand-text-secondary truncate mt-0.5">
                                         {user?.email || ''}
