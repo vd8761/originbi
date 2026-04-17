@@ -295,23 +295,34 @@ export class AffiliatesService {
       }
 
       // Fire-and-forget: send WhatsApp welcome posters (college, school, employee)
-      this.whatsAppService
-        .sendAllWelcomePosters(
-          dto.mobileNumber,
-          dto.countryCode ?? '+91',
-          referralCode,
-        )
-        .then(() =>
-          this.logger.log(
-            `WhatsApp welcome posters sent to: ${dto.mobileNumber}`,
-          ),
-        )
-        .catch((whatsappErr: any) =>
-          this.logger.error(
-            `Failed to send WhatsApp welcome posters to ${dto.mobileNumber}: ${whatsappErr.message}`,
-            whatsappErr.stack,
-          ),
+      const sendWhatsappEnabled = await this.settingsService.getValue<boolean>(
+        'affiliate',
+        'send_whatsapp_welcome_posters',
+      );
+
+      if (sendWhatsappEnabled === false) {
+        this.logger.log(
+          'WhatsApp welcome posters disabled via global settings. Skipping.',
         );
+      } else {
+        this.whatsAppService
+          .sendAllWelcomePosters(
+            dto.mobileNumber,
+            dto.countryCode ?? '+91',
+            referralCode,
+          )
+          .then(() =>
+            this.logger.log(
+              `WhatsApp welcome posters sent to: ${dto.mobileNumber}`,
+            ),
+          )
+          .catch((whatsappErr: any) =>
+            this.logger.error(
+              `Failed to send WhatsApp welcome posters to ${dto.mobileNumber}: ${whatsappErr.message}`,
+              whatsappErr.stack,
+            ),
+          );
+      }
 
       return affiliate;
     } catch (e: any) {
@@ -642,8 +653,11 @@ export class AffiliatesService {
       fromName,
       fromAddress: fromEmail,
       ccAddresses,
+      bccAddresses,
+      replyToAddress,
     } = await this.settingsService.getEmailConfig('affiliate_email_config');
     const ccEmail = ccAddresses.join(', ');
+    const bccEmail = bccAddresses.join(', ');
     const frontendUrl = process.env.FRONTEND_URL ?? '';
     const backendUrl = process.env.BACKEND_URL ?? '';
     const fromAddress = `"${fromName}" <${fromEmail}>`;
@@ -666,13 +680,15 @@ export class AffiliatesService {
       assets,
     );
 
-    const mailOptions = {
+    const mailOptions: Record<string, any> = {
       from: fromAddress,
       to,
       cc: ccEmail,
       subject: 'Welcome to OriginBI - Affiliate Partner Account Created',
       html: html,
     };
+    if (bccEmail) mailOptions.bcc = bccEmail;
+    if (replyToAddress) mailOptions.replyTo = replyToAddress;
 
     try {
       return await transporter.sendMail(mailOptions);

@@ -845,17 +845,22 @@ export class RegistrationsService {
       fromName,
       fromAddress: fromEmail,
       ccAddresses,
+      bccAddresses,
+      replyToAddress,
     } = await this.settingsService.getEmailConfig('registration_email_config');
     const ccEmail = ccAddresses.join(', ');
+    const bccEmail = bccAddresses.join(', ');
     const fromAddress = `"${fromName}" <${fromEmail}>`;
 
-    const mailOptions = {
+    const mailOptions: Record<string, any> = {
       from: fromAddress,
       to,
       cc: ccEmail, // Add CC if configured
       subject: 'Welcome to OriginBI - Your Assessment is Ready!',
       html: '',
     };
+    if (bccEmail) mailOptions.bcc = bccEmail;
+    if (replyToAddress) mailOptions.replyTo = replyToAddress;
 
     // Use full URLs for assets ("from application itself")
     // Controller is at /assets/:filename in admin-service (Port 4001)

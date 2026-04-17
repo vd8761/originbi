@@ -135,16 +135,22 @@ export class TestController {
       fromName,
       fromAddress: fromEmail,
       ccAddresses,
+      bccAddresses,
+      replyToAddress,
     } = await this.settingsService.getEmailConfig('registration_email_config');
     const fromAddress = `"${fromName}" <${fromEmail}>`;
 
-    await transporter.sendMail({
+    const mailOpts: Record<string, any> = {
       from: fromAddress,
       to: email,
       cc: ccAddresses.join(', ') || undefined,
       subject: 'Test Welcome Email - Mobile Responsive Check',
       html: html,
-    });
+    };
+    if (bccAddresses.length > 0) mailOpts.bcc = bccAddresses.join(', ');
+    if (replyToAddress) mailOpts.replyTo = replyToAddress;
+
+    await transporter.sendMail(mailOpts);
 
     return {
       success: true,
@@ -192,18 +198,24 @@ export class TestController {
       fromName,
       fromAddress: fromEmail,
       ccAddresses,
+      bccAddresses,
+      replyToAddress,
     } = await this.settingsService.getEmailConfig(
       'corporate_welcome_email_config',
     );
     const fromAddress = `"${fromName}" <${fromEmail}>`;
 
-    await transporter.sendMail({
+    const mailOpts: Record<string, any> = {
       from: fromAddress,
       to: email,
       cc: ccAddresses.join(', ') || undefined,
       subject: 'Test Corporate Welcome Email',
       html: html,
-    });
+    };
+    if (bccAddresses.length > 0) mailOpts.bcc = bccAddresses.join(', ');
+    if (replyToAddress) mailOpts.replyTo = replyToAddress;
+
+    await transporter.sendMail(mailOpts);
 
     return {
       success: true,

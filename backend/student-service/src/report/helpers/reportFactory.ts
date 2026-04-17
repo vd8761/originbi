@@ -12,6 +12,7 @@ import {
 } from '../types/types';
 import { logger } from './logger';
 import { updateReportPassword } from './sqlHelper';
+import { getPool } from './dbPool';
 import { buildSchoolReportJSON } from '../reports/school/schoolReportJSON';
 import { buildCollegeReportJSON } from '../reports/college/collegeReportJSON';
 import { buildEmployeeReportJSON } from '../reports/employee/employeeReportJSON';
@@ -39,13 +40,46 @@ function generateRandomPassword(length: number = 15): string {
 }
 
 /**
+ * Fetches report password settings from the originbi_settings table.
+ * This is called from a standalone context (not NestJS DI) so it queries
+ * the DB directly via the existing pg pool.
+ */
+async function getReportPasswordSettings(): Promise<{
+  enabled: boolean;
+  adminPassword: string;
+}> {
+  const pool = getPool();
+  try {
+    // Fetch the toggle
+    const toggleResult = await pool.query(
+      `SELECT value_boolean FROM originbi_settings WHERE category = 'report' AND setting_key = 'report_password_enabled' LIMIT 1`,
+    );
+    const enabled = toggleResult.rows.length > 0 ? toggleResult.rows[0].value_boolean : true;
+
+    // Fetch the admin password
+    const pwResult = await pool.query(
+      `SELECT value_string FROM originbi_settings WHERE category = 'report' AND setting_key = 'report_admin_password' LIMIT 1`,
+    );
+    const adminPassword = pwResult.rows.length > 0 ? (pwResult.rows[0].value_string || '') : '';
+
+    return { enabled: enabled !== false, adminPassword };
+  } catch (err) {
+    logger.warn(
+      `[ReportFactory] Failed to fetch report password settings from DB, falling back to defaults.`,
+      err,
+    );
+    return { enabled: true, adminPassword: '' };
+  }
+}
+
+/**
  * Factory Function: generateReportForUser
  * ---------------------------------------
  * Instantiates and generates the appropriate PDF report based on the user's `program_type`.
  *
  * @param user - The unified user data object containing assessment results.
  * @param filePath - The absolute file path where the generated PDF will be saved.
- * @returns A Promise that resolves to the PDF user password.
+ * @returns A Promise that resolves to the PDF user password (empty string if passwords disabled).
  */
 export async function generateReportForUser(
   user: MergedReportData,
@@ -55,51 +89,64 @@ export async function generateReportForUser(
     `[ReportFactory] Generating Type ${user.program_type} for ${user.full_name}`,
   );
 
-  // 1. Generate PDF user password (cryptographically random)
-  let userPassword = generateRandomPassword();
+  // 1. Fetch password settings from DB
+  const passwordSettings = await getReportPasswordSettings();
 
-  // 2. Admin password — MUST be set in environment; no fallback to avoid leaked default
-  const adminPassword = process.env.PDF_ADMIN_PASSWORD;
-  if (!adminPassword) {
-    throw new Error(
-      'PDF_ADMIN_PASSWORD environment variable is not set. Cannot generate protected reports.',
-    );
-  }
+  let userPassword = '';
+  let pdfOptions: PDFKit.PDFDocumentOptions = {};
 
-  // 3. Update DB with user password (or retrieve existing one)
-  if (user.assigned_exam_id) {
-    try {
-      userPassword = await updateReportPassword(
-        user.assigned_exam_id,
-        userPassword,
+  if (passwordSettings.enabled) {
+    // 2. Generate PDF user password (cryptographically random)
+    userPassword = generateRandomPassword();
+
+    // 3. Admin password — from DB, fall back to ENV, then throw if neither is set
+    const adminPassword =
+      passwordSettings.adminPassword || process.env.PDF_ADMIN_PASSWORD;
+    if (!adminPassword) {
+      throw new Error(
+        'PDF admin password is not configured. Set it in Admin Panel → Report Settings, or set PDF_ADMIN_PASSWORD environment variable.',
       );
-    } catch (err) {
-      logger.error(
-        `[ReportFactory] Failed to update/fetch password for user ${user.full_name}`,
-        err,
-      );
-      // Proceed with the generated password as a best-effort fallback.
     }
+
+    // 4. Update DB with user password (or retrieve existing one)
+    if (user.assigned_exam_id) {
+      try {
+        userPassword = await updateReportPassword(
+          user.assigned_exam_id,
+          userPassword,
+        );
+      } catch (err) {
+        logger.error(
+          `[ReportFactory] Failed to update/fetch password for user ${user.full_name}`,
+          err,
+        );
+        // Proceed with the generated password as a best-effort fallback.
+      }
+    } else {
+      logger.warn(
+        `[ReportFactory] User ${user.full_name} has no assigned_exam_id. Skipping DB password update.`,
+      );
+    }
+
+    // 5. Build PDF options with password protection
+    pdfOptions = {
+      userPassword,
+      ownerPassword: adminPassword,
+      permissions: {
+        printing: 'highResolution',
+        modifying: false,
+        copying: false,
+        annotating: false,
+        fillingForms: false,
+        contentAccessibility: false,
+        documentAssembly: false,
+      },
+    };
   } else {
-    logger.warn(
-      `[ReportFactory] User ${user.full_name} has no assigned_exam_id. Skipping DB password update.`,
+    logger.info(
+      `[ReportFactory] Report password protection is DISABLED. Generating unprotected PDF.`,
     );
   }
-
-  // 4. Build PDF options
-  const pdfOptions: PDFKit.PDFDocumentOptions = {
-    userPassword,
-    ownerPassword: adminPassword,
-    permissions: {
-      printing: 'highResolution',
-      modifying: false,
-      copying: false,
-      annotating: false,
-      fillingForms: false,
-      contentAccessibility: false,
-      documentAssembly: false,
-    },
-  };
 
   logger.info(
     `[ReportFactory] Building PDF for program_type ${user.program_type}`,

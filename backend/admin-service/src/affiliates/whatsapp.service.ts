@@ -102,6 +102,8 @@ export class WhatsAppService {
 
     for (const audience of audiences) {
       try {
+        const referralLink = `${REGISTER_URLS[audience]}?ref=${encodeURIComponent(referralCode)}`;
+
         // 1. Generate poster with QR code overlay
         const posterBuffer = await this.generatePosterWithQR(
           audience,
@@ -121,6 +123,7 @@ export class WhatsAppService {
           TEMPLATE_NAMES[audience],
           imageUrl,
           referralCode,
+          referralLink,
           authKey,
         );
 
@@ -129,11 +132,56 @@ export class WhatsAppService {
         );
       } catch (err: any) {
         this.logger.error(
-          `❌ Failed to send ${audience} WhatsApp poster to ${phoneNumber}: ${err.message}`,
-          err.stack,
+          `❌ Failed to send ${audience} WhatsApp poster to ${phoneNumber}: ${err.message}. Triggering SMS fallback...`,
         );
-        // Continue to the next audience — don't let one failure block the others
+        
+        try {
+          await this.sendSmsFallback(audience, phoneNumber, referralCode);
+        } catch (smsErr: any) {
+          this.logger.error(
+            `❌ SMS fallback failed for ${audience} to ${phoneNumber}: ${smsErr.message}`,
+          );
+        }
       }
+    }
+  }
+
+  // =================================================================
+  // Fallback: Send SMS if WhatsApp fails
+  // =================================================================
+
+  private async sendSmsFallback(
+    audience: AffiliateAudience,
+    phoneNumber: string,
+    referralCode: string,
+  ): Promise<void> {
+    const authKey = process.env.SMS_AUTH_KEY;
+    if (!authKey) {
+      this.logger.warn(`SMS_AUTH_KEY not configured. Skipping SMS fallback for ${audience}.`);
+      return;
+    }
+
+    let url = '';
+
+    if (audience === 'school') {
+      url = `http://smpp.webtechsolution.co/http-tokenkeyapi.php?authentic-key=${authKey}&senderid=Senderid&route=2&number=${phoneNumber}&message=Confused%20about%20your%20subject%20choice%3F%20Get%20clarity%20on%20streams%2C%20strengths%20%26%20future%20career%20path.%20Start%20now%20for%20INR%20749%3A%20https%3A%2F%2Fpickmycareer.originbi.com%2Fregister%3Fref%3D%0A${referralCode}&templateid=1707177631775371277`;
+    } else if (audience === 'college') {
+      url = `http://smpp.webtechsolution.co/http-tokenkeyapi.php?authentic-key=${authKey}&senderid=Senderid&route=2&number=${phoneNumber}&message=Finished%20college%20but%20unsure%20what%20next%3F%20Discover%20the%20right%20career%20path%20for%20you.%20Start%20now%20for%20INR%20499%3A%20https%3A%2F%2Fdiscover.originbi.com%2Fregister%3Fref%3D%0A${referralCode}&templateid=1707177631813422154`;
+    } else if (audience === 'employee') {
+      url = `http://smpp.webtechsolution.co/http-tokenkeyapi.php?authentic-key=${authKey}&senderid=Senderid&route=2&number=${phoneNumber}&message=Ready%20for%20your%20next%20career%20move%3F%20Get%20leadership%20insights%2C%20growth%20areas%20%26%20role%20clarity.%20Unlock%20for%20INR%20499%3A%20https%3A%2F%2Fgrow.originbi.com%2Fregister%3Fref%3D${referralCode}&templateid=1707177631823308700`;
+    }
+
+    try {
+      const response = await firstValueFrom(
+        this.http.get(url, { timeout: 15000 }),
+      );
+      this.logger.log(
+        `✅ SMS fallback sent successfully for ${audience}: ${
+          typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
+        }`,
+      );
+    } catch (err: any) {
+      throw new Error(err.message);
     }
   }
 
@@ -235,6 +283,7 @@ export class WhatsAppService {
     templateName: string,
     imageUrl: string,
     referralCode: string,
+    referralLink: string,
     authKey: string,
   ): Promise<void> {
     const payload = {
@@ -265,7 +314,7 @@ export class WhatsAppService {
                 button_1: {
                   subtype: 'url',
                   type: 'text',
-                  value: referralCode,
+                  value: referralLink,
                 },
               },
             },
@@ -284,6 +333,16 @@ export class WhatsAppService {
           timeout: 30000,
         }),
       );
+
+      // Check for structural failure response from MSG91
+      if (
+        response.data?.status === 'fail' ||
+        response.data?.hasError === true
+      ) {
+        throw new Error(
+          `MSG91 returned fail status: ${JSON.stringify(response.data)}`,
+        );
+      }
 
       this.logger.log(
         `MSG91 response for ${templateName}: ${JSON.stringify(response.data)}`,
