@@ -290,7 +290,8 @@ const Header: React.FC<HeaderProps> = ({
                 const isWithin7Days =
                     new Date(n.createdAt).getTime() >=
                     Date.now() - 7 * 24 * 60 * 60 * 1000;
-                if (!isWithin7Days) return false;
+                // Don't filter out unread notifications even if older than 7 days
+                if (!isWithin7Days && n.isRead) return false;
 
                 if (activeTab === "History") return true;
 
