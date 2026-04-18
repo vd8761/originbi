@@ -1,12 +1,15 @@
 "use client";
 
 import React from "react";
-import JobsPortal from '../../../components/corporate/jobs/JobsPortal';
+import ComingSoon from '../../../components/ui/ComingSoon';
 
 export default function JobsPage() {
     return (
         <div className="h-full">
-            <JobsPortal />
+            <ComingSoon
+                title="Jobs Module Under Development"
+                description="We are currently working on this page to complete backend integration. Thank you for your patience."
+            />
         </div>
     );
 }
