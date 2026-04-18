@@ -6,9 +6,16 @@ interface AssessmentLayoutProps {
   children: React.ReactNode;
   hideNav?: boolean;
   showAssessmentOnly?: boolean;
+  onNavigate?: (view: "dashboard" | "assessment") => void;
 }
 
-const AssessmentLayout: React.FC<AssessmentLayoutProps> = ({ onLogout, children, hideNav, showAssessmentOnly }) => {
+const AssessmentLayout: React.FC<AssessmentLayoutProps> = ({
+  onLogout,
+  children,
+  hideNav,
+  showAssessmentOnly,
+  onNavigate,
+}) => {
   return (
     <div className="bg-brand-light-primary dark:bg-brand-dark-primary h-screen w-screen overflow-hidden flex flex-col relative">
       {/* Green Glow Effect - Dark Mode Only - Bottom Full Width - Large Ambient */}
@@ -24,6 +31,7 @@ const AssessmentLayout: React.FC<AssessmentLayoutProps> = ({ onLogout, children,
         currentView="assessment"
         hideNav={hideNav}
         showAssessmentOnly={showAssessmentOnly}
+        onNavigate={onNavigate}
       />
       {/* 
           Main Content Area:

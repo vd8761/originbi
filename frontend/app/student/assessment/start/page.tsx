@@ -20,7 +20,10 @@ function AssessmentRunnerContent() {
   };
 
   const handleGoToDashboard = () => {
-    router.push('/student/dashboard');
+    sessionStorage.setItem('studentReportReady', 'true');
+    localStorage.setItem('studentReportReady', 'true');
+    sessionStorage.removeItem('isAssessmentMode');
+    router.push('/student/assessment');
   };
 
   return (

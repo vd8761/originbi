@@ -15,7 +15,6 @@ import {
     LogoutIcon,
     MenuIcon,
     UsersIcon,
-    HistoryIcon,
     CompletedStepIcon,
     MarkAllReadIcon,
     NoNotificationsIcon,
@@ -25,6 +24,8 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { Brain } from 'lucide-react';
 import { capitalizeWords, formatRelativeTime } from "../../lib/utils";
 import { useNotifications } from "../../lib/hooks/useNotifications";
+
+const REPORT_READY_STORAGE_KEY = 'studentReportReady';
 
 interface HeaderProps {
     onLogout: () => void;
@@ -94,6 +95,12 @@ const NavItem: React.FC<NavItemProps> = ({
     );
 };
 
+const ReportTriangleIcon: React.FC<{ fillColor: string }> = ({ fillColor }) => (
+    <svg width="15" height="16" viewBox="0 0 15 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M15 16L0 0H15V16Z" fill={fillColor} />
+    </svg>
+);
+
 const NotificationItem: React.FC<{
     icon?: React.ReactNode;
     title: string;
@@ -159,6 +166,16 @@ const Header: React.FC<HeaderProps> = ({
     const mobileMenuRef = useRef<HTMLDivElement>(null);
 
     const [user, setUser] = useState<{ name: string; email: string } | null>(null);
+    const [isReportReady, setIsReportReady] = useState<boolean>(() => {
+        if (typeof window === 'undefined') {
+            return false;
+        }
+
+        return (
+            sessionStorage.getItem(REPORT_READY_STORAGE_KEY) === 'true' ||
+            localStorage.getItem(REPORT_READY_STORAGE_KEY) === 'true'
+        );
+    });
 
     useEffect(() => {
         const fetchUserProfile = async () => {
@@ -193,6 +210,50 @@ const Header: React.FC<HeaderProps> = ({
 
         fetchUserProfile();
     }, []);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const checkReportReadiness = async () => {
+            if (showAssessmentOnly) {
+                if (isMounted) setIsReportReady(false);
+                return;
+            }
+
+            const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
+            if (!email) {
+                if (isMounted) setIsReportReady(false);
+                return;
+            }
+
+            try {
+                const progressData = await studentService.getAssessmentProgress(email);
+                if (!isMounted) return;
+
+                const completedCount = Array.isArray(progressData)
+                    ? progressData.filter((step: any) => String(step?.status || '').toUpperCase() === 'COMPLETED').length
+                    : 0;
+
+                const nextReportReady = completedCount >= 2;
+                setIsReportReady(nextReportReady);
+                sessionStorage.setItem(REPORT_READY_STORAGE_KEY, nextReportReady ? 'true' : 'false');
+                localStorage.setItem(REPORT_READY_STORAGE_KEY, nextReportReady ? 'true' : 'false');
+            } catch (error) {
+                console.warn('Unable to check report readiness for header nav', error);
+            }
+        };
+
+        void checkReportReadiness();
+
+        const intervalId = window.setInterval(() => {
+            void checkReportReadiness();
+        }, 60_000);
+
+        return () => {
+            isMounted = false;
+            window.clearInterval(intervalId);
+        };
+    }, [showAssessmentOnly]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -233,6 +294,11 @@ const Header: React.FC<HeaderProps> = ({
     const pathname = usePathname();
 
     const handleNavClick = (view: "dashboard" | "assessment") => {
+        if (view === 'assessment' && isReportReady) {
+            sessionStorage.setItem(REPORT_READY_STORAGE_KEY, 'true');
+            localStorage.setItem(REPORT_READY_STORAGE_KEY, 'true');
+        }
+
         onNavigate?.(view);
         setMobileMenuOpen(false);
     };
@@ -374,6 +440,14 @@ const Header: React.FC<HeaderProps> = ({
                 />
             );
         }
+
+        const assessmentNavLabel = isReportReady ? "Report" : "Assessments";
+        const isAssessmentActive = currentView === "assessment";
+        const reportIconFill = isAssessmentActive
+            ? '#FFFFFF'
+            : (theme === 'dark' ? '#FFFFFF' : '#1ED36A');
+        const assessmentNavIcon = isReportReady ? <ReportTriangleIcon fillColor={reportIconFill} /> : <JobsIcon />;
+
         return (
             <>
                 <NavItem
@@ -384,8 +458,8 @@ const Header: React.FC<HeaderProps> = ({
                     onClick={() => handleNavClick("dashboard")}
                 />
                 <NavItem
-                    icon={<JobsIcon />}
-                    label="Assessments"
+                    icon={assessmentNavIcon}
+                    label={assessmentNavLabel}
                     active={currentView === "assessment"}
                     isMobile={isMobile}
                     onClick={() => handleNavClick("assessment")}

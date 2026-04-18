@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { studentService } from '../../lib/services/student.service';
 import PersonalityCard from './PersonalityCard';
 import ConsultantCallCard from './ConsultantCallCard';
@@ -9,8 +10,15 @@ import ImpactAssessmentCard from './ImpactAssessmentCard';
 import TopCollegesCard from './TopCollegesCard';
 
 const FINAL_ASSESSMENT_COMPLETION_NOTICE_KEY = 'finalAssessmentCompletionNotice';
+const REPORT_READY_STORAGE_KEY = 'studentReportReady';
 const DASHBOARD_NOTICE_DELAY_MS = 2000;
 const FINAL_ASSESSMENT_COUNT_THRESHOLD = 2;
+const FORCE_SHOW_COMPLETION_NOTICE_FOR_TESTING = false;
+const ASSESSMENT_COMPLETION_SOUND_SRC = '/sounds/dragon-studio-new-notification-3-398649.mp3';
+
+type CompletionAudioWindow = Window & {
+    __completionNoticeAudio?: HTMLAudioElement;
+};
 
 type AssessmentCompletionNoticePayload = {
     source?: string;
@@ -20,6 +28,45 @@ type AssessmentCompletionNoticePayload = {
 };
 
 const playAssessmentCompletionSound = () => {
+    if (typeof window === 'undefined') return;
+
+    try {
+        const audioWindow = window as CompletionAudioWindow;
+        if (!audioWindow.__completionNoticeAudio) {
+            const persistentAudio = new Audio(ASSESSMENT_COMPLETION_SOUND_SRC);
+            persistentAudio.preload = 'auto';
+            persistentAudio.volume = 0.9;
+            audioWindow.__completionNoticeAudio = persistentAudio;
+        }
+
+        const audio = audioWindow.__completionNoticeAudio;
+        audio.currentTime = 0;
+
+        void audio.play().catch((playbackError) => {
+            console.warn('Unable to play completion mp3 immediately, waiting for interaction', playbackError);
+
+            const retryPlayback = () => {
+                window.removeEventListener('pointerdown', retryPlayback);
+                window.removeEventListener('keydown', retryPlayback);
+                audio.currentTime = 0;
+                void audio.play().catch((retryError) => {
+                    console.warn('Completion mp3 retry failed, using fallback tone', retryError);
+                    playFallbackCompletionTone();
+                });
+            };
+
+            window.addEventListener('pointerdown', retryPlayback, { once: true });
+            window.addEventListener('keydown', retryPlayback, { once: true });
+
+            playFallbackCompletionTone();
+        });
+    } catch (error) {
+        console.warn('Unable to initialize completion mp3 playback', error);
+        playFallbackCompletionTone();
+    }
+};
+
+const playFallbackCompletionTone = () => {
     if (typeof window === 'undefined') return;
 
     try {
@@ -67,11 +114,12 @@ const playAssessmentCompletionSound = () => {
             void audioContext.close();
         }, 900);
     } catch (error) {
-        console.warn('Unable to play assessment completion sound', error);
+        console.warn('Unable to play fallback assessment completion tone', error);
     }
 };
 
 const Dashboard: React.FC = () => {
+    const router = useRouter();
     const [isSchool, setIsSchool] = useState(false);
     const [reportData, setReportData] = useState<any>(null);
     const [isLoadingReport, setIsLoadingReport] = useState(false);
@@ -121,8 +169,25 @@ const Dashboard: React.FC = () => {
     }, []);
 
     useEffect(() => {
+        const triggerCompletionNotice = () => {
+            setShowCompletionNotice(true);
+            playAssessmentCompletionSound();
+        };
+
         const rawNotice = sessionStorage.getItem(FINAL_ASSESSMENT_COMPLETION_NOTICE_KEY);
-        if (!rawNotice) return;
+        if (!rawNotice) {
+            if (!FORCE_SHOW_COMPLETION_NOTICE_FOR_TESTING) {
+                return;
+            }
+
+            const timeoutId = window.setTimeout(() => {
+                triggerCompletionNotice();
+            }, DASHBOARD_NOTICE_DELAY_MS);
+
+            return () => {
+                window.clearTimeout(timeoutId);
+            };
+        }
 
         sessionStorage.removeItem(FINAL_ASSESSMENT_COMPLETION_NOTICE_KEY);
 
@@ -145,8 +210,7 @@ const Dashboard: React.FC = () => {
         }
 
         const timeoutId = window.setTimeout(() => {
-            setShowCompletionNotice(true);
-            playAssessmentCompletionSound();
+            triggerCompletionNotice();
         }, DASHBOARD_NOTICE_DELAY_MS);
 
         return () => {
@@ -157,35 +221,47 @@ const Dashboard: React.FC = () => {
     return (
         <div className="relative min-h-screen bg-transparent dark:bg-[#19211C] font-sans transition-colors duration-300 overflow-hidden p-4 sm:p-6 lg:p-8">
             {showCompletionNotice && (
-                <div className="fixed top-20 left-4 right-4 sm:left-auto sm:right-8 sm:w-[460px] z-[120] animate-fade-in">
-                    <div className="relative rounded-2xl border border-brand-green/30 bg-white/95 dark:bg-[#111827]/95 backdrop-blur-xl shadow-2xl px-5 py-4">
-                        <button
-                            onClick={() => setShowCompletionNotice(false)}
-                            className="absolute top-3 right-3 w-7 h-7 rounded-full bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 transition-colors flex items-center justify-center"
-                            aria-label="Close notification"
-                        >
-                            <svg className="w-4 h-4 text-gray-600 dark:text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="18" y1="6" x2="6" y2="18" />
-                                <line x1="6" y1="6" x2="18" y2="18" />
-                            </svg>
-                        </button>
+                <div className="fixed inset-0 z-[130] flex items-center justify-center px-4 animate-fade-in">
+                    <div
+                        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                        onClick={() => setShowCompletionNotice(false)}
+                    />
 
-                        <div className="flex items-start gap-3 pr-6">
-                            <div className="w-10 h-10 rounded-full bg-brand-green/15 border border-brand-green/30 flex items-center justify-center shrink-0 mt-0.5">
-                                <svg className="w-5 h-5 text-brand-green" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <div className="relative bg-white dark:bg-[#1A1D21] rounded-3xl p-8 max-w-md w-full shadow-2xl border border-brand-light-tertiary dark:border-white/10 text-center flex flex-col items-center animate-notice-pop">
+                        <div className="relative w-20 h-20 bg-brand-green/10 rounded-full flex items-center justify-center mb-6 border border-brand-green/20">
+                            <div className="notice-sparkles" aria-hidden="true">
+                                <span className="notice-sparkle-dot" />
+                                <span className="notice-sparkle-dot" />
+                                <span className="notice-sparkle-dot" />
+                                <span className="notice-sparkle-dot" />
+                            </div>
+
+                            <div className="w-12 h-12 bg-brand-green rounded-full flex items-center justify-center shadow-lg shadow-brand-green/30 animate-notice-icon-pop">
+                                <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                     <polyline points="20 6 9 17 4 12" />
                                 </svg>
                             </div>
-
-                            <div>
-                                <h3 className="text-sm font-semibold text-brand-text-light-primary dark:text-white">
-                                    Assessment Completed Successfully
-                                </h3>
-                                <p className="mt-1 text-xs leading-relaxed text-brand-text-light-secondary dark:text-gray-300">
-                                    Thank you for completing the full assessment process. Your personalized report is now being prepared and will be sent to your registered email address. Delivery may take a few minutes.
-                                </p>
-                            </div>
                         </div>
+
+                        <h2 className="text-2xl font-bold text-brand-text-light-primary dark:text-white mb-2">
+                            Assessment Completed!
+                        </h2>
+                        <p className="text-brand-text-light-secondary dark:text-gray-300 mb-8 text-sm leading-relaxed">
+                            You&apos;ve successfully completed the assessment. Your report is being processed and will be shared to your registered mail ID.
+                        </p>
+
+                        <button
+                            onClick={() => {
+                                setShowCompletionNotice(false);
+                                sessionStorage.setItem(REPORT_READY_STORAGE_KEY, 'true');
+                                localStorage.setItem(REPORT_READY_STORAGE_KEY, 'true');
+                                sessionStorage.removeItem('isAssessmentMode');
+                                router.push('/student/assessment');
+                            }}
+                            className="w-full py-3.5 rounded-full bg-brand-green text-white font-bold text-sm hover:bg-brand-green/90 transition-colors shadow-lg shadow-brand-green/20"
+                        >
+                            Continue
+                        </button>
                     </div>
                 </div>
             )}

@@ -17,7 +17,11 @@ export default function StudentAssessmentPage() {
 
   React.useEffect(() => {
     const isMode = sessionStorage.getItem('isAssessmentMode') === 'true';
-    if (isMode) {
+    const isReportReady =
+      sessionStorage.getItem('studentReportReady') === 'true' ||
+      localStorage.getItem('studentReportReady') === 'true';
+
+    if (isMode && !isReportReady) {
       setShowAssessmentOnly(true);
     }
   }, []);
@@ -32,10 +36,21 @@ export default function StudentAssessmentPage() {
     // No-op or handle specific logic
   };
 
+  const handleNavigate = (view: 'dashboard' | 'assessment') => {
+    if (view === 'dashboard') {
+      router.push('/student/dashboard');
+    } else if (view === 'assessment') {
+      router.push('/student/assessment');
+    }
+  };
+
   return (
-    // Update: Passing hideNav={true} to remove the menu from the Assessment Listing screen aswell
     <RequireStudent>
-      <AssessmentLayout onLogout={handleLogout} showAssessmentOnly={showAssessmentOnly} hideNav={true}>
+      <AssessmentLayout
+        onLogout={handleLogout}
+        showAssessmentOnly={showAssessmentOnly}
+        onNavigate={handleNavigate}
+      >
         <AssessmentScreen onStartAssessment={handleStart} />
       </AssessmentLayout>
     </RequireStudent>
