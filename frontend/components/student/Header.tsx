@@ -176,6 +176,7 @@ const Header: React.FC<HeaderProps> = ({
             localStorage.getItem(REPORT_READY_STORAGE_KEY) === 'true'
         );
     });
+    const [isSchool, setIsSchool] = useState(false);
 
     useEffect(() => {
         const fetchUserProfile = async () => {
@@ -464,6 +465,7 @@ const Header: React.FC<HeaderProps> = ({
             ? '#FFFFFF'
             : (theme === 'dark' ? '#FFFFFF' : '#1ED36A');
         const assessmentNavIcon = isReportReady ? <ReportTriangleIcon fillColor={reportIconFill} /> : <JobsIcon />;
+        const showRoadmapAndCounsellor = !isSchool || isReportReady;
 
         return (
             <>
@@ -475,13 +477,13 @@ const Header: React.FC<HeaderProps> = ({
                     onClick={() => handleNavClick("dashboard")}
                 />
                 <NavItem
-                    icon={<JobsIcon />}
-                    label="Assessments"
-                    active={currentView === "assessment"}
+                    icon={assessmentNavIcon}
+                    label={assessmentNavLabel}
+                    active={isAssessmentActive}
                     isMobile={isMobile}
                     onClick={() => handleNavClick("assessment")}
                 />
-                {!isSchool && (
+                {showRoadmapAndCounsellor && (
                     <>
                         <NavItem icon={<RoadmapIcon />} label="Road Map" active={isRoadmapsActive} isMobile={isMobile} onClick={handleRoadmapClick} />
                         <NavItem icon={<Brain className="w-4 h-4" />} label="AI Counsellor" active={isCounsellorActive} isMobile={isMobile} onClick={handleCounsellorClick} />

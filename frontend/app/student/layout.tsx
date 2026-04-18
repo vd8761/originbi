@@ -9,6 +9,8 @@ import { configureAmplify } from '../../lib/aws-amplify-config';
 import { studentService } from '../../lib/services/student.service';
 import { useEffect, useState } from 'react';
 
+const REPORT_READY_STORAGE_KEY = 'studentReportReady';
+
 configureAmplify();
 
 export default function StudentLayout({
@@ -19,6 +21,8 @@ export default function StudentLayout({
     const pathname = usePathname();
     const router = useRouter();
     const [checkingStatus, setCheckingStatus] = useState(true);
+    const [isAssessmentModeFlag, setIsAssessmentModeFlag] = useState(false);
+    const [isReportReady, setIsReportReady] = useState(false);
 
     // Define public routes that do NOT require authentication or Header
     const publicRoutes = [
@@ -29,6 +33,40 @@ export default function StudentLayout({
     ];
 
     const isPublic = publicRoutes.some(route => pathname?.includes(route));
+
+    const syncModeFlags = () => {
+        if (typeof window === 'undefined') return;
+
+        const assessmentMode = sessionStorage.getItem('isAssessmentMode') === 'true';
+        const reportReady =
+            sessionStorage.getItem(REPORT_READY_STORAGE_KEY) === 'true' ||
+            localStorage.getItem(REPORT_READY_STORAGE_KEY) === 'true';
+
+        setIsAssessmentModeFlag(assessmentMode);
+        setIsReportReady(reportReady);
+    };
+
+    useEffect(() => {
+        if (isPublic) {
+            return;
+        }
+
+        syncModeFlags();
+
+        const intervalId = window.setInterval(syncModeFlags, 1000);
+        const handleStorage = (event: StorageEvent) => {
+            if (event.key === 'isAssessmentMode' || event.key === REPORT_READY_STORAGE_KEY || event.key === null) {
+                syncModeFlags();
+            }
+        };
+
+        window.addEventListener('storage', handleStorage);
+
+        return () => {
+            window.clearInterval(intervalId);
+            window.removeEventListener('storage', handleStorage);
+        };
+    }, [isPublic]);
 
     useEffect(() => {
         if (isPublic) {
@@ -53,11 +91,13 @@ export default function StudentLayout({
 
                     if (status?.isAssessmentMode) {
                         sessionStorage.setItem('isAssessmentMode', 'true');
+                        syncModeFlags();
                         if (!pathname?.includes('/student/assessment')) {
                             router.push('/student/assessment');
                         }
                     } else {
                         sessionStorage.removeItem('isAssessmentMode');
+                        syncModeFlags();
                     }
                 } catch (e) {
                     console.error("Error checking assessment status", e);
@@ -103,9 +143,8 @@ export default function StudentLayout({
 
     // Detect special modes for Header
     const isAssessmentPage = pathname?.includes('/student/assessment');
-    // For now, if we are on assessment page, match the behavior in assessment/page.tsx
-    const hideNav = isAssessmentPage; 
-    const showAssessmentOnly = typeof window !== 'undefined' ? sessionStorage.getItem('isAssessmentMode') === 'true' : false;
+    const hideNav = isAssessmentPage && !isReportReady;
+    const showAssessmentOnly = isAssessmentModeFlag && !isReportReady;
 
     return (
         <div className="relative min-h-screen w-full bg-transparent dark:bg-[#19211C] font-sans selection:bg-brand-green/20 overflow-x-hidden">

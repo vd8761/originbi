@@ -892,15 +892,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   const [pdfPreviewError, setPdfPreviewError] = useState<string | null>(null);
   // Whether we're currently restoring from cache (blocks generation trigger)
   const [isRestoringFromCache, setIsRestoringFromCache] = useState(false);
-  const [forceReportPageMode, setForceReportPageMode] = useState<boolean>(() => {
-    if (typeof window === 'undefined') {
-      return false;
-    }
-    return (
-      sessionStorage.getItem(REPORT_READY_STORAGE_KEY) === 'true' ||
-      localStorage.getItem(REPORT_READY_STORAGE_KEY) === 'true'
-    );
-  });
+  const [forceReportPageMode, setForceReportPageMode] = useState(false);
   // Lock ref set IMMEDIATELY (synchronously) to prevent any concurrent generation calls
   const reportGenerationLockRef = useRef(false);
   // Track if cache restore has been attempted this mount
@@ -987,18 +979,24 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   );
 
   useEffect(() => {
-    if (completedAssessmentCount < REPORT_READY_COMPLETION_COUNT) {
+    if (loading) {
       return;
     }
 
-    setForceReportPageMode(true);
+    const reportReady = completedAssessmentCount >= REPORT_READY_COMPLETION_COUNT;
+    setForceReportPageMode(reportReady);
 
     if (typeof window !== 'undefined') {
-      sessionStorage.setItem(REPORT_READY_STORAGE_KEY, 'true');
-      localStorage.setItem(REPORT_READY_STORAGE_KEY, 'true');
-      sessionStorage.removeItem('isAssessmentMode');
+      if (reportReady) {
+        sessionStorage.setItem(REPORT_READY_STORAGE_KEY, 'true');
+        localStorage.setItem(REPORT_READY_STORAGE_KEY, 'true');
+        sessionStorage.removeItem('isAssessmentMode');
+      } else {
+        sessionStorage.removeItem(REPORT_READY_STORAGE_KEY);
+        localStorage.removeItem(REPORT_READY_STORAGE_KEY);
+      }
     }
-  }, [completedAssessmentCount]);
+  }, [completedAssessmentCount, loading]);
 
   const { totalQuestions, totalCompleted } = useMemo(() => {
     return assessments.reduce(
@@ -1574,13 +1572,19 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   }
 
   if (!loading && assessments.length === 0 && !isReportPageMode) {
-    return <div className="p-20 text-center text-brand-text-light-primary dark:text-white text-lg">{t.noAssessments}</div>;
+    return (
+      <div className="relative min-h-screen bg-transparent dark:bg-[#19211C] font-sans transition-colors duration-300 overflow-hidden p-4 sm:p-6 lg:p-8">
+        <div className="w-full max-w-[2000px] mx-auto">
+          <div className="p-20 text-center text-brand-text-light-primary dark:text-white text-lg">{t.noAssessments}</div>
+        </div>
+      </div>
+    );
   }
 
   if (isReportPageMode) {
     return (
-      <>
-        <div className="flex flex-col gap-5 w-full px-10 pb-10 max-w-[1920px] mx-auto pt-6 lg:pt-10">
+      <div className="relative min-h-screen bg-transparent dark:bg-[#19211C] font-sans transition-colors duration-300 overflow-hidden p-4 sm:p-6 lg:p-8">
+        <div className="flex flex-col gap-5 w-full max-w-[2000px] mx-auto">
           <div className="flex items-center text-xs text-black dark:text-white font-normal flex-wrap">
             <Link
               href="/student/dashboard"
@@ -1683,90 +1687,92 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
         </div>
 
         {reportPreviewModal}
-      </>
+      </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4 w-full px-10 pb-10 max-w-[1920px] mx-auto pt-6 lg:pt-10">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-1.5">
-        <div className="flex items-center text-xs text-black dark:text-white font-normal flex-wrap">
-          <Link
-            href="/student/dashboard"
-            className="hover:text-gray-700 dark:hover:text-[#1ED36A] transition-colors"
-          >
-            Dashboard
-          </Link>
-          <span className="mx-2 text-gray-400 dark:text-gray-600">
-            <ArrowRightWithoutLineIcon className="w-3 h-3 text-black dark:text-white" />
-          </span>
-          <span className="text-brand-green font-semibold">Assessments</span>
+    <div className="relative min-h-screen bg-transparent dark:bg-[#19211C] font-sans transition-colors duration-300 overflow-hidden p-4 sm:p-6 lg:p-8">
+      <div className="flex flex-col gap-4 w-full max-w-[2000px] mx-auto">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-1.5">
+          <div className="flex items-center text-xs text-black dark:text-white font-normal flex-wrap">
+            <Link
+              href="/student/dashboard"
+              className="hover:text-gray-700 dark:hover:text-[#1ED36A] transition-colors"
+            >
+              Dashboard
+            </Link>
+            <span className="mx-2 text-gray-400 dark:text-gray-600">
+              <ArrowRightWithoutLineIcon className="w-3 h-3 text-black dark:text-white" />
+            </span>
+            <span className="text-brand-green font-semibold">Assessments</span>
+          </div>
+
+          {canPreviewReport && (
+            <button
+              onClick={() => { void openReportPreview(); }}
+              disabled={isPdfPreviewLoading}
+              className="self-end px-4 py-2 rounded-full bg-brand-green text-white hover:bg-brand-green/90 text-xs md:text-sm font-semibold shadow-lg shadow-brand-green/20 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {isPdfPreviewLoading ? 'Opening Report...' : 'Preview Report'}
+            </button>
+          )}
         </div>
 
-        {canPreviewReport && (
-          <button
-            onClick={() => { void openReportPreview(); }}
-            disabled={isPdfPreviewLoading}
-            className="self-end px-4 py-2 rounded-full bg-brand-green text-white hover:bg-brand-green/90 text-xs md:text-sm font-semibold shadow-lg shadow-brand-green/20 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
-          >
-            {isPdfPreviewLoading ? 'Opening Report...' : 'Preview Report'}
-          </button>
-        )}
-      </div>
-
-      <div className="mb-4 overflow-x-auto pb-4 px-4 scrollbar-hide md:overflow-visible md:pb-0 md:mx-0 md:px-0">
-        <Stepper overallProgress={overallPercentage} steps={stepperSteps} />
-      </div>
-
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
-        <div className="w-full md:w-auto">
-          <h1 className="text-[clamp(18px,1.8vw,28px)] font-semibold text-brand-text-light-primary dark:text-brand-text-primary mb-1">
-            {t.hello} {userName}
-          </h1>
-          <p className="text-brand-text-light-secondary dark:text-brand-text-secondary text-[clamp(10px,0.8vw,12px)] max-w-xl">
-            {t.subtitle}
-          </p>
+        <div className="mb-4 overflow-x-auto pb-4 px-4 scrollbar-hide md:overflow-visible md:pb-0 md:mx-0 md:px-0">
+          <Stepper overallProgress={overallPercentage} steps={stepperSteps} />
         </div>
 
-        <div className="w-full md:w-auto flex flex-col gap-2 md:items-end">
-          <div
-            className="relative overflow-hidden rounded-r-2xl rounded-l-none p-3 min-w-[160px] text-white self-start md:self-center w-full md:w-auto text-right"
-            style={{
-              background: "linear-gradient(90deg, transparent 0%, #1ED36A 100%)",
-            }}
-          >
-            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10 blur-xl"></div>
-            <p className="text-[clamp(8px,0.7vw,10px)] opacity-90 mb-0.5 text-white">
-              {t.overall}
-            </p>
-            <p className="text-[clamp(16px,1.5vw,22px)] font-semibold text-white">
-              {overallPercentage}%
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
+          <div className="w-full md:w-auto">
+            <h1 className="text-[clamp(18px,1.8vw,28px)] font-semibold text-brand-text-light-primary dark:text-brand-text-primary mb-1">
+              {t.hello} {userName}
+            </h1>
+            <p className="text-brand-text-light-secondary dark:text-brand-text-secondary text-[clamp(10px,0.8vw,12px)] max-w-xl">
+              {t.subtitle}
             </p>
           </div>
+
+          <div className="w-full md:w-auto flex flex-col gap-2 md:items-end">
+            <div
+              className="relative overflow-hidden rounded-r-2xl rounded-l-none p-3 min-w-[160px] text-white self-start md:self-center w-full md:w-auto text-right"
+              style={{
+                background: "linear-gradient(90deg, transparent 0%, #1ED36A 100%)",
+              }}
+            >
+              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10 blur-xl"></div>
+              <p className="text-[clamp(8px,0.7vw,10px)] opacity-90 mb-0.5 text-white">
+                {t.overall}
+              </p>
+              <p className="text-[clamp(16px,1.5vw,22px)] font-semibold text-white">
+                {overallPercentage}%
+              </p>
+            </div>
+          </div>
         </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {assessments.map((assessment) => (
+            <AssessmentCard
+              key={assessment.id}
+              {...assessment}
+              progress={Math.round(
+                (assessment.completedQuestions / assessment.totalQuestions) * 100
+              )}
+              onAction={handleCardAction}
+            />
+          ))}
+        </div>
+
+        <AssessmentModal
+          isOpen={!!selectedAssessment}
+          assessment={selectedAssessment}
+          onClose={() => setSelectedAssessment(null)}
+          onStart={handleStartAssessment}
+        />
+
+        {reportPreviewModal}
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {assessments.map((assessment) => (
-          <AssessmentCard
-            key={assessment.id}
-            {...assessment}
-            progress={Math.round(
-              (assessment.completedQuestions / assessment.totalQuestions) * 100
-            )}
-            onAction={handleCardAction}
-          />
-        ))}
-      </div>
-
-      <AssessmentModal
-        isOpen={!!selectedAssessment}
-        assessment={selectedAssessment}
-        onClose={() => setSelectedAssessment(null)}
-        onStart={handleStartAssessment}
-      />
-
-      {reportPreviewModal}
     </div>
   );
 };
