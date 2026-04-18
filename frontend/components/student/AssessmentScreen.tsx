@@ -35,6 +35,7 @@ import AssessmentModal from "./AssessmentModal";
 const REPORT_PDF_POLL_INTERVAL_MS = 1200;
 const REPORT_PDF_POLL_MAX_ATTEMPTS = 240;
 const PDF_RENDER_MAX_WIDTH = 1080;
+const PDF_RENDER_PIXEL_RATIO_CAP = 1.35;
 const REPORT_PREVIEW_CACHE_VERSION = 'v3';
 const REPORT_PREVIEW_CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
 const REPORT_READY_COMPLETION_COUNT = 2;
@@ -286,7 +287,6 @@ const writeReportToCache = async (
     });
     // Set the sync flag so next mount knows cache exists
     setCacheMeta(studentId, userEmail);
-    console.log('[ReportCache] Report saved to IndexedDB + localStorage flag set');
   } catch (error) {
     console.warn('[ReportCache] IndexedDB write failed', error);
   }
@@ -307,6 +307,10 @@ const ResponsivePdfRenderer: React.FC<ResponsivePdfRendererProps> = ({
   const [containerWidth, setContainerWidth] = useState(0);
   const [isRendering, setIsRendering] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
+  const fallbackContainerWidth =
+    typeof window !== 'undefined'
+      ? Math.max(320, Math.min(window.innerWidth - 96, PDF_RENDER_MAX_WIDTH + 24))
+      : 0;
 
   useEffect(() => {
     const container = viewportRef.current;
@@ -315,7 +319,12 @@ const ResponsivePdfRenderer: React.FC<ResponsivePdfRendererProps> = ({
     }
 
     const updateWidth = () => {
-      const measuredWidth = Math.floor(container.clientWidth || 0);
+      // Use border-box width so scrollbar appearance does not change measured width.
+      const measuredWidth = Math.floor(
+        container.getBoundingClientRect().width ||
+        container.clientWidth ||
+        0,
+      );
       if (measuredWidth <= 0) {
         return;
       }
@@ -324,7 +333,7 @@ const ResponsivePdfRenderer: React.FC<ResponsivePdfRendererProps> = ({
       // to prevent repeated full PDF re-render loops.
       const shouldUpdate =
         lastMeasuredWidthRef.current === 0 ||
-        Math.abs(measuredWidth - lastMeasuredWidthRef.current) >= 8;
+        Math.abs(measuredWidth - lastMeasuredWidthRef.current) >= 16;
 
       if (!shouldUpdate) {
         return;
@@ -336,6 +345,9 @@ const ResponsivePdfRenderer: React.FC<ResponsivePdfRendererProps> = ({
 
     updateWidth();
 
+    // Modal layout can report 0 width briefly on first paint; retry once after layout settles.
+    const retryTimer = window.setTimeout(updateWidth, 60);
+
     if (typeof ResizeObserver !== 'undefined') {
       const observer = new ResizeObserver(() => {
         updateWidth();
@@ -343,18 +355,22 @@ const ResponsivePdfRenderer: React.FC<ResponsivePdfRendererProps> = ({
       observer.observe(container);
 
       return () => {
+        window.clearTimeout(retryTimer);
         observer.disconnect();
       };
     }
 
     window.addEventListener('resize', updateWidth);
     return () => {
+      window.clearTimeout(retryTimer);
       window.removeEventListener('resize', updateWidth);
     };
   }, []);
 
   useEffect(() => {
-    if (!pdfBytes || containerWidth <= 0 || !pagesHostRef.current) {
+    const effectiveContainerWidth = containerWidth > 0 ? containerWidth : fallbackContainerWidth;
+
+    if (!pdfBytes || effectiveContainerWidth <= 0 || !pagesHostRef.current) {
       return;
     }
 
@@ -369,7 +385,8 @@ const ResponsivePdfRenderer: React.FC<ResponsivePdfRendererProps> = ({
 
       setIsRendering(true);
       setRenderError(null);
-      pagesHost.innerHTML = '';
+      const shouldRenderIncrementally = pagesHost.childElementCount === 0;
+      const renderedNodes: HTMLDivElement[] = [];
 
       try {
         const pdfjsLib: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
@@ -400,10 +417,12 @@ const ResponsivePdfRenderer: React.FC<ResponsivePdfRendererProps> = ({
 
         const availableWidth = Math.max(
           280,
-          Math.min(containerWidth - 24, PDF_RENDER_MAX_WIDTH),
+          Math.min(effectiveContainerWidth - 24, PDF_RENDER_MAX_WIDTH),
         );
         const pixelRatio =
-          typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+          typeof window !== 'undefined'
+            ? Math.min(window.devicePixelRatio || 1, PDF_RENDER_PIXEL_RATIO_CAP)
+            : 1;
 
         for (
           let pageNumber = 1;
@@ -423,6 +442,9 @@ const ResponsivePdfRenderer: React.FC<ResponsivePdfRendererProps> = ({
           wrapper.style.width = '100%';
           wrapper.style.display = 'flex';
           wrapper.style.justifyContent = 'center';
+          wrapper.style.contentVisibility = 'auto';
+          wrapper.style.contain = 'layout paint';
+          wrapper.style.containIntrinsicSize = `1px ${Math.max(320, Math.ceil(viewport.height))}px`;
 
           const canvas = document.createElement('canvas');
           canvas.width = Math.floor(viewport.width * pixelRatio);
@@ -430,9 +452,9 @@ const ResponsivePdfRenderer: React.FC<ResponsivePdfRendererProps> = ({
           canvas.style.width = `${Math.floor(viewport.width)}px`;
           canvas.style.height = `${Math.floor(viewport.height)}px`;
           canvas.style.maxWidth = '100%';
-          canvas.style.borderRadius = '14px';
+          canvas.style.borderRadius = '10px';
           canvas.style.background = '#ffffff';
-          canvas.style.boxShadow = '0 8px 30px rgba(15, 20, 25, 0.28)';
+          canvas.style.boxShadow = '0 2px 8px rgba(15, 20, 25, 0.12)';
 
           const context = canvas.getContext('2d', { alpha: false });
           if (!context) {
@@ -451,7 +473,27 @@ const ResponsivePdfRenderer: React.FC<ResponsivePdfRendererProps> = ({
           }
 
           wrapper.appendChild(canvas);
-          pagesHost.appendChild(wrapper);
+          renderedNodes.push(wrapper);
+          if (shouldRenderIncrementally) {
+            pagesHost.appendChild(wrapper);
+          }
+
+          // Yield after each page so wheel/touch scrolling remains smooth.
+          await new Promise<void>((resolve) => {
+            if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+              window.requestAnimationFrame(() => resolve());
+              return;
+            }
+            setTimeout(() => resolve(), 0);
+          });
+        }
+
+        if (renderedNodes.length === 0) {
+          throw new Error('Report pages are empty. Please refresh preview.');
+        }
+
+        if (!cancelled && !shouldRenderIncrementally) {
+          pagesHost.replaceChildren(...renderedNodes);
         }
       } catch (error) {
         console.error('Failed to render PDF preview', error);
@@ -484,13 +526,17 @@ const ResponsivePdfRenderer: React.FC<ResponsivePdfRendererProps> = ({
         void loadingTask.destroy();
       }
     };
-  }, [pdfBytes, password, containerWidth]);
+  }, [pdfBytes, password, containerWidth, fallbackContainerWidth]);
 
   return (
     <div
       ref={viewportRef}
       className="h-full w-full overflow-x-auto overflow-y-scroll p-3 md:p-6"
-      style={{ scrollbarGutter: 'stable both-edges' }}
+      style={{
+        overscrollBehavior: 'contain',
+        scrollbarGutter: 'stable',
+        WebkitOverflowScrolling: 'touch',
+      }}
     >
       {isRendering && (
         <div className="sticky top-3 z-20 mb-4 mx-auto w-fit rounded-full bg-black/70 px-3 py-2 shadow-lg">
@@ -696,7 +742,7 @@ const LockTimer: React.FC<LockTimerProps> = ({ time, onTimerExpire }) => {
     };
 
     setTimeLeft(calculateTimeLeft());
-    const timer = setInterval(() => setTimeLeft(calculateTimeLeft()), 1000); // Check every second for better precision
+    const timer = setInterval(() => setTimeLeft(calculateTimeLeft()), 30000);
     return () => clearInterval(timer);
   }, [time, onTimerExpire]);
 
@@ -904,15 +950,12 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     const fetchProgress = async () => {
       const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
       setActiveUserEmail(email?.trim().toLowerCase() || null);
-      console.log("Fetching progress for:", email); // Debug log
       if (email) {
         try {
           const [progressData, profileData] = await Promise.all([
             studentService.getAssessmentProgress(email),
             studentService.getProfile(email)
           ]);
-
-          console.log("Progress Data:", progressData); // Debug log
 
           if (progressData && Array.isArray(progressData)) {
             setFetchedSteps(progressData);
@@ -936,7 +979,6 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     if (fetchedSteps.length === 0) return [];
 
     return fetchedSteps.map((step, index) => {
-      console.log("Mapping step - RAW:", JSON.stringify(step, null, 2)); // Debug log
       const normalizedStatus = String(step?.status || '').toUpperCase();
 
       let status: "completed" | "in-progress" | "locked" | "not-started" = "not-started";
@@ -1079,8 +1121,6 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   };
 
   const handleStartAssessment = () => {
-    console.log("Starting Assessment with data:", selectedAssessment); // Debug log
-
     if (selectedAssessment?.attemptId) {
       // Optimistic Update: Set status to IN_PROGRESS immediately
       setFetchedSteps((prevSteps) =>
@@ -1092,8 +1132,6 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
           return step;
         })
       );
-
-      console.log("Redirecting to assessment...");
       router.push(`/student/assessment/start?attempt_id=${selectedAssessment.attemptId}`);
     } else {
       console.error("No attempt ID found. Selected Assessment:", selectedAssessment);
@@ -1122,24 +1160,23 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     // SYNC CHECK: Does localStorage flag say we have cached data?
     const hasCacheFlag = hasValidCacheMeta(studentId, authContext.userEmail);
     if (!hasCacheFlag) {
-      console.log('[ReportCache] No cache flag found — will generate fresh report');
       return;
     }
 
     // We have a cache flag! Block generation and start async restore.
-    console.log('[ReportCache] Cache flag found — restoring from IndexedDB...');
     setIsRestoringFromCache(true);
+    setIsPdfPreviewLoading(true);
+    setPdfPreviewError(null);
+    setPdfPreviewProgress('Loading cached report...');
     reportGenerationLockRef.current = true; // Block generation immediately
 
     const restoreFromCache = async () => {
       try {
         const cached = await readReportFromIDB(studentId, authContext.userEmail!);
         if (cached) {
-          console.log('[ReportCache] ✅ Report restored from IndexedDB cache — NO regeneration');
           setReportPdfBytes(cached.pdfBytes);
           setReportPdfPassword(cached.password);
         } else {
-          console.log('[ReportCache] ⚠ IndexedDB miss despite flag — will generate fresh');
           clearCacheMeta();
         }
       } catch (err) {
@@ -1147,6 +1184,8 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
         clearCacheMeta();
       } finally {
         setIsRestoringFromCache(false);
+        setIsPdfPreviewLoading(false);
+        setPdfPreviewProgress('');
         reportGenerationLockRef.current = false;
       }
     };
@@ -1165,13 +1204,16 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     forceRefresh?: boolean;
     openModal?: boolean;
   } = {}) => {
+    if (openModal) {
+      setShowReportPreview(true);
+    }
+
     // IMMEDIATE LOCK: Set ref synchronously before any async work
     if (!studentId || reportGenerationLockRef.current) return;
     if (!forceRefresh && (isPdfPreviewLoading || isRestoringFromCache)) return;
 
     // If we already have PDF bytes in state and not forcing refresh, skip
     if (!forceRefresh && reportPdfBytes) {
-      if (openModal) setShowReportPreview(true);
       return;
     }
 
@@ -1179,10 +1221,6 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     reportGenerationLockRef.current = true;
 
     const authContext = getSessionAuthContext();
-
-    if (openModal) {
-      setShowReportPreview(true);
-    }
 
     setPdfPreviewError(null);
     setPdfPreviewProgress('Initializing report preview...');
@@ -1208,7 +1246,6 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       try {
         const cachedPreview = await readReportFromIDB(studentId, authContext.userEmail);
         if (cachedPreview) {
-          console.log('[ReportCache] ✅ Loaded from IndexedDB in ensureReportPreviewData');
           setReportPdfBytes(cachedPreview.pdfBytes);
           setReportPdfPassword(cachedPreview.password);
           setIsPdfPreviewLoading(false);
@@ -1222,7 +1259,6 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     }
 
     // ===== NO CACHE — GENERATE FRESH REPORT =====
-    console.log('[ReportCache] 🔄 No cached report — starting generation from API');
     setIsPdfPreviewLoading(true);
     setReportPdfBytes(null);
     setReportPdfPassword(null);
@@ -1475,14 +1511,14 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
         onClick={handleCloseReportPreview}
       />
 
-      <div className="relative h-full w-full p-2 md:p-4">
+      <div className="relative mt-[clamp(70px,7.6vh,100px)] h-[calc(100%-clamp(70px,7.6vh,100px))] w-full p-2 md:p-4">
         <div className="relative h-full w-full rounded-2xl border border-brand-light-tertiary dark:border-white/10 bg-white dark:bg-[#0F1419] shadow-2xl overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-brand-light-tertiary dark:border-white/10">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-brand-light-tertiary dark:border-white/10">
             <h2 className="text-base md:text-lg font-semibold text-brand-text-light-primary dark:text-white">
               Assessment Report PDF Preview
             </h2>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               {!isPdfPreviewLoading && !pdfPreviewError && reportPdfBytes && (
                 <>
                   <button
@@ -1573,7 +1609,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
 
   if (!loading && assessments.length === 0 && !isReportPageMode) {
     return (
-      <div className="relative min-h-screen bg-transparent dark:bg-[#19211C] font-sans transition-colors duration-300 overflow-hidden p-4 sm:p-6 lg:p-8">
+      <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-x-hidden p-4 sm:p-6 lg:p-8">
         <div className="w-full max-w-[2000px] mx-auto">
           <div className="p-20 text-center text-brand-text-light-primary dark:text-white text-lg">{t.noAssessments}</div>
         </div>
@@ -1583,7 +1619,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
 
   if (isReportPageMode) {
     return (
-      <div className="relative min-h-screen bg-transparent dark:bg-[#19211C] font-sans transition-colors duration-300 overflow-hidden p-4 sm:p-6 lg:p-8">
+      <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-x-hidden p-4 sm:p-6 lg:p-8">
         <div className="flex flex-col gap-5 w-full max-w-[2000px] mx-auto">
           <div className="flex items-center text-xs text-black dark:text-white font-normal flex-wrap">
             <Link
@@ -1619,7 +1655,6 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => { void openReportPreview(); }}
-                  disabled={isPdfPreviewLoading}
                   className="px-4 py-2 rounded-full border border-[#EEF4F1] dark:border-white/10 bg-white dark:bg-white/10 text-xs lg:text-[0.833vw] font-semibold text-[#19211C] dark:text-white hover:bg-[#F7FAF8] dark:hover:bg-white/15 transition-colors disabled:opacity-55 disabled:cursor-not-allowed"
                 >
                   Open Fullpage View
@@ -1669,7 +1704,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
               </div>
             )}
 
-            {!isPdfPreviewLoading && !pdfPreviewError && reportPdfBytes && (
+            {!showReportPreview && !isPdfPreviewLoading && !pdfPreviewError && reportPdfBytes && (
               <ResponsivePdfRenderer
                 pdfBytes={reportPdfBytes}
                 password={reportPdfPassword}
@@ -1692,33 +1727,8 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   }
 
   return (
-    <div className="relative min-h-screen bg-transparent dark:bg-[#19211C] font-sans transition-colors duration-300 overflow-hidden p-4 sm:p-6 lg:p-8">
+    <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-x-hidden p-4 sm:p-6 lg:p-8">
       <div className="flex flex-col gap-4 w-full max-w-[2000px] mx-auto">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-1.5">
-          <div className="flex items-center text-xs text-black dark:text-white font-normal flex-wrap">
-            <Link
-              href="/student/dashboard"
-              className="hover:text-gray-700 dark:hover:text-[#1ED36A] transition-colors"
-            >
-              Dashboard
-            </Link>
-            <span className="mx-2 text-gray-400 dark:text-gray-600">
-              <ArrowRightWithoutLineIcon className="w-3 h-3 text-black dark:text-white" />
-            </span>
-            <span className="text-brand-green font-semibold">Assessments</span>
-          </div>
-
-          {canPreviewReport && (
-            <button
-              onClick={() => { void openReportPreview(); }}
-              disabled={isPdfPreviewLoading}
-              className="self-end px-4 py-2 rounded-full bg-brand-green text-white hover:bg-brand-green/90 text-xs md:text-sm font-semibold shadow-lg shadow-brand-green/20 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {isPdfPreviewLoading ? 'Opening Report...' : 'Preview Report'}
-            </button>
-          )}
-        </div>
-
         <div className="mb-4 overflow-x-auto pb-4 px-4 scrollbar-hide md:overflow-visible md:pb-0 md:mx-0 md:px-0">
           <Stepper overallProgress={overallPercentage} steps={stepperSteps} />
         </div>

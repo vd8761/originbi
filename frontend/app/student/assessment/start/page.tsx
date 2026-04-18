@@ -11,10 +11,6 @@ function AssessmentRunnerContent() {
   const searchParams = useSearchParams();
   const attemptId = searchParams.get('attempt_id') || undefined;
 
-  const handleLogout = () => {
-    router.push('/student/login');
-  };
-
   const handleBackToAssessments = () => {
     router.push('/student/assessment');
   };
@@ -27,7 +23,7 @@ function AssessmentRunnerContent() {
   };
 
   return (
-    <AssessmentLayout onLogout={handleLogout} hideNav={true}>
+    <AssessmentLayout>
       <AssessmentRunner
         onBack={handleBackToAssessments}
         onGoToDashboard={handleGoToDashboard}
