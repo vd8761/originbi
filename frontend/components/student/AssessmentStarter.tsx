@@ -60,17 +60,33 @@ interface AssessmentRunnerProps {
   attemptId?: string;
 }
 
+const FINAL_ASSESSMENT_COMPLETION_NOTICE_KEY = "finalAssessmentCompletionNotice";
+const FINAL_ASSESSMENT_COUNT_THRESHOLD = 2;
+const REPORT_READY_STORAGE_KEY = 'studentReportReady';
+const ASSESSMENT_COMPLETION_SOUND_SRC = '/sounds/dragon-studio-new-notification-3-398649.mp3';
+
+type CompletionAudioWindow = Window & {
+  __assessmentRunnerCompletionAudio?: HTMLAudioElement;
+};
+
 // --- Success Modal Component ---
 const SuccessModal: React.FC<{
   onBack: () => void;
   onDashboard: () => void;
-  isLastLevel?: boolean;
-}> = ({ onBack, onDashboard, isLastLevel = false }) => (
+  showDashboard?: boolean;
+}> = ({ onBack, onDashboard, showDashboard = false }) => (
   <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 animate-fade-in">
     <div className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" />
-    <div className="relative bg-white dark:bg-[#1A1D21] rounded-3xl p-8 max-w-md w-full shadow-2xl border border-brand-light-tertiary dark:border-white/10 text-center flex flex-col items-center">
-      <div className="w-20 h-20 bg-brand-green/10 rounded-full flex items-center justify-center mb-6 border border-brand-green/20">
-        <div className="w-12 h-12 bg-brand-green rounded-full flex items-center justify-center shadow-lg shadow-brand-green/30">
+    <div className="relative bg-white dark:bg-[#1A1D21] rounded-3xl p-8 max-w-md w-full shadow-2xl border border-brand-light-tertiary dark:border-white/10 text-center flex flex-col items-center animate-notice-pop">
+      <div className="relative w-20 h-20 bg-brand-green/10 rounded-full flex items-center justify-center mb-6 border border-brand-green/20">
+        <div className="notice-sparkles" aria-hidden="true">
+          <span className="notice-sparkle-dot" />
+          <span className="notice-sparkle-dot" />
+          <span className="notice-sparkle-dot" />
+          <span className="notice-sparkle-dot" />
+        </div>
+
+        <div className="w-12 h-12 bg-brand-green rounded-full flex items-center justify-center shadow-lg shadow-brand-green/30 animate-notice-icon-pop">
           <CheckCircleIcon className="w-6 h-6 text-white" />
         </div>
       </div>
@@ -78,18 +94,17 @@ const SuccessModal: React.FC<{
       <h2 className="text-2xl font-bold text-brand-text-light-primary dark:text-white mb-2">
         Assessment Completed!
       </h2>
-      <p className="text-brand-text-light-secondary dark:text-gray-400 mb-8 text-sm">
-        Great job! You've successfully completed the assessment. Your results
-        are being processed.
+      <p className="text-brand-text-light-secondary dark:text-gray-400 mb-8 text-sm leading-relaxed">
+        You&apos;ve successfully completed the assessment. Your report is being processed and will be shared to your registered mail ID.
       </p>
 
       <div className="flex flex-col gap-3 w-full">
-        {isLastLevel ? (
+        {showDashboard ? (
           <button
             onClick={onDashboard}
             className="w-full py-3.5 rounded-full bg-brand-green text-white font-bold text-sm hover:bg-brand-green/90 transition-colors shadow-lg shadow-brand-green/20"
           >
-            Go to Dashboard
+            Continue
           </button>
         ) : (
           <button
@@ -305,6 +320,7 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
   const [isCompleted, setIsCompleted] = useState(false);
   const [changeCount, setChangeCount] = useState(0);
   const [isLastLevel, setIsLastLevel] = useState(false);
+  const [isFinalCompletion, setIsFinalCompletion] = useState<boolean | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Language Context
@@ -313,6 +329,200 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
   // Refs for logic
   const startTimeRef = useRef<number>(Date.now());
   const initialLoadRef = useRef(false);
+  const predictedCompletedCountRef = useRef(1);
+  const completionNoticeWrittenRef = useRef(false);
+  const completionSoundPlayedRef = useRef(false);
+
+  const playFallbackCompletionTone = () => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const extendedWindow = window as Window & {
+        webkitAudioContext?: typeof AudioContext;
+      };
+
+      const AudioContextClass = window.AudioContext || extendedWindow.webkitAudioContext;
+      if (!AudioContextClass) return;
+
+      const audioContext = new AudioContextClass();
+      if (audioContext.state === 'suspended') {
+        void audioContext.resume();
+      }
+
+      const playTone = (
+        frequency: number,
+        startTime: number,
+        duration: number,
+        gainValue: number,
+      ) => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(frequency, startTime);
+
+        gainNode.gain.setValueAtTime(0.0001, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(gainValue, startTime + 0.01);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.start(startTime);
+        oscillator.stop(startTime + duration);
+      };
+
+      const startAt = audioContext.currentTime + 0.02;
+      playTone(784, startAt, 0.12, 0.14);
+      playTone(988, startAt + 0.14, 0.12, 0.12);
+      playTone(1175, startAt + 0.28, 0.16, 0.10);
+
+      window.setTimeout(() => {
+        void audioContext.close();
+      }, 900);
+    } catch (error) {
+      console.warn('[AssessmentRunner] Unable to play fallback completion tone', error);
+    }
+  };
+
+  const playAssessmentCompletionSound = () => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const audioWindow = window as CompletionAudioWindow;
+      if (!audioWindow.__assessmentRunnerCompletionAudio) {
+        const persistentAudio = new Audio(ASSESSMENT_COMPLETION_SOUND_SRC);
+        persistentAudio.preload = 'auto';
+        persistentAudio.volume = 0.9;
+        audioWindow.__assessmentRunnerCompletionAudio = persistentAudio;
+      }
+
+      const audio = audioWindow.__assessmentRunnerCompletionAudio;
+      audio.currentTime = 0;
+
+      void audio.play().catch((playbackError) => {
+        console.warn('[AssessmentRunner] Unable to play completion mp3 immediately, waiting for interaction', playbackError);
+
+        const retryPlayback = () => {
+          window.removeEventListener('pointerdown', retryPlayback);
+          window.removeEventListener('keydown', retryPlayback);
+          audio.currentTime = 0;
+          void audio.play().catch((retryError) => {
+            console.warn('[AssessmentRunner] Completion mp3 retry failed, using fallback tone', retryError);
+            playFallbackCompletionTone();
+          });
+        };
+
+        window.addEventListener('pointerdown', retryPlayback, { once: true });
+        window.addEventListener('keydown', retryPlayback, { once: true });
+
+        playFallbackCompletionTone();
+      });
+    } catch (error) {
+      console.warn('[AssessmentRunner] Unable to initialize completion mp3 playback', error);
+      playFallbackCompletionTone();
+    }
+  };
+
+  const wait = (ms: number) =>
+    new Promise<void>((resolve) => {
+      window.setTimeout(resolve, ms);
+    });
+
+  const writeDashboardCompletionNotice = (completedCount: number) => {
+    if (typeof window === 'undefined' || completionNoticeWrittenRef.current) {
+      return;
+    }
+
+    sessionStorage.setItem(
+      FINAL_ASSESSMENT_COMPLETION_NOTICE_KEY,
+      JSON.stringify({
+        source: "final-assessment",
+        completedCount,
+        completionPercentage: 100,
+        completedAt: Date.now(),
+      }),
+    );
+
+    completionNoticeWrittenRef.current = true;
+  };
+
+  const fetchLatestCompletedCount = async () => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
+    if (!email) {
+      return null;
+    }
+
+    try {
+      const progressData = await studentService.getAssessmentProgress(email);
+      if (!Array.isArray(progressData)) {
+        return null;
+      }
+
+      return progressData.filter(
+        (step: any) => String(step?.status || '').toUpperCase() === 'COMPLETED',
+      ).length;
+    } catch (progressError) {
+      console.warn('[AssessmentRunner] Unable to refresh progress during final completion check', progressError);
+      return null;
+    }
+  };
+
+  const resolveFinalCompletionSignal = async () => {
+    const predictedCompletedCount = Math.max(
+      0,
+      Number(predictedCompletedCountRef.current || 0),
+    );
+
+    if (isFinalCompletion === true || predictedCompletedCount >= FINAL_ASSESSMENT_COUNT_THRESHOLD) {
+      return {
+        shouldTriggerDashboardPopup: true,
+        completedCount: Math.max(
+          predictedCompletedCount,
+          FINAL_ASSESSMENT_COUNT_THRESHOLD,
+        ),
+      };
+    }
+
+    let latestCompletedCount: number | null = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      latestCompletedCount = await fetchLatestCompletedCount();
+
+      if (
+        latestCompletedCount !== null &&
+        latestCompletedCount >= FINAL_ASSESSMENT_COUNT_THRESHOLD
+      ) {
+        return {
+          shouldTriggerDashboardPopup: true,
+          completedCount: latestCompletedCount,
+        };
+      }
+
+      if (attempt < 2) {
+        await wait(700);
+      }
+    }
+
+    if (latestCompletedCount !== null) {
+      return {
+        shouldTriggerDashboardPopup:
+          latestCompletedCount >= FINAL_ASSESSMENT_COUNT_THRESHOLD,
+        completedCount: latestCompletedCount,
+      };
+    }
+
+    // Fallback for legacy flows where progress snapshot is temporarily unavailable.
+    return {
+      shouldTriggerDashboardPopup: Boolean(isLastLevel),
+      completedCount: isLastLevel
+        ? FINAL_ASSESSMENT_COUNT_THRESHOLD
+        : predictedCompletedCount,
+    };
+  };
 
   // Sync selectedOption when Question Index or Answers change
   useEffect(() => {
@@ -351,6 +561,41 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
 
       const studentId = Number(profile.id);
       const examId = Number(attemptId) || 0;
+
+      let hasProgressSnapshot = false;
+      let completedCountFromProgress = 0;
+      let currentAttemptStatus = '';
+      try {
+        const progressData = await studentService.getAssessmentProgress(email);
+        if (Array.isArray(progressData) && progressData.length > 0) {
+          hasProgressSnapshot = true;
+          completedCountFromProgress = progressData.filter(
+            (step: any) => String(step?.status || '').toUpperCase() === 'COMPLETED',
+          ).length;
+
+          const currentAttemptProgress = progressData.find((step: any) => {
+            const foundAttemptId = String(
+              step?.id || step?.attempt_id || step?.assessment_attempt_id || step?.uuid || '',
+            );
+            return foundAttemptId === String(examId);
+          });
+
+          currentAttemptStatus = String(currentAttemptProgress?.status || '').toUpperCase();
+        }
+      } catch (progressError) {
+        console.warn('[AssessmentRunner] Unable to fetch progress for final completion detection', progressError);
+      }
+
+      const predictedCompletedCount =
+        completedCountFromProgress + (currentAttemptStatus === 'COMPLETED' ? 0 : 1);
+      predictedCompletedCountRef.current = predictedCompletedCount;
+      if (hasProgressSnapshot) {
+        setIsFinalCompletion(
+          predictedCompletedCount >= FINAL_ASSESSMENT_COUNT_THRESHOLD,
+        );
+      } else {
+        setIsFinalCompletion(null);
+      }
 
       const payload = {
         student_id: studentId, // Real User ID
@@ -476,6 +721,20 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
     fetchQuestions();
   }, [attemptId]);
 
+  useEffect(() => {
+    if (!isCompleted) {
+      completionSoundPlayedRef.current = false;
+      return;
+    }
+
+    if (completionSoundPlayedRef.current) {
+      return;
+    }
+
+    completionSoundPlayedRef.current = true;
+    playAssessmentCompletionSound();
+  }, [isCompleted]);
+
   const currentQuestion = questions[currentQIndex];
   const totalQuestions = questions.length;
   const currentNumber = currentQIndex + 1;
@@ -562,6 +821,18 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
       const unAnsweredCount = questions.filter(q => !checkAnswers[String(q.assessmentAnswerId)]).length;
 
       if (unAnsweredCount === 0) {
+        if (!completionSoundPlayedRef.current) {
+          completionSoundPlayedRef.current = true;
+          playAssessmentCompletionSound();
+        }
+
+        const completionSignal = await resolveFinalCompletionSignal();
+
+        if (completionSignal.shouldTriggerDashboardPopup) {
+          setIsFinalCompletion(true);
+          writeDashboardCompletionNotice(completionSignal.completedCount);
+        }
+
         setIsCompleted(true);
       } else {
         const nextUnansweredIndex = questions.findIndex((q, idx) => idx > currentQIndex && !checkAnswers[String(q.assessmentAnswerId)]);
@@ -589,6 +860,32 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
       startTimeRef.current = Date.now();
     } else {
       onBack();
+    }
+  };
+
+  const handleGoToDashboard = () => {
+    const shouldTriggerDashboardPopup =
+      isFinalCompletion === true ||
+      predictedCompletedCountRef.current >= FINAL_ASSESSMENT_COUNT_THRESHOLD ||
+      (isFinalCompletion === null && isLastLevel);
+
+    if (shouldTriggerDashboardPopup) {
+      writeDashboardCompletionNotice(
+        Math.max(
+          Number(predictedCompletedCountRef.current || 0),
+          FINAL_ASSESSMENT_COUNT_THRESHOLD,
+        ),
+      );
+
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(REPORT_READY_STORAGE_KEY, 'true');
+        localStorage.setItem(REPORT_READY_STORAGE_KEY, 'true');
+        sessionStorage.removeItem('isAssessmentMode');
+      }
+    }
+
+    if (onGoToDashboard) {
+      onGoToDashboard();
     }
   };
 
@@ -666,8 +963,11 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
         {isCompleted && (
           <SuccessModal
             onBack={onBack}
-            onDashboard={() => onGoToDashboard && onGoToDashboard()}
-            isLastLevel={isLastLevel}
+            onDashboard={handleGoToDashboard}
+            showDashboard={
+              isFinalCompletion === true ||
+              (isFinalCompletion === null && isLastLevel)
+            }
           />
         )}
 

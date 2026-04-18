@@ -86,85 +86,74 @@ export default function StudentCounsellorPage() {
 
     return (
         <RequireStudent>
-            <div className="relative min-h-screen w-full bg-transparent dark:bg-[#19211C] font-sans selection:bg-brand-green/20 overflow-x-hidden">
-                <div className="w-full min-h-screen lg:[zoom:0.85] xl:[zoom:0.9] 2xl:[zoom:1.0] bg-[url('/Background_Light_Theme.svg')] dark:bg-[url('/Background_Dark_Theme.svg')] bg-cover bg-top bg-no-repeat">
-                    {/* Header */}
-                    <div className="fixed top-0 left-0 right-0 z-50">
-                        <Header
-                            onLogout={handleLogout}
-                            currentView="dashboard"
-                            onNavigate={handleNavigate}
-                        />
-                    </div>
-
-                    {/* Content */}
-                    {loading ? (
-                        /* Loading state */
-                        <main className="relative z-10 w-full min-h-screen flex items-center justify-center pt-[90px] sm:pt-[98px] lg:pt-[105px]">
-                            <div className="flex flex-col items-center gap-3">
-                                <Loader2 className="w-8 h-8 text-brand-green animate-spin" />
-                                <p className="text-sm text-gray-500 dark:text-gray-400">Checking access...</p>
+            <div className="w-full h-full bg-[url('/Background_Light_Theme.svg')] dark:bg-[url('/Background_Dark_Theme.svg')] bg-cover bg-top bg-no-repeat">
+                {/* Content */}
+                {loading ? (
+                    /* Loading state */
+                    <main className="w-full min-h-[60vh] flex items-center justify-center">
+                        <div className="flex flex-col items-center gap-3">
+                            <Loader2 className="w-8 h-8 text-brand-green animate-spin" />
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Checking access...</p>
+                        </div>
+                    </main>
+                ) : hasAccess ? (
+                    /* Has access — show the AI Counsellor chat */
+                    <AiCounsellorChat />
+                ) : (
+                    /* No access — show paywall / redirect to dashboard */
+                    <main className="w-full min-h-[60vh] flex items-center justify-center px-4">
+                        <div className="max-w-md w-full text-center">
+                            <div className="relative mb-6 inline-block">
+                                <div className="absolute inset-0 bg-brand-green rounded-3xl blur-2xl opacity-20" />
+                                <div className="relative w-20 h-20 rounded-3xl bg-brand-green flex items-center justify-center shadow-xl shadow-brand-green/30 dark:shadow-brand-green/20">
+                                    <Lock className="w-10 h-10 text-white" />
+                                </div>
                             </div>
-                        </main>
-                    ) : hasAccess ? (
-                        /* Has access — show the AI Counsellor chat */
-                        <AiCounsellorChat />
-                    ) : (
-                        /* No access — show paywall / redirect to dashboard */
-                        <main className="relative z-10 w-full min-h-screen flex items-center justify-center pt-[90px] sm:pt-[98px] lg:pt-[105px] px-4">
-                            <div className="max-w-md w-full text-center">
-                                <div className="relative mb-6 inline-block">
-                                    <div className="absolute inset-0 bg-brand-green rounded-3xl blur-2xl opacity-20" />
-                                    <div className="relative w-20 h-20 rounded-3xl bg-brand-green flex items-center justify-center shadow-xl shadow-brand-green/30 dark:shadow-brand-green/20">
-                                        <Lock className="w-10 h-10 text-white" />
+
+                            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3">
+                                AI Counsellor is Locked
+                            </h1>
+                            <p className="text-gray-500 dark:text-gray-400 mb-2">
+                                Get personalized career guidance powered by AI
+                            </p>
+                            <p className="text-sm text-gray-400 dark:text-gray-500 mb-8">
+                                Request the Pro Version to unlock AI-powered career guidance.
+                            </p>
+
+                            <div className="space-y-3">
+                                <button
+                                    onClick={() => router.push('/student/dashboard')}
+                                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-brand-green hover:bg-[#16b058] text-[#19211C] dark:text-white rounded-xl font-semibold transition-all shadow-lg shadow-brand-green/20 dark:shadow-brand-green/10 hover:scale-[1.02] active:scale-[0.98]"
+                                >
+                                    <Sparkles className="w-5 h-5" />
+                                    Request for Pro Version
+                                </button>
+                                <button
+                                    onClick={() => router.back()}
+                                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 rounded-xl font-medium transition-all border border-gray-200 dark:border-white/10"
+                                >
+                                    <ArrowLeft className="w-4 h-4" />
+                                    Go Back
+                                </button>
+                            </div>
+
+                            {/* Features preview */}
+                            <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
+                                {[
+                                    { icon: Brain, label: 'Career Guidance', desc: 'AI-powered career matching' },
+                                    { icon: Sparkles, label: 'Skill Analysis', desc: 'Personalized recommendations' },
+                                    { icon: Lock, label: 'Private & Secure', desc: 'Your data stays yours' },
+                                ].map((f, i) => (
+                                    <div key={i} className="p-4 rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10">
+                                        <f.icon className="w-5 h-5 text-brand-green mb-2" />
+                                        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{f.label}</p>
+                                        <p className="text-xs text-gray-400 dark:text-gray-500">{f.desc}</p>
                                     </div>
-                                </div>
-
-                                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3">
-                                    AI Counsellor is Locked
-                                </h1>
-                                <p className="text-gray-500 dark:text-gray-400 mb-2">
-                                    Get personalized career guidance powered by AI
-                                </p>
-                                <p className="text-sm text-gray-400 dark:text-gray-500 mb-8">
-                                    Request the Pro Version to unlock AI-powered career guidance.
-                                </p>
-
-                                <div className="space-y-3">
-                                    <button
-                                        onClick={() => router.push('/student/dashboard')}
-                                        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-brand-green hover:bg-[#16b058] text-[#19211C] dark:text-white rounded-xl font-semibold transition-all shadow-lg shadow-brand-green/20 dark:shadow-brand-green/10 hover:scale-[1.02] active:scale-[0.98]"
-                                    >
-                                        <Sparkles className="w-5 h-5" />
-                                        Request for Pro Version
-                                    </button>
-                                    <button
-                                        onClick={() => router.back()}
-                                        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 rounded-xl font-medium transition-all border border-gray-200 dark:border-white/10"
-                                    >
-                                        <ArrowLeft className="w-4 h-4" />
-                                        Go Back
-                                    </button>
-                                </div>
-
-                                {/* Features preview */}
-                                <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
-                                    {[
-                                        { icon: Brain, label: 'Career Guidance', desc: 'AI-powered career matching' },
-                                        { icon: Sparkles, label: 'Skill Analysis', desc: 'Personalized recommendations' },
-                                        { icon: Lock, label: 'Private & Secure', desc: 'Your data stays yours' },
-                                    ].map((f, i) => (
-                                        <div key={i} className="p-4 rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10">
-                                            <f.icon className="w-5 h-5 text-brand-green mb-2" />
-                                            <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{f.label}</p>
-                                            <p className="text-xs text-gray-400 dark:text-gray-500">{f.desc}</p>
-                                        </div>
-                                    ))}
-                                </div>
+                                ))}
                             </div>
-                        </main>
-                    )}
-                </div>
+                        </div>
+                    </main>
+                )}
             </div>
         </RequireStudent>
     );
