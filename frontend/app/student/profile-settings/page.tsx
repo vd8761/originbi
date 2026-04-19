@@ -119,48 +119,60 @@ function ProfileSettingsContent({ user }: { user: UserProfile | null }) {
             </div>
 
             {/* Profile Details Card */}
-            <div className="bg-white dark:bg-white/[0.08] rounded-2xl p-6 shadow-md dark:shadow-none border border-gray-200 dark:border-white/[0.08] mb-6 relative">
-                {/* Change Password Button */}
-                <button
-                    onClick={() => setIsPasswordModalOpen(true)}
-                    className="absolute top-6 right-6 flex items-center gap-2 px-4 py-2 bg-[#1ED36A]/10 hover:bg-[#1ED36A]/20 text-[#1ED36A] rounded-xl transition-all text-sm font-semibold group"
-                >
-                    <LockIcon className="w-4 h-4" />
-                    <span>Change Password</span>
-                </button>
-
-                <div className="flex items-start gap-6">
+            <div className="bg-white dark:bg-white/[0.08] rounded-2xl p-6 shadow-md dark:shadow-none border border-gray-200 dark:border-white/[0.08] mb-6 relative overflow-hidden">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
                     {/* Avatar */}
                     <div
-                        className="w-28 h-28 rounded-full flex items-center justify-center text-white text-4xl font-bold flex-shrink-0"
+                        className="w-24 h-24 sm:w-28 sm:h-28 rounded-full flex items-center justify-center text-white text-3xl sm:text-4xl font-bold flex-shrink-0 shadow-lg"
                         style={{ backgroundColor: `#${getAvatarColor(user?.name || 'S')}` }}
                     >
                         {getInitials(user?.name)}
                     </div>
 
                     {/* Profile Info */}
-                    <div className="flex-1 h-28 flex flex-col justify-center">
-                        <h2 className="text-2xl font-semibold text-[#19211C] dark:text-white mb-2">
-                            {capitalizeWords(user?.name) || 'Student'}
-                        </h2>
-
-                        <div className="flex items-center mb-3">
-                            <div className="px-4 py-[5px] rounded-lg border border-[#FEF000] text-gray-900 dark:text-white text-sm font-medium bg-[#FEF000]/5 whitespace-nowrap">
-                                Trait: {traitName}
+                    <div className="flex-1 flex flex-col items-center sm:items-start text-center sm:text-left">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-2 w-full justify-center sm:justify-start">
+                            <h2 className="text-xl sm:text-2xl font-semibold text-[#19211C] dark:text-white">
+                                {capitalizeWords(user?.name) || 'Student'}
+                            </h2>
+                            <div className="flex justify-center sm:justify-start">
+                                <div className="px-3 py-[3px] rounded-lg border border-[#FEF000] text-gray-900 dark:text-white text-xs sm:text-sm font-medium bg-[#FEF000]/5 whitespace-nowrap">
+                                    Trait: {traitName}
+                                </div>
                             </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-y-2 gap-x-8 text-white">
+                        <div className="flex flex-wrap justify-center sm:justify-start items-center gap-y-3 gap-x-6 sm:gap-x-8 mt-2">
                             <div className="flex items-center gap-2.5">
-                                <PhoneIcon className="w-4 h-4 text-[#1ED36A] relative -top-[2px]" />
-                                <span className="text-[15px] font-medium text-gray-700 dark:text-white">{user?.mobile_number || '99876543321'}</span>
+                                <PhoneIcon className="w-4 h-4 text-[#1ED36A]" />
+                                <span className="text-sm sm:text-[15px] font-medium text-gray-700 dark:text-white">{user?.mobile_number || '99876543321'}</span>
                             </div>
                             <div className="flex items-center gap-2.5">
-                                <EmailIcon className="w-[19px] h-[19px] text-[#1ED36A]" />
-                                <span className="text-[15px] font-medium text-gray-700 dark:text-white">{user?.email || ''}</span>
+                                <EmailIcon className="w-[18px] h-[18px] text-[#1ED36A]" />
+                                <span className="text-sm sm:text-[15px] font-medium text-gray-700 dark:text-white truncate max-w-[200px] sm:max-w-none">{user?.email || ''}</span>
                             </div>
+                        </div>
+
+                        {/* Change Password Button - Mobile version (Inside flow) */}
+                        <div className="mt-6 sm:hidden w-full">
+                            <button
+                                onClick={() => setIsPasswordModalOpen(true)}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#1ED36A]/10 hover:bg-[#1ED36A]/20 text-[#1ED36A] rounded-xl transition-all text-sm font-semibold border border-[#1ED36A]/20"
+                            >
+                                <LockIcon className="w-4 h-4" />
+                                <span>Change Password</span>
+                            </button>
                         </div>
                     </div>
+                    
+                    {/* Change Password Button - Desktop version (Absolute) */}
+                    <button
+                        onClick={() => setIsPasswordModalOpen(true)}
+                        className="hidden sm:flex absolute top-6 right-6 items-center gap-2 px-4 py-2 bg-[#1ED36A]/10 hover:bg-[#1ED36A]/20 text-[#1ED36A] rounded-xl transition-all text-sm font-semibold border border-[#1ED36A]/20 group"
+                    >
+                        <LockIcon className="w-4 h-4" />
+                        <span>Change Password</span>
+                    </button>
                 </div>
             </div>
 
