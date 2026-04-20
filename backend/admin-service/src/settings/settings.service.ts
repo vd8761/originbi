@@ -146,9 +146,7 @@ export class SettingsService {
   // ---------------------------------------------------------
   // Helper: Merge Global & Local Email Config
   // ---------------------------------------------------------
-  async getEmailConfig(
-    overrideKey: string,
-  ): Promise<{
+  async getEmailConfig(overrideKey: string): Promise<{
     fromName: string;
     fromAddress: string;
     ccAddresses: string[];
@@ -228,7 +226,7 @@ export class SettingsService {
       category: row.category,
       key: row.settingKey,
       valueType: row.valueType,
-      value: row.isSensitive ? '••••••••' : row.value,
+      value: row.value,
       label: row.label,
       description: row.description,
       isSensitive: row.isSensitive,

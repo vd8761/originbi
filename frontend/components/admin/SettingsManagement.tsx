@@ -8,6 +8,8 @@ import {
     SettingsIcon,
     EmailIcon,
     ProfileIcon,
+    EyeIcon,
+    EyeOffIcon,
 } from "../icons";
 
 // Type definitions matching backend OriginbiSetting
@@ -39,6 +41,7 @@ export default function SettingsManagement() {
 
     // Modal state for feature-specific overrides
     const [activeOverrideKey, setActiveOverrideKey] = useState<string | null>(null);
+    const [visibleSensitiveFields, setVisibleSensitiveFields] = useState<Record<string, boolean>>({});
 
     const toggleToConfigMap: Record<string, string> = {
         'send_registration_email': 'registration_email_config',
@@ -254,17 +257,47 @@ export default function SettingsManagement() {
         }
 
         if (item.valueType === 'string' || item.valueType === 'number') {
+            const fieldId = `${item.category}:${item.key}`;
+            const isSensitiveTextField = item.isSensitive && item.valueType === 'string';
+            const isVisible = visibleSensitiveFields[fieldId];
+            const inputType = item.valueType === 'number'
+                ? 'number'
+                : isSensitiveTextField && !isVisible
+                    ? 'password'
+                    : 'text';
+
             return (
-                <input
-                    type={item.valueType === 'number' ? 'number' : 'text'}
-                    disabled={item.isReadonly}
-                    value={item.value || ''}
-                    onChange={(e) => {
-                        const val = item.valueType === 'number' ? Number(e.target.value) : e.target.value;
-                        handleValueChange(item.category, item.key, val);
-                    }}
-                    className={`block w-full max-w-lg rounded-xl border-0 py-2.5 px-4 bg-gray-50 dark:bg-white/5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-brand-green sm:text-sm sm:leading-6 transition-all ${item.isReadonly ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-black/20' : 'hover:ring-gray-300 dark:hover:ring-white/20'}`}
-                />
+                <div className="relative">
+                    <input
+                        id={item.key}
+                        type={inputType}
+                        disabled={item.isReadonly}
+                        value={item.value || ''}
+                        onChange={(e) => {
+                            const val = item.valueType === 'number' ? Number(e.target.value) : e.target.value;
+                            handleValueChange(item.category, item.key, val);
+                        }}
+                        className={`block w-full max-w-lg rounded-xl border-0 py-2.5 px-4 bg-gray-50 dark:bg-white/5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-brand-green sm:text-sm sm:leading-6 transition-all ${isSensitiveTextField ? 'pr-11' : ''} ${item.isReadonly ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-black/20' : 'hover:ring-gray-300 dark:hover:ring-white/20'}`}
+                    />
+                    {isSensitiveTextField && (
+                        <button
+                            type="button"
+                            onClick={() => setVisibleSensitiveFields((prev) => ({
+                                ...prev,
+                                [fieldId]: !prev[fieldId],
+                            }))}
+                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-brand-green dark:text-gray-500 dark:hover:text-brand-green"
+                            aria-label={isVisible ? 'Hide password' : 'Show password'}
+                            title={isVisible ? 'Hide password' : 'Show password'}
+                        >
+                            {isVisible ? (
+                                <EyeIcon className="h-5 w-5" />
+                            ) : (
+                                <EyeOffIcon className="h-5 w-5" />
+                            )}
+                        </button>
+                    )}
+                </div>
             );
         }
 

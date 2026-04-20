@@ -134,7 +134,7 @@ export class WhatsAppService {
         this.logger.error(
           `❌ Failed to send ${audience} WhatsApp poster to ${phoneNumber}: ${err.message}. Triggering SMS fallback...`,
         );
-        
+
         try {
           await this.sendSmsFallback(audience, phoneNumber, referralCode);
         } catch (smsErr: any) {
@@ -157,7 +157,9 @@ export class WhatsAppService {
   ): Promise<void> {
     const authKey = process.env.SMS_AUTH_KEY;
     if (!authKey) {
-      this.logger.warn(`SMS_AUTH_KEY not configured. Skipping SMS fallback for ${audience}.`);
+      this.logger.warn(
+        `SMS_AUTH_KEY not configured. Skipping SMS fallback for ${audience}.`,
+      );
       return;
     }
 
@@ -177,7 +179,9 @@ export class WhatsAppService {
       );
       this.logger.log(
         `✅ SMS fallback sent successfully for ${audience}: ${
-          typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
+          typeof response.data === 'string'
+            ? response.data
+            : JSON.stringify(response.data)
         }`,
       );
     } catch (err: any) {
