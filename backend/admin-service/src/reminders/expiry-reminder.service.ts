@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { DataSource } from 'typeorm';
 import { SettingsService } from '../settings/settings.service';
 import { WhatsappTemplatesService } from '../whatsapp/whatsapp-templates.service';
+import { SmsService } from '../sms/sms.service';
 
 interface ExpiryRow {
   user_id: string;
@@ -12,8 +13,11 @@ interface ExpiryRow {
 }
 
 /**
- * Sends a WhatsApp expiry reminder exactly 3 days before an assessment's
+ * Sends an expiry reminder exactly 3 days before an assessment's
  * `valid_to`. Runs daily at 09:00 IST. Only one reminder per user.
+ *
+ * WhatsApp first; SMS fallback per the `sms.send_expiry_reminder` toggle
+ * if WhatsApp is disabled or fails.
  */
 @Injectable()
 export class ExpiryReminderService {
@@ -23,19 +27,22 @@ export class ExpiryReminderService {
     private readonly dataSource: DataSource,
     private readonly settingsService: SettingsService,
     private readonly whatsappTemplates: WhatsappTemplatesService,
+    private readonly smsService: SmsService,
   ) {}
 
   @Cron('0 0 9 * * *', { timeZone: 'Asia/Kolkata' })
   async sendExpiryReminders(): Promise<void> {
     this.logger.log('[ExpiryReminder] Cron fired');
 
-    const enabled = await this.settingsService.getValue<boolean>(
+    const whatsappEnabled = await this.settingsService.getValue<boolean>(
       'whatsapp',
       'send_expiry_reminder',
     );
-    if (enabled === false) {
+    const smsEnabled = await this.smsService.isEnabled('expiry_reminder');
+
+    if (whatsappEnabled === false && !smsEnabled) {
       this.logger.log(
-        '[ExpiryReminder] Disabled via whatsapp.send_expiry_reminder. Skipping.',
+        '[ExpiryReminder] Both WhatsApp and SMS are disabled. Skipping.',
       );
       return;
     }
@@ -58,25 +65,47 @@ export class ExpiryReminderService {
         row.mobile_number,
         row.country_code,
       );
-      try {
-        await this.whatsappTemplates.send({
-          templateName: 'originbi_assessment_expiry_reminder',
-          phoneNumber: phone,
-          components: {
-            header_1: { type: 'image', value: imageUrl ?? '' },
-            body_1: { type: 'text', value: row.full_name ?? '' },
-            body_2: {
-              type: 'text',
-              value: portalUrl ?? 'https://mind.originbi.com/student',
+      const name = row.full_name ?? '';
+
+      let whatsappSucceeded = false;
+      if (whatsappEnabled !== false) {
+        try {
+          await this.whatsappTemplates.send({
+            templateName: 'originbi_assessment_expiry_reminder',
+            phoneNumber: phone,
+            components: {
+              header_1: { type: 'image', value: imageUrl ?? '' },
+              body_1: { type: 'text', value: name },
+              body_2: {
+                type: 'text',
+                value: portalUrl ?? 'https://mind.originbi.com/student',
+              },
             },
-          },
-        });
+          });
+          whatsappSucceeded = true;
+          this.logger.log(
+            `[ExpiryReminder] WhatsApp sent to ${phone} (user ${row.user_id}, 3d left)`,
+          );
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `[ExpiryReminder] WhatsApp failed for ${phone} (user ${row.user_id}): ${msg}`,
+          );
+        }
+      }
+
+      if (whatsappSucceeded) continue;
+      if (!smsEnabled) continue;
+
+      try {
+        await this.smsService.send('expiry_reminder', phone, name);
         this.logger.log(
-          `[ExpiryReminder] sent to ${phone} (user ${row.user_id}, 3d left)`,
+          `[ExpiryReminder] SMS sent to ${phone} (user ${row.user_id}, 3d left)`,
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
         this.logger.error(
-          `[ExpiryReminder] failed for ${phone} (user ${row.user_id}): ${err.message}`,
+          `[ExpiryReminder] SMS fallback failed for ${phone} (user ${row.user_id}): ${msg}`,
         );
       }
     }

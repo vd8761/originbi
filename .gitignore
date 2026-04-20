@@ -81,3 +81,5 @@ stop-all.sh
 
 act.exe
 /bin
+
+.claude/
