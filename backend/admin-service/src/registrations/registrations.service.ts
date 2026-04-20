@@ -25,6 +25,7 @@ import { GroupsService } from '../groups/groups.service';
 import { AssessmentGenerationService } from '../assessment/assessment-generation.service';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
 import { SettingsService } from '../settings/settings.service';
+import { WhatsappTemplatesService } from '../whatsapp/whatsapp-templates.service';
 
 import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
@@ -58,6 +59,7 @@ export class RegistrationsService {
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
     private readonly settingsService: SettingsService,
+    private readonly whatsappTemplates: WhatsappTemplatesService,
   ) {}
 
   async withRetry<T>(
@@ -426,6 +428,13 @@ export class RegistrationsService {
             // Do not rollback
           }
         }
+
+        // I. Send Assessment Instructions WhatsApp (fire-and-forget)
+        this.fireAssessmentInstructionsWhatsapp(registration).catch((err) =>
+          this.logger.error(
+            `Instructions WhatsApp failed for ${registration.mobileNumber}: ${err.message}`,
+          ),
+        );
 
         return {
           registrationId: registration.id,
@@ -822,6 +831,51 @@ export class RegistrationsService {
   // ---------------------------------------------------------
   // Helper: Send Welcome Email
   // ---------------------------------------------------------
+  private async fireAssessmentInstructionsWhatsapp(
+    registration: Registration,
+  ): Promise<void> {
+    const source = registration.registrationSource;
+    if (source !== 'SELF' && source !== 'AFFILIATE') return;
+
+    const enabled = await this.settingsService.getValue<boolean>(
+      'whatsapp',
+      'send_assessment_instructions',
+    );
+    if (enabled === false) return;
+
+    const [imageUrl, youtubeUrl, portalUrl] = await Promise.all([
+      this.settingsService.getValue<string>(
+        'whatsapp',
+        'student_template_image_url',
+      ),
+      this.settingsService.getValue<string>(
+        'whatsapp',
+        'instructions_youtube_url',
+      ),
+      this.settingsService.getValue<string>('whatsapp', 'student_portal_url'),
+    ]);
+
+    const phone = WhatsappTemplatesService.formatPhoneNumber(
+      registration.mobileNumber,
+      registration.countryCode,
+    );
+
+    await this.whatsappTemplates.send({
+      templateName: 'assessment_instructions_v6',
+      phoneNumber: phone,
+      components: {
+        header_1: { type: 'image', value: imageUrl ?? '' },
+        body_1: { type: 'text', value: registration.fullName ?? '' },
+        body_2: { type: 'text', value: youtubeUrl ?? '' },
+        button_1: {
+          subtype: 'url',
+          type: 'text',
+          value: portalUrl ?? 'https://mind.originbi.com/student',
+        },
+      },
+    });
+  }
+
   private async sendWelcomeEmail(
     to: string,
     name: string,
