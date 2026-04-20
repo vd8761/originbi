@@ -26,6 +26,7 @@ import { AssessmentGenerationService } from '../assessment/assessment-generation
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
 import { SettingsService } from '../settings/settings.service';
 import { WhatsappTemplatesService } from '../whatsapp/whatsapp-templates.service';
+import { SmsService, SmsTemplate } from '../sms/sms.service';
 
 import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
@@ -60,6 +61,7 @@ export class RegistrationsService {
     private readonly http: HttpService,
     private readonly settingsService: SettingsService,
     private readonly whatsappTemplates: WhatsappTemplatesService,
+    private readonly smsService: SmsService,
   ) {}
 
   async withRetry<T>(
@@ -837,43 +839,75 @@ export class RegistrationsService {
     const source = registration.registrationSource;
     if (source !== 'SELF' && source !== 'AFFILIATE') return;
 
-    const enabled = await this.settingsService.getValue<boolean>(
-      'whatsapp',
-      'send_assessment_instructions',
-    );
-    if (enabled === false) return;
-
-    const [imageUrl, youtubeUrl, portalUrl] = await Promise.all([
-      this.settingsService.getValue<string>(
-        'whatsapp',
-        'student_template_image_url',
-      ),
-      this.settingsService.getValue<string>(
-        'whatsapp',
-        'instructions_youtube_url',
-      ),
-      this.settingsService.getValue<string>('whatsapp', 'student_portal_url'),
-    ]);
-
     const phone = WhatsappTemplatesService.formatPhoneNumber(
       registration.mobileNumber,
       registration.countryCode,
     );
+    const name = registration.fullName ?? '';
 
-    await this.whatsappTemplates.send({
-      templateName: 'assessment_instructions_v6',
-      phoneNumber: phone,
-      components: {
-        header_1: { type: 'image', value: imageUrl ?? '' },
-        body_1: { type: 'text', value: registration.fullName ?? '' },
-        body_2: { type: 'text', value: youtubeUrl ?? '' },
-        button_1: {
-          subtype: 'url',
-          type: 'text',
-          value: portalUrl ?? 'https://mind.originbi.com/student',
-        },
-      },
-    });
+    const whatsappEnabled = await this.settingsService.getValue<boolean>(
+      'whatsapp',
+      'send_assessment_instructions',
+    );
+
+    let whatsappSucceeded = false;
+    if (whatsappEnabled !== false) {
+      try {
+        const [imageUrl, youtubeUrl, portalUrl] = await Promise.all([
+          this.settingsService.getValue<string>(
+            'whatsapp',
+            'student_template_image_url',
+          ),
+          this.settingsService.getValue<string>(
+            'whatsapp',
+            'instructions_youtube_url',
+          ),
+          this.settingsService.getValue<string>(
+            'whatsapp',
+            'student_portal_url',
+          ),
+        ]);
+
+        await this.whatsappTemplates.send({
+          templateName: 'assessment_instructions_v6',
+          phoneNumber: phone,
+          components: {
+            header_1: { type: 'image', value: imageUrl ?? '' },
+            body_1: { type: 'text', value: name },
+            body_2: { type: 'text', value: youtubeUrl ?? '' },
+            button_1: {
+              subtype: 'url',
+              type: 'text',
+              value: portalUrl ?? 'https://mind.originbi.com/student',
+            },
+          },
+        });
+        whatsappSucceeded = true;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Instructions WhatsApp failed for ${phone}, will try SMS fallback: ${msg}`,
+        );
+      }
+    }
+
+    if (whatsappSucceeded) return;
+    await this.trySmsFallback('assessment_instructions', phone, name);
+  }
+
+  private async trySmsFallback(
+    template: SmsTemplate,
+    phone: string,
+    name: string,
+  ): Promise<void> {
+    try {
+      const smsOn = await this.smsService.isEnabled(template);
+      if (!smsOn) return;
+      await this.smsService.send(template, phone, name);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`SMS fallback failed for ${template} ${phone}: ${msg}`);
+    }
   }
 
   private async sendWelcomeEmail(
