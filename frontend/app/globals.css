@@ -204,3 +204,109 @@ nextjs-portal,
 [data-nextjs-toast] {
     display: none !important;
 }
+
+@keyframes notice-pop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.92);
+  }
+
+  60% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.02);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-notice-pop {
+  animation: notice-pop-in 420ms cubic-bezier(0.18, 0.89, 0.32, 1.28);
+  transform-origin: center;
+}
+
+@keyframes notice-icon-pop {
+  0% {
+    transform: scale(0.86);
+    filter: drop-shadow(0 0 0 rgba(30, 211, 106, 0));
+  }
+
+  55% {
+    transform: scale(1.08);
+    filter: drop-shadow(0 8px 16px rgba(30, 211, 106, 0.35));
+  }
+
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(30, 211, 106, 0));
+  }
+}
+
+@keyframes notice-sparkle-float {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.65);
+  }
+
+  25% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(var(--sparkle-x, 0px), var(--sparkle-y, -26px)) scale(1.1);
+  }
+}
+
+.animate-notice-icon-pop {
+  animation: notice-icon-pop 560ms cubic-bezier(0.2, 0.9, 0.25, 1.25);
+}
+
+.notice-sparkles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.notice-sparkle-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(30, 211, 106, 0.95) 0%, rgba(30, 211, 106, 0) 70%);
+  animation: notice-sparkle-float 1.2s ease-out infinite;
+}
+
+.notice-sparkle-dot:nth-child(1) {
+  left: 8%;
+  top: 12%;
+  --sparkle-x: -12px;
+  --sparkle-y: -24px;
+  animation-delay: 0s;
+}
+
+.notice-sparkle-dot:nth-child(2) {
+  right: 10%;
+  top: 16%;
+  --sparkle-x: 14px;
+  --sparkle-y: -22px;
+  animation-delay: 0.18s;
+}
+
+.notice-sparkle-dot:nth-child(3) {
+  left: 14%;
+  bottom: 16%;
+  --sparkle-x: -16px;
+  --sparkle-y: 10px;
+  animation-delay: 0.08s;
+}
+
+.notice-sparkle-dot:nth-child(4) {
+  right: 14%;
+  bottom: 14%;
+  --sparkle-x: 16px;
+  --sparkle-y: 10px;
+  animation-delay: 0.24s;
+}

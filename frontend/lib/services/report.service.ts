@@ -6,6 +6,30 @@ const API_URL = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || "";
 const simulateDelay = (ms: number) =>
     new Promise((resolve) => setTimeout(resolve, ms));
 
+const getSessionToken = () => {
+    if (typeof window === "undefined") {
+        return null;
+    }
+
+    return (
+        sessionStorage.getItem("idToken") ||
+        sessionStorage.getItem("accessToken") ||
+        localStorage.getItem("originbi_id_token") ||
+        AuthService.getToken()
+    );
+};
+
+const buildSecureHeaders = (baseHeaders: Record<string, string> = {}) => {
+    const headers: Record<string, string> = { ...baseHeaders };
+    const token = getSessionToken();
+
+    if (token) {
+        headers.Authorization = `Bearer ${token}`;
+    }
+
+    return headers;
+};
+
 export const reportService = {
     async downloadReport(
         userId: string,
@@ -20,7 +44,9 @@ export const reportService = {
             `${API_URL}/reports/${userId}?type=${reportType}`,
             {
                 method: "GET",
-                headers: { Authorization: `Bearer ${token}` },
+                headers: buildSecureHeaders({
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                }),
             },
         );
 
@@ -33,7 +59,11 @@ export const reportService = {
                 `${API_URL}/generate/student/${studentId}`,
                 {
                     method: "GET",
-                    headers: { "Content-Type": "application/json" },
+                    headers: buildSecureHeaders({
+                        "Content-Type": "application/json",
+                        Accept: "application/json",
+                    }),
+                    cache: "no-store",
                 },
             );
             if (!res.ok) throw new Error("Failed to start report generation");
@@ -49,7 +79,10 @@ export const reportService = {
             const res = await fetch(
                 `${API_URL}/download/status/${jobId}?json=true`,
                 {
-                    headers: { Accept: "application/json" },
+                    headers: buildSecureHeaders({
+                        Accept: "application/json",
+                    }),
+                    cache: "no-store",
                 },
             );
             if (!res.ok) throw new Error("Failed to check status");

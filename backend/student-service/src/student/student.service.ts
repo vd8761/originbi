@@ -336,17 +336,30 @@ export class StudentService {
     const traitResult = await this.userRepo.query(traitQuery, [user.id]);
     const trait = traitResult && traitResult.length > 0 ? traitResult[0] : null;
 
-    // Fetch program type from registration
+    // Fetch program type and academic details from registration
     const programQuery = `
-      SELECT p.code as program_code, p.id as program_id
+      SELECT p.code as program_code, p.id as program_id,
+             r.school_level, r.school_stream, r.student_board,
+             r.department_degree_id, r.metadata,
+             d.name as department_name
       FROM registrations r
       JOIN programs p ON r.program_id = p.id
+      LEFT JOIN department_degrees dd ON r.department_degree_id = dd.id
+      LEFT JOIN departments d ON dd.department_id = d.id
       WHERE r.user_id = $1 AND r.is_deleted = false
       ORDER BY r.created_at DESC
       LIMIT 1
     `;
     const programResult = await this.userRepo.query(programQuery, [user.id]);
     const programCode = programResult?.[0]?.program_code || null;
+    const academicDetails = {
+      schoolLevel: programResult?.[0]?.school_level || null,
+      schoolStream: programResult?.[0]?.school_stream || null,
+      studentBoard: programResult?.[0]?.student_board || null,
+      departmentDegreeId: programResult?.[0]?.department_degree_id || null,
+      departmentName: programResult?.[0]?.department_name || null,
+      currentYear: programResult?.[0]?.metadata?.current_year || programResult?.[0]?.metadata?.currentYear || null,
+    };
 
     // Fetch DISC scores and agile scores for impact assessment
     let impactData = null;
@@ -413,6 +426,7 @@ export class StudentService {
       ...user,
       personalityTrait: trait,
       programCode,
+      academicDetails,
       ...(impactData || {}),
     };
   }

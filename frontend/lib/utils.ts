@@ -60,3 +60,41 @@ export const normalizeDepartmentDisplayName = (label: string | undefined | null)
 
     return normalized;
 };
+
+// Generate a unique but consistent color based on the name
+// Using HSL allows us to keep the colors vibrant and readable (consistent saturation/lightness)
+export const getAvatarColor = (name: string) => {
+    if (!name) return "1ED36A"; // Default green if no name
+    
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+
+    const h = Math.abs(hash) % 360;    // Full hue spectrum
+    const s = 55 + (Math.abs(hash) % 20); // Saturation 55-75% (Vibrant but not neon)
+    const l = 45 + (Math.abs(hash) % 10); // Lightness 45-55% (Dark formatting for white text)
+
+    // HSL to Hex conversion
+    const hslToHex = (h: number, s: number, l: number) => {
+        l /= 100;
+        const a = s * Math.min(l, 1 - l) / 100;
+        const f = (n: number) => {
+            const k = (n + h / 30) % 12;
+            const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+            return Math.round(255 * color).toString(16).padStart(2, '0');
+        };
+        return `${f(0)}${f(8)}${f(4)}`;
+    };
+
+    return hslToHex(h, s, l);
+};
+
+export const getInitials = (name: string | undefined | null) => {
+    if (!name) return "ST";
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+        return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
+    }
+    return parts[0].slice(0, 2).toUpperCase();
+};
