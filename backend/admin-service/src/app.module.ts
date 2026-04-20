@@ -24,6 +24,7 @@ import { R2Module } from './r2/r2.module';
 import { NotificationModule } from './notification/notification.module';
 import { SettingsModule } from './settings/settings.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { SmsModule } from './sms/sms.module';
 import { RemindersModule } from './reminders/reminders.module';
 
 @Module({
@@ -128,6 +129,7 @@ import { RemindersModule } from './reminders/reminders.module';
     NotificationModule,
     SettingsModule,
     WhatsappModule,
+    SmsModule,
     RemindersModule,
   ],
   controllers: [TestController, MailAssetsController, HealthController],

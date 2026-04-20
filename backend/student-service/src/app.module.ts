@@ -7,6 +7,7 @@ import { CounsellingModule } from './modules/counselling/counselling.module';
 import { PgBossModule } from '@wavezync/nestjs-pgboss';
 import { ReportModule } from './report/report.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { SmsModule } from './sms/sms.module';
 
 @Module({
   imports: [
@@ -75,6 +76,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
     CounsellingModule,
     ReportModule,
     WhatsappModule,
+    SmsModule,
   ],
 })
 export class AppModule {}
