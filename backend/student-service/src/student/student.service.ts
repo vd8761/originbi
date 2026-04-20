@@ -1466,8 +1466,11 @@ export class StudentService {
       fromName,
       fromAddress: fromEmail,
       ccAddresses,
+      bccAddresses,
+      replyToAddress,
     } = await this.settingsService.getEmailConfig('registration_email_config');
     const ccEmail = ccAddresses.join(', ');
+    const bccEmail = bccAddresses.join(', ');
     const fromAddress = `"${fromName}" <${fromEmail}>`;
 
     this.logger.log(`[Email Debug] Sending from: ${fromAddress}, to: ${to}`);
@@ -1479,7 +1482,7 @@ export class StudentService {
       logo: `${this.configService.get('API_URL')}/assets/logo-light.png`,
     };
 
-    const mailOptions = {
+    const mailOptions: Record<string, any> = {
       from: fromAddress,
       to,
       cc: ccEmail,
@@ -1494,6 +1497,8 @@ export class StudentService {
         assessmentTitle,
       ),
     };
+    if (bccEmail) mailOptions.bcc = bccEmail;
+    if (replyToAddress) mailOptions.replyTo = replyToAddress;
 
     try {
       const info = await transporter.sendMail(mailOptions);
@@ -1769,58 +1774,75 @@ export class StudentService {
         );
       }
 
-      // 10. Send Email
-      const dateStr = new Date().toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      });
+      // 10. Send Email (check global toggle)
+      const sendReportEmailEnabled =
+        await this.settingsService.getValue<boolean>(
+          'email',
+          'send_report_email',
+        );
 
-      const assets = {
-        logo: `https://mind.originbi.com/Origin-BI-Logo-01.png`,
-        reportCover: `https://mind.originbi.com/Origin-BI-Logo-01.png`,
-      };
+      if (sendReportEmailEnabled === false) {
+        this.logger.log(
+          `Report email disabled via admin settings (send_report_email=false). Skipping email for user ${userId}.`,
+        );
+      } else {
+        const dateStr = new Date().toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
 
-      const emailHtml = getAssessmentCompletionEmailTemplate(
-        registration.fullName || 'Student',
-        password,
-        this.configService.get('FRONTEND_URL') || 'https://mind.originbi.com/',
-        assets,
-        dateStr,
-        ((registration as any).program?.reportTitle as string) ||
-          'Self Discovery Report',
-      );
-
-      try {
-        const transporter = this.createEmailTransporter();
-
-        const {
-          fromName,
-          fromAddress: fromEmail,
-          ccAddresses,
-        } = await this.settingsService.getEmailConfig('report_email_config');
-
-        const mailOptions = {
-          from: `"${fromName}" <${fromEmail}>`,
-          to: user.email,
-          cc: ccAddresses,
-          subject: `Your Assessment Report is Ready - ${((registration as any).program?.reportTitle as string) || 'Origin BI'}`,
-          html: emailHtml,
-          attachments: [
-            {
-              filename: attachmentFileName,
-              content: pdfBuffer,
-              contentType: 'application/pdf',
-            },
-          ],
+        const assets = {
+          logo: `https://mind.originbi.com/Origin-BI-Logo-01.png`,
+          reportCover: `https://mind.originbi.com/Origin-BI-Logo-01.png`,
         };
 
-        await transporter.sendMail(mailOptions);
-        this.logger.log(`Assessment completion email sent to ${user.email}`);
-      } catch (err) {
-        this.logger.error(
-          `Failed to send assessment completion email to ${user.email}: ${err.message}`,
+        const emailHtml = getAssessmentCompletionEmailTemplate(
+          registration.fullName || 'Student',
+          password,
+          this.configService.get('FRONTEND_URL') ||
+            'https://mind.originbi.com/',
+          assets,
+          dateStr,
+          ((registration as any).program?.reportTitle as string) ||
+            'Self Discovery Report',
         );
+
+        try {
+          const transporter = this.createEmailTransporter();
+
+          const {
+            fromName,
+            fromAddress: fromEmail,
+            ccAddresses,
+            bccAddresses,
+            replyToAddress,
+          } = await this.settingsService.getEmailConfig('report_email_config');
+
+          const mailOptions: Record<string, any> = {
+            from: `"${fromName}" <${fromEmail}>`,
+            to: user.email,
+            cc: ccAddresses,
+            subject: `Your Assessment Report is Ready - ${((registration as any).program?.reportTitle as string) || 'Origin BI'}`,
+            html: emailHtml,
+            attachments: [
+              {
+                filename: attachmentFileName,
+                content: pdfBuffer,
+                contentType: 'application/pdf',
+              },
+            ],
+          };
+          if (bccAddresses.length > 0) mailOptions.bcc = bccAddresses;
+          if (replyToAddress) mailOptions.replyTo = replyToAddress;
+
+          await transporter.sendMail(mailOptions);
+          this.logger.log(`Assessment completion email sent to ${user.email}`);
+        } catch (err) {
+          this.logger.error(
+            `Failed to send assessment completion email to ${user.email}: ${err.message}`,
+          );
+        }
       }
 
       // Update assessment_reports to track the sent email
@@ -2002,11 +2024,13 @@ export class StudentService {
         fromName,
         fromAddress: fromEmail,
         ccAddresses,
+        bccAddresses,
+        replyToAddress,
       } = await this.settingsService.getEmailConfig(
         'manual_report_email_config',
       );
 
-      const mailOptions = {
+      const mailOptions: Record<string, any> = {
         from: `"${fromName}" <${fromEmail}>`,
         to: recipientEmail,
         cc: ccAddresses,
@@ -2020,6 +2044,8 @@ export class StudentService {
           },
         ],
       };
+      if (bccAddresses.length > 0) mailOptions.bcc = bccAddresses;
+      if (replyToAddress) mailOptions.replyTo = replyToAddress;
 
       await transporter.sendMail(mailOptions);
       this.logger.log(
@@ -2072,6 +2098,8 @@ export class StudentService {
         fromName,
         fromAddress: fromEmail,
         ccAddresses,
+        bccAddresses,
+        replyToAddress,
       } = await this.settingsService.getEmailConfig(
         'manual_report_email_config',
       );
@@ -2083,7 +2111,7 @@ export class StudentService {
         this.configService.get('FRONTEND_URL') || 'https://mind.originbi.com/',
       );
 
-      const mailOptions = {
+      const mailOptions: Record<string, any> = {
         from: `"${fromName}" <${fromEmail}>`,
         to: toEmail,
         cc: ccAddresses,
@@ -2097,6 +2125,8 @@ export class StudentService {
           },
         ],
       };
+      if (bccAddresses.length > 0) mailOptions.bcc = bccAddresses;
+      if (replyToAddress) mailOptions.replyTo = replyToAddress;
 
       await transporter.sendMail(mailOptions);
       this.logger.log(

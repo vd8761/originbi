@@ -69,11 +69,11 @@ export class SchoolReport extends BaseReport {
     confidence: 'High' | 'Moderate' | 'Exploratory';
     topGap: number;
   } = {
-    bestFit: '',
-    secondaryFit: '',
-    confidence: 'Exploratory',
-    topGap: 0,
-  };
+      bestFit: '',
+      secondaryFit: '',
+      confidence: 'Exploratory',
+      topGap: 0,
+    };
 
   constructor(data: SchoolData, options?: PDFKit.PDFDocumentOptions) {
     super(options);
@@ -475,62 +475,62 @@ export class SchoolReport extends BaseReport {
       targets: { key: keyof typeof profile; target: number; weight: number }[];
       readinessKeys: (keyof typeof profile)[];
     }[] = [
-      {
-        label: 'Engineering & Technology',
-        targets: [
-          { key: 'C', target: 88, weight: 0.22 },
-          { key: 'Focus', target: 85, weight: 0.2 },
-          { key: 'Commitment', target: 72, weight: 0.16 },
-          { key: 'D', target: 52, weight: 0.12 },
-          { key: 'Openness', target: 48, weight: 0.1 },
-          { key: 'S', target: 46, weight: 0.1 },
-          { key: 'Courage', target: 58, weight: 0.1 },
-        ],
-        readinessKeys: ['Focus', 'Commitment', 'C'],
-      },
-      {
-        label: 'Management & Leadership',
-        targets: [
-          { key: 'D', target: 86, weight: 0.22 },
-          { key: 'Courage', target: 82, weight: 0.18 },
-          { key: 'Commitment', target: 72, weight: 0.16 },
-          { key: 'I', target: 62, weight: 0.14 },
-          { key: 'Focus', target: 60, weight: 0.1 },
-          { key: 'Openness', target: 56, weight: 0.08 },
-          { key: 'Respect', target: 52, weight: 0.06 },
-          { key: 'C', target: 48, weight: 0.06 },
-        ],
-        readinessKeys: ['Courage', 'Commitment', 'Focus'],
-      },
-      {
-        label: 'Creative & Design',
-        targets: [
-          { key: 'I', target: 84, weight: 0.22 },
-          { key: 'Openness', target: 86, weight: 0.22 },
-          { key: 'Courage', target: 60, weight: 0.12 },
-          { key: 'Commitment', target: 50, weight: 0.1 },
-          { key: 'Focus', target: 52, weight: 0.1 },
-          { key: 'D', target: 48, weight: 0.08 },
-          { key: 'Respect', target: 58, weight: 0.08 },
-          { key: 'C', target: 42, weight: 0.08 },
-        ],
-        readinessKeys: ['Openness', 'Courage', 'I'],
-      },
-      {
-        label: 'People & HR',
-        targets: [
-          { key: 'S', target: 84, weight: 0.22 },
-          { key: 'Respect', target: 84, weight: 0.22 },
-          { key: 'I', target: 66, weight: 0.14 },
-          { key: 'Commitment', target: 70, weight: 0.14 },
-          { key: 'Openness', target: 58, weight: 0.1 },
-          { key: 'Focus', target: 56, weight: 0.08 },
-          { key: 'Courage', target: 46, weight: 0.05 },
-          { key: 'D', target: 40, weight: 0.05 },
-        ],
-        readinessKeys: ['Respect', 'Commitment', 'S'],
-      },
-    ];
+        {
+          label: 'Engineering & Technology',
+          targets: [
+            { key: 'C', target: 88, weight: 0.22 },
+            { key: 'Focus', target: 85, weight: 0.2 },
+            { key: 'Commitment', target: 72, weight: 0.16 },
+            { key: 'D', target: 52, weight: 0.12 },
+            { key: 'Openness', target: 48, weight: 0.1 },
+            { key: 'S', target: 46, weight: 0.1 },
+            { key: 'Courage', target: 58, weight: 0.1 },
+          ],
+          readinessKeys: ['Focus', 'Commitment', 'C'],
+        },
+        {
+          label: 'Management & Leadership',
+          targets: [
+            { key: 'D', target: 86, weight: 0.22 },
+            { key: 'Courage', target: 82, weight: 0.18 },
+            { key: 'Commitment', target: 72, weight: 0.16 },
+            { key: 'I', target: 62, weight: 0.14 },
+            { key: 'Focus', target: 60, weight: 0.1 },
+            { key: 'Openness', target: 56, weight: 0.08 },
+            { key: 'Respect', target: 52, weight: 0.06 },
+            { key: 'C', target: 48, weight: 0.06 },
+          ],
+          readinessKeys: ['Courage', 'Commitment', 'Focus'],
+        },
+        {
+          label: 'Creative & Design',
+          targets: [
+            { key: 'I', target: 84, weight: 0.22 },
+            { key: 'Openness', target: 86, weight: 0.22 },
+            { key: 'Courage', target: 60, weight: 0.12 },
+            { key: 'Commitment', target: 50, weight: 0.1 },
+            { key: 'Focus', target: 52, weight: 0.1 },
+            { key: 'D', target: 48, weight: 0.08 },
+            { key: 'Respect', target: 58, weight: 0.08 },
+            { key: 'C', target: 42, weight: 0.08 },
+          ],
+          readinessKeys: ['Openness', 'Courage', 'I'],
+        },
+        {
+          label: 'People & HR',
+          targets: [
+            { key: 'S', target: 84, weight: 0.22 },
+            { key: 'Respect', target: 84, weight: 0.22 },
+            { key: 'I', target: 66, weight: 0.14 },
+            { key: 'Commitment', target: 70, weight: 0.14 },
+            { key: 'Openness', target: 58, weight: 0.1 },
+            { key: 'Focus', target: 56, weight: 0.08 },
+            { key: 'Courage', target: 46, weight: 0.05 },
+            { key: 'D', target: 40, weight: 0.05 },
+          ],
+          readinessKeys: ['Respect', 'Commitment', 'S'],
+        },
+      ];
 
     return models
       .map((model) => {
@@ -543,7 +543,7 @@ export class SchoolReport extends BaseReport {
         }, 0);
         const readiness = Math.round(
           model.readinessKeys.reduce((sum, key) => sum + profile[key], 0) /
-            model.readinessKeys.length,
+          model.readinessKeys.length,
         );
 
         return {
@@ -913,7 +913,7 @@ export class SchoolReport extends BaseReport {
         norm(agile?.focus ?? 0) +
         norm(agile?.openness ?? 0) +
         norm(agile?.respect ?? 0)) /
-        5,
+      5,
     );
     const leadershipScore = this.ci_patterns.leadership;
 
@@ -1144,7 +1144,6 @@ export class SchoolReport extends BaseReport {
       indent: 30,
       type: 'number',
     });
-
     this.h2('Trait Mapping');
 
     const headers = [
@@ -1349,13 +1348,13 @@ export class SchoolReport extends BaseReport {
     }
 
     // 4. Career Alignment Index
-    this.ci_generateCareerAlignmentIndex();
+    // this.ci_generateCareerAlignmentIndex();
 
     // 5. Career Fit
-    this.ci_generateCareerFit();
+    // this.ci_generateCareerFit();
 
     // 6. Career Domain Table
-    this.ci_generateCareerDomainTable();
+    // this.ci_generateCareerDomainTable();
 
     // 7. Career Flight Path
     try {
@@ -1375,13 +1374,13 @@ export class SchoolReport extends BaseReport {
    */
   private async generateHSCSections(): Promise<void> {
     // 1. Career Alignment Index
-    this.ci_generateCareerAlignmentIndex();
+    // this.ci_generateCareerAlignmentIndex();
 
     // 2. Career Fit
-    this.ci_generateCareerFit();
+    // this.ci_generateCareerFit();
 
     // 3. Career Domain Table
-    this.ci_generateCareerDomainTable();
+    // this.ci_generateCareerDomainTable();
 
     const streamKey = STREAM_NAMES[this.data.school_stream_id ?? 0];
 
@@ -2831,9 +2830,9 @@ export class SchoolReport extends BaseReport {
     this.doc.font(this.FONT_SORA_REGULAR).fontSize(10);
     const subtitleH = streamFullTitle
       ? this.doc.heightOfString(streamFullTitle, {
-          width: textAreaW,
-          align: 'center',
-        })
+        width: textAreaW,
+        align: 'center',
+      })
       : 0;
     // Compatibility row height: label + bar + percent text inline
     const compatRowH = 18; // fixed height for the bar row
@@ -3652,10 +3651,10 @@ export class SchoolReport extends BaseReport {
   private generateACI(): void {
     const contentBlock =
       ACI[
-        this.getTopTwoTraits(
-          this.data.most_answered_answer_type,
-          this.data,
-        ).join('')
+      this.getTopTwoTraits(
+        this.data.most_answered_answer_type,
+        this.data,
+      ).join('')
       ];
     const agileSum =
       this.data.agile_scores[0].commitment +
@@ -4158,7 +4157,7 @@ export class SchoolReport extends BaseReport {
 
     // B. Sub Headers (DISC Focus, etc.)
     const subHeaders = [
-      'Personality Focus',
+      'DISC Focus',
       'Problem/Tasks',
       'People',
       'Pace (Environment)',
@@ -5840,40 +5839,40 @@ export class SchoolReport extends BaseReport {
     });
 
     const styleTitles: Record<string, { title: string; techniques: string[] }> =
-      {
-        structured: {
-          title: 'Structured Learning Approach',
-          techniques: [
-            'Detailed revision timetables with milestone tracking',
-            'Systematic note-taking and concept mapping',
-            'Regular self-assessment against defined benchmarks',
-          ],
-        },
-        collaborative: {
-          title: 'Collaborative Learning Approach',
-          techniques: [
-            'Group discussions and peer-teaching sessions',
-            'Presentation-based learning and debate',
-            'Interactive workshops and case study analysis',
-          ],
-        },
-        'self-paced': {
-          title: 'Self-Paced Learning Approach',
-          techniques: [
-            'Consistent daily study routines with fixed duration',
-            'Repetitive practice with familiar question formats',
-            'Incremental complexity progression over time',
-          ],
-        },
-        competitive: {
-          title: 'Competitive Learning Approach',
-          techniques: [
-            'Mock tests and timed exam simulations',
-            'Leaderboard-based study challenges',
-            'Goal-setting with visible progress metrics',
-          ],
-        },
-      };
+    {
+      structured: {
+        title: 'Structured Learning Approach',
+        techniques: [
+          'Detailed revision timetables with milestone tracking',
+          'Systematic note-taking and concept mapping',
+          'Regular self-assessment against defined benchmarks',
+        ],
+      },
+      collaborative: {
+        title: 'Collaborative Learning Approach',
+        techniques: [
+          'Group discussions and peer-teaching sessions',
+          'Presentation-based learning and debate',
+          'Interactive workshops and case study analysis',
+        ],
+      },
+      'self-paced': {
+        title: 'Self-Paced Learning Approach',
+        techniques: [
+          'Consistent daily study routines with fixed duration',
+          'Repetitive practice with familiar question formats',
+          'Incremental complexity progression over time',
+        ],
+      },
+      competitive: {
+        title: 'Competitive Learning Approach',
+        techniques: [
+          'Mock tests and timed exam simulations',
+          'Leaderboard-based study challenges',
+          'Goal-setting with visible progress metrics',
+        ],
+      },
+    };
 
     const style =
       styleTitles[this.ci_patterns.academicStyle] || styleTitles['structured'];
@@ -6972,7 +6971,7 @@ export class SchoolReport extends BaseReport {
 
     this.pHtml(
       `Based on your Personality trait, the institutions below have been selected and ranked using <b>${params.primary}</b> as the primary parameter and <b>${params.secondary}</b> as the secondary parameter. ` +
-        `Results are filtered for <b>${streamLabel}</b> and ordered by NIRF national rank after selection.`,
+      `Results are filtered for <b>${streamLabel}</b> and ordered by NIRF national rank after selection.`,
     );
 
     const colleges: UniversityData[] = await getTopCollegesForStudent(
@@ -7226,7 +7225,7 @@ export class SchoolReport extends BaseReport {
 
     this.pHtml(
       `Based on your personality trait and top Agile scrum value your career trajectory has been mapped below. ` +
-        `The gauge shows how your combination accelerates your journey compared to the industry average.`,
+      `The gauge shows how your combination accelerates your journey compared to the industry average.`,
     );
 
     const parsePace = (s: string): [number, number] => {

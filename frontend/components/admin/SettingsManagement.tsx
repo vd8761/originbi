@@ -1,12 +1,15 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import ReactDOM from "react-dom";
 import { api } from "../../lib/api";
 import { 
     CheckCircleIcon,
     SettingsIcon,
     EmailIcon,
     ProfileIcon,
+    EyeIcon,
+    EyeOffIcon,
 } from "../icons";
 
 // Type definitions matching backend OriginbiSetting
@@ -38,6 +41,7 @@ export default function SettingsManagement() {
 
     // Modal state for feature-specific overrides
     const [activeOverrideKey, setActiveOverrideKey] = useState<string | null>(null);
+    const [visibleSensitiveFields, setVisibleSensitiveFields] = useState<Record<string, boolean>>({});
 
     const toggleToConfigMap: Record<string, string> = {
         'send_registration_email': 'registration_email_config',
@@ -55,6 +59,44 @@ export default function SettingsManagement() {
         try {
             if (showLoading) setLoading(true);
             const { data } = await api.get('/settings');
+            
+            // "2 way option" implementation for Affiliate Email configuration
+            if (!data['affiliate']) data['affiliate'] = [];
+            const affiliateEmailSetting = data['email']?.find((s: SettingItem) => s.key === 'send_affiliate_email');
+            
+            if (affiliateEmailSetting) {
+                // Ensure the exact original category is retained to save correctly to backend
+                data['affiliate'].push({ ...affiliateEmailSetting, originalCategory: 'email' });
+                
+                // If there's an override config modal button, copy it too
+                const overrideKey = toggleToConfigMap['send_affiliate_email'];
+                const overrideSetting = overrideKey ? data['email']?.find((s: SettingItem) => s.key === overrideKey) : null;
+                if (overrideSetting) {
+                    data['affiliate'].push({ ...overrideSetting, originalCategory: 'email' });
+                }
+            }
+
+            // "2 way option" implementation for Report Email settings
+            // Show "Send Report Emails" toggle and "Manual Report Email Config" in the Report tab too
+            if (!data['report']) data['report'] = [];
+
+            // 1. Send Report Emails toggle + its override config
+            const reportEmailToggle = data['email']?.find((s: SettingItem) => s.key === 'send_report_email');
+            if (reportEmailToggle) {
+                data['report'].push({ ...reportEmailToggle, originalCategory: 'email' });
+                const reportOverrideKey = toggleToConfigMap['send_report_email'];
+                const reportOverrideSetting = reportOverrideKey ? data['email']?.find((s: SettingItem) => s.key === reportOverrideKey) : null;
+                if (reportOverrideSetting) {
+                    data['report'].push({ ...reportOverrideSetting, originalCategory: 'email' });
+                }
+            }
+
+            // 2. Manual Report Email Config (standalone override)
+            const manualReportConfig = data['email']?.find((s: SettingItem) => s.key === 'manual_report_email_config');
+            if (manualReportConfig) {
+                data['report'].push({ ...manualReportConfig, originalCategory: 'email' });
+            }
+            
             setSettingsGrouped(data);
             
             // Set first category as active by default
@@ -157,7 +199,14 @@ export default function SettingsManagement() {
     };
 
     const handleValueChange = (category: string, key: string, newValue: any) => {
-        const compoundKey = `${category}::${key}`;
+        // If the item had an originalCategory (from our 2-way option logic), use it to save properly!
+        let saveCategory = category;
+        const currentItem = settingsGrouped[category]?.find(s => s.key === key);
+        if (currentItem && (currentItem as any).originalCategory) {
+            saveCategory = (currentItem as any).originalCategory;
+        }
+
+        const compoundKey = `${saveCategory}::${key}`;
         
         // Update local modified state
         setModifiedSettings(prev => ({
@@ -165,13 +214,15 @@ export default function SettingsManagement() {
             [compoundKey]: newValue
         }));
         
-        // Update displayed grouped state for real-time UI reflection
+        // Update displayed grouped state for real-time UI reflection across any tabs it exists in
         setSettingsGrouped(prev => {
             const newGrouped = { ...prev };
-            const index = newGrouped[category].findIndex(s => s.key === key);
-            if (index !== -1) {
-                newGrouped[category][index].value = newValue;
-            }
+            Object.keys(newGrouped).forEach(cat => {
+                const index = newGrouped[cat].findIndex(s => s.key === key);
+                if (index !== -1) {
+                    newGrouped[cat][index].value = newValue;
+                }
+            });
             return newGrouped;
         });
     };
@@ -180,6 +231,7 @@ export default function SettingsManagement() {
     const getCategoryIcon = (catName: string) => {
         const lowerCat = catName.toLowerCase();
         if (lowerCat.includes("email")) return <EmailIcon className="w-5 h-5 flex-shrink-0" />;
+        if (lowerCat.includes("report")) return <ProfileIcon className="w-5 h-5 flex-shrink-0" />;
         if (lowerCat.includes("system")) return <SettingsIcon className="w-5 h-5 flex-shrink-0" />;
         return <ProfileIcon className="w-5 h-5 flex-shrink-0" />;
     };
@@ -205,17 +257,47 @@ export default function SettingsManagement() {
         }
 
         if (item.valueType === 'string' || item.valueType === 'number') {
+            const fieldId = `${item.category}:${item.key}`;
+            const isSensitiveTextField = item.isSensitive && item.valueType === 'string';
+            const isVisible = visibleSensitiveFields[fieldId];
+            const inputType = item.valueType === 'number'
+                ? 'number'
+                : isSensitiveTextField && !isVisible
+                    ? 'password'
+                    : 'text';
+
             return (
-                <input
-                    type={item.valueType === 'number' ? 'number' : 'text'}
-                    disabled={item.isReadonly}
-                    value={item.value || ''}
-                    onChange={(e) => {
-                        const val = item.valueType === 'number' ? Number(e.target.value) : e.target.value;
-                        handleValueChange(item.category, item.key, val);
-                    }}
-                    className={`block w-full max-w-lg rounded-xl border-0 py-2.5 px-4 bg-gray-50 dark:bg-white/5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-brand-green sm:text-sm sm:leading-6 transition-all ${item.isReadonly ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-black/20' : 'hover:ring-gray-300 dark:hover:ring-white/20'}`}
-                />
+                <div className="relative">
+                    <input
+                        id={item.key}
+                        type={inputType}
+                        disabled={item.isReadonly}
+                        value={item.value || ''}
+                        onChange={(e) => {
+                            const val = item.valueType === 'number' ? Number(e.target.value) : e.target.value;
+                            handleValueChange(item.category, item.key, val);
+                        }}
+                        className={`block w-full max-w-lg rounded-xl border-0 py-2.5 px-4 bg-gray-50 dark:bg-white/5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-brand-green sm:text-sm sm:leading-6 transition-all ${isSensitiveTextField ? 'pr-11' : ''} ${item.isReadonly ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-black/20' : 'hover:ring-gray-300 dark:hover:ring-white/20'}`}
+                    />
+                    {isSensitiveTextField && (
+                        <button
+                            type="button"
+                            onClick={() => setVisibleSensitiveFields((prev) => ({
+                                ...prev,
+                                [fieldId]: !prev[fieldId],
+                            }))}
+                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-brand-green dark:text-gray-500 dark:hover:text-brand-green"
+                            aria-label={isVisible ? 'Hide password' : 'Show password'}
+                            title={isVisible ? 'Hide password' : 'Show password'}
+                        >
+                            {isVisible ? (
+                                <EyeIcon className="h-5 w-5" />
+                            ) : (
+                                <EyeOffIcon className="h-5 w-5" />
+                            )}
+                        </button>
+                    )}
+                </div>
             );
         }
 
@@ -360,8 +442,15 @@ export default function SettingsManagement() {
                                             ? settingsGrouped[activeCategory]?.find(s => s.key === overrideKey) 
                                             : null;
 
+                                        // Conditional visibility: dim report_admin_password when report_password_enabled is OFF
+                                        const isReportPasswordField = item.key === 'report_admin_password';
+                                        const reportPasswordEnabled = isReportPasswordField
+                                            ? settingsGrouped[activeCategory]?.find(s => s.key === 'report_password_enabled')?.value
+                                            : true;
+                                        const isDimmed = isReportPasswordField && !reportPasswordEnabled;
+
                                         return (
-                                        <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-8 border-b border-gray-50 dark:border-white/[0.02] last:border-0 last:pb-0">
+                                        <div key={item.id} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-8 border-b border-gray-50 dark:border-white/[0.02] last:border-0 last:pb-0 transition-opacity duration-200 ${isDimmed ? 'opacity-40 pointer-events-none' : ''}`}>
                                             <div className="sm:max-w-md">
                                                 <label htmlFor={item.key} className="flex items-center text-[15px] font-semibold leading-6 text-gray-900 dark:text-white">
                                                     {item.label}
@@ -391,6 +480,9 @@ export default function SettingsManagement() {
                                             </label>
                                             <p className="mt-1.5 text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
                                                 {item.description}
+                                                {isDimmed && (
+                                                    <span className="block mt-1 text-xs text-yellow-600 dark:text-yellow-400">Enable "Report Password Protection" above to configure this.</span>
+                                                )}
                                             </p>
                                         </div>
                                         <div className="mt-2 sm:mt-0 flex-shrink-0 w-full sm:w-auto sm:max-w-[300px]">
@@ -421,7 +513,7 @@ function EmailOverrideModal({ isOpen, onClose, configItem, onChange }: any) {
     if (!isOpen || !configItem) return null;
     
     // Default safe parsing
-    const defaultVal = { mode: 'global', from_address: '', from_name: '', cc_addresses: [] };
+    const defaultVal = { mode: 'global', from_address: '', from_name: '', cc_addresses: [], bcc_addresses: [], reply_to_address: '' };
     const value = typeof configItem.value === 'object' && configItem.value ? { ...defaultVal, ...configItem.value } : defaultVal;
 
     const isLocal = value.mode === 'local';
@@ -430,10 +522,10 @@ function EmailOverrideModal({ isOpen, onClose, configItem, onChange }: any) {
         onChange({ ...value, [field]: val });
     };
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    return ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose}></div>
-            <div className="relative bg-white dark:bg-[#1f2823] rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-gray-100 dark:border-white/10">
+            <div className="relative bg-white dark:bg-[#1f2823] rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-gray-100 dark:border-white/10 max-h-[90vh] flex flex-col">
                 <div className="px-6 py-5 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50/50 dark:bg-black/20">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         <SettingsIcon className="w-5 h-5 text-brand-green" />
@@ -446,7 +538,7 @@ function EmailOverrideModal({ isOpen, onClose, configItem, onChange }: any) {
                     </button>
                 </div>
                 
-                <div className="p-6 space-y-6">
+                <div className="p-6 space-y-6 overflow-y-auto flex-1">
                     <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5">
                         <div>
                             <p className="text-sm font-semibold text-gray-900 dark:text-white">Configuration Mode</p>
@@ -492,6 +584,26 @@ function EmailOverrideModal({ isOpen, onClose, configItem, onChange }: any) {
                                 onChange={(arr) => updateField('cc_addresses', arr)} 
                             />
                         </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">BCC Addresses</label>
+                            <p className="text-xs text-gray-500 mb-2">Hidden recipients. Leave blank for no BCCs. Will entirely overwrite global BCCs.</p>
+                            <ArrayChipInput 
+                                values={Array.isArray(value.bcc_addresses) ? value.bcc_addresses : []} 
+                                isReadonly={!isLocal} 
+                                onChange={(arr) => updateField('bcc_addresses', arr)} 
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Reply-To Address</label>
+                            <p className="text-xs text-gray-500 mb-2">Replies will go to this address instead of the From address. Leave blank to use From address.</p>
+                            <input 
+                                type="text"
+                                placeholder="Leave blank to fallback to global" 
+                                value={value.reply_to_address || ''}
+                                onChange={(e) => updateField('reply_to_address', e.target.value)}
+                                className="block w-full rounded-xl border-0 py-2 px-3 text-sm bg-white dark:bg-white/5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-brand-green"
+                            />
+                        </div>
                     </div>
                 </div>
                 
@@ -504,7 +616,8 @@ function EmailOverrideModal({ isOpen, onClose, configItem, onChange }: any) {
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 

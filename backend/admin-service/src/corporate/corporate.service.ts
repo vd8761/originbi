@@ -881,10 +881,13 @@ export class CorporateService {
       fromName,
       fromAddress: fromEmail,
       ccAddresses,
+      bccAddresses,
+      replyToAddress,
     } = await this.settingsService.getEmailConfig(
       'corporate_welcome_email_config',
     );
     const ccEmail = ccAddresses.join(', ');
+    const bccEmail = bccAddresses.join(', ');
     const frontendUrl = process.env.FRONTEND_URL ?? '';
     const backendUrl = process.env.BACKEND_URL ?? '';
     const fromAddress = `"${fromName}" <${fromEmail}>`;
@@ -907,13 +910,16 @@ export class CorporateService {
       assets,
     );
 
-    const mailOptions = {
+    const mailOptions: Record<string, any> = {
       from: fromAddress,
       to,
       cc: ccEmail,
       subject: 'Welcome to OriginBI - Corporate Account Created',
       html: html,
     };
+    if (bccEmail) mailOptions.bcc = bccEmail;
+    if (replyToAddress) mailOptions.replyTo = replyToAddress;
+
     return transporter.sendMail(mailOptions);
   }
 }
