@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import { signOut, updatePassword } from 'aws-amplify/auth';
+import { updatePassword } from 'aws-amplify/auth';
 import { configureAmplify } from '../../../lib/aws-amplify-config';
 import RequireStudent from '../../../components/auth/RequireStudent';
 import { studentService } from '../../../lib/services/student.service';
-import { ArrowRightWithoutLineIcon, PhoneIcon, EmailIcon, LockIcon, EyeIcon, EyeOffIcon, XIcon, WarningIcon } from '../../../components/icons';
+import { ArrowRightWithoutLineIcon, PhoneIcon, EmailIcon, LockIcon, EyeIcon, EyeOffIcon, XIcon } from '../../../components/icons';
 import { capitalizeWords, getAvatarColor, getInitials } from '../../../lib/utils';
 
 configureAmplify();
@@ -137,7 +138,7 @@ function ProfileSettingsContent({ user }: { user: UserProfile | null }) {
                             </h2>
                             <div className="flex justify-center sm:justify-start">
                                 <div className="px-3 py-[3px] rounded-lg border border-[#FEF000] text-gray-900 dark:text-white text-xs sm:text-sm font-medium bg-[#FEF000]/5 whitespace-nowrap">
-                                    Trait: {traitName}
+                                    {traitName}
                                 </div>
                             </div>
                         </div>
@@ -302,6 +303,19 @@ function ChangePasswordModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         }
     }, [isOpen]);
 
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
+        const originalOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+
+        return () => {
+            document.body.style.overflow = originalOverflow;
+        };
+    }, [isOpen]);
+
     if (!isOpen) return null;
 
     const validatePassword = (password: string) => {
@@ -349,9 +363,10 @@ function ChangePasswordModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         }
     };
 
-    return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-[#19211C] w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 dark:border-white/10 overflow-hidden animate-in zoom-in-95 duration-200">
+    const modalContent = (
+        <div className="fixed inset-0 z-[200] overflow-y-auto bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="flex min-h-full items-start justify-center p-4 pt-24 sm:items-center sm:pt-4">
+                <div className="bg-white dark:bg-[#19211C] w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 dark:border-white/10 overflow-hidden animate-in zoom-in-95 duration-200 max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-3rem)] overflow-y-auto">
                 <div className="px-6 py-5 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
                     <h3 className="text-xl font-semibold text-[#150089] dark:text-white flex items-center gap-2">
                         <LockIcon className="w-5 h-5 text-[#1ED36A]" />
@@ -524,5 +539,8 @@ function ChangePasswordModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 )}
             </div>
         </div>
+        </div>
     );
+
+    return createPortal(modalContent, document.body);
 }
