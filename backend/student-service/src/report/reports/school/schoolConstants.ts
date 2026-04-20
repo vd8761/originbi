@@ -33,7 +33,7 @@ export const SSLC_TOC_CONTENT = [
   'Tech Areas That Will Matter in 2027 - 2035',
   'Behavioral Capability Profile',
   'Mapping Your Strengths to Future Academic and Career Goals',
-  'Career Alignment Index',
+  // 'Career Alignment Index',
   'Career Flight Path',
   'Where You Fit Best',
   'Future Pathways: Stream Selection',
@@ -71,7 +71,7 @@ export const HSC_TOC_CONTENT = [
   'Tech Areas That Will Matter in 2027 - 2035',
   'Behavioral Capability Profile',
   'Mapping Your Strengths to Future Academic and Career Goals',
-  'Career Alignment Index',
+  // 'Career Alignment Index',
   'Future Pathways: Your Stream',
   'Course Compatibility Matrix',
   'Your Reach Institutions - Top Colleges for You',
@@ -3525,213 +3525,213 @@ export interface StreamSelectionContent {
 }
 
 export const STREAM_SELECTION_CONTENT: Record<string, StreamSelectionContent> =
-  {
-    PCMB: {
-      shortName: 'PCMB',
-      title: 'Physics, Chemistry, Maths, Biology',
-      vibe: 'The ultimate flexible pathway. Keep all doors open for an inspiring career in technology or healing. Choose based on your dual interest!',
-      fields: [
-        {
-          name: 'Medical & Allied Health Sciences',
-          vibe: 'Healers, researchers, and technologists. Use science to improve lives directly.',
-          mappedDegrees:
-            'MBBS, BDS, Physiotherapy (BPT), Nursing, Radiology & Medical Imaging, Cardiac Technology.',
-          icon: 'medic.png',
-        },
-        {
-          name: 'Engineering & Technology',
-          vibe: 'Builders, coders, and creators of future infrastructure, systems, and software.',
-          mappedDegrees:
-            'Computer Science & AI, Robotics, Aerospace Engineering, Mechanical Engineering, Civil Engineering.',
-          icon: 'engineering.png',
-        },
-        {
-          name: 'Pure & Applied Science Research',
-          vibe: 'Discoverers, theorists, and problem solvers unlocking the secrets of the world.',
-          mappedDegrees:
-            'Theoretical Physics, Chemical Research, Biotechnology, Genetics, Microbiology, Biochemistry.',
-          icon: 'research.png',
-        },
-        {
-          name: 'Agriculture & Environmental',
-          vibe: 'Stewards of the earth, food, and environmental sustainability.',
-          mappedDegrees:
-            'Modern Farming, Horticulture, Forestry, Food Science & Production, Environmental Conservation.',
-          icon: 'tea.png',
-        },
-      ],
-    },
-    PCB: {
-      shortName: 'PCB',
-      title: 'Physics, Chemistry, Biology',
-      vibe: 'The gateway to healthcare, research, and natural sciences. Perfect for those passionate about life and medicine.',
-      fields: [
-        {
-          name: 'Medical Sciences',
-          vibe: "The traditional doctor's path to diagnosing and treating patients.",
-          mappedDegrees:
-            'MBBS, BDS, BAMS (Ayurveda), BHMS (Homeopathy), BUMS (Unani).',
-          icon: 'medic.png',
-        },
-        {
-          name: 'Allied Health Sciences',
-          vibe: 'The crucial backbone of hospital operations and patient care.',
-          mappedDegrees:
-            'Nursing, Physiotherapy (BPT), Optometry, Radiology, Medical Lab Technology.',
-          icon: 'health.png',
-        },
-        {
-          name: 'Life Sciences',
-          vibe: 'Deep dive into the building blocks of life, genetics, and organisms.',
-          mappedDegrees:
-            'Biotechnology, Microbiology, Biochemistry, Genetics, Zoology, Botany.',
-          icon: 'life.png',
-        },
-        {
-          name: 'Agriculture & Nutrition',
-          vibe: 'Cultivating resources and understanding the biology of human health.',
-          mappedDegrees:
-            'Agriculture, Horticulture, Forestry, Pharmacy, Food Technology, Nutrition.',
-          icon: 'agriculture.png',
-        },
-      ],
-    },
-    PCM: {
-      shortName: 'PCM',
-      title: 'Physics, Chemistry, Mathematics',
-      vibe: 'The builders, coders, and creators path. Designed for logical thinkers who want to engineer the future.',
-      fields: [
-        {
-          name: 'Engineering Fields',
-          vibe: 'Designing and building physical and digital solutions across all industries.',
-          mappedDegrees:
-            'Computer Science, AI & Data Science, Robotics, Mechanical, Civil, Aerospace.',
-          icon: 'engineering.png',
-        },
-        {
-          name: 'Technology & IT',
-          vibe: 'Creating the software, apps, and AI that power the modern world.',
-          mappedDegrees:
-            'Computer Applications (BCA), B.Sc Computer Science, B.Sc Artificial Intelligence.',
-          icon: 'tech.png',
-        },
-        {
-          name: 'Mathematical & Analytical',
-          vibe: 'Using complex numbers to predict trends, manage data, and solve puzzles.',
-          mappedDegrees:
-            'Mathematics, Statistics, Actuarial Science, Economics.',
-          icon: 'analytical.png',
-        },
-        {
-          name: 'Design, Architecture & Aviation',
-          vibe: 'Blending technical math with creative design, structures, or flight.',
-          mappedDegrees:
-            'Architecture (B.Arch), Industrial Design (B.Des), Aviation, Commercial Pilot Training.',
-          icon: 'architecture.png',
-        },
-      ],
-    },
-    PCBZ: {
-      shortName: 'PCBZ',
-      title: 'Physics, Chemistry, Botany, Zoology',
-      vibe: 'The ultimate biology specialist path. Dive deep into the specific study of plant and animal life alongside medicine.',
-      fields: [
-        {
-          name: 'Medical Degrees',
-          vibe: 'Direct patient care and exploring traditional medicine systems.',
-          mappedDegrees: 'MBBS, BDS, BAMS, BHMS.',
-          icon: 'medic.png',
-        },
-        {
-          name: 'Allied Health Degrees',
-          vibe: 'Supporting critical medical treatments and hospital infrastructure.',
-          mappedDegrees:
-            'Nursing, Physiotherapy (BPT), Radiology, Medical Lab Technology, Cardiac Technology.',
-          icon: 'health.png',
-        },
-        {
-          name: 'Life Science Degrees',
-          vibe: 'Specialized research and deep study into the natural world and organisms.',
-          mappedDegrees:
-            'Botany, Zoology, Biotechnology, Microbiology, Biochemistry.',
-          icon: 'virus.png',
-        },
-        {
-          name: 'Agriculture & Food Sciences',
-          vibe: 'Sustaining human life through food innovation and natural harmony.',
-          mappedDegrees:
-            'Agriculture, Horticulture, Food Technology, Dairy Technology, Fisheries.',
-          icon: 'food.png',
-        },
-      ],
-    },
-    Commerce: {
-      shortName: 'Commerce',
-      title: 'Commerce Stream',
-      vibe: 'The gateway to the corporate world. For future leaders focused on finance, business, and economics.',
-      fields: [
-        {
-          name: 'Commerce Degrees',
-          vibe: 'The foundation of corporate finance, auditing, and modern banking.',
-          mappedDegrees:
-            'B.Com (General), Accounting & Finance, Corporate Secretaryship, Banking & Insurance.',
-          icon: 'commerce.png',
-        },
-        {
-          name: 'Professional Certifications',
-          vibe: 'High-level, specialized financial and legal auditing and strategy.',
-          mappedDegrees:
-            'CA (Chartered Accountant), CMA (Cost Accountant), CS (Company Secretary).',
-          icon: 'professional.png',
-        },
-        {
-          name: 'Management Degrees',
-          vibe: 'Leading teams, running companies, and marketing products to the world.',
-          mappedDegrees:
-            'BBA, BMS (Management Studies), BBM (Business Management).',
-          icon: 'management.png',
-        },
-        {
-          name: 'Economics & Analytics',
-          vibe: 'Understanding global markets, human trends, and financial data.',
-          mappedDegrees:
-            'B.A/B.Sc Economics, Computer Applications (BCA), Data Analytics.',
-          icon: 'economics.png',
-        },
-      ],
-    },
-    Humanities: {
-      shortName: 'Humanities',
-      title: 'Humanities / Arts Stream',
-      vibe: 'The path of society, law, and expression. For those who want to understand human behavior and shape culture.',
-      fields: [
-        {
-          name: 'Social Sciences',
-          vibe: 'Studying how humans think, act, and organize globally across history.',
-          mappedDegrees: 'History, Political Science, Sociology, Psychology.',
-          icon: 'social.png',
-        },
-        {
-          name: 'Creative Fields & Media',
-          vibe: 'Storytelling, journalism, and managing public information.',
-          mappedDegrees: 'Journalism, Mass Communication, English Literature.',
-          icon: 'media.png',
-        },
-        {
-          name: 'Design Fields',
-          vibe: 'Shaping visual culture and functional aesthetics in the modern world.',
-          mappedDegrees: 'Design (B.Des), Fashion Designing.',
-          icon: 'design.png',
-        },
-        {
-          name: 'Law',
-          vibe: 'Fighting for justice, policy-making, and understanding legal frameworks.',
-          mappedDegrees: 'BA LLB.',
-          icon: 'law.png',
-        },
-      ],
-    },
-  };
+{
+  PCMB: {
+    shortName: 'PCMB',
+    title: 'Physics, Chemistry, Maths, Biology',
+    vibe: 'The ultimate flexible pathway. Keep all doors open for an inspiring career in technology or healing. Choose based on your dual interest!',
+    fields: [
+      {
+        name: 'Medical & Allied Health Sciences',
+        vibe: 'Healers, researchers, and technologists. Use science to improve lives directly.',
+        mappedDegrees:
+          'MBBS, BDS, Physiotherapy (BPT), Nursing, Radiology & Medical Imaging, Cardiac Technology.',
+        icon: 'medic.png',
+      },
+      {
+        name: 'Engineering & Technology',
+        vibe: 'Builders, coders, and creators of future infrastructure, systems, and software.',
+        mappedDegrees:
+          'Computer Science & AI, Robotics, Aerospace Engineering, Mechanical Engineering, Civil Engineering.',
+        icon: 'engineering.png',
+      },
+      {
+        name: 'Pure & Applied Science Research',
+        vibe: 'Discoverers, theorists, and problem solvers unlocking the secrets of the world.',
+        mappedDegrees:
+          'Theoretical Physics, Chemical Research, Biotechnology, Genetics, Microbiology, Biochemistry.',
+        icon: 'research.png',
+      },
+      {
+        name: 'Agriculture & Environmental',
+        vibe: 'Stewards of the earth, food, and environmental sustainability.',
+        mappedDegrees:
+          'Modern Farming, Horticulture, Forestry, Food Science & Production, Environmental Conservation.',
+        icon: 'tea.png',
+      },
+    ],
+  },
+  PCB: {
+    shortName: 'PCB',
+    title: 'Physics, Chemistry, Biology',
+    vibe: 'The gateway to healthcare, research, and natural sciences. Perfect for those passionate about life and medicine.',
+    fields: [
+      {
+        name: 'Medical Sciences',
+        vibe: "The traditional doctor's path to diagnosing and treating patients.",
+        mappedDegrees:
+          'MBBS, BDS, BAMS (Ayurveda), BHMS (Homeopathy), BUMS (Unani).',
+        icon: 'medic.png',
+      },
+      {
+        name: 'Allied Health Sciences',
+        vibe: 'The crucial backbone of hospital operations and patient care.',
+        mappedDegrees:
+          'Nursing, Physiotherapy (BPT), Optometry, Radiology, Medical Lab Technology.',
+        icon: 'health.png',
+      },
+      {
+        name: 'Life Sciences',
+        vibe: 'Deep dive into the building blocks of life, genetics, and organisms.',
+        mappedDegrees:
+          'Biotechnology, Microbiology, Biochemistry, Genetics, Zoology, Botany.',
+        icon: 'life.png',
+      },
+      {
+        name: 'Agriculture & Nutrition',
+        vibe: 'Cultivating resources and understanding the biology of human health.',
+        mappedDegrees:
+          'Agriculture, Horticulture, Forestry, Pharmacy, Food Technology, Nutrition.',
+        icon: 'agriculture.png',
+      },
+    ],
+  },
+  PCM: {
+    shortName: 'PCM',
+    title: 'Physics, Chemistry, Mathematics',
+    vibe: 'The builders, coders, and creators path. Designed for logical thinkers who want to engineer the future.',
+    fields: [
+      {
+        name: 'Engineering Fields',
+        vibe: 'Designing and building physical and digital solutions across all industries.',
+        mappedDegrees:
+          'Computer Science, AI & Data Science, Robotics, Mechanical, Civil, Aerospace.',
+        icon: 'engineering.png',
+      },
+      {
+        name: 'Technology & IT',
+        vibe: 'Creating the software, apps, and AI that power the modern world.',
+        mappedDegrees:
+          'Computer Applications (BCA), B.Sc Computer Science, B.Sc Artificial Intelligence.',
+        icon: 'tech.png',
+      },
+      {
+        name: 'Mathematical & Analytical',
+        vibe: 'Using complex numbers to predict trends, manage data, and solve puzzles.',
+        mappedDegrees:
+          'Mathematics, Statistics, Actuarial Science, Economics.',
+        icon: 'analytical.png',
+      },
+      {
+        name: 'Design, Architecture & Aviation',
+        vibe: 'Blending technical math with creative design, structures, or flight.',
+        mappedDegrees:
+          'Architecture (B.Arch), Industrial Design (B.Des), Aviation, Commercial Pilot Training.',
+        icon: 'architecture.png',
+      },
+    ],
+  },
+  PCBZ: {
+    shortName: 'PCBZ',
+    title: 'Physics, Chemistry, Botany, Zoology',
+    vibe: 'The ultimate biology specialist path. Dive deep into the specific study of plant and animal life alongside medicine.',
+    fields: [
+      {
+        name: 'Medical Degrees',
+        vibe: 'Direct patient care and exploring traditional medicine systems.',
+        mappedDegrees: 'MBBS, BDS, BAMS, BHMS.',
+        icon: 'medic.png',
+      },
+      {
+        name: 'Allied Health Degrees',
+        vibe: 'Supporting critical medical treatments and hospital infrastructure.',
+        mappedDegrees:
+          'Nursing, Physiotherapy (BPT), Radiology, Medical Lab Technology, Cardiac Technology.',
+        icon: 'health.png',
+      },
+      {
+        name: 'Life Science Degrees',
+        vibe: 'Specialized research and deep study into the natural world and organisms.',
+        mappedDegrees:
+          'Botany, Zoology, Biotechnology, Microbiology, Biochemistry.',
+        icon: 'virus.png',
+      },
+      {
+        name: 'Agriculture & Food Sciences',
+        vibe: 'Sustaining human life through food innovation and natural harmony.',
+        mappedDegrees:
+          'Agriculture, Horticulture, Food Technology, Dairy Technology, Fisheries.',
+        icon: 'food.png',
+      },
+    ],
+  },
+  Commerce: {
+    shortName: 'Commerce',
+    title: 'Commerce Stream',
+    vibe: 'The gateway to the corporate world. For future leaders focused on finance, business, and economics.',
+    fields: [
+      {
+        name: 'Commerce Degrees',
+        vibe: 'The foundation of corporate finance, auditing, and modern banking.',
+        mappedDegrees:
+          'B.Com (General), Accounting & Finance, Corporate Secretaryship, Banking & Insurance.',
+        icon: 'commerce.png',
+      },
+      {
+        name: 'Professional Certifications',
+        vibe: 'High-level, specialized financial and legal auditing and strategy.',
+        mappedDegrees:
+          'CA (Chartered Accountant), CMA (Cost Accountant), CS (Company Secretary).',
+        icon: 'professional.png',
+      },
+      {
+        name: 'Management Degrees',
+        vibe: 'Leading teams, running companies, and marketing products to the world.',
+        mappedDegrees:
+          'BBA, BMS (Management Studies), BBM (Business Management).',
+        icon: 'management.png',
+      },
+      {
+        name: 'Economics & Analytics',
+        vibe: 'Understanding global markets, human trends, and financial data.',
+        mappedDegrees:
+          'B.A/B.Sc Economics, Computer Applications (BCA), Data Analytics.',
+        icon: 'economics.png',
+      },
+    ],
+  },
+  Humanities: {
+    shortName: 'Humanities',
+    title: 'Humanities / Arts Stream',
+    vibe: 'The path of society, law, and expression. For those who want to understand human behavior and shape culture.',
+    fields: [
+      {
+        name: 'Social Sciences',
+        vibe: 'Studying how humans think, act, and organize globally across history.',
+        mappedDegrees: 'History, Political Science, Sociology, Psychology.',
+        icon: 'social.png',
+      },
+      {
+        name: 'Creative Fields & Media',
+        vibe: 'Storytelling, journalism, and managing public information.',
+        mappedDegrees: 'Journalism, Mass Communication, English Literature.',
+        icon: 'media.png',
+      },
+      {
+        name: 'Design Fields',
+        vibe: 'Shaping visual culture and functional aesthetics in the modern world.',
+        mappedDegrees: 'Design (B.Des), Fashion Designing.',
+        icon: 'design.png',
+      },
+      {
+        name: 'Law',
+        vibe: 'Fighting for justice, policy-making, and understanding legal frameworks.',
+        mappedDegrees: 'BA LLB.',
+        icon: 'law.png',
+      },
+    ],
+  },
+};
 
 export interface StreamOdysseyNode {
   label: string;

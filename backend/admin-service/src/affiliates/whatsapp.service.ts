@@ -164,11 +164,11 @@ export class WhatsAppService {
     let url = '';
 
     if (audience === 'school') {
-      url = `http://smpp.webtechsolution.co/http-tokenkeyapi.php?authentic-key=${authKey}&senderid=Senderid&route=2&number=${phoneNumber}&message=Confused%20about%20your%20subject%20choice%3F%20Get%20clarity%20on%20streams%2C%20strengths%20%26%20future%20career%20path.%20Start%20now%20for%20INR%20749%3A%20https%3A%2F%2Fpickmycareer.originbi.com%2Fregister%3Fref%3D%0A${referralCode}&templateid=1707177631775371277`;
+      url = `http://smpp.webtechsolution.co/http-tokenkeyapi.php?authentic-key=${authKey}&senderid=ORGNBI&route=1&number=${phoneNumber}&message=Confused%20about%20your%20subject%20choice%3F%20Get%20clarity%20on%20streams%2C%20strengths%20%26%20future%20career%20path.%20Start%20now%20for%20INR%20749%3A%20https%3A%2F%2Fpickmycareer.originbi.com%2Fregister%3Fref%3D${referralCode}&templateid=1707177631775371277`;
     } else if (audience === 'college') {
-      url = `http://smpp.webtechsolution.co/http-tokenkeyapi.php?authentic-key=${authKey}&senderid=Senderid&route=2&number=${phoneNumber}&message=Finished%20college%20but%20unsure%20what%20next%3F%20Discover%20the%20right%20career%20path%20for%20you.%20Start%20now%20for%20INR%20499%3A%20https%3A%2F%2Fdiscover.originbi.com%2Fregister%3Fref%3D%0A${referralCode}&templateid=1707177631813422154`;
+      url = `http://smpp.webtechsolution.co/http-tokenkeyapi.php?authentic-key=${authKey}&senderid=ORGNBI&route=1&number=${phoneNumber}&message=Finished%20college%20but%20unsure%20what%20next%3F%20Discover%20the%20right%20career%20path%20for%20you.%20Start%20now%20for%20INR%20499%3A%20https%3A%2F%2Fdiscover.originbi.com%2Fregister%3Fref%3D${referralCode}&templateid=1707177631813422154`;
     } else if (audience === 'employee') {
-      url = `http://smpp.webtechsolution.co/http-tokenkeyapi.php?authentic-key=${authKey}&senderid=Senderid&route=2&number=${phoneNumber}&message=Ready%20for%20your%20next%20career%20move%3F%20Get%20leadership%20insights%2C%20growth%20areas%20%26%20role%20clarity.%20Unlock%20for%20INR%20499%3A%20https%3A%2F%2Fgrow.originbi.com%2Fregister%3Fref%3D${referralCode}&templateid=1707177631823308700`;
+      url = `http://smpp.webtechsolution.co/http-tokenkeyapi.php?authentic-key=${authKey}&senderid=ORGNBI&route=1&number=${phoneNumber}&message=Ready%20for%20your%20next%20career%20move%3F%20Get%20leadership%20insights%2C%20growth%20areas%20%26%20role%20clarity.%20Unlock%20for%20INR%20499%3A%20https%3A%2F%2Fgrow.originbi.com%2Fregister%3Fref%3D${referralCode}&templateid=1707177631823308700`;
     }
 
     try {
