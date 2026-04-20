@@ -3,13 +3,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import ReactDOM from "react-dom";
 import { api } from "../../lib/api";
-import { 
+import {
     CheckCircleIcon,
     SettingsIcon,
     EmailIcon,
     ProfileIcon,
     EyeIcon,
     EyeOffIcon,
+    WhatsappIcon,
 } from "../icons";
 
 // Type definitions matching backend OriginbiSetting
@@ -230,6 +231,7 @@ export default function SettingsManagement() {
     // Helper for category icons
     const getCategoryIcon = (catName: string) => {
         const lowerCat = catName.toLowerCase();
+        if (lowerCat.includes("whatsapp")) return <WhatsappIcon className="w-5 h-5 flex-shrink-0" />;
         if (lowerCat.includes("email")) return <EmailIcon className="w-5 h-5 flex-shrink-0" />;
         if (lowerCat.includes("report")) return <ProfileIcon className="w-5 h-5 flex-shrink-0" />;
         if (lowerCat.includes("system")) return <SettingsIcon className="w-5 h-5 flex-shrink-0" />;

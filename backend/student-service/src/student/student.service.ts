@@ -35,6 +35,7 @@ import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
 import { SettingsService } from '../settings/settings.service';
+import { WhatsappTemplatesService } from '../whatsapp/whatsapp-templates.service';
 
 export interface AssessmentProgressItem {
   id: number;
@@ -85,6 +86,7 @@ export class StudentService {
     private readonly departmentDegreeRepo: Repository<DepartmentDegree>,
     private readonly configService: ConfigService,
     private readonly settingsService: SettingsService,
+    private readonly whatsappTemplates: WhatsappTemplatesService,
   ) {}
 
   /**
@@ -358,7 +360,10 @@ export class StudentService {
       studentBoard: programResult?.[0]?.student_board || null,
       departmentDegreeId: programResult?.[0]?.department_degree_id || null,
       departmentName: programResult?.[0]?.department_name || null,
-      currentYear: programResult?.[0]?.metadata?.current_year || programResult?.[0]?.metadata?.currentYear || null,
+      currentYear:
+        programResult?.[0]?.metadata?.current_year ||
+        programResult?.[0]?.metadata?.currentYear ||
+        null,
     };
 
     // Fetch DISC scores and agile scores for impact assessment
@@ -1033,6 +1038,13 @@ export class StudentService {
         }
       }
 
+      // 8a. Send Assessment Instructions WhatsApp (fire-and-forget)
+      this.fireAssessmentInstructionsWhatsapp(savedReg).catch((err) =>
+        this.logger.error(
+          `Instructions WhatsApp failed for ${savedReg.mobileNumber}: ${err.message}`,
+        ),
+      );
+
       // 8. Send Welcome Email
       if (registration.metadata?.sendEmail) {
         const validFrom = session.validFrom
@@ -1449,6 +1461,118 @@ export class StudentService {
   }
 
   // ---------------------------------------------------------
+  // Helpers: Student-facing WhatsApp templates
+  // ---------------------------------------------------------
+  private async fireAssessmentInstructionsWhatsapp(
+    registration: Registration,
+  ): Promise<void> {
+    const source = registration.registrationSource;
+    if (source !== 'SELF' && source !== 'AFFILIATE') return;
+
+    const enabled = await this.settingsService.getValue<boolean>(
+      'whatsapp',
+      'send_assessment_instructions',
+    );
+    if (enabled === false) return;
+
+    const [imageUrl, youtubeUrl, portalUrl] = await Promise.all([
+      this.settingsService.getValue<string>(
+        'whatsapp',
+        'student_template_image_url',
+      ),
+      this.settingsService.getValue<string>(
+        'whatsapp',
+        'instructions_youtube_url',
+      ),
+      this.settingsService.getValue<string>('whatsapp', 'student_portal_url'),
+    ]);
+
+    const phone = WhatsappTemplatesService.formatPhoneNumber(
+      registration.mobileNumber,
+      registration.countryCode,
+    );
+
+    await this.whatsappTemplates.send({
+      templateName: 'assessment_instructions_v6',
+      phoneNumber: phone,
+      components: {
+        header_1: { type: 'image', value: imageUrl ?? '' },
+        body_1: { type: 'text', value: registration.fullName ?? '' },
+        body_2: { type: 'text', value: youtubeUrl ?? '' },
+        button_1: {
+          subtype: 'url',
+          type: 'text',
+          value: portalUrl ?? 'https://mind.originbi.com/student',
+        },
+      },
+    });
+  }
+
+  private async fireCompletionWhatsapp(
+    registration: Registration,
+  ): Promise<void> {
+    const source = registration.registrationSource;
+    if (source !== 'SELF' && source !== 'AFFILIATE') return;
+
+    const enabled = await this.settingsService.getValue<boolean>(
+      'whatsapp',
+      'send_completion_notification',
+    );
+    if (enabled === false) return;
+
+    const imageUrl = await this.settingsService.getValue<string>(
+      'whatsapp',
+      'student_template_image_url',
+    );
+
+    const phone = WhatsappTemplatesService.formatPhoneNumber(
+      registration.mobileNumber,
+      registration.countryCode,
+    );
+
+    await this.whatsappTemplates.send({
+      templateName: 'assessment_completion_notification',
+      phoneNumber: phone,
+      components: {
+        header_1: { type: 'image', value: imageUrl ?? '' },
+        body_1: { type: 'text', value: registration.fullName ?? '' },
+      },
+    });
+  }
+
+  private async fireReportSentWhatsapp(
+    registration: Registration,
+  ): Promise<void> {
+    const source = registration.registrationSource;
+    if (source !== 'SELF' && source !== 'AFFILIATE') return;
+
+    const enabled = await this.settingsService.getValue<boolean>(
+      'whatsapp',
+      'send_report_sent_notification',
+    );
+    if (enabled === false) return;
+
+    const imageUrl = await this.settingsService.getValue<string>(
+      'whatsapp',
+      'student_template_image_url',
+    );
+
+    const phone = WhatsappTemplatesService.formatPhoneNumber(
+      registration.mobileNumber,
+      registration.countryCode,
+    );
+
+    await this.whatsappTemplates.send({
+      templateName: 'assessment_report_sent_notification',
+      phoneNumber: phone,
+      components: {
+        header_1: { type: 'image', value: imageUrl ?? '' },
+        body_1: { type: 'text', value: registration.fullName ?? '' },
+      },
+    });
+  }
+
+  // ---------------------------------------------------------
   // Helper: Send Welcome Email
   // ---------------------------------------------------------
   private async sendWelcomeEmail(
@@ -1565,6 +1689,13 @@ export class StudentService {
         this.logger.error(`User not found: ${userId}`);
         return;
       }
+
+      // Fire Completion WhatsApp (fire-and-forget) — before report generation
+      this.fireCompletionWhatsapp(registration).catch((err) =>
+        this.logger.error(
+          `Completion WhatsApp failed for user ${userId}: ${err.message}`,
+        ),
+      );
 
       // --- 8. Notify Corporate User (MOVED UP) ---
       if (registration.registrationSource === 'CORPORATE') {
@@ -1838,6 +1969,13 @@ export class StudentService {
 
           await transporter.sendMail(mailOptions);
           this.logger.log(`Assessment completion email sent to ${user.email}`);
+
+          // Fire Report-Sent WhatsApp (fire-and-forget)
+          this.fireReportSentWhatsapp(registration).catch((whatsappErr) =>
+            this.logger.error(
+              `Report-sent WhatsApp failed for user ${userId}: ${whatsappErr.message}`,
+            ),
+          );
         } catch (err) {
           this.logger.error(
             `Failed to send assessment completion email to ${user.email}: ${err.message}`,
