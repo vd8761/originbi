@@ -1516,7 +1516,7 @@ export class StudentService {
         });
         whatsappSucceeded = true;
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = err instanceof Error ? err.message : typeof err === 'string' ? err : JSON.stringify(err);
         this.logger.warn(
           `Instructions WhatsApp failed for ${phone}, will try SMS fallback: ${msg}`,
         );
@@ -1562,7 +1562,7 @@ export class StudentService {
         });
         whatsappSucceeded = true;
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = err instanceof Error ? err.message : typeof err === 'string' ? err : JSON.stringify(err);
         this.logger.warn(
           `Completion WhatsApp failed for ${phone}, will try SMS fallback: ${msg}`,
         );
@@ -1608,7 +1608,7 @@ export class StudentService {
         });
         whatsappSucceeded = true;
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = err instanceof Error ? err.message : typeof err === 'string' ? err : JSON.stringify(err);
         this.logger.warn(
           `Report-sent WhatsApp failed for ${phone}, will try SMS fallback: ${msg}`,
         );
