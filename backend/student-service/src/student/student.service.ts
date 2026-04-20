@@ -1634,7 +1634,7 @@ export class StudentService {
       if (!smsOn) return;
       await this.smsService.send(template, phone, name);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = err instanceof Error ? err.message : typeof err === 'string' ? err : JSON.stringify(err);
       this.logger.error(`SMS fallback failed for ${template} ${phone}: ${msg}`);
     }
   }
