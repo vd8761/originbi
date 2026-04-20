@@ -1,0 +1,114 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
+
+export interface WhatsappComponent {
+  type: string;
+  subtype?: string;
+  value: string;
+}
+
+export interface SendTemplateParams {
+  templateName: string;
+  phoneNumber: string;
+  components: Record<string, WhatsappComponent>;
+}
+
+/**
+ * Generic MSG91 WhatsApp template dispatcher.
+ * Caller is responsible for:
+ *   - formatting the phone number (use WhatsappTemplatesService.formatPhoneNumber)
+ *   - fetching component values (image URLs, body text, button URLs) from settings
+ *   - gating on the relevant `whatsapp.send_*` toggle
+ *
+ * This service never throws for a missing auth key — it logs a warning and
+ * returns. Callers should still wrap .send() in try/catch since the MSG91
+ * API itself may fail; a WhatsApp failure must never break the user's flow.
+ */
+@Injectable()
+export class WhatsappTemplatesService {
+  private readonly logger = new Logger(WhatsappTemplatesService.name);
+
+  private readonly msg91Url =
+    'https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/';
+  private readonly integratedNumber = '919445997283';
+  private readonly templateNamespace = '371d8e5e_4dfb_4ead_b9c7_55bc570d1027';
+
+  constructor(private readonly http: HttpService) {}
+
+  async send(params: SendTemplateParams): Promise<void> {
+    const authKey = process.env.MSG91_WHATSAPP_AUTH_KEY;
+    if (!authKey) {
+      this.logger.warn(
+        `MSG91_WHATSAPP_AUTH_KEY not configured. Skipping WhatsApp send: ${params.templateName}`,
+      );
+      return;
+    }
+
+    const payload = {
+      integrated_number: this.integratedNumber,
+      content_type: 'template',
+      payload: {
+        messaging_product: 'whatsapp',
+        type: 'template',
+        template: {
+          name: params.templateName,
+          language: { code: 'en', policy: 'deterministic' },
+          namespace: this.templateNamespace,
+          to_and_components: [
+            {
+              to: [params.phoneNumber],
+              components: params.components,
+            },
+          ],
+        },
+      },
+    };
+
+    try {
+      const response = await firstValueFrom(
+        this.http.post(this.msg91Url, payload, {
+          headers: {
+            'Content-Type': 'application/json',
+            authkey: authKey,
+          },
+          timeout: 30000,
+        }),
+      );
+
+      if (
+        response.data?.status === 'fail' ||
+        response.data?.hasError === true
+      ) {
+        throw new Error(
+          `MSG91 returned fail status: ${JSON.stringify(response.data)}`,
+        );
+      }
+
+      this.logger.log(
+        `MSG91 ${params.templateName} → ${params.phoneNumber}: ${JSON.stringify(response.data)}`,
+      );
+    } catch (err: any) {
+      const errData = err.response?.data || err.message;
+      this.logger.error(
+        `MSG91 API error for ${params.templateName}: ${JSON.stringify(errData)}`,
+      );
+      throw new Error(
+        `MSG91 send failed for ${params.templateName}: ${JSON.stringify(errData)}`,
+      );
+    }
+  }
+
+  /**
+   * Format phone number for MSG91 — digits only, no `+` prefix.
+   * e.g. "+91", "9876543210" → "919876543210"
+   */
+  static formatPhoneNumber(
+    mobileNumber: string | null | undefined,
+    countryCode: string | null | undefined,
+  ): string {
+    const cleanCountryCode = (countryCode || '+91').replace(/\+/g, '').trim();
+    const cleanMobile = (mobileNumber || '').replace(/\D/g, '').trim();
+    return `${cleanCountryCode}${cleanMobile}`;
+  }
+}
