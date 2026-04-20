@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
+import { isAxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
 
 export interface WhatsappComponent {
@@ -12,6 +13,11 @@ export interface SendTemplateParams {
   templateName: string;
   phoneNumber: string;
   components: Record<string, WhatsappComponent>;
+}
+
+interface Msg91Response {
+  status?: string;
+  hasError?: boolean;
 }
 
 /**
@@ -61,7 +67,7 @@ export class WhatsappTemplatesService {
 
     try {
       const response = await firstValueFrom(
-        this.http.post(this.msg91Url, payload, {
+        this.http.post<Msg91Response>(this.msg91Url, payload, {
           headers: {
             'Content-Type': 'application/json',
             authkey: authKey,
@@ -82,8 +88,12 @@ export class WhatsappTemplatesService {
       this.logger.log(
         `MSG91 ${params.templateName} → ${params.phoneNumber}: ${JSON.stringify(response.data)}`,
       );
-    } catch (err: any) {
-      const errData = err.response?.data || err.message;
+    } catch (err: unknown) {
+      const errData = isAxiosError<unknown>(err)
+        ? (err.response?.data ?? err.message)
+        : err instanceof Error
+          ? err.message
+          : 'Unknown error';
       this.logger.error(
         `MSG91 API error for ${params.templateName}: ${JSON.stringify(errData)}`,
       );

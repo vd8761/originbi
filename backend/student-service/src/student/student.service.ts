@@ -360,7 +360,10 @@ export class StudentService {
       studentBoard: programResult?.[0]?.student_board || null,
       departmentDegreeId: programResult?.[0]?.department_degree_id || null,
       departmentName: programResult?.[0]?.department_name || null,
-      currentYear: programResult?.[0]?.metadata?.current_year || programResult?.[0]?.metadata?.currentYear || null,
+      currentYear:
+        programResult?.[0]?.metadata?.current_year ||
+        programResult?.[0]?.metadata?.currentYear ||
+        null,
     };
 
     // Fetch DISC scores and agile scores for impact assessment
