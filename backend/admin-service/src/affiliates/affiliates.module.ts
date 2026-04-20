@@ -14,6 +14,7 @@ import {
 import { AffiliatesService } from './affiliates.service';
 import { AffiliatesController } from './affiliates.controller';
 import { AffiliatePortalController } from './affiliate-portal.controller';
+import { WhatsAppService } from './whatsapp.service';
 import { R2Module } from '../r2/r2.module';
 import { SettingsModule } from '../settings/settings.module';
 
@@ -31,7 +32,7 @@ import { SettingsModule } from '../settings/settings.module';
     NotificationModule,
     SettingsModule,
   ],
-  providers: [AffiliatesService],
+  providers: [AffiliatesService, WhatsAppService],
   controllers: [AffiliatesController, AffiliatePortalController],
   exports: [AffiliatesService],
 })
