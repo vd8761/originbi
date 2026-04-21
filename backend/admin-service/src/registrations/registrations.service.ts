@@ -25,6 +25,8 @@ import { GroupsService } from '../groups/groups.service';
 import { AssessmentGenerationService } from '../assessment/assessment-generation.service';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
 import { SettingsService } from '../settings/settings.service';
+import { WhatsappTemplatesService } from '../whatsapp/whatsapp-templates.service';
+import { SmsService, SmsTemplate } from '../sms/sms.service';
 
 import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
@@ -58,6 +60,8 @@ export class RegistrationsService {
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
     private readonly settingsService: SettingsService,
+    private readonly whatsappTemplates: WhatsappTemplatesService,
+    private readonly smsService: SmsService,
   ) {}
 
   async withRetry<T>(
@@ -430,6 +434,13 @@ export class RegistrationsService {
             // Do not rollback
           }
         }
+
+        // I. Send Assessment Instructions WhatsApp (fire-and-forget)
+        this.fireAssessmentInstructionsWhatsapp(registration).catch((err) =>
+          this.logger.error(
+            `Instructions WhatsApp failed for ${registration.mobileNumber}: ${err.message}`,
+          ),
+        );
 
         return {
           registrationId: registration.id,
@@ -830,6 +841,83 @@ export class RegistrationsService {
   // ---------------------------------------------------------
   // Helper: Send Welcome Email
   // ---------------------------------------------------------
+  private async fireAssessmentInstructionsWhatsapp(
+    registration: Registration,
+  ): Promise<void> {
+    const source = registration.registrationSource;
+    if (source !== 'SELF' && source !== 'AFFILIATE') return;
+
+    const phone = WhatsappTemplatesService.formatPhoneNumber(
+      registration.mobileNumber,
+      registration.countryCode,
+    );
+    const name = registration.fullName ?? '';
+
+    const whatsappEnabled = await this.settingsService.getValue<boolean>(
+      'whatsapp',
+      'send_assessment_instructions',
+    );
+
+    let whatsappSucceeded = false;
+    if (whatsappEnabled !== false) {
+      try {
+        const [imageUrl, youtubeUrl, portalUrl] = await Promise.all([
+          this.settingsService.getValue<string>(
+            'whatsapp',
+            'student_template_image_url',
+          ),
+          this.settingsService.getValue<string>(
+            'whatsapp',
+            'instructions_youtube_url',
+          ),
+          this.settingsService.getValue<string>(
+            'whatsapp',
+            'student_portal_url',
+          ),
+        ]);
+
+        await this.whatsappTemplates.send({
+          templateName: 'assessment_instructions_v6',
+          phoneNumber: phone,
+          components: {
+            header_1: { type: 'image', value: imageUrl ?? '' },
+            body_1: { type: 'text', value: name },
+            body_2: { type: 'text', value: youtubeUrl ?? '' },
+            button_1: {
+              subtype: 'url',
+              type: 'text',
+              value: portalUrl ?? 'https://mind.originbi.com/student',
+            },
+          },
+        });
+        whatsappSucceeded = true;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Instructions WhatsApp failed for ${phone}, will try SMS fallback: ${msg}`,
+        );
+      }
+    }
+
+    if (whatsappSucceeded) return;
+    await this.trySmsFallback('assessment_instructions', phone, name);
+  }
+
+  private async trySmsFallback(
+    template: SmsTemplate,
+    phone: string,
+    name: string,
+  ): Promise<void> {
+    try {
+      const smsOn = await this.smsService.isEnabled(template);
+      if (!smsOn) return;
+      await this.smsService.send(template, phone, name);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`SMS fallback failed for ${template} ${phone}: ${msg}`);
+    }
+  }
+
   private async sendWelcomeEmail(
     to: string,
     name: string,
@@ -853,17 +941,22 @@ export class RegistrationsService {
       fromName,
       fromAddress: fromEmail,
       ccAddresses,
+      bccAddresses,
+      replyToAddress,
     } = await this.settingsService.getEmailConfig('registration_email_config');
     const ccEmail = ccAddresses.join(', ');
+    const bccEmail = bccAddresses.join(', ');
     const fromAddress = `"${fromName}" <${fromEmail}>`;
 
-    const mailOptions = {
+    const mailOptions: Record<string, any> = {
       from: fromAddress,
       to,
       cc: ccEmail, // Add CC if configured
       subject: 'Welcome to OriginBI - Your Assessment is Ready!',
       html: '',
     };
+    if (bccEmail) mailOptions.bcc = bccEmail;
+    if (replyToAddress) mailOptions.replyTo = replyToAddress;
 
     // Use full URLs for assets ("from application itself")
     // Controller is at /assets/:filename in admin-service (Port 4001)

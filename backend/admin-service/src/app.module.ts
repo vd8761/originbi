@@ -23,6 +23,9 @@ import { AffiliateLoginModule } from './affiliatelogin/affiliatelogin.module';
 import { R2Module } from './r2/r2.module';
 import { NotificationModule } from './notification/notification.module';
 import { SettingsModule } from './settings/settings.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { SmsModule } from './sms/sms.module';
+import { RemindersModule } from './reminders/reminders.module';
 
 @Module({
   imports: [
@@ -125,6 +128,9 @@ import { SettingsModule } from './settings/settings.module';
     R2Module,
     NotificationModule,
     SettingsModule,
+    WhatsappModule,
+    SmsModule,
+    RemindersModule,
   ],
   controllers: [TestController, MailAssetsController, HealthController],
 })

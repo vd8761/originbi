@@ -1144,7 +1144,6 @@ export class SchoolReport extends BaseReport {
       indent: 30,
       type: 'number',
     });
-
     this.h2('Trait Mapping');
 
     const headers = [
@@ -1349,13 +1348,13 @@ export class SchoolReport extends BaseReport {
     }
 
     // 4. Career Alignment Index
-    this.ci_generateCareerAlignmentIndex();
+    // this.ci_generateCareerAlignmentIndex();
 
     // 5. Career Fit
-    this.ci_generateCareerFit();
+    // this.ci_generateCareerFit();
 
     // 6. Career Domain Table
-    this.ci_generateCareerDomainTable();
+    // this.ci_generateCareerDomainTable();
 
     // 7. Career Flight Path
     try {
@@ -1375,13 +1374,13 @@ export class SchoolReport extends BaseReport {
    */
   private async generateHSCSections(): Promise<void> {
     // 1. Career Alignment Index
-    this.ci_generateCareerAlignmentIndex();
+    // this.ci_generateCareerAlignmentIndex();
 
     // 2. Career Fit
-    this.ci_generateCareerFit();
+    // this.ci_generateCareerFit();
 
     // 3. Career Domain Table
-    this.ci_generateCareerDomainTable();
+    // this.ci_generateCareerDomainTable();
 
     const streamKey = STREAM_NAMES[this.data.school_stream_id ?? 0];
 
@@ -4158,7 +4157,7 @@ export class SchoolReport extends BaseReport {
 
     // B. Sub Headers (DISC Focus, etc.)
     const subHeaders = [
-      'Personality Focus',
+      'DISC Focus',
       'Problem/Tasks',
       'People',
       'Pace (Environment)',
