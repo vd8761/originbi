@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getStoredUser, getAuthHeaders } from '../auth-helpers';
 import { usePathname } from 'next/navigation';
 import { useNotificationSound } from './useNotificationSound';
@@ -22,39 +22,30 @@ export function useNotifications() {
     const [loading, setLoading] = useState(false);
     const user = getStoredUser();
     const { playNotificationSound } = useNotificationSound();
-    
-    // Role-specific notification types that should trigger sound
-    const getTargetNotificationTypes = (role: string) => {
-        switch (role) {
-            case 'STUDENT':
-                return ['LEVEL_UNLOCKED', 'ASSESSMENT_REPORT_READY'];
-            case 'AFFILIATE':
-                return ['AFFILIATE_SETTLEMENT_READY', 'AFFILIATE_SETTLEMENT_PROCESSED', 'AFFILIATE_NEW_REFERRAL', 'AFFILIATE_MILESTONE_REACHED'];
-            case 'ADMIN':
-                return ['NEW_CORPORATE_SIGNUP', 'AFFILIATE_SETTLEMENT_READY', 'STUDENT_REFERRAL_REGISTRATION', 'STUDENT_DIRECT_REGISTRATION'];
-            case 'CORPORATE':
-                return ['EMPLOYEE_TEST_COMPLETED', 'LOW_CREDITS', 'CREDITS_ADDED', 'EXAM_EXPIRATION'];
-            default:
-                return [];
-        }
-    };
-    
-    const TARGET_NOTIFICATION_TYPES = getTargetNotificationTypes(user.role || '');
-    
-    // Role-specific localStorage key to prevent interference between roles
-    const localStorageKey = `previousTargetUnreadCount_${user.role || 'unknown'}`;
-    
-    // Initialize previous count from localStorage to persist across page navigations
+
+    // Role + user specific key to avoid cross-account bleed when same browser is reused.
+    const localStorageKey = `previousUnreadCount_${user.role || 'unknown'}_${user.id || 0}`;
+
+    // Initialize previous unread count from localStorage; null means "first fetch baseline not set".
     const getInitialPreviousCount = () => {
         if (typeof window !== 'undefined') {
             const stored = localStorage.getItem(localStorageKey);
-            const parsed = stored ? parseInt(stored, 10) : 0;
-            return isNaN(parsed) ? 0 : parsed;
+            if (stored === null) {
+                return null;
+            }
+            const parsed = parseInt(stored, 10);
+            return isNaN(parsed) ? null : parsed;
         }
-        return 0;
+        return null;
     };
-    
-    const [previousTargetUnreadCount, setPreviousTargetUnreadCount] = useState(getInitialPreviousCount());
+
+    const previousUnreadCountRef = useRef<number | null>(getInitialPreviousCount());
+    const hasFetchedOnceRef = useRef(false);
+
+    useEffect(() => {
+        previousUnreadCountRef.current = getInitialPreviousCount();
+        hasFetchedOnceRef.current = false;
+    }, [localStorageKey]);
 
     const fetchUnreadCount = useCallback(async () => {
         if (!user.id || user.id === 0) return;
@@ -71,27 +62,29 @@ export function useNotifications() {
                 // Calculate total unread count
                 const totalUnreadCount = (data.items || []).filter((n: Notification) => !n.isRead).length;
                 setUnreadCount(totalUnreadCount);
-                
-                // Calculate target notification unread count (LEVEL_UNLOCKED and ASSESSMENT_REPORT_READY)
-                const currentTargetUnreadCount = (data.items || []).filter((n: Notification) => 
-                    !n.isRead && TARGET_NOTIFICATION_TYPES.includes(n.type)
-                ).length;
-                
-                // Play sound only when new target notifications arrive
-                if (currentTargetUnreadCount > previousTargetUnreadCount && previousTargetUnreadCount >= 0) {
+
+                const currentUnreadCount = totalUnreadCount;
+                const previousUnreadCount = previousUnreadCountRef.current;
+
+                // Do not play on first baseline fetch; play only for new incoming unread notifications.
+                if (
+                    hasFetchedOnceRef.current &&
+                    previousUnreadCount !== null &&
+                    currentUnreadCount > previousUnreadCount
+                ) {
                     playNotificationSound();
                 }
-                
-                // Update previous count for next comparison and persist to localStorage with role-specific key
-                setPreviousTargetUnreadCount(currentTargetUnreadCount);
+
+                previousUnreadCountRef.current = currentUnreadCount;
+                hasFetchedOnceRef.current = true;
                 if (typeof window !== 'undefined') {
-                    localStorage.setItem(localStorageKey, String(currentTargetUnreadCount));
+                    localStorage.setItem(localStorageKey, String(currentUnreadCount));
                 }
             }
         } catch (error) {
             console.error('Failed to fetch unread count:', error);
         }
-    }, [user.id, user.role, previousTargetUnreadCount, playNotificationSound, localStorageKey]);
+    }, [user.id, user.role, playNotificationSound, localStorageKey]);
 
     const fetchNotifications = useCallback(async () => {
         if (!user.id || user.id === 0) return;
@@ -115,9 +108,9 @@ export function useNotifications() {
 
     const markAsRead = useCallback(async (id: number) => {
         try {
-            // Find notification before API call to check if it was unread
+            // Find notification before API call to check if it was unread.
             const notification = notifications.find(n => n.id === id);
-            const wasUnreadTargetNotification = notification && !notification.isRead && TARGET_NOTIFICATION_TYPES.includes(notification.type);
+            const wasUnreadNotification = Boolean(notification && !notification.isRead);
             
             const baseUrl = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4001';
             const response = await fetch(`${baseUrl}/notifications/${id}/read`, {
@@ -131,10 +124,10 @@ export function useNotifications() {
                 );
                 setUnreadCount(prev => Math.max(0, prev - 1));
                 
-                // Update localStorage previous count if the marked notification was a target type
-                if (wasUnreadTargetNotification) {
-                    const newPreviousCount = Math.max(0, previousTargetUnreadCount - 1);
-                    setPreviousTargetUnreadCount(newPreviousCount);
+                if (wasUnreadNotification) {
+                    const previousUnreadCount = previousUnreadCountRef.current ?? 0;
+                    const newPreviousCount = Math.max(0, previousUnreadCount - 1);
+                    previousUnreadCountRef.current = newPreviousCount;
                     if (typeof window !== 'undefined') {
                         localStorage.setItem(localStorageKey, String(newPreviousCount));
                     }
@@ -143,7 +136,7 @@ export function useNotifications() {
         } catch (error) {
             console.error('Failed to mark notification as read:', error);
         }
-    }, [notifications, previousTargetUnreadCount, TARGET_NOTIFICATION_TYPES, localStorageKey, user.id]);
+    }, [notifications, localStorageKey, user.id]);
 
     const markAllAsRead = useCallback(async () => {
         try {
@@ -157,8 +150,8 @@ export function useNotifications() {
                 setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
                 setUnreadCount(0);
                 
-                // Reset localStorage previous count since all notifications are now read
-                setPreviousTargetUnreadCount(0);
+                // Reset baseline since all notifications are now read.
+                previousUnreadCountRef.current = 0;
                 if (typeof window !== 'undefined') {
                     localStorage.setItem(localStorageKey, '0');
                 }
@@ -177,10 +170,23 @@ export function useNotifications() {
         // Initial fetch and on route change
         fetchUnreadCount();
 
-        // Start polling every 120 seconds
-        const intervalId = setInterval(fetchUnreadCount, 120000);
+        // Poll frequently so new notification sounds are near real-time.
+        const intervalId = setInterval(fetchUnreadCount, 15000);
 
-        return () => clearInterval(intervalId);
+        const handleVisibilityOrFocus = () => {
+            if (typeof document === 'undefined' || !document.hidden) {
+                void fetchUnreadCount();
+            }
+        };
+
+        window.addEventListener('focus', handleVisibilityOrFocus);
+        document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+        return () => {
+            clearInterval(intervalId);
+            window.removeEventListener('focus', handleVisibilityOrFocus);
+            document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+        };
     }, [user.id, fetchUnreadCount, pathname]);
 
     return {

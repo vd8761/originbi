@@ -71,6 +71,14 @@ export class CreateRegistrationDto {
 
   @IsOptional()
   @IsString()
+  currentRole?: string;
+
+  @IsOptional()
+  @IsString()
+  roleDescription?: string;
+
+  @IsOptional()
+  @IsString()
   studentBoard?: string;
 
   @IsOptional()

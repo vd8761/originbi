@@ -54,4 +54,12 @@ export class CreateCandidateDto {
   @IsString()
   @IsOptional()
   currentYear?: string;
+
+  @IsString()
+  @IsOptional()
+  currentRole?: string;
+
+  @IsString()
+  @IsOptional()
+  roleDescription?: string;
 }
