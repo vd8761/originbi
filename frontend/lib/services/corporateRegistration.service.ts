@@ -235,6 +235,8 @@ export const corporateRegistrationService = {
         departmentId?: string;
         degreeId?: string;
         currentYear?: string;
+        currentRole?: string;
+        roleDescription?: string;
     }, userId: string): Promise<any> {
         const token = AuthService.getToken();
         const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_URL;

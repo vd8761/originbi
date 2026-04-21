@@ -3218,6 +3218,7 @@ Please tell me the target role first, for example:
                     r.full_name,
                     r.gender,
                     r.mobile_number,
+                  r.metadata as reg_metadata,
                     r.school_level,
                     r.school_stream,
                     r.student_board,
@@ -3268,7 +3269,8 @@ Please tell me the target role first, for example:
         }
         personData = await this.dataSource.query(`
                 SELECT 
-                    r.id, r.full_name, r.gender, r.mobile_number,
+                  r.id, r.full_name, r.gender, r.mobile_number,
+                  r.metadata as reg_metadata,
                     r.school_level, r.school_stream, r.student_board, r.registration_source,
                     u.email,
                     aa.total_score, aa.sincerity_index,
@@ -3364,6 +3366,17 @@ Please tell me the target role first, for example:
 
       const person = personData[targetIndex];
 
+      const regMetadata = (() => {
+        try {
+          if (!person.reg_metadata) return {};
+          return typeof person.reg_metadata === 'string'
+            ? JSON.parse(person.reg_metadata)
+            : person.reg_metadata;
+        } catch {
+          return {};
+        }
+      })();
+
       const completedAttempts = parseInt(person.attempt_count || '0');
       if (!completedAttempts || completedAttempts <= 0) {
         return {
@@ -3380,24 +3393,50 @@ Please tell me the target role first, for example:
       const isStudent = !person.company_name; // No corporate = student
       const schoolInfo = [person.school_level, person.school_stream, person.student_board].filter(Boolean).join(' / ');
       const deptInfo = [person.degree_name, person.department_name].filter(Boolean).join(' — ');
-      const currentRole = isStudent
+      const storedCurrentRole = String(regMetadata.currentRole || '').trim();
+      const storedRoleDescription = String(
+        regMetadata.roleDescription || regMetadata.currentJobDescription || '',
+      ).trim();
+
+      if (!storedCurrentRole || !storedRoleDescription) {
+        const missingFields: string[] = [];
+        if (!storedCurrentRole) missingFields.push('Current Role');
+        if (!storedRoleDescription) missingFields.push('Role Description');
+
+        const currentRoleLine = !storedCurrentRole
+          ? `Current Role: [Your current job title]\n`
+          : '';
+        const roleDescriptionLine = !storedRoleDescription
+          ? `Role Description: [Briefly describe responsibilities]\n`
+          : '';
+
+        return {
+          answer: `**⚠️ ${person.full_name || cleanSearchTerm} is found, but ${missingFields.join(' and ')} ${missingFields.length === 1 ? 'is' : 'are'} missing in registration metadata.**\n\nPlease provide the missing details in this format:\n\n\`\`\`\nName: ${person.full_name || cleanSearchTerm}\n${currentRoleLine}${roleDescriptionLine}\`\`\`\n\nIf these fields are already saved in DB next time, I will use them automatically.`,
+          searchType: 'chat_profile_request',
+          confidence: 0.95,
+        };
+      }
+
+      const currentRole = storedCurrentRole || (isStudent
         ? (deptInfo ? `Student (${deptInfo})` : (schoolInfo ? `Student (${schoolInfo})` : 'Student'))
-        : (person.company_name ? `Employee at ${person.company_name}` : 'Assessment Candidate');
-      const currentIndustry = isStudent
+        : (person.company_name ? `Employee at ${person.company_name}` : 'Assessment Candidate'));
+      const currentIndustry = regMetadata.currentIndustry || (isStudent
         ? (person.department_name || 'Education / Academics')
-        : (person.company_name || 'Professional');
+        : (person.company_name || 'Professional'));
 
       // Generate the full Career Fitment Report
       const report = await this.futureRoleReportService.generateReport({
         name: person.full_name || searchTerm,
         currentRole,
-        currentJobDescription: isStudent
-          ? `Pursuing ${deptInfo || schoolInfo || 'academics'}. Completed behavioral and skill assessments.`
-          : `Working at ${person.company_name || 'organization'}. Completed behavioral and skill assessments.`,
-        yearsOfExperience: isStudent ? 0 : 0,
-        relevantExperience: isStudent ? '' : '',
+        currentJobDescription:
+          storedRoleDescription ||
+          (isStudent
+            ? `Pursuing ${deptInfo || schoolInfo || 'academics'}. Completed behavioral and skill assessments.`
+            : `Working at ${person.company_name || 'organization'}. Completed behavioral and skill assessments.`),
+        yearsOfExperience: Number(regMetadata.yearsOfExperience || 0),
+        relevantExperience: regMetadata.relevantExperience || (isStudent ? '' : ''),
         currentIndustry,
-        expectedFutureRole: '',
+        expectedFutureRole: regMetadata.expectedFutureRole || '',
         behavioralStyle: person.behavioral_style || undefined,
         behavioralDescription: person.behavior_description || undefined,
         agileScore: scoreToUse ? parseFloat(scoreToUse) : undefined,
@@ -4306,8 +4345,9 @@ Please tell me the target role first, for example:
         profileGuardParams.push(profileCorporateId);
       }
 
-      let dbCheck = await this.dataSource.query(
+          let dbCheck = await this.dataSource.query(
         `SELECT r.id, r.full_name, r.user_id,
+          r.metadata as reg_metadata,
                 (SELECT COUNT(*) FROM assessment_attempts aa
                  WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
          FROM registrations r
@@ -4328,6 +4368,7 @@ Please tell me the target role first, for example:
         }
         dbCheck = await this.dataSource.query(
           `SELECT r.id, r.full_name, r.user_id,
+            r.metadata as reg_metadata,
                   (SELECT COUNT(*) FROM assessment_attempts aa
                    WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
            FROM registrations r
@@ -4369,23 +4410,79 @@ Please tell me the target role first, for example:
       const bestMatch = withAssessment[0];
       this.logger.log(`✅ DB validated: ${bestMatch.full_name} (userId: ${bestMatch.user_id}, assessments: ${bestMatch.completed_count})`);
 
+      const parseMetadata = (value: any): Record<string, any> => {
+        if (!value) return {};
+        if (typeof value === 'string') {
+          try {
+            return JSON.parse(value);
+          } catch {
+            return {};
+          }
+        }
+        return value;
+      };
+
+      const bestRegMetadata = parseMetadata(bestMatch.reg_metadata);
+      const providedCurrentRole =
+        profileData.currentRole &&
+        profileData.currentRole.toLowerCase() !== 'not specified'
+          ? profileData.currentRole.trim()
+          : '';
+      const providedJobDescription = profileData.currentJobDescription?.trim() || '';
+
+      const resolvedCurrentRole = String(
+        bestRegMetadata.currentRole || providedCurrentRole || '',
+      ).trim();
+      const resolvedJobDescription = String(
+        bestRegMetadata.roleDescription ||
+          bestRegMetadata.currentJobDescription ||
+          providedJobDescription ||
+          '',
+      ).trim();
+
+      const missingFields: string[] = [];
+      if (!resolvedCurrentRole) missingFields.push('Current Role');
+      if (!resolvedJobDescription) missingFields.push('Role Description');
+
+      if (missingFields.length > 0) {
+        const currentRoleLine = !resolvedCurrentRole
+          ? `Current Role: [Your current job title]\n`
+          : '';
+        const roleDescriptionLine = !resolvedJobDescription
+          ? `Role Description: [Briefly describe responsibilities]\n`
+          : '';
+
+        return {
+          answer: `**⚠️ ${bestMatch.full_name} is found, but ${missingFields.join(' and ')} ${missingFields.length === 1 ? 'is' : 'are'} missing in registration metadata.**\n\nPlease provide only the missing details:\n\n\`\`\`\nName: ${bestMatch.full_name}\n${currentRoleLine}${roleDescriptionLine}\`\`\`\n\nAfter you provide this, I will generate the report immediately.`,
+          searchType: 'chat_profile_request',
+          confidence: 0.95,
+        };
+      }
+
       // Encode the profile data as base64 for the URL — merge DB data with provided profile
       const reportPayload = {
         name: bestMatch.full_name, // Use the DB name for accuracy
-        currentRole: profileData.currentRole,
-        currentJobDescription: profileData.currentJobDescription,
-        yearsOfExperience: profileData.yearsOfExperience,
+        currentRole: resolvedCurrentRole,
+        currentJobDescription: resolvedJobDescription,
+        yearsOfExperience:
+          Number(bestRegMetadata.yearsOfExperience ?? profileData.yearsOfExperience ?? 0) ||
+          0,
         relevantExperience: profileData.relevantExperience,
-        currentIndustry: profileData.currentIndustry,
-        expectedFutureRole: profileData.expectedFutureRole,
-        expectedIndustry: profileData.expectedIndustry || '',
+        currentIndustry:
+          bestRegMetadata.currentIndustry || profileData.currentIndustry || 'Not Specified',
+        expectedFutureRole:
+          bestRegMetadata.expectedFutureRole ||
+          profileData.expectedFutureRole ||
+          'Not Specified',
+        expectedIndustry:
+          bestRegMetadata.expectedIndustry || profileData.expectedIndustry || '',
       };
 
       const encodedProfile = Buffer.from(JSON.stringify(reportPayload)).toString('base64');
       const downloadUrl = `/rag/chat-report/download?profile=${encodedProfile}`;
 
       return {
-        answer: `**✅ Profile Captured Successfully for ${bestMatch.full_name}!** 🎯\n\n📊 **Profile Summary:**\n- **Name:** ${bestMatch.full_name}\n- **Current Role:** ${profileData.currentRole}\n- **Experience:** ${profileData.yearsOfExperience} years\n- **Industry:** ${profileData.currentIndustry}\n- **Target Role:** ${profileData.expectedFutureRole}\n- **Assessments Completed:** ${bestMatch.completed_count}\n\n📄 **[Click here to download your personalized Career Fitment Report](${downloadUrl})**\n\n*Report is generated using real assessment data from our platform combined with the profile details you provided.*`,
+        answer: `**✅ Profile Captured Successfully for ${bestMatch.full_name}!** 🎯\n\n📊 **Profile Summary:**\n- **Name:** ${bestMatch.full_name}\n- **Current Role:** ${reportPayload.currentRole}\n- **Experience:** ${reportPayload.yearsOfExperience} years\n- **Industry:** ${reportPayload.currentIndustry}\n- **Target Role:** ${reportPayload.expectedFutureRole}\n- **Assessments Completed:** ${bestMatch.completed_count}\n\n📄 **[Click here to download your personalized Career Fitment Report](${downloadUrl})**\n\n*Report is generated using real assessment data from our platform combined with profile details and registration metadata.*`,
         searchType: 'chat_profile_report',
         confidence: 0.95,
         reportUrl: downloadUrl,
@@ -4436,6 +4533,7 @@ Please tell me the target role first, for example:
 
       const currentJobDescription = extractField([
         /(?:current\s*)?job\s*description[:\s]*([^\n]+(?:\n(?![A-Z][a-z]*:)[^\n]+)*)/i,
+        /role\s*description[:\s]*([^\n]+(?:\n(?![A-Z][a-z]*:)[^\n]+)*)/i,
         /responsibilities[:\s]*([^\n]+)/i,
       ]);
 
@@ -4445,7 +4543,6 @@ Please tell me the target role first, for example:
         /experience[:\s]*(\d+)/i,
       ]);
       const yearsOfExperience = parseInt(yearsStr) || 0;
-      5
       const relevantExperience = extractField([
         /relevant\s*experience[:\s\(]*([^\n\)]+)/i,
         /key\s*focus\s*areas?[:\s]*([^\n]+)/i,
