@@ -34,6 +34,8 @@ export interface CreateRegistrationDto {
   current_year?: string;
   student_board?: string;
   group_name?: string;
+  current_role?: string;
+  role_description?: string;
 
   password?: string;
 
@@ -168,6 +170,8 @@ export const registrationService = {
       departmentId: payload.department_degree_id,
       currentYear: payload.current_year,
       studentBoard: payload.student_board,
+      currentRole: payload.current_role,
+      roleDescription: payload.role_description,
       password: payload.password,
     };
 

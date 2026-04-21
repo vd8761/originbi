@@ -409,7 +409,8 @@ export class RagController {
         reportData = await this.customReportService.generateChatBasedReport({
           name: registration.full_name,
           currentRole: regMetadata.currentRole || 'Not Specified',
-          currentJobDescription: regMetadata.currentJobDescription || '',
+          currentJobDescription:
+            regMetadata.roleDescription || regMetadata.currentJobDescription || '',
           yearsOfExperience: regMetadata.yearsOfExperience || 0,
           relevantExperience: regMetadata.relevantExperience || '',
           currentIndustry: regMetadata.currentIndustry || 'Not Specified',

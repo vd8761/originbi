@@ -1079,7 +1079,8 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
       }
 
       const results = await this.dataSource.query(`
-        SELECT r.id, r.full_name, r.gender, r.status,
+         SELECT r.id, r.full_name, r.gender, r.status,
+           r.metadata as reg_metadata,
                u.email,
                aa.total_score, aa.status as assessment_status,
                pt.blended_style_name as personality_style,
@@ -1254,6 +1255,18 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
       }
 
       const person = personResult.data.person;
+
+      const regMetadata = (() => {
+        try {
+          if (!person.reg_metadata) return {};
+          return typeof person.reg_metadata === 'string'
+            ? JSON.parse(person.reg_metadata)
+            : person.reg_metadata;
+        } catch {
+          return {};
+        }
+      })();
+
       if (person.assessment_status !== 'COMPLETED') {
         return {
           toolName: 'career_report',
@@ -1267,12 +1280,20 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
       // Build ProfileInput from person data
       const profileInput = {
         name: person.full_name || name,
-        currentRole: person.program_name ? `Student — ${person.program_name}` : 'Student',
-        currentJobDescription: person.personality_desc || 'Assessment candidate',
-        yearsOfExperience: 0,
-        relevantExperience: 'N/A',
-        currentIndustry: 'Education / Career Development',
-        expectedFutureRole: 'Based on assessment analysis',
+        currentRole:
+          regMetadata.currentRole ||
+          (person.program_name ? `Student — ${person.program_name}` : 'Student'),
+        currentJobDescription:
+          regMetadata.roleDescription ||
+          regMetadata.currentJobDescription ||
+          person.personality_desc ||
+          'Assessment candidate',
+        yearsOfExperience: Number(regMetadata.yearsOfExperience || 0),
+        relevantExperience: regMetadata.relevantExperience || 'N/A',
+        currentIndustry:
+          regMetadata.currentIndustry || 'Education / Career Development',
+        expectedFutureRole:
+          regMetadata.expectedFutureRole || 'Based on assessment analysis',
         behavioralStyle: person.personality_style,
         behavioralDescription: person.personality_desc,
         totalScore: person.total_score ? parseFloat(person.total_score) : undefined,

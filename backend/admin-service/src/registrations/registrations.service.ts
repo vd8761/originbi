@@ -218,6 +218,8 @@ export class RegistrationsService {
     const schoolLevel = this.normalizeSchoolLevel(dto.schoolLevel);
     const schoolStream = this.normalizeSchoolStream(dto.schoolStream);
     const departmentDegreeId = this.toBigIntOrNull(dto.departmentId);
+    const currentRole = dto.currentRole?.trim() || undefined;
+    const roleDescription = dto.roleDescription?.trim() || undefined;
 
     // 4. Transaction
     try {
@@ -318,6 +320,8 @@ export class RegistrationsService {
             groupName: dto.groupName,
             sendEmail: dto.sendEmail,
             currentYear: dto.currentYear,
+            currentRole,
+            roleDescription,
             examStart: dto.examStart,
             examEnd: dto.examEnd,
             departmentId: dto.departmentId ?? null,
@@ -467,6 +471,8 @@ export class RegistrationsService {
     const schoolLevel = this.normalizeSchoolLevel(dto.schoolLevel);
     const schoolStream = this.normalizeSchoolStream(dto.schoolStream);
     const departmentDegreeId = this.toBigIntOrNull(dto.departmentId);
+    const currentRole = dto.currentRole?.trim() || undefined;
+    const roleDescription = dto.roleDescription?.trim() || undefined;
 
     // 2. Transaction
     return this.dataSource.transaction(async (manager) => {
@@ -499,6 +505,8 @@ export class RegistrationsService {
           groupName: dto.groupName,
           sendEmail: dto.sendEmail,
           currentYear: dto.currentYear,
+          currentRole,
+          roleDescription,
           examStart: dto.examStart,
           examEnd: dto.examEnd,
           departmentId: dto.departmentId ?? null,
