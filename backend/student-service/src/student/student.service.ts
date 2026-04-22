@@ -34,6 +34,8 @@ import {
 import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
+import { getDebriefBookingEmailTemplate } from '../mail/templates/debrief-booking.template';
+import { getDebriefTeamNotificationEmailTemplate } from '../mail/templates/debrief-team-notification.template';
 import { SettingsService } from '../settings/settings.service';
 import { WhatsappTemplatesService } from '../whatsapp/whatsapp-templates.service';
 import { SmsService, SmsTemplate } from '../sms/sms.service';
@@ -1837,6 +1839,51 @@ export class StudentService {
         return;
       }
 
+      // --- Send Debrief Email Immediately if enabled ---
+      if (registration.metadata?.debrief === true || registration.metadata?.debrief === 'true') {
+        try {
+          const {
+            fromName,
+            fromAddress: fromEmail,
+            ccAddresses,
+            bccAddresses,
+            replyToAddress,
+          } = await this.settingsService.getEmailConfig('report_email_config');
+          
+          const assets = {
+            logo: `https://mind.originbi.com/Origin-BI-Logo-01.png`,
+            popper: `${this.configService.get('API_URL') || 'https://mind.originbi.com'}/assets/Popper.png`,
+            footer: `${this.configService.get('API_URL') || 'https://mind.originbi.com'}/assets/Email_Vector.png`,
+          };
+
+          const debriefHtml = getDebriefBookingEmailTemplate(
+            registration.fullName || 'Student',
+            assets,
+          );
+
+          const transporter = this.createEmailTransporter();
+          const debriefMailOptions: Record<string, any> = {
+            from: `"${fromName}" <${fromEmail}>`,
+            to: user.email,
+            cc: ccAddresses,
+            subject: `Expert Debrief Session Booked - Origin BI`,
+            html: debriefHtml,
+          };
+          if (bccAddresses.length > 0) debriefMailOptions.bcc = bccAddresses;
+          if (replyToAddress) debriefMailOptions.replyTo = replyToAddress;
+
+          // Send without awaiting to allow report generation to start immediately
+          transporter.sendMail(debriefMailOptions)
+            .then(() => this.logger.log(`Immediate debrief booking email sent to ${user.email}`))
+            .catch((err) => this.logger.error(`Failed to send instant debrief booking email to ${user.email}: ${err.message}`));
+            
+        } catch (debriefErr) {
+          this.logger.error(
+            `Failed to prepare instant debrief booking email for ${user.email}: ${debriefErr.message}`,
+          );
+        }
+      }
+
       // 2. Trigger Report Generation
       const port = process.env.PORT || 4004;
       const reportServiceUrl = `http://localhost:${port}/report`;
@@ -1996,6 +2043,8 @@ export class StudentService {
         const assets = {
           logo: `https://mind.originbi.com/Origin-BI-Logo-01.png`,
           reportCover: `https://mind.originbi.com/Origin-BI-Logo-01.png`,
+          footer: `${this.configService.get('API_URL') || 'https://mind.originbi.com'}/assets/Email_Vector.png`,
+          popper: `${this.configService.get('API_URL') || 'https://mind.originbi.com'}/assets/Popper.png`,
         };
 
         const emailHtml = getAssessmentCompletionEmailTemplate(
@@ -2046,6 +2095,64 @@ export class StudentService {
               `Report-sent WhatsApp failed for user ${userId}: ${whatsappErr.message}`,
             ),
           );
+
+          // --- Send Debrief Team Notification (with report attached) ---
+          if (registration.metadata?.debrief === true || registration.metadata?.debrief === 'true') {
+            try {
+              const debriefForwardEmails = (this.configService.get('DEBRIEF_FORWARD_EMAILS') || 'info@originbi.com,vikashuvi07@gmail.com')
+                .split(',')
+                .map((e: string) => e.trim())
+                .filter((e: string) => e.length > 0);
+
+              const teamHtml = getDebriefTeamNotificationEmailTemplate(
+                registration.fullName || 'Student',
+                user.email,
+                `${registration.countryCode || '+91'} ${registration.mobileNumber}`,
+                registration.gender || 'Not specified',
+                registration.paymentAmount || '0',
+                registration.paymentReference || 'N/A',
+                registration.createdAt
+                  ? new Date(registration.createdAt).toLocaleString('en-GB', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      timeZone: 'Asia/Kolkata',
+                      hour12: true,
+                    })
+                  : 'N/A',
+                program?.name || 'Assessment Program',
+                assets,
+              );
+
+              // Send separate email to each forward address
+              for (const forwardEmail of debriefForwardEmails) {
+                const teamMailOptions: Record<string, any> = {
+                  from: `"${fromName}" <${fromEmail}>`,
+                  to: forwardEmail,
+                  subject: `[Debrief Booking] ${registration.fullName || 'Student'} - Expert Debrief Session`,
+                  html: teamHtml,
+                  attachments: [
+                    {
+                      filename: attachmentFileName,
+                      content: pdfBuffer,
+                      contentType: 'application/pdf',
+                    },
+                  ],
+                };
+
+                transporter.sendMail(teamMailOptions)
+                  .then(() => this.logger.log(`Debrief team notification sent to ${forwardEmail}`))
+                  .catch((teamErr) => this.logger.error(`Failed to send debrief team notification to ${forwardEmail}: ${teamErr.message}`));
+              }
+            } catch (teamErr) {
+              this.logger.error(
+                `Failed to prepare debrief team notification: ${teamErr.message}`,
+              );
+            }
+          }
+
         } catch (err) {
           this.logger.error(
             `Failed to send assessment completion email to ${user.email}: ${err.message}`,
