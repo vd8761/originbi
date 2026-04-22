@@ -1167,6 +1167,8 @@ export class BulkCorporateRegistrationsService {
       departmentId: departmentDegreeId ? String(departmentDegreeId) : undefined, // Corporate frontend dto expects departmentId as string which maps to departmentDegreeId in backend
       degreeId: undefined, // Not used in registration directly, inferred via DepartmentDegree
       currentYear: isCollege ? String(currentYear) : undefined,
+      currentRole: this.getValue(rawData, ['CurrentRole', 'current_role', 'Current Role', 'currentRole']) || undefined,
+      roleDescription: this.getValue(rawData, ['RoleDescription', 'role_description', 'Role Description', 'roleDescription']) || undefined,
 
       password:
         this.getValue(rawData, ['Password', 'password']) || 'Welcome@123',
@@ -1358,6 +1360,13 @@ export class BulkCorporateRegistrationsService {
       if (!deptDegreeMap.has(key)) {
         return `The combination of Department '${deptName}' and Degree '${degreeName}' is invalid or not found.`;
       }
+    } else {
+      // Employee / Corporate Program
+      const role = row['CurrentRole'] || row['current_role'] || row['Current Role'] || row['currentRole'];
+      const desc = row['RoleDescription'] || row['role_description'] || row['Role Description'] || row['roleDescription'];
+
+      if (!role) return 'Current Role is required for Employee programs';
+      if (!desc) return 'Role Description is required for Employee programs';
     }
 
     // 4. Dates
