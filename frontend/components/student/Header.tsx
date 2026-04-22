@@ -327,11 +327,17 @@ const Header: React.FC<HeaderProps> = ({
         setMobileMenuOpen(false);
     };
 
+    const handleDebriefClick = () => {
+        window.open('/debrief', '_blank');
+        setMobileMenuOpen(false);
+    };
+
     // Determine active states based on pathname or currentView prop
     const isDashboardActive = pathname === '/student/dashboard' || currentView === 'dashboard';
     const isAssessmentActive = pathname?.includes('/student/assessment') || currentView === 'assessment';
     const isRoadmapsActive = pathname?.includes('/student/roadmaps') || currentView === 'roadmaps';
     const isCounsellorActive = pathname?.includes('/student/counsellor');
+    const isDebriefActive = false; // Opens in a new tab at /debrief
     const isProfileSettingsActive = pathname?.includes('/student/profile-settings') || currentView === 'profile';
 
     const getNotificationIcon = (type: string) => {
@@ -487,7 +493,7 @@ const Header: React.FC<HeaderProps> = ({
                     <>
                         <NavItem icon={<RoadmapIcon />} label="Road Map" active={isRoadmapsActive} isMobile={isMobile} onClick={handleRoadmapClick} />
                         <NavItem icon={<Brain className="w-4 h-4" />} label="AI Counsellor" active={isCounsellorActive} isMobile={isMobile} onClick={handleCounsellorClick} />
-                        <NavItem icon={<VideosIcon />} label="Videos" isMobile={isMobile} />
+                        <NavItem icon={<VideosIcon />} label="Book Debrief" active={isDebriefActive} isMobile={isMobile} onClick={handleDebriefClick} />
                     </>
                 )}
                 <NavItem icon={<ProfileIcon />} label="Profile and Settings" active={isProfileSettingsActive} isMobile={isMobile} onClick={handleProfileAndSettingsClick} />

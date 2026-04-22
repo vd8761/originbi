@@ -352,4 +352,207 @@ export class SubscriptionService {
       return { success: false };
     }
   }
+
+  /**
+   * Create a Razorpay order for Debrief Booking
+   */
+  async createDebriefOrder(email: string): Promise<{
+    orderId: string;
+    amount: number;
+    currency: string;
+    keyId: string;
+  }> {
+    const razorpayKeyId = this.configService.get<string>('RAZORPAY_KEY_ID');
+    const razorpayKeySecret = this.configService.get<string>(
+      'RAZORPAY_KEY_SECRET',
+    );
+
+    if (!razorpayKeyId || !razorpayKeySecret) {
+      throw new Error('Payment gateway not configured');
+    }
+
+    // Amount can be overridden by env, defaults to 2500 INR (250000 paise)
+    const baseAmountStr = this.configService.get<string>('NEXT_PUBLIC_DEBRIEF_AMOUNT') || '2500';
+    const amountStr = this.configService.get<string>('DEBRIEF_AMOUNT') || baseAmountStr;
+    const amount = parseInt(amountStr, 10) * 100;
+    const currency = 'INR';
+
+    // Create Razorpay order via API
+    const orderData = {
+      amount,
+      currency,
+      receipt: `debrief_${String(Date.now())}`,
+      notes: { email, plan: 'debrief' },
+    };
+
+    const response = await fetch('https://api.razorpay.com/v1/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization:
+          'Basic ' +
+          Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString(
+            'base64',
+          ),
+      },
+      body: JSON.stringify(orderData),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      this.logger.error(`Razorpay debrief order creation failed: ${err}`);
+      throw new Error('Failed to create debrief payment order');
+    }
+
+    const order = (await response.json()) as RazorpayOrderResponse;
+
+    return {
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      keyId: razorpayKeyId,
+    };
+  }
+
+  /**
+   * Check if a student has booked a debrief session
+   */
+  async getDebriefStatus(email: string): Promise<{
+    booked: boolean;
+    purchasedAt?: Date | null;
+    paymentReference?: string | null;
+  }> {
+    try {
+      const registration = await this.queryRegistration(
+        `SELECT r.id, r.user_id, r.metadata
+                 FROM registrations r
+                 JOIN users u ON r.user_id = u.id
+                 WHERE LOWER(u.email) = LOWER($1) AND r.is_deleted = false
+                 ORDER BY r.created_at DESC LIMIT 1`,
+        [email],
+      );
+
+      if (!registration || registration.length === 0) {
+        return { booked: false };
+      }
+
+      const reg = registration[0];
+      const metadata = (reg as any).metadata || {};
+
+      // Check registration metadata first (fastest)
+      if (metadata.debrief) {
+        // Try to find the actual subscription record for details
+        const sub = await this.subscriptionRepo.findOne({
+          where: {
+            registrationId: reg.id,
+            planType: 'debrief' as any,
+            status: 'active' as any,
+          },
+          order: { createdAt: 'DESC' },
+        });
+
+        return {
+          booked: true,
+          purchasedAt: sub?.purchasedAt || null,
+          paymentReference: sub?.paymentReference || null,
+        };
+      }
+
+      return { booked: false };
+    } catch (error: unknown) {
+      this.logger.error(`Error checking debrief status: ${getErrorMessage(error)}`);
+      return { booked: false };
+    }
+  }
+
+  /**
+   * Verify Razorpay payment and activate debrief
+   */
+  async verifyDebriefPayment(body: {
+    email: string;
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }): Promise<{ success: boolean; message: string }> {
+    const razorpayKeySecret = this.configService.get<string>(
+      'RAZORPAY_KEY_SECRET',
+    );
+
+    if (!razorpayKeySecret) {
+      throw new Error('Payment gateway not configured');
+    }
+
+    // Verify signature
+    const crypto = await import('crypto');
+    const expectedSignature = crypto
+      .createHmac('sha256', razorpayKeySecret)
+      .update(`${body.razorpay_order_id}|${body.razorpay_payment_id}`)
+      .digest('hex');
+
+    if (expectedSignature !== body.razorpay_signature) {
+      this.logger.warn(`Debrief payment verification failed for ${body.email}`);
+      return { success: false, message: 'Payment verification failed' };
+    }
+
+    // Get user and registration
+    const registration = await this.queryRegistration(
+      `SELECT r.id, r.user_id, r.metadata
+             FROM registrations r
+             JOIN users u ON r.user_id = u.id
+             WHERE u.email = $1 AND r.is_deleted = false
+             ORDER BY r.created_at DESC LIMIT 1`,
+      [body.email],
+    );
+
+    if (!registration || registration.length === 0) {
+      return { success: false, message: 'User not found' };
+    }
+
+    const reg = registration[0];
+
+    // Use a transaction to ensure atomicity
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const dbAmount = this.configService.get<string>('DEBRIEF_AMOUNT') || this.configService.get<string>('NEXT_PUBLIC_DEBRIEF_AMOUNT') || '2500';
+
+      // Create subscription record
+      await queryRunner.query(
+        `INSERT INTO student_subscriptions 
+                    (user_id, registration_id, plan_type, status, payment_provider, payment_reference, payment_order_id, amount, currency, purchased_at, metadata)
+                 VALUES ($1, $2, 'debrief', 'active', 'razorpay', $3, $4, $5, 'INR', NOW(), '{"debrief": true}')`,
+        [reg.user_id, reg.id, body.razorpay_payment_id, body.razorpay_order_id, parseFloat(dbAmount)],
+      );
+
+      // Update metadata on registration for easy frontend/subsequent workflow checking
+      const currentMeta = (reg as any).metadata || {};
+      const newMeta = { ...currentMeta, debrief: true };
+      
+      await queryRunner.query(
+        `UPDATE registrations SET metadata = $1 WHERE id = $2`,
+        [JSON.stringify(newMeta), reg.id],
+      );
+
+      await queryRunner.commitTransaction();
+
+      this.logger.log(
+        `✅ Debrief booked for ${body.email} (payment: ${body.razorpay_payment_id})`,
+      );
+      return {
+        success: true,
+        message: 'Debrief booked successfully!',
+      };
+    } catch (error: unknown) {
+      await queryRunner.rollbackTransaction();
+      this.logger.error(`Debrief booking failed: ${getErrorMessage(error)}`);
+      return {
+        success: false,
+        message: 'Booking failed. Please contact support.',
+      };
+    } finally {
+      await queryRunner.release();
+    }
+  }
 }

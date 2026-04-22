@@ -347,6 +347,7 @@ export class StudentService {
       SELECT p.code as program_code, p.id as program_id,
              r.school_level, r.school_stream, r.student_board,
              r.department_degree_id, r.metadata,
+             r.full_name, r.mobile_number, r.gender,
              d.name as department_name
       FROM registrations r
       JOIN programs p ON r.program_id = p.id
@@ -433,6 +434,9 @@ export class StudentService {
 
     return {
       ...user,
+      fullName: programResult?.[0]?.full_name || user.metadata?.fullName || null,
+      mobileNumber: programResult?.[0]?.mobile_number || user.metadata?.mobileNumber || null,
+      gender: programResult?.[0]?.gender || user.metadata?.gender || null,
       personalityTrait: trait,
       programCode,
       academicDetails,

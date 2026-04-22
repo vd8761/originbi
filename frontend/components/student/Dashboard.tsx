@@ -219,7 +219,7 @@ const Dashboard: React.FC = () => {
     }, []);
 
     return (
-        <div className="relative min-h-screen bg-transparent dark:bg-[#19211C] font-sans transition-colors duration-300 overflow-hidden p-4 sm:p-6 lg:p-8">
+        <div className="relative bg-transparent dark:bg-[#19211C] font-sans transition-colors duration-300 overflow-hidden pb-10">
             {showCompletionNotice && (
                 <div className="fixed inset-0 z-[130] flex items-center justify-center px-4 animate-fade-in">
                     <div
