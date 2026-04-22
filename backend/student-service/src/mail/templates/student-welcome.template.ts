@@ -6,6 +6,7 @@ export const getStudentWelcomeEmailTemplate = (
   assets: { popper: string; pattern: string; footer: string; logo: string },
   startDateTime?: Date | string,
   assessmentTitle?: string,
+  isDebrief?: boolean,
 ) => `
 <!DOCTYPE html>
 <html>
@@ -159,6 +160,38 @@ export const getStudentWelcomeEmailTemplate = (
                     <td style="font-size: 14px; color: #000000; padding: 5px 0;">${pass}</td>
                   </tr>
                 </table>
+
+                ${isDebrief ? `
+                <!-- Debrief Special Container -->
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 24px; background: linear-gradient(135deg, #1ED36A 0%, #150089 100%); border-radius: 12px; overflow: hidden;">
+                  <tr>
+                    <td style="padding: 2px;">
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 10px;">
+                        <tr>
+                          <td style="padding: 20px;">
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                              <tr>
+                                <td style="vertical-align: top; width: 40px;">
+                                  <div style="background-color: #E8FFF0; border-radius: 50%; width: 32px; height: 32px; text-align: center; line-height: 32px;">
+                                    <span style="color: #1ED36A; font-size: 18px;">★</span>
+                                  </div>
+                                </td>
+                                <td style="padding-left: 12px;">
+                                  <div style="font-size: 16px; font-weight: 700; color: #150089; margin-bottom: 4px;">Expert Debrief Session Included</div>
+                                  <div style="font-size: 13px; line-height: 1.5; color: #4B5563;">
+                                    Thank you for choosing the Expert Debrief session. After you complete your assessment, our experts will connect with you to explain your results and help you with the next steps!
+                                  </div>
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+                ` : ''}
+
 
                 <div style="font-size: 14px; line-height: 1.5; color: #000000; margin-bottom: 24px;">
                   ${

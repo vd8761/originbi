@@ -1062,6 +1062,7 @@ export class StudentService {
             dto.password, // We need the password here. DTO has it.
             validFrom,
             programTitle,
+            savedReg.metadata?.debrief === true || savedReg.metadata?.debrief === 'true',
           );
           this.logger.log(`Welcome email sent successfully to ${dto.email}`);
         } catch (emailErr) {
@@ -1648,6 +1649,7 @@ export class StudentService {
     pass: string,
     startDateTime?: Date | string,
     assessmentTitle?: string,
+    isDebrief?: boolean,
   ) {
     this.logger.log(`[Email Debug] AWS Config Check triggered for: ${to}`);
 
@@ -1686,6 +1688,7 @@ export class StudentService {
         assets,
         startDateTime,
         assessmentTitle,
+        isDebrief,
       ),
     };
     if (bccEmail) mailOptions.bcc = bccEmail;
