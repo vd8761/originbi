@@ -83,6 +83,8 @@ export default function DebriefPage() {
     const [loading, setLoading] = useState(true);
     const [processing, setProcessing] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
+    const [hasExistingBooking, setHasExistingBooking] = useState(false);
+    const [isAssessmentCompleted, setIsAssessmentCompleted] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const DEBRIEF_AMOUNT = Number(process.env.NEXT_PUBLIC_DEBRIEF_AMOUNT) || 2500;
@@ -117,8 +119,14 @@ export default function DebriefPage() {
 
                 if (profile) {
                     setUserProfile(profile);
+                    
+                    // Check assessment completion status
+                    const assessmentStatus = await studentService.getAssessmentStatus(profile.id);
+                    setIsAssessmentCompleted(assessmentStatus.isCompleted);
+
                     if (debriefStatus?.booked || profile.metadata?.debrief) {
-                        setIsSuccess(true);
+                        setHasExistingBooking(true);
+                        // Don't set isSuccess=true here anymore, as we want to show the form
                     }
                 } else {
                     setError("Unable to load your profile. Please try again.");
@@ -231,7 +239,7 @@ export default function DebriefPage() {
         );
     }
 
-    if (isSuccess) {
+    if (isSuccess && !hasExistingBooking) {
         return (
             <div className="min-h-screen bg-white flex flex-col relative overflow-hidden">
                 <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
@@ -245,9 +253,14 @@ export default function DebriefPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
                         </div>
-                        <h2 className="text-3xl font-bold text-slate-900 mb-3">Debrief Booked!</h2>
+                        <h2 className="text-3xl font-bold text-slate-900 mb-3">
+                            {hasExistingBooking ? "You have already booked!" : "Debrief Booked!"}
+                        </h2>
                         <p className="text-slate-500 mb-8 leading-relaxed">
-                            Your debrief session has been successfully booked. Our expert team will review your assessment report and reach out to schedule your session.
+                            {hasExistingBooking 
+                                ? "Our records show that you have already booked an expert debrief session. Our team will be in touch soon to schedule it."
+                                : "Your debrief session has been successfully booked. Our expert team will review your assessment report and reach out to schedule your session."
+                            }
                         </p>
                         <div className="bg-[#1ED36A]/10 border border-[#1ED36A]/20 rounded-2xl px-5 py-4 text-sm text-[#156e35] font-medium">
                             📩 You will receive a confirmation on <span className="font-bold">{userProfile?.email}</span>
@@ -318,6 +331,23 @@ export default function DebriefPage() {
                             </p>
                         </div>
 
+                        {hasExistingBooking && (
+                            <div className="mb-8 p-6 bg-emerald-50/50 rounded-3xl border-2 border-dashed border-emerald-200 flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-700">
+                                <div className="bg-[#1ED36A] p-2.5 rounded-2xl shadow-lg shadow-emerald-200">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h4 className="text-base font-black text-emerald-900 mb-1">Expert Debrief Confirmed</h4>
+                                    <p className="text-xs text-emerald-800/80 font-bold leading-relaxed">
+                                        Our records show that you have already booked your expert debrief session. 
+                                        Our counsellors are reviewing your report and will reach out to you soon.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
                         {error && (
                             <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 font-bold animate-shake">
                                 {error}
@@ -376,17 +406,37 @@ export default function DebriefPage() {
                             </div>
 
                             {/* CTA */}
+                            {!isAssessmentCompleted && (
+                                <div className="mb-6 p-4 bg-amber-50 rounded-2xl border border-amber-200 flex items-start gap-3">
+                                    <div className="bg-amber-100 p-2 rounded-lg mt-0.5">
+                                        <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-amber-900 font-bold mb-1">Assessment Incomplete</p>
+                                        <p className="text-xs text-amber-800 font-medium leading-relaxed">
+                                            You must complete all levels of your career assessment before you can book a debrief session. 
+                                            This allows our experts to have your full report ready for discussion.
+                                        </p>
+                                        <a href="/student/assessment" className="inline-block mt-3 text-xs font-black text-[#1ED36A] hover:text-[#18c562] transition-colors">
+                                            Continue Assessment →
+                                        </a>
+                                    </div>
+                                </div>
+                            )}
+
                             <button
                                 onClick={handlePayment}
-                                disabled={processing}
+                                disabled={processing || !isAssessmentCompleted || hasExistingBooking}
                                 className={`w-full h-16 rounded-full font-black text-lg text-white shadow-2xl transition-all relative overflow-hidden group flex items-center justify-center gap-3 ${
-                                    processing ? "bg-[#1ED36A]/70 cursor-not-allowed" : "bg-[#1ED36A] hover:bg-[#18c562] hover:-translate-y-1 active:translate-y-0"
+                                    (processing || !isAssessmentCompleted || hasExistingBooking) ? "bg-slate-300 cursor-not-allowed shadow-none" : "bg-[#1ED36A] hover:bg-[#18c562] hover:-translate-y-1 active:translate-y-0"
                                 }`}
                             >
                                 <span className="relative z-10">
-                                    {processing ? "Processing..." : `Pay ₹${DEBRIEF_AMOUNT.toLocaleString("en-IN")} & Book`}
+                                    {hasExistingBooking ? "Already Booked" : !isAssessmentCompleted ? "Complete Assessment to Book" : processing ? "Processing..." : `Pay ₹${DEBRIEF_AMOUNT.toLocaleString("en-IN")} & Book`}
                                 </span>
-                                {!processing && (
+                                {!processing && isAssessmentCompleted && !hasExistingBooking && (
                                     <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                                 )}
                             </button>

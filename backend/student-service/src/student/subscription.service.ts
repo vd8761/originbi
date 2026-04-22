@@ -1,9 +1,18 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { StudentSubscription } from '@originbi/shared-entities';
-import { Registration } from '@originbi/shared-entities';
+import { Registration, StudentSubscription } from '@originbi/shared-entities';
 import { ConfigService } from '@nestjs/config';
+import { HttpService } from '@nestjs/axios';
+import { AssessmentReport } from '../entities/assessment-report.entity';
+import { User } from '../entities/student.entity';
+import { Program } from '../entities/program.entity';
+import { SettingsService } from '../settings/settings.service';
+import { lastValueFrom } from 'rxjs';
+import * as nodemailer from 'nodemailer';
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
+import { getDebriefBookingEmailTemplate } from '../mail/templates/debrief-booking.template';
+import { getDebriefTeamNotificationEmailTemplate } from '../mail/templates/debrief-team-notification.template';
 
 interface RegistrationRow {
   id: number;
@@ -41,9 +50,45 @@ export class SubscriptionService {
     private readonly subscriptionRepo: Repository<StudentSubscription>,
     @InjectRepository(Registration)
     private readonly registrationRepo: Repository<Registration>,
+    @InjectRepository(AssessmentReport)
+    private readonly reportRepo: Repository<AssessmentReport>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(Program)
+    private readonly programRepo: Repository<Program>,
     private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
+    private readonly httpService: HttpService,
+    private readonly settingsService: SettingsService,
   ) {}
+
+  /**
+   * Creates a configured nodemailer transporter backed by AWS SES v2.
+   */
+  private createEmailTransporter() {
+    const region =
+      this.configService.get<string>('AWS_REGION') ||
+      this.configService.get<string>('AWS_DEFAULT_REGION');
+    const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
+    const secretAccessKey = this.configService.get<string>(
+      'AWS_SECRET_ACCESS_KEY',
+    );
+
+    if (!region || !accessKeyId || !secretAccessKey) {
+      throw new Error(
+        'AWS SES configuration is missing. Ensure AWS_REGION, AWS_ACCESS_KEY_ID, and AWS_SECRET_ACCESS_KEY are set.',
+      );
+    }
+
+    const sesClient = new SESv2Client({
+      region,
+      credentials: { accessKeyId, secretAccessKey },
+    });
+
+    return nodemailer.createTransport({
+      SES: { sesClient, SendEmailCommand },
+    } as any);
+  }
 
   private async queryRegistration(
     sql: string,
@@ -52,6 +97,156 @@ export class SubscriptionService {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const result = await this.dataSource.query(sql, params);
     return result as RegistrationRow[];
+  }
+
+  /**
+   * Send debrief booking emails to student and expert team
+   */
+  public async sendDebriefEmails(email: string, registrationId: number) {
+    try {
+      // 1. Get detailed info for the templates
+      const registration = await this.registrationRepo.findOne({
+        where: { id: registrationId },
+        relations: ['group'],
+      });
+
+      if (!registration) return;
+
+      // Idempotency check: if team email was sent, both emails (student/team) are already handled
+      if (registration.metadata?.debriefTeamEmailSent === true || registration.metadata?.debriefTeamEmailSent === 'true') {
+        this.logger.log(`Debrief emails already sent for registration ${registrationId}, skipping.`);
+        return;
+      }
+
+      const user = await this.userRepo.findOne({ where: { id: registration.userId } });
+      const program = await this.programRepo.findOne({ where: { id: registration.programId } });
+
+      if (!user) return;
+
+      // 2. Prepare assets and transporter
+      const assets = {
+        logo: `https://mind.originbi.com/Origin-BI-Logo-01.png`,
+        popper: `${this.configService.get('API_URL') || 'https://mind.originbi.com'}/assets/Popper.png`,
+        footer: `${this.configService.get('API_URL') || 'https://mind.originbi.com'}/assets/Email_Vector.png`,
+      };
+
+      const transporter = this.createEmailTransporter();
+      const {
+        fromName,
+        fromAddress: fromEmail,
+        replyToAddress,
+      } = await this.settingsService.getEmailConfig('report_email_config');
+
+      // 3. Send Student Confirmation Email IMMEDIATELY
+      const studentHtml = getDebriefBookingEmailTemplate(
+        registration.fullName || 'Student',
+        assets,
+      );
+
+      const studentMailOptions = {
+        from: `"${fromName}" <${fromEmail}>`,
+        to: user.email,
+        subject: `Expert Debrief Session Booked - Origin BI`,
+        html: studentHtml,
+        replyTo: replyToAddress,
+      };
+
+      await transporter.sendMail(studentMailOptions);
+      this.logger.log(`Debrief booking confirmation sent to student: ${user.email}`);
+
+      // 4. Try to send Team Notification (only if report is already ready)
+      let pdfBuffer: Buffer | null = null;
+      let attachmentFileName = '';
+
+      const sessionSql = `SELECT id FROM assessment_sessions WHERE registration_id = $1 AND status = 'COMPLETED' ORDER BY updated_at DESC LIMIT 1`;
+      const sessions = await this.dataSource.query(sessionSql, [registrationId]);
+
+      if (sessions && sessions.length > 0) {
+        const sessionId = sessions[0].id;
+        const report = await this.reportRepo.findOne({
+          where: { assessmentSessionId: sessionId },
+          order: { generatedAt: 'DESC' },
+        });
+
+        if (report && report.reportUrl) {
+          try {
+            const port = process.env.PORT || 4004;
+            const downloadUrl = `http://localhost:${port}/report/download/file/${report.reportNumber}`;
+            
+            this.logger.log(`Attempting to download report for team attachment: ${downloadUrl}`);
+            const pdfResponse = await lastValueFrom(
+              this.httpService.get(downloadUrl, { responseType: 'arraybuffer' }),
+            );
+            pdfBuffer = Buffer.from(pdfResponse.data, 'binary');
+            attachmentFileName = `${(registration.fullName || 'Student').replace(/\s/g, '_')}_Report.pdf`;
+          } catch (downloadErr: any) {
+            this.logger.warn(`Could not download report for debrief attachment: ${downloadErr.message}`);
+          }
+        }
+      }
+
+      // If report is not ready, team notification will be sent later by handleAssessmentCompletion
+      if (!pdfBuffer) {
+        this.logger.log(`Debrief student confirmation sent. Team notification postponed: report not yet ready for registration ${registrationId}`);
+        return;
+      }
+
+      // 5. Report is ready — send Team Notification now
+      const debriefForwardEmails = (this.configService.get('DEBRIEF_FORWARD_EMAILS') || 'info@originbi.com,vikashuvi07@gmail.com')
+        .split(',')
+        .map((e: string) => e.trim())
+        .filter((e: string) => e.length > 0);
+
+      const teamHtml = getDebriefTeamNotificationEmailTemplate(
+        registration.fullName || 'Student',
+        user.email,
+        `${registration.countryCode || '+91'} ${registration.mobileNumber}`,
+        registration.gender || 'Not specified',
+        registration.paymentAmount?.toString() || '2500',
+        registration.paymentReference || 'N/A',
+        new Date(registration.createdAt).toLocaleString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'Asia/Kolkata',
+          hour12: true,
+        }),
+        program?.name || 'Assessment Program',
+        assets,
+      );
+
+      for (const forwardEmail of debriefForwardEmails) {
+        const teamMailOptions: any = {
+          from: `"${fromName}" <${fromEmail}>`,
+          to: forwardEmail,
+          subject: `[Debrief Booking] ${registration.fullName || 'Student'} - Expert Debrief Session`,
+          html: teamHtml,
+          attachments: [
+            {
+              filename: attachmentFileName,
+              content: pdfBuffer,
+              contentType: 'application/pdf',
+            },
+          ],
+        };
+
+        await transporter.sendMail(teamMailOptions);
+        this.logger.log(`Debrief team notification sent to: ${forwardEmail}`);
+      }
+
+      // 6. Mark team notification as sent to avoid duplicates
+      const freshReg = await this.registrationRepo.findOne({ where: { id: registrationId } });
+      if (freshReg) {
+        const meta = freshReg.metadata || {};
+        meta.debriefTeamEmailSent = true;
+        await this.registrationRepo.update(registrationId, { metadata: meta });
+      }
+
+    } catch (err: any) {
+      this.logger.error(`Failed to send debrief emails: ${err.message}`);
+    }
   }
 
   /**
@@ -371,6 +566,20 @@ export class SubscriptionService {
       throw new Error('Payment gateway not configured');
     }
 
+    // --- ASSESSMENT COMPLETION CHECK ---
+    const user = await this.userRepo.findOne({ where: { email: (email as any).email || email } });
+    if (!user) throw new BadRequestException('User not found');
+
+    const latestSession = await this.dataSource.query(
+      `SELECT status FROM assessment_sessions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      [user.id]
+    );
+
+    if (!latestSession || latestSession.length === 0 || latestSession[0].status !== 'COMPLETED') {
+      throw new BadRequestException('You must complete all levels of your career assessment before booking a debrief session.');
+    }
+    // ------------------------------------
+
     // Amount can be overridden by env, defaults to 2500 INR (250000 paise)
     const baseAmountStr = this.configService.get<string>('NEXT_PUBLIC_DEBRIEF_AMOUNT') || '2500';
     const amountStr = this.configService.get<string>('DEBRIEF_AMOUNT') || baseAmountStr;
@@ -540,6 +749,12 @@ export class SubscriptionService {
       this.logger.log(
         `✅ Debrief booked for ${body.email} (payment: ${body.razorpay_payment_id})`,
       );
+
+      // Trigger emails in background
+      this.sendDebriefEmails((body.email as any).email || body.email, reg.id).catch((err) =>
+        this.logger.error(`Background debrief emails failed: ${err.message}`),
+      );
+
       return {
         success: true,
         message: 'Debrief booked successfully!',

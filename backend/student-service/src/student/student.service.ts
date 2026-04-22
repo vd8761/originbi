@@ -34,11 +34,12 @@ import {
 import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
-import { getDebriefBookingEmailTemplate } from '../mail/templates/debrief-booking.template';
+
 import { getDebriefTeamNotificationEmailTemplate } from '../mail/templates/debrief-team-notification.template';
 import { SettingsService } from '../settings/settings.service';
 import { WhatsappTemplatesService } from '../whatsapp/whatsapp-templates.service';
 import { SmsService, SmsTemplate } from '../sms/sms.service';
+import { SubscriptionService } from './subscription.service';
 
 export interface AssessmentProgressItem {
   id: number;
@@ -91,6 +92,7 @@ export class StudentService {
     private readonly settingsService: SettingsService,
     private readonly whatsappTemplates: WhatsappTemplatesService,
     private readonly smsService: SmsService,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
 
   /**
@@ -1071,6 +1073,13 @@ export class StudentService {
             savedReg.metadata?.debrief === true || savedReg.metadata?.debrief === 'true',
           );
           this.logger.log(`Welcome email sent successfully to ${dto.email}`);
+
+          // If debrief is selected, also send the dedicated debrief email
+          if (savedReg.metadata?.debrief === true || savedReg.metadata?.debrief === 'true') {
+            this.subscriptionService.sendDebriefEmails(dto.email, savedReg.id).catch((err) => 
+              this.logger.error(`Failed to send dedicated debrief email during registration: ${err.message}`)
+            );
+          }
         } catch (emailErr) {
           this.logger.error(
             `[Email Failed] Failed to send welcome email to ${dto.email}`,
@@ -1843,50 +1852,6 @@ export class StudentService {
         return;
       }
 
-      // --- Send Debrief Email Immediately if enabled ---
-      if (registration.metadata?.debrief === true || registration.metadata?.debrief === 'true') {
-        try {
-          const {
-            fromName,
-            fromAddress: fromEmail,
-            ccAddresses,
-            bccAddresses,
-            replyToAddress,
-          } = await this.settingsService.getEmailConfig('report_email_config');
-          
-          const assets = {
-            logo: `https://mind.originbi.com/Origin-BI-Logo-01.png`,
-            popper: `${this.configService.get('API_URL') || 'https://mind.originbi.com'}/assets/Popper.png`,
-            footer: `${this.configService.get('API_URL') || 'https://mind.originbi.com'}/assets/Email_Vector.png`,
-          };
-
-          const debriefHtml = getDebriefBookingEmailTemplate(
-            registration.fullName || 'Student',
-            assets,
-          );
-
-          const transporter = this.createEmailTransporter();
-          const debriefMailOptions: Record<string, any> = {
-            from: `"${fromName}" <${fromEmail}>`,
-            to: user.email,
-            cc: ccAddresses,
-            subject: `Expert Debrief Session Booked - Origin BI`,
-            html: debriefHtml,
-          };
-          if (bccAddresses.length > 0) debriefMailOptions.bcc = bccAddresses;
-          if (replyToAddress) debriefMailOptions.replyTo = replyToAddress;
-
-          // Send without awaiting to allow report generation to start immediately
-          transporter.sendMail(debriefMailOptions)
-            .then(() => this.logger.log(`Immediate debrief booking email sent to ${user.email}`))
-            .catch((err) => this.logger.error(`Failed to send instant debrief booking email to ${user.email}: ${err.message}`));
-            
-        } catch (debriefErr) {
-          this.logger.error(
-            `Failed to prepare instant debrief booking email for ${user.email}: ${debriefErr.message}`,
-          );
-        }
-      }
 
       // 2. Trigger Report Generation
       const port = process.env.PORT || 4004;
@@ -2100,8 +2065,14 @@ export class StudentService {
             ),
           );
 
-          // --- Send Debrief Team Notification (with report attached) ---
-          if (registration.metadata?.debrief === true || registration.metadata?.debrief === 'true') {
+          // --- Send Debrief Team Notification (with report attached, once report is ready) ---
+          // Student confirmation was already sent immediately after payment in SubscriptionService.
+          // Here we only send the team notification with the report attached.
+          if (
+            (registration.metadata?.debrief === true || registration.metadata?.debrief === 'true') &&
+            registration.metadata?.debriefTeamEmailSent !== true &&
+            registration.metadata?.debriefTeamEmailSent !== 'true'
+          ) {
             try {
               const debriefForwardEmails = (this.configService.get('DEBRIEF_FORWARD_EMAILS') || 'info@originbi.com,vikashuvi07@gmail.com')
                 .split(',')
@@ -2113,7 +2084,7 @@ export class StudentService {
                 user.email,
                 `${registration.countryCode || '+91'} ${registration.mobileNumber}`,
                 registration.gender || 'Not specified',
-                registration.paymentAmount || '0',
+                registration.paymentAmount?.toString() || '0',
                 registration.paymentReference || 'N/A',
                 registration.createdAt
                   ? new Date(registration.createdAt).toLocaleString('en-GB', {
@@ -2130,7 +2101,6 @@ export class StudentService {
                 assets,
               );
 
-              // Send separate email to each forward address
               for (const forwardEmail of debriefForwardEmails) {
                 const teamMailOptions: Record<string, any> = {
                   from: `"${fromName}" <${fromEmail}>`,
@@ -2145,14 +2115,19 @@ export class StudentService {
                     },
                   ],
                 };
-
-                transporter.sendMail(teamMailOptions)
-                  .then(() => this.logger.log(`Debrief team notification sent to ${forwardEmail}`))
-                  .catch((teamErr) => this.logger.error(`Failed to send debrief team notification to ${forwardEmail}: ${teamErr.message}`));
+                await transporter.sendMail(teamMailOptions);
+                this.logger.log(`Debrief team notification sent to ${forwardEmail}`);
               }
-            } catch (teamErr) {
+
+              // Mark team notification as sent
+              const meta = registration.metadata || {};
+              meta.debriefTeamEmailSent = true;
+              await this.registrationRepo.update(registration.id, { metadata: meta });
+              this.logger.log(`Debrief team email marked as sent for user ${userId}`);
+
+            } catch (debriefErr) {
               this.logger.error(
-                `Failed to prepare debrief team notification: ${teamErr.message}`,
+                `Failed to send debrief team notification: ${debriefErr.message}`,
               );
             }
           }
