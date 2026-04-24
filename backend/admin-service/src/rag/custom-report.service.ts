@@ -316,7 +316,11 @@ export class CustomReportService {
             fullName: assessmentData.full_name || userMetadata.fullName || 'Unknown',
             email: assessmentData.email || '',
             currentRole: regMetadata.currentRole || attemptMetadata.currentRole || 'Not Specified',
-            currentJobDescription: regMetadata.currentJobDescription || attemptMetadata.jobDescription || '',
+            currentJobDescription:
+                regMetadata.roleDescription ||
+                regMetadata.currentJobDescription ||
+                attemptMetadata.jobDescription ||
+                '',
             yearsOfExperience: regMetadata.yearsOfExperience || attemptMetadata.yearsOfExperience || 0,
             relevantExperience: regMetadata.relevantExperience || '',
             currentIndustry: regMetadata.currentIndustry || assessmentData.group_name || 'Not Specified',
@@ -845,6 +849,18 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
     async generateChatBasedReport(profileInput: ChatProfileInput): Promise<CareerFitmentReportData> {
         this.logger.log(`📊 Generating Chat-Based Career Fitment Report for ${profileInput.name}`);
 
+        const parseJsonObject = (value: any): Record<string, any> => {
+            if (!value) return {};
+            if (typeof value === 'string') {
+                try {
+                    return JSON.parse(value);
+                } catch {
+                    return {};
+                }
+            }
+            return value;
+        };
+
         // ═══════════════════════════════════════════════════════════════
         // STEP 1: Find user in database by name (using fuzzy matching)
         // ═══════════════════════════════════════════════════════════════
@@ -852,6 +868,7 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
         let realDiscProfile: DiscProfile | null = null;
         let realAgileProfile: AgileProfile | null = null;
         let realSkillCategories: SkillCategory[] | null = null;
+        let dbProfileOverrides: Partial<CareerProfileData> = {};
 
         try {
             // Normalize the input name for matching
@@ -918,6 +935,46 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
             this.logger.log(`📋 Found ${results?.length || 0} registration records for "${searchName}"`);
 
             if (results && results.length > 0) {
+                const latestRegistration = results[0];
+                const latestRegMetadata = parseJsonObject(
+                    latestRegistration.reg_metadata,
+                );
+                const latestAttemptMetadata = parseJsonObject(
+                    latestRegistration.attempt_metadata,
+                );
+
+                dbProfileOverrides = {
+                    fullName: latestRegistration.full_name || profileInput.name,
+                    email: latestRegistration.user_email || '',
+                    currentRole:
+                        latestRegMetadata.currentRole ||
+                        latestAttemptMetadata.currentRole ||
+                        profileInput.currentRole,
+                    currentJobDescription:
+                        latestRegMetadata.roleDescription ||
+                        latestRegMetadata.currentJobDescription ||
+                        latestAttemptMetadata.jobDescription ||
+                        profileInput.currentJobDescription,
+                    yearsOfExperience:
+                        latestRegMetadata.yearsOfExperience ??
+                        latestAttemptMetadata.yearsOfExperience ??
+                        profileInput.yearsOfExperience,
+                    relevantExperience:
+                        latestRegMetadata.relevantExperience ||
+                        profileInput.relevantExperience,
+                    currentIndustry:
+                        latestRegMetadata.currentIndustry ||
+                        latestRegistration.group_name ||
+                        profileInput.currentIndustry,
+                    expectedFutureRole:
+                        latestRegMetadata.expectedFutureRole ||
+                        profileInput.expectedFutureRole,
+                    expectedIndustry:
+                        latestRegMetadata.expectedIndustry ||
+                        profileInput.expectedIndustry ||
+                        '',
+                };
+
                 // Log all results for debugging
                 results.forEach((r: any, idx: number) => {
                     this.logger.log(`  [${idx}] ${r.full_name} | attempt_id: ${r.attempt_id} | status: ${r.attempt_status} | agile_score: ${r.agile_score} | disc_type: ${r.disc_type}`);
@@ -1007,16 +1064,27 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
 
                     // 3. GENERATE SKILLS based on real assessment data
                     const dbEmail = latestAttempt.user_email || '';
-                    const regMetadata = typeof latestAttempt.reg_metadata === 'string'
-                        ? JSON.parse(latestAttempt.reg_metadata || '{}')
-                        : (latestAttempt.reg_metadata || {});
+                    const regMetadata = parseJsonObject(latestAttempt.reg_metadata);
+                    const attemptMetadata = parseJsonObject(
+                        latestAttempt.attempt_metadata,
+                    );
 
                     const tempProfile: CareerProfileData = {
                         fullName: latestAttempt.full_name || profileInput.name,
                         email: dbEmail,
-                        currentRole: regMetadata.currentRole || profileInput.currentRole,
-                        currentJobDescription: regMetadata.currentJobDescription || profileInput.currentJobDescription,
-                        yearsOfExperience: regMetadata.yearsOfExperience || profileInput.yearsOfExperience,
+                        currentRole:
+                            regMetadata.currentRole ||
+                            attemptMetadata.currentRole ||
+                            profileInput.currentRole,
+                        currentJobDescription:
+                            regMetadata.roleDescription ||
+                            regMetadata.currentJobDescription ||
+                            attemptMetadata.jobDescription ||
+                            profileInput.currentJobDescription,
+                        yearsOfExperience:
+                            regMetadata.yearsOfExperience ??
+                            attemptMetadata.yearsOfExperience ??
+                            profileInput.yearsOfExperience,
                         relevantExperience: regMetadata.relevantExperience || profileInput.relevantExperience,
                         currentIndustry: regMetadata.currentIndustry || latestAttempt.group_name || profileInput.currentIndustry,
                         expectedFutureRole: regMetadata.expectedFutureRole || profileInput.expectedFutureRole,
@@ -1052,16 +1120,42 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
         // ═══════════════════════════════════════════════════════════════
         // STEP 2: Build profile (use DB data if available, else use chat input)
         // ═══════════════════════════════════════════════════════════════
+        const yearsOfExperience = Number(
+            dbProfileOverrides.yearsOfExperience ??
+                profileInput.yearsOfExperience ??
+                0,
+        );
+
         const profile: CareerProfileData = {
-            fullName: profileInput.name,
-            email: '',
-            currentRole: profileInput.currentRole,
-            currentJobDescription: profileInput.currentJobDescription,
-            yearsOfExperience: profileInput.yearsOfExperience,
-            relevantExperience: profileInput.relevantExperience,
-            currentIndustry: profileInput.currentIndustry,
-            expectedFutureRole: profileInput.expectedFutureRole,
-            expectedIndustry: profileInput.expectedIndustry || '',
+            fullName: dbProfileOverrides.fullName || profileInput.name,
+            email: dbProfileOverrides.email || '',
+            currentRole:
+                dbProfileOverrides.currentRole ||
+                profileInput.currentRole ||
+                'Not Specified',
+            currentJobDescription:
+                dbProfileOverrides.currentJobDescription ||
+                profileInput.currentJobDescription ||
+                '',
+            yearsOfExperience: Number.isFinite(yearsOfExperience)
+                ? yearsOfExperience
+                : 0,
+            relevantExperience:
+                dbProfileOverrides.relevantExperience ||
+                profileInput.relevantExperience ||
+                '',
+            currentIndustry:
+                dbProfileOverrides.currentIndustry ||
+                profileInput.currentIndustry ||
+                'Not Specified',
+            expectedFutureRole:
+                dbProfileOverrides.expectedFutureRole ||
+                profileInput.expectedFutureRole ||
+                'Not Specified',
+            expectedIndustry:
+                dbProfileOverrides.expectedIndustry ||
+                profileInput.expectedIndustry ||
+                '',
         };
 
         // ═══════════════════════════════════════════════════════════════

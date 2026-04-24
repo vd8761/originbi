@@ -87,6 +87,8 @@ export class CorporateRegistrationsService {
   async registerCandidate(dto: CreateCandidateDto, corporateUserId: number) {
     const email = this.normalizeEmail(dto.email);
     const mobileDigits = this.normalizeMobile(dto.mobile);
+    const currentRole = dto.currentRole?.trim() || undefined;
+    const roleDescription = dto.roleDescription?.trim() || undefined;
 
     if (!mobileDigits) {
       throw new BadRequestException('Valid mobile number is required');
@@ -275,6 +277,8 @@ export class CorporateRegistrationsService {
           groupName: dto.groupName,
           sendEmail: true,
           currentYear: dto.currentYear,
+          currentRole,
+          roleDescription,
         },
       });
       await manager.save(registration);
@@ -452,6 +456,9 @@ export class CorporateRegistrationsService {
     dto: CreateCandidateDto,
     corporateUserId: number,
   ) {
+    const currentRole = dto.currentRole?.trim() || undefined;
+    const roleDescription = dto.roleDescription?.trim() || undefined;
+
     // Check for active assessments
     const activeSession = await this.dataSource
       .getRepository(AssessmentSession)
@@ -536,6 +543,8 @@ export class CorporateRegistrationsService {
             groupName: dto.groupName,
             sendEmail: true,
             currentYear: dto.currentYear,
+            currentRole,
+            roleDescription,
           },
         });
         await manager.save(registration);

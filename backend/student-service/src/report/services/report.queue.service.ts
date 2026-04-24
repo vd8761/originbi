@@ -38,4 +38,8 @@ export class ReportQueueService {
   ): Promise<void> {
     return reportQueueService.processSingleUserReport(userId, jobId, short);
   }
+
+  processSingleUserShortReport(userId: string, jobId: string): Promise<void> {
+    return reportQueueService.processSingleUserShortReport(userId, jobId);
+  }
 }

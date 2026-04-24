@@ -10,7 +10,7 @@ import {
 import { User } from './user.entity';
 import { Registration } from './registration.entity';
 
-export type SubscriptionPlan = 'free' | 'ai_counsellor';
+export type SubscriptionPlan = 'free' | 'ai_counsellor' | 'debrief';
 export type SubscriptionStatus = 'active' | 'expired' | 'cancelled';
 
 @Entity('student_subscriptions')

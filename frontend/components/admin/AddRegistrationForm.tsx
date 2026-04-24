@@ -43,6 +43,8 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     current_year: "",
     department_degree_id: "",
     student_board: "",
+    current_role: "",
+    role_description: "",
     password: "",
   });
 
@@ -105,6 +107,9 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
   const selectedProgram = programs.find((p) => p.id === formData.program_id);
   const isSchoolProgram = selectedProgram?.code === "SCHOOL_STUDENT";
   const isCollegeProgram = selectedProgram?.code === "COLLEGE_STUDENT";
+  const isEmployeeProgram =
+    selectedProgram?.code === "EMPLOYEE" ||
+    selectedProgram?.name?.trim().toUpperCase() === "EMPLOYEE";
 
   // --- Handlers ---
   const handleInputChange = (
@@ -157,6 +162,12 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     if (isCollegeProgram) {
       if (!formData.department_degree_id) errors.department_degree_id = "Required";
       if (!formData.current_year) errors.current_year = "Required";
+    }
+
+    if (isEmployeeProgram) {
+      if (!formData.current_role?.trim()) errors.current_role = "Required";
+      if (!formData.role_description?.trim())
+        errors.role_description = "Required";
     }
 
     if (!formData.password?.trim()) {
@@ -438,6 +449,8 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                   handleInputChange("current_year", "");
                   handleInputChange("department_degree_id", "");
                   handleInputChange("student_board", "");
+                  handleInputChange("current_role", "");
+                  handleInputChange("role_description", "");
                 }}
                 onOpenChange={(isOpen) => handleOpenStatus("program", isOpen)}
                 placeholder="Choose Program Type"
@@ -621,6 +634,53 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                 className={baseInputClasses}
               />
             </div>
+
+            {/* Current Role (Employee only) */}
+            {isEmployeeProgram && (
+              <div className="space-y-2 animate-fade-in relative z-0">
+                <label className={baseLabelClasses}>
+                  Current Role <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.current_role || ""}
+                  onChange={(e) =>
+                    handleInputChange("current_role", e.target.value)
+                  }
+                  placeholder="E.g. Business Analyst"
+                  className={`${baseInputClasses} ${formErrors.current_role ? "border-red-500/50" : ""
+                    }`}
+                />
+                {formErrors.current_role && (
+                  <p className="text-xs text-red-500 ml-1 mt-1">
+                    {formErrors.current_role}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Role Description (Employee only) */}
+            {isEmployeeProgram && (
+              <div className="space-y-2 animate-fade-in md:col-span-2 lg:col-span-4">
+                <label className={baseLabelClasses}>
+                  Role Description <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={formData.role_description || ""}
+                  onChange={(e) =>
+                    handleInputChange("role_description", e.target.value)
+                  }
+                  placeholder="Briefly describe responsibilities"
+                  className={`w-full min-h-[140px] bg-gray-50 dark:bg-white/10 border border-transparent dark:border-transparent rounded-[26px] px-4 py-4 text-sm text-black dark:text-white placeholder-black/40 dark:placeholder-white/70 focus:border-brand-green focus:outline-none transition-all resize-none ${formErrors.role_description ? "border-red-500/50" : ""
+                    }`}
+                />
+                {formErrors.role_description && (
+                  <p className="text-xs text-red-500 ml-1 mt-1">
+                    {formErrors.role_description}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Send Email Notification */}
             <div className="space-y-2 relative">
