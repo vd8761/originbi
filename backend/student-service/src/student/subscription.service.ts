@@ -146,7 +146,7 @@ export class SubscriptionService {
       const studentMailOptions = {
         from: `"${fromName}" <${fromEmail}>`,
         to: user.email,
-        subject: `Expert Debrief Session Booked - Origin BI`,
+        subject: `Expert Debrief Booking Confirmed - Origin BI`,
         html: studentHtml,
         replyTo: replyToAddress,
       };
@@ -197,6 +197,17 @@ export class SubscriptionService {
         .map((e: string) => e.trim())
         .filter((e: string) => e.length > 0);
 
+      // Construct academic details string
+      let academicDetails = 'Not specified';
+      if (registration.schoolLevel) {
+        academicDetails = `Class ${registration.schoolLevel}`;
+        if (registration.schoolStream) academicDetails += `, ${registration.schoolStream}`;
+        if (registration.studentBoard) academicDetails += `, ${registration.studentBoard}`;
+      } else if (registration.departmentDegreeId) {
+        academicDetails = `College/University Degree`;
+        if (registration.metadata?.currentYear) academicDetails += ` (Year ${registration.metadata.currentYear})`;
+      }
+
       const teamHtml = getDebriefTeamNotificationEmailTemplate(
         registration.fullName || 'Student',
         user.email,
@@ -213,7 +224,8 @@ export class SubscriptionService {
           timeZone: 'Asia/Kolkata',
           hour12: true,
         }),
-        program?.name || 'Assessment Program',
+        program?.assessmentTitle || program?.name || 'Assessment Program',
+        academicDetails,
         assets,
       );
 

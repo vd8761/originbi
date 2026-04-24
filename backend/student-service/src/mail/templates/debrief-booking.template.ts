@@ -9,7 +9,7 @@ export const getDebriefBookingEmailTemplate = (
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
   <meta name="supported-color-schemes" content="light dark">
-  <title>Debrief Session Confirmation</title>
+  <title>Debrief Booking Confirmed</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -80,7 +80,7 @@ export const getDebriefBookingEmailTemplate = (
              </tr>
              <tr>
                 <td colspan="2" style="padding: 10px 0 20px 40px;">
-                    <h1 style="font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 28px; line-height: 100%; letter-spacing: 0%; color: #000000; margin: 0;">Debrief Session Booked</h1>
+                    <h1 style="font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 28px; line-height: 100%; letter-spacing: 0%; color: #000000; margin: 0;">Debrief Booking Confirmed</h1>
                 </td>
              </tr>
            </table>
@@ -98,11 +98,11 @@ export const getDebriefBookingEmailTemplate = (
                 <div style="font-size: 16px; color: #000000; margin-bottom: 20px; font-weight: 400;">Dear <strong style="font-weight: 700;">${name}</strong>,</div>
                 
                 <div style="font-size: 14px; line-height: 1.5; color: #000000; margin-bottom: 24px;">
-                  Thank you for booking the Expert Debrief session! We have received your assessment report and shared it with our expert team.
+                  Thank you for booking your Expert Debrief session! Your booking is confirmed and our team is ready to help.
                 </div>
 
                 <div style="font-size: 14px; line-height: 1.5; color: #000000; margin-bottom: 24px;">
-                  Our team is currently reviewing your results in detail. We will contact you soon to schedule a one-on-one session at your earliest convenience.
+                  Our experts will now review your assessment results. We will contact you soon to schedule your one-on-one session.
                 </div>
 
                 <div style="background-color: #F8F9FA; border-left: 4px solid #150089; padding: 16px; border-radius: 0 4px 4px 0; margin-bottom: 30px;">

@@ -2115,6 +2115,17 @@ export class StudentService {
                 .map((e: string) => e.trim())
                 .filter((e: string) => e.length > 0);
 
+              // Construct academic details string
+              let academicDetails = 'Not specified';
+              if (registration.schoolLevel) {
+                academicDetails = `Class ${registration.schoolLevel}`;
+                if (registration.schoolStream) academicDetails += `, ${registration.schoolStream}`;
+                if (registration.studentBoard) academicDetails += `, ${registration.studentBoard}`;
+              } else if (registration.departmentDegreeId) {
+                academicDetails = `College/University Degree`;
+                if (registration.metadata?.currentYear) academicDetails += ` (Year ${registration.metadata.currentYear})`;
+              }
+
               const teamHtml = getDebriefTeamNotificationEmailTemplate(
                 registration.fullName || 'Student',
                 user.email,
@@ -2133,7 +2144,8 @@ export class StudentService {
                       hour12: true,
                     })
                   : 'N/A',
-                program?.name || 'Assessment Program',
+                (registration as any).program?.assessmentTitle || (registration as any).program?.name || 'Assessment Program',
+                academicDetails,
                 assets,
               );
 

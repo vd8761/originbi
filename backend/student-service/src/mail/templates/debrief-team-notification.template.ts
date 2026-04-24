@@ -6,9 +6,21 @@ export const getDebriefTeamNotificationEmailTemplate = (
   paymentAmount: string,
   paymentReference: string,
   registrationDate: string,
-  programName: string,
+  assessmentTitle: string,
+  academicDetails: string,
   assets: { footer: string; logo: string; popper: string },
-) => `
+) => {
+  const showRow = (label: string, value: string | null | undefined) => {
+    if (!value || value === 'N/A' || value === 'Not specified' || value === 'undefined') return '';
+    return `
+      <tr>
+        <td style="font-size: 14px; color: #707070; padding: 8px 0; width: 40%; border-bottom: 1px solid #F0F0F0;">${label}</td>
+        <td style="font-size: 14px; color: #000000; padding: 8px 0; border-bottom: 1px solid #F0F0F0;">${label === 'Email' ? `<a href="mailto:${value}" style="color: #150089; text-decoration: none;">${value}</a>` : value}</td>
+      </tr>
+    `;
+  };
+
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -105,49 +117,26 @@ export const getDebriefTeamNotificationEmailTemplate = (
                 <div style="font-size: 16px; color: #000000; margin-bottom: 20px; font-weight: 400;">Hi Team,</div>
                 
                 <div style="font-size: 14px; line-height: 1.5; color: #000000; margin-bottom: 24px;">
-                  <strong style="font-weight: 700;">${studentName}</strong> has completed their assessment and has booked an Expert Debrief session. Their report is attached to this email. Please review and reach out to schedule the session.
+                  <strong style="font-weight: 700;">${studentName}</strong> has booked an Expert Debrief session. Their report is attached to this email. Please review and reach out to schedule the session.
                 </div>
 
                 <div style="color: #1ED36A; font-size: 14px; margin-bottom: 16px;">Student Details:</div>
 
                 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 24px;">
-                  <tr>
-                    <td style="font-size: 14px; color: #707070; padding: 8px 0; width: 40%; border-bottom: 1px solid #F0F0F0;">Full Name</td>
-                    <td style="font-size: 14px; color: #000000; padding: 8px 0; border-bottom: 1px solid #F0F0F0;">${studentName}</td>
-                  </tr>
-                  <tr>
-                    <td style="font-size: 14px; color: #707070; padding: 8px 0; border-bottom: 1px solid #F0F0F0;">Email</td>
-                    <td style="font-size: 14px; color: #000000; padding: 8px 0; border-bottom: 1px solid #F0F0F0;"><a href="mailto:${studentEmail}" style="color: #150089; text-decoration: none;">${studentEmail}</a></td>
-                  </tr>
-                  <tr>
-                    <td style="font-size: 14px; color: #707070; padding: 8px 0; border-bottom: 1px solid #F0F0F0;">Phone</td>
-                    <td style="font-size: 14px; color: #000000; padding: 8px 0; border-bottom: 1px solid #F0F0F0;">${studentPhone}</td>
-                  </tr>
-                  <tr>
-                    <td style="font-size: 14px; color: #707070; padding: 8px 0; border-bottom: 1px solid #F0F0F0;">Gender</td>
-                    <td style="font-size: 14px; color: #000000; padding: 8px 0; border-bottom: 1px solid #F0F0F0;">${studentGender}</td>
-                  </tr>
-                  <tr>
-                    <td style="font-size: 14px; color: #707070; padding: 8px 0; border-bottom: 1px solid #F0F0F0;">Program</td>
-                    <td style="font-size: 14px; color: #000000; padding: 8px 0; border-bottom: 1px solid #F0F0F0;">${programName}</td>
-                  </tr>
-                  <tr>
-                    <td style="font-size: 14px; color: #707070; padding: 8px 0; border-bottom: 1px solid #F0F0F0;">Registration Date</td>
-                    <td style="font-size: 14px; color: #000000; padding: 8px 0; border-bottom: 1px solid #F0F0F0;">${registrationDate}</td>
-                  </tr>
+                  ${showRow('Full Name', studentName)}
+                  ${showRow('Email', studentEmail)}
+                  ${showRow('Phone', studentPhone)}
+                  ${showRow('Gender', studentGender)}
+                  ${showRow('Assessment', assessmentTitle)}
+                  ${showRow('Academic Details', academicDetails)}
+                  ${showRow('Registration Date', registrationDate)}
                 </table>
 
                 <div style="color: #1ED36A; font-size: 14px; margin-bottom: 16px;">Payment Details:</div>
 
                 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 24px;">
-                  <tr>
-                    <td style="font-size: 14px; color: #707070; padding: 8px 0; width: 40%; border-bottom: 1px solid #F0F0F0;">Amount Paid</td>
-                    <td style="font-size: 14px; color: #000000; padding: 8px 0; font-weight: 700; border-bottom: 1px solid #F0F0F0;">₹${paymentAmount}</td>
-                  </tr>
-                  <tr>
-                    <td style="font-size: 14px; color: #707070; padding: 8px 0; border-bottom: 1px solid #F0F0F0;">Payment Reference</td>
-                    <td style="font-size: 14px; color: #000000; padding: 8px 0; border-bottom: 1px solid #F0F0F0;">${paymentReference}</td>
-                  </tr>
+                  ${showRow('Amount Paid', `₹${paymentAmount}`)}
+                  ${showRow('Payment Reference', paymentReference)}
                 </table>
 
                 <div style="background-color: #F8F9FA; border-left: 4px solid #150089; padding: 16px; border-radius: 0 4px 4px 0; margin-bottom: 30px;">
@@ -184,3 +173,4 @@ export const getDebriefTeamNotificationEmailTemplate = (
 </body>
 </html>
 `;
+};
