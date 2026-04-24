@@ -2126,12 +2126,19 @@ export class StudentService {
                 if (registration.metadata?.currentYear) academicDetails += ` (Year ${registration.metadata.currentYear})`;
               }
 
+              const totalAmount = parseFloat(registration.paymentAmount?.toString() || '0');
+              const debriefAmountStr = this.configService.get<string>('DEBRIEF_AMOUNT') || this.configService.get<string>('NEXT_PUBLIC_DEBRIEF_AMOUNT') || '2500';
+              const debriefCostValue = parseFloat(debriefAmountStr);
+              const registrationCostValue = totalAmount > debriefCostValue ? totalAmount - debriefCostValue : 0;
+
               const teamHtml = getDebriefTeamNotificationEmailTemplate(
                 registration.fullName || 'Student',
                 user.email,
                 `${registration.countryCode || '+91'} ${registration.mobileNumber}`,
                 registration.gender || 'Not specified',
-                registration.paymentAmount?.toString() || '0',
+                totalAmount.toFixed(2),
+                registrationCostValue.toFixed(2),
+                debriefCostValue.toFixed(2),
                 registration.paymentReference || 'N/A',
                 registration.createdAt
                   ? new Date(registration.createdAt).toLocaleString('en-GB', {

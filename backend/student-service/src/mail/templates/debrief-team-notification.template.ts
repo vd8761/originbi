@@ -4,6 +4,8 @@ export const getDebriefTeamNotificationEmailTemplate = (
   studentPhone: string,
   studentGender: string,
   paymentAmount: string,
+  registrationCost: string,
+  debriefCost: string,
   paymentReference: string,
   registrationDate: string,
   assessmentTitle: string,
@@ -135,7 +137,9 @@ export const getDebriefTeamNotificationEmailTemplate = (
                 <div style="color: #1ED36A; font-size: 14px; margin-bottom: 16px;">Payment Details:</div>
 
                 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 24px;">
-                  ${showRow('Amount Paid', `₹${paymentAmount}`)}
+                  ${showRow('Registration Cost', `₹${registrationCost}`)}
+                  ${showRow('Debrief Session Cost', `₹${debriefCost}`)}
+                  ${showRow('Total Amount Paid', `₹${paymentAmount}`)}
                   ${showRow('Payment Reference', paymentReference)}
                 </table>
 
