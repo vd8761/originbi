@@ -436,8 +436,12 @@ export class StudentService {
 
     return {
       ...user,
-      fullName: programResult?.[0]?.full_name || user.metadata?.fullName || null,
-      mobileNumber: programResult?.[0]?.mobile_number || user.metadata?.mobileNumber || null,
+      fullName:
+        programResult?.[0]?.full_name || user.metadata?.fullName || null,
+      mobileNumber:
+        programResult?.[0]?.mobile_number ||
+        user.metadata?.mobileNumber ||
+        null,
       gender: programResult?.[0]?.gender || user.metadata?.gender || null,
       personalityTrait: trait,
       programCode,
@@ -1075,10 +1079,10 @@ export class StudentService {
             dto.password, // We need the password here. DTO has it.
             validFrom,
             programTitle,
-            savedReg.metadata?.debrief === true || savedReg.metadata?.debrief === 'true',
+            savedReg.metadata?.debrief === true ||
+              savedReg.metadata?.debrief === 'true',
           );
           this.logger.log(`Welcome email sent successfully to ${dto.email}`);
-
         } catch (emailErr) {
           this.logger.error(
             `[Email Failed] Failed to send welcome email to ${dto.email}`,
@@ -1531,7 +1535,12 @@ export class StudentService {
         });
         whatsappSucceeded = true;
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : typeof err === 'string' ? err : JSON.stringify(err);
+        const msg =
+          err instanceof Error
+            ? err.message
+            : typeof err === 'string'
+              ? err
+              : JSON.stringify(err);
         this.logger.warn(
           `Instructions WhatsApp failed for ${phone}, will try SMS fallback: ${msg}`,
         );
@@ -1577,7 +1586,12 @@ export class StudentService {
         });
         whatsappSucceeded = true;
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : typeof err === 'string' ? err : JSON.stringify(err);
+        const msg =
+          err instanceof Error
+            ? err.message
+            : typeof err === 'string'
+              ? err
+              : JSON.stringify(err);
         this.logger.warn(
           `Completion WhatsApp failed for ${phone}, will try SMS fallback: ${msg}`,
         );
@@ -1623,7 +1637,12 @@ export class StudentService {
         });
         whatsappSucceeded = true;
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : typeof err === 'string' ? err : JSON.stringify(err);
+        const msg =
+          err instanceof Error
+            ? err.message
+            : typeof err === 'string'
+              ? err
+              : JSON.stringify(err);
         this.logger.warn(
           `Report-sent WhatsApp failed for ${phone}, will try SMS fallback: ${msg}`,
         );
@@ -1649,7 +1668,12 @@ export class StudentService {
       if (!smsOn) return;
       await this.smsService.send(template, phone, name);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : typeof err === 'string' ? err : JSON.stringify(err);
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'string'
+            ? err
+            : JSON.stringify(err);
       this.logger.error(`SMS fallback failed for ${template} ${phone}: ${msg}`);
     }
   }
@@ -1850,7 +1874,6 @@ export class StudentService {
         );
         return;
       }
-
 
       // 2. Trigger Report Generation
       const port = process.env.PORT || 4004;
@@ -2100,7 +2123,6 @@ export class StudentService {
               `Report-sent WhatsApp failed for user ${userId}: ${whatsappErr.message}`,
             ),
           );
-
         } catch (err) {
           this.logger.error(
             `Failed to send assessment completion email to ${user.email}: ${err.message}`,
@@ -2113,21 +2135,23 @@ export class StudentService {
       // Student confirmation was already sent immediately after payment in SubscriptionService.
       // Here we only send the team notification with the report attached.
       if (
-        (registration.metadata?.debrief === true || registration.metadata?.debrief === 'true') &&
+        (registration.metadata?.debrief === true ||
+          registration.metadata?.debrief === 'true') &&
         registration.metadata?.debriefTeamEmailSent !== true &&
         registration.metadata?.debriefTeamEmailSent !== 'true'
       ) {
         try {
-          const debriefForwardEmails = (this.configService.get('DEBRIEF_FORWARD_EMAILS') || 'info@originbi.com,vikashuvi07@gmail.com')
+          const debriefForwardEmails = (
+            this.configService.get('DEBRIEF_FORWARD_EMAILS') ||
+            'info@originbi.com,vikashuvi07@gmail.com'
+          )
             .split(',')
             .map((e: string) => e.trim())
             .filter((e: string) => e.length > 0);
 
           const debriefTransporter = this.createEmailTransporter();
-          const {
-            fromName: debriefFromName,
-            fromAddress: debriefFromEmail,
-          } = await this.settingsService.getEmailConfig('report_email_config');
+          const { fromName: debriefFromName, fromAddress: debriefFromEmail } =
+            await this.settingsService.getEmailConfig('report_email_config');
 
           const debriefAssets = {
             logo: `https://mind.originbi.com/Origin-BI-Logo-01.png`,
@@ -2139,15 +2163,19 @@ export class StudentService {
           let academicDetails = 'Not specified';
           if (registration.schoolLevel) {
             academicDetails = `Class ${registration.schoolLevel}`;
-            if (registration.schoolStream) academicDetails += `, ${registration.schoolStream}`;
-            if (registration.studentBoard) academicDetails += `, ${registration.studentBoard}`;
+            if (registration.schoolStream)
+              academicDetails += `, ${registration.schoolStream}`;
+            if (registration.studentBoard)
+              academicDetails += `, ${registration.studentBoard}`;
           } else if (registration.departmentDegreeId) {
             academicDetails = `College/University Degree`;
-            if (registration.metadata?.currentYear) academicDetails += ` (Year ${registration.metadata.currentYear})`;
+            if (registration.metadata?.currentYear)
+              academicDetails += ` (Year ${registration.metadata.currentYear})`;
           }
 
           // Robust calculation of costs (handles bundled vs separate payments)
-          const { registrationCost, debriefCost, totalAmount } = await this.subscriptionService.getDebriefCostSplit(registration);
+          const { registrationCost, debriefCost, totalAmount } =
+            await this.subscriptionService.getDebriefCostSplit(registration);
 
           const teamHtml = getDebriefTeamNotificationEmailTemplate(
             registration.fullName || 'Student',
@@ -2189,15 +2217,20 @@ export class StudentService {
               ],
             };
             await debriefTransporter.sendMail(teamMailOptions);
-            this.logger.log(`Debrief team notification sent to ${forwardEmail}`);
+            this.logger.log(
+              `Debrief team notification sent to ${forwardEmail}`,
+            );
           }
 
           // Mark team notification as sent
           const meta = registration.metadata || {};
           meta.debriefTeamEmailSent = true;
-          await this.registrationRepo.update(registration.id, { metadata: meta });
-          this.logger.log(`Debrief team email marked as sent for user ${userId}`);
-
+          await this.registrationRepo.update(registration.id, {
+            metadata: meta,
+          });
+          this.logger.log(
+            `Debrief team email marked as sent for user ${userId}`,
+          );
         } catch (debriefErr) {
           this.logger.error(
             `Failed to send debrief team notification: ${debriefErr.message}`,

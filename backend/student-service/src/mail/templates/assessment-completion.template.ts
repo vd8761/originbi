@@ -92,7 +92,9 @@ export const getAssessmentCompletionEmailTemplate = (
                                 You can download your report from the attachment. Your password for the report is <strong>${reportPassword}</strong>.
                             </p>
 
-                            ${isDebrief ? `
+                            ${
+                              isDebrief
+                                ? `
                             <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 30px; background-color: #F8F9FA; border-left: 4px solid #150089; border-radius: 4px;">
                                 <tr>
                                     <td style="padding: 15px 20px;">
@@ -105,7 +107,9 @@ export const getAssessmentCompletionEmailTemplate = (
                                     </td>
                                 </tr>
                             </table>
-                            ` : ''}
+                            `
+                                : ''
+                            }
 
                             <p style="margin: 0; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 17px; color: #000000;">
                                 Best regards,<br/>

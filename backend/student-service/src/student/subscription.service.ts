@@ -110,7 +110,7 @@ export class SubscriptionService {
 
     return nodemailer.createTransport({
       SES: { sesClient, SendEmailCommand },
-    } as any);
+    } as nodemailer.TransportOptions);
   }
 
   /**
@@ -131,13 +131,18 @@ export class SubscriptionService {
       order: { createdAt: 'DESC' },
     });
 
-    const debriefAmountStr = this.configService.get<string>('DEBRIEF_AMOUNT') || this.configService.get<string>('NEXT_PUBLIC_DEBRIEF_AMOUNT') || '2500';
+    const debriefAmountStr =
+      this.configService.get<string>('DEBRIEF_AMOUNT') ||
+      this.configService.get<string>('NEXT_PUBLIC_DEBRIEF_AMOUNT') ||
+      '2500';
     const defaultDebriefCost = parseFloat(debriefAmountStr);
 
     if (debriefSub) {
       // Paid separately via /debrief flow
       const debriefCost = parseFloat(debriefSub.amount);
-      const registrationCost = parseFloat(registration.paymentAmount?.toString() || '0');
+      const registrationCost = parseFloat(
+        registration.paymentAmount?.toString() || '0',
+      );
       return {
         registrationCost,
         debriefCost,
@@ -145,7 +150,9 @@ export class SubscriptionService {
       };
     } else {
       // Likely paid together (bundled) during initial registration
-      const fullAmount = parseFloat(registration.paymentAmount?.toString() || '0');
+      const fullAmount = parseFloat(
+        registration.paymentAmount?.toString() || '0',
+      );
       if (fullAmount > defaultDebriefCost) {
         return {
           registrationCost: fullAmount - defaultDebriefCost,
@@ -178,37 +185,50 @@ export class SubscriptionService {
   public async sendDebriefEmails(email: string, registrationId: number) {
     try {
       // 1. Get detailed info for the templates
-      const registration = await this.registrationRepo.findOne({
+      const registration = (await this.registrationRepo.findOne({
         where: { id: registrationId },
         relations: ['group'],
-      }) as RegistrationWithMetadata | null;
+      })) as RegistrationWithMetadata | null;
 
       if (!registration) return;
 
       // Idempotency check: if team email was sent, both emails (student/team) are already handled
-      if (registration.metadata?.debriefTeamEmailSent === true || registration.metadata?.debriefTeamEmailSent === 'true') {
-        this.logger.log(`Debrief emails already sent for registration ${registrationId}, skipping.`);
+      if (
+        registration.metadata?.debriefTeamEmailSent === true ||
+        registration.metadata?.debriefTeamEmailSent === 'true'
+      ) {
+        this.logger.log(
+          `Debrief emails already sent for registration ${registrationId}, skipping.`,
+        );
         return;
       }
 
-      const user = await this.userRepo.findOne({ where: { id: registration.userId } });
-      const program = await this.programRepo.findOne({ where: { id: registration.programId } });
+      const user = await this.userRepo.findOne({
+        where: { id: registration.userId },
+      });
+      const program = await this.programRepo.findOne({
+        where: { id: registration.programId },
+      });
 
       if (!user) return;
 
       // 2. Prepare assets and transporter
       const assets = {
         logo: `https://mind.originbi.com/Origin-BI-Logo-01.png`,
-        popper: `${this.configService.get('API_URL') || 'https://mind.originbi.com'}/assets/Popper.png`,
-        footer: `${this.configService.get('API_URL') || 'https://mind.originbi.com'}/assets/Email_Vector.png`,
+        popper: `${this.configService.get<string>('API_URL') || 'https://mind.originbi.com'}/assets/Popper.png`,
+        footer: `${this.configService.get<string>('API_URL') || 'https://mind.originbi.com'}/assets/Email_Vector.png`,
       };
 
       const transporter = this.createEmailTransporter();
-      const {
-        fromName,
-        fromAddress: fromEmail,
-        replyToAddress,
-      } = await this.settingsService.getEmailConfig('report_email_config');
+      const emailConfig = (await this.settingsService.getEmailConfig(
+        'report_email_config',
+      )) as {
+        fromName: string;
+        fromAddress: string;
+        replyToAddress: string;
+      };
+
+      const { fromName, fromAddress: fromEmail, replyToAddress } = emailConfig;
 
       // 3. Send Student Confirmation Email IMMEDIATELY
       const studentHtml = getDebriefBookingEmailTemplate(
@@ -225,14 +245,18 @@ export class SubscriptionService {
       };
 
       await transporter.sendMail(studentMailOptions);
-      this.logger.log(`Debrief booking confirmation sent to student: ${user.email}`);
+      this.logger.log(
+        `Debrief booking confirmation sent to student: ${user.email}`,
+      );
 
       // 4. Try to send Team Notification (only if report is already ready)
       let pdfBuffer: Buffer | null = null;
       let attachmentFileName = '';
 
       const sessionSql = `SELECT id FROM assessment_sessions WHERE registration_id = $1 AND status = 'COMPLETED' ORDER BY updated_at DESC LIMIT 1`;
-      const sessions = await this.dataSource.query(sessionSql, [registrationId]);
+      const sessions = (await this.dataSource.query(sessionSql, [
+        registrationId,
+      ])) as unknown as { id: number }[];
 
       if (sessions && sessions.length > 0) {
         try {
@@ -241,12 +265,14 @@ export class SubscriptionService {
 
           // Trigger report generation for this user
           const generateUrl = `${reportServiceUrl}/generate/student/${registration.userId}`;
-          this.logger.log(`Triggering report generation for debrief attachment: ${generateUrl}`);
+          this.logger.log(
+            `Triggering report generation for debrief attachment: ${generateUrl}`,
+          );
 
           const generateResponse = await lastValueFrom(
             this.httpService.get<ReportJobResponse>(generateUrl),
           );
-          const responseData = generateResponse.data;
+          const responseData: ReportJobResponse = generateResponse.data;
 
           if (responseData.success && responseData.jobId) {
             const jobId = responseData.jobId;
@@ -260,15 +286,21 @@ export class SubscriptionService {
             while (jobStatus === 'PROCESSING' && attempts < maxAttempts) {
               await new Promise((resolve) => setTimeout(resolve, 3000));
               try {
-                const statusRes = await lastValueFrom(this.httpService.get<ReportStatusResponse>(pollUrl));
+                const statusRes = await lastValueFrom(
+                  this.httpService.get<ReportStatusResponse>(pollUrl),
+                );
                 const statusData = statusRes.data;
                 jobStatus = statusData.status;
                 if (jobStatus === 'ERROR') {
-                  this.logger.warn(`Report generation failed for debrief: ${statusData.error || 'Unknown error'}`);
+                  this.logger.warn(
+                    `Report generation failed for debrief: ${statusData.error || 'Unknown error'}`,
+                  );
                   break;
                 }
               } catch (pollErr: unknown) {
-                this.logger.warn(`Polling failed for debrief report job ${jobId}: ${getErrorMessage(pollErr)}`);
+                this.logger.warn(
+                  `Polling failed for debrief report job ${jobId}: ${getErrorMessage(pollErr)}`,
+                );
               }
               attempts++;
             }
@@ -276,28 +308,41 @@ export class SubscriptionService {
             if (jobStatus === 'COMPLETED') {
               const downloadUrl = `${reportServiceUrl}/download/status/${jobId}`;
               const pdfResponse = await lastValueFrom(
-                this.httpService.get<Buffer>(downloadUrl, { responseType: 'arraybuffer' }),
+                this.httpService.get<Buffer>(downloadUrl, {
+                  responseType: 'arraybuffer',
+                }),
               );
               pdfBuffer = Buffer.from(pdfResponse.data);
               attachmentFileName = `${(registration.fullName || 'Student').replace(/\s/g, '_')}_Report.pdf`;
-              this.logger.log(`Report downloaded successfully for debrief team notification`);
+              this.logger.log(
+                `Report downloaded successfully for debrief team notification`,
+              );
             } else {
-              this.logger.warn(`Report generation timed out or failed for debrief. Status: ${jobStatus}`);
+              this.logger.warn(
+                `Report generation timed out or failed for debrief. Status: ${jobStatus}`,
+              );
             }
           }
         } catch (downloadErr: unknown) {
-          this.logger.warn(`Could not generate/download report for debrief attachment: ${getErrorMessage(downloadErr)}`);
+          this.logger.warn(
+            `Could not generate/download report for debrief attachment: ${getErrorMessage(downloadErr)}`,
+          );
         }
       }
 
       // If report is not ready, team notification will be sent later by handleAssessmentCompletion
       if (!pdfBuffer) {
-        this.logger.log(`Debrief student confirmation sent. Team notification postponed: report not yet ready for registration ${registrationId}`);
+        this.logger.log(
+          `Debrief student confirmation sent. Team notification postponed: report not yet ready for registration ${registrationId}`,
+        );
         return;
       }
 
       // 5. Report is ready — send Team Notification now
-      const debriefForwardEmails = (this.configService.get('DEBRIEF_FORWARD_EMAILS') || 'info@originbi.com,vikashuvi07@gmail.com')
+      const forwardEmailsStr =
+        this.configService.get<string>('DEBRIEF_FORWARD_EMAILS') ||
+        'info@originbi.com,vikashuvi07@gmail.com';
+      const debriefForwardEmails = forwardEmailsStr
         .split(',')
         .map((e: string) => e.trim())
         .filter((e: string) => e.length > 0);
@@ -306,15 +351,19 @@ export class SubscriptionService {
       let academicDetails = 'Not specified';
       if (registration.schoolLevel) {
         academicDetails = `Class ${registration.schoolLevel}`;
-        if (registration.schoolStream) academicDetails += `, ${registration.schoolStream}`;
-        if (registration.studentBoard) academicDetails += `, ${registration.studentBoard}`;
+        if (registration.schoolStream)
+          academicDetails += `, ${registration.schoolStream}`;
+        if (registration.studentBoard)
+          academicDetails += `, ${registration.studentBoard}`;
       } else if (registration.departmentDegreeId) {
         academicDetails = `College/University Degree`;
-        if (registration.metadata?.currentYear) academicDetails += ` (Year ${registration.metadata.currentYear})`;
+        if (registration.metadata?.currentYear)
+          academicDetails += ` (Year ${registration.metadata.currentYear})`;
       }
 
       // Robust calculation of costs (handles bundled vs separate payments)
-      const { registrationCost, debriefCost, totalAmount } = await this.getDebriefCostSplit(registration);
+      const { registrationCost, debriefCost, totalAmount } =
+        await this.getDebriefCostSplit(registration);
 
       const teamHtml = getDebriefTeamNotificationEmailTemplate(
         registration.fullName || 'Student',
@@ -362,15 +411,20 @@ export class SubscriptionService {
       }
 
       // 6. Mark team notification as sent to avoid duplicates
-      const freshReg = await this.registrationRepo.findOne({ where: { id: registrationId } }) as RegistrationWithMetadata | null;
+      const freshReg = (await this.registrationRepo.findOne({
+        where: { id: registrationId },
+      })) as RegistrationWithMetadata | null;
       if (freshReg) {
         const meta = freshReg.metadata || {};
         meta.debriefTeamEmailSent = true;
-        await this.registrationRepo.update(registrationId, { metadata: meta as any });
+        await this.registrationRepo.update(registrationId, {
+          metadata: meta,
+        } as unknown as any);
       }
-
     } catch (err: unknown) {
-      this.logger.error(`Failed to send debrief emails: ${getErrorMessage(err)}`);
+      this.logger.error(
+        `Failed to send debrief emails: ${getErrorMessage(err)}`,
+      );
     }
   }
 
@@ -695,8 +749,10 @@ export class SubscriptionService {
     if (!user) throw new BadRequestException('User not found');
 
     // Amount can be overridden by env, defaults to 2500 INR (250000 paise)
-    const baseAmountStr = this.configService.get<string>('NEXT_PUBLIC_DEBRIEF_AMOUNT') || '2500';
-    const amountStr = this.configService.get<string>('DEBRIEF_AMOUNT') || baseAmountStr;
+    const baseAmountStr =
+      this.configService.get<string>('NEXT_PUBLIC_DEBRIEF_AMOUNT') || '2500';
+    const amountStr =
+      this.configService.get<string>('DEBRIEF_AMOUNT') || baseAmountStr;
     const amount = parseInt(amountStr, 10) * 100;
     const currency = 'INR';
 
@@ -783,7 +839,9 @@ export class SubscriptionService {
 
       return { booked: false };
     } catch (error: unknown) {
-      this.logger.error(`Error checking debrief status: ${getErrorMessage(error)}`);
+      this.logger.error(
+        `Error checking debrief status: ${getErrorMessage(error)}`,
+      );
       return { booked: false };
     }
   }
@@ -839,20 +897,29 @@ export class SubscriptionService {
     await queryRunner.startTransaction();
 
     try {
-      const dbAmount = this.configService.get<string>('DEBRIEF_AMOUNT') || this.configService.get<string>('NEXT_PUBLIC_DEBRIEF_AMOUNT') || '2500';
+      const dbAmount =
+        this.configService.get<string>('DEBRIEF_AMOUNT') ||
+        this.configService.get<string>('NEXT_PUBLIC_DEBRIEF_AMOUNT') ||
+        '2500';
 
       // Create subscription record
       await queryRunner.query(
         `INSERT INTO student_subscriptions 
                     (user_id, registration_id, plan_type, status, payment_provider, payment_reference, payment_order_id, amount, currency, purchased_at, metadata)
                  VALUES ($1, $2, 'debrief', 'active', 'razorpay', $3, $4, $5, 'INR', NOW(), '{"debrief": true}')`,
-        [reg.user_id, reg.id, body.razorpay_payment_id, body.razorpay_order_id, parseFloat(dbAmount)],
+        [
+          reg.user_id,
+          reg.id,
+          body.razorpay_payment_id,
+          body.razorpay_order_id,
+          parseFloat(dbAmount),
+        ],
       );
 
       // Update metadata on registration for easy frontend/subsequent workflow checking
       const currentMeta = reg.metadata || {};
       const newMeta = { ...currentMeta, debrief: true };
-      
+
       await queryRunner.query(
         `UPDATE registrations SET metadata = $1 WHERE id = $2`,
         [JSON.stringify(newMeta), reg.id],
@@ -866,7 +933,9 @@ export class SubscriptionService {
 
       // Trigger emails in background
       this.sendDebriefEmails(body.email, reg.id).catch((err: unknown) =>
-        this.logger.error(`Background debrief emails failed: ${getErrorMessage(err)}`),
+        this.logger.error(
+          `Background debrief emails failed: ${getErrorMessage(err)}`,
+        ),
       );
 
       return {

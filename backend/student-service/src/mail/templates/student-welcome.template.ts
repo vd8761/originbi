@@ -161,7 +161,9 @@ export const getStudentWelcomeEmailTemplate = (
                   </tr>
                 </table>
 
-                ${isDebrief ? `
+                ${
+                  isDebrief
+                    ? `
                 <!-- Debrief Special Container -->
                 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 24px; background: linear-gradient(135deg, #1ED36A 0%, #150089 100%); border-radius: 12px; overflow: hidden;">
                   <tr>
@@ -190,7 +192,9 @@ export const getStudentWelcomeEmailTemplate = (
                     </td>
                   </tr>
                 </table>
-                ` : ''}
+                `
+                    : ''
+                }
 
 
                 <div style="font-size: 14px; line-height: 1.5; color: #000000; margin-bottom: 24px;">

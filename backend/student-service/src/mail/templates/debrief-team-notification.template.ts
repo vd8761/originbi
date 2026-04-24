@@ -13,7 +13,13 @@ export const getDebriefTeamNotificationEmailTemplate = (
   assets: { footer: string; logo: string; popper: string },
 ) => {
   const showRow = (label: string, value: string | null | undefined) => {
-    if (!value || value === 'N/A' || value === 'Not specified' || value === 'undefined') return '';
+    if (
+      !value ||
+      value === 'N/A' ||
+      value === 'Not specified' ||
+      value === 'undefined'
+    )
+      return '';
     return `
       <tr>
         <td style="font-size: 14px; color: #707070; padding: 8px 0; width: 40%; border-bottom: 1px solid #F0F0F0;">${label}</td>
