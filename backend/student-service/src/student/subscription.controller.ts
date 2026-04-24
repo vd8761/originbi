@@ -54,4 +54,10 @@ export class SubscriptionController {
   ) {
     return this.subscriptionService.verifyDebriefPayment(body);
   }
+
+  @Post('debrief/retry-team-email')
+  async retryDebriefTeamEmail(@Body() body: { email: string; registrationId: number }) {
+    await this.subscriptionService.sendDebriefEmails(body.email, body.registrationId);
+    return { success: true, message: 'Debrief team email retry triggered' };
+  }
 }

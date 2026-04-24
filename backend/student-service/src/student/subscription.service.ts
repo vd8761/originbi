@@ -212,26 +212,58 @@ export class SubscriptionService {
       const sessions = await this.dataSource.query(sessionSql, [registrationId]);
 
       if (sessions && sessions.length > 0) {
-        const sessionId = sessions[0].id;
-        const report = await this.reportRepo.findOne({
-          where: { assessmentSessionId: sessionId },
-          order: { generatedAt: 'DESC' },
-        });
+        try {
+          const port = process.env.PORT || 4004;
+          const reportServiceUrl = `http://localhost:${port}/report`;
 
-        if (report && report.reportNumber) {
-          try {
-            const port = process.env.PORT || 4004;
-            const downloadUrl = `http://localhost:${port}/report/download/file/${report.reportNumber}`;
-            
-            this.logger.log(`Attempting to download report for team attachment: ${downloadUrl}`);
-            const pdfResponse = await lastValueFrom(
-              this.httpService.get(downloadUrl, { responseType: 'arraybuffer' }),
-            );
-            pdfBuffer = Buffer.from(pdfResponse.data, 'binary');
-            attachmentFileName = `${(registration.fullName || 'Student').replace(/\s/g, '_')}_Report.pdf`;
-          } catch (downloadErr: any) {
-            this.logger.warn(`Could not download report for debrief attachment: ${downloadErr.message}`);
+          // Trigger report generation for this user
+          const generateUrl = `${reportServiceUrl}/generate/student/${registration.userId}`;
+          this.logger.log(`Triggering report generation for debrief attachment: ${generateUrl}`);
+
+          const generateResponse = await lastValueFrom(
+            this.httpService.get(generateUrl),
+          );
+          const responseData = generateResponse.data as { success: boolean; jobId: string };
+
+          if (responseData.success && responseData.jobId) {
+            const jobId = responseData.jobId;
+
+            // Poll for completion
+            let jobStatus: 'PROCESSING' | 'COMPLETED' | 'ERROR' = 'PROCESSING';
+            let attempts = 0;
+            const maxAttempts = 30; // 30 * 3s = 90 seconds timeout
+            const pollUrl = `${reportServiceUrl}/download/status/${jobId}?json=true`;
+
+            while (jobStatus === 'PROCESSING' && attempts < maxAttempts) {
+              await new Promise((resolve) => setTimeout(resolve, 3000));
+              try {
+                const statusRes = await lastValueFrom(this.httpService.get(pollUrl));
+                const statusData = statusRes.data as { status: 'PROCESSING' | 'COMPLETED' | 'ERROR'; error?: string };
+                jobStatus = statusData.status;
+                if (jobStatus === 'ERROR') {
+                  this.logger.warn(`Report generation failed for debrief: ${statusData.error}`);
+                  break;
+                }
+              } catch (pollErr: any) {
+                this.logger.warn(`Polling failed for debrief report job ${jobId}: ${pollErr.message}`);
+              }
+              attempts++;
+            }
+
+            if (jobStatus === 'COMPLETED') {
+              const downloadUrl = `${reportServiceUrl}/download/status/${jobId}`;
+              const pdfResponse = await lastValueFrom(
+                this.httpService.get(downloadUrl, { responseType: 'arraybuffer' }),
+              );
+              pdfBuffer = Buffer.from(pdfResponse.data, 'binary');
+              attachmentFileName = `${(registration.fullName || 'Student').replace(/\s/g, '_')}_Report.pdf`;
+              this.logger.log(`Report downloaded successfully for debrief team notification`);
+            } else {
+              this.logger.warn(`Report generation timed out or failed for debrief. Status: ${jobStatus}`);
+            }
           }
+        } catch (downloadErr: any) {
+          this.logger.warn(`Could not generate/download report for debrief attachment: ${downloadErr.message}`);
         }
       }
 

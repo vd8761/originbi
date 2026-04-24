@@ -2101,93 +2101,106 @@ export class StudentService {
             ),
           );
 
-          // --- Send Debrief Team Notification (with report attached, once report is ready) ---
-          // Student confirmation was already sent immediately after payment in SubscriptionService.
-          // Here we only send the team notification with the report attached.
-          if (
-            (registration.metadata?.debrief === true || registration.metadata?.debrief === 'true') &&
-            registration.metadata?.debriefTeamEmailSent !== true &&
-            registration.metadata?.debriefTeamEmailSent !== 'true'
-          ) {
-            try {
-              const debriefForwardEmails = (this.configService.get('DEBRIEF_FORWARD_EMAILS') || 'info@originbi.com,vikashuvi07@gmail.com')
-                .split(',')
-                .map((e: string) => e.trim())
-                .filter((e: string) => e.length > 0);
-
-              // Construct academic details string
-              let academicDetails = 'Not specified';
-              if (registration.schoolLevel) {
-                academicDetails = `Class ${registration.schoolLevel}`;
-                if (registration.schoolStream) academicDetails += `, ${registration.schoolStream}`;
-                if (registration.studentBoard) academicDetails += `, ${registration.studentBoard}`;
-              } else if (registration.departmentDegreeId) {
-                academicDetails = `College/University Degree`;
-                if (registration.metadata?.currentYear) academicDetails += ` (Year ${registration.metadata.currentYear})`;
-              }
-
-              // Robust calculation of costs (handles bundled vs separate payments)
-              const { registrationCost, debriefCost, totalAmount } = await this.subscriptionService.getDebriefCostSplit(registration);
-
-              const teamHtml = getDebriefTeamNotificationEmailTemplate(
-                registration.fullName || 'Student',
-                user.email,
-                `${registration.countryCode || '+91'} ${registration.mobileNumber}`,
-                registration.gender || 'Not specified',
-                totalAmount.toFixed(2),
-                registrationCost.toFixed(2),
-                debriefCost.toFixed(2),
-                registration.paymentReference || 'N/A',
-                registration.createdAt
-                  ? new Date(registration.createdAt).toLocaleString('en-GB', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      timeZone: 'Asia/Kolkata',
-                      hour12: true,
-                    })
-                  : 'N/A',
-                (registration as any).program?.assessmentTitle || (registration as any).program?.name || 'Assessment Program',
-                academicDetails,
-                assets,
-              );
-
-              for (const forwardEmail of debriefForwardEmails) {
-                const teamMailOptions: Record<string, any> = {
-                  from: `"${fromName}" <${fromEmail}>`,
-                  to: forwardEmail,
-                  subject: `[Debrief Booking] ${registration.fullName || 'Student'} - Expert Debrief Session`,
-                  html: teamHtml,
-                  attachments: [
-                    {
-                      filename: attachmentFileName,
-                      content: pdfBuffer,
-                      contentType: 'application/pdf',
-                    },
-                  ],
-                };
-                await transporter.sendMail(teamMailOptions);
-                this.logger.log(`Debrief team notification sent to ${forwardEmail}`);
-              }
-
-              // Mark team notification as sent
-              const meta = registration.metadata || {};
-              meta.debriefTeamEmailSent = true;
-              await this.registrationRepo.update(registration.id, { metadata: meta });
-              this.logger.log(`Debrief team email marked as sent for user ${userId}`);
-
-            } catch (debriefErr) {
-              this.logger.error(
-                `Failed to send debrief team notification: ${debriefErr.message}`,
-              );
-            }
-          }
-
         } catch (err) {
           this.logger.error(
             `Failed to send assessment completion email to ${user.email}: ${err.message}`,
+          );
+        }
+      }
+
+      // --- Send Debrief Team Notification (with report attached, once report is ready) ---
+      // This runs independently of the report email toggle so team always gets notified.
+      // Student confirmation was already sent immediately after payment in SubscriptionService.
+      // Here we only send the team notification with the report attached.
+      if (
+        (registration.metadata?.debrief === true || registration.metadata?.debrief === 'true') &&
+        registration.metadata?.debriefTeamEmailSent !== true &&
+        registration.metadata?.debriefTeamEmailSent !== 'true'
+      ) {
+        try {
+          const debriefForwardEmails = (this.configService.get('DEBRIEF_FORWARD_EMAILS') || 'info@originbi.com,vikashuvi07@gmail.com')
+            .split(',')
+            .map((e: string) => e.trim())
+            .filter((e: string) => e.length > 0);
+
+          const debriefTransporter = this.createEmailTransporter();
+          const {
+            fromName: debriefFromName,
+            fromAddress: debriefFromEmail,
+          } = await this.settingsService.getEmailConfig('report_email_config');
+
+          const debriefAssets = {
+            logo: `https://mind.originbi.com/Origin-BI-Logo-01.png`,
+            popper: `${this.configService.get('API_URL') || 'https://mind.originbi.com'}/assets/Popper.png`,
+            footer: `${this.configService.get('API_URL') || 'https://mind.originbi.com'}/assets/Email_Vector.png`,
+          };
+
+          // Construct academic details string
+          let academicDetails = 'Not specified';
+          if (registration.schoolLevel) {
+            academicDetails = `Class ${registration.schoolLevel}`;
+            if (registration.schoolStream) academicDetails += `, ${registration.schoolStream}`;
+            if (registration.studentBoard) academicDetails += `, ${registration.studentBoard}`;
+          } else if (registration.departmentDegreeId) {
+            academicDetails = `College/University Degree`;
+            if (registration.metadata?.currentYear) academicDetails += ` (Year ${registration.metadata.currentYear})`;
+          }
+
+          // Robust calculation of costs (handles bundled vs separate payments)
+          const { registrationCost, debriefCost, totalAmount } = await this.subscriptionService.getDebriefCostSplit(registration);
+
+          const teamHtml = getDebriefTeamNotificationEmailTemplate(
+            registration.fullName || 'Student',
+            user.email,
+            `${registration.countryCode || '+91'} ${registration.mobileNumber}`,
+            registration.gender || 'Not specified',
+            totalAmount.toFixed(2),
+            registrationCost.toFixed(2),
+            debriefCost.toFixed(2),
+            registration.paymentReference || 'N/A',
+            registration.createdAt
+              ? new Date(registration.createdAt).toLocaleString('en-GB', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  timeZone: 'Asia/Kolkata',
+                  hour12: true,
+                })
+              : 'N/A',
+            program?.assessmentTitle || program?.name || 'Assessment Program',
+            academicDetails,
+            debriefAssets,
+          );
+
+          for (const forwardEmail of debriefForwardEmails) {
+            const teamMailOptions: Record<string, any> = {
+              from: `"${debriefFromName}" <${debriefFromEmail}>`,
+              to: forwardEmail,
+              subject: `[Debrief Booking] ${registration.fullName || 'Student'} - Expert Debrief Session`,
+              html: teamHtml,
+              attachments: [
+                {
+                  filename: attachmentFileName,
+                  content: pdfBuffer,
+                  contentType: 'application/pdf',
+                },
+              ],
+            };
+            await debriefTransporter.sendMail(teamMailOptions);
+            this.logger.log(`Debrief team notification sent to ${forwardEmail}`);
+          }
+
+          // Mark team notification as sent
+          const meta = registration.metadata || {};
+          meta.debriefTeamEmailSent = true;
+          await this.registrationRepo.update(registration.id, { metadata: meta });
+          this.logger.log(`Debrief team email marked as sent for user ${userId}`);
+
+        } catch (debriefErr) {
+          this.logger.error(
+            `Failed to send debrief team notification: ${debriefErr.message}`,
           );
         }
       }
