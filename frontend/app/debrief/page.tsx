@@ -319,15 +319,6 @@ export default function DebriefPage() {
                     </div>
 
                     <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 sm:p-10 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.15)]">
-                        <div className="mb-8 p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center gap-3">
-                            <div className="bg-[#1ED36A]/10 p-2 rounded-lg">
-                                <CheckIcon />
-                            </div>
-                            <p className="text-xs text-emerald-800 font-semibold leading-tight">
-                                These details are pre-filled from your registration and cannot be edited.
-                            </p>
-                        </div>
-
                         {hasExistingBooking && (
                             <div className="mb-8 p-6 bg-emerald-50/50 rounded-3xl border-2 border-dashed border-emerald-200 flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-700">
                                 <div className="bg-[#1ED36A] p-2.5 rounded-2xl shadow-lg shadow-emerald-200">
@@ -410,6 +401,7 @@ export default function DebriefPage() {
                                 </div>
                             </div>
 
+
                             <div className="space-y-5 pt-2">
                                 <div className="flex items-center gap-3 ml-1">
                                     <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Academic Profile</h3>
@@ -425,6 +417,17 @@ export default function DebriefPage() {
                                     <ReadOnlyField label="Stream" value={stream} isLoading={verifyingEmail} />
                                 )}
                             </div>
+
+                            {isEmailVerified && (
+                                <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-500">
+                                    <div className="bg-[#1ED36A]/10 p-2 rounded-lg">
+                                        <CheckIcon />
+                                    </div>
+                                    <p className="text-xs text-emerald-800 font-semibold leading-tight">
+                                        These details are pre-filled from your registration and cannot be edited.
+                                    </p>
+                                </div>
+                            )}
 
                             <div className="pt-4">
                                 <div className="bg-slate-50 border border-slate-100 rounded-3xl p-6 flex items-center justify-between shadow-inner">

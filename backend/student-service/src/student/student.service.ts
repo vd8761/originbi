@@ -1079,12 +1079,6 @@ export class StudentService {
           );
           this.logger.log(`Welcome email sent successfully to ${dto.email}`);
 
-          // If debrief is selected, also send the dedicated debrief email
-          if (savedReg.metadata?.debrief === true || savedReg.metadata?.debrief === 'true') {
-            this.subscriptionService.sendDebriefEmails(dto.email, savedReg.id).catch((err) => 
-              this.logger.error(`Failed to send dedicated debrief email during registration: ${err.message}`)
-            );
-          }
         } catch (emailErr) {
           this.logger.error(
             `[Email Failed] Failed to send welcome email to ${dto.email}`,
@@ -2030,6 +2024,9 @@ export class StudentService {
           dateStr,
           ((registration as any).program?.reportTitle as string) ||
             'Self Discovery Report',
+          new Date().getFullYear().toString(),
+          registration.metadata?.debrief === true ||
+            registration.metadata?.debrief === 'true',
         );
 
         try {

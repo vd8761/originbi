@@ -9,6 +9,7 @@ export const getAssessmentCompletionEmailTemplate = (
   dateStr: string,
   reportTitle: string = 'Self Discovery Report',
   year: string = new Date().getFullYear().toString(),
+  isDebrief: boolean = false,
 ) => {
   return `
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -87,9 +88,24 @@ export const getAssessmentCompletionEmailTemplate = (
                                 This report also gives you an overview of industry trends to help you strengthen your skills and prepare for the future. Origin BI wishes you the very best as you get ready for your future roles.
                             </p>
 
-                            <p style="margin: 0 0 30px 0; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 20px; color: #000000;">
+                            <p style="margin: 0 0 ${isDebrief ? '20px' : '30px'} 0; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 20px; color: #000000;">
                                 You can download your report from the attachment. Your password for the report is <strong>${reportPassword}</strong>.
                             </p>
+
+                            ${isDebrief ? `
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 30px; background-color: #F8F9FA; border-left: 4px solid #150089; border-radius: 4px;">
+                                <tr>
+                                    <td style="padding: 15px 20px;">
+                                        <p style="margin: 0; font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 14px; color: #150089; margin-bottom: 5px;">
+                                            Expert Debrief Session
+                                        </p>
+                                        <p style="margin: 0; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 13px; line-height: 18px; color: #444444;">
+                                            Your report has been shared with our expert debrief team. They will review your results in detail and contact you soon to schedule your one-on-one session.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            ` : ''}
 
                             <p style="margin: 0; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 17px; color: #000000;">
                                 Best regards,<br/>
