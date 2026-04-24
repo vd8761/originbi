@@ -168,7 +168,7 @@ export class SubscriptionService {
           order: { generatedAt: 'DESC' },
         });
 
-        if (report && report.reportUrl) {
+        if (report && report.reportNumber) {
           try {
             const port = process.env.PORT || 4004;
             const downloadUrl = `http://localhost:${port}/report/download/file/${report.reportNumber}`;
@@ -566,19 +566,8 @@ export class SubscriptionService {
       throw new Error('Payment gateway not configured');
     }
 
-    // --- ASSESSMENT COMPLETION CHECK ---
     const user = await this.userRepo.findOne({ where: { email: (email as any).email || email } });
     if (!user) throw new BadRequestException('User not found');
-
-    const latestSession = await this.dataSource.query(
-      `SELECT status FROM assessment_sessions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
-      [user.id]
-    );
-
-    if (!latestSession || latestSession.length === 0 || latestSession[0].status !== 'COMPLETED') {
-      throw new BadRequestException('You must complete all levels of your career assessment before booking a debrief session.');
-    }
-    // ------------------------------------
 
     // Amount can be overridden by env, defaults to 2500 INR (250000 paise)
     const baseAmountStr = this.configService.get<string>('NEXT_PUBLIC_DEBRIEF_AMOUNT') || '2500';

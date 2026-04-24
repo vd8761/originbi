@@ -36,10 +36,7 @@ const LEVEL_LABELS: Record<string, string> = {
     HSC: "HSC (12th Standard)",
 };
 
-const STANDARD_LABELS: Record<string, string> = {
-    "1": "11th Standard",
-    "2": "12th Standard",
-};
+
 
 // --- Components ---
 
@@ -83,7 +80,7 @@ export default function DebriefPage() {
     const [processing, setProcessing] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
     const [hasExistingBooking, setHasExistingBooking] = useState(false);
-    const [isAssessmentCompleted, setIsAssessmentCompleted] = useState(false);
+
     const [error, setError] = useState<string | null>(null);
 
     // Manual Entry States
@@ -130,12 +127,11 @@ export default function DebriefPage() {
                 setIsEmailVerified(true);
                 setUserNotFound(false);
                 
-                const [debriefStatus, assessmentStatus] = await Promise.all([
+                const [debriefStatus] = await Promise.all([
                     studentService.getDebriefStatus(email),
-                    studentService.getAssessmentStatus(profile.id)
                 ]);
 
-                setIsAssessmentCompleted(assessmentStatus.isCompleted);
+
                 if (debriefStatus?.booked || profile.metadata?.debrief) {
                     setHasExistingBooking(true);
                 }
@@ -259,7 +255,7 @@ export default function DebriefPage() {
                         </h2>
                         <p className="text-slate-500 mb-8 leading-relaxed">
                             {hasExistingBooking 
-                                ? "Our records show that you have already booked an expert debrief session. Our team will be in touch soon to schedule it."
+                                ? "You've already booked your expert debrief session! Our team is reviewing your report and will reach out to you shortly."
                                 : "Your debrief session has been successfully booked. Our expert team will review your assessment report and reach out to schedule your session."
                             }
                         </p>
@@ -287,7 +283,7 @@ export default function DebriefPage() {
     const board = BOARD_LABELS[academic.studentBoard] || academic.studentBoard;
     const level = LEVEL_LABELS[academic.schoolLevel] || academic.schoolLevel;
     const stream = STREAM_LABELS[academic.schoolStream] || academic.schoolStream;
-    const standard = STANDARD_LABELS[academic.currentYear] || academic.currentYear;
+
 
     return (
         <div className="min-h-screen bg-white flex flex-col relative overflow-hidden">
@@ -342,7 +338,7 @@ export default function DebriefPage() {
                                 <div>
                                     <h4 className="text-base font-black text-emerald-900 mb-1">Expert Debrief Confirmed</h4>
                                     <p className="text-xs text-emerald-800/80 font-bold leading-relaxed">
-                                        Our records show that you have already booked your expert debrief session. 
+                                        You've already booked your expert debrief session! 
                                         Our counsellors are reviewing your report and will reach out to you soon.
                                     </p>
                                 </div>
@@ -426,10 +422,7 @@ export default function DebriefPage() {
                                 </div>
 
                                 {academic?.schoolLevel === "HSC" && (
-                                    <div className="grid sm:grid-cols-2 gap-5">
-                                        <ReadOnlyField label="Stream" value={stream} isLoading={verifyingEmail} />
-                                        <ReadOnlyField label="Current Grade" value={standard} isLoading={verifyingEmail} />
-                                    </div>
+                                    <ReadOnlyField label="Stream" value={stream} isLoading={verifyingEmail} />
                                 )}
                             </div>
 
@@ -445,38 +438,19 @@ export default function DebriefPage() {
                                 </div>
                             </div>
 
-                            {/* CTA */}
-                            {!isAssessmentCompleted && (
-                                <div className="mb-6 p-4 bg-amber-50 rounded-2xl border border-amber-200 flex items-start gap-3">
-                                    <div className="bg-amber-100 p-2 rounded-lg mt-0.5">
-                                        <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-amber-900 font-bold mb-1">Assessment Incomplete</p>
-                                        <p className="text-xs text-amber-800 font-medium leading-relaxed">
-                                            You must complete all levels of your career assessment before you can book a debrief session. 
-                                            This allows our experts to have your full report ready for discussion.
-                                        </p>
-                                        <a href="/student/assessment" className="inline-block mt-3 text-xs font-black text-[#1ED36A] hover:text-[#18c562] transition-colors">
-                                            Continue Assessment →
-                                        </a>
-                                    </div>
-                                </div>
-                            )}
+
 
                             <button
                                 onClick={handlePayment}
-                                disabled={processing || !isAssessmentCompleted || hasExistingBooking}
+                                disabled={processing || !isEmailVerified || hasExistingBooking}
                                 className={`w-full h-16 rounded-full font-black text-lg text-white shadow-2xl transition-all relative overflow-hidden group flex items-center justify-center gap-3 ${
-                                    (processing || !isAssessmentCompleted || hasExistingBooking) ? "bg-slate-300 cursor-not-allowed shadow-none" : "bg-[#1ED36A] hover:bg-[#18c562] hover:-translate-y-1 active:translate-y-0"
+                                    (processing || !isEmailVerified || hasExistingBooking) ? "bg-slate-300 cursor-not-allowed shadow-none" : "bg-[#1ED36A] hover:bg-[#18c562] hover:-translate-y-1 active:translate-y-0"
                                 }`}
                             >
                                 <span className="relative z-10">
-                                    {hasExistingBooking ? "Already Booked" : !isAssessmentCompleted ? "Complete Assessment to Book" : processing ? "Processing..." : `Pay ₹${DEBRIEF_AMOUNT.toLocaleString("en-IN")} & Book`}
+                                    {hasExistingBooking ? "Already Booked" : processing ? "Processing..." : `Pay ₹${DEBRIEF_AMOUNT.toLocaleString("en-IN")} & Book`}
                                 </span>
-                                {!processing && isAssessmentCompleted && !hasExistingBooking && (
+                                {!processing && isEmailVerified && !hasExistingBooking && (
                                     <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                                 )}
                             </button>
