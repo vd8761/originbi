@@ -41,7 +41,7 @@ const ToastItem: React.FC<{ toast: ToastMessage; onRemove: () => void }> = ({ to
     }, [toast, onRemove]);
 
     return (
-        <div className={`flex items-start gap-3 p-4 rounded-lg border shadow-lg w-full max-w-sm animate-in slide-in-from-right-full transition-transform bg-white dark:bg-[#1e293b] ${bgColors[toast.type]} backdrop-blur-sm`}>
+        <div className={`flex items-start gap-3 p-4 rounded-lg border shadow-lg w-full max-w-sm animate-in slide-in-from-right-full transition-transform bg-white/95 dark:bg-[#24272B]/90 ${bgColors[toast.type]} backdrop-blur-md`}>
             <div className="shrink-0 mt-0.5">{icons[toast.type]}</div>
             <div className="flex-1">
                 {toast.title && (
@@ -49,7 +49,7 @@ const ToastItem: React.FC<{ toast: ToastMessage; onRemove: () => void }> = ({ to
                         {toast.title}
                     </h3>
                 )}
-                <p className="text-sm text-gray-700 dark:text-gray-300 break-words leading-relaxed">
+                <p className="text-sm text-gray-700 dark:text-white break-words leading-relaxed">
                     {toast.message}
                 </p>
             </div>

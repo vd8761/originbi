@@ -91,6 +91,21 @@ export const studentService = {
         }
     },
 
+    async getDebriefStatus(email: string) {
+        try {
+            const res = await fetch(`${API_URL}/student/subscription/debrief/status`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email }),
+            });
+            if (!res.ok) return { booked: false };
+            return await res.json();
+        } catch (error) {
+            console.error("Debrief status check failed", error);
+            return { booked: false };
+        }
+    },
+
     async createCounsellorOrder(email: string) {
         try {
             const res = await fetch(`${API_URL}/student/subscription/create-order`, {
@@ -142,6 +157,40 @@ export const studentService = {
         } catch (error) {
             console.error("Failed to fetch student report", error);
             return null;
+        }
+    },
+    async createDebriefOrder(email: string) {
+        try {
+            const res = await fetch(`${API_URL}/student/subscription/debrief/order`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email }),
+            });
+            if (!res.ok) throw new Error("Failed to create debrief order");
+            return await res.json();
+        } catch (error) {
+            console.error("Create debrief order failed", error);
+            throw error;
+        }
+    },
+
+    async verifyDebriefPayment(payload: {
+        email: string;
+        razorpay_order_id: string;
+        razorpay_payment_id: string;
+        razorpay_signature: string;
+    }) {
+        try {
+            const res = await fetch(`${API_URL}/student/subscription/debrief/verify`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            if (!res.ok) throw new Error("Debrief payment verification failed");
+            return await res.json();
+        } catch (error) {
+            console.error("Verify debrief payment failed", error);
+            throw error;
         }
     }
 };
