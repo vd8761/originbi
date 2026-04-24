@@ -1056,7 +1056,11 @@ export class StudentService {
       );
 
       // 8. Send Welcome Email
-      if (registration.metadata?.sendEmail) {
+      const shouldSendEmail =
+        savedReg.metadata?.sendEmail === true ||
+        savedReg.metadata?.sendEmail === 'true';
+
+      if (shouldSendEmail) {
         const validFrom = session.validFrom
           ? new Date(session.validFrom)
           : new Date();
@@ -1064,6 +1068,7 @@ export class StudentService {
         const programTitle = program.assessmentTitle || program.name;
 
         try {
+          this.logger.log(`[Email] Triggering welcome email to ${dto.email}`);
           await this.sendWelcomeEmail(
             dto.email,
             dto.full_name,
