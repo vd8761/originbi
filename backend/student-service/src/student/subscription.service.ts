@@ -19,12 +19,19 @@ interface RegistrationRow {
   user_id: number;
   has_ai_counsellor?: boolean;
   full_name?: string;
+  metadata?: RegistrationMetadata;
 }
 
 interface RazorpayOrderResponse {
   id: string;
   amount: number;
   currency: string;
+}
+
+interface RegistrationMetadata {
+  debrief?: boolean | string;
+  debriefTeamEmailSent?: boolean | string;
+  currentYear?: string | number;
 }
 
 export interface SubscriptionPlanInfo {
@@ -39,6 +46,22 @@ function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   if (typeof err === 'string') return err;
   return 'Unknown error';
+}
+
+interface RegistrationWithMetadata extends Registration {
+  metadata: RegistrationMetadata;
+}
+
+interface ReportJobResponse {
+  success: boolean;
+  jobId: string;
+  status?: string;
+  error?: string;
+}
+
+interface ReportStatusResponse {
+  status: 'PROCESSING' | 'COMPLETED' | 'ERROR';
+  error?: string;
 }
 
 @Injectable()
@@ -102,8 +125,8 @@ export class SubscriptionService {
     const debriefSub = await this.subscriptionRepo.findOne({
       where: {
         registrationId: registration.id,
-        planType: 'debrief' as any,
-        status: 'active' as any,
+        planType: 'debrief' as StudentSubscription['planType'],
+        status: 'active' as StudentSubscription['status'],
       },
       order: { createdAt: 'DESC' },
     });
@@ -158,7 +181,7 @@ export class SubscriptionService {
       const registration = await this.registrationRepo.findOne({
         where: { id: registrationId },
         relations: ['group'],
-      });
+      }) as RegistrationWithMetadata | null;
 
       if (!registration) return;
 
@@ -221,9 +244,9 @@ export class SubscriptionService {
           this.logger.log(`Triggering report generation for debrief attachment: ${generateUrl}`);
 
           const generateResponse = await lastValueFrom(
-            this.httpService.get(generateUrl),
+            this.httpService.get<ReportJobResponse>(generateUrl),
           );
-          const responseData = generateResponse.data as { success: boolean; jobId: string };
+          const responseData = generateResponse.data;
 
           if (responseData.success && responseData.jobId) {
             const jobId = responseData.jobId;
@@ -237,15 +260,15 @@ export class SubscriptionService {
             while (jobStatus === 'PROCESSING' && attempts < maxAttempts) {
               await new Promise((resolve) => setTimeout(resolve, 3000));
               try {
-                const statusRes = await lastValueFrom(this.httpService.get(pollUrl));
-                const statusData = statusRes.data as { status: 'PROCESSING' | 'COMPLETED' | 'ERROR'; error?: string };
+                const statusRes = await lastValueFrom(this.httpService.get<ReportStatusResponse>(pollUrl));
+                const statusData = statusRes.data;
                 jobStatus = statusData.status;
                 if (jobStatus === 'ERROR') {
-                  this.logger.warn(`Report generation failed for debrief: ${statusData.error}`);
+                  this.logger.warn(`Report generation failed for debrief: ${statusData.error || 'Unknown error'}`);
                   break;
                 }
-              } catch (pollErr: any) {
-                this.logger.warn(`Polling failed for debrief report job ${jobId}: ${pollErr.message}`);
+              } catch (pollErr: unknown) {
+                this.logger.warn(`Polling failed for debrief report job ${jobId}: ${getErrorMessage(pollErr)}`);
               }
               attempts++;
             }
@@ -253,17 +276,17 @@ export class SubscriptionService {
             if (jobStatus === 'COMPLETED') {
               const downloadUrl = `${reportServiceUrl}/download/status/${jobId}`;
               const pdfResponse = await lastValueFrom(
-                this.httpService.get(downloadUrl, { responseType: 'arraybuffer' }),
+                this.httpService.get<Buffer>(downloadUrl, { responseType: 'arraybuffer' }),
               );
-              pdfBuffer = Buffer.from(pdfResponse.data, 'binary');
+              pdfBuffer = Buffer.from(pdfResponse.data);
               attachmentFileName = `${(registration.fullName || 'Student').replace(/\s/g, '_')}_Report.pdf`;
               this.logger.log(`Report downloaded successfully for debrief team notification`);
             } else {
               this.logger.warn(`Report generation timed out or failed for debrief. Status: ${jobStatus}`);
             }
           }
-        } catch (downloadErr: any) {
-          this.logger.warn(`Could not generate/download report for debrief attachment: ${downloadErr.message}`);
+        } catch (downloadErr: unknown) {
+          this.logger.warn(`Could not generate/download report for debrief attachment: ${getErrorMessage(downloadErr)}`);
         }
       }
 
@@ -316,9 +339,12 @@ export class SubscriptionService {
         assets,
       );
 
+      const debriefFromNameString = String(fromName);
+      const debriefFromEmailString = String(fromEmail);
+
       for (const forwardEmail of debriefForwardEmails) {
-        const teamMailOptions: any = {
-          from: `"${fromName}" <${fromEmail}>`,
+        const teamMailOptions = {
+          from: `"${debriefFromNameString}" <${debriefFromEmailString}>`,
           to: forwardEmail,
           subject: `[Debrief Booking] ${registration.fullName || 'Student'} - Expert Debrief Session`,
           html: teamHtml,
@@ -336,15 +362,15 @@ export class SubscriptionService {
       }
 
       // 6. Mark team notification as sent to avoid duplicates
-      const freshReg = await this.registrationRepo.findOne({ where: { id: registrationId } });
+      const freshReg = await this.registrationRepo.findOne({ where: { id: registrationId } }) as RegistrationWithMetadata | null;
       if (freshReg) {
         const meta = freshReg.metadata || {};
         meta.debriefTeamEmailSent = true;
-        await this.registrationRepo.update(registrationId, { metadata: meta });
+        await this.registrationRepo.update(registrationId, { metadata: meta as any });
       }
 
-    } catch (err: any) {
-      this.logger.error(`Failed to send debrief emails: ${err.message}`);
+    } catch (err: unknown) {
+      this.logger.error(`Failed to send debrief emails: ${getErrorMessage(err)}`);
     }
   }
 
@@ -665,7 +691,7 @@ export class SubscriptionService {
       throw new Error('Payment gateway not configured');
     }
 
-    const user = await this.userRepo.findOne({ where: { email: (email as any).email || email } });
+    const user = await this.userRepo.findOne({ where: { email } });
     if (!user) throw new BadRequestException('User not found');
 
     // Amount can be overridden by env, defaults to 2500 INR (250000 paise)
@@ -734,7 +760,7 @@ export class SubscriptionService {
       }
 
       const reg = registration[0];
-      const metadata = (reg as any).metadata || {};
+      const metadata = reg.metadata || {};
 
       // Check registration metadata first (fastest)
       if (metadata.debrief) {
@@ -742,8 +768,8 @@ export class SubscriptionService {
         const sub = await this.subscriptionRepo.findOne({
           where: {
             registrationId: reg.id,
-            planType: 'debrief' as any,
-            status: 'active' as any,
+            planType: 'debrief' as StudentSubscription['planType'],
+            status: 'active' as StudentSubscription['status'],
           },
           order: { createdAt: 'DESC' },
         });
@@ -824,7 +850,7 @@ export class SubscriptionService {
       );
 
       // Update metadata on registration for easy frontend/subsequent workflow checking
-      const currentMeta = (reg as any).metadata || {};
+      const currentMeta = reg.metadata || {};
       const newMeta = { ...currentMeta, debrief: true };
       
       await queryRunner.query(
@@ -839,8 +865,8 @@ export class SubscriptionService {
       );
 
       // Trigger emails in background
-      this.sendDebriefEmails((body.email as any).email || body.email, reg.id).catch((err) =>
-        this.logger.error(`Background debrief emails failed: ${err.message}`),
+      this.sendDebriefEmails(body.email, reg.id).catch((err: unknown) =>
+        this.logger.error(`Background debrief emails failed: ${getErrorMessage(err)}`),
       );
 
       return {
