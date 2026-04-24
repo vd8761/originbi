@@ -150,8 +150,7 @@ export class ReportController {
           });
           return;
         }
-        const user = groupData[0];
-        const reportJSON = await buildReportJSON(user);
+        const reportJSON = await buildReportJSON(groupData[0]);
         res.json({ success: true, data: reportJSON });
       } catch (error) {
         logger.error(
@@ -178,7 +177,6 @@ export class ReportController {
           });
           return;
         }
-        const user = groupData[0];
         
         // Generate short report directly
         const jobId = `short_student_${userId}_${Date.now()}`;

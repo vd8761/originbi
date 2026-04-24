@@ -4,7 +4,6 @@ import { SchoolReport } from '../reports/school/schoolReport';
 import { CollegeReport } from '../reports/college/collegeReport';
 import { EmployeeReport } from '../reports/employee/employeeReport';
 import { CxoReport } from '../reports/cxo/cxoReport';
-import { SchoolShortReport } from '../reports/school/schoolShortReport';
 import { CollegeShortReport } from '../reports/college/collegeShortReport';
 import { EmployeeShortReport } from '../reports/employee/employeeShortReport';
 import {
@@ -207,11 +206,6 @@ export async function generateShortReportForUser(
   );
 
   switch (user.program_type) {
-    case ProgramType.SCHOOL:
-      await new SchoolShortReport(
-        user as unknown as SchoolData,
-      ).generate(filePath);
-      break;
     case ProgramType.COLLEGE:
       await new CollegeShortReport(
         user as unknown as CollegeData,

@@ -32,14 +32,14 @@ export class CollegeShortReport extends BaseReport {
       stream.on('error', reject);
     });
 
-    await this.generateSinglePageReport();
+    this.generateSinglePageReport();
 
     this.doc.end();
     await streamFinished;
     logger.info('[College Short REPORT] PDF Generation completed.');
   }
 
-  private async generateSinglePageReport(): Promise<void> {
+  private generateSinglePageReport(): void {
     const backgroundPath = this.resolveBackgroundPath();
     this._currentBackground =
       backgroundPath ?? 'public/assets/images/Watermark_Background.jpg';
