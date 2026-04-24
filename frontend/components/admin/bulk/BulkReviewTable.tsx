@@ -67,6 +67,8 @@ export const BulkReviewTable: React.FC<BulkReviewTableProps> = ({ validRows, inv
                         <th className="px-4 py-3">Department</th>
                         <th className="px-4 py-3">Degree</th>
                         <th className="px-4 py-3">Year</th>
+                        <th className="px-4 py-3">Current Role</th>
+                        <th className="px-4 py-3">Role Description</th>
                         <th className="px-4 py-3">Start Date</th>
                         <th className="px-4 py-3">End Date</th>
                         <th className="px-4 py-3">Password</th>
@@ -110,6 +112,12 @@ export const BulkReviewTable: React.FC<BulkReviewTableProps> = ({ validRows, inv
                                     <td className="px-4 py-3">
                                         {isCollege ? renderCell(row, ['CurrentYear', 'current_year']) : '-'}
                                     </td>
+                                    <td className="px-4 py-3">
+                                        {renderCell(row, ['CurrentRole', 'current_role', 'currentRole', 'Current Role'])}
+                                    </td>
+                                    <td className="px-4 py-3 max-w-[200px] truncate" title={String(row.rawData['RoleDescription'] || row.rawData['role_description'] || row.rawData['Role Description'] || '')}>
+                                        {renderCell(row, ['RoleDescription', 'role_description', 'roleDescription', 'Role Description'])}
+                                    </td>
                                     <td className="px-4 py-3">{renderCell(row, ['ExamStart', 'exam_start_date'])}</td>
                                     <td className="px-4 py-3">{renderCell(row, ['ExamEnd', 'exam_end_date'])}</td>
                                     <td className="px-4 py-3 blur-[2px] hover:blur-none transition-all cursor-pointer select-none">
@@ -119,7 +127,7 @@ export const BulkReviewTable: React.FC<BulkReviewTableProps> = ({ validRows, inv
                                 </tr>
                                 {hasError && (
                                     <tr>
-                                        <td colSpan={16} className="px-4 py-2 bg-red-500/10 border-b border-red-500/20">
+                                        <td colSpan={18} className="px-4 py-2 bg-red-500/10 border-b border-red-500/20">
                                             <div className="flex items-center gap-2 text-red-500 text-sm font-medium">
                                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

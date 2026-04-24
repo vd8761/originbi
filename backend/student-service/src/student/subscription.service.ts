@@ -1,21 +1,37 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { StudentSubscription } from '@originbi/shared-entities';
-import { Registration } from '@originbi/shared-entities';
+import { Registration, StudentSubscription } from '@originbi/shared-entities';
 import { ConfigService } from '@nestjs/config';
+import { HttpService } from '@nestjs/axios';
+import { AssessmentReport } from '../entities/assessment-report.entity';
+import { User } from '../entities/student.entity';
+import { Program } from '../entities/program.entity';
+import { SettingsService } from '../settings/settings.service';
+import { lastValueFrom } from 'rxjs';
+import * as nodemailer from 'nodemailer';
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
+import { getDebriefBookingEmailTemplate } from '../mail/templates/debrief-booking.template';
+import { getDebriefTeamNotificationEmailTemplate } from '../mail/templates/debrief-team-notification.template';
 
 interface RegistrationRow {
   id: number;
   user_id: number;
   has_ai_counsellor?: boolean;
   full_name?: string;
+  metadata?: RegistrationMetadata;
 }
 
 interface RazorpayOrderResponse {
   id: string;
   amount: number;
   currency: string;
+}
+
+interface RegistrationMetadata {
+  debrief?: boolean | string;
+  debriefTeamEmailSent?: boolean | string;
+  currentYear?: string | number;
 }
 
 export interface SubscriptionPlanInfo {
@@ -32,6 +48,22 @@ function getErrorMessage(err: unknown): string {
   return 'Unknown error';
 }
 
+interface RegistrationWithMetadata extends Registration {
+  metadata: RegistrationMetadata;
+}
+
+interface ReportJobResponse {
+  success: boolean;
+  jobId: string;
+  status?: string;
+  error?: string;
+}
+
+interface ReportStatusResponse {
+  status: 'PROCESSING' | 'COMPLETED' | 'ERROR';
+  error?: string;
+}
+
 @Injectable()
 export class SubscriptionService {
   private readonly logger = new Logger(SubscriptionService.name);
@@ -41,9 +73,102 @@ export class SubscriptionService {
     private readonly subscriptionRepo: Repository<StudentSubscription>,
     @InjectRepository(Registration)
     private readonly registrationRepo: Repository<Registration>,
+    @InjectRepository(AssessmentReport)
+    private readonly reportRepo: Repository<AssessmentReport>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(Program)
+    private readonly programRepo: Repository<Program>,
     private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
+    private readonly httpService: HttpService,
+    private readonly settingsService: SettingsService,
   ) {}
+
+  /**
+   * Creates a configured nodemailer transporter backed by AWS SES v2.
+   */
+  private createEmailTransporter() {
+    const region =
+      this.configService.get<string>('AWS_REGION') ||
+      this.configService.get<string>('AWS_DEFAULT_REGION');
+    const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
+    const secretAccessKey = this.configService.get<string>(
+      'AWS_SECRET_ACCESS_KEY',
+    );
+
+    if (!region || !accessKeyId || !secretAccessKey) {
+      throw new Error(
+        'AWS SES configuration is missing. Ensure AWS_REGION, AWS_ACCESS_KEY_ID, and AWS_SECRET_ACCESS_KEY are set.',
+      );
+    }
+
+    const sesClient = new SESv2Client({
+      region,
+      credentials: { accessKeyId, secretAccessKey },
+    });
+
+    return nodemailer.createTransport({
+      SES: { sesClient, SendEmailCommand },
+    } as nodemailer.TransportOptions);
+  }
+
+  /**
+   * Calculate the registration and debrief costs from a registration and its subscriptions.
+   * Handles both bundled (paid together) and separate (paid via /debrief) payments.
+   */
+  public async getDebriefCostSplit(registration: Registration): Promise<{
+    registrationCost: number;
+    debriefCost: number;
+    totalAmount: number;
+  }> {
+    const debriefSub = await this.subscriptionRepo.findOne({
+      where: {
+        registrationId: registration.id,
+        planType: 'debrief' as StudentSubscription['planType'],
+        status: 'active' as StudentSubscription['status'],
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    const debriefAmountStr =
+      this.configService.get<string>('DEBRIEF_AMOUNT') ||
+      this.configService.get<string>('NEXT_PUBLIC_DEBRIEF_AMOUNT') ||
+      '2500';
+    const defaultDebriefCost = parseFloat(debriefAmountStr);
+
+    if (debriefSub) {
+      // Paid separately via /debrief flow
+      const debriefCost = parseFloat(debriefSub.amount);
+      const registrationCost = parseFloat(
+        registration.paymentAmount?.toString() || '0',
+      );
+      return {
+        registrationCost,
+        debriefCost,
+        totalAmount: registrationCost + debriefCost,
+      };
+    } else {
+      // Likely paid together (bundled) during initial registration
+      const fullAmount = parseFloat(
+        registration.paymentAmount?.toString() || '0',
+      );
+      if (fullAmount > defaultDebriefCost) {
+        return {
+          registrationCost: fullAmount - defaultDebriefCost,
+          debriefCost: defaultDebriefCost,
+          totalAmount: fullAmount,
+        };
+      } else {
+        // Fallback: registration was paid, debrief might be included or not yet paid
+        return {
+          registrationCost: fullAmount,
+          debriefCost: defaultDebriefCost,
+          totalAmount: fullAmount + defaultDebriefCost,
+        };
+      }
+    }
+  }
 
   private async queryRegistration(
     sql: string,
@@ -52,6 +177,255 @@ export class SubscriptionService {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const result = await this.dataSource.query(sql, params);
     return result as RegistrationRow[];
+  }
+
+  /**
+   * Send debrief booking emails to student and expert team
+   */
+  public async sendDebriefEmails(email: string, registrationId: number) {
+    try {
+      // 1. Get detailed info for the templates
+      const registration = (await this.registrationRepo.findOne({
+        where: { id: registrationId },
+        relations: ['group'],
+      })) as RegistrationWithMetadata | null;
+
+      if (!registration) return;
+
+      // Idempotency check: if team email was sent, both emails (student/team) are already handled
+      if (
+        registration.metadata?.debriefTeamEmailSent === true ||
+        registration.metadata?.debriefTeamEmailSent === 'true'
+      ) {
+        this.logger.log(
+          `Debrief emails already sent for registration ${registrationId}, skipping.`,
+        );
+        return;
+      }
+
+      const user = await this.userRepo.findOne({
+        where: { id: registration.userId },
+      });
+      const program = await this.programRepo.findOne({
+        where: { id: registration.programId },
+      });
+
+      if (!user) return;
+
+      // 2. Prepare assets and transporter
+      const assets = {
+        logo: `https://mind.originbi.com/Origin-BI-Logo-01.png`,
+        popper: `${this.configService.get<string>('API_URL') || 'https://mind.originbi.com'}/assets/Popper.png`,
+        footer: `${this.configService.get<string>('API_URL') || 'https://mind.originbi.com'}/assets/Email_Vector.png`,
+      };
+
+      const transporter = this.createEmailTransporter();
+      const emailConfig = (await this.settingsService.getEmailConfig(
+        'report_email_config',
+      )) as {
+        fromName: string;
+        fromAddress: string;
+        replyToAddress: string;
+      };
+
+      const { fromName, fromAddress: fromEmail, replyToAddress } = emailConfig;
+
+      // 3. Send Student Confirmation Email IMMEDIATELY
+      const studentHtml = getDebriefBookingEmailTemplate(
+        registration.fullName || 'Student',
+        assets,
+      );
+
+      const studentMailOptions = {
+        from: `"${fromName}" <${fromEmail}>`,
+        to: user.email,
+        subject: `Expert Debrief Booking Confirmed - Origin BI`,
+        html: studentHtml,
+        replyTo: replyToAddress,
+      };
+
+      await transporter.sendMail(studentMailOptions);
+      this.logger.log(
+        `Debrief booking confirmation sent to student: ${user.email}`,
+      );
+
+      // 4. Try to send Team Notification (only if report is already ready)
+      let pdfBuffer: Buffer | null = null;
+      let attachmentFileName = '';
+
+      const sessionSql = `SELECT id FROM assessment_sessions WHERE registration_id = $1 AND status = 'COMPLETED' ORDER BY updated_at DESC LIMIT 1`;
+      const sessions = (await this.dataSource.query(sessionSql, [
+        registrationId,
+      ])) as unknown as { id: number }[];
+
+      if (sessions && sessions.length > 0) {
+        try {
+          const port = process.env.PORT || 4004;
+          const reportServiceUrl = `http://localhost:${port}/report`;
+
+          // Trigger report generation for this user
+          const generateUrl = `${reportServiceUrl}/generate/student/${registration.userId}`;
+          this.logger.log(
+            `Triggering report generation for debrief attachment: ${generateUrl}`,
+          );
+
+          const generateResponse = await lastValueFrom(
+            this.httpService.get<ReportJobResponse>(generateUrl),
+          );
+          const responseData: ReportJobResponse = generateResponse.data;
+
+          if (responseData.success && responseData.jobId) {
+            const jobId = responseData.jobId;
+
+            // Poll for completion
+            let jobStatus: 'PROCESSING' | 'COMPLETED' | 'ERROR' = 'PROCESSING';
+            let attempts = 0;
+            const maxAttempts = 30; // 30 * 3s = 90 seconds timeout
+            const pollUrl = `${reportServiceUrl}/download/status/${jobId}?json=true`;
+
+            while (jobStatus === 'PROCESSING' && attempts < maxAttempts) {
+              await new Promise((resolve) => setTimeout(resolve, 3000));
+              try {
+                const statusRes = await lastValueFrom(
+                  this.httpService.get<ReportStatusResponse>(pollUrl),
+                );
+                const statusData = statusRes.data;
+                jobStatus = statusData.status;
+                if (jobStatus === 'ERROR') {
+                  this.logger.warn(
+                    `Report generation failed for debrief: ${statusData.error || 'Unknown error'}`,
+                  );
+                  break;
+                }
+              } catch (pollErr: unknown) {
+                this.logger.warn(
+                  `Polling failed for debrief report job ${jobId}: ${getErrorMessage(pollErr)}`,
+                );
+              }
+              attempts++;
+            }
+
+            if (jobStatus === 'COMPLETED') {
+              const downloadUrl = `${reportServiceUrl}/download/status/${jobId}`;
+              const pdfResponse = await lastValueFrom(
+                this.httpService.get<Buffer>(downloadUrl, {
+                  responseType: 'arraybuffer',
+                }),
+              );
+              pdfBuffer = Buffer.from(pdfResponse.data);
+              attachmentFileName = `${(registration.fullName || 'Student').replace(/\s/g, '_')}_Report.pdf`;
+              this.logger.log(
+                `Report downloaded successfully for debrief team notification`,
+              );
+            } else {
+              this.logger.warn(
+                `Report generation timed out or failed for debrief. Status: ${jobStatus}`,
+              );
+            }
+          }
+        } catch (downloadErr: unknown) {
+          this.logger.warn(
+            `Could not generate/download report for debrief attachment: ${getErrorMessage(downloadErr)}`,
+          );
+        }
+      }
+
+      // If report is not ready, team notification will be sent later by handleAssessmentCompletion
+      if (!pdfBuffer) {
+        this.logger.log(
+          `Debrief student confirmation sent. Team notification postponed: report not yet ready for registration ${registrationId}`,
+        );
+        return;
+      }
+
+      // 5. Report is ready — send Team Notification now
+      const forwardEmailsStr =
+        this.configService.get<string>('DEBRIEF_FORWARD_EMAILS') ||
+        'info@originbi.com,vikashuvi07@gmail.com';
+      const debriefForwardEmails = forwardEmailsStr
+        .split(',')
+        .map((e: string) => e.trim())
+        .filter((e: string) => e.length > 0);
+
+      // Construct academic details string
+      let academicDetails = 'Not specified';
+      if (registration.schoolLevel) {
+        academicDetails = `Class ${registration.schoolLevel}`;
+        if (registration.schoolStream)
+          academicDetails += `, ${registration.schoolStream}`;
+        if (registration.studentBoard)
+          academicDetails += `, ${registration.studentBoard}`;
+      } else if (registration.departmentDegreeId) {
+        academicDetails = `College/University Degree`;
+        if (registration.metadata?.currentYear)
+          academicDetails += ` (Year ${registration.metadata.currentYear})`;
+      }
+
+      // Robust calculation of costs (handles bundled vs separate payments)
+      const { registrationCost, debriefCost, totalAmount } =
+        await this.getDebriefCostSplit(registration);
+
+      const teamHtml = getDebriefTeamNotificationEmailTemplate(
+        registration.fullName || 'Student',
+        user.email,
+        `${registration.countryCode || '+91'} ${registration.mobileNumber}`,
+        registration.gender || 'Not specified',
+        totalAmount.toFixed(2),
+        registrationCost.toFixed(2),
+        debriefCost.toFixed(2),
+        registration.paymentReference || 'N/A',
+        new Date(registration.createdAt).toLocaleString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'Asia/Kolkata',
+          hour12: true,
+        }),
+        program?.assessmentTitle || program?.name || 'Assessment Program',
+        academicDetails,
+        assets,
+      );
+
+      const debriefFromNameString = String(fromName);
+      const debriefFromEmailString = String(fromEmail);
+
+      for (const forwardEmail of debriefForwardEmails) {
+        const teamMailOptions = {
+          from: `"${debriefFromNameString}" <${debriefFromEmailString}>`,
+          to: forwardEmail,
+          subject: `[Debrief Booking] ${registration.fullName || 'Student'} - Expert Debrief Session`,
+          html: teamHtml,
+          attachments: [
+            {
+              filename: attachmentFileName,
+              content: pdfBuffer,
+              contentType: 'application/pdf',
+            },
+          ],
+        };
+
+        await transporter.sendMail(teamMailOptions);
+        this.logger.log(`Debrief team notification sent to: ${forwardEmail}`);
+      }
+
+      // 6. Mark team notification as sent to avoid duplicates
+      const freshReg = (await this.registrationRepo.findOne({
+        where: { id: registrationId },
+      })) as RegistrationWithMetadata | null;
+      if (freshReg) {
+        const meta = freshReg.metadata || {};
+        meta.debriefTeamEmailSent = true;
+        await this.registrationRepo.update(registrationId, {
+          metadata: meta,
+        } as unknown as any);
+      }
+    } catch (err: unknown) {
+      this.logger.error(
+        `Failed to send debrief emails: ${getErrorMessage(err)}`,
+      );
+    }
   }
 
   /**
@@ -350,6 +724,233 @@ export class SubscriptionService {
     } catch (error: unknown) {
       this.logger.error(`Manual activation failed: ${getErrorMessage(error)}`);
       return { success: false };
+    }
+  }
+
+  /**
+   * Create a Razorpay order for Debrief Booking
+   */
+  async createDebriefOrder(email: string): Promise<{
+    orderId: string;
+    amount: number;
+    currency: string;
+    keyId: string;
+  }> {
+    const razorpayKeyId = this.configService.get<string>('RAZORPAY_KEY_ID');
+    const razorpayKeySecret = this.configService.get<string>(
+      'RAZORPAY_KEY_SECRET',
+    );
+
+    if (!razorpayKeyId || !razorpayKeySecret) {
+      throw new Error('Payment gateway not configured');
+    }
+
+    const user = await this.userRepo.findOne({ where: { email } });
+    if (!user) throw new BadRequestException('User not found');
+
+    // Amount can be overridden by env, defaults to 2500 INR (250000 paise)
+    const baseAmountStr =
+      this.configService.get<string>('NEXT_PUBLIC_DEBRIEF_AMOUNT') || '2500';
+    const amountStr =
+      this.configService.get<string>('DEBRIEF_AMOUNT') || baseAmountStr;
+    const amount = parseInt(amountStr, 10) * 100;
+    const currency = 'INR';
+
+    // Create Razorpay order via API
+    const orderData = {
+      amount,
+      currency,
+      receipt: `debrief_${String(Date.now())}`,
+      notes: { email, plan: 'debrief' },
+    };
+
+    const response = await fetch('https://api.razorpay.com/v1/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization:
+          'Basic ' +
+          Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString(
+            'base64',
+          ),
+      },
+      body: JSON.stringify(orderData),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      this.logger.error(`Razorpay debrief order creation failed: ${err}`);
+      throw new Error('Failed to create debrief payment order');
+    }
+
+    const order = (await response.json()) as RazorpayOrderResponse;
+
+    return {
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      keyId: razorpayKeyId,
+    };
+  }
+
+  /**
+   * Check if a student has booked a debrief session
+   */
+  async getDebriefStatus(email: string): Promise<{
+    booked: boolean;
+    purchasedAt?: Date | null;
+    paymentReference?: string | null;
+  }> {
+    try {
+      const registration = await this.queryRegistration(
+        `SELECT r.id, r.user_id, r.metadata
+                 FROM registrations r
+                 JOIN users u ON r.user_id = u.id
+                 WHERE LOWER(u.email) = LOWER($1) AND r.is_deleted = false
+                 ORDER BY r.created_at DESC LIMIT 1`,
+        [email],
+      );
+
+      if (!registration || registration.length === 0) {
+        return { booked: false };
+      }
+
+      const reg = registration[0];
+      const metadata = reg.metadata || {};
+
+      // Check registration metadata first (fastest)
+      if (metadata.debrief) {
+        // Try to find the actual subscription record for details
+        const sub = await this.subscriptionRepo.findOne({
+          where: {
+            registrationId: reg.id,
+            planType: 'debrief' as StudentSubscription['planType'],
+            status: 'active' as StudentSubscription['status'],
+          },
+          order: { createdAt: 'DESC' },
+        });
+
+        return {
+          booked: true,
+          purchasedAt: sub?.purchasedAt || null,
+          paymentReference: sub?.paymentReference || null,
+        };
+      }
+
+      return { booked: false };
+    } catch (error: unknown) {
+      this.logger.error(
+        `Error checking debrief status: ${getErrorMessage(error)}`,
+      );
+      return { booked: false };
+    }
+  }
+
+  /**
+   * Verify Razorpay payment and activate debrief
+   */
+  async verifyDebriefPayment(body: {
+    email: string;
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }): Promise<{ success: boolean; message: string }> {
+    const razorpayKeySecret = this.configService.get<string>(
+      'RAZORPAY_KEY_SECRET',
+    );
+
+    if (!razorpayKeySecret) {
+      throw new Error('Payment gateway not configured');
+    }
+
+    // Verify signature
+    const crypto = await import('crypto');
+    const expectedSignature = crypto
+      .createHmac('sha256', razorpayKeySecret)
+      .update(`${body.razorpay_order_id}|${body.razorpay_payment_id}`)
+      .digest('hex');
+
+    if (expectedSignature !== body.razorpay_signature) {
+      this.logger.warn(`Debrief payment verification failed for ${body.email}`);
+      return { success: false, message: 'Payment verification failed' };
+    }
+
+    // Get user and registration
+    const registration = await this.queryRegistration(
+      `SELECT r.id, r.user_id, r.metadata
+             FROM registrations r
+             JOIN users u ON r.user_id = u.id
+             WHERE u.email = $1 AND r.is_deleted = false
+             ORDER BY r.created_at DESC LIMIT 1`,
+      [body.email],
+    );
+
+    if (!registration || registration.length === 0) {
+      return { success: false, message: 'User not found' };
+    }
+
+    const reg = registration[0];
+
+    // Use a transaction to ensure atomicity
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const dbAmount =
+        this.configService.get<string>('DEBRIEF_AMOUNT') ||
+        this.configService.get<string>('NEXT_PUBLIC_DEBRIEF_AMOUNT') ||
+        '2500';
+
+      // Create subscription record
+      await queryRunner.query(
+        `INSERT INTO student_subscriptions 
+                    (user_id, registration_id, plan_type, status, payment_provider, payment_reference, payment_order_id, amount, currency, purchased_at, metadata)
+                 VALUES ($1, $2, 'debrief', 'active', 'razorpay', $3, $4, $5, 'INR', NOW(), '{"debrief": true}')`,
+        [
+          reg.user_id,
+          reg.id,
+          body.razorpay_payment_id,
+          body.razorpay_order_id,
+          parseFloat(dbAmount),
+        ],
+      );
+
+      // Update metadata on registration for easy frontend/subsequent workflow checking
+      const currentMeta = reg.metadata || {};
+      const newMeta = { ...currentMeta, debrief: true };
+
+      await queryRunner.query(
+        `UPDATE registrations SET metadata = $1 WHERE id = $2`,
+        [JSON.stringify(newMeta), reg.id],
+      );
+
+      await queryRunner.commitTransaction();
+
+      this.logger.log(
+        `✅ Debrief booked for ${body.email} (payment: ${body.razorpay_payment_id})`,
+      );
+
+      // Trigger emails in background
+      this.sendDebriefEmails(body.email, reg.id).catch((err: unknown) =>
+        this.logger.error(
+          `Background debrief emails failed: ${getErrorMessage(err)}`,
+        ),
+      );
+
+      return {
+        success: true,
+        message: 'Debrief booked successfully!',
+      };
+    } catch (error: unknown) {
+      await queryRunner.rollbackTransaction();
+      this.logger.error(`Debrief booking failed: ${getErrorMessage(error)}`);
+      return {
+        success: false,
+        message: 'Booking failed. Please contact support.',
+      };
+    } finally {
+      await queryRunner.release();
     }
   }
 }
