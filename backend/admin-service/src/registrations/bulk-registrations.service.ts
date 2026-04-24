@@ -871,6 +871,8 @@ export class BulkRegistrationsService {
             'year',
           ])
         : undefined,
+      currentRole: this.getValue(rawData, ['CurrentRole', 'current_role', 'Current Role', 'currentRole']) || undefined,
+      roleDescription: this.getValue(rawData, ['RoleDescription', 'role_description', 'Role Description', 'roleDescription']) || undefined,
 
       password: this.getValue(rawData, ['Password', 'password']) || 'Admin@123',
       sendEmail: (() => {
@@ -1111,6 +1113,13 @@ export class BulkRegistrationsService {
       if (!year) return 'Current Year is required';
       if (!['1', '2', '3', '4'].includes(String(year).trim()))
         return 'Current Year must be 1, 2, 3, or 4';
+    } else {
+      // Employee / Corporate Program
+      const role = row['CurrentRole'] || row['current_role'] || row['Current Role'] || row['currentRole'];
+      const desc = row['RoleDescription'] || row['role_description'] || row['Role Description'] || row['roleDescription'];
+
+      if (!role) return 'Current Role is required for Employee programs';
+      if (!desc) return 'Role Description is required for Employee programs';
     }
 
     // 4. Dates
