@@ -61,10 +61,10 @@ export class ReportController {
       res.json({
         success: true,
         jobId,
-        statusUrl: `/download/status/${jobId}`,
+        statusUrl: `/report/download/status/${jobId}`,
       });
     } else {
-      res.redirect(`/download/status/${jobId}`);
+      res.redirect(`/report/download/status/${jobId}`);
     }
   }
 
@@ -87,10 +87,10 @@ export class ReportController {
       res.json({
         success: true,
         jobId,
-        statusUrl: `/download/status/${jobId}`,
+        statusUrl: `/report/download/status/${jobId}`,
       });
     } else {
-      res.redirect(`/download/status/${jobId}`);
+      res.redirect(`/report/download/status/${jobId}`);
     }
   }
 
@@ -119,15 +119,16 @@ export class ReportController {
 
     res.json({
       success: true,
-      statusUrl: `/download/status/${jobId}`,
+      statusUrl: `/report/download/status/${jobId}`,
     });
   }
 
-  // 4. Single Student Report Route (PDF or JSON with ?api=true)
+  // 4. Single Student Report Route (PDF or JSON with ?api=true, Short Report with ?short=true)
   @Get('generate/student/:student_id')
   async generateSingleUserReport(
     @Param('student_id') userId: string,
     @Query('api') apiMode: string,
+    @Query('short') shortMode: string,
     @Res() res: Response,
   ): Promise<void> {
     if (!userId) {
@@ -165,6 +166,45 @@ export class ReportController {
       return;
     }
 
+    // ── Short Report Mode ──
+    if (shortMode === 'true') {
+      logger.info(`[API] Short Report Request for student: ${userId}`);
+      try {
+        const groupData = await fetchUserAssessmentData([userId]);
+        if (!groupData || groupData.length === 0) {
+          res.status(HttpStatus.NOT_FOUND).json({
+            success: false,
+            error: 'No completed assessment found for this student.',
+          });
+          return;
+        }
+        const user = groupData[0];
+        
+        // Generate short report directly
+        const jobId = `short_student_${userId}_${Date.now()}`;
+        
+        this.reportQueue
+          .processSingleUserShortReport(userId, jobId)
+          .catch((err) => logger.error('Background Job Error', err));
+
+        res.json({
+          success: true,
+          jobId,
+          statusUrl: `/report/download/status/${jobId}`,
+        });
+      } catch (error) {
+        logger.error(
+          `[API] Short Report Generation failed for ${userId}:`,
+          error,
+        );
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+          success: false,
+          error: (error as Error).message,
+        });
+      }
+      return;
+    }
+
     // ── Standard PDF Mode ──
     logger.info(`[API] Start Single Student Report: ${userId}`);
 
@@ -177,7 +217,7 @@ export class ReportController {
     res.json({
       success: true,
       jobId,
-      statusUrl: `/download/status/${jobId}`,
+      statusUrl: `/report/download/status/${jobId}`,
     });
   }
 
@@ -215,7 +255,7 @@ export class ReportController {
       if (job.status === 'COMPLETED') {
         res.json({
           status: 'COMPLETED',
-          downloadUrl: `/download/status/${jobId}?download=true`,
+          downloadUrl: `/report/download/status/${jobId}?download=true`,
           password: job.password,
         });
         return;
