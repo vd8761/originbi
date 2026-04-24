@@ -9,6 +9,7 @@ import RequireStudent from '../../../components/auth/RequireStudent';
 import { studentService } from '../../../lib/services/student.service';
 import { ArrowRightWithoutLineIcon, PhoneIcon, EmailIcon, LockIcon, EyeIcon, EyeOffIcon, XIcon } from '../../../components/icons';
 import { capitalizeWords, getAvatarColor, getInitials } from '../../../lib/utils';
+import DebriefPromoToast from '../../../components/student/DebriefPromoToast';
 
 configureAmplify();
 
@@ -105,6 +106,7 @@ function ProfileSettingsContent({ user }: { user: UserProfile | null }) {
 
     return (
         <div className="w-full">
+            <DebriefPromoToast />
             {/* Breadcrumbs */}
             <div className="flex items-center text-xs text-black dark:text-white mb-1.5 font-normal flex-wrap">
                 <span onClick={() => router.push('/student/dashboard')} className="cursor-pointer hover:underline text-gray-500 dark:text-gray-400">Dashboard</span>

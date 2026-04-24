@@ -1984,6 +1984,40 @@ export class StudentService {
             `Assessment report-ready notification already exists for user ${userId}, skipping duplicate.`,
           );
         }
+
+        // --- Debrief Promotion Notification ---
+        const isSchool = program?.code?.toUpperCase().includes('SCHOOL');
+        const debriefEnabled =
+          registration.metadata?.debrief === true ||
+          registration.metadata?.debrief === 'true';
+
+        if (isSchool && !debriefEnabled) {
+          const existingDebriefNotif = await this.notificationRepo
+            .createQueryBuilder('n')
+            .where('n.user_id = :userId', { userId: Number(userId) })
+            .andWhere('n.type = :type', { type: 'DEBRIEF_PROMOTION' })
+            .andWhere("n.metadata ->> 'registrationId' = :regId", {
+              regId: registration.id.toString(),
+            })
+            .getOne();
+
+          if (!existingDebriefNotif) {
+            await this.notificationRepo.save({
+              userId: Number(userId),
+              role: user.role || 'STUDENT',
+              type: 'DEBRIEF_PROMOTION',
+              title: 'Unlock Your Expert Debrief',
+              message:
+                'Your assessment is complete! Book a 1-on-1 expert debrief session to get personalised insights and career guidance.',
+              metadata: {
+                registrationId: registration.id,
+              },
+            });
+            this.logger.log(
+              `Student debrief promotion notification saved for user ${userId}`,
+            );
+          }
+        }
       } catch (err) {
         this.logger.error(
           `Failed to save student notification: ${err.message}`,

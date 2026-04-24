@@ -354,6 +354,8 @@ const Header: React.FC<HeaderProps> = ({
                 return <JobsIcon className={iconClass} />;
             case 'ASSESSMENT_REPORT_READY':
                 return <CompletedStepIcon className={iconClass} />;
+            case 'DEBRIEF_PROMOTION':
+                return <VideosIcon className={iconClass} />;
             default:
                 return <RoadmapIcon className={iconClass} />;
         }

@@ -8,6 +8,7 @@ import MoodCard from './MoodCard';
 import MyJobsCard from './MyJobsCard';
 import ImpactAssessmentCard from './ImpactAssessmentCard';
 import TopCollegesCard from './TopCollegesCard';
+import DebriefPromoToast from './DebriefPromoToast';
 
 const FINAL_ASSESSMENT_COMPLETION_NOTICE_KEY = 'finalAssessmentCompletionNotice';
 const REPORT_READY_STORAGE_KEY = 'studentReportReady';
@@ -220,6 +221,7 @@ const Dashboard: React.FC = () => {
 
     return (
         <div className="relative bg-transparent dark:bg-[#19211C] font-sans transition-colors duration-300 overflow-hidden pb-10">
+            <DebriefPromoToast />
             {showCompletionNotice && (
                 <div className="fixed inset-0 z-[130] flex items-center justify-center px-4 animate-fade-in">
                     <div
