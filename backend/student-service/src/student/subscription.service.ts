@@ -90,6 +90,56 @@ export class SubscriptionService {
     } as any);
   }
 
+  /**
+   * Calculate the registration and debrief costs from a registration and its subscriptions.
+   * Handles both bundled (paid together) and separate (paid via /debrief) payments.
+   */
+  public async getDebriefCostSplit(registration: Registration): Promise<{
+    registrationCost: number;
+    debriefCost: number;
+    totalAmount: number;
+  }> {
+    const debriefSub = await this.subscriptionRepo.findOne({
+      where: {
+        registrationId: registration.id,
+        planType: 'debrief' as any,
+        status: 'active' as any,
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    const debriefAmountStr = this.configService.get<string>('DEBRIEF_AMOUNT') || this.configService.get<string>('NEXT_PUBLIC_DEBRIEF_AMOUNT') || '2500';
+    const defaultDebriefCost = parseFloat(debriefAmountStr);
+
+    if (debriefSub) {
+      // Paid separately via /debrief flow
+      const debriefCost = parseFloat(debriefSub.amount);
+      const registrationCost = parseFloat(registration.paymentAmount?.toString() || '0');
+      return {
+        registrationCost,
+        debriefCost,
+        totalAmount: registrationCost + debriefCost,
+      };
+    } else {
+      // Likely paid together (bundled) during initial registration
+      const fullAmount = parseFloat(registration.paymentAmount?.toString() || '0');
+      if (fullAmount > defaultDebriefCost) {
+        return {
+          registrationCost: fullAmount - defaultDebriefCost,
+          debriefCost: defaultDebriefCost,
+          totalAmount: fullAmount,
+        };
+      } else {
+        // Fallback: registration was paid, debrief might be included or not yet paid
+        return {
+          registrationCost: fullAmount,
+          debriefCost: defaultDebriefCost,
+          totalAmount: fullAmount + defaultDebriefCost,
+        };
+      }
+    }
+  }
+
   private async queryRegistration(
     sql: string,
     params: unknown[],
@@ -208,10 +258,8 @@ export class SubscriptionService {
         if (registration.metadata?.currentYear) academicDetails += ` (Year ${registration.metadata.currentYear})`;
       }
 
-      const totalAmount = parseFloat(registration.paymentAmount?.toString() || '2500');
-      const debriefAmountStr = this.configService.get<string>('DEBRIEF_AMOUNT') || this.configService.get<string>('NEXT_PUBLIC_DEBRIEF_AMOUNT') || '2500';
-      const debriefCostValue = parseFloat(debriefAmountStr);
-      const registrationCostValue = totalAmount > debriefCostValue ? totalAmount - debriefCostValue : 0;
+      // Robust calculation of costs (handles bundled vs separate payments)
+      const { registrationCost, debriefCost, totalAmount } = await this.getDebriefCostSplit(registration);
 
       const teamHtml = getDebriefTeamNotificationEmailTemplate(
         registration.fullName || 'Student',
@@ -219,8 +267,8 @@ export class SubscriptionService {
         `${registration.countryCode || '+91'} ${registration.mobileNumber}`,
         registration.gender || 'Not specified',
         totalAmount.toFixed(2),
-        registrationCostValue.toFixed(2),
-        debriefCostValue.toFixed(2),
+        registrationCost.toFixed(2),
+        debriefCost.toFixed(2),
         registration.paymentReference || 'N/A',
         new Date(registration.createdAt).toLocaleString('en-GB', {
           day: 'numeric',
