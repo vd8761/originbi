@@ -31,7 +31,11 @@ export class ReportQueueService {
     return reportQueueService.processUserReports(userIds, jobId);
   }
 
-  processSingleUserReport(userId: string, jobId: string): Promise<void> {
-    return reportQueueService.processSingleUserReport(userId, jobId);
+  processSingleUserReport(
+    userId: string,
+    jobId: string,
+    short: boolean = false,
+  ): Promise<void> {
+    return reportQueueService.processSingleUserReport(userId, jobId, short);
   }
 }

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 import * as crypto from 'crypto';
 import { SchoolReport } from '../reports/school/schoolReport';
+import { SchoolShortReport } from '../reports/school/schoolShortReport';
 import { CollegeReport } from '../reports/college/collegeReport';
 import { EmployeeReport } from '../reports/employee/employeeReport';
 import { CxoReport } from '../reports/cxo/cxoReport';
@@ -87,9 +88,10 @@ async function getReportPasswordSettings(): Promise<{
 export async function generateReportForUser(
   user: MergedReportData,
   filePath: string,
+  short: boolean = false,
 ): Promise<string> {
   logger.info(
-    `[ReportFactory] Generating Type ${user.program_type} for ${user.full_name}`,
+    `[ReportFactory] Generating Type ${user.program_type}${short ? ' (SHORT)' : ''} for ${user.full_name}`,
   );
 
   // 1. Fetch password settings from DB
@@ -156,12 +158,32 @@ export async function generateReportForUser(
   );
 
   switch (user.program_type) {
-    case ProgramType.SCHOOL:
-      await new SchoolReport(
-        user as unknown as SchoolData,
-        pdfOptions,
-      ).generate(filePath);
+    case ProgramType.SCHOOL: {
+      const schoolUser = user as unknown as SchoolData;
+      if (short) {
+        // Select short-report variant by school level / board.
+        // Currently only SSLC is implemented; HSC/GCSE fall through to
+        // the same class with a variant flag (placeholder for now).
+        const isGCSE =
+          schoolUser.student_board?.toUpperCase() === 'IGCSE' ||
+          schoolUser.student_board?.toUpperCase() === 'IGSCE' ||
+          schoolUser.group_name?.toUpperCase() === 'IGCSE' ||
+          schoolUser.dept_code?.toUpperCase() === 'IGCSE';
+
+        const variant: 'SSLC' | 'HSC' | 'GCSE' = isGCSE
+          ? 'GCSE'
+          : schoolUser.school_level_id === 1
+            ? 'SSLC'
+            : 'HSC';
+
+        await new SchoolShortReport(schoolUser, pdfOptions, variant).generate(
+          filePath,
+        );
+      } else {
+        await new SchoolReport(schoolUser, pdfOptions).generate(filePath);
+      }
       break;
+    }
     case ProgramType.COLLEGE:
       await new CollegeReport(
         user as unknown as CollegeData,

@@ -396,7 +396,11 @@ export const reportQueueService = {
   // ============================================================================
   // WORKER 4: SINGLE STUDENT REPORT (Single PDF Generation)
   // ============================================================================
-  async processSingleUserReport(userId: string, jobId: string) {
+  async processSingleUserReport(
+    userId: string,
+    jobId: string,
+    short: boolean = false,
+  ) {
     logger.info(`=================================================`);
     const jobDir = path.join(TEMP_DIR, jobId);
 
@@ -448,13 +452,15 @@ export const reportQueueService = {
         .replace(/_+/g, '_')
         .replace(/^_|_$/g, '');
 
-      // Naming convention: <full_name>_<report_number>.pdf
-      const fileName = `${formattedName}_${formattedReportNo}.pdf`;
+      // Naming convention: <full_name>_<report_number>[_short].pdf
+      const fileName = `${formattedName}_${formattedReportNo}${short ? '_short' : ''}.pdf`;
       const filePath = path.join(jobDir, fileName);
 
-      logger.info(`[JOB:${jobId}] Generating ${fileName}...`);
+      logger.info(
+        `[JOB:${jobId}] Generating ${fileName}${short ? ' (SHORT)' : ''}...`,
+      );
 
-      const password = await generateReportForUser(user, filePath);
+      const password = await generateReportForUser(user, filePath, short);
 
       // Complete
       logger.info(`[JOB:${jobId}] PDF Created.`);

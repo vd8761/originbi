@@ -128,6 +128,7 @@ export class ReportController {
   async generateSingleUserReport(
     @Param('student_id') userId: string,
     @Query('api') apiMode: string,
+    @Query('short') shortMode: string,
     @Res() res: Response,
   ): Promise<void> {
     if (!userId) {
@@ -166,12 +167,15 @@ export class ReportController {
     }
 
     // ── Standard PDF Mode ──
-    logger.info(`[API] Start Single Student Report: ${userId}`);
+    const isShort = shortMode === 'true';
+    logger.info(
+      `[API] Start Single Student Report${isShort ? ' (SHORT)' : ''}: ${userId}`,
+    );
 
-    const jobId = `student_${userId}_${Date.now()}`;
+    const jobId = `student_${isShort ? 'short_' : ''}${userId}_${Date.now()}`;
 
     this.reportQueue
-      .processSingleUserReport(userId, jobId)
+      .processSingleUserReport(userId, jobId, isShort)
       .catch((err) => logger.error('Background Job Error', err));
 
     res.json({
