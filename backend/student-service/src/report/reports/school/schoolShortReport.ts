@@ -56,6 +56,7 @@ export class SchoolShortReport extends BaseReport {
   private variant: 'SSLC' | 'HSC' | 'GCSE';
   private rankedStreams: { name: string; compat: number }[] = [];
   private hscCourses: CourseCompatibility[] = [];
+  private sslcCourses: CourseCompatibility[] = [];
 
   private readonly CONTENT_X = this.MARGIN_STD;
   private readonly CONTENT_W = this.PAGE_WIDTH - 2 * this.MARGIN_STD;
@@ -64,6 +65,7 @@ export class SchoolShortReport extends BaseReport {
   private readonly C_CARD_BG = '#F4F3FB';
   private readonly C_CARD_BORDER = '#E0DEF2';
   private readonly C_MUTED = '#5D5D70';
+  private readonly CONTENT_SAFE_BOTTOM = this.PAGE_HEIGHT - 52;
 
   constructor(
     data: SchoolData,
@@ -83,7 +85,7 @@ export class SchoolShortReport extends BaseReport {
     if (this.variant === 'HSC') {
       await this.preloadHscCourses();
     } else {
-      this.preloadRankedStreams();
+      await this.preloadSslcData();
     }
 
     const stream = fs.createWriteStream(outputPath);
@@ -124,15 +126,23 @@ export class SchoolShortReport extends BaseReport {
 
     let y = 20;
     y = this.drawHeader(y);
-    y = this.drawOverview(y + 6, combo);
-    y = this.drawWhereYouFitBest(y + 8, combo);
-    y = this.drawAllStreams(y + 8);
-    y = this.drawCareerFlightPath(y + 18, t1 as 'D' | 'I' | 'S' | 'C');
+    y = this.drawOverview(y + 14, combo);
+    y = this.drawWhereYouFitBest(y + 14, combo);
+    y = this.drawBestFitVision(y + 26);
+    y = this.drawCareerFlightPath(y + 26, t1 as 'D' | 'I' | 'S' | 'C', true);
+    this.drawFooterStrip();
 
-    const DISCLAIMER_H = 56;
-    const disclaimerY = Math.max(
-      y + 8,
-      this.PAGE_HEIGHT - 32 - DISCLAIMER_H - 8,
+    this.doc.addPage();
+    this.drawPageFrame();
+
+    y = this.drawHeader(20);
+    y = this.drawCompatibleCourses(y + 14);
+    y = this.drawAllStreams(y + 14, true);
+
+    const DISCLAIMER_H = 60;
+    const disclaimerY = Math.min(
+      y + 18,
+      this.CONTENT_SAFE_BOTTOM - DISCLAIMER_H,
     );
     this.drawDisclaimer(disclaimerY);
 
@@ -164,8 +174,42 @@ export class SchoolShortReport extends BaseReport {
       .sort((a, b) => b.compat - a.compat);
   }
 
+  private async preloadSslcData(): Promise<void> {
+    this.preloadRankedStreams();
+
+    const [t1, t2] = this.getTopTwoTraits(
+      this.data.most_answered_answer_type,
+      this.data,
+    );
+    const traitCode = t1 + t2;
+    const bestStreamId = this.getBestFitStreamId();
+
+    try {
+      this.sslcCourses = await getCompatibilityMatrixDetails(
+        traitCode,
+        bestStreamId,
+      );
+    } catch (err) {
+      logger.warn(
+        `[School SHORT REPORT] Failed to fetch SSLC compatible courses`,
+        err,
+      );
+      this.sslcCourses = [];
+    }
+  }
+
+  private getBestFitStreamId(): number | undefined {
+    const streamName = this.rankedStreams[0]?.name;
+    if (!streamName) return undefined;
+
+    const entry = Object.entries(STREAM_NAMES).find(
+      ([, name]) => name === streamName,
+    );
+    return entry ? Number(entry[0]) : undefined;
+  }
+
   // ------------------------------------------------------------
-  // HSC PRELOAD — fetch course compatibility for chosen stream
+  // HSC PRELOAD - fetch course compatibility for chosen stream
   // ------------------------------------------------------------
   private async preloadHscCourses(): Promise<void> {
     const [t1, t2] = this.getTopTwoTraits(
@@ -224,13 +268,13 @@ export class SchoolShortReport extends BaseReport {
       .text('About This Report', x, y, { lineBreak: false });
 
     const body =
-      'This short report offers a focused snapshot of the stream you have chosen — your 10-year career outlook within it, and the courses that align best with your traits, grouped by department.';
+      'This short report offers a focused snapshot of the stream you have chosen - your 10-year career outlook within it, and the courses that align best with your traits, grouped by department.';
 
     this.doc
       .font(this.FONT_REGULAR)
       .fontSize(10)
       .fillColor('#2A2A36')
-      .text(body, x, y + 22, {
+      .text(body, x, y + 26, {
         width: w,
         lineGap: 1.6,
       });
@@ -244,10 +288,10 @@ export class SchoolShortReport extends BaseReport {
   private drawYourStream(y: number): number {
     const x = this.CONTENT_X;
     const w = this.CONTENT_W;
-    const h = 220;
+    const h = 245;
 
     const streamId = this.data.school_stream_id ?? 0;
-    const streamName = STREAM_NAMES[streamId] ?? '—';
+    const streamName = STREAM_NAMES[streamId] ?? '-';
     const streamFull = STREAM_EXPANDED[streamName] ?? streamName;
     const odyssey = STREAM_ODYSSEY_ROADMAP[streamName];
 
@@ -279,23 +323,84 @@ export class SchoolShortReport extends BaseReport {
         ellipsis: true,
       });
 
-    // Tagline (right of stream block)
     const taglineText = odyssey?.tagline ?? 'Your 10-Year Vision';
+
+    // Odyssey roadmap area
+    if (odyssey && odyssey.nodes.length > 0) {
+      this.drawOdysseyRoadmap(x, y + 58, w, h - 110, odyssey.nodes);
+    }
+
     this.doc
       .font(this.FONT_SORA_SEMIBOLD)
       .fontSize(11.5)
       .fillColor(this.COLOR_DEEP_BLUE)
-      .text(taglineText, x + w * 0.34, y + 28, {
-        width: w * 0.66,
-        lineBreak: true,
-        height: 34,
+      .text(taglineText, x, y + h - 22, {
+        width: w,
+        align: 'center',
+        lineBreak: false,
         ellipsis: true,
       });
 
-    // Odyssey roadmap area
+    return y + h;
+  }
+
+  private drawBestFitVision(y: number): number {
+    const x = this.CONTENT_X;
+    const w = this.CONTENT_W;
+    const h = 230;
+
+    const streamName = this.rankedStreams[0]?.name ?? '-';
+    const streamFull = STREAM_EXPANDED[streamName] ?? streamName;
+    const odyssey = STREAM_ODYSSEY_ROADMAP[streamName];
+
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(13)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text('10-Year Vision Roadmap', x, y, { lineBreak: false });
+
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(20)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text(streamName, x, y + 24, {
+        width: w * 0.28,
+        lineBreak: false,
+      });
+
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(9)
+      .fillColor(this.C_MUTED)
+      .text(streamFull, x, y + 50, {
+        width: w * 0.34,
+        lineBreak: false,
+        ellipsis: true,
+      });
+
     if (odyssey && odyssey.nodes.length > 0) {
-      this.drawOdysseyRoadmap(x, y + 58, w, h - 58, odyssey.nodes);
+      this.drawOdysseyRoadmap(x, y + 68, w, h - 138, odyssey.nodes);
+    } else {
+      this.doc
+        .font(this.FONT_REGULAR)
+        .fontSize(9)
+        .fillColor(this.C_MUTED)
+        .text('Roadmap data is not available for this stream.', x, y + 86, {
+          width: w,
+          lineBreak: false,
+        });
     }
+
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(10.5)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text(odyssey?.tagline ?? 'Your 10-Year Vision', x, y + h - 12, {
+        width: w,
+        align: 'center',
+        lineBreak: false,
+        ellipsis: true,
+      });
 
     return y + h;
   }
@@ -314,7 +419,8 @@ export class SchoolShortReport extends BaseReport {
     const endX = boxX + boxW - 54;
     const amplitude = 20;
     const centerY = boxY + boxH / 2;
-    const DASHED_LINE_LENGTH = 14;
+    const DASHED_LINE_LENGTH = 10;
+    const TEXT_STACK_GAP = 3;
 
     // Draw winding wave path
     this.doc.save();
@@ -372,14 +478,14 @@ export class SchoolShortReport extends BaseReport {
 
       if (textAbove) {
         dashEndY = nodeY - nodeR - DASHED_LINE_LENGTH;
-        subtitleY = dashEndY - 2 - subtitleH;
-        titleY = subtitleY - 2 - titleH;
-        labelY = titleY - 2 - labelH;
+        subtitleY = dashEndY - TEXT_STACK_GAP - subtitleH;
+        titleY = subtitleY - TEXT_STACK_GAP - titleH;
+        labelY = titleY - TEXT_STACK_GAP - labelH;
       } else {
         dashEndY = nodeY + nodeR + DASHED_LINE_LENGTH;
-        labelY = dashEndY + 2;
-        titleY = labelY + labelH + 2;
-        subtitleY = titleY + titleH + 2;
+        labelY = dashEndY + TEXT_STACK_GAP;
+        titleY = labelY + labelH + TEXT_STACK_GAP;
+        subtitleY = titleY + titleH + TEXT_STACK_GAP;
       }
 
       // Dashed connector
@@ -441,12 +547,70 @@ export class SchoolShortReport extends BaseReport {
   //   Top 3 courses per department, up to 4 departments.
   // ------------------------------------------------------------
   private drawCourseMatrix(y: number): number {
+    return this.drawCourseMatrixSection(
+      y,
+      this.hscCourses,
+      'Course Compatibility Matrix',
+      'Use this matrix to compare the strongest course options within each department. Higher percentages show stronger alignment with your trait profile.',
+    );
+  }
+
+  private drawCompatibleCourses(y: number): number {
+    const streamName = this.rankedStreams[0]?.name ?? 'your best-fit stream';
+    return this.drawCourseMatrixSection(
+      y,
+      this.sslcCourses,
+      'Compatible Courses for This Stream',
+      `These course options align with ${streamName}. Review the departments below, then compare the top course matches and percentages to plan your next academic step.`,
+    );
+  }
+
+  private measureCourseMatrixSection(courses: CourseCompatibility[]): number {
+    const w = this.CONTENT_W;
+    const deptMap = new Map<string, CourseCompatibility[]>();
+    for (const c of courses) {
+      const dept = (c.department_name || 'General').trim();
+      if (!deptMap.has(dept)) deptMap.set(dept, []);
+      deptMap.get(dept).push(c);
+    }
+
+    const depts = Array.from(deptMap.entries())
+      .slice(0, 4)
+      .map(([, deptCourses]) =>
+        deptCourses
+          .slice()
+          .sort(
+            (a, b) => b.compatibility_percentage - a.compatibility_percentage,
+          )
+          .slice(0, 3),
+      );
+
+    if (depts.length === 0) return 70;
+
+    const colGap = 26;
+    const rowGap = 8;
+    const colW = (w - colGap) / 2;
+    const blockHeights = depts.map((deptCourses) =>
+      this.measureDeptBlock(colW, deptCourses),
+    );
+    const row1H = Math.max(blockHeights[0] ?? 0, blockHeights[1] ?? 0);
+    const row2H = Math.max(blockHeights[2] ?? 0, blockHeights[3] ?? 0);
+
+    return 52 + row1H + (row2H > 0 ? rowGap + row2H : 0);
+  }
+
+  private drawCourseMatrixSection(
+    y: number,
+    courses: CourseCompatibility[],
+    title: string,
+    description: string,
+  ): number {
     const x = this.CONTENT_X;
     const w = this.CONTENT_W;
 
     // Group courses by department preserving insertion order, keep top 3 each.
     const deptMap = new Map<string, CourseCompatibility[]>();
-    for (const c of this.hscCourses) {
+    for (const c of courses) {
       const dept = (c.department_name || 'General').trim();
       if (!deptMap.has(dept)) deptMap.set(dept, []);
       deptMap.get(dept).push(c);
@@ -468,17 +632,12 @@ export class SchoolShortReport extends BaseReport {
       .font(this.FONT_SORA_BOLD)
       .fontSize(13)
       .fillColor(this.COLOR_DEEP_BLUE)
-      .text('Course Compatibility Matrix', x, y, { lineBreak: false });
+      .text(title, x, y, { lineBreak: false });
     this.doc
       .font(this.FONT_REGULAR)
       .fontSize(8.5)
       .fillColor(this.C_MUTED)
-      .text(
-        'Use this matrix to compare the strongest course options within each department. Higher percentages show stronger alignment with your trait profile.',
-        x,
-        y + 22,
-        { width: w, lineGap: 1.0 },
-      );
+      .text(description, x, y + 22, { width: w, lineGap: 1.0 });
 
     if (depts.length === 0) {
       this.doc
@@ -496,7 +655,7 @@ export class SchoolShortReport extends BaseReport {
 
     // 2-column x 2-row grid of departments
     const colGap = 26;
-    const rowGap = 18;
+    const rowGap = 8;
     const colW = (w - colGap) / 2;
     const gridTop = y + 52;
 
@@ -587,7 +746,7 @@ export class SchoolShortReport extends BaseReport {
           lineGap: 1.0,
         });
 
-      // Percentage — aligned to first line of course name
+      // Percentage - aligned to first line of course name
       this.doc
         .font(this.FONT_SORA_BOLD)
         .fontSize(10)
@@ -677,7 +836,7 @@ export class SchoolShortReport extends BaseReport {
       .font(this.FONT_SORA_BOLD)
       .fontSize(13)
       .fillColor(this.COLOR_BLACK)
-      .text(this.data.full_name || '—', metaX, y + 14, {
+      .text(this.data.full_name || '-', metaX, y + 14, {
         width: metaW,
         align: 'right',
         lineBreak: false,
@@ -736,7 +895,7 @@ export class SchoolShortReport extends BaseReport {
       .font(this.FONT_REGULAR)
       .fontSize(9.5)
       .fillColor('#2A2A36')
-      .text(body, x, y + 22, {
+      .text(body, x, y + 26, {
         width: w,
         lineGap: 1.2,
       });
@@ -750,9 +909,9 @@ export class SchoolShortReport extends BaseReport {
   private drawWhereYouFitBest(y: number, combo: string): number {
     const x = this.CONTENT_X;
     const w = this.CONTENT_W;
-    const h = 112;
+    const h = 150;
 
-    const stream = this.rankedStreams[0] ?? { name: '—', compat: 0 };
+    const stream = this.rankedStreams[0] ?? { name: '-', compat: 0 };
     const reasons = (TRAIT_REASONS[combo] || []).slice(0, 3);
     const fields =
       STREAM_FUTURE_DIRECTIONS[stream.name] ?? 'Academic and career pathways';
@@ -763,24 +922,24 @@ export class SchoolShortReport extends BaseReport {
       .font(this.FONT_SORA_SEMIBOLD)
       .fontSize(8)
       .fillColor('#2E7D4F')
-      .text('WHERE YOU FIT BEST', x + 14, y + 10, { lineBreak: false });
+      .text('WHERE YOU FIT BEST', x + 18, y + 16, { lineBreak: false });
 
     this.doc
       .font(this.FONT_SORA_BOLD)
-      .fontSize(22)
+      .fontSize(26)
       .fillColor(this.COLOR_DEEP_BLUE)
-      .text(stream.name, x + 14, y + 22, {
-        width: w * 0.32,
+      .text(stream.name, x + 18, y + 34, {
+        width: w * 0.34,
         lineBreak: false,
       });
 
     const fullForm = STREAM_EXPANDED[stream.name] ?? stream.name;
     this.doc
       .font(this.FONT_REGULAR)
-      .fontSize(7.5)
+      .fontSize(8.5)
       .fillColor(this.C_MUTED)
-      .text(fullForm, x + 14, y + 48, {
-        width: w * 0.32,
+      .text(fullForm, x + 18, y + 65, {
+        width: w * 0.34,
         lineBreak: false,
         ellipsis: true,
       });
@@ -789,60 +948,63 @@ export class SchoolShortReport extends BaseReport {
 
     this.doc
       .font(this.FONT_REGULAR)
-      .fontSize(7.5)
+      .fontSize(8)
       .fillColor(this.C_MUTED)
-      .text('Based on agile dimensions', x + 14, y + 64, {
-        width: w * 0.32,
+      .text('Based on agile dimensions', x + 18, y + 84, {
+        width: w * 0.34,
         lineBreak: false,
       });
 
     this.doc
       .font(this.FONT_SORA_SEMIBOLD)
-      .fontSize(7.5)
+      .fontSize(8)
       .fillColor('#2E7D4F')
-      .text('Departments', x + 14, y + 80, { lineBreak: false });
+      .text('Departments', x + 18, y + 108, { lineBreak: false });
     this.doc
       .font(this.FONT_REGULAR)
-      .fontSize(7.9)
+      .fontSize(8.2)
       .fillColor('#34554A')
-      .text(fields, x + 14, y + 91, {
-        width: w * 0.32,
-        height: 28,
+      .text(fields, x + 18, y + 121, {
+        width: w * 0.34,
+        height: 24,
         lineGap: 0.8,
         ellipsis: true,
       });
 
     const rightX = x + w * 0.36;
-    const rightMaxX = x + w - 14;
+    const rightMaxX = x + w - 18;
     const rightW = rightMaxX - rightX;
 
     this.doc
       .font(this.FONT_SORA_SEMIBOLD)
       .fontSize(8)
       .fillColor('#2E7D4F')
-      .text('MATCH STRENGTH', rightX, y + 10, { lineBreak: false });
+      .text('MATCH STRENGTH', rightX, y + 16, { lineBreak: false });
+    const matchRowY = y + 34;
+    const pctW = 92;
+
     this.doc
       .font(this.FONT_SORA_BOLD)
-      .fontSize(24)
+      .fontSize(28)
       .fillColor(this.COLOR_DEEP_BLUE)
-      .text(`${matchPct}%`, rightX, y + 23, {
-        width: 74,
+      .text(`${matchPct}%`, rightX, matchRowY, {
+        width: pctW,
         lineBreak: false,
       });
 
-    const barX = rightX + 82;
-    const barY = y + 34;
-    const barW = rightW - 82;
-    const barH = 7;
+    const barX = rightX + pctW + 8;
+    const barY = matchRowY + 16;
+    const barW = rightW - pctW - 8;
+    const barH = 8;
     this.doc.roundedRect(barX, barY, barW, barH, barH / 2).fill('#DCEBE2');
     this.doc
       .roundedRect(barX, barY, (matchPct / 100) * barW, barH, barH / 2)
       .fill('#2E7D4F');
     this.doc
       .font(this.FONT_REGULAR)
-      .fontSize(7.5)
+      .fontSize(8)
       .fillColor(this.C_MUTED)
-      .text('Agile stream alignment', barX, y + 46, {
+      .text('Agile stream alignment', barX, barY + 14, {
         width: barW,
         lineBreak: false,
       });
@@ -851,21 +1013,23 @@ export class SchoolShortReport extends BaseReport {
       .font(this.FONT_SORA_SEMIBOLD)
       .fontSize(8)
       .fillColor('#2E7D4F')
-      .text('WHY THIS FITS YOU', rightX, y + 64, { lineBreak: false });
+      .text('WHY THIS FITS YOU', rightX, y + 92, { lineBreak: false });
 
-    const reasonGap = 8;
-    const reasonCardH = 22;
-    const reasonStartY = y + 80;
-    const reasonMaxX = rightX + rightW;
-    let reasonX = rightX;
+    const reasonAreaX = rightX;
+    const reasonAreaW = x + w - 18 - reasonAreaX;
+    const reasonGap = 7;
+    const reasonCardH = 24;
+    const reasonStartY = y + 112;
+    const reasonMaxX = reasonAreaX + reasonAreaW;
+    let reasonX = reasonAreaX;
     let reasonY = reasonStartY;
 
     reasons.forEach((reason) => {
       this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(7.8);
       const measuredTextW = this.doc.widthOfString(reason);
-      const reasonCardW = Math.min(measuredTextW + 24, rightW);
-      if (reasonX > rightX && reasonX + reasonCardW > reasonMaxX) {
-        reasonX = rightX;
+      const reasonCardW = Math.min(measuredTextW + 20, reasonAreaW);
+      if (reasonX > reasonAreaX && reasonX + reasonCardW > reasonMaxX) {
+        reasonX = reasonAreaX;
         reasonY += reasonCardH + 6;
       }
 
@@ -881,7 +1045,7 @@ export class SchoolShortReport extends BaseReport {
       this.doc
         .fillColor('#1F5B3A')
         .font(this.FONT_SORA_SEMIBOLD)
-        .fontSize(7.8)
+        .fontSize(8)
         .text(reason, reasonX + 10, reasonY + 6, {
           width: reasonCardW - 16,
           height: reasonCardH - 8,
@@ -898,10 +1062,10 @@ export class SchoolShortReport extends BaseReport {
   // ------------------------------------------------------------
   // 3. ALL AVAILABLE STREAM OPTIONS
   // ------------------------------------------------------------
-  private drawAllStreams(y: number): number {
+  private drawAllStreams(y: number, compact = false): number {
     const x = this.CONTENT_X;
     const w = this.CONTENT_W;
-    const h = 172;
+    const h = compact ? 142 : 184;
     const streams = this.rankedStreams.slice(0, 6);
 
     this.doc
@@ -913,7 +1077,7 @@ export class SchoolShortReport extends BaseReport {
       .font(this.FONT_REGULAR)
       .fontSize(8)
       .fillColor(this.C_MUTED)
-      .text('All stream options ranked for this profile.', x, y + 22, {
+      .text('All stream options ranked for this profile.', x, y + 26, {
         lineBreak: false,
       });
 
@@ -922,10 +1086,10 @@ export class SchoolShortReport extends BaseReport {
     }
 
     const colGap = 10;
-    const rowGap = 16;
+    const rowGap = compact ? 6 : 16;
     const colW = (w - 28 - colGap) / 2;
-    const cardH = 32;
-    const startY = y + 44;
+    const cardH = compact ? 28 : 32;
+    const startY = y + (compact ? 44 : 52);
 
     streams.forEach((stream, index) => {
       const col = index % 2;
@@ -937,8 +1101,8 @@ export class SchoolShortReport extends BaseReport {
 
       this.doc
         .font(this.FONT_SORA_BOLD)
-        .fontSize(13)
-        .fillColor(isTop ? this.COLOR_DEEP_BLUE : this.COLOR_BLACK)
+        .fontSize(compact ? 11.5 : 13)
+        .fillColor(isTop ? '#0E7C42' : this.COLOR_DEEP_BLUE)
         .text(`${index + 1}. ${stream.name}`, cx + 8, cy + 4, {
           width: colW - 56,
           lineBreak: false,
@@ -947,7 +1111,7 @@ export class SchoolShortReport extends BaseReport {
 
       this.doc
         .font(this.FONT_SORA_SEMIBOLD)
-        .fontSize(10)
+        .fontSize(compact ? 9 : 10)
         .fillColor('#44635A')
         .text(`${pct}%`, cx + colW - 46, cy + 5, {
           width: 38,
@@ -958,7 +1122,7 @@ export class SchoolShortReport extends BaseReport {
       const streamFullName = STREAM_EXPANDED[stream.name] ?? stream.name;
       this.doc
         .font(this.FONT_REGULAR)
-        .fontSize(8.1)
+        .fontSize(compact ? 7.4 : 8.1)
         .fillColor(this.C_MUTED)
         .text(streamFullName, cx + 8, cy + 21, {
           width: colW - 16,
@@ -976,6 +1140,7 @@ export class SchoolShortReport extends BaseReport {
   private drawCareerFlightPath(
     y: number,
     primaryTrait: 'D' | 'I' | 'S' | 'C',
+    compact = false,
   ): number {
     const agile = this.data.agile_scores?.[0] ?? {
       focus: 0,
@@ -1000,7 +1165,7 @@ export class SchoolShortReport extends BaseReport {
 
     const x = this.CONTENT_X;
     const w = this.CONTENT_W;
-    const h = 220;
+    const h = compact ? 200 : 226;
     const explainer =
       'This view compares your likely pace to senior responsibility with the broader industry timeline. It uses your dominant trait and strongest agile value to estimate how quickly you may grow over time, where you may gain an advantage, and which challenge may need attention so your progress stays steady through important career transitions.';
 
@@ -1010,15 +1175,17 @@ export class SchoolShortReport extends BaseReport {
       .font(this.FONT_SORA_BOLD)
       .fontSize(13)
       .fillColor(this.COLOR_DEEP_BLUE)
-      .text('Career Flight Path', x + 14, y + 10, { lineBreak: false });
+      .text('Career Flight Path', x + 14, y + (compact ? 10 : 14), {
+        lineBreak: false,
+      });
 
     this.doc
       .font(this.FONT_REGULAR)
-      .fontSize(8.3)
+      .fontSize(compact ? 7.7 : 8.3)
       .fillColor('#5F4B32')
-      .text(explainer, x + 14, y + 30, {
+      .text(explainer, x + 14, y + (compact ? 32 : 40), {
         width: w - 28,
-        height: 44,
+        height: compact ? 30 : 44,
         lineGap: 0.9,
         ellipsis: true,
       });
@@ -1027,10 +1194,15 @@ export class SchoolShortReport extends BaseReport {
       .font(this.FONT_SORA_BOLD)
       .fontSize(13)
       .fillColor(this.COLOR_DEEP_BLUE)
-      .text(entry ? `You: ${entry.predictedPace}` : 'You: —', x + 14, y + 84, {
-        width: w * 0.5,
-        lineBreak: false,
-      });
+      .text(
+        entry ? `You: ${entry.predictedPace}` : 'You: -',
+        x + 14,
+        y + (compact ? 70 : 92),
+        {
+          width: w * 0.5,
+          lineBreak: false,
+        },
+      );
 
     this.doc
       .font(this.FONT_REGULAR)
@@ -1041,14 +1213,14 @@ export class SchoolShortReport extends BaseReport {
           ? `Industry avg to seniority: ${entry.industryAvg}`
           : 'Industry benchmark unavailable.',
         x + 14,
-        y + 102,
+        y + (compact ? 88 : 110),
         { width: w * 0.5, lineBreak: false },
       );
 
     if (entry) {
-      this.drawPaceBar(x + 14, y + 126, w - 28, entry);
+      this.drawPaceBar(x + 14, y + (compact ? 110 : 134), w - 28, entry);
 
-      const bottomY = y + 174;
+      const bottomY = y + (compact ? 148 : 182);
       const colGap = 14;
       const colW = (w - 28 - colGap) / 2;
 
@@ -1071,7 +1243,7 @@ export class SchoolShortReport extends BaseReport {
         .fontSize(8.5)
         .fillColor(this.C_ACCENT_DONT)
         .text(
-          `WATCH OUT — ${entry.challengeTitle}`,
+          `WATCH OUT - ${entry.challengeTitle}`,
           x + 14 + colW + colGap,
           bottomY,
           { width: colW, lineBreak: false, ellipsis: true },
@@ -1172,7 +1344,7 @@ export class SchoolShortReport extends BaseReport {
   private drawDisclaimer(y: number): number {
     const x = this.CONTENT_X;
     const w = this.CONTENT_W;
-    const h = 56;
+    const h = 60;
 
     this.doc
       .font(this.FONT_SORA_BOLD)
@@ -1187,7 +1359,7 @@ export class SchoolShortReport extends BaseReport {
       .text(
         'This short report is a quick summary and should support, not replace, your final stream decision. Please refer to the full Origin BI report for detailed trait insights, stream comparisons, and guidance on next steps.',
         x,
-        y + 22,
+        y + 26,
         {
           width: w,
           lineGap: 1.2,

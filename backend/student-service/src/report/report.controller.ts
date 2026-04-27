@@ -165,44 +165,6 @@ export class ReportController {
       return;
     }
 
-    // ── Short Report Mode ──
-    if (shortMode === 'true') {
-      logger.info(`[API] Short Report Request for student: ${userId}`);
-      try {
-        const groupData = await fetchUserAssessmentData([userId]);
-        if (!groupData || groupData.length === 0) {
-          res.status(HttpStatus.NOT_FOUND).json({
-            success: false,
-            error: 'No completed assessment found for this student.',
-          });
-          return;
-        }
-        
-        // Generate short report directly
-        const jobId = `short_student_${userId}_${Date.now()}`;
-        
-        this.reportQueue
-          .processSingleUserShortReport(userId, jobId)
-          .catch((err) => logger.error('Background Job Error', err));
-
-        res.json({
-          success: true,
-          jobId,
-          statusUrl: `/report/download/status/${jobId}`,
-        });
-      } catch (error) {
-        logger.error(
-          `[API] Short Report Generation failed for ${userId}:`,
-          error,
-        );
-        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-          success: false,
-          error: (error as Error).message,
-        });
-      }
-      return;
-    }
-
     // ── Standard PDF Mode ──
     const isShort = shortMode === 'true';
     logger.info(
