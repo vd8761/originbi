@@ -11,35 +11,48 @@ const PersonalityCard: React.FC<PersonalityCardProps> = ({ reportData, isLoading
     const [isImageLoading, setIsImageLoading] = useState(true);
 
     useEffect(() => {
+        let storedTrait: { id: number; name: string; code: string; colorRgb: string } | null = null;
+        try {
+            const userStr = localStorage.getItem('user');
+            if (userStr) {
+                const user = JSON.parse(userStr);
+                if (user.personalityTrait) {
+                    storedTrait = user.personalityTrait;
+                }
+            }
+        } catch (e) {
+            console.error("Error parsing user from localStorage", e);
+        }
+
         if (reportData) {
             setTrait({
-                id: 0,
-                name: reportData.sections?.corePersonality?.archetype?.title || reportData.coreIdentity?.title || "Analytical Leader",
-                code: reportData.discProfile?.primaryType || "D",
-                colorRgb: "0,0,0"
+                id: storedTrait?.id || 0,
+                name: storedTrait?.name || "Analytical Leader",
+                code: storedTrait?.code || reportData.discProfile?.primaryType || "D",
+                colorRgb: storedTrait?.colorRgb || "0,0,0"
             });
             setIsLoadingUser(false);
             return;
         }
 
         const checkUser = () => {
-            const userStr = localStorage.getItem('user');
-            if (userStr) {
-                try {
+            if (storedTrait) {
+                setTrait(storedTrait);
+                setIsLoadingUser(false);
+                return true;
+            }
+            try {
+                const userStr = localStorage.getItem('user');
+                if (userStr) {
                     const user = JSON.parse(userStr);
-                    if (user.personalityTrait) {
-                        setTrait(user.personalityTrait);
-                        setIsLoadingUser(false);
-                        return true;
-                    }
                     if (Object.prototype.hasOwnProperty.call(user, 'id')) {
                         // User is present but no personality trait yet
                         setIsLoadingUser(false);
                         return true;
                     }
-                } catch (e) {
-                    console.error("Error parsing user from localStorage", e);
                 }
+            } catch (e) {
+                console.error("Error checking user id", e);
             }
             return false;
         };
@@ -61,9 +74,12 @@ const PersonalityCard: React.FC<PersonalityCardProps> = ({ reportData, isLoading
                 clearTimeout(timeout);
             };
         }
-    }, []);
+    }, [reportData]);
 
-    const traitName = trait?.name || "Analytical Leader";
+    let traitName = trait?.name || "Analytical Leader";
+    if (traitName.toLowerCase().startsWith('the ')) {
+        traitName = traitName.substring(4);
+    }
     const traitImageKey = traitName.replace(/\s+/g, '_');
     const imageSrc = `/student_traits/${traitImageKey}.png`;
 
@@ -71,12 +87,12 @@ const PersonalityCard: React.FC<PersonalityCardProps> = ({ reportData, isLoading
     const firstName = nameWords[0] || "";
     const remainingName = nameWords.slice(1).join(' ');
 
-    const showLoading = !trait && (isLoadingUser || isLoadingReport);
+    const isAnyLoading = isLoadingReport || (!trait && isLoadingUser);
 
     return (
         <div className="rounded-2xl relative w-full h-full min-h-[220px] md:min-h-[300px] overflow-hidden group bg-gradient-to-br from-[#150089] to-[#0D0055]">
-            {showLoading && (
-                <div className="absolute inset-0 z-30 flex items-center justify-center bg-transparent">
+            {isAnyLoading && (
+                <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/20 backdrop-blur-sm">
                     <div className="animate-spin rounded-full h-8 w-8 lg:h-12 lg:w-12 border-b-2 border-[#1ED36A]"></div>
                 </div>
             )}

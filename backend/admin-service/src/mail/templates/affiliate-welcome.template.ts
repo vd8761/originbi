@@ -135,20 +135,7 @@ export const getAffiliateWelcomeEmailTemplate = (
                               </tr>
                             </table>
 
-                            <!-- Referral Link Section -->
-                            <p style="margin: 0 0 10px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #1ED36A;">
-                              Your Referral Link:
-                            </p>
-                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 25px;">
-                              <tr>
-                                <td style="background-color: #F5F5FF; border: 1px solid #E0E0FF; border-radius: 6px; padding: 14px 16px;">
-                                  <a href="${referralLink}" style="font-family: Tahoma, Arial, sans-serif; font-weight: 600; font-size: 13px; line-height: 150%; color: #150089; word-break: break-all; text-decoration: none;">${referralLink}</a>
-                                </td>
-                              </tr>
-                            </table>
-                            <p style="margin: 0 0 25px; font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 13px; line-height: 150%; letter-spacing: 0%; color: #707070;">
-                              Share the above referral link with potential users. When they register using your link, you'll earn a commission on every successful registration.
-                            </p>
+
 
                             <!-- Login Button -->
                             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 25px;">
