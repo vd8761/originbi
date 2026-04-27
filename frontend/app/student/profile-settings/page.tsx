@@ -427,9 +427,9 @@ function ChangePasswordModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                                 <button
                                     type="button"
                                     onClick={() => setShowOldPassword(!showOldPassword)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#1ED36A] hover:opacity-80 transition-opacity"
                                 >
-                                    {showOldPassword ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
+                                    {showOldPassword ? <EyeIcon className="w-4 h-4" /> : <EyeOffIcon className="w-4 h-4" />}
                                 </button>
                             </div>
                             {currentPasswordError && (
@@ -456,9 +456,9 @@ function ChangePasswordModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                                 <button
                                     type="button"
                                     onClick={() => setShowNewPassword(!showNewPassword)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#1ED36A] hover:opacity-80 transition-opacity"
                                 >
-                                    {showNewPassword ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
+                                    {showNewPassword ? <EyeIcon className="w-4 h-4" /> : <EyeOffIcon className="w-4 h-4" />}
                                 </button>
                             </div>
                         </div>
@@ -477,9 +477,9 @@ function ChangePasswordModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                                 <button
                                     type="button"
                                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#1ED36A] hover:opacity-80 transition-opacity"
                                 >
-                                    {showConfirmPassword ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
+                                    {showConfirmPassword ? <EyeIcon className="w-4 h-4" /> : <EyeOffIcon className="w-4 h-4" />}
                                 </button>
                             </div>
                         </div>
