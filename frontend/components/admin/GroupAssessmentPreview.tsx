@@ -119,6 +119,10 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                         isComplete = true;
                         setProgress('Download Starting...');
 
+                        if (!statusData.downloadUrl) {
+                            throw new Error('Download URL missing from report status.');
+                        }
+
                         // Trigger Download
                         window.location.href = buildReportApiUrl(statusData.downloadUrl);
 
@@ -179,6 +183,10 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 } else if (statusData.status === 'COMPLETED') {
                     isComplete = true;
+
+                    if (!statusData.downloadUrl) {
+                        throw new Error('Download URL missing from report status.');
+                    }
 
                     // 3. Trigger send email with the download URL
                     const selectedDept = departmentStats.find((d: any) => d.id === selectedDepartment);

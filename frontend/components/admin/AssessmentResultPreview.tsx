@@ -267,6 +267,10 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                                             } else if (statusData.status === 'COMPLETED') {
                                                 isComplete = true;
                                                 setDownloadProgress('Downloading...');
+
+                                                if (!statusData.downloadUrl) {
+                                                    throw new Error('Download URL missing from report status.');
+                                                }
                                                 
                                                 const extendedData = statusData as any;
                                                 if (extendedData.password) {
