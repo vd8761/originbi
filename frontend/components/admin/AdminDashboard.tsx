@@ -357,7 +357,7 @@ const AdminDashboard: React.FC = () => {
                       <div className="flex justify-between items-center py-4">
                         <div className="flex items-center gap-3">
                           <img
-                            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(aff.name)}&background=random`}
+                            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(aff.name)}&background=${getAvatarColor(aff.name)}&color=fff&font-size=0.4`}
                             alt=""
                             className="w-9 h-9 rounded-full object-cover shadow-sm group-hover:scale-105 transition-transform"
                           />
