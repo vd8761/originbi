@@ -148,6 +148,7 @@ interface DashboardData {
   activeAssessments: number;
   corporateClients: number;
   totalCommissionsPaid: number;
+  totalRevenue: number;
   revenueTrend: Array<{ month: string; revenue: number }>;
   userDistribution: UserDistributionData;
   affiliates: Array<{
@@ -271,6 +272,13 @@ const AdminDashboard: React.FC = () => {
       href: "/admin/corporate"
     },
     {
+      title: "Total Revenue",
+      value: loading ? "..." : formatCurrency(data?.totalRevenue || 0),
+      change: "Last 12m",
+      isPositive: true,
+      isLoading: loading,
+    },
+    {
       title: "Total Commissions Paid",
       value: loading ? "..." : formatCurrency(data?.totalCommissionsPaid || 0),
       change: "Distributed",
@@ -297,7 +305,7 @@ const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {stats.map((s) => (
           <StatCard key={s.title} {...s} />
         ))}

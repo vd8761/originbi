@@ -60,7 +60,7 @@ function ReadOnlyField({ label, value, className, isLoading }: { label: string; 
                 {label}
             </label>
             <div className="relative">
-                <div className={`w-full h-12 bg-slate-50 border border-slate-200 rounded-full px-6 flex items-center text-sm font-medium ${value ? "text-slate-600" : "text-slate-300 italic"} outline-none cursor-not-allowed select-none transition-all`}>
+                <div className={`w-full h-12 bg-slate-50 border border-slate-200 rounded-full pl-6 pr-10 flex items-center text-sm font-medium ${value ? "text-slate-600" : "text-slate-300 italic"} outline-none cursor-not-allowed select-none transition-all`}>
                     {isLoading ? (
                         <div className="w-4 h-4 border-2 border-[#1ED36A] border-t-transparent rounded-full animate-spin mr-3" />
                     ) : null}
@@ -309,7 +309,7 @@ export default function DebriefPage() {
             <div className="relative z-10 flex-1 flex items-start justify-center pt-8 pb-20 px-4 sm:px-6">
                 <div className="w-full max-w-2xl">
                     <div className="text-center mb-10">
-                        <h1 className="text-4xl lg:text-5xl font-black text-slate-900 tracking-tight mb-4">
+                        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight mb-4">
                             Expert <span className="text-[#1ED36A]">Debrief</span>
                         </h1>
                         <p className="text-slate-500 font-semibold max-w-lg mx-auto leading-relaxed">
@@ -318,7 +318,7 @@ export default function DebriefPage() {
                         </p>
                     </div>
 
-                    <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 sm:p-10 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.15)]">
+                    <div className="bg-white border border-slate-100 rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-10 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.15)]">
                         {hasExistingBooking && (
                             <div className="mb-8 p-6 bg-emerald-50/50 rounded-3xl border-2 border-dashed border-emerald-200 flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-700">
                                 <div className="bg-[#1ED36A] p-2.5 rounded-2xl shadow-lg shadow-emerald-200">
@@ -350,7 +350,7 @@ export default function DebriefPage() {
                                 </div>
                                 <div className="space-y-4">
                                     <div className="space-y-1.5">
-                                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Email Address</label>
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Registered Email Address</label>
                                         <div className="relative group">
                                             <input 
                                                 type="email"
@@ -358,7 +358,7 @@ export default function DebriefPage() {
                                                 value={isEmailVerified ? userProfile?.email : manualEmail}
                                                 onChange={(e) => setManualEmail(e.target.value)}
                                                 placeholder={isEmailVerified ? "" : "Enter your registered email"}
-                                                className={`w-full h-12 rounded-full px-6 text-sm font-bold outline-none transition-all ${
+                                                className={`w-full h-12 rounded-full pl-6 ${isEmailVerified ? "pr-6" : "pr-24"} text-sm font-bold outline-none transition-all ${
                                                     isEmailVerified 
                                                     ? "bg-slate-50 border border-slate-200 text-slate-600 cursor-not-allowed" 
                                                     : "bg-white border-2 border-slate-200 text-slate-800 focus:border-[#1ED36A] focus:ring-4 focus:ring-[#1ED36A]/5"
@@ -368,7 +368,7 @@ export default function DebriefPage() {
                                                 <button 
                                                     onClick={handleManualVerify}
                                                     disabled={verifyingEmail || !manualEmail.includes("@")}
-                                                    className="absolute right-1.5 top-1.5 bottom-1.5 bg-[#1ED36A] text-white px-5 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-[#18c562] transition-colors disabled:bg-slate-200 disabled:text-slate-400"
+                                                    className="absolute right-1.5 top-1.5 bottom-1.5 bg-[#1ED36A] text-white px-3 sm:px-5 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-[#18c562] transition-colors disabled:bg-slate-200 disabled:text-slate-400"
                                                 >
                                                     {verifyingEmail ? "..." : "Verify"}
                                                 </button>

@@ -78,9 +78,9 @@ const NavItem: React.FC<NavItemProps> = ({
                 // LG: Ultra-Compact Mode (h-8.5, px-2) to fit 7 items
                 // XL: Medium-Compact Mode (px-3) for 125% zoom levels on larger screens
                 // 2XL: Robust Mode (h-10, px-3.5) for large screens
-                className={`flex items-center ${spacingClass} rounded-full transition-all duration-200 w-full ${isMobile ? "py-3.5" : "lg:h-8.5 xl:h-9 2xl:h-10"} cursor-pointer ${active
-                    ? "bg-brand-green text-white border border-transparent shadow-none px-2 xl:px-3 2xl:px-3.5"
-                    : "bg-gray-50 border border-gray-200 text-black hover:bg-gray-100 hover:text-black hover:border-gray-300 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white px-2 xl:px-3 2xl:px-3.5"
+                className={`flex items-center ${spacingClass} rounded-full transition-all duration-200 w-full ${isMobile ? "py-3.5 px-5" : "lg:h-8.5 xl:h-9 2xl:h-10 px-2 xl:px-3 2xl:px-3.5"} cursor-pointer ${active
+                    ? "bg-brand-green text-white border border-transparent shadow-none"
+                    : "bg-gray-50 border border-gray-200 text-black hover:bg-gray-100 hover:text-black hover:border-gray-300 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white"
                     }`}
             >
                 <div
@@ -808,49 +808,55 @@ const Header: React.FC<HeaderProps> = ({
             </div>
 
             {isMobileMenuOpen && !hideNav && (
-                <div
-                    id="mobile-menu"
-                    ref={mobileMenuRef}
-                    className="md:hidden absolute top-full left-0 w-full bg-brand-light-secondary dark:bg-[#19211C]/40 dark:backdrop-blur-[200px] shadow-none z-40 border-t border-brand-light-tertiary dark:border-white/[0.08] animate-fade-in"
-                >
-                    <nav className="flex flex-col p-4 space-y-2">
-                        {renderNavItems(true)}
+                <>
+                    <div 
+                        className="fixed inset-0 bg-black/40 dark:bg-black/60 z-[-1] md:hidden animate-fade-in-fast"
+                        onClick={() => setMobileMenuOpen(false)}
+                    />
+                    <div
+                        id="mobile-menu"
+                        ref={mobileMenuRef}
+                        className="md:hidden absolute top-full left-0 w-full bg-white dark:bg-[#19211C] shadow-2xl z-40 border-t border-brand-light-tertiary dark:border-white/[0.08] animate-fade-in-fast"
+                    >
+                        <nav className="flex flex-col p-4 space-y-2">
+                            {renderNavItems(true)}
 
-                        <div className="border-t border-brand-light-tertiary dark:border-brand-dark-tertiary my-2 pt-2">
-                            <div className="flex justify-between items-center px-2 mb-2">
-                                <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider">
-                                    Appearance
-                                </p>
-                                <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
-                            </div>
-                            <div className="flex justify-between items-center px-2">
-                                <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider">
-                                    Language
-                                </p>
-                                <div className="flex bg-white dark:bg-brand-dark-tertiary rounded-lg p-1 border border-brand-light-tertiary dark:border-white/10">
-                                    <button
-                                        onClick={() => setLanguage("ENG")}
-                                        className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${language === "ENG"
-                                            ? "bg-brand-green text-white shadow-none"
-                                            : "text-brand-text-light-secondary dark:text-brand-text-secondary hover:text-brand-text-primary dark:hover:text-white"
-                                            }`}
-                                    >
-                                        ENG
-                                    </button>
-                                    <button
-                                        onClick={() => setLanguage("TAM")}
-                                        className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${language === "TAM"
-                                            ? "bg-brand-green text-white shadow-none"
-                                            : "text-brand-text-light-secondary dark:text-brand-text-secondary hover:text-brand-text-primary dark:hover:text-white"
-                                            }`}
-                                    >
-                                        TAM
-                                    </button>
+                            <div className="border-t border-brand-light-tertiary dark:border-brand-dark-tertiary my-2 pt-2">
+                                <div className="flex justify-between items-center px-2 mb-2">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider">
+                                        Appearance
+                                    </p>
+                                    <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
+                                </div>
+                                <div className="flex justify-between items-center px-2">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider">
+                                        Language
+                                    </p>
+                                    <div className="flex bg-white dark:bg-brand-dark-tertiary rounded-lg p-1 border border-brand-light-tertiary dark:border-white/10">
+                                        <button
+                                            onClick={() => setLanguage("ENG")}
+                                            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${language === "ENG"
+                                                ? "bg-brand-green text-white shadow-none"
+                                                : "text-brand-text-light-secondary dark:text-brand-text-secondary hover:text-brand-text-primary dark:hover:text-white"
+                                                }`}
+                                        >
+                                            ENG
+                                        </button>
+                                        <button
+                                            onClick={() => setLanguage("TAM")}
+                                            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${language === "TAM"
+                                                ? "bg-brand-green text-white shadow-none"
+                                                : "text-brand-text-light-secondary dark:text-brand-text-secondary hover:text-brand-text-primary dark:hover:text-white"
+                                                }`}
+                                        >
+                                            TAM
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </nav>
-                </div>
+                        </nav>
+                    </div>
+                </>
             )}
         </header>
     );

@@ -14,6 +14,7 @@ import {
   CorporateCreditLedger,
   Registration,
   AffiliateSettlementTransaction,
+  StudentSubscription,
 } from '@originbi/shared-entities';
 import { AffiliatesService } from '../affiliates/affiliates.service';
 import dayjs from 'dayjs';
@@ -44,6 +45,9 @@ export class AdminService {
 
     @InjectRepository(AffiliateSettlementTransaction)
     private readonly settlementRepo: Repository<AffiliateSettlementTransaction>,
+
+    @InjectRepository(StudentSubscription)
+    private readonly subscriptionRepo: Repository<StudentSubscription>,
 
     private readonly affiliatesService: AffiliatesService,
   ) {}
@@ -79,6 +83,7 @@ export class AdminService {
 
       // 5. Revenue Trend (Last 12 Months)
       const revenueTrend = await this.getRevenueTrend();
+      const totalRevenue = revenueTrend.reduce((acc, curr) => acc + curr.revenue, 0);
 
       // 6. Total Commissions Paid
       const totalCommissionsPaid = await this.getTotalCommissionsPaid();
@@ -92,6 +97,7 @@ export class AdminService {
         totalReadyToPayment: affiliateStats.totalReadyToPayment,
         affiliates: affiliateStats.affiliates,
         revenueTrend,
+        totalRevenue,
         totalCommissionsPaid,
         userDistribution,
         recentExpiredAssessments: await this.getRecentExpiredAssessments(),
@@ -136,6 +142,26 @@ export class AdminService {
     months.forEach((m) => trendMap.set(m, 0));
 
     individualRevenue.forEach((item) => {
+      const monthLabel = dayjs(item.month).format('MMM YYYY');
+      if (trendMap.has(monthLabel)) {
+        trendMap.set(
+          monthLabel,
+          trendMap.get(monthLabel)! + (parseFloat(item.amount) || 0),
+        );
+      }
+    });
+
+    // Add Subscription Revenue (e.g. Debrief extra payments)
+    const subscriptionRevenue = await this.subscriptionRepo
+      .createQueryBuilder('s')
+      .select("DATE_TRUNC('month', s.purchased_at)", 'month')
+      .addSelect('SUM(CAST(s.amount AS NUMERIC))', 'amount')
+      .where("s.status = 'active'")
+      .andWhere('s.purchased_at >= :twelveMonthsAgo', { twelveMonthsAgo })
+      .groupBy('month')
+      .getRawMany();
+
+    subscriptionRevenue.forEach((item) => {
       const monthLabel = dayjs(item.month).format('MMM YYYY');
       if (trendMap.has(monthLabel)) {
         trendMap.set(
