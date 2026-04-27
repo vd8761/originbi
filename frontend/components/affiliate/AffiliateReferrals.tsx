@@ -70,6 +70,7 @@ const AffiliateReferrals: React.FC = () => {
     const [destinationAction, setDestinationAction] = useState<'copy' | 'share-native' | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [sharingPlatform, setSharingPlatform] = useState<string | null>(null);
+    const selectedAudienceLabel = selectedAudience.charAt(0).toUpperCase() + selectedAudience.slice(1);
 
     useEffect(() => {
         try {
@@ -80,9 +81,9 @@ const AffiliateReferrals: React.FC = () => {
                 const affId = user.affiliateId || user.id;
                 if (affId) {
                     setAffiliateId(String(affId));
-                    if (user.referralCode) {
-                        setReferralCode(user.referralCode);
-                    }
+                }
+                if (user.referralCode) {
+                    setReferralCode(user.referralCode);
                 }
             }
         } catch { /* empty */ }
@@ -641,22 +642,75 @@ Scan the QR code in the image or register here: ${link}`;
                 </div>
             )}
 
-            {/* Referral Link Quick Banner */}
-            <div className="bg-gradient-to-r from-[#150089] to-[#1ED36A] rounded-[32px] p-8 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
-                <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg>
+            {/* Referral Link Share Card */}
+            <div className="relative overflow-hidden rounded-[32px] border border-[#E6E6E6] dark:border-white/10 bg-white/85 dark:bg-[#FFFFFF]/[0.07] backdrop-blur-xl shadow-sm">
+                <div className="p-6 sm:p-7 lg:p-8">
+                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+                        <div>
+                            <p className="text-[#19211C] dark:text-white font-semibold text-[clamp(18px,1.2vw,22px)] leading-tight">Share your referral link to earn more</p>
+                            <p className="text-[#19211C]/65 dark:text-white/70 text-[clamp(13px,0.95vw,15px)] mt-1">One focused share panel with your current audience, QR, and actions.</p>
+                        </div>
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#150089]/10 dark:bg-white/10 border border-[#150089]/20 dark:border-white/20">
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#1ED36A]" />
+                            <span className="text-[11px] uppercase tracking-wider font-semibold text-[#150089] dark:text-white/90">Active Audience</span>
+                            <span className="text-sm font-semibold text-[#19211C] dark:text-white">{selectedAudienceLabel}</span>
+                        </div>
                     </div>
-                    <div>
-                        <p className="text-white font-semibold text-[clamp(16px,1.1vw,20px)]">Share your referral link to earn more</p>
-                        <p className="text-white/80 text-[clamp(14px,1vw,16px)] font-normal mt-0.5">{referralLink}</p>
+
+                    <div className="flex flex-wrap gap-2.5 mb-5">
+                        {[
+                            { key: 'school', label: 'School' },
+                            { key: 'college', label: 'College' },
+                            { key: 'employee', label: 'Employee' },
+                        ].map((aud) => (
+                            <span
+                                key={aud.key}
+                                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${selectedAudience === aud.key
+                                    ? 'bg-[#150089] text-white border-[#150089] shadow-[0_6px_20px_rgba(21,0,137,0.22)]'
+                                    : 'bg-white dark:bg-white/5 text-[#19211C]/70 dark:text-white/70 border-[#E0E0E0] dark:border-white/15'
+                                    }`}
+                            >
+                                {aud.label}
+                            </span>
+                        ))}
                     </div>
-                </div>
-                <div className="flex flex-wrap gap-3 shrink-0">
-                    <button onClick={handleCopy}
-                        className="px-8 py-3.5 rounded-full bg-white text-[#150089] font-semibold text-[clamp(14px,1vw,16px)] hover:bg-white/90 transition-all shadow-md">
-                        {copied ? '✓ Copied!' : 'Copy Link'}
-                    </button>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-[1fr,320px] gap-4 lg:gap-5 items-stretch">
+                        <div className="rounded-2xl border border-[#E8E8E8] dark:border-white/10 bg-[#FAFAFA] dark:bg-white/[0.04] p-4 sm:p-5">
+                            <p className="text-[11px] uppercase tracking-wider font-semibold text-[#150089] dark:text-white/70 mb-2">Your affiliate link</p>
+                            <p className="text-[#19211C] dark:text-white text-[clamp(13px,0.95vw,15px)] font-medium break-all leading-relaxed">{referralLink}</p>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                                <button
+                                    onClick={handleCopy}
+                                    className="px-4 py-3 rounded-xl bg-white dark:bg-white/10 border border-[#E0E0E0] dark:border-white/15 text-[#150089] dark:text-white font-semibold text-sm hover:shadow-sm transition-all"
+                                >
+                                    {copied ? '✓ Copied!' : 'Copy Link'}
+                                </button>
+                                <button
+                                    onClick={() => requestDestination('share-native')}
+                                    disabled={isGenerating}
+                                    className="px-4 py-3 rounded-xl bg-[#1ED36A] text-white font-semibold text-sm hover:bg-[#16b058] transition-all disabled:opacity-60"
+                                >
+                                    {isGenerating && sharingPlatform === 'native' ? 'Sharing...' : 'Share'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-[#E8E8E8] dark:border-white/10 bg-[#F6F8FB] dark:bg-white/[0.04] p-4 sm:p-5 flex items-center gap-4">
+                            <div className="p-2 bg-white rounded-xl border border-[#E0E0E0] shadow-sm shrink-0">
+                                {qrDataUrl ? (
+                                    <img src={qrDataUrl} alt="Referral QR" className="w-[88px] h-[88px] rounded-lg" />
+                                ) : (
+                                    <div className="w-[88px] h-[88px] rounded-lg bg-gray-100 animate-pulse" />
+                                )}
+                            </div>
+                            <div>
+                                <p className="text-[#19211C] dark:text-white font-semibold text-[15px] leading-tight">Quick Share QR</p>
+                                <p className="text-[#19211C]/65 dark:text-white/65 text-sm mt-1">Share this {selectedAudienceLabel.toLowerCase()} referral link with QR support.</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
