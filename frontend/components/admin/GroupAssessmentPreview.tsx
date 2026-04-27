@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { assessmentService } from '../../lib/services/assessment.service';
+import { buildReportApiUrl } from '../../lib/utils/reportUrl';
 import { ArrowLeftWithoutLineIcon, ArrowRightWithoutLineIcon, ChevronDownIcon, EyeVisibleIcon, FilterFunnelIcon } from '../icons';
 import ExcelExportButton from '../ui/ExcelExportButton';
 
@@ -94,10 +95,8 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
             setGenerating(true);
             setProgress('Initializing...');
 
-            const apiBase = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || '';
-
             // 1. Start Job
-            const startRes = await fetch(`${apiBase}/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true`);
+            const startRes = await fetch(buildReportApiUrl(`/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true`));
             const startData = await startRes.json();
 
             if (!startData.success || !startData.jobId) {
@@ -110,7 +109,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
             let isComplete = false;
             while (!isComplete && isDownloadingRef.current) {
                 try {
-                    const statusRes = await fetch(`${apiBase}/download/status/${jobId}?json=true`);
+                    const statusRes = await fetch(buildReportApiUrl(`/download/status/${jobId}?json=true`));
                     const statusData = await statusRes.json();
 
                     if (statusData.status === 'PROCESSING') {
@@ -121,7 +120,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                         setProgress('Download Starting...');
 
                         // Trigger Download
-                        window.location.href = `${apiBase}${statusData.downloadUrl}`;
+                        window.location.href = buildReportApiUrl(statusData.downloadUrl);
 
                         // Close Modal after a delay
                         setTimeout(() => {
@@ -159,10 +158,9 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
 
         try {
             setSendingReportEmail(true);
-            const apiBase = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || '';
 
             // 1. Start Generation
-            const startRes = await fetch(`${apiBase}/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true`);
+            const startRes = await fetch(buildReportApiUrl(`/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true`));
             const startData = await startRes.json();
 
             if (!startData.success || !startData.jobId) {
@@ -174,7 +172,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
             // 2. Poll until complete
             let isComplete = false;
             while (!isComplete) {
-                const statusRes = await fetch(`${apiBase}/download/status/${jobId}?json=true`);
+                const statusRes = await fetch(buildReportApiUrl(`/download/status/${jobId}?json=true`));
                 const statusData = await statusRes.json();
 
                 if (statusData.status === 'PROCESSING') {
@@ -198,7 +196,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                             groupId: groupData.group.id,
                             departmentId: selectedDepartment,
                             toEmail: reportEmail,
-                            downloadUrl: `${apiBase}${statusData.downloadUrl}`,
+                            downloadUrl: buildReportApiUrl(statusData.downloadUrl),
                             studentCount: selectedDept?.completed || 0,
                             degreeType,
                             departmentName: deptName,
