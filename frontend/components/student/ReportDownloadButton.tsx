@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Download, Loader2, CheckCircle, AlertCircle, Copy, Check } from 'lucide-react';
 import { reportService } from '../../lib/services/report.service';
 import { studentService } from '../../lib/services/student.service';
+import { buildReportApiUrl } from '../../lib/utils/reportUrl';
 
 interface ReportDownloadButtonProps {
     className?: string;
@@ -102,8 +103,7 @@ const ReportDownloadButton: React.FC<ReportDownloadButtonProps> = ({ className }
                         // Best approach: create a hidden link and click it
                         // But we need the full URL.
                         // Assuming report service URL is base.
-                        const API_URL = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || "";
-                        const fullDownloadUrl = `${API_URL}${downloadUrl}`;
+                        const fullDownloadUrl = buildReportApiUrl(downloadUrl);
                         
                         // Trigger download
                         const link = document.createElement('a');

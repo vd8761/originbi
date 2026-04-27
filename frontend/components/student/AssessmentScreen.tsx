@@ -29,6 +29,7 @@ const translations = {
 };
 
 import { studentService } from '../../lib/services/student.service';
+import { buildReportApiUrl } from '../../lib/utils/reportUrl';
 import { ArrowRightWithoutLineIcon, Spinner } from '../icons';
 import AssessmentModal from "./AssessmentModal";
 
@@ -172,19 +173,8 @@ const idbDelete = async (key: string): Promise<void> => {
 // =============================================
 // LAYER 3: Combined read/write helpers
 // =============================================
-const getReportApiBase = () => {
-  const reportApiBase = (process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || '').trim().replace(/\/$/, '');
-  if (!reportApiBase) {
-    throw new Error('Report API base URL is not configured.');
-  }
-  return reportApiBase;
-};
-
 const buildReportDownloadUrl = (downloadUrl: string) => {
-  if (/^https?:\/\//i.test(downloadUrl)) {
-    return downloadUrl;
-  }
-  return `${getReportApiBase()}${downloadUrl}`;
+  return buildReportApiUrl(downloadUrl);
 };
 
 interface SessionAuthContext {
@@ -496,13 +486,33 @@ const ResponsivePdfRenderer: React.FC<ResponsivePdfRendererProps> = ({
           pagesHost.replaceChildren(...renderedNodes);
         }
       } catch (error) {
-        console.error('Failed to render PDF preview', error);
+        const rawMessage =
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : '';
+        const normalizedMessage = rawMessage.toLowerCase();
+        const isExpectedCancellation =
+          cancelled ||
+          normalizedMessage.includes('worker was destroyed') ||
+          normalizedMessage.includes('renderingcancelledexception') ||
+          normalizedMessage.includes('rendering cancelled');
+
+        if (!isExpectedCancellation) {
+          console.error('Failed to render PDF preview', error);
+        }
+
         if (cancelled) {
           return;
         }
 
         const message =
           error instanceof Error ? error.message : 'Failed to render PDF preview.';
+
+        if (isExpectedCancellation) {
+          return;
+        }
 
         if (/password/i.test(message)) {
           setRenderError(
@@ -1264,9 +1274,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     setReportPdfPassword(null);
 
     try {
-      const reportApiBase = getReportApiBase();
-
-      const startResponse = await fetch(`${reportApiBase}/generate/student/${studentId}`, {
+      const startResponse = await fetch(buildReportApiUrl(`/generate/student/${studentId}`), {
         method: 'GET',
         headers: buildSecureRequestHeaders(authContext, {
           Accept: 'application/json',
@@ -1292,7 +1300,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       let attempts = 0;
 
       while (attempts < REPORT_PDF_POLL_MAX_ATTEMPTS) {
-        const statusResponse = await fetch(`${reportApiBase}/download/status/${jobId}?json=true`, {
+        const statusResponse = await fetch(buildReportApiUrl(`/download/status/${jobId}?json=true`), {
           headers: buildSecureRequestHeaders(authContext, {
             Accept: 'application/json',
           }),
