@@ -1,7 +1,7 @@
 import { AuthService } from "./auth.service";
+import { buildReportApiUrl } from "../utils/reportUrl";
 
 const USE_REAL_API = process.env.NEXT_PUBLIC_USE_MOCKS === "false";
-const API_URL = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || "";
 
 const simulateDelay = (ms: number) =>
     new Promise((resolve) => setTimeout(resolve, ms));
@@ -41,7 +41,7 @@ export const reportService = {
         }
         const token = AuthService.getToken();
         const res = await fetch(
-            `${API_URL}/reports/${userId}?type=${reportType}`,
+            buildReportApiUrl(`/reports/${userId}?type=${reportType}`),
             {
                 method: "GET",
                 headers: buildSecureHeaders({
@@ -56,7 +56,7 @@ export const reportService = {
     async generateStudentReport(studentId: string) {
         try {
             const res = await fetch(
-                `${API_URL}/generate/student/${studentId}`,
+                buildReportApiUrl(`/generate/student/${studentId}`),
                 {
                     method: "GET",
                     headers: buildSecureHeaders({
@@ -77,7 +77,7 @@ export const reportService = {
     async checkStatus(jobId: string) {
         try {
             const res = await fetch(
-                `${API_URL}/download/status/${jobId}?json=true`,
+                buildReportApiUrl(`/download/status/${jobId}?json=true`),
                 {
                     headers: buildSecureHeaders({
                         Accept: "application/json",
