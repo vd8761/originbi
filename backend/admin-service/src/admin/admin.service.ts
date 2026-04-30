@@ -58,15 +58,23 @@ export class AdminService {
       const startOfWeek = dayjs().startOf('week'); // Usually Sunday
       const startOfMonth = dayjs().startOf('month');
 
-      // 1. User Distribution (and demographics total)
+      // 1. Total Registrations (Non-deleted)
+      const totalUsersCount = await this.registrationRepo.count({
+        where: { isDeleted: false },
+      });
+
+      // 2. User Distribution (Segments)
       const userDistribution = await this.getUserDistribution();
-      const totalUsersCount = userDistribution.totalWithTraits;
 
       // 2. Active Assessments (This Week)
       // Count both individual sessions and group assessments created/starts this week
       const [weeklySessions, weeklyGroups] = await Promise.all([
         this.sessionRepo.count({
-          where: { createdAt: MoreThanOrEqual(startOfWeek.toDate()) },
+          where: { 
+            createdAt: MoreThanOrEqual(startOfWeek.toDate()),
+            registration: { isDeleted: false }
+          },
+          relations: ['registration'],
         }),
         this.groupAssessmentRepo.count({
           where: { createdAt: MoreThanOrEqual(startOfWeek.toDate()) },
@@ -189,17 +197,18 @@ export class AdminService {
     const [schoolCount, collegeCount, totalCorporateCount, cxoCount] =
       await Promise.all([
         this.registrationRepo.count({
-          where: { schoolLevel: Not(IsNull()) },
+          where: { schoolLevel: Not(IsNull()), isDeleted: false },
         }),
         this.registrationRepo.count({
-          where: { departmentDegreeId: Not(IsNull()) },
+          where: { departmentDegreeId: Not(IsNull()), isDeleted: false },
         }),
         this.registrationRepo.count({
-          where: { corporateAccountId: Not(IsNull()) },
+          where: { corporateAccountId: Not(IsNull()), isDeleted: false },
         }),
         this.registrationRepo
           .createQueryBuilder('r')
           .where('r.corporate_account_id IS NOT NULL')
+          .andWhere('r.is_deleted = false')
           .andWhere("r.metadata->>'programType' ILIKE :type", { type: '%cxo%' })
           .getCount(),
       ]);
@@ -244,6 +253,7 @@ export class AdminService {
           'EXPIRED',
           'PARTIALLY_EXPIRED',
         ]),
+        registration: { isDeleted: false }
       },
       relations: ['user', 'program', 'registration'],
       order: { validTo: 'DESC' },
@@ -256,6 +266,7 @@ export class AdminService {
     return this.registrationRepo.find({
       where: {
         createdAt: MoreThanOrEqual(startOfToday),
+        isDeleted: false,
       },
       relations: ['user', 'program'],
       order: { createdAt: 'DESC' },

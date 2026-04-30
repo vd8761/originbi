@@ -101,3 +101,30 @@ function normalizeRole(role: string | undefined): 'ADMIN' | 'CORPORATE' | 'STUDE
     if (upper === 'AFFILIATE') return 'AFFILIATE';
     return 'STUDENT';
 }
+
+/**
+ * Clear all auth-related storage items.
+ */
+export function clearAuthStorage(): void {
+    if (typeof window === 'undefined') return;
+    
+    // Tokens
+    localStorage.removeItem('originbi_id_token');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('token');
+    sessionStorage.removeItem('idToken');
+    sessionStorage.removeItem('accessToken');
+    
+    // User data
+    localStorage.removeItem('user');
+    localStorage.removeItem('affiliate_user');
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('affiliateEmail');
+    
+    // Amplify keys (prefix match for Cognito)
+    const amplifyKeys = Object.keys(localStorage).filter(key => 
+        key.startsWith('amplify-') || 
+        key.includes('CognitoIdentityServiceProvider')
+    );
+    amplifyKeys.forEach(key => localStorage.removeItem(key));
+}
