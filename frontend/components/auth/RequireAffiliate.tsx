@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchAuthSession, signOut } from 'aws-amplify/auth';
 import { configureAmplify } from '../../lib/aws-amplify-config';
+import { clearAuthStorage } from '../../lib/auth-helpers';
 
 configureAmplify();
 
@@ -24,6 +25,13 @@ const RequireAffiliate: React.FC<RequireAffiliateProps> = ({ children }) => {
 
                 if (!tokens) {
                     throw new Error('No tokens found');
+                }
+
+                // 🔄 Sync tokens for other components
+                const idTokenJwt = tokens.idToken?.toString();
+                if (idTokenJwt) {
+                    localStorage.setItem('originbi_id_token', idTokenJwt);
+                    sessionStorage.setItem('idToken', idTokenJwt);
                 }
 
                 // 2. Check Role/Group is AFFILIATE
@@ -54,9 +62,7 @@ const RequireAffiliate: React.FC<RequireAffiliateProps> = ({ children }) => {
                 } catch {
                     // ignore error
                 }
-                localStorage.removeItem('affiliate_user');
-                localStorage.removeItem('affiliate_token');
-                sessionStorage.clear();
+                clearAuthStorage();
                 router.replace('/affiliate/login');
             }
         };

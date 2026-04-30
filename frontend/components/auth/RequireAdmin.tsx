@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchAuthSession, signOut } from 'aws-amplify/auth';
 import { configureAmplify } from '../../lib/aws-amplify-config';
+import { clearAuthStorage } from '../../lib/auth-helpers';
 
 configureAmplify();
 
@@ -30,6 +31,10 @@ const RequireAdmin: React.FC<RequireAdminProps> = ({ children }) => {
         if (!idTokenJwt) {
           throw new Error('No ID token');
         }
+
+        // 🔄 Sync tokens for other components
+        localStorage.setItem('originbi_id_token', idTokenJwt);
+        sessionStorage.setItem('idToken', idTokenJwt);
 
         // 2️⃣ Ask backend: /admin/me
         const apiBase =
@@ -58,7 +63,8 @@ const RequireAdmin: React.FC<RequireAdminProps> = ({ children }) => {
           // ignore signOut errors
         }
 
-        router.replace('/admin/login'); // adjust to your actual login route
+        clearAuthStorage();
+        router.replace('/admin/login');
       }
     };
 
