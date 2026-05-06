@@ -379,10 +379,10 @@ const ResponsivePdfRenderer: React.FC<ResponsivePdfRendererProps> = ({
       const renderedNodes: HTMLDivElement[] = [];
 
       try {
-        const pdfjsLib: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
+        const pdfjsLib: any = await import('pdfjs-dist');
 
         if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
         }
 
         const documentConfig: { data: Uint8Array; password?: string } = {
@@ -1617,7 +1617,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
 
   if (!loading && assessments.length === 0 && !isReportPageMode) {
     return (
-      <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-x-hidden p-4 sm:p-6 lg:p-8">
+      <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-x-hidden py-4 sm:py-6 lg:py-8">
         <div className="w-full max-w-[2000px] mx-auto">
           <div className="p-20 text-center text-brand-text-light-primary dark:text-white text-lg">{t.noAssessments}</div>
         </div>
@@ -1627,7 +1627,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
 
   if (isReportPageMode) {
     return (
-      <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-x-hidden p-4 sm:p-6 lg:p-8">
+      <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-x-hidden py-4 sm:py-6 lg:py-8">
         <div className="flex flex-col gap-5 w-full max-w-[2000px] mx-auto">
           <div className="flex items-center text-xs text-black dark:text-white font-normal flex-wrap">
             <Link
@@ -1642,7 +1642,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
             <span className="text-brand-green font-semibold">Report</span>
           </div>
 
-          <div className="rounded-[24px] bg-white dark:bg-white/[0.08] border border-[#EEF4F1] dark:border-white/[0.12] shadow-[0_2px_8px_rgba(25,33,28,0.04)] dark:shadow-none p-7 lg:p-[1.5vw] flex flex-col items-center justify-center text-center gap-3 min-h-[180px] transition-colors duration-300 hover:border-[#EAF1ED] dark:hover:border-white/[0.2]">
+          <div className="rounded-2xl bg-white dark:bg-white/[0.08] border border-[#EEF4F1] dark:border-white/[0.12] shadow-[0_2px_8px_rgba(25,33,28,0.04)] dark:shadow-none p-7 lg:p-[1.5vw] flex flex-col items-center justify-center text-center gap-3 min-h-[180px] transition-colors duration-300 hover:border-[#EAF1ED] dark:hover:border-white/[0.2]">
             <h1 className="font-semibold text-[#19211C] dark:text-white text-[clamp(20px,2vw,42px)] leading-tight">
               You have successfully completed the assessment <span aria-hidden="true">🎉</span>
             </h1>
@@ -1657,7 +1657,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
             )}
           </div>
 
-          <div className="rounded-[24px] bg-white dark:bg-white/[0.08] border border-[#EEF4F1] dark:border-white/[0.12] shadow-[0_2px_8px_rgba(25,33,28,0.04)] dark:shadow-none h-[68vh] min-h-[440px] flex flex-col overflow-hidden transition-colors duration-300 hover:border-[#EAF1ED] dark:hover:border-white/[0.2]">
+          <div className="rounded-2xl bg-white dark:bg-white/[0.08] border border-[#EEF4F1] dark:border-white/[0.12] shadow-[0_2px_8px_rgba(25,33,28,0.04)] dark:shadow-none h-[68vh] min-h-[440px] flex flex-col overflow-hidden transition-colors duration-300 hover:border-[#EAF1ED] dark:hover:border-white/[0.2]">
             <div className="px-6 pt-6 pb-4 lg:px-[1.25vw] lg:pt-[1.25vw] lg:pb-[0.833vw] flex flex-wrap justify-between items-center gap-2">
               <h3 className="font-semibold text-[#19211C] dark:text-white text-[18px]">Your Report Document</h3>
               <div className="flex flex-wrap items-center gap-2">
@@ -1735,7 +1735,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   }
 
   return (
-    <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-x-hidden p-4 sm:p-6 lg:p-8">
+    <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-x-hidden py-4 sm:py-6 lg:py-8">
       <div className="flex flex-col gap-4 w-full max-w-[2000px] mx-auto">
         <div className="mb-4 overflow-x-auto pb-4 px-4 scrollbar-hide md:overflow-visible md:pb-0 md:mx-0 md:px-0">
           <Stepper overallProgress={overallPercentage} steps={stepperSteps} />

@@ -93,31 +93,28 @@ const MoodCard: React.FC = () => {
     ];
 
     return (
-        <div className="dashboard-glass-card h-full flex flex-col overflow-hidden">
+        <div className="dashboard-glass-card h-full flex flex-col overflow-hidden min-h-[300px] lg:min-h-[400px]">
             <div className="flex justify-between items-center px-6 pt-6 pb-4 lg:px-[1.25vw] lg:pt-[1.25vw] lg:pb-[0.833vw] flex-shrink-0">
                 <h3 className="font-semibold font-sans text-[#19211C] dark:text-brand-text-primary text-lg lg:text-[1.25vw]">
                     What&apos;s Your Mood?
                 </h3>
-                <a
-                    href="#"
-                    className="font-medium font-sans text-brand-green text-xs lg:text-[0.833vw] hover:underline"
-                >
-                    View All
-                </a>
+
             </div>
 
-            <div className="flex flex-col flex-grow overflow-y-auto w-full">
-                {moodItems.map((item, index) => (
-                    <React.Fragment key={index}>
-                        <MoodItem
-                            item={item}
-                            isHighlighted={index === 0}
-                            onClick={() => { }}
-                        />
-                        {index < moodItems.length - 1 && <hr className="w-full border-[#19211C]/20 dark:border-white/10" />}
-                    </React.Fragment>
-                ))}
+            <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-4">
+                <div className="w-16 h-16 rounded-full bg-brand-green/5 flex items-center justify-center mb-2">
+                     <svg className="w-8 h-8 text-brand-green/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.182 15.182a4.5 4.5 0 0 1-6.364 0M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75Zm-.375 0h.008v.015h-.008V9.75Zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75Zm-.375 0h.008v.015h-.008V9.75Z" />
+                    </svg>
+                </div>
+                <div className="bg-brand-green/10 text-brand-green px-6 py-2 rounded-full font-bold text-sm lg:text-[0.938vw] shadow-sm transform transition-transform hover:scale-105">
+                    Coming Soon
+                </div>
+                <p className="text-xs lg:text-[0.833vw] text-[#19211C]/40 dark:text-white/30 text-center max-w-[200px]">
+                    Mood-based recommendations will be available shortly.
+                </p>
             </div>
+
         </div>
     );
 };
