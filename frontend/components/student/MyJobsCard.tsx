@@ -119,16 +119,25 @@ const MyJobsCard: React.FC = () => {
     ];
 
     return (
-        <div className="dashboard-glass-card h-full flex flex-col p-4 sm:p-6 lg:p-[1.25vw]">
+        <div className="dashboard-glass-card h-full flex flex-col p-4 sm:p-6 lg:p-[1.25vw] min-h-[300px] lg:min-h-[400px]">
             <div className="flex justify-between items-center mb-6 lg:mb-[1.25vw]">
                 <h3 className="font-semibold text-[#19211C] dark:text-white text-lg lg:text-[1.25vw]">My Jobs</h3>
-                <a href="#" className="text-brand-green text-xs lg:text-[0.833vw] font-medium hover:underline">View All</a>
+
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-[1vw] overflow-y-auto custom-scrollbar">
-                {jobs.map((job, index) => (
-                    <JobItem key={index} {...job} />
-                ))}
+            <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-4">
+                <div className="w-16 h-16 rounded-full bg-brand-green/5 flex items-center justify-center mb-2">
+                     <svg className="w-8 h-8 text-brand-green/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.25c0 .414-.336.75-.75.75H4.5a.75.75 0 0 1-.75-.75v-4.25m16.5 0a3 3 0 0 0-3-3H6.75a3 3 0 0 0-3 3m16.5 0V10.5A3.75 3.75 0 0 0 16.5 6.75h-9A3.75 3.75 0 0 0 3.75 10.5v3.65m16.5 0a3 3 0 0 1-3 3H6.75a3 3 0 0 1-3-3" />
+                    </svg>
+                </div>
+                <div className="bg-brand-green/10 text-brand-green px-6 py-2 rounded-full font-bold text-sm lg:text-[0.938vw] shadow-sm transform transition-transform hover:scale-105">
+                    Coming Soon
+                </div>
+                <p className="text-xs lg:text-[0.833vw] text-[#19211C]/40 dark:text-white/30 text-center max-w-[200px]">
+                    Job recommendations based on your profile will be available shortly.
+                </p>
             </div>
+
         </div>
     );
 };
