@@ -130,7 +130,7 @@ export const getAffiliateWelcomeEmailTemplate = (
                                 <td style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${countryCode} ${mobile}</td>
                               </tr>
                               <tr>
-                                <td style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Temporary Password</td>
+                                <td style="font-family: Tahoma, Arial, sans-serif; font-weight: 400; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #707070; vertical-align: top;">Password</td>
                                 <td style="font-family: Tahoma, Arial, sans-serif; font-weight: 700; font-size: 14px; line-height: 100%; letter-spacing: 0%; color: #000000;">${pass}</td>
                               </tr>
                             </table>
