@@ -8,6 +8,7 @@ import {
   IsIn,
   MinLength,
   Matches,
+  IsBoolean,
 } from 'class-validator';
 
 export class CreateRegistrationDto {
@@ -113,4 +114,8 @@ export class CreateRegistrationDto {
 
   @IsOptional()
   metadata?: any;
+
+  @IsBoolean()
+  @IsOptional()
+  is_tech_assessment?: boolean;
 }

@@ -133,6 +133,6 @@ export class ExpiryReminderService {
         AND (s.valid_to::date - (NOW() AT TIME ZONE 'Asia/Kolkata')::date) = 3
       ORDER BY s.user_id, s.valid_to ASC
     `;
-    return this.dataSource.query(sql) as Promise<ExpiryRow[]>;
+    return this.dataSource.query(sql);
   }
 }

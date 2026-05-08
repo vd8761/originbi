@@ -56,6 +56,11 @@ export class StudentController {
     return this.studentService.register(dto);
   }
 
+  @Post('register/tech')
+  async registerTechAssessment(@Body() dto: CreateRegistrationDto) {
+    return this.studentService.registerTechAssessment(dto);
+  }
+
   @Post('validate-registration')
   async validateRegistration(
     @Body() dto: { email: string; mobile_number?: string },

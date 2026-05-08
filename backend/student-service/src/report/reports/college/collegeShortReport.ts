@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument */
 import * as fs from 'fs';
 import * as path from 'path';
 import { CollegeData } from '../../types/types';
@@ -78,7 +77,10 @@ export class CollegeShortReport extends BaseReport {
 
   private resolveBackgroundPath(): string | null {
     const candidates = [
-      path.resolve(process.cwd(), 'public/assets/images/Watermark_Background.jpg'),
+      path.resolve(
+        process.cwd(),
+        'public/assets/images/Watermark_Background.jpg',
+      ),
       path.resolve(process.cwd(), 'frontend/public/Watermark_Background.jpg'),
       path.resolve(
         process.cwd(),
@@ -184,19 +186,16 @@ export class CollegeShortReport extends BaseReport {
     const left = this.MARGIN_STD;
     const width = this.PAGE_WIDTH - 2 * this.MARGIN_STD;
     const blended = blendedTraits[traitCode];
-    const styleName = this.truncate(blended?.name || `${traitCode} profile`, 24);
+    const styleName = this.truncate(
+      blended?.name || `${traitCode} profile`,
+      24,
+    );
     const aboutText =
       `This short report gives you a quick snapshot of your college direction. ` +
       `It highlights your ${styleName} style, suggested role options, and your 2027 – 2035 readiness map. ` +
       'Use this as a concise guide and refer to the full Origin BI report for complete insights.';
 
-    const aboutTextFitted = this.fitTextToHeight(
-      aboutText,
-      width,
-      50,
-      10,
-      1.2,
-    );
+    const aboutTextFitted = this.fitTextToHeight(aboutText, width, 50, 10, 1.2);
     this.doc.font(this.FONT_REGULAR).fontSize(10);
     const textHeight = this.doc.heightOfString(aboutTextFitted, {
       width,
@@ -222,17 +221,16 @@ export class CollegeShortReport extends BaseReport {
     return y + sectionHeight + 14;
   }
 
-  private drawProfileCard(
-    y: number,
-    traitCode: string,
-  ): number {
+  private drawProfileCard(y: number, traitCode: string): number {
     const left = this.MARGIN_STD;
     const width = this.PAGE_WIDTH - 2 * this.MARGIN_STD;
     const blended = blendedTraits[traitCode];
     const styleName = blended?.name || `${traitCode} Profile`;
     const descriptionWidth = width;
 
-    const rawDescription = this.extractPrimaryDescription(blended?.description || '');
+    const rawDescription = this.extractPrimaryDescription(
+      blended?.description || '',
+    );
     const description = this.fitTextToHeight(
       rawDescription,
       descriptionWidth,
@@ -278,29 +276,35 @@ export class CollegeShortReport extends BaseReport {
     const width = this.PAGE_WIDTH - 2 * this.MARGIN_STD;
     const summary = this.getTraitSummary(traitCode);
     const roleSuggestions = this.getCareerRoleSuggestions(traitCode);
-    
+
     // Get all unique roles from DB and remove the first 3 (which are shown in the circles)
     const allUniqueRoles = summary.roleSuggestion
       .split(/,|\/|\||;|\band\b/gi)
       .map((part) => this.cleanRoleLabel(part))
       .filter(Boolean)
       .reduce((acc: string[], role) => {
-        if (!acc.some((item) => item.toLowerCase() === role.toLowerCase())) acc.push(role);
+        if (!acc.some((item) => item.toLowerCase() === role.toLowerCase()))
+          acc.push(role);
         return acc;
       }, []);
-      
+
     let roleSummary = allUniqueRoles.slice(3).join(', ');
     if (!roleSummary) {
-      roleSummary = 'Refer to the full Origin BI report for additional role suggestions';
+      roleSummary =
+        'Refer to the full Origin BI report for additional role suggestions';
     }
     if (roleSummary && !roleSummary.endsWith('.')) roleSummary += '.';
 
     let focusSummary = this.normalizeSummaryList(summary.focusArea);
     if (focusSummary && !focusSummary.endsWith('.')) focusSummary += '.';
-    
+
     const primaryTrait = (traitCode[0] as DiscTrait) || 'D';
     const secondaryTrait = (traitCode[1] as DiscTrait) || primaryTrait;
-    const roleTraits: DiscTrait[] = [primaryTrait, secondaryTrait, primaryTrait];
+    const roleTraits: DiscTrait[] = [
+      primaryTrait,
+      secondaryTrait,
+      primaryTrait,
+    ];
     const itemsY = y + 62;
     const itemGap = 10;
     const itemW = (width - itemGap * 2) / 3;
@@ -478,10 +482,15 @@ export class CollegeShortReport extends BaseReport {
 
     this.doc.font(this.FONT_SORA_REGULAR).fontSize(10).fillColor('#1F1F1F');
     years.forEach((year, index) => {
-      this.doc.text(String(year), chartLeft + index * boxWidth, rowStartY - 15, {
-        width: boxWidth,
-        align: 'center',
-      });
+      this.doc.text(
+        String(year),
+        chartLeft + index * boxWidth,
+        rowStartY - 15,
+        {
+          width: boxWidth,
+          align: 'center',
+        },
+      );
     });
 
     skills.forEach((skill, index) => {
@@ -568,7 +577,10 @@ export class CollegeShortReport extends BaseReport {
       width: width - 28,
       lineGap: 1,
     });
-    const sectionHeight = Math.min(availableHeight, Math.max(24, textHeight + 16));
+    const sectionHeight = Math.min(
+      availableHeight,
+      Math.max(24, textHeight + 16),
+    );
 
     this.doc
       .font(this.FONT_SORA_BOLD)
@@ -596,9 +608,7 @@ export class CollegeShortReport extends BaseReport {
       .fillColor('#1F1F1F')
       .text('2027', x, y, { width: 32, align: 'right', lineBreak: false });
 
-    this.doc
-      .circle(x + 52, circleY, 4)
-      .fillAndStroke('#FFFFFF', '#B4B4B4');
+    this.doc.circle(x + 52, circleY, 4).fillAndStroke('#FFFFFF', '#B4B4B4');
     this.doc
       .moveTo(x + 56, circleY)
       .lineTo(x + 92, circleY)
@@ -673,16 +683,20 @@ export class CollegeShortReport extends BaseReport {
 
   private getTraitSummary(traitCode: string): TraitSummary {
     const blended = blendedTraits[traitCode];
-    const mapping = blended?.trait_mapping1?.[0] || blended?.trait_mapping2?.[0];
+    const mapping =
+      blended?.trait_mapping1?.[0] || blended?.trait_mapping2?.[0];
 
     return {
       roleSuggestion: String(
-        mapping?.[1] || blended?.suggestions || 'Career Strategist, Domain Specialist',
+        mapping?.[1] ||
+          blended?.suggestions ||
+          'Career Strategist, Domain Specialist',
       )
         .replace(/\s+/g, ' ')
         .trim(),
       focusArea: String(
-        mapping?.[3] || 'Domain depth, applied projects, and future-ready capabilities',
+        mapping?.[3] ||
+          'Domain depth, applied projects, and future-ready capabilities',
       )
         .replace(/\s+/g, ' ')
         .trim(),
@@ -779,7 +793,11 @@ export class CollegeShortReport extends BaseReport {
     return lines.slice(0, maxLines);
   }
 
-  private buildCompactListLine(raw: string, maxChars: number, maxItems: number): string {
+  private buildCompactListLine(
+    raw: string,
+    maxChars: number,
+    maxItems: number,
+  ): string {
     const items = String(raw || '')
       .split(/,|\/|\||;|\band\b/gi)
       .map((item) => this.cleanRoleLabel(item))
@@ -804,7 +822,9 @@ export class CollegeShortReport extends BaseReport {
       .map((item) => this.cleanRoleLabel(item))
       .filter(Boolean);
 
-    return items.length ? items.join(', ') : this.cleanRoleLabel(String(raw || ''));
+    return items.length
+      ? items.join(', ')
+      : this.cleanRoleLabel(String(raw || ''));
   }
 
   private fitTextToHeight(
@@ -814,7 +834,9 @@ export class CollegeShortReport extends BaseReport {
     fontSize: number,
     lineGap: number,
   ): string {
-    const clean = String(value || '').replace(/\s+/g, ' ').trim();
+    const clean = String(value || '')
+      .replace(/\s+/g, ' ')
+      .trim();
     if (!clean) return '';
 
     this.doc.font(this.FONT_REGULAR).fontSize(fontSize);
@@ -854,7 +876,9 @@ export class CollegeShortReport extends BaseReport {
   }
 
   private fitPhraseToLength(value: string, maxChars: number): string {
-    const clean = String(value || '').replace(/\s+/g, ' ').trim();
+    const clean = String(value || '')
+      .replace(/\s+/g, ' ')
+      .trim();
     if (clean.length <= maxChars) return clean;
 
     const words = clean.split(' ').filter(Boolean);

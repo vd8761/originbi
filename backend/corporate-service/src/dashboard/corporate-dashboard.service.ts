@@ -23,7 +23,11 @@ import { Program } from '@originbi/shared-entities';
 import { GroupAssessment } from '@originbi/shared-entities';
 import { Groups } from '@originbi/shared-entities';
 import { CorporateCounsellingAccess } from '@originbi/shared-entities';
-import { Department, DepartmentDegree, DegreeType } from '@originbi/shared-entities';
+import {
+  Department,
+  DepartmentDegree,
+  DegreeType,
+} from '@originbi/shared-entities';
 import { CounsellingType } from '@originbi/shared-entities';
 import { CounsellingSession } from '@originbi/shared-entities';
 import { CounsellingResponse } from '@originbi/shared-entities';
@@ -477,9 +481,9 @@ export class CorporateDashboardService {
         count: parseInt((row.count as string) || '0', 10),
         colorRgb:
           row.color_rgb &&
-            !row.color_rgb.startsWith('#') &&
-            !row.color_rgb.startsWith('rgb') &&
-            row.color_rgb.includes(',')
+          !row.color_rgb.startsWith('#') &&
+          !row.color_rgb.startsWith('rgb') &&
+          row.color_rgb.includes(',')
             ? `rgb(${row.color_rgb})`
             : (row.color_rgb as string) || '#1ED36A',
       })),
@@ -516,10 +520,10 @@ export class CorporateDashboardService {
       status: row.status === 'COMPLETED',
       registerDate: row.register_date
         ? new Date(row.register_date as string).toLocaleDateString('en-IN', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        })
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+          })
         : 'N/A',
       mobile: (row.mobile as string) || 'N/A',
     }));
@@ -826,7 +830,10 @@ export class CorporateDashboardService {
       this.configService.get('ADMIN_SERVICE_URL') || 'http://localhost:4001';
     try {
       await firstValueFrom(
-        this.httpService.post(`${adminServiceUrl}/notifications/internal`, data),
+        this.httpService.post(
+          `${adminServiceUrl}/notifications/internal`,
+          data,
+        ),
       );
     } catch (err: any) {
       console.error(
@@ -876,7 +883,13 @@ export class CorporateDashboardService {
       assets,
     );
 
-    const { fromName, fromAddress: fromEmail, ccAddresses } = await this.settingsService.getEmailConfig('corporate_welcome_email_config');
+    const {
+      fromName,
+      fromAddress: fromEmail,
+      ccAddresses,
+    } = await this.settingsService.getEmailConfig(
+      'corporate_welcome_email_config',
+    );
     const source = `"${fromName}" <${fromEmail}>`;
 
     const params = {
@@ -1151,7 +1164,13 @@ export class CorporateDashboardService {
       assets,
     );
 
-    const { fromName, fromAddress: fromEmail, ccAddresses } = await this.settingsService.getEmailConfig('corporate_welcome_email_config');
+    const {
+      fromName,
+      fromAddress: fromEmail,
+      ccAddresses,
+    } = await this.settingsService.getEmailConfig(
+      'corporate_welcome_email_config',
+    );
     const source = `"${fromName}" <${fromEmail}>`;
 
     const params = {
@@ -1319,9 +1338,23 @@ export class CorporateDashboardService {
       .leftJoinAndSelect('registration.user', 'user')
       .leftJoinAndSelect('registration.group', 'group')
       .leftJoinAndSelect('registration.program', 'program')
-      .leftJoin('DepartmentDegree', 'dd', 'registration.departmentDegreeId = dd.id')
-      .leftJoinAndMapOne('registration.deptRaw', 'Department', 'dept', 'dd.departmentId = dept.id')
-      .leftJoinAndMapOne('registration.degRaw', 'DegreeType', 'deg', 'dd.degreeTypeId = deg.id')
+      .leftJoin(
+        'DepartmentDegree',
+        'dd',
+        'registration.departmentDegreeId = dd.id',
+      )
+      .leftJoinAndMapOne(
+        'registration.deptRaw',
+        'Department',
+        'dept',
+        'dd.departmentId = dept.id',
+      )
+      .leftJoinAndMapOne(
+        'registration.degRaw',
+        'DegreeType',
+        'deg',
+        'dd.degreeTypeId = deg.id',
+      )
       .where('registration.corporateAccountId = :corpId', {
         corpId: corporate.id,
       });
@@ -1526,9 +1559,7 @@ export class CorporateDashboardService {
       } else if (emailStatus === 'third_party') {
         qb.andWhere('ar.email_sent = true AND ar.email_sent_to != u.email');
       } else if (emailStatus === 'not_sent') {
-        qb.andWhere(
-          '(ar.email_sent IS NULL OR ar.email_sent = false)',
-        );
+        qb.andWhere('(ar.email_sent IS NULL OR ar.email_sent = false)');
       }
     }
 
@@ -1583,13 +1614,16 @@ export class CorporateDashboardService {
     // Hydrate email metadata via secondary raw SQL (avoids TypeORM leftJoinAndMapOne bug)
     if (data.length > 0) {
       const sessionIds = data.map((s) => s.id);
-      const emailRows: { assessment_session_id: string; email_sent: boolean; email_sent_to: string | null }[] =
-        await this.dataSource.query(
-          `SELECT assessment_session_id, email_sent, email_sent_to
+      const emailRows: {
+        assessment_session_id: string;
+        email_sent: boolean;
+        email_sent_to: string | null;
+      }[] = await this.dataSource.query(
+        `SELECT assessment_session_id, email_sent, email_sent_to
            FROM assessment_reports
            WHERE assessment_session_id = ANY($1)`,
-          [sessionIds],
-        );
+        [sessionIds],
+      );
 
       const emailMap = new Map(
         emailRows.map((row) => [String(row.assessment_session_id), row]),
@@ -1746,9 +1780,12 @@ export class CorporateDashboardService {
   // ========================================================================
   // SEARCH BY REPORT NUMBER
   // ========================================================================
-  async searchByReportNumber(reportNumberInput: string, corporateAccountId: number) {
+  async searchByReportNumber(
+    reportNumberInput: string,
+    corporateAccountId: number,
+  ) {
     let reportNumber = reportNumberInput.toUpperCase();
-    
+
     // Reverse the abbreviations used in the generated report PDFs
     if (reportNumber.includes('-CS-')) {
       reportNumber = reportNumber.replace('-CS-', '-COLLEGE_STUDENT-');
@@ -1856,9 +1893,9 @@ export class CorporateDashboardService {
         description: row.blended_style_desc,
         colorRgb:
           row.color_rgb &&
-            !row.color_rgb.startsWith('#') &&
-            !row.color_rgb.startsWith('rgb') &&
-            row.color_rgb.includes(',')
+          !row.color_rgb.startsWith('#') &&
+          !row.color_rgb.startsWith('rgb') &&
+          row.color_rgb.includes(',')
             ? `rgb(${row.color_rgb})`
             : (row.color_rgb as string) || '#1ED36A',
         imageKey: traitImageKey,

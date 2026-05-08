@@ -70,9 +70,9 @@ export class AdminService {
       // Count both individual sessions and group assessments created/starts this week
       const [weeklySessions, weeklyGroups] = await Promise.all([
         this.sessionRepo.count({
-          where: { 
+          where: {
             createdAt: MoreThanOrEqual(startOfWeek.toDate()),
-            registration: { isDeleted: false }
+            registration: { isDeleted: false },
           },
           relations: ['registration'],
         }),
@@ -91,7 +91,10 @@ export class AdminService {
 
       // 5. Revenue Trend (Last 12 Months)
       const revenueTrend = await this.getRevenueTrend();
-      const totalRevenue = revenueTrend.reduce((acc, curr) => acc + curr.revenue, 0);
+      const totalRevenue = revenueTrend.reduce(
+        (acc, curr) => acc + curr.revenue,
+        0,
+      );
 
       // 6. Total Commissions Paid
       const totalCommissionsPaid = await this.getTotalCommissionsPaid();
@@ -253,7 +256,7 @@ export class AdminService {
           'EXPIRED',
           'PARTIALLY_EXPIRED',
         ]),
-        registration: { isDeleted: false }
+        registration: { isDeleted: false },
       },
       relations: ['user', 'program', 'registration'],
       order: { validTo: 'DESC' },

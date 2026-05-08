@@ -10,7 +10,10 @@ import {
 } from '../helpers/groupReportHelper';
 import { MergedReportData } from '../types/types';
 import { getPlacementDetails } from '../helpers/sqlHelper';
-import { generateReportForUser, generateShortReportForUser } from '../helpers/reportFactory';
+import {
+  generateReportForUser,
+  generateShortReportForUser,
+} from '../helpers/reportFactory';
 import { PlacementReport } from '../reports/placement/placementReport';
 import { logger } from '../helpers/logger';
 
@@ -492,7 +495,9 @@ export const reportQueueService = {
         fs.mkdirSync(jobDir, { recursive: true });
       }
 
-      logger.info(`[JOB:${jobId}] Fetching data for user ${userId} (short report)...`);
+      logger.info(
+        `[JOB:${jobId}] Fetching data for user ${userId} (short report)...`,
+      );
 
       // Reuse existing fetchUserAssessmentData which takes array
       const groupData: MergedReportData[] = await fetchUserAssessmentData([

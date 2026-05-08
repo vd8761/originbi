@@ -27,6 +27,9 @@ export class CorporateCandidatesController {
     @Query('email') email: string,
   ) {
     if (!email) throw new BadRequestException('Email is required');
-    return this.jobsService.getCandidateApplications(email, Number(registrationId));
+    return this.jobsService.getCandidateApplications(
+      email,
+      Number(registrationId),
+    );
   }
 }
