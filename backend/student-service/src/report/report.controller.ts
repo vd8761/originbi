@@ -177,10 +177,10 @@ export class ReportController {
           });
           return;
         }
-        
+
         // Generate short report directly
         const jobId = `short_student_${userId}_${Date.now()}`;
-        
+
         this.reportQueue
           .processSingleUserShortReport(userId, jobId)
           .catch((err) => logger.error('Background Job Error', err));

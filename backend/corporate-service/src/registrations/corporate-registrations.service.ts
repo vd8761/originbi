@@ -32,7 +32,8 @@ import { SettingsService } from '../settings/settings.service';
 export class CorporateRegistrationsService {
   private readonly logger = new Logger(CorporateRegistrationsService.name);
   private authServiceBaseUrl = process.env.AUTH_SERVICE_URL;
-  private adminServiceBaseUrl = process.env.ADMIN_SERVICE_URL || 'http://localhost:4001';
+  private adminServiceBaseUrl =
+    process.env.ADMIN_SERVICE_URL || 'http://localhost:4001';
 
   private normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
@@ -82,7 +83,7 @@ export class CorporateRegistrationsService {
     private readonly http: HttpService,
     private readonly assessmentGenService: AssessmentGenerationService,
     private readonly settingsService: SettingsService,
-  ) { }
+  ) {}
 
   async registerCandidate(dto: CreateCandidateDto, corporateUserId: number) {
     const email = this.normalizeEmail(dto.email);
@@ -157,8 +158,8 @@ export class CorporateRegistrationsService {
     const password =
       dto.password ||
       Math.random().toString(36).slice(-8) +
-      Math.random().toString(36).slice(-4).toUpperCase() +
-      '1!';
+        Math.random().toString(36).slice(-4).toUpperCase() +
+        '1!';
 
     // 3. Create Cognito User
     let sub: string;
@@ -184,193 +185,206 @@ export class CorporateRegistrationsService {
     }
 
     // 4. Transaction
-    const result = await this.dataSource.transaction(async (manager: EntityManager) => {
-      // A. Debit Credit & Ledger
-      const oldCredits = Number(corporateAccount.availableCredits);
-      corporateAccount.availableCredits -= 1;
-      await manager.save(corporateAccount);
+    const result = await this.dataSource.transaction(
+      async (manager: EntityManager) => {
+        // A. Debit Credit & Ledger
+        const oldCredits = Number(corporateAccount.availableCredits);
+        corporateAccount.availableCredits -= 1;
+        await manager.save(corporateAccount);
 
-      this.logger.log(`Credit Update: Old=${oldCredits}, New=${corporateAccount.availableCredits}, CorporateUserId=${corporateUserId}`);
+        this.logger.log(
+          `Credit Update: Old=${oldCredits}, New=${corporateAccount.availableCredits}, CorporateUserId=${corporateUserId}`,
+        );
 
-      // Notify if credits just dropped below 10
-      if (oldCredits >= 10 && Number(corporateAccount.availableCredits) < 10) {
-        this.logger.log(`Triggering LOW_CREDITS notification for user ${corporateUserId}`);
-        try {
-          await manager.save(Notification, {
-            userId: corporateUserId,
-            role: 'CORPORATE',
-            type: 'LOW_CREDITS',
-            title: 'Low Credits Alert',
-            message: `Your account balance is low (${corporateAccount.availableCredits} credits remaining). Please top up now to ensure uninterrupted service.`,
-          });
-        } catch (err) {
-          this.logger.error(
-            `Failed to save low credits notification: ${err.message}`,
+        // Notify if credits just dropped below 10
+        if (
+          oldCredits >= 10 &&
+          Number(corporateAccount.availableCredits) < 10
+        ) {
+          this.logger.log(
+            `Triggering LOW_CREDITS notification for user ${corporateUserId}`,
+          );
+          try {
+            await manager.save(Notification, {
+              userId: corporateUserId,
+              role: 'CORPORATE',
+              type: 'LOW_CREDITS',
+              title: 'Low Credits Alert',
+              message: `Your account balance is low (${corporateAccount.availableCredits} credits remaining). Please top up now to ensure uninterrupted service.`,
+            });
+          } catch (err) {
+            this.logger.error(
+              `Failed to save low credits notification: ${err.message}`,
+            );
+          }
+        } else {
+          this.logger.log(
+            `Notification NOT triggered. Condition (oldCredits >= 10 && newCredits < 10) not met.`,
           );
         }
-      } else {
-        this.logger.log(`Notification NOT triggered. Condition (oldCredits >= 10 && newCredits < 10) not met.`);
-      }
 
-      const ledger = manager.create(CorporateCreditLedger, {
-        corporateAccountId: corporateAccount.id,
-        ledgerType: 'DEBIT',
-        creditDelta: 1,
-        reason: 'One credit used for candidate registration.',
-        createdByUserId: corporateUserId, // Use the actual User ID, not Corporate Account ID
-      });
-      await manager.save(ledger);
+        const ledger = manager.create(CorporateCreditLedger, {
+          corporateAccountId: corporateAccount.id,
+          ledgerType: 'DEBIT',
+          creditDelta: 1,
+          reason: 'One credit used for candidate registration.',
+          createdByUserId: corporateUserId, // Use the actual User ID, not Corporate Account ID
+        });
+        await manager.save(ledger);
 
-      // B. Create User (Candidate)
-      const user = manager.create(User, {
-        email,
-        role: 'STUDENT',
-        emailVerified: true,
-        cognitoSub: sub,
-        isActive: true,
-        isBlocked: false,
-        corporateId: corporateAccount.id.toString(),
-        metadata: {
-          fullName: dto.fullName,
-          mobile: dto.mobile,
-          gender: dto.gender,
-        },
-      });
-      await manager.save(user);
-
-      // C. Find or Create Group
-      let groupId: number | null = null;
-      if (dto.groupName) {
-        let group = await manager.getRepository(Groups).findOne({
-          where: {
-            name: dto.groupName,
-            corporateAccountId: corporateAccount.id,
+        // B. Create User (Candidate)
+        const user = manager.create(User, {
+          email,
+          role: 'STUDENT',
+          emailVerified: true,
+          cognitoSub: sub,
+          isActive: true,
+          isBlocked: false,
+          corporateId: corporateAccount.id.toString(),
+          metadata: {
+            fullName: dto.fullName,
+            mobile: dto.mobile,
+            gender: dto.gender,
           },
         });
-        if (!group) {
-          group = manager.create(Groups, {
-            name: dto.groupName,
-            corporateAccountId: corporateAccount.id,
-            createdByUserId: corporateUserId, // Use actual User ID
-            isActive: true,
+        await manager.save(user);
+
+        // C. Find or Create Group
+        let groupId: number | null = null;
+        if (dto.groupName) {
+          let group = await manager.getRepository(Groups).findOne({
+            where: {
+              name: dto.groupName,
+              corporateAccountId: corporateAccount.id,
+            },
           });
-          await manager.save(group);
+          if (!group) {
+            group = manager.create(Groups, {
+              name: dto.groupName,
+              corporateAccountId: corporateAccount.id,
+              createdByUserId: corporateUserId, // Use actual User ID
+              isActive: true,
+            });
+            await manager.save(group);
+          }
+          groupId = group.id;
         }
-        groupId = group.id;
-      }
 
-      // D. Create Registration
-      const registration = manager.create(Registration, {
-        userId: user.id,
-        registrationSource: 'CORPORATE',
-        createdByUserId: corporateUserId, // Use actual User ID
-        corporateAccountId: corporateAccount.id,
-        status: 'COMPLETED',
-        fullName: dto.fullName,
-        mobileNumber: dto.mobile,
-        gender: dto.gender,
-        countryCode: '+91',
-        groupId: groupId,
-        departmentDegreeId: dto.departmentId ? Number(dto.departmentId) : null,
-        metadata: {
-          programType: dto.programType,
-          groupName: dto.groupName,
-          sendEmail: true,
-          currentYear: dto.currentYear,
-          currentRole,
-          roleDescription,
-        },
-      });
-      await manager.save(registration);
-
-      // E. Create Assessment Session
-      // Search for Program (Robust lookup)
-      const program = await this.findProgram(manager, dto.programType);
-
-      if (!program) {
-        // Try finding by like if exact match fails, or rely on frontend sending exact name
-        // For now, assume exact name 'Employee' or 'CXO General'
-        throw new BadRequestException(
-          `Program '${dto.programType}' not found.`,
-        );
-      }
-
-      const validFrom = dto.examStart ? new Date(dto.examStart) : new Date();
-      const validTo = dto.examEnd ? new Date(dto.examEnd) : new Date();
-      if (!dto.examEnd) {
-        validTo.setDate(validTo.getDate() + 7);
-      }
-
-      const session = manager.create(AssessmentSession, {
-        userId: user.id,
-        registrationId: registration.id,
-        programId: Number(program.id), // program.id is string in entity, cast if needed or use as is
-        groupId: groupId,
-        groupAssessmentId: dto.groupAssessmentId, // Link to Header
-        status: 'NOT_STARTED',
-        validFrom,
-        validTo,
-        metadata: {},
-      });
-      await manager.save(session);
-
-      // F. Create Attempt (Level 1)
-      // F. Create Attempts (Mandatory Levels)
-      // Fetch all mandatory levels, ordered by sequence (Level 1 -> Level 2)
-      const levels = await manager.getRepository(AssessmentLevel).find({
-        where: {
-          isMandatory: true,
-        },
-        order: {
-          sortOrder: 'ASC',
-        },
-      });
-
-      if (levels.length === 0) {
-        this.logger.warn(
-          'No mandatory levels found in AssessmentLevel table. Candidate created without assessment attempt.',
-        );
-      }
-
-      for (const level of levels) {
-        const attempt = manager.create(AssessmentAttempt, {
+        // D. Create Registration
+        const registration = manager.create(Registration, {
           userId: user.id,
-          registrationId: registration.id,
-          assessmentSessionId: session.id,
-          programId: Number(program.id),
-          assessmentLevelId: level.id,
-          status: 'NOT_STARTED',
+          registrationSource: 'CORPORATE',
+          createdByUserId: corporateUserId, // Use actual User ID
+          corporateAccountId: corporateAccount.id,
+          status: 'COMPLETED',
+          fullName: dto.fullName,
+          mobileNumber: dto.mobile,
+          gender: dto.gender,
+          countryCode: '+91',
+          groupId: groupId,
+          departmentDegreeId: dto.departmentId
+            ? Number(dto.departmentId)
+            : null,
+          metadata: {
+            programType: dto.programType,
+            groupName: dto.groupName,
+            sendEmail: true,
+            currentYear: dto.currentYear,
+            currentRole,
+            roleDescription,
+          },
         });
-        await manager.save(attempt);
+        await manager.save(registration);
 
-        // G. Generate Questions for this Level (Only Level 1)
-        // We strictly generate questions ONLY for Level 1 here.
-        if (level.levelNumber === 1 || level.name === 'Level 1') {
-          await this.assessmentGenService.generateLevel1Questions(
-            attempt,
-            manager,
+        // E. Create Assessment Session
+        // Search for Program (Robust lookup)
+        const program = await this.findProgram(manager, dto.programType);
+
+        if (!program) {
+          // Try finding by like if exact match fails, or rely on frontend sending exact name
+          // For now, assume exact name 'Employee' or 'CXO General'
+          throw new BadRequestException(
+            `Program '${dto.programType}' not found.`,
           );
         }
-      }
 
-      // G. Send Email (non-blocking)
-      if (dto.sendEmail) {
-        void this.sendWelcomeEmail(
-          email,
-          dto.fullName,
-          password,
+        const validFrom = dto.examStart ? new Date(dto.examStart) : new Date();
+        const validTo = dto.examEnd ? new Date(dto.examEnd) : new Date();
+        if (!dto.examEnd) {
+          validTo.setDate(validTo.getDate() + 7);
+        }
+
+        const session = manager.create(AssessmentSession, {
+          userId: user.id,
+          registrationId: registration.id,
+          programId: Number(program.id), // program.id is string in entity, cast if needed or use as is
+          groupId: groupId,
+          groupAssessmentId: dto.groupAssessmentId, // Link to Header
+          status: 'NOT_STARTED',
           validFrom,
-          program.assessmentTitle || program.name,
-        );
-      }
+          validTo,
+          metadata: {},
+        });
+        await manager.save(session);
 
-      return {
-        message: 'Candidate registered successfully',
-        registrationId: registration.id,
-        userId: user.id,
-        creditsLeft: corporateAccount.availableCredits,
-      };
-    });
+        // F. Create Attempt (Level 1)
+        // F. Create Attempts (Mandatory Levels)
+        // Fetch all mandatory levels, ordered by sequence (Level 1 -> Level 2)
+        const levels = await manager.getRepository(AssessmentLevel).find({
+          where: {
+            isMandatory: true,
+          },
+          order: {
+            sortOrder: 'ASC',
+          },
+        });
+
+        if (levels.length === 0) {
+          this.logger.warn(
+            'No mandatory levels found in AssessmentLevel table. Candidate created without assessment attempt.',
+          );
+        }
+
+        for (const level of levels) {
+          const attempt = manager.create(AssessmentAttempt, {
+            userId: user.id,
+            registrationId: registration.id,
+            assessmentSessionId: session.id,
+            programId: Number(program.id),
+            assessmentLevelId: level.id,
+            status: 'NOT_STARTED',
+          });
+          await manager.save(attempt);
+
+          // G. Generate Questions for this Level (Only Level 1)
+          // We strictly generate questions ONLY for Level 1 here.
+          if (level.levelNumber === 1 || level.name === 'Level 1') {
+            await this.assessmentGenService.generateLevel1Questions(
+              attempt,
+              manager,
+            );
+          }
+        }
+
+        // G. Send Email (non-blocking)
+        if (dto.sendEmail) {
+          void this.sendWelcomeEmail(
+            email,
+            dto.fullName,
+            password,
+            validFrom,
+            program.assessmentTitle || program.name,
+          );
+        }
+
+        return {
+          message: 'Candidate registered successfully',
+          registrationId: registration.id,
+          userId: user.id,
+          creditsLeft: corporateAccount.availableCredits,
+        };
+      },
+    );
 
     return result;
   }
@@ -399,7 +413,8 @@ export class CorporateRegistrationsService {
       });
 
       // Use full URLs for assets ("from application itself")
-      const apiUrl = process.env.API_URL || process.env.CORPORATE_SERVICE_URL || '';
+      const apiUrl =
+        process.env.API_URL || process.env.CORPORATE_SERVICE_URL || '';
 
       const assets = {
         popper: `${apiUrl}/email-assets/Popper.png`,
@@ -419,7 +434,13 @@ export class CorporateRegistrationsService {
         assessmentTitle,
       );
 
-      const { fromName, fromAddress: fromEmail, ccAddresses } = await this.settingsService.getEmailConfig('corporate_welcome_email_config');
+      const {
+        fromName,
+        fromAddress: fromEmail,
+        ccAddresses,
+      } = await this.settingsService.getEmailConfig(
+        'corporate_welcome_email_config',
+      );
       const ccEmail = ccAddresses.join(', ');
       const source = `"${fromName}" <${fromEmail}>`;
 
@@ -537,7 +558,9 @@ export class CorporateRegistrationsService {
           gender: user.metadata?.gender || dto.gender || 'FEMALE',
           countryCode: '+91',
           groupId: groupId,
-          departmentDegreeId: dto.departmentId ? Number(dto.departmentId) : null,
+          departmentDegreeId: dto.departmentId
+            ? Number(dto.departmentId)
+            : null,
           metadata: {
             programType: dto.programType,
             groupName: dto.groupName,
@@ -620,22 +643,23 @@ export class CorporateRegistrationsService {
     return str ? str.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
   }
 
-  private async findProgram(manager: EntityManager, programType: string): Promise<Program> {
+  private async findProgram(
+    manager: EntityManager,
+    programType: string,
+  ): Promise<Program> {
     const programRepo = manager.getRepository(Program);
     const normInput = this.normalizeString(programType);
 
     // 1. Try exact match first via DB
     let program = await programRepo.findOne({
-      where: [
-        { name: programType },
-        { code: programType },
-      ]
+      where: [{ name: programType }, { code: programType }],
     });
 
     if (program) return program;
 
     // 2. Case insensitive exact match or code match
-    program = await programRepo.createQueryBuilder('p')
+    program = await programRepo
+      .createQueryBuilder('p')
       .where('LOWER(p.name) = :name', { name: programType.toLowerCase() })
       .orWhere('LOWER(p.code) = :code', { code: programType.toLowerCase() })
       .getOne();
@@ -647,16 +671,21 @@ export class CorporateRegistrationsService {
 
     // Handle Singular/Plural mismatch (specifically for College Student/Students)
     if (normInput === 'collegestudent') {
-      program = allPrograms.find(p => this.normalizeString(p.name) === 'collegestudents');
+      program = allPrograms.find(
+        (p) => this.normalizeString(p.name) === 'collegestudents',
+      );
     } else if (normInput === 'collegestudents') {
-      program = allPrograms.find(p => this.normalizeString(p.name) === 'collegestudent');
+      program = allPrograms.find(
+        (p) => this.normalizeString(p.name) === 'collegestudent',
+      );
     }
 
     // 4. Partial match (last resort)
     if (!program) {
-      program = allPrograms.find(p =>
-        this.normalizeString(p.name).includes(normInput) ||
-        normInput.includes(this.normalizeString(p.name))
+      program = allPrograms.find(
+        (p) =>
+          this.normalizeString(p.name).includes(normInput) ||
+          normInput.includes(this.normalizeString(p.name)),
       );
     }
 

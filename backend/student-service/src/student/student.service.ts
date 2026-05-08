@@ -1132,7 +1132,10 @@ export class StudentService {
       // 2. Create User in Cognito
       let cognitoSub = '';
       try {
-        const cognitoRes = await this.createCognitoUser(dto.email, dto.password);
+        const cognitoRes = await this.createCognitoUser(
+          dto.email,
+          dto.password,
+        );
         cognitoSub = cognitoRes.sub || '';
       } catch (e) {
         this.logger.error('Cognito creation failed', e);
@@ -1195,8 +1198,11 @@ export class StudentService {
         createdAt: new Date(),
         updatedAt: new Date(),
       } as any);
-      
-      const savedReg = await this.sessionRepo.manager.save(Registration, registration);
+
+      const savedReg = await this.sessionRepo.manager.save(
+        Registration,
+        registration,
+      );
 
       // 6. Create Assessment Session with Schedule
       const now = new Date();
@@ -1235,11 +1241,18 @@ export class StudentService {
         const savedAttempt = await this.attemptRepo.save(attempt);
 
         if (level.levelNumber === 1 || level.name.includes('Level 1')) {
-          await this.generateQuestionsForAttempt(savedAttempt, user, savedReg, level);
+          await this.generateQuestionsForAttempt(
+            savedAttempt,
+            user,
+            savedReg,
+            level,
+          );
         }
       }
 
-      this.logger.log(`Tech Assessment Registration completed for ${dto.email}`);
+      this.logger.log(
+        `Tech Assessment Registration completed for ${dto.email}`,
+      );
 
       return {
         success: true,
@@ -1853,8 +1866,10 @@ export class StudentService {
       logo: `${this.configService.get('API_URL')}/assets/logo-light.png`,
     };
 
-    const defaultFrontendUrl = this.configService.get('FRONTEND_URL') ?? 'https://mind.originbi.com/';
-    const techFrontendUrl = this.configService.get('TECH_FRONTEND_URL') || 'http://localhost:3000';
+    const defaultFrontendUrl =
+      this.configService.get('FRONTEND_URL') ?? 'https://mind.originbi.com/';
+    const techFrontendUrl =
+      this.configService.get('TECH_FRONTEND_URL') || 'http://localhost:3000';
     const frontendUrl = isTechAssessment ? techFrontendUrl : defaultFrontendUrl;
 
     const emailSubject = isTechAssessment
@@ -1870,7 +1885,6 @@ export class StudentService {
           assets,
           startDateTime,
           assessmentTitle,
-          isDebrief,
         )
       : getStudentWelcomeEmailTemplate(
           name,

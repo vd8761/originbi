@@ -78,7 +78,11 @@ export class JobsService {
     return String(order || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
   }
 
-  private toPositiveInt(value: string | undefined, fallback: number, max = 100): number {
+  private toPositiveInt(
+    value: string | undefined,
+    fallback: number,
+    max = 100,
+  ): number {
     const n = Number(value);
     if (!Number.isFinite(n) || n <= 0) return fallback;
     return Math.min(Math.floor(n), max);
@@ -95,11 +99,15 @@ export class JobsService {
     return JOB_STATUSES.includes(status as JobLifecycleStatus);
   }
 
-  private isValidApplicationStatus(status: string): status is JobApplicationStatus {
+  private isValidApplicationStatus(
+    status: string,
+  ): status is JobApplicationStatus {
     return APPLICATION_STATUSES.includes(status as JobApplicationStatus);
   }
 
-  private async resolveCorporateContext(email: string): Promise<{ user: User; corporate: CorporateAccount }> {
+  private async resolveCorporateContext(
+    email: string,
+  ): Promise<{ user: User; corporate: CorporateAccount }> {
     if (!email) {
       throw new BadRequestException('Email is required');
     }
@@ -136,14 +144,26 @@ export class JobsService {
       const exists = await this.jobRepo.findOne({ where: { jobRefNo: ref } });
       if (!exists) return ref;
     }
-    throw new BadRequestException('Failed to generate unique job reference number');
+    throw new BadRequestException(
+      'Failed to generate unique job reference number',
+    );
   }
 
-  private normalizeSkills(requiredSkills?: string[], preferredSkills?: string[]) {
-    const result: Array<{ skillName: string; skillType: 'REQUIRED' | 'PREFERRED'; weight: number }> = [];
+  private normalizeSkills(
+    requiredSkills?: string[],
+    preferredSkills?: string[],
+  ) {
+    const result: Array<{
+      skillName: string;
+      skillType: 'REQUIRED' | 'PREFERRED';
+      weight: number;
+    }> = [];
     const seen = new Set<string>();
 
-    const addSkill = (skillName: string, skillType: 'REQUIRED' | 'PREFERRED') => {
+    const addSkill = (
+      skillName: string,
+      skillType: 'REQUIRED' | 'PREFERRED',
+    ) => {
       const normalized = String(skillName || '').trim();
       if (!normalized) return;
       const key = `${skillType}:${normalized.toLowerCase()}`;
@@ -158,7 +178,10 @@ export class JobsService {
     return result;
   }
 
-  private parseOptionalNumber(value: unknown, fieldName: string): number | null {
+  private parseOptionalNumber(
+    value: unknown,
+    fieldName: string,
+  ): number | null {
     if (value === null || value === undefined || value === '') return null;
     const n = Number(value);
     if (!Number.isFinite(n)) {
@@ -167,7 +190,10 @@ export class JobsService {
     return n;
   }
 
-  private parseOptionalDate(value: string | undefined, fieldName: string): Date | null {
+  private parseOptionalDate(
+    value: string | undefined,
+    fieldName: string,
+  ): Date | null {
     if (!value) return null;
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) {
@@ -192,7 +218,7 @@ export class JobsService {
     if (query.search?.trim()) {
       const s = `%${query.search.trim()}%`;
       qb.andWhere(
-        '(j.title ILIKE :s OR j.job_ref_no ILIKE :s OR COALESCE(j.location, \'\') ILIKE :s)',
+        "(j.title ILIKE :s OR j.job_ref_no ILIKE :s OR COALESCE(j.location, '') ILIKE :s)",
         { s },
       );
     }
@@ -260,7 +286,9 @@ export class JobsService {
       if (!Number.isFinite(jobId) || jobId <= 0) {
         throw new BadRequestException('Invalid jobId filter');
       }
-      qb.andWhere('ja.job_id = :filterJobId', { filterJobId: Math.floor(jobId) });
+      qb.andWhere('ja.job_id = :filterJobId', {
+        filterJobId: Math.floor(jobId),
+      });
     }
 
     if (query.appliedDateFrom?.trim()) {
@@ -281,9 +309,10 @@ export class JobsService {
 
     const minCtc = this.parseOptionalNumber(dto.minCtc, 'minCtc');
     const maxCtc = this.parseOptionalNumber(dto.maxCtc, 'maxCtc');
-    const openings = dto.openings === undefined || dto.openings === null || dto.openings === ''
-      ? 1
-      : Math.floor(Number(dto.openings));
+    const openings =
+      dto.openings === undefined || dto.openings === null || dto.openings === ''
+        ? 1
+        : Math.floor(Number(dto.openings));
 
     if (!Number.isFinite(openings) || openings < 1) {
       throw new BadRequestException('openings must be at least 1');
@@ -293,20 +322,33 @@ export class JobsService {
       throw new BadRequestException('minCtc cannot be greater than maxCtc');
     }
 
-    const postingStartAt = this.parseOptionalDate(dto.postingStartAt, 'postingStartAt');
-    const postingEndAt = this.parseOptionalDate(dto.postingEndAt, 'postingEndAt');
+    const postingStartAt = this.parseOptionalDate(
+      dto.postingStartAt,
+      'postingStartAt',
+    );
+    const postingEndAt = this.parseOptionalDate(
+      dto.postingEndAt,
+      'postingEndAt',
+    );
 
     if (postingStartAt && postingEndAt && postingStartAt > postingEndAt) {
-      throw new BadRequestException('postingStartAt cannot be later than postingEndAt');
+      throw new BadRequestException(
+        'postingStartAt cannot be later than postingEndAt',
+      );
     }
 
-    const requestedStatus = dto.status?.toUpperCase() as JobLifecycleStatus | undefined;
+    const requestedStatus = dto.status?.toUpperCase() as
+      | JobLifecycleStatus
+      | undefined;
     if (requestedStatus && !this.isValidJobStatus(requestedStatus)) {
       throw new BadRequestException('Invalid job status');
     }
 
     const status = requestedStatus || 'DRAFT';
-    const skills = this.normalizeSkills(dto.requiredSkills, dto.preferredSkills);
+    const skills = this.normalizeSkills(
+      dto.requiredSkills,
+      dto.preferredSkills,
+    );
     const jobRefNo = await this.generateJobRefNo();
 
     const created = await this.dataSource.transaction(async (manager) => {
@@ -371,14 +413,17 @@ export class JobsService {
 
     const qb = this.jobRepo
       .createQueryBuilder('j')
-      .leftJoin('job_applications', 'ja', 'ja.job_id = j.id AND ja.is_deleted = false')
+      .leftJoin(
+        'job_applications',
+        'ja',
+        'ja.job_id = j.id AND ja.is_deleted = false',
+      )
       .where('j.corporate_account_id = :corpId', { corpId: corporate.id })
       .andWhere('j.is_deleted = false');
 
     this.applyJobsListFilters(qb, query);
 
-    qb
-      .select('j.id', 'id')
+    qb.select('j.id', 'id')
       .addSelect('j.job_ref_no', 'jobRefNo')
       .addSelect('j.title', 'title')
       .addSelect('j.department', 'department')
@@ -397,10 +442,22 @@ export class JobsService {
       .addSelect('j.created_at', 'createdAt')
       .addSelect('j.updated_at', 'updatedAt')
       .addSelect('COUNT(ja.id)', 'totalApplicants')
-      .addSelect("COUNT(ja.id) FILTER (WHERE ja.current_status = 'APPLIED')", 'newApplicants')
-      .addSelect("COUNT(ja.id) FILTER (WHERE ja.current_status = 'SHORTLISTED')", 'shortlisted')
-      .addSelect("COUNT(ja.id) FILTER (WHERE ja.current_status = 'HIRED')", 'hired')
-      .addSelect("COUNT(ja.id) FILTER (WHERE ja.current_status = 'REJECTED')", 'rejected')
+      .addSelect(
+        "COUNT(ja.id) FILTER (WHERE ja.current_status = 'APPLIED')",
+        'newApplicants',
+      )
+      .addSelect(
+        "COUNT(ja.id) FILTER (WHERE ja.current_status = 'SHORTLISTED')",
+        'shortlisted',
+      )
+      .addSelect(
+        "COUNT(ja.id) FILTER (WHERE ja.current_status = 'HIRED')",
+        'hired',
+      )
+      .addSelect(
+        "COUNT(ja.id) FILTER (WHERE ja.current_status = 'REJECTED')",
+        'rejected',
+      )
       .groupBy('j.id');
 
     const sortBy = (query.sortBy || '').toLowerCase();
@@ -510,18 +567,34 @@ export class JobsService {
     const stats = await this.jobApplicationRepo
       .createQueryBuilder('ja')
       .select('COUNT(ja.id)', 'totalApplicants')
-      .addSelect("COUNT(ja.id) FILTER (WHERE ja.current_status = 'APPLIED')", 'newApplicants')
-      .addSelect("COUNT(ja.id) FILTER (WHERE ja.current_status = 'SHORTLISTED')", 'shortlisted')
-      .addSelect("COUNT(ja.id) FILTER (WHERE ja.current_status = 'HIRED')", 'hired')
-      .addSelect("COUNT(ja.id) FILTER (WHERE ja.current_status = 'REJECTED')", 'rejected')
+      .addSelect(
+        "COUNT(ja.id) FILTER (WHERE ja.current_status = 'APPLIED')",
+        'newApplicants',
+      )
+      .addSelect(
+        "COUNT(ja.id) FILTER (WHERE ja.current_status = 'SHORTLISTED')",
+        'shortlisted',
+      )
+      .addSelect(
+        "COUNT(ja.id) FILTER (WHERE ja.current_status = 'HIRED')",
+        'hired',
+      )
+      .addSelect(
+        "COUNT(ja.id) FILTER (WHERE ja.current_status = 'REJECTED')",
+        'rejected',
+      )
       .where('ja.job_id = :jobId', { jobId: job.id })
       .andWhere('ja.is_deleted = false')
       .getRawOne();
 
     return {
       job,
-      requiredSkills: skills.filter((s) => s.skillType === 'REQUIRED').map((s) => s.skillName),
-      preferredSkills: skills.filter((s) => s.skillType === 'PREFERRED').map((s) => s.skillName),
+      requiredSkills: skills
+        .filter((s) => s.skillType === 'REQUIRED')
+        .map((s) => s.skillName),
+      preferredSkills: skills
+        .filter((s) => s.skillType === 'PREFERRED')
+        .map((s) => s.skillName),
       stats: {
         totalApplicants: Number(stats?.totalApplicants || 0),
         newApplicants: Number(stats?.newApplicants || 0),
@@ -555,16 +628,20 @@ export class JobsService {
       throw new BadRequestException('minCtc cannot be greater than maxCtc');
     }
 
-    const postingStartAt = dto.postingStartAt === undefined
-      ? job.postingStartAt
-      : this.parseOptionalDate(dto.postingStartAt, 'postingStartAt');
+    const postingStartAt =
+      dto.postingStartAt === undefined
+        ? job.postingStartAt
+        : this.parseOptionalDate(dto.postingStartAt, 'postingStartAt');
 
-    const postingEndAt = dto.postingEndAt === undefined
-      ? job.postingEndAt
-      : this.parseOptionalDate(dto.postingEndAt, 'postingEndAt');
+    const postingEndAt =
+      dto.postingEndAt === undefined
+        ? job.postingEndAt
+        : this.parseOptionalDate(dto.postingEndAt, 'postingEndAt');
 
     if (postingStartAt && postingEndAt && postingStartAt > postingEndAt) {
-      throw new BadRequestException('postingStartAt cannot be later than postingEndAt');
+      throw new BadRequestException(
+        'postingStartAt cannot be later than postingEndAt',
+      );
     }
 
     if (dto.status) {
@@ -576,15 +653,21 @@ export class JobsService {
     }
 
     if (dto.title !== undefined) job.title = dto.title.trim();
-    if (dto.department !== undefined) job.department = dto.department?.trim() || null;
+    if (dto.department !== undefined)
+      job.department = dto.department?.trim() || null;
     if (dto.location !== undefined) job.location = dto.location?.trim() || null;
     if (dto.workMode !== undefined) job.workMode = dto.workMode;
-    if (dto.employmentType !== undefined) job.employmentType = dto.employmentType;
+    if (dto.employmentType !== undefined)
+      job.employmentType = dto.employmentType;
     if (dto.shift !== undefined) job.shift = dto.shift || null;
-    if (dto.experienceLevel !== undefined) job.experienceLevel = dto.experienceLevel || null;
-    if (dto.minCtc !== undefined) job.minCtc = minCtc === null ? null : String(minCtc);
-    if (dto.maxCtc !== undefined) job.maxCtc = maxCtc === null ? null : String(maxCtc);
-    if (dto.currencyCode !== undefined) job.currencyCode = (dto.currencyCode || 'INR').toUpperCase();
+    if (dto.experienceLevel !== undefined)
+      job.experienceLevel = dto.experienceLevel || null;
+    if (dto.minCtc !== undefined)
+      job.minCtc = minCtc === null ? null : String(minCtc);
+    if (dto.maxCtc !== undefined)
+      job.maxCtc = maxCtc === null ? null : String(maxCtc);
+    if (dto.currencyCode !== undefined)
+      job.currencyCode = (dto.currencyCode || 'INR').toUpperCase();
     if (dto.openings !== undefined) {
       const openings = Math.floor(Number(dto.openings));
       if (!Number.isFinite(openings) || openings < 1) {
@@ -597,11 +680,15 @@ export class JobsService {
     job.postingEndAt = postingEndAt;
 
     if (dto.description !== undefined) job.description = dto.description;
-    if (dto.responsibilities !== undefined) job.responsibilities = dto.responsibilities || null;
-    if (dto.eligibility !== undefined) job.eligibility = dto.eligibility || null;
+    if (dto.responsibilities !== undefined)
+      job.responsibilities = dto.responsibilities || null;
+    if (dto.eligibility !== undefined)
+      job.eligibility = dto.eligibility || null;
     if (dto.niceToHave !== undefined) job.niceToHave = dto.niceToHave || null;
-    if (dto.whatYouWillLearn !== undefined) job.whatYouWillLearn = dto.whatYouWillLearn || null;
-    if (dto.companyDetails !== undefined) job.companyDetails = dto.companyDetails || null;
+    if (dto.whatYouWillLearn !== undefined)
+      job.whatYouWillLearn = dto.whatYouWillLearn || null;
+    if (dto.companyDetails !== undefined)
+      job.companyDetails = dto.companyDetails || null;
     if (dto.metadata !== undefined) job.metadata = dto.metadata || {};
 
     job.updatedByUserId = user.id;
@@ -637,10 +724,17 @@ export class JobsService {
     return this.getJobById(email, job.id);
   }
 
-  async updateJobStatus(email: string, jobId: number, status: string, note?: string) {
+  async updateJobStatus(
+    email: string,
+    jobId: number,
+    status: string,
+    note?: string,
+  ) {
     const { user, corporate } = await this.resolveCorporateContext(email);
     const parsedJobId = this.parseId(jobId, 'jobId');
-    const toStatus = String(status || '').trim().toUpperCase();
+    const toStatus = String(status || '')
+      .trim()
+      .toUpperCase();
 
     if (!this.isValidJobStatus(toStatus)) {
       throw new BadRequestException('Invalid job status');
@@ -707,7 +801,11 @@ export class JobsService {
     };
   }
 
-  async listJobCandidates(email: string, jobId: number, query: ListJobCandidatesQueryDto) {
+  async listJobCandidates(
+    email: string,
+    jobId: number,
+    query: ListJobCandidatesQueryDto,
+  ) {
     const { corporate } = await this.resolveCorporateContext(email);
     const parsedJobId = this.parseId(jobId, 'jobId');
 
@@ -730,7 +828,10 @@ export class JobsService {
 
     const latestAttemptSubQuery = this.attemptRepo
       .createQueryBuilder('aa')
-      .select('DISTINCT ON (aa.registration_id) aa.registration_id', 'registration_id')
+      .select(
+        'DISTINCT ON (aa.registration_id) aa.registration_id',
+        'registration_id',
+      )
       .addSelect('aa.dominant_trait_id', 'dominant_trait_id')
       .addSelect('aa.total_score', 'total_score')
       .where('aa.dominant_trait_id IS NOT NULL')
@@ -757,7 +858,9 @@ export class JobsService {
       if (!this.isValidApplicationStatus(status)) {
         throw new BadRequestException('Invalid candidate status filter');
       }
-      qb.andWhere('ja.current_status = :statusFilter', { statusFilter: status });
+      qb.andWhere('ja.current_status = :statusFilter', {
+        statusFilter: status,
+      });
     }
 
     if (query.search?.trim()) {
@@ -768,8 +871,7 @@ export class JobsService {
       );
     }
 
-    qb
-      .select('ja.id', 'applicationId')
+    qb.select('ja.id', 'applicationId')
       .addSelect('r.id', 'registrationId')
       .addSelect('COALESCE(r.full_name, u.email)', 'fullName')
       .addSelect('u.email', 'email')
@@ -807,10 +909,22 @@ export class JobsService {
     const summary = await this.jobApplicationRepo
       .createQueryBuilder('ja')
       .select('COUNT(ja.id)', 'totalApplicants')
-      .addSelect("COUNT(ja.id) FILTER (WHERE ja.current_status = 'APPLIED')", 'newApplicants')
-      .addSelect("COUNT(ja.id) FILTER (WHERE ja.current_status = 'SHORTLISTED')", 'shortlisted')
-      .addSelect("COUNT(ja.id) FILTER (WHERE ja.current_status = 'HIRED')", 'hired')
-      .addSelect("COUNT(ja.id) FILTER (WHERE ja.current_status = 'REJECTED')", 'rejected')
+      .addSelect(
+        "COUNT(ja.id) FILTER (WHERE ja.current_status = 'APPLIED')",
+        'newApplicants',
+      )
+      .addSelect(
+        "COUNT(ja.id) FILTER (WHERE ja.current_status = 'SHORTLISTED')",
+        'shortlisted',
+      )
+      .addSelect(
+        "COUNT(ja.id) FILTER (WHERE ja.current_status = 'HIRED')",
+        'hired',
+      )
+      .addSelect(
+        "COUNT(ja.id) FILTER (WHERE ja.current_status = 'REJECTED')",
+        'rejected',
+      )
       .where('ja.job_id = :jobId', { jobId: parsedJobId })
       .andWhere('ja.corporate_account_id = :corpId', { corpId: corporate.id })
       .andWhere('ja.is_deleted = false')
@@ -948,11 +1062,17 @@ export class JobsService {
     }
 
     const uniqueRegistrationIds = Array.from(
-      new Set((dto.registrationIds || []).map((id) => Math.floor(Number(id))).filter((id) => Number.isFinite(id) && id > 0)),
+      new Set(
+        (dto.registrationIds || [])
+          .map((id) => Math.floor(Number(id)))
+          .filter((id) => Number.isFinite(id) && id > 0),
+      ),
     );
 
     if (uniqueRegistrationIds.length === 0) {
-      throw new BadRequestException('registrationIds must contain valid positive numbers');
+      throw new BadRequestException(
+        'registrationIds must contain valid positive numbers',
+      );
     }
 
     const registrations = await this.registrationRepo.find({
@@ -978,7 +1098,9 @@ export class JobsService {
         })
       : [];
 
-    const existingRegistrationSet = new Set(existingRows.map((r) => r.registrationId));
+    const existingRegistrationSet = new Set(
+      existingRows.map((r) => r.registrationId),
+    );
     const registrationById = new Map(registrations.map((r) => [r.id, r]));
 
     const source: JobApplicationSource =
@@ -989,7 +1111,7 @@ export class JobsService {
     const toCreate = validRegistrationIds
       .filter((registrationId) => !existingRegistrationSet.has(registrationId))
       .map((registrationId) => {
-        const registration = registrationById.get(registrationId)!;
+        const registration = registrationById.get(registrationId);
         return {
           corporateAccountId: corporate.id,
           jobId: parsedJobId,
@@ -1009,30 +1131,32 @@ export class JobsService {
     let insertedApplications: JobApplication[] = [];
 
     if (toCreate.length > 0) {
-      insertedApplications = await this.dataSource.transaction(async (manager) => {
-        const createdRows = await manager.save(
-          JobApplication,
-          toCreate.map((row) => manager.create(JobApplication, row)),
-        );
+      insertedApplications = await this.dataSource.transaction(
+        async (manager) => {
+          const createdRows = await manager.save(
+            JobApplication,
+            toCreate.map((row) => manager.create(JobApplication, row)),
+          );
 
-        const historyRows = createdRows.map((created) =>
-          manager.create(JobApplicationStatusHistory, {
-            jobApplicationId: created.id,
-            fromStatus: null,
-            toStatus: 'APPLIED',
-            changedByUserId: user.id,
-            changedAt: new Date(),
-            note: 'Bulk apply',
-            metadata: {
-              source,
-            },
-          }),
-        );
+          const historyRows = createdRows.map((created) =>
+            manager.create(JobApplicationStatusHistory, {
+              jobApplicationId: created.id,
+              fromStatus: null,
+              toStatus: 'APPLIED',
+              changedByUserId: user.id,
+              changedAt: new Date(),
+              note: 'Bulk apply',
+              metadata: {
+                source,
+              },
+            }),
+          );
 
-        await manager.save(JobApplicationStatusHistory, historyRows);
+          await manager.save(JobApplicationStatusHistory, historyRows);
 
-        return createdRows;
-      });
+          return createdRows;
+        },
+      );
     }
 
     const missingRegistrationIds = uniqueRegistrationIds.filter(
@@ -1045,7 +1169,9 @@ export class JobsService {
       requested: uniqueRegistrationIds.length,
       appliedCount: insertedApplications.length,
       skippedExistingCount:
-        uniqueRegistrationIds.length - missingRegistrationIds.length - insertedApplications.length,
+        uniqueRegistrationIds.length -
+        missingRegistrationIds.length -
+        insertedApplications.length,
       missingRegistrationIds,
       applicationIds: insertedApplications.map((a) => a.id),
     };
@@ -1059,7 +1185,10 @@ export class JobsService {
 
     const latestAttemptSubQuery = this.attemptRepo
       .createQueryBuilder('aa')
-      .select('DISTINCT ON (aa.registration_id) aa.registration_id', 'registration_id')
+      .select(
+        'DISTINCT ON (aa.registration_id) aa.registration_id',
+        'registration_id',
+      )
       .addSelect('aa.dominant_trait_id', 'dominant_trait_id')
       .where('aa.dominant_trait_id IS NOT NULL')
       .orderBy('aa.registration_id', 'ASC')
@@ -1074,7 +1203,11 @@ export class JobsService {
         'ja.registration_id = r.id AND ja.corporate_account_id = :corpId AND ja.is_deleted = false',
         { corpId: corporate.id },
       )
-      .leftJoin('corporate_jobs', 'j', 'j.id = ja.job_id AND j.is_deleted = false')
+      .leftJoin(
+        'corporate_jobs',
+        'j',
+        'j.id = ja.job_id AND j.is_deleted = false',
+      )
       .leftJoin(
         `(${latestAttemptSubQuery.getQuery()})`,
         'la',
@@ -1097,9 +1230,18 @@ export class JobsService {
       .addSelect('pt.color_rgb', 'traitColor')
       .addSelect('MAX(ja.applied_at)', 'latestApplied')
       .addSelect('COUNT(ja.id)', 'applicationsCount')
-      .addSelect("COUNT(ja.id) FILTER (WHERE ja.current_status = 'HIRED')", 'hiredCount')
-      .addSelect("COUNT(ja.id) FILTER (WHERE ja.current_status = 'SHORTLISTED')", 'shortlistedCount')
-      .addSelect("COUNT(ja.id) FILTER (WHERE ja.current_status = 'REJECTED')", 'rejectedCount')
+      .addSelect(
+        "COUNT(ja.id) FILTER (WHERE ja.current_status = 'HIRED')",
+        'hiredCount',
+      )
+      .addSelect(
+        "COUNT(ja.id) FILTER (WHERE ja.current_status = 'SHORTLISTED')",
+        'shortlistedCount',
+      )
+      .addSelect(
+        "COUNT(ja.id) FILTER (WHERE ja.current_status = 'REJECTED')",
+        'rejectedCount',
+      )
       .groupBy('r.id')
       .addGroupBy('u.email')
       .addGroupBy('u.avatar_url')
@@ -1113,9 +1255,7 @@ export class JobsService {
       rowsQb.orderBy('MAX(ja.applied_at)', sortOrder, 'NULLS LAST');
     }
 
-    const countQb = baseQb
-      .clone()
-      .select('COUNT(DISTINCT r.id)', 'total');
+    const countQb = baseQb.clone().select('COUNT(DISTINCT r.id)', 'total');
 
     const totalRow = await countQb.getRawOne();
     const total = Number(totalRow?.total || 0);
@@ -1127,17 +1267,26 @@ export class JobsService {
 
     const registrationIds = rows.map((row) => Number(row.registrationId));
 
-    const appliedJobsMap = new Map<number, Array<{ title: string; count: number }>>();
+    const appliedJobsMap = new Map<
+      number,
+      Array<{ title: string; count: number }>
+    >();
 
     if (registrationIds.length > 0) {
       const jobRows = await this.jobApplicationRepo
         .createQueryBuilder('ja')
-        .innerJoin('corporate_jobs', 'j', 'j.id = ja.job_id AND j.is_deleted = false')
+        .innerJoin(
+          'corporate_jobs',
+          'j',
+          'j.id = ja.job_id AND j.is_deleted = false',
+        )
         .select('ja.registration_id', 'registrationId')
         .addSelect('j.title', 'jobTitle')
         .addSelect('COUNT(ja.id)', 'count')
         .where('ja.corporate_account_id = :corpId', { corpId: corporate.id })
-        .andWhere('ja.registration_id IN (:...registrationIds)', { registrationIds })
+        .andWhere('ja.registration_id IN (:...registrationIds)', {
+          registrationIds,
+        })
         .andWhere('ja.is_deleted = false')
         .groupBy('ja.registration_id')
         .addGroupBy('j.title')
@@ -1195,12 +1344,18 @@ export class JobsService {
     });
 
     if (!registration) {
-      throw new NotFoundException('Candidate not found in this corporate account');
+      throw new NotFoundException(
+        'Candidate not found in this corporate account',
+      );
     }
 
     const applications = await this.jobApplicationRepo
       .createQueryBuilder('ja')
-      .innerJoin('corporate_jobs', 'j', 'j.id = ja.job_id AND j.is_deleted = false')
+      .innerJoin(
+        'corporate_jobs',
+        'j',
+        'j.id = ja.job_id AND j.is_deleted = false',
+      )
       .select('ja.id', 'applicationId')
       .addSelect('ja.job_id', 'jobId')
       .addSelect('j.job_ref_no', 'jobRefNo')
@@ -1248,7 +1403,9 @@ export class JobsService {
       bucket.push({
         fromStatus: row.fromStatus,
         toStatus: row.toStatus,
-        changedByUserId: row.changedByUserId ? Number(row.changedByUserId) : null,
+        changedByUserId: row.changedByUserId
+          ? Number(row.changedByUserId)
+          : null,
         changedAt: row.changedAt,
         note: row.note,
       });

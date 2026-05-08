@@ -6,7 +6,6 @@ export const getTechWelcomeEmailTemplate = (
   assets: { popper: string; pattern: string; footer: string; logo: string },
   startDateTime?: Date | string,
   assessmentTitle?: string,
-  isDebrief?: boolean,
 ) => `
 <!DOCTYPE html>
 <html>

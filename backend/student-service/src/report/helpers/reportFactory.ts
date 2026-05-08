@@ -207,20 +207,22 @@ export async function generateShortReportForUser(
 
   switch (user.program_type) {
     case ProgramType.COLLEGE:
-      await new CollegeShortReport(
-        user as unknown as CollegeData,
-      ).generate(filePath);
+      await new CollegeShortReport(user as unknown as CollegeData).generate(
+        filePath,
+      );
       break;
     case ProgramType.EMPLOYEE:
-      await new EmployeeShortReport(
-        user as unknown as EmployeeData,
-      ).generate(filePath);
+      await new EmployeeShortReport(user as unknown as EmployeeData).generate(
+        filePath,
+      );
       break;
     default:
       logger.error(
         `[ReportFactory] Short report not supported for program_type: ${user.program_type}`,
       );
-      throw new Error(`Short report not supported for program_type: ${user.program_type}`);
+      throw new Error(
+        `Short report not supported for program_type: ${user.program_type}`,
+      );
   }
 }
 
