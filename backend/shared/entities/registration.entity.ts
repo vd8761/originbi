@@ -163,6 +163,9 @@ export class Registration {
     @Column({ name: 'has_ai_counsellor', type: 'boolean', default: false })
     hasAiCounsellor: boolean;
 
+    @Column({ name: 'is_tech_assessment', type: 'boolean', default: false })
+    isTechAssessment: boolean;
+
     @Column({ name: 'is_deleted', type: 'boolean', default: false })
     isDeleted: boolean;
 
