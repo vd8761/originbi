@@ -160,11 +160,11 @@ export class RegistrationsService {
 
   private normalizeSchoolStream(
     stream?: string | null,
-  ): 'SCIENCE' | 'COMMERCE' | 'HUMANITIES' | null {
+  ): 'PCMB' | 'PCB' | 'PCM' | 'PCBZ' | 'SCIENCE' | 'COMMERCE' | 'HUMANITIES' | null {
     if (!stream) return null;
     const v = stream.trim().toUpperCase();
-    return ['SCIENCE', 'COMMERCE', 'HUMANITIES'].includes(v)
-      ? (v as 'SCIENCE' | 'COMMERCE' | 'HUMANITIES')
+    return ['PCMB', 'PCB', 'PCM', 'PCBZ', 'SCIENCE', 'COMMERCE', 'HUMANITIES'].includes(v)
+      ? (v as 'PCMB' | 'PCB' | 'PCM' | 'PCBZ' | 'SCIENCE' | 'COMMERCE' | 'HUMANITIES')
       : null;
   }
 

@@ -72,9 +72,12 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     : schoolLevels.filter(l => l.value !== "GCSE");
 
   const schoolStreams = [
-    { value: "SCIENCE", label: "Science" },
-    { value: "COMMERCE", label: "Commerce" },
-    { value: "HUMANITIES", label: "Humanities" },
+    { value: "PCMB", label: "PCMB (Physics, Chemistry, Maths, Biology)" },
+    { value: "PCB", label: "PCB (Physics, Chemistry, Biology)" },
+    { value: "PCM", label: "PCM (Physics, Chemistry, Mathematics)" },
+    { value: "PCBZ", label: "PCBZ (Physics, Chemistry, Botany, Zoology)" },
+    { value: "COMMERCE", label: "COMMERCE (Commerce Stream)" },
+    { value: "HUMANITIES", label: "HUMANITIES (Humanities / Arts Stream)" },
   ];
 
   const boardOptions = getEnabledBoards();

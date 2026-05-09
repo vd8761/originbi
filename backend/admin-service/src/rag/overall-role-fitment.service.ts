@@ -191,10 +191,15 @@ export class OverallRoleFitmentService {
       conditions.push(`r.school_level = $${params.length}`);
     }
 
-    // ── School stream (SCIENCE / COMMERCE / HUMANITIES) — only for HSC ──
+    // ── School stream (PCMB / PCB / PCM / PCBZ / SCIENCE / COMMERCE / HUMANITIES) — only for HSC ──
     if (input.schoolStream) {
-      params.push(input.schoolStream.toUpperCase());
-      conditions.push(`r.school_stream = $${params.length}`);
+      const streamVal = input.schoolStream.toUpperCase();
+      if (streamVal === 'SCIENCE') {
+        conditions.push(`(r.school_stream = 'SCIENCE' OR r.school_stream IN ('PCMB', 'PCB', 'PCM', 'PCBZ'))`);
+      } else {
+        params.push(streamVal);
+        conditions.push(`r.school_stream = $${params.length}`);
+      }
     }
 
     // ── Department / Degree name filter ──
