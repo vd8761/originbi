@@ -1088,10 +1088,10 @@ export class BulkRegistrationsService {
           row['school_stream'] ||
           ''
         ).toLowerCase();
-        const validStreams = ['science', 'commerce', 'humanities'];
+        const validStreams = ['science', 'pcmb', 'pcb', 'pcm', 'pcbz', 'commerce', 'humanities'];
         if (!stream) return 'Stream is required for HSC students';
         if (!validStreams.includes(stream))
-          return 'Stream must be Science, Commerce, or Humanities for HSC';
+          return 'Stream must be PCMB, PCB, PCM, PCBZ, Science, Commerce, or Humanities for HSC';
       }
     } else if (isCollege) {
       const deptName =
