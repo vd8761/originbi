@@ -658,7 +658,8 @@ export class RegistrationsService {
           'deg',
           'dd.degreeTypeId = deg.id',
         )
-        .where('r.isDeleted = false');
+        .where('r.isDeleted = false')
+        .andWhere('r.isTechAssessment = false');
 
       if (search) {
         const s = `%${search.toLowerCase()}%`;
@@ -825,7 +826,7 @@ export class RegistrationsService {
         `SELECT r.has_ai_counsellor
          FROM registrations r
          JOIN users u ON r.user_id = u.id
-         WHERE LOWER(u.email) = LOWER($1) AND r.is_deleted = false
+         WHERE LOWER(u.email) = LOWER($1) AND r.is_deleted = false AND r.is_tech_assessment = false
          ORDER BY r.created_at DESC LIMIT 1`,
         [email],
       );
