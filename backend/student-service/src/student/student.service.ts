@@ -1101,6 +1101,7 @@ export class StudentService {
             programTitle,
             savedReg.metadata?.debrief === true ||
               savedReg.metadata?.debrief === 'true',
+            savedReg.isTechAssessment,
           );
           this.logger.log(`Welcome email sent successfully to ${dto.email}`);
         } catch (emailErr) {
@@ -1209,7 +1210,7 @@ export class StudentService {
         metadata: {
           groupCode: dto.group_code,
           studentBoard: dto.student_board || dto.studentBoard,
-          sendEmail: false, // NO EMAILS for tech assessment
+          sendEmail: true,
           currentYear: dto.current_year || dto.currentYear,
           ...(dto.metadata || {}),
         },
@@ -1264,6 +1265,40 @@ export class StudentService {
             user,
             savedReg,
             level,
+          );
+        }
+      }
+
+      // Send Welcome Email
+      const shouldSendEmail =
+        savedReg.metadata?.sendEmail === true ||
+        savedReg.metadata?.sendEmail === 'true';
+
+      if (shouldSendEmail) {
+        const validFrom = session.validFrom
+          ? new Date(session.validFrom)
+          : new Date();
+        const programTitle = program.assessmentTitle || program.name;
+
+        try {
+          this.logger.log(`[Email] Triggering tech welcome email to ${dto.email}`);
+          await this.sendWelcomeEmail(
+            dto.email,
+            dto.full_name,
+            dto.password,
+            validFrom,
+            programTitle,
+            savedReg.metadata?.debrief === true ||
+              savedReg.metadata?.debrief === 'true',
+            savedReg.isTechAssessment,
+          );
+          this.logger.log(`Tech welcome email sent successfully to ${dto.email}`);
+        } catch (emailErr) {
+          this.logger.error(
+            `[Email Failed] Failed to send tech welcome email to ${dto.email}`,
+          );
+          this.logger.error(
+            `[Email Error Details] ${JSON.stringify(emailErr, Object.getOwnPropertyNames(emailErr))}`,
           );
         }
       }
