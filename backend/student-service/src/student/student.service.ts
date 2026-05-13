@@ -236,13 +236,22 @@ export class StudentService {
     ];
 
     // Find latest incomplete session
-    const incompleteSession = await this.sessionRepo.findOne({
+    let incompleteSession = await this.sessionRepo.findOne({
       where: {
         userId: user.id,
         status: In(incompleteStatuses),
       },
       order: { createdAt: 'DESC' },
     });
+
+    if (incompleteSession) {
+      const isTech = await this.registrationRepo.findOne({
+        where: { id: incompleteSession.registrationId, isTechAssessment: true },
+      });
+      if (isTech) {
+        incompleteSession = null;
+      }
+    }
 
     if (incompleteSession) {
       // --- DEMO USER LOOP LOGIC ---
@@ -356,7 +365,7 @@ export class StudentService {
       JOIN programs p ON r.program_id = p.id
       LEFT JOIN department_degrees dd ON r.department_degree_id = dd.id
       LEFT JOIN departments d ON dd.department_id = d.id
-      WHERE r.user_id = $1 AND r.is_deleted = false
+      WHERE r.user_id = $1 AND r.is_deleted = false AND r.is_tech_assessment = false
       ORDER BY r.created_at DESC
       LIMIT 1
     `;
@@ -501,6 +510,15 @@ export class StudentService {
         where: { userId: user.id },
         order: { createdAt: 'DESC' },
       });
+    }
+
+    if (session) {
+      const isTech = await this.registrationRepo.findOne({
+        where: { id: session.registrationId, isTechAssessment: true },
+      });
+      if (isTech) {
+        session = null;
+      }
     }
 
     if (!session) {

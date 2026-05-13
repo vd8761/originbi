@@ -286,7 +286,7 @@ export class CustomReportService {
             LEFT JOIN assessment_attempts aa ON aa.registration_id = r.id AND aa.status = 'COMPLETED'
             LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
             LEFT JOIN groups g ON r.group_id = g.id
-            WHERE r.user_id = $1 AND r.is_deleted = false
+            WHERE r.user_id = $1 AND r.is_deleted = false AND r.is_tech_assessment = false
             ORDER BY 
                 CASE WHEN pt.blended_style_name IS NOT NULL THEN 0 ELSE 1 END,
                 aa.completed_at DESC NULLS LAST

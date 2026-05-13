@@ -11,6 +11,7 @@ export const SCHOOL_STREAM_ID = {
   PCBZ: 4,
   COMMERCE: 5,
   HUMANITIES: 6,
+  SCIENCE: 1, // Fallback for legacy general "Science" records
 };
 
 export const DISCLAIMER: Record<string, any> = {
