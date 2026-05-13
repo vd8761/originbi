@@ -1101,6 +1101,7 @@ export class StudentService {
             programTitle,
             savedReg.metadata?.debrief === true ||
               savedReg.metadata?.debrief === 'true',
+            savedReg.isTechAssessment,
           );
           this.logger.log(`Welcome email sent successfully to ${dto.email}`);
         } catch (emailErr) {
@@ -1209,7 +1210,7 @@ export class StudentService {
         metadata: {
           groupCode: dto.group_code,
           studentBoard: dto.student_board || dto.studentBoard,
-          sendEmail: false, // NO EMAILS for tech assessment
+          sendEmail: true,
           currentYear: dto.current_year || dto.currentYear,
           ...(dto.metadata || {}),
         },
@@ -1264,6 +1265,44 @@ export class StudentService {
             user,
             savedReg,
             level,
+          );
+        }
+      }
+
+      // Send Welcome Email
+      const shouldSendEmail =
+        savedReg.metadata?.sendEmail === true ||
+        savedReg.metadata?.sendEmail === 'true';
+
+      if (shouldSendEmail) {
+        const validFrom = session.validFrom
+          ? new Date(session.validFrom)
+          : new Date();
+        const programTitle = program.assessmentTitle || program.name;
+
+        try {
+          this.logger.log(
+            `[Email] Triggering tech welcome email to ${dto.email}`,
+          );
+          await this.sendWelcomeEmail(
+            dto.email,
+            dto.full_name,
+            dto.password,
+            validFrom,
+            programTitle,
+            savedReg.metadata?.debrief === true ||
+              savedReg.metadata?.debrief === 'true',
+            savedReg.isTechAssessment,
+          );
+          this.logger.log(
+            `Tech welcome email sent successfully to ${dto.email}`,
+          );
+        } catch (emailErr) {
+          this.logger.error(
+            `[Email Failed] Failed to send tech welcome email to ${dto.email}`,
+          );
+          this.logger.error(
+            `[Email Error Details] ${JSON.stringify(emailErr, Object.getOwnPropertyNames(emailErr))}`,
           );
         }
       }
@@ -1885,9 +1924,11 @@ export class StudentService {
     };
 
     const defaultFrontendUrl =
-      this.configService.get('FRONTEND_URL') ?? 'https://mind.originbi.com/';
+      this.configService.get<string>('FRONTEND_URL') ??
+      'https://mind.originbi.com/';
     const techFrontendUrl =
-      this.configService.get('TECH_FRONTEND_URL') || 'http://localhost:3000';
+      this.configService.get<string>('TECH_FRONTEND_URL') ||
+      'http://localhost:3000';
     const frontendUrl = isTechAssessment ? techFrontendUrl : defaultFrontendUrl;
 
     const emailSubject = isTechAssessment
@@ -1895,15 +1936,7 @@ export class StudentService {
       : 'Welcome to OriginBI - Your Assessment is Ready!';
 
     const emailHtml = isTechAssessment
-      ? getTechWelcomeEmailTemplate(
-          name,
-          to,
-          pass,
-          frontendUrl,
-          assets,
-          startDateTime,
-          assessmentTitle,
-        )
+      ? getTechWelcomeEmailTemplate(name, to, pass, frontendUrl, assets)
       : getStudentWelcomeEmailTemplate(
           name,
           to,

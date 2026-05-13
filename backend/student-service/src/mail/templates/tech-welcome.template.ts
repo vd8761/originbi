@@ -4,8 +4,6 @@ export const getTechWelcomeEmailTemplate = (
   pass: string,
   frontendUrl: string,
   assets: { popper: string; pattern: string; footer: string; logo: string },
-  startDateTime?: Date | string,
-  assessmentTitle?: string,
 ) => `
 <!DOCTYPE html>
 <html>
@@ -104,69 +102,33 @@ export const getTechWelcomeEmailTemplate = (
             <tr>
               <td class="content-padding" style="padding: 40px;">
                 
-                <div style="font-size: 16px; color: #000000; margin-bottom: 20px; font-weight: 400;">Dear <strong style="font-weight: 700;">${name}</strong>,</div>
-                
-                <div style="font-size: 14px; line-height: 1.5; color: #000000; margin-bottom: 24px;">
-                  Thank you for registering with our **Technical Assessment Platform**! We're excited to have you. An online coding and technical evaluation assessment is now available for you to test your skills and unlock job match insights.
-                </div>
+                 <div style="font-size: 16px; color: #000000; margin-bottom: 20px; font-weight: 400;">Dear <strong style="font-weight: 700;">${name}</strong>,</div>
+                 
+                 <div style="font-size: 14px; line-height: 1.5; color: #000000; margin-bottom: 24px;">
+                   Thank you for registering with our **Technical Assessment Platform**! We're excited to have you. You can now login and explore our wide range of assessments.
+                 </div>
 
-                <div style="color: #150089; font-size: 14px; margin-bottom: 16px; font-weight: 700;">Here are your access details:</div>
+                 <div style="color: #150089; font-size: 14px; margin-bottom: 16px; font-weight: 700;">Here are your access details:</div>
 
-                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 24px;">
-                  <tr>
-                    <td style="font-size: 14px; color: #707070; padding: 5px 0; width: 40%;">Assessment Title</td>
-                    <td style="font-size: 14px; color: #000000; padding: 5px 0;">${assessmentTitle || 'Technical Assessment Engine'}</td>
-                  </tr>
-                  <tr>
-                    <td style="font-size: 14px; color: #707070; padding: 5px 0;">Start Date and Time</td>
-                    <td style="font-size: 14px; color: #000000; padding: 5px 0;">${
-                      startDateTime
-                        ? new Date(startDateTime).toLocaleString('en-GB', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            timeZone: 'Asia/Kolkata',
-                            hour12: true,
-                          })
-                        : new Date().toLocaleString('en-GB', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            timeZone: 'Asia/Kolkata',
-                            hour12: true,
-                          })
-                    }</td>
-                  </tr>
-                  <tr>
-                    <td style="font-size: 14px; color: #707070; padding: 5px 0;">Username</td>
-                    <td style="font-size: 14px; color: #000000; padding: 5px 0;">${to}</td>
-                  </tr>
-                  <tr>
-                    <td style="font-size: 14px; color: #707070; padding: 5px 0;">Password</td>
-                    <td style="font-size: 14px; color: #000000; padding: 5px 0;">${pass}</td>
-                  </tr>
-                </table>
+                 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 24px;">
+                   <tr>
+                     <td style="font-size: 14px; color: #707070; padding: 5px 0; width: 40%;">Username</td>
+                     <td style="font-size: 14px; color: #000000; padding: 5px 0;">${to}</td>
+                   </tr>
+                   <tr>
+                     <td style="font-size: 14px; color: #707070; padding: 5px 0;">Password</td>
+                     <td style="font-size: 14px; color: #000000; padding: 5px 0;">${pass}</td>
+                   </tr>
+                 </table>
 
-                <div style="font-size: 14px; line-height: 1.5; color: #000000; margin-bottom: 24px;">
-                  You can start your coding, logic, and core technical assessments immediately. The assessment is fully timed, so manage your time effectively to write and submit your solutions.
-                </div>
+                 <div style="margin-top: 10px; margin-bottom: 30px;">
+                   <a href="${frontendUrl}" style="display: inline-block; background-color: #150089; color: #ffffff; padding: 14px 28px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Login</a>
+                 </div>
 
-                <div style="margin-top: 10px; margin-bottom: 30px;">
-                  <a href="${frontendUrl}" style="display: inline-block; background-color: #150089; color: #ffffff; padding: 14px 28px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Start Tech Assessment</a>
-                </div>
-
-                <div style="font-size: 14px; line-height: 1.5; color: #000000; margin-bottom: 30px;">
-                  If you need any technical assistance during the coding sessions, please contact support immediately. Best of luck!
-                </div>
-
-                <div style="font-size: 14px; color: #000000; margin-bottom: 10px;">
-                  Best regards,<br>
-                  <strong style="font-weight: 700;">OriginBI Technical Team</strong>
-                </div>
+                 <div style="font-size: 14px; color: #000000; margin-bottom: 10px;">
+                   Best regards,<br>
+                   <strong style="font-weight: 700;">OriginBI Technical Team</strong>
+                 </div>
 
               </td>
             </tr>
