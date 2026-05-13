@@ -1,0 +1,163 @@
+version: '3.9'
+
+# ── Shared ────────────────────────────────────────────────────────────────────
+x-backend-common: &backend-common
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+
+# ── Database ──────────────────────────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: originbi-postgres
+    environment:
+      POSTGRES_DB: obidatanew
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASS:-0023}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d obidatanew"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+# ── NestJS Microservices ──────────────────────────────────────────────────────
+  admin-service:
+    <<: *backend-common
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        SERVICE: admin-service
+        PORT: 4001
+    container_name: originbi-admin
+    ports:
+      - "4001:4001"
+    env_file:
+      - ./backend/admin-service/.env.local
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      PORT: 4001
+      # Override localhost URLs → Docker container names
+      AUTH_SERVICE_URL: http://auth-service:4002
+      API_URL: http://admin-service:4001
+      BACKEND_URL: http://admin-service:4001
+
+  auth-service:
+    <<: *backend-common
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        SERVICE: auth-service
+        PORT: 4002
+    container_name: originbi-auth
+    ports:
+      - "4002:4002"
+    env_file:
+      - ./backend/auth-service/.env.local
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      PORT: 4002
+
+  corporate-service:
+    <<: *backend-common
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        SERVICE: corporate-service
+        PORT: 4003
+    container_name: originbi-corporate
+    ports:
+      - "4003:4003"
+    env_file:
+      - ./backend/corporate-service/.env.local
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      PORT: 4003
+      # Override localhost URLs → Docker container names
+      AUTH_SERVICE_URL: http://auth-service:4002
+      API_URL: http://corporate-service:4003
+
+  student-service:
+    <<: *backend-common
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        SERVICE: student-service
+        PORT: 4004
+    container_name: originbi-student
+    ports:
+      - "4004:4004"
+    env_file:
+      - ./backend/student-service/.env.local
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      PORT: 4004
+      # Override localhost URLs → Docker container names
+      AUTH_SERVICE_URL: http://auth-service:4002
+      API_URL: http://student-service:4004
+      REPORT_SERVICE_URL: http://student-service:4004/report
+
+# ── Go Exam Engine ────────────────────────────────────────────────────────────
+  exam-engine:
+    <<: *backend-common
+    build:
+      context: ./backend/exam-engine
+      dockerfile: Dockerfile
+    container_name: originbi-exam-engine
+    ports:
+      - "4005:4005"
+    env_file:
+      - ./backend/exam-engine/.env
+    environment:
+      PORT: 4005
+      DB_HOST: postgres
+      DB_PORT: 5432
+
+# ── Frontend ──────────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_COGNITO_REGION: ${NEXT_PUBLIC_COGNITO_REGION}
+        NEXT_PUBLIC_COGNITO_USER_POOL_ID: ${NEXT_PUBLIC_COGNITO_USER_POOL_ID}
+        NEXT_PUBLIC_COGNITO_APP_CLIENT_ID: ${NEXT_PUBLIC_COGNITO_APP_CLIENT_ID}
+        NEXT_PUBLIC_AUTH_REDIRECT_SIGNIN: ${NEXT_PUBLIC_AUTH_REDIRECT_SIGNIN}
+        NEXT_PUBLIC_AUTH_REDIRECT_SIGNOUT: ${NEXT_PUBLIC_AUTH_REDIRECT_SIGNOUT}
+        NEXT_PUBLIC_ADMIN_API_BASE_URL: ${NEXT_PUBLIC_ADMIN_API_BASE_URL}
+        NEXT_PUBLIC_AUTH_API_BASE_URL: ${NEXT_PUBLIC_AUTH_API_BASE_URL}
+        NEXT_PUBLIC_CORPORATE_API_BASE_URL: ${NEXT_PUBLIC_CORPORATE_API_BASE_URL}
+        NEXT_PUBLIC_CORPORATE_API_URL: ${NEXT_PUBLIC_CORPORATE_API_URL}
+        NEXT_PUBLIC_STUDENT_API_URL: ${NEXT_PUBLIC_STUDENT_API_URL}
+        NEXT_PUBLIC_EXAM_ENGINE_API_URL: ${NEXT_PUBLIC_EXAM_ENGINE_API_URL}
+        NEXT_PUBLIC_REPORT_API_BASE_URL: ${NEXT_PUBLIC_REPORT_API_BASE_URL}
+    container_name: originbi-frontend
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./frontend/.env.local
+    restart: unless-stopped
+    depends_on:
+      - admin-service
+      - auth-service
+      - corporate-service
+      - student-service
+      - exam-engine
+
+volumes:
+  pgdata:

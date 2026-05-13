@@ -32,6 +32,7 @@ const corporateUrl = process.env.NEXT_PUBLIC_CORPORATE_API_URL;
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   async rewrites() {
     if (!corporateUrl) {
       console.warn('⚠️  WARNING: NEXT_PUBLIC_CORPORATE_API_URL is missing. The /api/proxy/corporate route will NOT work.');
