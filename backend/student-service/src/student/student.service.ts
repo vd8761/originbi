@@ -1281,7 +1281,9 @@ export class StudentService {
         const programTitle = program.assessmentTitle || program.name;
 
         try {
-          this.logger.log(`[Email] Triggering tech welcome email to ${dto.email}`);
+          this.logger.log(
+            `[Email] Triggering tech welcome email to ${dto.email}`,
+          );
           await this.sendWelcomeEmail(
             dto.email,
             dto.full_name,
@@ -1292,7 +1294,9 @@ export class StudentService {
               savedReg.metadata?.debrief === 'true',
             savedReg.isTechAssessment,
           );
-          this.logger.log(`Tech welcome email sent successfully to ${dto.email}`);
+          this.logger.log(
+            `Tech welcome email sent successfully to ${dto.email}`,
+          );
         } catch (emailErr) {
           this.logger.error(
             `[Email Failed] Failed to send tech welcome email to ${dto.email}`,
@@ -1920,9 +1924,11 @@ export class StudentService {
     };
 
     const defaultFrontendUrl =
-      this.configService.get('FRONTEND_URL') ?? 'https://mind.originbi.com/';
+      this.configService.get<string>('FRONTEND_URL') ??
+      'https://mind.originbi.com/';
     const techFrontendUrl =
-      this.configService.get('TECH_FRONTEND_URL') || 'http://localhost:3000';
+      this.configService.get<string>('TECH_FRONTEND_URL') ||
+      'http://localhost:3000';
     const frontendUrl = isTechAssessment ? techFrontendUrl : defaultFrontendUrl;
 
     const emailSubject = isTechAssessment
@@ -1930,15 +1936,7 @@ export class StudentService {
       : 'Welcome to OriginBI - Your Assessment is Ready!';
 
     const emailHtml = isTechAssessment
-      ? getTechWelcomeEmailTemplate(
-          name,
-          to,
-          pass,
-          frontendUrl,
-          assets,
-          startDateTime,
-          assessmentTitle,
-        )
+      ? getTechWelcomeEmailTemplate(name, to, pass, frontendUrl, assets)
       : getStudentWelcomeEmailTemplate(
           name,
           to,

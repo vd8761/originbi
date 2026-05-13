@@ -4,8 +4,6 @@ export const getTechWelcomeEmailTemplate = (
   pass: string,
   frontendUrl: string,
   assets: { popper: string; pattern: string; footer: string; logo: string },
-  startDateTime?: Date | string,
-  assessmentTitle?: string,
 ) => `
 <!DOCTYPE html>
 <html>
