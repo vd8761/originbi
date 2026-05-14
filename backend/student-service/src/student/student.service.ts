@@ -246,7 +246,7 @@ export class StudentService {
 
     if (incompleteSession) {
       const isTech = await this.registrationRepo.findOne({
-        where: { id: incompleteSession.registrationId, isTechAssessment: true },
+        where: { id: incompleteSession.registrationId, isTechAssessment: In([1, 2]) },
       });
       if (isTech) {
         incompleteSession = null;
@@ -365,7 +365,7 @@ export class StudentService {
       JOIN programs p ON r.program_id = p.id
       LEFT JOIN department_degrees dd ON r.department_degree_id = dd.id
       LEFT JOIN departments d ON dd.department_id = d.id
-      WHERE r.user_id = $1 AND r.is_deleted = false AND r.is_tech_assessment = false
+      WHERE r.user_id = $1 AND r.is_deleted = false AND r.is_tech_assessment IN (0, 2)
       ORDER BY r.created_at DESC
       LIMIT 1
     `;
@@ -514,7 +514,7 @@ export class StudentService {
 
     if (session) {
       const isTech = await this.registrationRepo.findOne({
-        where: { id: session.registrationId, isTechAssessment: true },
+        where: { id: session.registrationId, isTechAssessment: In([1, 2]) },
       });
       if (isTech) {
         session = null;
@@ -852,7 +852,7 @@ export class StudentService {
           roleDescription:
             dto.role_description || dto.metadata?.role_description,
         },
-        isTechAssessment: dto.is_tech_assessment || false,
+        isTechAssessment: (dto.is_tech_assessment ?? 0) as any,
         createdAt: new Date(),
         updatedAt: new Date(),
       } as any);
@@ -1101,7 +1101,7 @@ export class StudentService {
             programTitle,
             savedReg.metadata?.debrief === true ||
               savedReg.metadata?.debrief === 'true',
-            savedReg.isTechAssessment,
+            (savedReg.isTechAssessment as any) === 1 || (savedReg.isTechAssessment as any) === 2,
           );
           this.logger.log(`Welcome email sent successfully to ${dto.email}`);
         } catch (emailErr) {
@@ -1206,7 +1206,7 @@ export class StudentService {
         paymentAmount: '0.00',
         paymentProvider: 'FREE',
         paidAt: new Date(),
-        isTechAssessment: true,
+        isTechAssessment: 1 as any,
         metadata: {
           groupCode: dto.group_code,
           studentBoard: dto.student_board || dto.studentBoard,
@@ -1292,7 +1292,7 @@ export class StudentService {
             programTitle,
             savedReg.metadata?.debrief === true ||
               savedReg.metadata?.debrief === 'true',
-            savedReg.isTechAssessment,
+            (savedReg.isTechAssessment as any) === 1 || (savedReg.isTechAssessment as any) === 2,
           );
           this.logger.log(
             `Tech welcome email sent successfully to ${dto.email}`,
