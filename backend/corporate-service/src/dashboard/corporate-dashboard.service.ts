@@ -256,7 +256,7 @@ export class CorporateDashboardService {
       prevEnd.setDate(prevEnd.getDate() - 1);
     }
 
-    const baseQuery = `corporate_account_id = $1 AND is_deleted = false AND is_tech_assessment = false`;
+    const baseQuery = `corporate_account_id = $1 AND is_deleted = false AND is_tech_assessment IN (0, 2)`;
     const dateQueryFromFilter =
       startDate && endDate
         ? ` AND created_at >= '${startDate} 00:00:00' AND created_at <= '${endDate} 23:59:59'`
@@ -300,7 +300,7 @@ export class CorporateDashboardService {
         COUNT(s.id) FILTER (WHERE s.status = 'COMPLETED' AND s.completed_at >= $3 AND s.completed_at <= $4) AS completed_prev
       FROM assessment_sessions s
       JOIN registrations r ON s.registration_id = r.id
-      WHERE r.corporate_account_id = $1 AND r.is_deleted = false AND r.is_tech_assessment = false ${sessionDateQuery}
+      WHERE r.corporate_account_id = $1 AND r.is_deleted = false AND r.is_tech_assessment IN (0, 2) ${sessionDateQuery}
       `,
       [
         corpId,
@@ -373,7 +373,7 @@ export class CorporateDashboardService {
       JOIN registrations r ON s.registration_id = r.id
       WHERE r.corporate_account_id = $1
         AND r.is_deleted = false
-        AND r.is_tech_assessment = false
+        AND r.is_tech_assessment IN (0, 2)
         ${dateQuery}
       GROUP BY TO_CHAR(s.created_at, 'Mon'), EXTRACT(YEAR FROM s.created_at), EXTRACT(MONTH FROM s.created_at)
       ORDER BY year, month_num
@@ -408,7 +408,7 @@ export class CorporateDashboardService {
         COUNT(s.id) FILTER (WHERE s.status = 'COMPLETED') AS assessments_completed
       FROM registrations r
       LEFT JOIN assessment_sessions s ON s.registration_id = r.id
-      WHERE r.corporate_account_id = $1 AND r.is_deleted = false AND r.is_tech_assessment = false ${dateQuery}
+      WHERE r.corporate_account_id = $1 AND r.is_deleted = false AND r.is_tech_assessment IN (0, 2) ${dateQuery}
       `,
       [corpId],
     );
@@ -452,7 +452,7 @@ export class CorporateDashboardService {
       JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
       WHERE r.corporate_account_id = $1
         AND r.is_deleted = false
-        AND r.is_tech_assessment = false
+        AND r.is_tech_assessment IN (0, 2)
         AND aa.dominant_trait_id IS NOT NULL
         ${dateQuery}
       GROUP BY pt.id, pt.blended_style_name, pt.color_rgb
@@ -470,7 +470,7 @@ export class CorporateDashboardService {
       JOIN registrations r ON aa.registration_id = r.id
       WHERE r.corporate_account_id = $1
         AND r.is_deleted = false
-        AND r.is_tech_assessment = false
+        AND r.is_tech_assessment IN (0, 2)
         AND aa.dominant_trait_id IS NOT NULL
         ${dateQuery}
       `,
@@ -509,7 +509,7 @@ export class CorporateDashboardService {
         r.mobile_number AS mobile
       FROM registrations r
       LEFT JOIN programs p_direct ON r.program_id = p_direct.id
-      WHERE r.corporate_account_id = $1 AND r.is_deleted = false AND r.is_tech_assessment = false
+      WHERE r.corporate_account_id = $1 AND r.is_deleted = false AND r.is_tech_assessment IN (0, 2)
       ORDER BY r.created_at DESC
       LIMIT 5
       `,

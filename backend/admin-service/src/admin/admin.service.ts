@@ -60,7 +60,7 @@ export class AdminService {
 
       // 1. Total Registrations (Non-deleted)
       const totalUsersCount = await this.registrationRepo.count({
-        where: { isDeleted: false, isTechAssessment: false },
+        where: { isDeleted: false, isTechAssessment: In([0, 2]) },
       });
 
       // 2. User Distribution (Segments)
@@ -72,7 +72,7 @@ export class AdminService {
         this.sessionRepo.count({
           where: {
             createdAt: MoreThanOrEqual(startOfWeek.toDate()),
-            registration: { isDeleted: false, isTechAssessment: false },
+            registration: { isDeleted: false, isTechAssessment: In([0, 2]) },
           },
           relations: ['registration'],
         }),
@@ -140,7 +140,7 @@ export class AdminService {
       .select("DATE_TRUNC('month', r.paid_at)", 'month')
       .addSelect('SUM(CAST(r.payment_amount AS NUMERIC))', 'amount')
       .where("r.payment_status IN ('PAID', 'SUCCESS')")
-      .andWhere('r.isTechAssessment = false')
+      .andWhere('r.isTechAssessment IN (0, 2)')
       .andWhere('r.paid_at >= :twelveMonthsAgo', { twelveMonthsAgo })
       .groupBy('month')
       .getRawMany();
@@ -201,19 +201,19 @@ export class AdminService {
     const [schoolCount, collegeCount, totalCorporateCount, cxoCount] =
       await Promise.all([
         this.registrationRepo.count({
-          where: { schoolLevel: Not(IsNull()), isDeleted: false, isTechAssessment: false },
+          where: { schoolLevel: Not(IsNull()), isDeleted: false, isTechAssessment: In([0, 2]) },
         }),
         this.registrationRepo.count({
-          where: { departmentDegreeId: Not(IsNull()), isDeleted: false, isTechAssessment: false },
+          where: { departmentDegreeId: Not(IsNull()), isDeleted: false, isTechAssessment: In([0, 2]) },
         }),
         this.registrationRepo.count({
-          where: { corporateAccountId: Not(IsNull()), isDeleted: false, isTechAssessment: false },
+          where: { corporateAccountId: Not(IsNull()), isDeleted: false, isTechAssessment: In([0, 2]) },
         }),
         this.registrationRepo
           .createQueryBuilder('r')
           .where('r.corporate_account_id IS NOT NULL')
           .andWhere('r.is_deleted = false')
-          .andWhere('r.isTechAssessment = false')
+          .andWhere('r.isTechAssessment IN (0, 2)')
           .andWhere("r.metadata->>'programType' ILIKE :type", { type: '%cxo%' })
           .getCount(),
       ]);
@@ -258,7 +258,7 @@ export class AdminService {
           'EXPIRED',
           'PARTIALLY_EXPIRED',
         ]),
-        registration: { isDeleted: false, isTechAssessment: false },
+        registration: { isDeleted: false, isTechAssessment: In([0, 2]) },
       },
       relations: ['user', 'program', 'registration'],
       order: { validTo: 'DESC' },
@@ -272,7 +272,7 @@ export class AdminService {
       where: {
         createdAt: MoreThanOrEqual(startOfToday),
         isDeleted: false,
-        isTechAssessment: false,
+        isTechAssessment: In([0, 2]),
       },
       relations: ['user', 'program'],
       order: { createdAt: 'DESC' },
