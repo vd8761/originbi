@@ -1362,7 +1362,7 @@ export class CorporateDashboardService {
         corpId: corporate.id,
       })
       .andWhere('registration.isDeleted = false')
-      .andWhere('registration.isTechAssessment = false');
+      .andWhere('registration.is_tech_assessment = 0');
 
     if (search) {
       query.andWhere(
@@ -1521,7 +1521,7 @@ export class CorporateDashboardService {
       .leftJoinAndMapOne('s.program', Program, 'p', 'p.id = s.programId')
       .where('r.corporateAccountId = :corpId', { corpId: corporate.id })
       .andWhere('r.isDeleted = false')
-      .andWhere('r.isTechAssessment = false');
+      .andWhere('r.is_tech_assessment = 0');
 
     if (search) {
       const s = `%${search.toLowerCase()}%`;

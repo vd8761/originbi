@@ -8,7 +8,6 @@ import {
   IsIn,
   MinLength,
   Matches,
-  IsBoolean,
 } from 'class-validator';
 
 export class CreateRegistrationDto {

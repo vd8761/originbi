@@ -1080,7 +1080,7 @@ export class JobsService {
         id: In(uniqueRegistrationIds),
         corporateAccountId: corporate.id,
         isDeleted: false,
-        isTechAssessment: false,
+        isTechAssessment: 0,
       },
       select: ['id', 'userId'],
     });
@@ -1217,7 +1217,7 @@ export class JobsService {
       .leftJoin('personality_traits', 'pt', 'pt.id = la.dominant_trait_id')
       .where('r.corporate_account_id = :corpId', { corpId: corporate.id })
       .andWhere('r.is_deleted = false')
-      .andWhere('r.isTechAssessment = false')
+      .andWhere('r.is_tech_assessment = 0')
       .setParameters(latestAttemptSubQuery.getParameters());
 
     this.applyCandidatesFilters(baseQb, query);
@@ -1341,7 +1341,7 @@ export class JobsService {
         id: parsedRegistrationId,
         corporateAccountId: corporate.id,
         isDeleted: false,
-        isTechAssessment: false,
+        isTechAssessment: 0,
       },
       select: ['id'],
     });
