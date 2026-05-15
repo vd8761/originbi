@@ -29,6 +29,7 @@ const translations = {
 };
 
 import { studentService } from '../../lib/services/student.service';
+import { buildReportApiUrl } from '../../lib/utils/reportUrl';
 import { ArrowRightWithoutLineIcon, Spinner } from '../icons';
 import AssessmentModal from "./AssessmentModal";
 
@@ -172,19 +173,8 @@ const idbDelete = async (key: string): Promise<void> => {
 // =============================================
 // LAYER 3: Combined read/write helpers
 // =============================================
-const getReportApiBase = () => {
-  const reportApiBase = (process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || '').trim().replace(/\/$/, '');
-  if (!reportApiBase) {
-    throw new Error('Report API base URL is not configured.');
-  }
-  return reportApiBase;
-};
-
 const buildReportDownloadUrl = (downloadUrl: string) => {
-  if (/^https?:\/\//i.test(downloadUrl)) {
-    return downloadUrl;
-  }
-  return `${getReportApiBase()}${downloadUrl}`;
+  return buildReportApiUrl(downloadUrl);
 };
 
 interface SessionAuthContext {
@@ -389,10 +379,10 @@ const ResponsivePdfRenderer: React.FC<ResponsivePdfRendererProps> = ({
       const renderedNodes: HTMLDivElement[] = [];
 
       try {
-        const pdfjsLib: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
+        const pdfjsLib: any = await import('pdfjs-dist');
 
         if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
         }
 
         const documentConfig: { data: Uint8Array; password?: string } = {
@@ -496,13 +486,33 @@ const ResponsivePdfRenderer: React.FC<ResponsivePdfRendererProps> = ({
           pagesHost.replaceChildren(...renderedNodes);
         }
       } catch (error) {
-        console.error('Failed to render PDF preview', error);
+        const rawMessage =
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : '';
+        const normalizedMessage = rawMessage.toLowerCase();
+        const isExpectedCancellation =
+          cancelled ||
+          normalizedMessage.includes('worker was destroyed') ||
+          normalizedMessage.includes('renderingcancelledexception') ||
+          normalizedMessage.includes('rendering cancelled');
+
+        if (!isExpectedCancellation) {
+          console.error('Failed to render PDF preview', error);
+        }
+
         if (cancelled) {
           return;
         }
 
         const message =
           error instanceof Error ? error.message : 'Failed to render PDF preview.';
+
+        if (isExpectedCancellation) {
+          return;
+        }
 
         if (/password/i.test(message)) {
           setRenderError(
@@ -1264,9 +1274,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     setReportPdfPassword(null);
 
     try {
-      const reportApiBase = getReportApiBase();
-
-      const startResponse = await fetch(`${reportApiBase}/generate/student/${studentId}`, {
+      const startResponse = await fetch(buildReportApiUrl(`/generate/student/${studentId}`), {
         method: 'GET',
         headers: buildSecureRequestHeaders(authContext, {
           Accept: 'application/json',
@@ -1292,7 +1300,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       let attempts = 0;
 
       while (attempts < REPORT_PDF_POLL_MAX_ATTEMPTS) {
-        const statusResponse = await fetch(`${reportApiBase}/download/status/${jobId}?json=true`, {
+        const statusResponse = await fetch(buildReportApiUrl(`/download/status/${jobId}?json=true`), {
           headers: buildSecureRequestHeaders(authContext, {
             Accept: 'application/json',
           }),
@@ -1609,7 +1617,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
 
   if (!loading && assessments.length === 0 && !isReportPageMode) {
     return (
-      <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-x-hidden p-4 sm:p-6 lg:p-8">
+      <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-x-hidden py-4 sm:py-6 lg:py-8">
         <div className="w-full max-w-[2000px] mx-auto">
           <div className="p-20 text-center text-brand-text-light-primary dark:text-white text-lg">{t.noAssessments}</div>
         </div>
@@ -1619,7 +1627,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
 
   if (isReportPageMode) {
     return (
-      <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-x-hidden p-4 sm:p-6 lg:p-8">
+      <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-x-hidden py-4 sm:py-6 lg:py-8">
         <div className="flex flex-col gap-5 w-full max-w-[2000px] mx-auto">
           <div className="flex items-center text-xs text-black dark:text-white font-normal flex-wrap">
             <Link
@@ -1634,7 +1642,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
             <span className="text-brand-green font-semibold">Report</span>
           </div>
 
-          <div className="rounded-[24px] bg-white dark:bg-white/[0.08] border border-[#EEF4F1] dark:border-white/[0.12] shadow-[0_2px_8px_rgba(25,33,28,0.04)] dark:shadow-none p-7 lg:p-[1.5vw] flex flex-col items-center justify-center text-center gap-3 min-h-[180px] transition-colors duration-300 hover:border-[#EAF1ED] dark:hover:border-white/[0.2]">
+          <div className="rounded-2xl bg-white dark:bg-white/[0.08] border border-[#EEF4F1] dark:border-white/[0.12] shadow-[0_2px_8px_rgba(25,33,28,0.04)] dark:shadow-none p-7 lg:p-[1.5vw] flex flex-col items-center justify-center text-center gap-3 min-h-[180px] transition-colors duration-300 hover:border-[#EAF1ED] dark:hover:border-white/[0.2]">
             <h1 className="font-semibold text-[#19211C] dark:text-white text-[clamp(20px,2vw,42px)] leading-tight">
               You have successfully completed the assessment <span aria-hidden="true">🎉</span>
             </h1>
@@ -1649,7 +1657,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
             )}
           </div>
 
-          <div className="rounded-[24px] bg-white dark:bg-white/[0.08] border border-[#EEF4F1] dark:border-white/[0.12] shadow-[0_2px_8px_rgba(25,33,28,0.04)] dark:shadow-none h-[68vh] min-h-[440px] flex flex-col overflow-hidden transition-colors duration-300 hover:border-[#EAF1ED] dark:hover:border-white/[0.2]">
+          <div className="rounded-2xl bg-white dark:bg-white/[0.08] border border-[#EEF4F1] dark:border-white/[0.12] shadow-[0_2px_8px_rgba(25,33,28,0.04)] dark:shadow-none h-[68vh] min-h-[440px] flex flex-col overflow-hidden transition-colors duration-300 hover:border-[#EAF1ED] dark:hover:border-white/[0.2]">
             <div className="px-6 pt-6 pb-4 lg:px-[1.25vw] lg:pt-[1.25vw] lg:pb-[0.833vw] flex flex-wrap justify-between items-center gap-2">
               <h3 className="font-semibold text-[#19211C] dark:text-white text-[18px]">Your Report Document</h3>
               <div className="flex flex-wrap items-center gap-2">
@@ -1727,7 +1735,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   }
 
   return (
-    <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-x-hidden p-4 sm:p-6 lg:p-8">
+    <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-x-hidden py-4 sm:py-6 lg:py-8">
       <div className="flex flex-col gap-4 w-full max-w-[2000px] mx-auto">
         <div className="mb-4 overflow-x-auto pb-4 px-4 scrollbar-hide md:overflow-visible md:pb-0 md:mx-0 md:px-0">
           <Stepper overallProgress={overallPercentage} steps={stepperSteps} />

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { EyeVisibleIcon, XIcon, EditIcon } from '../icons';
 import { COUNTRY_CODES } from '../../lib/countryCodes';
-import { capitalizeWords } from "../../lib/utils";
+import { capitalizeWords, getAvatarColor } from "../../lib/utils";
 
 const API_BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || "";
 
@@ -265,7 +265,7 @@ const AffiliateTable: React.FC<AffiliateTableProps> = ({
                                         <td className="p-4 align-middle">
                                             <div className="flex items-center gap-3">
                                                 <img
-                                                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(affiliate.name || 'User')}&background=random`}
+                                                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(affiliate.name || 'User')}&background=${getAvatarColor(affiliate.name || 'User')}&color=fff&font-size=0.4`}
                                                     alt=""
                                                     className="w-8 h-8 rounded-full object-cover border border-brand-light-tertiary dark:border-brand-dark-tertiary"
                                                 />

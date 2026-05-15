@@ -40,6 +40,7 @@ const RoadmapsPage: React.FC = () => {
     const [roadmapDetails, setRoadmapDetails] = useState<Record<string, RoadmapDetailData>>({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isSchool, setIsSchool] = useState(false);
     const searchParams = useSearchParams();
 
     useEffect(() => {
@@ -62,6 +63,28 @@ const RoadmapsPage: React.FC = () => {
                     setLoading(false);
                     return;
                 }
+
+                // Check if user is a school student
+                let isSchoolUser = false;
+                try {
+                    const userStr = localStorage.getItem('user');
+                    if (userStr) {
+                        const user = JSON.parse(userStr);
+                        if (user.programCode) {
+                            isSchoolUser = user.programCode.toUpperCase().includes('SCHOOL');
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error parsing user from localStorage', e);
+                }
+
+                setIsSchool(isSchoolUser);
+
+                if (isSchoolUser) {
+                    setLoading(false);
+                    return;
+                }
+
 
                 // 2. Fetch the report which contains career guidance / roadmap
                 const report = await studentService.getStudentReport(userId);
@@ -248,6 +271,30 @@ const RoadmapsPage: React.FC = () => {
                     className="bg-brand-green text-white px-6 py-2 rounded-lg hover:bg-brand-green/90 transition-colors"
                 >
                     Go to Assessment
+                </Link>
+            </div>
+        );
+    }
+
+    if (isSchool) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 space-y-6">
+                <div className="w-24 h-24 rounded-full bg-brand-green/5 flex items-center justify-center mb-2">
+                    <svg className="w-12 h-12 text-brand-green/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                </div>
+                <div className="bg-brand-green/10 text-brand-green px-8 py-3 rounded-full font-bold text-lg shadow-sm transform transition-transform hover:scale-105">
+                    Coming Soon
+                </div>
+                <p className="text-[#19211C]/60 dark:text-white/60 text-center max-w-md text-base">
+                    Personalized career roadmaps are currently being developed for school students. Check back later!
+                </p>
+                <Link 
+                    href="/student/dashboard" 
+                    className="mt-4 bg-brand-green text-white px-6 py-2 rounded-lg hover:bg-brand-green/90 transition-colors"
+                >
+                    Back to Dashboard
                 </Link>
             </div>
         );

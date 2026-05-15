@@ -12,6 +12,7 @@ import {
   CorporateCreditLedger,
   Registration,
   AffiliateSettlementTransaction,
+  StudentSubscription,
 } from '@originbi/shared-entities';
 
 @Module({
@@ -25,6 +26,7 @@ import {
       CorporateCreditLedger,
       Registration,
       AffiliateSettlementTransaction,
+      StudentSubscription,
     ]),
     AffiliatesModule,
   ],

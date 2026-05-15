@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchAuthSession, signOut } from 'aws-amplify/auth';
 import { configureAmplify } from '../../lib/aws-amplify-config';
+import { clearAuthStorage } from '../../lib/auth-helpers';
 
 configureAmplify();
 
@@ -26,6 +27,13 @@ const RequireCorporate: React.FC<RequireCorporateProps> = ({ children }) => {
                     throw new Error('No tokens found');
                 }
 
+                // 🔄 Sync tokens for other components
+                const idTokenJwt = tokens.idToken?.toString();
+                if (idTokenJwt) {
+                    localStorage.setItem('originbi_id_token', idTokenJwt);
+                    sessionStorage.setItem('idToken', idTokenJwt);
+                }
+
                 // 2. Check Role/Group
                 const accessToken = tokens.accessToken;
                 const groups = (accessToken.payload['cognito:groups'] as string[]) || [];
@@ -43,6 +51,7 @@ const RequireCorporate: React.FC<RequireCorporateProps> = ({ children }) => {
                 } catch {
                     // ignore error
                 }
+                clearAuthStorage();
                 router.replace('/corporate/login');
             }
         };

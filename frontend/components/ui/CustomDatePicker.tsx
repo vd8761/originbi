@@ -90,22 +90,32 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
 
   const toggleOpen = () => setIsOpen((prev) => !prev);
 
-  const formatDisplayDate = (
-    date: Date,
-    time: { h: number; m: number; period: string }
-  ) => {
-    const d = date.toLocaleDateString("en-US", {
+  const formatISOForDisplay = (isoStr: string) => {
+    if (!isoStr) return "";
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return isoStr;
+    return d.toLocaleString("en-US", {
       month: "short",
       day: "2-digit",
       year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
     });
-    const mStr = time.m.toString().padStart(2, "0");
-    return `${d} ${time.h}:${mStr} ${time.period}`;
+  };
+
+  const getISODate = (date: Date, time: { h: number; m: number; period: string }) => {
+    const result = new Date(date);
+    let h = time.h;
+    if (time.period === "PM" && h !== 12) h += 12;
+    if (time.period === "AM" && h === 12) h = 0;
+    result.setHours(h, time.m, 0, 0);
+    return result.toISOString();
   };
 
   const handleApply = () => {
-    const startStr = formatDisplayDate(startDate, startTime);
-    const endStr = formatDisplayDate(endDate, endTime);
+    const startStr = getISODate(startDate, startTime);
+    const endStr = getISODate(endDate, endTime);
     onChange(startStr, endStr);
     setIsOpen(false);
   };
@@ -318,7 +328,7 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ value, onChange }) 
         <div className="flex items-center gap-3 overflow-hidden">
           <CalendarIcon className="w-4 h-4 text-brand-green shrink-0" />
           <span className="font-medium text-sm truncate">
-            {value ? `${value.start} - ${value.end}` : "Select date & time"}
+            {value ? `${formatISOForDisplay(value.start)} - ${formatISOForDisplay(value.end)}` : "Select date & time"}
           </span>
         </div>
         <ChevronDownIcon

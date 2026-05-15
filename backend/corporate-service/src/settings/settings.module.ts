@@ -8,8 +8,8 @@ import { SettingsService } from './settings.service';
  * No controller — only provides SettingsService for DI.
  */
 @Module({
-    imports: [TypeOrmModule.forFeature([OriginbiSetting])],
-    providers: [SettingsService],
-    exports: [SettingsService],
+  imports: [TypeOrmModule.forFeature([OriginbiSetting])],
+  providers: [SettingsService],
+  exports: [SettingsService],
 })
-export class SettingsModule { }
+export class SettingsModule {}

@@ -871,8 +871,20 @@ export class BulkRegistrationsService {
             'year',
           ])
         : undefined,
-      currentRole: this.getValue(rawData, ['CurrentRole', 'current_role', 'Current Role', 'currentRole']) || undefined,
-      roleDescription: this.getValue(rawData, ['RoleDescription', 'role_description', 'Role Description', 'roleDescription']) || undefined,
+      currentRole:
+        this.getValue(rawData, [
+          'CurrentRole',
+          'current_role',
+          'Current Role',
+          'currentRole',
+        ]) || undefined,
+      roleDescription:
+        this.getValue(rawData, [
+          'RoleDescription',
+          'role_description',
+          'Role Description',
+          'roleDescription',
+        ]) || undefined,
 
       password: this.getValue(rawData, ['Password', 'password']) || 'Admin@123',
       sendEmail: (() => {
@@ -1088,10 +1100,10 @@ export class BulkRegistrationsService {
           row['school_stream'] ||
           ''
         ).toLowerCase();
-        const validStreams = ['science', 'commerce', 'humanities'];
+        const validStreams = ['science', 'pcmb', 'pcb', 'pcm', 'pcbz', 'commerce', 'humanities'];
         if (!stream) return 'Stream is required for HSC students';
         if (!validStreams.includes(stream))
-          return 'Stream must be Science, Commerce, or Humanities for HSC';
+          return 'Stream must be PCMB, PCB, PCM, PCBZ, Science, Commerce, or Humanities for HSC';
       }
     } else if (isCollege) {
       const deptName =
@@ -1115,8 +1127,16 @@ export class BulkRegistrationsService {
         return 'Current Year must be 1, 2, 3, or 4';
     } else {
       // Employee / Corporate Program
-      const role = row['CurrentRole'] || row['current_role'] || row['Current Role'] || row['currentRole'];
-      const desc = row['RoleDescription'] || row['role_description'] || row['Role Description'] || row['roleDescription'];
+      const role =
+        row['CurrentRole'] ||
+        row['current_role'] ||
+        row['Current Role'] ||
+        row['currentRole'];
+      const desc =
+        row['RoleDescription'] ||
+        row['role_description'] ||
+        row['Role Description'] ||
+        row['roleDescription'];
 
       if (!role) return 'Current Role is required for Employee programs';
       if (!desc) return 'Role Description is required for Employee programs';

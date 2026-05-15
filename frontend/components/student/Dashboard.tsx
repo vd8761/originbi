@@ -122,8 +122,9 @@ const playFallbackCompletionTone = () => {
 const Dashboard: React.FC = () => {
     const router = useRouter();
     const [isSchool, setIsSchool] = useState(false);
+    const [isProgramLoading, setIsProgramLoading] = useState(true);
     const [reportData, setReportData] = useState<any>(null);
-    const [isLoadingReport, setIsLoadingReport] = useState(false);
+    const [isLoadingReport, setIsLoadingReport] = useState(true);
     const [showCompletionNotice, setShowCompletionNotice] = useState(false);
 
     useEffect(() => {
@@ -134,25 +135,33 @@ const Dashboard: React.FC = () => {
                     const user = JSON.parse(userStr);
 
                     // Fetch report data if not already fetched
-                    if (user.id && !reportData && !isLoadingReport) {
+                    if (user.id && !reportData) {
                         setIsLoadingReport(true);
                         const data = await studentService.getStudentReport(user.id);
                         if (data) {
                             setReportData(data);
                         }
                         setIsLoadingReport(false);
+                    } else {
+                        setIsLoadingReport(false);
                     }
 
                     if (user.programCode) {
                         const code = (user.programCode || '').toUpperCase();
                         setIsSchool(code.includes('SCHOOL'));
+                        setIsProgramLoading(false);
                         return true;
                     }
-                    if (Object.prototype.hasOwnProperty.call(user, 'id')) return true;
+                    if (Object.prototype.hasOwnProperty.call(user, 'id')) {
+                        setIsProgramLoading(false);
+                        return true;
+                    }
                 } catch (e) {
                     console.error("Error parsing user or fetching report", e);
                     setIsLoadingReport(false);
                 }
+            } else {
+                setIsLoadingReport(false);
             }
             return false;
         };
@@ -162,9 +171,13 @@ const Dashboard: React.FC = () => {
                 const interval = setInterval(async () => {
                     if (await checkProgram()) clearInterval(interval);
                 }, 500);
-                const timeout = setTimeout(() => clearInterval(interval), 5000);
+                const timeout = setTimeout(() => {
+                    clearInterval(interval);
+                    setIsProgramLoading(false);
+                }, 5000);
                 return () => { clearInterval(interval); clearTimeout(timeout); };
             }
+            setIsProgramLoading(false);
         };
         init();
     }, []);
@@ -268,29 +281,20 @@ const Dashboard: React.FC = () => {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 lg:gap-[1.666vw] w-full auto-rows-auto">
-            {/* 
-              GRID SYSTEM (12 Columns Desktop / 2 Columns Tablet / 1 Column Mobile)
-              
-              Row 1:
-              - Personality: 50% (6 cols) | Tablet: 100% (2 cols)
-              - Consultant:  25% (3 cols) | Tablet: 50% (1 col)
-              - Roadmaps:    25% (3 cols) | Tablet: 50% (1 col)
-              
-              Row 2 (College):
-              - Mood:        33% (4 cols) | Tablet: 100% (2 cols)
-              - My Jobs:     66% (8 cols) | Tablet: 100% (2 cols)
-
-              Row 2 (School):
-              - Roadmaps:            33% (4 cols)
-              - Impact Assessment:   33% (4 cols)
-              - Top Colleges:        33% (4 cols)
-            */}
-
-            {/* Row 1 */}
-            <div className="col-span-1 md:col-span-2 lg:col-span-6 h-full">
-                <PersonalityCard reportData={reportData} isLoadingReport={isLoadingReport} />
-            </div>
+            <div className="w-full flex-grow flex items-center justify-center min-h-[60vh]">
+                {isProgramLoading ? (
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-green"></div>
+                        <p className="text-brand-text-light-secondary dark:text-white/60 font-medium animate-pulse">
+                            Initializing your dashboard...
+                        </p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 lg:gap-[1.666vw] w-full auto-rows-auto">
+                        {/* Row 1 */}
+                        <div className="col-span-1 md:col-span-2 lg:col-span-6 h-full">
+                            <PersonalityCard reportData={reportData} isLoadingReport={isLoadingReport} />
+                        </div>
             {isSchool ? (
                 <>
                     <div className="col-span-1 md:col-span-1 lg:col-span-3 h-full">
@@ -330,6 +334,8 @@ const Dashboard: React.FC = () => {
                     <MyJobsCard />
                 </div>
             )}
+                    </div>
+                )}
             </div>
         </div>
     );

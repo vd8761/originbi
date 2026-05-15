@@ -27,13 +27,19 @@ export class JobsController {
   }
 
   @Get()
-  async listJobs(@Query() query: ListJobsQueryDto, @Query('email') email: string) {
+  async listJobs(
+    @Query() query: ListJobsQueryDto,
+    @Query('email') email: string,
+  ) {
     if (!email) throw new BadRequestException('Email is required');
     return this.jobsService.listJobs(email, query);
   }
 
   @Get(':jobId')
-  async getJobById(@Param('jobId') jobId: string, @Query('email') email: string) {
+  async getJobById(
+    @Param('jobId') jobId: string,
+    @Query('email') email: string,
+  ) {
     if (!email) throw new BadRequestException('Email is required');
     return this.jobsService.getJobById(email, Number(jobId));
   }
@@ -56,7 +62,12 @@ export class JobsController {
   ) {
     if (!email) throw new BadRequestException('Email is required');
     if (!dto?.status) throw new BadRequestException('Status is required');
-    return this.jobsService.updateJobStatus(email, Number(jobId), dto.status, dto.note);
+    return this.jobsService.updateJobStatus(
+      email,
+      Number(jobId),
+      dto.status,
+      dto.note,
+    );
   }
 
   @Get(':jobId/candidates')

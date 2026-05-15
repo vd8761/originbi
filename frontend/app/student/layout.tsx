@@ -145,8 +145,8 @@ export default function StudentLayout({
     const isAssessmentPage = pathname?.includes('/student/assessment');
     const hideNav = isAssessmentPage && !isReportReady;
     const showAssessmentOnly = isAssessmentModeFlag && !isReportReady;
-    const shouldApplyZoom = !isPublic && !isAssessmentPage;
-    const pageBaseBackgroundClass = isAssessmentPage
+    const shouldApplyZoom = !isPublic && (!isAssessmentPage || isReportReady);
+    const pageBaseBackgroundClass = (isAssessmentPage && !isReportReady)
         ? 'bg-transparent dark:bg-transparent'
         : 'bg-transparent dark:bg-[#19211C]';
 

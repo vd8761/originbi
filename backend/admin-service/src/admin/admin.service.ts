@@ -14,6 +14,7 @@ import {
   CorporateCreditLedger,
   Registration,
   AffiliateSettlementTransaction,
+  StudentSubscription,
 } from '@originbi/shared-entities';
 import { AffiliatesService } from '../affiliates/affiliates.service';
 import dayjs from 'dayjs';
@@ -45,6 +46,9 @@ export class AdminService {
     @InjectRepository(AffiliateSettlementTransaction)
     private readonly settlementRepo: Repository<AffiliateSettlementTransaction>,
 
+    @InjectRepository(StudentSubscription)
+    private readonly subscriptionRepo: Repository<StudentSubscription>,
+
     private readonly affiliatesService: AffiliatesService,
   ) {}
 
@@ -54,15 +58,23 @@ export class AdminService {
       const startOfWeek = dayjs().startOf('week'); // Usually Sunday
       const startOfMonth = dayjs().startOf('month');
 
-      // 1. User Distribution (and demographics total)
+      // 1. Total Registrations (Non-deleted)
+      const totalUsersCount = await this.registrationRepo.count({
+        where: { isDeleted: false, isTechAssessment: In([0, 2]) },
+      });
+
+      // 2. User Distribution (Segments)
       const userDistribution = await this.getUserDistribution();
-      const totalUsersCount = userDistribution.totalWithTraits;
 
       // 2. Active Assessments (This Week)
       // Count both individual sessions and group assessments created/starts this week
       const [weeklySessions, weeklyGroups] = await Promise.all([
         this.sessionRepo.count({
-          where: { createdAt: MoreThanOrEqual(startOfWeek.toDate()) },
+          where: {
+            createdAt: MoreThanOrEqual(startOfWeek.toDate()),
+            registration: { isDeleted: false, isTechAssessment: In([0, 2]) },
+          },
+          relations: ['registration'],
         }),
         this.groupAssessmentRepo.count({
           where: { createdAt: MoreThanOrEqual(startOfWeek.toDate()) },
@@ -79,6 +91,10 @@ export class AdminService {
 
       // 5. Revenue Trend (Last 12 Months)
       const revenueTrend = await this.getRevenueTrend();
+      const totalRevenue = revenueTrend.reduce(
+        (acc, curr) => acc + curr.revenue,
+        0,
+      );
 
       // 6. Total Commissions Paid
       const totalCommissionsPaid = await this.getTotalCommissionsPaid();
@@ -92,6 +108,7 @@ export class AdminService {
         totalReadyToPayment: affiliateStats.totalReadyToPayment,
         affiliates: affiliateStats.affiliates,
         revenueTrend,
+        totalRevenue,
         totalCommissionsPaid,
         userDistribution,
         recentExpiredAssessments: await this.getRecentExpiredAssessments(),
@@ -123,6 +140,7 @@ export class AdminService {
       .select("DATE_TRUNC('month', r.paid_at)", 'month')
       .addSelect('SUM(CAST(r.payment_amount AS NUMERIC))', 'amount')
       .where("r.payment_status IN ('PAID', 'SUCCESS')")
+      .andWhere('r.isTechAssessment IN (0, 2)')
       .andWhere('r.paid_at >= :twelveMonthsAgo', { twelveMonthsAgo })
       .groupBy('month')
       .getRawMany();
@@ -136,6 +154,26 @@ export class AdminService {
     months.forEach((m) => trendMap.set(m, 0));
 
     individualRevenue.forEach((item) => {
+      const monthLabel = dayjs(item.month).format('MMM YYYY');
+      if (trendMap.has(monthLabel)) {
+        trendMap.set(
+          monthLabel,
+          trendMap.get(monthLabel)! + (parseFloat(item.amount) || 0),
+        );
+      }
+    });
+
+    // Add Subscription Revenue (e.g. Debrief extra payments)
+    const subscriptionRevenue = await this.subscriptionRepo
+      .createQueryBuilder('s')
+      .select("DATE_TRUNC('month', s.purchased_at)", 'month')
+      .addSelect('SUM(CAST(s.amount AS NUMERIC))', 'amount')
+      .where("s.status = 'active'")
+      .andWhere('s.purchased_at >= :twelveMonthsAgo', { twelveMonthsAgo })
+      .groupBy('month')
+      .getRawMany();
+
+    subscriptionRevenue.forEach((item) => {
       const monthLabel = dayjs(item.month).format('MMM YYYY');
       if (trendMap.has(monthLabel)) {
         trendMap.set(
@@ -163,17 +201,19 @@ export class AdminService {
     const [schoolCount, collegeCount, totalCorporateCount, cxoCount] =
       await Promise.all([
         this.registrationRepo.count({
-          where: { schoolLevel: Not(IsNull()) },
+          where: { schoolLevel: Not(IsNull()), isDeleted: false, isTechAssessment: In([0, 2]) },
         }),
         this.registrationRepo.count({
-          where: { departmentDegreeId: Not(IsNull()) },
+          where: { departmentDegreeId: Not(IsNull()), isDeleted: false, isTechAssessment: In([0, 2]) },
         }),
         this.registrationRepo.count({
-          where: { corporateAccountId: Not(IsNull()) },
+          where: { corporateAccountId: Not(IsNull()), isDeleted: false, isTechAssessment: In([0, 2]) },
         }),
         this.registrationRepo
           .createQueryBuilder('r')
           .where('r.corporate_account_id IS NOT NULL')
+          .andWhere('r.is_deleted = false')
+          .andWhere('r.isTechAssessment IN (0, 2)')
           .andWhere("r.metadata->>'programType' ILIKE :type", { type: '%cxo%' })
           .getCount(),
       ]);
@@ -218,6 +258,7 @@ export class AdminService {
           'EXPIRED',
           'PARTIALLY_EXPIRED',
         ]),
+        registration: { isDeleted: false, isTechAssessment: In([0, 2]) },
       },
       relations: ['user', 'program', 'registration'],
       order: { validTo: 'DESC' },
@@ -230,6 +271,8 @@ export class AdminService {
     return this.registrationRepo.find({
       where: {
         createdAt: MoreThanOrEqual(startOfToday),
+        isDeleted: false,
+        isTechAssessment: In([0, 2]),
       },
       relations: ['user', 'program'],
       order: { createdAt: 'DESC' },

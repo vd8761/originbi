@@ -34,6 +34,7 @@ import {
 import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
+import { getTechWelcomeEmailTemplate } from '../mail/templates/tech-welcome.template';
 
 import { getDebriefTeamNotificationEmailTemplate } from '../mail/templates/debrief-team-notification.template';
 import { SettingsService } from '../settings/settings.service';
@@ -235,13 +236,22 @@ export class StudentService {
     ];
 
     // Find latest incomplete session
-    const incompleteSession = await this.sessionRepo.findOne({
+    let incompleteSession = await this.sessionRepo.findOne({
       where: {
         userId: user.id,
         status: In(incompleteStatuses),
       },
       order: { createdAt: 'DESC' },
     });
+
+    if (incompleteSession) {
+      const isTech = await this.registrationRepo.findOne({
+        where: { id: incompleteSession.registrationId, isTechAssessment: In([1, 2]) },
+      });
+      if (isTech) {
+        incompleteSession = null;
+      }
+    }
 
     if (incompleteSession) {
       // --- DEMO USER LOOP LOGIC ---
@@ -355,7 +365,7 @@ export class StudentService {
       JOIN programs p ON r.program_id = p.id
       LEFT JOIN department_degrees dd ON r.department_degree_id = dd.id
       LEFT JOIN departments d ON dd.department_id = d.id
-      WHERE r.user_id = $1 AND r.is_deleted = false
+      WHERE r.user_id = $1 AND r.is_deleted = false AND r.is_tech_assessment IN (0, 2)
       ORDER BY r.created_at DESC
       LIMIT 1
     `;
@@ -500,6 +510,15 @@ export class StudentService {
         where: { userId: user.id },
         order: { createdAt: 'DESC' },
       });
+    }
+
+    if (session) {
+      const isTech = await this.registrationRepo.findOne({
+        where: { id: session.registrationId, isTechAssessment: In([1, 2]) },
+      });
+      if (isTech) {
+        session = null;
+      }
     }
 
     if (!session) {
@@ -833,6 +852,7 @@ export class StudentService {
           roleDescription:
             dto.role_description || dto.metadata?.role_description,
         },
+        isTechAssessment: (dto.is_tech_assessment ?? 0) as any,
         createdAt: new Date(),
         updatedAt: new Date(),
       } as any);
@@ -1081,6 +1101,7 @@ export class StudentService {
             programTitle,
             savedReg.metadata?.debrief === true ||
               savedReg.metadata?.debrief === 'true',
+            (savedReg.isTechAssessment as any) === 1 || (savedReg.isTechAssessment as any) === 2,
           );
           this.logger.log(`Welcome email sent successfully to ${dto.email}`);
         } catch (emailErr) {
@@ -1110,6 +1131,194 @@ export class StudentService {
         error.stack,
       );
       throw new BadRequestException(`Registration failed: ${error.message}`);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Specialized Registration for Technical Assessment
+  // ---------------------------------------------------------------------------
+  async registerTechAssessment(dto: CreateRegistrationDto) {
+    try {
+      // 1. Check if User exists
+      let user = await this.userRepo.findOne({
+        where: { email: ILike(dto.email) },
+      });
+      if (user) {
+        this.logger.warn(`User ${dto.email} already exists.`);
+        throw new BadRequestException('User already exists');
+      }
+
+      // 2. Create User in Cognito
+      let cognitoSub = '';
+      try {
+        const cognitoRes = await this.createCognitoUser(
+          dto.email,
+          dto.password,
+        );
+        cognitoSub = cognitoRes.sub || '';
+      } catch (e) {
+        this.logger.error('Cognito creation failed', e);
+        throw e;
+      }
+
+      // 3. Create User Entity
+      user = this.userRepo.create({
+        email: dto.email,
+        role: 'STUDENT',
+        metadata: {
+          fullName: dto.full_name,
+          mobileNumber: dto.mobile_number,
+          countryCode: dto.country_code ?? '+91',
+          gender: dto.gender,
+          hasChangedPassword: true,
+          cognitoSub: cognitoSub,
+          ...(dto.metadata || {}),
+        },
+        createdAt: new Date(),
+      });
+      await this.userRepo.save(user);
+
+      // 4. Find Program
+      const programCode = dto.program_code || 'SCHOOL_STUDENT';
+      const program = await this.sessionRepo.manager.findOne(Program, {
+        where: { code: programCode },
+      });
+
+      if (!program) {
+        throw new Error(`Program ${programCode} not found`);
+      }
+
+      // 5. Create Registration (FREE for Tech Assessment)
+      const registration = this.sessionRepo.manager.create(Registration, {
+        userId: user.id,
+        registrationSource: 'SELF',
+        fullName: dto.full_name,
+        mobileNumber: dto.mobile_number,
+        countryCode: dto.country_code ?? '+91',
+        gender: dto.gender as Gender,
+        schoolLevel: dto.school_level,
+        schoolStream: dto.school_stream,
+        programId: program.id,
+        departmentDegreeId: dto.department_degree_id || dto.departmentDegreeId,
+        studentBoard: dto.student_board || dto.studentBoard,
+        status: 'COMPLETED' as RegistrationStatus,
+        paymentStatus: 'PAID' as PaymentStatus,
+        paymentAmount: '0.00',
+        paymentProvider: 'FREE',
+        paidAt: new Date(),
+        isTechAssessment: 1 as any,
+        metadata: {
+          groupCode: dto.group_code,
+          studentBoard: dto.student_board || dto.studentBoard,
+          sendEmail: true,
+          currentYear: dto.current_year || dto.currentYear,
+          ...(dto.metadata || {}),
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as any);
+
+      const savedReg = await this.sessionRepo.manager.save(
+        Registration,
+        registration,
+      );
+
+      // 6. Create Assessment Session with Schedule
+      const now = new Date();
+      const validFrom = new Date(now.getTime() + 5 * 60000); // +5 mins
+      const validTo = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // +7 days
+
+      const session = this.sessionRepo.create({
+        userId: user.id,
+        registrationId: savedReg.id,
+        programId: program.id,
+        status: 'NOT_STARTED',
+        validFrom: validFrom,
+        validTo: validTo,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      const savedSession = await this.sessionRepo.save(session);
+
+      // 7. Create Attempts (Level 1 Mandated)
+      const levels = await this.levelRepo.find({
+        where: { isMandatory: true },
+        order: { levelNumber: 'ASC' },
+      });
+
+      for (const level of levels) {
+        const attempt = this.attemptRepo.create({
+          assessmentSessionId: savedSession.id,
+          assessmentLevelId: level.id,
+          userId: user.id,
+          registrationId: savedReg.id,
+          programId: program.id,
+          status: 'NOT_STARTED',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        const savedAttempt = await this.attemptRepo.save(attempt);
+
+        if (level.levelNumber === 1 || level.name.includes('Level 1')) {
+          await this.generateQuestionsForAttempt(
+            savedAttempt,
+            user,
+            savedReg,
+            level,
+          );
+        }
+      }
+
+      // Send Welcome Email
+      const shouldSendEmail =
+        savedReg.metadata?.sendEmail === true ||
+        savedReg.metadata?.sendEmail === 'true';
+
+      if (shouldSendEmail) {
+        const validFrom = session.validFrom
+          ? new Date(session.validFrom)
+          : new Date();
+        const programTitle = program.assessmentTitle || program.name;
+
+        try {
+          this.logger.log(
+            `[Email] Triggering tech welcome email to ${dto.email}`,
+          );
+          await this.sendWelcomeEmail(
+            dto.email,
+            dto.full_name,
+            dto.password,
+            validFrom,
+            programTitle,
+            savedReg.metadata?.debrief === true ||
+              savedReg.metadata?.debrief === 'true',
+            (savedReg.isTechAssessment as any) === 1 || (savedReg.isTechAssessment as any) === 2,
+          );
+          this.logger.log(
+            `Tech welcome email sent successfully to ${dto.email}`,
+          );
+        } catch (emailErr) {
+          this.logger.error(
+            `[Email Failed] Failed to send tech welcome email to ${dto.email}`,
+          );
+          this.logger.error(
+            `[Email Error Details] ${JSON.stringify(emailErr, Object.getOwnPropertyNames(emailErr))}`,
+          );
+        }
+      }
+
+      this.logger.log(
+        `Tech Assessment Registration completed for ${dto.email}`,
+      );
+
+      return {
+        success: true,
+        message: 'Registration successful',
+      };
+    } catch (error) {
+      this.logger.error('Error in Tech Assessment Registration:', error.stack);
+      if (error instanceof BadRequestException) throw error;
+      throw new BadRequestException(error.message || 'Registration failed');
     }
   }
 
@@ -1688,6 +1897,7 @@ export class StudentService {
     startDateTime?: Date | string,
     assessmentTitle?: string,
     isDebrief?: boolean,
+    isTechAssessment?: boolean,
   ) {
     this.logger.log(`[Email Debug] AWS Config Check triggered for: ${to}`);
 
@@ -1713,21 +1923,37 @@ export class StudentService {
       logo: `${this.configService.get('API_URL')}/assets/logo-light.png`,
     };
 
+    const defaultFrontendUrl =
+      this.configService.get<string>('FRONTEND_URL') ??
+      'https://mind.originbi.com/';
+    const techFrontendUrl =
+      this.configService.get<string>('TECH_FRONTEND_URL') ||
+      'http://localhost:3000';
+    const frontendUrl = isTechAssessment ? techFrontendUrl : defaultFrontendUrl;
+
+    const emailSubject = isTechAssessment
+      ? 'Welcome to OriginBI Technical Assessment - Your Access is Ready!'
+      : 'Welcome to OriginBI - Your Assessment is Ready!';
+
+    const emailHtml = isTechAssessment
+      ? getTechWelcomeEmailTemplate(name, to, pass, frontendUrl, assets)
+      : getStudentWelcomeEmailTemplate(
+          name,
+          to,
+          pass,
+          frontendUrl,
+          assets,
+          startDateTime,
+          assessmentTitle,
+          isDebrief,
+        );
+
     const mailOptions: Record<string, any> = {
       from: fromAddress,
       to,
       cc: ccEmail,
-      subject: 'Welcome to OriginBI - Your Assessment is Ready!',
-      html: getStudentWelcomeEmailTemplate(
-        name,
-        to,
-        pass,
-        this.configService.get('FRONTEND_URL') ?? 'https://mind.originbi.com/',
-        assets,
-        startDateTime,
-        assessmentTitle,
-        isDebrief,
-      ),
+      subject: emailSubject,
+      html: emailHtml,
     };
     if (bccEmail) mailOptions.bcc = bccEmail;
     if (replyToAddress) mailOptions.replyTo = replyToAddress;

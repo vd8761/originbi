@@ -9,6 +9,7 @@ import {
   CorporateCreditLedger,
   Registration,
   AffiliateSettlementTransaction,
+  StudentSubscription,
 } from '@originbi/shared-entities';
 import { AffiliatesService } from '../affiliates/affiliates.service';
 
@@ -46,6 +47,10 @@ describe('AdminService', () => {
         {
           provide: getRepositoryToken(AffiliateSettlementTransaction),
           useValue: { count: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(StudentSubscription),
+          useValue: { count: jest.fn(), createQueryBuilder: jest.fn() },
         },
         {
           provide: AffiliatesService,

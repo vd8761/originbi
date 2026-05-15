@@ -148,6 +148,7 @@ interface DashboardData {
   activeAssessments: number;
   corporateClients: number;
   totalCommissionsPaid: number;
+  totalRevenue: number;
   revenueTrend: Array<{ month: string; revenue: number }>;
   userDistribution: UserDistributionData;
   affiliates: Array<{
@@ -271,6 +272,13 @@ const AdminDashboard: React.FC = () => {
       href: "/admin/corporate"
     },
     {
+      title: "Total Revenue",
+      value: loading ? "..." : formatCurrency(data?.totalRevenue || 0),
+      change: "Last 12m",
+      isPositive: true,
+      isLoading: loading,
+    },
+    {
       title: "Total Commissions Paid",
       value: loading ? "..." : formatCurrency(data?.totalCommissionsPaid || 0),
       change: "Distributed",
@@ -297,7 +305,7 @@ const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {stats.map((s) => (
           <StatCard key={s.title} {...s} />
         ))}
@@ -349,7 +357,7 @@ const AdminDashboard: React.FC = () => {
                       <div className="flex justify-between items-center py-4">
                         <div className="flex items-center gap-3">
                           <img
-                            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(aff.name)}&background=random`}
+                            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(aff.name)}&background=${getAvatarColor(aff.name)}&color=fff&font-size=0.4`}
                             alt=""
                             className="w-9 h-9 rounded-full object-cover shadow-sm group-hover:scale-105 transition-transform"
                           />
@@ -605,7 +613,7 @@ const AdminDashboard: React.FC = () => {
             ) : (
               <div className="flex flex-col">
                 {data.recentExpiredAssessments.map((session) => (
-                  <div key={session.id} className="px-6 group even:bg-white/5 hover:bg-white/10 dark:hover:bg-white/5 transition-all duration-200 border-b border-black/5 dark:border-white/5 last:border-0 text-white">
+                  <div key={session.id} className="px-6 group even:bg-white/5 hover:bg-white/10 dark:hover:bg-white/5 transition-all duration-200 border-b border-black/5 dark:border-white/5 last:border-0">
                     <div className="flex items-center py-4 gap-4">
                       {/* Column 1: Profile */}
                       <div className="flex items-center gap-3 w-[25%] min-w-0 shrink-0">
@@ -615,7 +623,7 @@ const AdminDashboard: React.FC = () => {
                           className="w-10 h-10 rounded-full object-cover border border-brand-light-tertiary dark:border-brand-dark-tertiary shrink-0"
                         />
                         <div className="flex flex-col min-w-0">
-                          <h4 className="font-semibold text-white text-sm truncate">
+                          <h4 className="font-semibold text-[#19211C] dark:text-white text-sm truncate">
                             {session.registration?.fullName || session.user?.email || 'Student'}
                           </h4>
                         </div>

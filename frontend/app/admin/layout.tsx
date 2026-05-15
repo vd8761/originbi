@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import RequireAdmin from '../../components/auth/RequireAdmin';
 import { signOut } from 'aws-amplify/auth';
 import { configureAmplify } from '../../lib/aws-amplify-config';
+import { clearAuthStorage } from '../../lib/auth-helpers';
 
 configureAmplify();
 
@@ -74,10 +75,7 @@ export default function AdminLayout({
             console.error('Error signing out: ', error);
         }
 
-        if (typeof window !== 'undefined') {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-        }
+        clearAuthStorage();
         router.push('/admin/login');
     };
 

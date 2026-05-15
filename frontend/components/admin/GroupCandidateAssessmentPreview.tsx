@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { AssessmentSession } from '../../lib/services/assessment.service';
 import { assessmentService } from '../../lib/services/assessment.service';
+import { buildReportApiUrl } from '../../lib/utils/reportUrl';
 import {
     ArrowLeftWithoutLineIcon,
     ArrowRightWithoutLineIcon,
@@ -264,14 +265,17 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                             } else if (statusData.status === 'COMPLETED') {
                                                 isComplete = true;
                                                 setDownloadProgress('Downloading...');
+
+                                                if (!statusData.downloadUrl) {
+                                                    throw new Error('Download URL missing from report status.');
+                                                }
                                                 
                                                 const extendedData = statusData as any;
                                                 if (extendedData.password) {
                                                     setGeneratedPassword(extendedData.password);
                                                 }
 
-                                                 const REPORT_API_URL = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || '';
-                                                window.location.href = `${REPORT_API_URL}${statusData.downloadUrl}`;
+                                                window.location.href = buildReportApiUrl(statusData.downloadUrl);
                                                 
                                                 setTimeout(() => {
                                                     setDownloading(false);

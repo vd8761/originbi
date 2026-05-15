@@ -49,7 +49,9 @@ export class BulkCorporateRegistrationsService {
   private readonly logger = new Logger(BulkCorporateRegistrationsService.name);
 
   private normalizeEmail(email: string): string {
-    return String(email || '').trim().toLowerCase();
+    return String(email || '')
+      .trim()
+      .toLowerCase();
   }
 
   private normalizeMobile(mobile: string): string {
@@ -81,7 +83,7 @@ export class BulkCorporateRegistrationsService {
     private readonly corporateRegistrationsService: CorporateRegistrationsService,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   /**
    * Phase 1: Preview & Validate
@@ -415,7 +417,8 @@ export class BulkCorporateRegistrationsService {
     // Also check if the job itself failed for overarching reasons
     let jobLastError = undefined;
     if (job.status === 'FAILED') {
-      jobLastError = "Job crashed unexpectedly during preprocessing. Please contact support.";
+      jobLastError =
+        'Job crashed unexpectedly during preprocessing. Please contact support.';
     }
 
     return {
@@ -457,7 +460,9 @@ export class BulkCorporateRegistrationsService {
       });
       // Fallback for sub-users
       if (!corporateAccount) {
-        const user = await this.userRepo.findOne({ where: { id: createdById } });
+        const user = await this.userRepo.findOne({
+          where: { id: createdById },
+        });
         if (user && user.corporateId) {
           corporateAccount = await this.corporateAccountRepo.findOne({
             where: { id: Number(user.corporateId) },
@@ -465,7 +470,9 @@ export class BulkCorporateRegistrationsService {
         }
       }
       if (!corporateAccount) {
-        this.logger.error(`Corporate Account not found for user ${createdById}`);
+        this.logger.error(
+          `Corporate Account not found for user ${createdById}`,
+        );
         job.status = 'FAILED';
         job.completedAt = new Date();
         await this.bulkImportRepo.save(job);
@@ -566,7 +573,10 @@ export class BulkCorporateRegistrationsService {
         );
 
         // Find Program ID for Header from original CSV value
-        const rawProgram = this.getValue(row.rawData, ['ProgramId', 'program_code']);
+        const rawProgram = this.getValue(row.rawData, [
+          'ProgramId',
+          'program_code',
+        ]);
         const programObj = rawProgram
           ? programMap.get(this.normalizeString(rawProgram))
           : null;
@@ -604,8 +614,11 @@ export class BulkCorporateRegistrationsService {
         // A. Create/Find Group
         let group = allGroups.find(
           (g) =>
-            this.normalizeString(g.name) === this.normalizeString(batch.groupName) ||
-            (g.code && this.normalizeString(g.code) === this.normalizeString(batch.groupName)),
+            this.normalizeString(g.name) ===
+              this.normalizeString(batch.groupName) ||
+            (g.code &&
+              this.normalizeString(g.code) ===
+                this.normalizeString(batch.groupName)),
         );
         try {
           // If group doesn't exist in map but was passed, Create it ONLY if we are sure?
@@ -678,7 +691,8 @@ export class BulkCorporateRegistrationsService {
               metadata: { importId: jobId, source: 'BULK_UPLOAD' },
             });
 
-            const savedGA = await this.groupAssessmentRepo.save(groupAssessment);
+            const savedGA =
+              await this.groupAssessmentRepo.save(groupAssessment);
             groupAssessmentId = savedGA.id;
           } else {
             // Fallback: Find any active program
@@ -707,7 +721,8 @@ export class BulkCorporateRegistrationsService {
                   note: 'Used default program',
                 },
               });
-              const savedGA = await this.groupAssessmentRepo.save(groupAssessment);
+              const savedGA =
+                await this.groupAssessmentRepo.save(groupAssessment);
               groupAssessmentId = savedGA.id;
 
               // Important: Update the DTOs in this batch to use this program ID
@@ -733,8 +748,9 @@ export class BulkCorporateRegistrationsService {
 
           for (const row of batch.rows) {
             row.status = 'FAILED';
-            row.errorMessage = `System Error: Failed to create Group Assessment Header${err instanceof Error && err.message ? ` - ${err.message}` : ''
-              }`;
+            row.errorMessage = `System Error: Failed to create Group Assessment Header${
+              err instanceof Error && err.message ? ` - ${err.message}` : ''
+            }`;
             row.resultType = 'FAILED_DB';
             failCount++;
           }
@@ -752,16 +768,26 @@ export class BulkCorporateRegistrationsService {
 
         // Pre-fetch users for this batch to avoid N+1 queries
         const emailsForBatch = batch.rows
-          .map((r) => this.normalizeEmail(r.rawData['Email'] || r.rawData['email']))
+          .map((r) =>
+            this.normalizeEmail(r.rawData['Email'] || r.rawData['email']),
+          )
           .filter(Boolean);
-        const mobilesForBatch = batch.rows.map(r => r.rawData['Mobile'] || r.rawData['mobile'] || r.rawData['mobile_number'])
-          .map(m => this.normalizeMobile(String(m)))
+        const mobilesForBatch = batch.rows
+          .map(
+            (r) =>
+              r.rawData['Mobile'] ||
+              r.rawData['mobile'] ||
+              r.rawData['mobile_number'],
+          )
+          .map((m) => this.normalizeMobile(String(m)))
           .filter(Boolean);
 
         const batchUsers = await this.userRepo
           .createQueryBuilder('u')
           .where(
-            emailsForBatch.length > 0 ? 'LOWER(u.email) IN (:...emails)' : '1=0',
+            emailsForBatch.length > 0
+              ? 'LOWER(u.email) IN (:...emails)'
+              : '1=0',
             { emails: emailsForBatch },
           )
           .orWhere(
@@ -795,12 +821,15 @@ export class BulkCorporateRegistrationsService {
             const email = this.normalizeEmail(
               row.rawData['Email'] || row.rawData['email'],
             );
-            const mobile = row.rawData['Mobile'] || row.rawData['mobile'] || row.rawData['mobile_number'];
+            const mobile =
+              row.rawData['Mobile'] ||
+              row.rawData['mobile'] ||
+              row.rawData['mobile_number'];
             const mobileNorm = this.normalizeMobile(mobile);
 
             let existingUserId: number | null = null;
             if (email && batchUserMapByEmail.has(email)) {
-              existingUserId = batchUserMapByEmail.get(email)!.id;
+              existingUserId = batchUserMapByEmail.get(email).id;
             } else if (mobileNorm) {
               // Secondary fallback for mobile if email didn't match
               const u = await this.userRepo
@@ -871,7 +900,10 @@ export class BulkCorporateRegistrationsService {
         `Job ${jobId} Completed. Success: ${successCount}, Fail: ${failCount}`,
       );
     } catch (error: any) {
-      this.logger.error(`Critical overarching error in processing job ${jobId}`, error);
+      this.logger.error(
+        `Critical overarching error in processing job ${jobId}`,
+        error,
+      );
       if (job) {
         job.status = 'FAILED';
         await this.bulkImportRepo.save(job);
@@ -942,7 +974,10 @@ export class BulkCorporateRegistrationsService {
       }
 
       // 3. Group by Corporate ID
-      const corpMap = new Map<number, { count: number; studentNames: string[] }>();
+      const corpMap = new Map<
+        number,
+        { count: number; studentNames: string[] }
+      >();
       for (const s of expiringSessions) {
         const corpId = Number(s.corporate_id);
         if (!corpId) continue;
@@ -950,7 +985,7 @@ export class BulkCorporateRegistrationsService {
         if (!corpMap.has(corpId)) {
           corpMap.set(corpId, { count: 0, studentNames: [] });
         }
-        const entry = corpMap.get(corpId)!;
+        const entry = corpMap.get(corpId);
         entry.count++;
         if (s.student_name) entry.studentNames.push(s.student_name);
       }
@@ -1092,8 +1127,12 @@ export class BulkCorporateRegistrationsService {
       const pObj = programMap.get(this.normalizeString(pCode));
       if (pObj) {
         pId = pObj.code || pObj.name;
-        isCollege = pObj.name.toLowerCase().includes('college') || pCode.toUpperCase().includes('COLLEGE');
-        isSchool = pObj.name.toLowerCase().includes('school') || pCode.toUpperCase().includes('SCHOOL');
+        isCollege =
+          pObj.name.toLowerCase().includes('college') ||
+          pCode.toUpperCase().includes('COLLEGE');
+        isSchool =
+          pObj.name.toLowerCase().includes('school') ||
+          pCode.toUpperCase().includes('SCHOOL');
       }
     }
 
@@ -1167,8 +1206,20 @@ export class BulkCorporateRegistrationsService {
       departmentId: departmentDegreeId ? String(departmentDegreeId) : undefined, // Corporate frontend dto expects departmentId as string which maps to departmentDegreeId in backend
       degreeId: undefined, // Not used in registration directly, inferred via DepartmentDegree
       currentYear: isCollege ? String(currentYear) : undefined,
-      currentRole: this.getValue(rawData, ['CurrentRole', 'current_role', 'Current Role', 'currentRole']) || undefined,
-      roleDescription: this.getValue(rawData, ['RoleDescription', 'role_description', 'Role Description', 'roleDescription']) || undefined,
+      currentRole:
+        this.getValue(rawData, [
+          'CurrentRole',
+          'current_role',
+          'Current Role',
+          'currentRole',
+        ]) || undefined,
+      roleDescription:
+        this.getValue(rawData, [
+          'RoleDescription',
+          'role_description',
+          'Role Description',
+          'roleDescription',
+        ]) || undefined,
 
       password:
         this.getValue(rawData, ['Password', 'password']) || 'Welcome@123',
@@ -1228,7 +1279,13 @@ export class BulkCorporateRegistrationsService {
     }
 
     // Group Matching Logic
-    const groupNameInput = this.getValue(rawData, ['GroupName', 'group_name', 'Corporate', 'corporate', 'Group']);
+    const groupNameInput = this.getValue(rawData, [
+      'GroupName',
+      'group_name',
+      'Corporate',
+      'corporate',
+      'Group',
+    ]);
     if (!groupNameInput) {
       rowEntity.status = 'INVALID';
       rowEntity.errorMessage = 'Group Name/Corporate is required';
@@ -1332,14 +1389,16 @@ export class BulkCorporateRegistrationsService {
           row['school_stream'] ||
           ''
         ).toLowerCase();
-        const validStreams = ['science', 'commerce', 'humanities'];
+        const validStreams = ['science', 'pcmb', 'pcb', 'pcm', 'pcbz', 'commerce', 'humanities'];
         if (!stream) return 'Stream is required for HSC students';
         if (!validStreams.includes(stream))
-          return 'Stream must be Science, Commerce, or Humanities for HSC';
+          return 'Stream must be PCMB, PCB, PCM, PCBZ, Science, Commerce, or Humanities for HSC';
       }
     } else if (isCollege) {
-      const deptName = row['DepartmentId'] || row['department_degree'] || row['department'];
-      const degreeName = row['DegreeId'] || row['degree_name'] || row['degree'] || row['Degree'];
+      const deptName =
+        row['DepartmentId'] || row['department_degree'] || row['department'];
+      const degreeName =
+        row['DegreeId'] || row['degree_name'] || row['degree'] || row['Degree'];
       const currentYear = row['CurrentYear'] || row['current_year'];
 
       if (!deptName) return 'Department is required for College students';
@@ -1362,8 +1421,16 @@ export class BulkCorporateRegistrationsService {
       }
     } else {
       // Employee / Corporate Program
-      const role = row['CurrentRole'] || row['current_role'] || row['Current Role'] || row['currentRole'];
-      const desc = row['RoleDescription'] || row['role_description'] || row['Role Description'] || row['roleDescription'];
+      const role =
+        row['CurrentRole'] ||
+        row['current_role'] ||
+        row['Current Role'] ||
+        row['currentRole'];
+      const desc =
+        row['RoleDescription'] ||
+        row['role_description'] ||
+        row['Role Description'] ||
+        row['roleDescription'];
 
       if (!role) return 'Current Role is required for Employee programs';
       if (!desc) return 'Role Description is required for Employee programs';
@@ -1397,7 +1464,9 @@ export class BulkCorporateRegistrationsService {
     const existingByMobile = userMapByMobile.get(inputMobile);
 
     if (existingByEmail) {
-      const dbMobile = this.normalizeMobile(existingByEmail.metadata?.mobile || '');
+      const dbMobile = this.normalizeMobile(
+        existingByEmail.metadata?.mobile || '',
+      );
       if (dbMobile !== inputMobile) {
         return `Email '${email}' already exists with a different mobile number`;
       }
@@ -1427,7 +1496,8 @@ export class BulkCorporateRegistrationsService {
 
     // Internal File Dupes
     if (seenEmails.has(emailNorm)) return `Duplicate Email in file: ${email}`;
-    if (seenMobiles.has(inputMobile)) return `Duplicate Mobile in file: ${mobile}`;
+    if (seenMobiles.has(inputMobile))
+      return `Duplicate Mobile in file: ${mobile}`;
 
     seenEmails.add(emailNorm);
     seenMobiles.add(inputMobile);
