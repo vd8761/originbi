@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 import * as crypto from 'crypto';
 import { SchoolReport } from '../reports/school/schoolReport';
+import { SchoolShortReport } from '../reports/school/schoolShortReport';
 import { CollegeReport } from '../reports/college/collegeReport';
 import { EmployeeReport } from '../reports/employee/employeeReport';
 import { CxoReport } from '../reports/cxo/cxoReport';
@@ -89,9 +90,10 @@ async function getReportPasswordSettings(): Promise<{
 export async function generateReportForUser(
   user: MergedReportData,
   filePath: string,
+  short: boolean = false,
 ): Promise<string> {
   logger.info(
-    `[ReportFactory] Generating Type ${user.program_type} for ${user.full_name}`,
+    `[ReportFactory] Generating Type ${user.program_type}${short ? ' (SHORT)' : ''} for ${user.full_name}`,
   );
 
   // 1. Fetch password settings from DB
@@ -158,23 +160,57 @@ export async function generateReportForUser(
   );
 
   switch (user.program_type) {
-    case ProgramType.SCHOOL:
-      await new SchoolReport(
-        user as unknown as SchoolData,
-        pdfOptions,
-      ).generate(filePath);
+    case ProgramType.SCHOOL: {
+      const schoolUser = user as unknown as SchoolData;
+      if (short) {
+        // Select short-report variant by school level / board.
+        // Currently only SSLC is implemented; HSC/GCSE fall through to
+        // the same class with a variant flag (placeholder for now).
+        const isGCSE =
+          schoolUser.student_board?.toUpperCase() === 'IGCSE' ||
+          schoolUser.student_board?.toUpperCase() === 'IGSCE' ||
+          schoolUser.group_name?.toUpperCase() === 'IGCSE' ||
+          schoolUser.dept_code?.toUpperCase() === 'IGCSE';
+
+        const variant: 'SSLC' | 'HSC' | 'GCSE' = isGCSE
+          ? 'GCSE'
+          : schoolUser.school_level_id === 1
+            ? 'SSLC'
+            : 'HSC';
+
+        await new SchoolShortReport(schoolUser, pdfOptions, variant).generate(
+          filePath,
+        );
+      } else {
+        await new SchoolReport(schoolUser, pdfOptions).generate(filePath);
+      }
       break;
+    }
     case ProgramType.COLLEGE:
-      await new CollegeReport(
-        user as unknown as CollegeData,
-        pdfOptions,
-      ).generate(filePath);
+      if (short) {
+        await new CollegeShortReport(
+          user as unknown as CollegeData,
+          pdfOptions,
+        ).generate(filePath);
+      } else {
+        await new CollegeReport(
+          user as unknown as CollegeData,
+          pdfOptions,
+        ).generate(filePath);
+      }
       break;
     case ProgramType.EMPLOYEE:
-      await new EmployeeReport(
-        user as unknown as EmployeeData,
-        pdfOptions,
-      ).generate(filePath);
+      if (short) {
+        await new EmployeeShortReport(
+          user as unknown as EmployeeData,
+          pdfOptions,
+        ).generate(filePath);
+      } else {
+        await new EmployeeReport(
+          user as unknown as EmployeeData,
+          pdfOptions,
+        ).generate(filePath);
+      }
       break;
     case ProgramType.CXO:
       await new CxoReport(user as unknown as CxoData, pdfOptions).generate(
@@ -189,41 +225,6 @@ export async function generateReportForUser(
   }
 
   return userPassword;
-}
-
-/**
- * Factory Function: generateShortReportForUser
- * ---------------------------------------------
- * Instantiates and generates the appropriate SHORT PDF report
- * based on the user's `program_type`.
- */
-export async function generateShortReportForUser(
-  user: MergedReportData,
-  filePath: string,
-): Promise<void> {
-  logger.info(
-    `[ReportFactory] Building SHORT PDF for program_type ${user.program_type}`,
-  );
-
-  switch (user.program_type) {
-    case ProgramType.COLLEGE:
-      await new CollegeShortReport(user as unknown as CollegeData).generate(
-        filePath,
-      );
-      break;
-    case ProgramType.EMPLOYEE:
-      await new EmployeeShortReport(user as unknown as EmployeeData).generate(
-        filePath,
-      );
-      break;
-    default:
-      logger.error(
-        `[ReportFactory] Short report not supported for program_type: ${user.program_type}`,
-      );
-      throw new Error(
-        `Short report not supported for program_type: ${user.program_type}`,
-      );
-  }
 }
 
 /**

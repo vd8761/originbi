@@ -70,7 +70,7 @@ export class EmployeeShortReport extends BaseReport {
     const department = this.data.group_name || 'N/A';
 
     // Title
-    this.h1('Origin BI - Employee Short Discovery Report', {
+    this.h1('Origin BI - Report Snapshot', {
       fontSize: 18,
       align: 'center',
       color: this.COLOR_DEEP_BLUE,
