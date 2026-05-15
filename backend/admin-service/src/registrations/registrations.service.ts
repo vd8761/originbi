@@ -331,6 +331,7 @@ export class RegistrationsService {
             departmentId: dto.departmentId ?? null,
             studentBoard: dto.studentBoard,
           },
+          isTechAssessment: (dto.is_tech_assessment ?? 0) as any,
         });
         await manager.save(registration);
 
@@ -659,6 +660,14 @@ export class RegistrationsService {
           'dd.degreeTypeId = deg.id',
         )
         .where('r.isDeleted = false');
+      
+      if (tab === 'tech') {
+        qb.andWhere('r.isTechAssessment IN (1, 2)');
+      } else if (tab === 'both') {
+        qb.andWhere('r.isTechAssessment = 2');
+      } else {
+        qb.andWhere('r.isTechAssessment IN (0, 2)');
+      }
 
       if (search) {
         const s = `%${search.toLowerCase()}%`;
@@ -825,7 +834,7 @@ export class RegistrationsService {
         `SELECT r.has_ai_counsellor
          FROM registrations r
          JOIN users u ON r.user_id = u.id
-         WHERE LOWER(u.email) = LOWER($1) AND r.is_deleted = false
+         WHERE LOWER(u.email) = LOWER($1) AND r.is_deleted = false AND r.is_tech_assessment IN (0, 2)
          ORDER BY r.created_at DESC LIMIT 1`,
         [email],
       );

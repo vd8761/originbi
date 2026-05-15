@@ -102,5 +102,8 @@ export class CreateRegistrationDto {
   @Matches(/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/, {
     message: 'Password must contain at least one special character',
   })
+  @IsOptional()
+  is_tech_assessment?: number;
+
   password: string;
 }

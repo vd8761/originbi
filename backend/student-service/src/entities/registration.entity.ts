@@ -57,6 +57,9 @@ export class Registration {
   @Column({ name: 'is_deleted', default: false })
   isDeleted: boolean;
 
+  @Column({ name: 'is_tech_assessment', type: 'smallint', default: 0 })
+  isTechAssessment: number;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

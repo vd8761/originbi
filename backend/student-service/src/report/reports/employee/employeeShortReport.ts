@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unused-vars, @typescript-eslint/require-await, @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import * as fs from 'fs';
 import { COLORS, EmployeeData } from '../../types/types';
 import {
@@ -6,9 +6,7 @@ import {
   FutureOutlookData,
   FutureOutlookOptions,
 } from '../BaseReport';
-import {
-  EMPLOYEE_CONTENT,
-} from './employeeConstants';
+import { EMPLOYEE_CONTENT } from './employeeConstants';
 import {
   getCareerGuidanceByTrait,
   CareerRoleData,
@@ -53,13 +51,13 @@ export class EmployeeShortReport extends BaseReport {
     // Set page properties for single page
     this._currentBackground = 'public/assets/images/Watermark_Background.jpg';
     this._useStdMargins = true;
-    
+
     // Add header with basic info
     this.generateShortHeader();
-    
+
     // Generate employee-specific content
     this.generateEmployeeShortContent();
-    
+
     // Add footer
     this.addShortFooter();
   }
@@ -70,15 +68,15 @@ export class EmployeeShortReport extends BaseReport {
   private generateShortHeader(): void {
     const fullName = this.data.full_name || 'Employee';
     const department = this.data.group_name || 'N/A';
-    
+
     // Title
-    this.h1('Origin BI - Employee Short Discovery Report', {
+    this.h1('Origin BI - Report Snapshot', {
       fontSize: 18,
       align: 'center',
       color: this.COLOR_DEEP_BLUE,
       gap: 10,
     });
-    
+
     // Employee info
     this.p(`Name: ${fullName} | Department: ${department}`, {
       fontSize: 12,
@@ -86,7 +84,7 @@ export class EmployeeShortReport extends BaseReport {
       color: this.COLOR_BLACK,
       gap: 15,
     });
-    
+
     // Add separator line
     this.drawSeparatorLine();
   }
@@ -97,16 +95,16 @@ export class EmployeeShortReport extends BaseReport {
   private generateEmployeeShortContent(): void {
     // Top traits summary
     this.generateTopTraitsSummary();
-    
+
     // Key strengths (top 3)
     this.generateKeyStrengths();
-    
+
     // ACI Score
     this.generateACIScore();
-    
+
     // Career advancement suggestions (top 3)
     this.generateCareerAdvancementSuggestions();
-    
+
     // Leadership potential
     this.generateLeadershipPotential();
   }
@@ -120,10 +118,13 @@ export class EmployeeShortReport extends BaseReport {
       color: this.COLOR_DEEP_BLUE,
       gap: 8,
     });
-    
-    const traits = this.getTopTwoTraits(this.data.most_answered_answer_type, this.data);
+
+    const traits = this.getTopTwoTraits(
+      this.data.most_answered_answer_type,
+      this.data,
+    );
     const traitText = traits.join(' & ');
-    
+
     this.p(`Primary Traits: ${traitText}`, {
       fontSize: 11,
       color: this.COLOR_BLACK,
@@ -140,10 +141,10 @@ export class EmployeeShortReport extends BaseReport {
       color: this.COLOR_DEEP_BLUE,
       gap: 8,
     });
-    
+
     // Get top 3 strengths based on trait scores
     const strengths = this.getTopStrengths();
-    
+
     strengths.forEach((strength, index) => {
       this.p(`${index + 1}. ${strength}`, {
         fontSize: 10,
@@ -151,7 +152,7 @@ export class EmployeeShortReport extends BaseReport {
         gap: 4,
       });
     });
-    
+
     this.ensureSpace(0.05);
   }
 
@@ -164,10 +165,10 @@ export class EmployeeShortReport extends BaseReport {
       color: this.COLOR_DEEP_BLUE,
       gap: 8,
     });
-    
+
     const aciScore = this.calculateACIScore();
     const aciLevel = this.getACILevel(aciScore);
-    
+
     this.p(`Score: ${aciScore}/100 (${aciLevel})`, {
       fontSize: 11,
       color: this.COLOR_BLACK,
@@ -184,9 +185,9 @@ export class EmployeeShortReport extends BaseReport {
       color: this.COLOR_DEEP_BLUE,
       gap: 8,
     });
-    
+
     const careers = this.getTopCareerPaths();
-    
+
     careers.forEach((career, index) => {
       this.p(`${index + 1}. ${career}`, {
         fontSize: 10,
@@ -194,7 +195,7 @@ export class EmployeeShortReport extends BaseReport {
         gap: 4,
       });
     });
-    
+
     this.ensureSpace(0.05);
   }
 
@@ -207,15 +208,15 @@ export class EmployeeShortReport extends BaseReport {
       color: this.COLOR_DEEP_BLUE,
       gap: 8,
     });
-    
+
     const leadership = this.getLeadershipAssessment();
-    
+
     this.p(`Leadership Style: ${leadership.style}`, {
       fontSize: 10,
       color: this.COLOR_BLACK,
       gap: 4,
     });
-    
+
     this.p(`Development Focus: ${leadership.focus}`, {
       fontSize: 10,
       color: this.COLOR_BLACK,
@@ -240,7 +241,8 @@ export class EmployeeShortReport extends BaseReport {
    */
   private drawSeparatorLine(): void {
     const y = this.doc.y;
-    this.doc.moveTo(50, y)
+    this.doc
+      .moveTo(50, y)
       .lineTo(this.doc.page.width - 50, y)
       .lineWidth(0.5)
       .stroke(this.COLOR_BLACK);
@@ -248,8 +250,11 @@ export class EmployeeShortReport extends BaseReport {
   }
 
   // Helper methods for data extraction
-  
-  protected getTopTwoTraits(mostAnswered: { ANSWER_TYPE: string; COUNT: number }[], scores: EmployeeData): [string, string] {
+
+  protected getTopTwoTraits(
+    mostAnswered: { ANSWER_TYPE: string; COUNT: number }[],
+    scores: EmployeeData,
+  ): [string, string] {
     // Implementation to get top two traits
     // This would be similar to the existing logic in employeeReport.ts
     return ['Strategic', 'Innovative']; // Placeholder
@@ -281,7 +286,7 @@ export class EmployeeShortReport extends BaseReport {
     // Implementation to assess leadership potential
     return {
       style: 'Transformational Leader',
-      focus: 'Strategic Planning & Team Development'
+      focus: 'Strategic Planning & Team Development',
     }; // Placeholder
   }
 }

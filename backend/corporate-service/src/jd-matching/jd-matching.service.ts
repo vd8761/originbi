@@ -753,6 +753,7 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
       LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
       LEFT JOIN groups g ON r.group_id = g.id
       WHERE r.is_deleted = false
+        AND r.is_tech_assessment IN (0, 2)
         AND r.corporate_account_id = $1
         ${groupFilter}
       ORDER BY aa.total_score DESC NULLS LAST

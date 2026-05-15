@@ -113,4 +113,7 @@ export class CreateRegistrationDto {
 
   @IsOptional()
   metadata?: any;
+
+  @IsOptional()
+  is_tech_assessment?: number;
 }

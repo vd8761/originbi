@@ -10,7 +10,7 @@ import {
 } from '../helpers/groupReportHelper';
 import { MergedReportData } from '../types/types';
 import { getPlacementDetails } from '../helpers/sqlHelper';
-import { generateReportForUser, generateShortReportForUser } from '../helpers/reportFactory';
+import { generateReportForUser } from '../helpers/reportFactory';
 import { PlacementReport } from '../reports/placement/placementReport';
 import { logger } from '../helpers/logger';
 
@@ -396,14 +396,18 @@ export const reportQueueService = {
   // ============================================================================
   // WORKER 4: SINGLE STUDENT REPORT (Single PDF Generation)
   // ============================================================================
-  async processSingleUserReport(userId: string, jobId: string) {
+  async processSingleUserReport(
+    userId: string,
+    jobId: string,
+    short: boolean = false,
+  ) {
     logger.info(`=================================================`);
     const jobDir = path.join(TEMP_DIR, jobId);
 
     try {
       jobStore.set(jobId, {
         status: 'PROCESSING',
-        progress: 'Fetching Student Data...',
+        progress: 'Fetching user data...',
       });
 
       // Ensure clean directory
@@ -421,7 +425,7 @@ export const reportQueueService = {
       if (!groupData || groupData.length === 0) {
         jobStore.set(jobId, {
           status: 'ERROR',
-          error: 'No completed assessment found for this student.',
+          error: 'No completed assessment found for this user.',
         });
         return;
       }
@@ -448,13 +452,15 @@ export const reportQueueService = {
         .replace(/_+/g, '_')
         .replace(/^_|_$/g, '');
 
-      // Naming convention: <full_name>_<report_number>.pdf
-      const fileName = `${formattedName}_${formattedReportNo}.pdf`;
+      // Naming convention: <full_name>_<report_number>[_short].pdf
+      const fileName = `${formattedName}_${formattedReportNo}${short ? '_short' : ''}.pdf`;
       const filePath = path.join(jobDir, fileName);
 
-      logger.info(`[JOB:${jobId}] Generating ${fileName}...`);
+      logger.info(
+        `[JOB:${jobId}] Generating ${fileName}${short ? ' (SHORT)' : ''}...`,
+      );
 
-      const password = await generateReportForUser(user, filePath);
+      const password = await generateReportForUser(user, filePath, short);
 
       // Complete
       logger.info(`[JOB:${jobId}] PDF Created.`);
@@ -462,79 +468,6 @@ export const reportQueueService = {
         status: 'COMPLETED',
         filePath: filePath, // Store as single file path
         password: password,
-      });
-      scheduleCleanup(jobId, [jobDir]);
-    } catch (error) {
-      console.error(`[Report service]`, `[JOB:${jobId}] Failed:`, error);
-      jobStore.set(jobId, {
-        status: 'ERROR',
-        error: (error as Error).message,
-      });
-      scheduleCleanup(jobId, [jobDir]);
-    }
-  },
-
-  // ============================================================================
-  // WORKER 5: SINGLE STUDENT SHORT REPORT (Single PDF Generation)
-  // ============================================================================
-  async processSingleUserShortReport(userId: string, jobId: string) {
-    logger.info(`=================================================`);
-    const jobDir = path.join(TEMP_DIR, jobId);
-
-    try {
-      jobStore.set(jobId, {
-        status: 'PROCESSING',
-        progress: 'Fetching user data...',
-      });
-
-      // Ensure clean directory
-      if (!fs.existsSync(jobDir)) {
-        fs.mkdirSync(jobDir, { recursive: true });
-      }
-
-      logger.info(`[JOB:${jobId}] Fetching data for user ${userId} (short report)...`);
-
-      // Reuse existing fetchUserAssessmentData which takes array
-      const groupData: MergedReportData[] = await fetchUserAssessmentData([
-        userId,
-      ]);
-
-      if (!groupData || groupData.length === 0) {
-        jobStore.set(jobId, {
-          status: 'ERROR',
-          error: 'No assessment data found for this user.',
-        });
-        return;
-      }
-
-      const user = groupData[0];
-
-      jobStore.set(jobId, {
-        status: 'PROCESSING',
-        progress: 'Generating Short PDF...',
-      });
-
-      // Naming convention: <full_name>_Short.pdf
-      const safeName = user.full_name
-        .replace(/[^a-zA-Z0-9 ]/g, '_')
-        .trim()
-        .replace(/\s+/g, '_');
-      const formattedReportNo = (user.exam_ref_no || '')
-        .replace(/[^a-zA-Z0-9]+/g, '_')
-        .replace(/_+/g, '_')
-        .replace(/^_|_$/g, '');
-      const fileName = `${safeName}_${formattedReportNo}_Short.pdf`;
-      const filePath = path.join(jobDir, fileName);
-
-      logger.info(`[JOB:${jobId}] Generating ${fileName}...`);
-
-      await generateShortReportForUser(user, filePath);
-
-      // Complete
-      logger.info(`[JOB:${jobId}] Short PDF Created.`);
-      jobStore.set(jobId, {
-        status: 'COMPLETED',
-        filePath: filePath,
       });
       scheduleCleanup(jobId, [jobDir]);
     } catch (error) {
