@@ -202,9 +202,14 @@ export class CognitoService {
         const groupsRes = await this.cognitoClient.send(groupsCommand);
         const groups = groupsRes.Groups?.map((g) => g.GroupName) || [];
 
-        if (!groups.includes(requiredGroup)) {
-          throw new InternalServerErrorException(
-            `Access denied. User is not part of group '${requiredGroup}'.`,
+        const isAllowed = requiredGroup === 'ADMIN'
+          ? (groups.includes('ADMIN') || groups.includes('STUDENT'))
+          : groups.includes(requiredGroup);
+
+        if (!isAllowed) {
+          throw new HttpException(
+            'Access denied. You do not have permission to access the admin portal.',
+            HttpStatus.FORBIDDEN,
           );
         }
       }
@@ -221,6 +226,17 @@ export class CognitoService {
         name: error?.name,
         message: error?.message,
       });
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      if (error?.name === 'NotAuthorizedException' || error?.name === 'UserNotFoundException') {
+        throw new HttpException(
+          'Incorrect username or password.',
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
 
       throw new InternalServerErrorException(
         `Login failed: ${error?.message || 'Unknown error'}`,
