@@ -231,6 +231,13 @@ export class CognitoService {
         throw error;
       }
 
+      if (error?.name === 'NotAuthorizedException' || error?.name === 'UserNotFoundException') {
+        throw new HttpException(
+          'Incorrect username or password.',
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+
       throw new InternalServerErrorException(
         `Login failed: ${error?.message || 'Unknown error'}`,
       );
