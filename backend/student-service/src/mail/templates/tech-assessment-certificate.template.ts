@@ -205,7 +205,6 @@ export const getTechCertificateDomainPhrase = (
   assessmentModule: string,
   assessmentTitle: string,
   overallScorePercent: number,
-  grade: string,
 ): string => {
   const performance =
     overallScorePercent >= 70
