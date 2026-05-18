@@ -128,14 +128,22 @@ export class StudentService {
     } as any);
   }
 
-  private async createCognitoUser(email: string, password: string) {
+  private async createCognitoUser(
+    email: string,
+    password: string,
+    role?: string,
+  ) {
     const authServiceUrl =
       process.env.AUTH_SERVICE_URL || 'http://localhost:4000'; // Default or Env
     try {
       const res = await firstValueFrom(
         this.httpService.post(
           `${authServiceUrl}/internal/cognito/users`,
-          { email, password },
+          {
+            email,
+            password,
+            groupName: role || 'STUDENT',
+          },
           { proxy: false },
         ),
       );
@@ -246,7 +254,10 @@ export class StudentService {
 
     if (incompleteSession) {
       const isTech = await this.registrationRepo.findOne({
-        where: { id: incompleteSession.registrationId, isTechAssessment: In([1, 2]) },
+        where: {
+          id: incompleteSession.registrationId,
+          isTechAssessment: In([1, 2]),
+        },
       });
       if (isTech) {
         incompleteSession = null;
@@ -765,6 +776,7 @@ export class StudentService {
         const cognitoRes = await this.createCognitoUser(
           dto.email,
           dto.password,
+          dto.role,
         );
         cognitoSub = cognitoRes.sub || '';
       } catch (e) {
@@ -783,7 +795,7 @@ export class StudentService {
 
       user = this.userRepo.create({
         email: dto.email,
-        role: 'STUDENT',
+        role: dto.role || 'STUDENT',
         // cognitoSub: cognitoSub, // If User entity has this field. It doesn't seem to have it in the file view I saw earlier.
         // I checked student.entity.ts earlier and it didn't have cognitoSub column explicitly shown in `Showing lines 1 to 38`.
         // Let's check if I missed it.
@@ -1101,7 +1113,8 @@ export class StudentService {
             programTitle,
             savedReg.metadata?.debrief === true ||
               savedReg.metadata?.debrief === 'true',
-            (savedReg.isTechAssessment as any) === 1 || (savedReg.isTechAssessment as any) === 2,
+            (savedReg.isTechAssessment as any) === 1 ||
+              (savedReg.isTechAssessment as any) === 2,
           );
           this.logger.log(`Welcome email sent successfully to ${dto.email}`);
         } catch (emailErr) {
@@ -1154,6 +1167,7 @@ export class StudentService {
         const cognitoRes = await this.createCognitoUser(
           dto.email,
           dto.password,
+          dto.role,
         );
         cognitoSub = cognitoRes.sub || '';
       } catch (e) {
@@ -1164,7 +1178,7 @@ export class StudentService {
       // 3. Create User Entity
       user = this.userRepo.create({
         email: dto.email,
-        role: 'STUDENT',
+        role: dto.role || 'STUDENT',
         metadata: {
           fullName: dto.full_name,
           mobileNumber: dto.mobile_number,
@@ -1223,61 +1237,13 @@ export class StudentService {
         registration,
       );
 
-      // 6. Create Assessment Session with Schedule
-      const now = new Date();
-      const validFrom = new Date(now.getTime() + 5 * 60000); // +5 mins
-      const validTo = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // +7 days
-
-      const session = this.sessionRepo.create({
-        userId: user.id,
-        registrationId: savedReg.id,
-        programId: program.id,
-        status: 'NOT_STARTED',
-        validFrom: validFrom,
-        validTo: validTo,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-      const savedSession = await this.sessionRepo.save(session);
-
-      // 7. Create Attempts (Level 1 Mandated)
-      const levels = await this.levelRepo.find({
-        where: { isMandatory: true },
-        order: { levelNumber: 'ASC' },
-      });
-
-      for (const level of levels) {
-        const attempt = this.attemptRepo.create({
-          assessmentSessionId: savedSession.id,
-          assessmentLevelId: level.id,
-          userId: user.id,
-          registrationId: savedReg.id,
-          programId: program.id,
-          status: 'NOT_STARTED',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-        const savedAttempt = await this.attemptRepo.save(attempt);
-
-        if (level.levelNumber === 1 || level.name.includes('Level 1')) {
-          await this.generateQuestionsForAttempt(
-            savedAttempt,
-            user,
-            savedReg,
-            level,
-          );
-        }
-      }
-
-      // Send Welcome Email
+      // 6. Send Welcome Email (Skip main application assessment scheduling as we only want tech assessment)
       const shouldSendEmail =
         savedReg.metadata?.sendEmail === true ||
         savedReg.metadata?.sendEmail === 'true';
 
       if (shouldSendEmail) {
-        const validFrom = session.validFrom
-          ? new Date(session.validFrom)
-          : new Date();
+        const validFrom = new Date();
         const programTitle = program.assessmentTitle || program.name;
 
         try {
@@ -1292,7 +1258,8 @@ export class StudentService {
             programTitle,
             savedReg.metadata?.debrief === true ||
               savedReg.metadata?.debrief === 'true',
-            (savedReg.isTechAssessment as any) === 1 || (savedReg.isTechAssessment as any) === 2,
+            (savedReg.isTechAssessment as any) === 1 ||
+              (savedReg.isTechAssessment as any) === 2,
           );
           this.logger.log(
             `Tech welcome email sent successfully to ${dto.email}`,
