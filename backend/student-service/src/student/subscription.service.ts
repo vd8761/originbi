@@ -419,7 +419,7 @@ export class SubscriptionService {
         meta.debriefTeamEmailSent = true;
 
         await this.registrationRepo.update(registrationId, {
-          metadata: meta,
+          metadata: meta as Record<string, unknown>,
         });
       }
     } catch (err: unknown) {
