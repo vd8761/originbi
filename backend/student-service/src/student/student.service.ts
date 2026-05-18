@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+﻿﻿/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 import { Injectable, ConsoleLogger, BadRequestException } from '@nestjs/common';
@@ -35,6 +35,7 @@ import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
 import { getTechWelcomeEmailTemplate } from '../mail/templates/tech-welcome.template';
+import { getTechAssessmentCertificateTemplate } from '../mail/templates/tech-assessment-certificate.template';
 
 import { getDebriefTeamNotificationEmailTemplate } from '../mail/templates/debrief-team-notification.template';
 import { SettingsService } from '../settings/settings.service';
@@ -1831,7 +1832,7 @@ export class StudentService {
 
   /**
    * Sends an SMS when WhatsApp was skipped (disabled) or failed. No-op if
-   * the per-template SMS toggle is off. Errors are swallowed — SMS is a
+   * the per-template SMS toggle is off. Errors are swallowed â€” SMS is a
    * best-effort fallback.
    */
   private async trySmsFallback(
@@ -1991,7 +1992,7 @@ export class StudentService {
         return;
       }
 
-      // Fire Completion WhatsApp (fire-and-forget) — before report generation
+      // Fire Completion WhatsApp (fire-and-forget) â€” before report generation
       this.fireCompletionWhatsapp(registration).catch((err) =>
         this.logger.error(
           `Completion WhatsApp failed for user ${userId}: ${err.message}`,
@@ -2603,8 +2604,8 @@ export class StudentService {
       const transporter = this.createEmailTransporter();
 
       const subject = isThirdParty
-        ? `${registration.fullName || 'Student'}'s Assessment Report – ${reportTitle}`
-        : `Your Assessment Report – ${reportTitle}`;
+        ? `${registration.fullName || 'Student'}'s Assessment Report â€“ ${reportTitle}`
+        : `Your Assessment Report â€“ ${reportTitle}`;
 
       const {
         fromName,
@@ -2701,7 +2702,7 @@ export class StudentService {
         from: `"${fromName}" <${fromEmail}>`,
         to: toEmail,
         cc: ccAddresses,
-        subject: `Students Handbook – ${degreeType} ${departmentName}`,
+        subject: `Students Handbook â€“ ${degreeType} ${departmentName}`,
         html: emailHtml,
         attachments: [
           {
@@ -2780,4 +2781,141 @@ export class StudentService {
       );
     }
   }
+  // --- Tech Assessment Certificate Email --------------------------------------
+
+  /**
+   * Sends a certificate email after a tech assessment is completed.
+   * Called via internal HTTP from assessment-service.
+   * Uses the existing AWS SES v2 transporter + tech-assessment-certificate template.
+   */
+  async sendTechCertificateEmail(payload: {
+    toEmail: string;
+    userName: string;
+    assessmentTitle: string;
+    assessmentModule: string;
+    overallScorePercent: number;
+    grade: string;
+    certificateId: string;
+    completedAt: string;
+    verifyUrl?: string;
+  }): Promise<void> {
+    const {
+      toEmail,
+      userName,
+      assessmentTitle,
+      assessmentModule,
+      overallScorePercent,
+      grade,
+      certificateId,
+      completedAt,
+      verifyUrl: incomingVerifyUrl,
+    } = payload;
+
+    const transporter = this.createEmailTransporter();
+
+    const {
+      fromName,
+      fromAddress: fromEmail,
+      ccAddresses,
+      bccAddresses,
+      replyToAddress,
+    } = await this.settingsService.getEmailConfig('tech_certificate_email_config');
+
+    const fromAddress = `"${fromName}" <${fromEmail}>`;
+
+    const apiUrl = this.configService.get<string>('API_URL') || 'http://localhost:4004';
+    const techFrontendUrl =
+      this.configService.get<string>('TECH_FRONTEND_URL') ||
+      this.configService.get<string>('FRONTEND_URL') ||
+      'http://localhost:3000';
+
+    const assets = {
+      logo: `${apiUrl}/assets/logo-light.png`,
+      footer: `${apiUrl}/assets/Email_Vector.png`,
+    };
+
+    const verifyUrl = incomingVerifyUrl || `${techFrontendUrl}/verify/${certificateId}`;
+
+    const formattedDate = new Date(completedAt).toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
+    const gradeLabel = this.getTechGradeLabel(grade);
+    const moduleLabel = this.getTechModuleLabel(assessmentModule);
+
+    const emailHtml = getTechAssessmentCertificateTemplate(
+      userName,
+      assessmentTitle,
+      moduleLabel,
+      overallScorePercent,
+      grade,
+      gradeLabel,
+      certificateId,
+      formattedDate,
+      verifyUrl,
+      techFrontendUrl,
+      assets,
+    );
+
+    const subject = `You have successfully completed the ${assessmentTitle} - Your Certificate is Ready 🎉`;
+
+    const mailOptions: Record<string, any> = {
+      from: fromAddress,
+      to: toEmail,
+      subject,
+      html: emailHtml,
+    };
+
+    const ccEmail = ccAddresses.join(', ');
+    const bccEmail = bccAddresses.join(', ');
+    if (ccEmail) mailOptions.cc = ccEmail;
+    if (bccEmail) mailOptions.bcc = bccEmail;
+    if (replyToAddress) mailOptions.replyTo = replyToAddress;
+
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      this.logger.log(
+        `[TechCertEmail] Sent to ${toEmail} [${certificateId}]: ${JSON.stringify(info)}`,
+      );
+    } catch (err: any) {
+      this.logger.error(
+        `[TechCertEmail] Failed to send to ${toEmail}: ${err.message}`,
+        err.stack,
+      );
+      throw err;
+    }
+  }
+
+  private getTechGradeLabel(grade: string): string {
+    const map: Record<string, string> = {
+      'A+': 'Outstanding',
+      'A': 'Excellent',
+      'B+': 'Very Good',
+      'B': 'Good',
+      'C': 'Average',
+      'D': 'Below Average',
+      'F': 'Needs Improvement',
+    };
+    return map[grade] || grade;
+  }
+
+  private getTechModuleLabel(module: string): string {
+    if (module.startsWith('coding:')) {
+      const lang = module.slice('coding:'.length);
+      const name = lang.charAt(0).toUpperCase() + lang.slice(1);
+      return `${name} Coding Assessment`;
+    }
+    const map: Record<string, string> = {
+      aptitude: 'Technical Aptitude',
+      grammar: 'Communication Skills',
+      communication: 'Communication Skills',
+      mnc: 'MNC Readiness',
+      role: 'Role-Based Assessment',
+      coding: 'Coding Assessment',
+    };
+    return map[module] || module;
+  }
+
 }
