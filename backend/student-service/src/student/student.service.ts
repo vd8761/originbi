@@ -128,7 +128,11 @@ export class StudentService {
     } as any);
   }
 
-  private async createCognitoUser(email: string, password: string, role?: string) {
+  private async createCognitoUser(
+    email: string,
+    password: string,
+    role?: string,
+  ) {
     const authServiceUrl =
       process.env.AUTH_SERVICE_URL || 'http://localhost:4000'; // Default or Env
     try {
@@ -138,7 +142,7 @@ export class StudentService {
           {
             email,
             password,
-            groupName: 'STUDENT',
+            groupName: role || 'STUDENT',
           },
           { proxy: false },
         ),
@@ -250,7 +254,10 @@ export class StudentService {
 
     if (incompleteSession) {
       const isTech = await this.registrationRepo.findOne({
-        where: { id: incompleteSession.registrationId, isTechAssessment: In([1, 2]) },
+        where: {
+          id: incompleteSession.registrationId,
+          isTechAssessment: In([1, 2]),
+        },
       });
       if (isTech) {
         incompleteSession = null;
@@ -1106,7 +1113,8 @@ export class StudentService {
             programTitle,
             savedReg.metadata?.debrief === true ||
               savedReg.metadata?.debrief === 'true',
-            (savedReg.isTechAssessment as any) === 1 || (savedReg.isTechAssessment as any) === 2,
+            (savedReg.isTechAssessment as any) === 1 ||
+              (savedReg.isTechAssessment as any) === 2,
           );
           this.logger.log(`Welcome email sent successfully to ${dto.email}`);
         } catch (emailErr) {
@@ -1250,7 +1258,8 @@ export class StudentService {
             programTitle,
             savedReg.metadata?.debrief === true ||
               savedReg.metadata?.debrief === 'true',
-            (savedReg.isTechAssessment as any) === 1 || (savedReg.isTechAssessment as any) === 2,
+            (savedReg.isTechAssessment as any) === 1 ||
+              (savedReg.isTechAssessment as any) === 2,
           );
           this.logger.log(
             `Tech welcome email sent successfully to ${dto.email}`,
