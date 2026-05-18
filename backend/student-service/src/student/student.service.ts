@@ -1880,7 +1880,7 @@ export class StudentService {
     } = await this.settingsService.getEmailConfig('registration_email_config');
     const ccEmail = ccAddresses.join(', ');
     const bccEmail = bccAddresses.join(', ');
-    const fromAddress = `"${fromName}" <${fromEmail}>`;
+    const fromAddress = '"' + fromName + '" <' + fromEmail + '>';
 
     this.logger.log(`[Email Debug] Sending from: ${fromAddress}, to: ${to}`);
 
@@ -2821,7 +2821,7 @@ export class StudentService {
       replyToAddress,
     } = await this.settingsService.getEmailConfig('tech_certificate_email_config');
 
-    const fromAddress = `"${fromName}" <${fromEmail}>`;
+    const fromAddress = '"' + fromName + '" <' + fromEmail + '>';
 
     const apiUrl = this.configService.get<string>('API_URL') || 'http://localhost:4004';
     const techFrontendUrl =
