@@ -417,10 +417,8 @@ export class SubscriptionService {
       if (freshReg) {
         const meta = freshReg.metadata || {};
         meta.debriefTeamEmailSent = true;
-        // TypeORM deep-partial typing for `any` metadata requires an explicit cast.
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const updatePayload: Partial<Registration> = {
-          metadata: meta as Registration['metadata'],
+          metadata: meta as Registration['metadata'], // eslint-disable-line @typescript-eslint/no-unsafe-assignment
         };
 
         await this.registrationRepo.update(registrationId, updatePayload);
