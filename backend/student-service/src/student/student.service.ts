@@ -2819,11 +2819,14 @@ export class StudentService {
       ccAddresses,
       bccAddresses,
       replyToAddress,
-    } = await this.settingsService.getEmailConfig('tech_certificate_email_config');
+    } = await this.settingsService.getEmailConfig(
+      'tech_certificate_email_config',
+    );
 
     const fromAddress = '"' + fromName + '" <' + fromEmail + '>';
 
-    const apiUrl = this.configService.get<string>('API_URL') || 'http://localhost:4004';
+    const apiUrl =
+      this.configService.get<string>('API_URL') || 'http://localhost:4004';
     const techFrontendUrl =
       this.configService.get<string>('TECH_FRONTEND_URL') ||
       this.configService.get<string>('FRONTEND_URL') ||
@@ -2834,7 +2837,8 @@ export class StudentService {
       footer: `${apiUrl}/assets/Email_Vector.png`,
     };
 
-    const verifyUrl = incomingVerifyUrl || `${techFrontendUrl}/verify/${certificateId}`;
+    const verifyUrl =
+      incomingVerifyUrl || `${techFrontendUrl}/verify/${certificateId}`;
 
     const formattedDate = new Date(completedAt).toLocaleDateString('en-US', {
       month: 'long',
@@ -2891,12 +2895,12 @@ export class StudentService {
   private getTechGradeLabel(grade: string): string {
     const map: Record<string, string> = {
       'A+': 'Outstanding',
-      'A': 'Excellent',
+      A: 'Excellent',
       'B+': 'Very Good',
-      'B': 'Good',
-      'C': 'Average',
-      'D': 'Below Average',
-      'F': 'Needs Improvement',
+      B: 'Good',
+      C: 'Average',
+      D: 'Below Average',
+      F: 'Needs Improvement',
     };
     return map[grade] || grade;
   }
@@ -2917,5 +2921,4 @@ export class StudentService {
     };
     return map[module] || module;
   }
-
 }

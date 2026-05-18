@@ -243,5 +243,4 @@ export class StudentController {
     await this.studentService.sendTechCertificateEmail(body);
     return { success: true, message: 'Certificate email sent' };
   }
-
 }

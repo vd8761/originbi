@@ -233,5 +233,8 @@ export const getTechCertificateDomainPhrase = (
     return `You demonstrated ${performance} in the ${assessmentTitle}, validating your ${langName} programming skills, algorithmic thinking, and code quality. This assessment reflects your ability to design and implement solutions using ${langName} in a structured, time-bound environment.`;
   }
 
-  return phrases[assessmentModule] || `You demonstrated ${performance} in the ${assessmentTitle}. This certificate recognises your commitment to professional development and your ability to perform under structured evaluation conditions. Your result is now part of your OriginBI assessment profile.`;
+  return (
+    phrases[assessmentModule] ||
+    `You demonstrated ${performance} in the ${assessmentTitle}. This certificate recognises your commitment to professional development and your ability to perform under structured evaluation conditions. Your result is now part of your OriginBI assessment profile.`
+  );
 };
