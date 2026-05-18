@@ -1,4 +1,4 @@
-﻿﻿/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 import { Injectable, ConsoleLogger, BadRequestException } from '@nestjs/common';
@@ -1832,7 +1832,7 @@ export class StudentService {
 
   /**
    * Sends an SMS when WhatsApp was skipped (disabled) or failed. No-op if
-   * the per-template SMS toggle is off. Errors are swallowed â€” SMS is a
+   * the per-template SMS toggle is off. Errors are swallowed — SMS is a
    * best-effort fallback.
    */
   private async trySmsFallback(
@@ -1992,7 +1992,7 @@ export class StudentService {
         return;
       }
 
-      // Fire Completion WhatsApp (fire-and-forget) â€” before report generation
+      // Fire Completion WhatsApp (fire-and-forget) — before report generation
       this.fireCompletionWhatsapp(registration).catch((err) =>
         this.logger.error(
           `Completion WhatsApp failed for user ${userId}: ${err.message}`,
@@ -2604,8 +2604,8 @@ export class StudentService {
       const transporter = this.createEmailTransporter();
 
       const subject = isThirdParty
-        ? `${registration.fullName || 'Student'}'s Assessment Report â€“ ${reportTitle}`
-        : `Your Assessment Report â€“ ${reportTitle}`;
+        ? `${registration.fullName || 'Student'}'s Assessment Report – ${reportTitle}`
+        : `Your Assessment Report – ${reportTitle}`;
 
       const {
         fromName,
@@ -2702,7 +2702,7 @@ export class StudentService {
         from: `"${fromName}" <${fromEmail}>`,
         to: toEmail,
         cc: ccAddresses,
-        subject: `Students Handbook â€“ ${degreeType} ${departmentName}`,
+        subject: `Students Handbook – ${degreeType} ${departmentName}`,
         html: emailHtml,
         attachments: [
           {
@@ -2863,7 +2863,7 @@ export class StudentService {
       assets,
     );
 
-    const subject = `You have successfully completed the ${assessmentTitle} - Your Certificate is Ready 🎉`;
+    const subject = `You have successfully completed the ${assessmentTitle} - Your Certificate is Ready ??`;
 
     const mailOptions: Record<string, any> = {
       from: fromAddress,
