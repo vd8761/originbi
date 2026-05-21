@@ -35,6 +35,7 @@ import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
 import { getTechWelcomeEmailTemplate } from '../mail/templates/tech-welcome.template';
+import { getTechAssessmentCertificateTemplate } from '../mail/templates/tech-assessment-certificate.template';
 
 import { getDebriefTeamNotificationEmailTemplate } from '../mail/templates/debrief-team-notification.template';
 import { SettingsService } from '../settings/settings.service';
@@ -1205,7 +1206,7 @@ export class StudentService {
       // 5. Create Registration (FREE for Tech Assessment)
       const registration = this.sessionRepo.manager.create(Registration, {
         userId: user.id,
-        registrationSource: 'SELF',
+        registrationSource: dto.registration_source || 'SELF',
         fullName: dto.full_name,
         mobileNumber: dto.mobile_number,
         countryCode: dto.country_code ?? '+91',
@@ -1879,7 +1880,7 @@ export class StudentService {
     } = await this.settingsService.getEmailConfig('registration_email_config');
     const ccEmail = ccAddresses.join(', ');
     const bccEmail = bccAddresses.join(', ');
-    const fromAddress = `"${fromName}" <${fromEmail}>`;
+    const fromAddress = '"' + fromName + '" <' + fromEmail + '>';
 
     this.logger.log(`[Email Debug] Sending from: ${fromAddress}, to: ${to}`);
 
@@ -2779,5 +2780,145 @@ export class StudentService {
         err.message,
       );
     }
+  }
+  // --- Tech Assessment Certificate Email --------------------------------------
+
+  /**
+   * Sends a certificate email after a tech assessment is completed.
+   * Called via internal HTTP from assessment-service.
+   * Uses the existing AWS SES v2 transporter + tech-assessment-certificate template.
+   */
+  async sendTechCertificateEmail(payload: {
+    toEmail: string;
+    userName: string;
+    assessmentTitle: string;
+    assessmentModule: string;
+    overallScorePercent: number;
+    grade: string;
+    certificateId: string;
+    completedAt: string;
+    verifyUrl?: string;
+  }): Promise<void> {
+    const {
+      toEmail,
+      userName,
+      assessmentTitle,
+      assessmentModule,
+      overallScorePercent,
+      grade,
+      certificateId,
+      completedAt,
+      verifyUrl: incomingVerifyUrl,
+    } = payload;
+
+    const transporter = this.createEmailTransporter();
+
+    const {
+      fromName,
+      fromAddress: fromEmail,
+      ccAddresses,
+      bccAddresses,
+      replyToAddress,
+    } = await this.settingsService.getEmailConfig(
+      'tech_certificate_email_config',
+    );
+
+    const fromAddress = '"' + fromName + '" <' + fromEmail + '>';
+
+    const apiUrl =
+      this.configService.get<string>('API_URL') || 'http://localhost:4004';
+    const techFrontendUrl =
+      this.configService.get<string>('TECH_FRONTEND_URL') ||
+      this.configService.get<string>('FRONTEND_URL') ||
+      'http://localhost:3000';
+
+    const assets = {
+      logo: `${apiUrl}/assets/logo-light.png`,
+      footer: `${apiUrl}/assets/Email_Vector.png`,
+    };
+
+    const verifyUrl =
+      incomingVerifyUrl || `${techFrontendUrl}/verify/${certificateId}`;
+
+    const formattedDate = new Date(completedAt).toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
+    const gradeLabel = this.getTechGradeLabel(grade);
+    const moduleLabel = this.getTechModuleLabel(assessmentModule);
+
+    const emailHtml = getTechAssessmentCertificateTemplate(
+      userName,
+      assessmentTitle,
+      moduleLabel,
+      overallScorePercent,
+      grade,
+      gradeLabel,
+      certificateId,
+      formattedDate,
+      verifyUrl,
+      techFrontendUrl,
+      assets,
+    );
+
+    const subject = `You have successfully completed the ${assessmentTitle} - Your Certificate is Ready ??`;
+
+    const mailOptions: Record<string, any> = {
+      from: fromAddress,
+      to: toEmail,
+      subject,
+      html: emailHtml,
+    };
+
+    const ccEmail = ccAddresses.join(', ');
+    const bccEmail = bccAddresses.join(', ');
+    if (ccEmail) mailOptions.cc = ccEmail;
+    if (bccEmail) mailOptions.bcc = bccEmail;
+    if (replyToAddress) mailOptions.replyTo = replyToAddress;
+
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      this.logger.log(
+        `[TechCertEmail] Sent to ${toEmail} [${certificateId}]: ${JSON.stringify(info)}`,
+      );
+    } catch (err: any) {
+      this.logger.error(
+        `[TechCertEmail] Failed to send to ${toEmail}: ${err.message}`,
+        err.stack,
+      );
+      throw err;
+    }
+  }
+
+  private getTechGradeLabel(grade: string): string {
+    const map: Record<string, string> = {
+      'A+': 'Outstanding',
+      A: 'Excellent',
+      'B+': 'Very Good',
+      B: 'Good',
+      C: 'Average',
+      D: 'Below Average',
+      F: 'Needs Improvement',
+    };
+    return map[grade] || grade;
+  }
+
+  private getTechModuleLabel(module: string): string {
+    if (module.startsWith('coding:')) {
+      const lang = module.slice('coding:'.length);
+      const name = lang.charAt(0).toUpperCase() + lang.slice(1);
+      return `${name} Coding Assessment`;
+    }
+    const map: Record<string, string> = {
+      aptitude: 'Technical Aptitude',
+      grammar: 'Communication Skills',
+      communication: 'Communication Skills',
+      mnc: 'MNC Readiness',
+      role: 'Role-Based Assessment',
+      coding: 'Coding Assessment',
+    };
+    return map[module] || module;
   }
 }

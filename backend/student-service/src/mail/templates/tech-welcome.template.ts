@@ -105,7 +105,7 @@ export const getTechWelcomeEmailTemplate = (
                  <div style="font-size: 16px; color: #000000; margin-bottom: 20px; font-weight: 400;">Dear <strong style="font-weight: 700;">${name}</strong>,</div>
                  
                  <div style="font-size: 14px; line-height: 1.5; color: #000000; margin-bottom: 24px;">
-                   Thank you for registering with our **Technical Assessment Platform**! We're excited to have you. You can now login and explore our wide range of assessments.
+                   Thank you for registering with our <strong>Technical Assessment Platform</strong>! We're excited to have you. You can now login and explore our wide range of assessments.
                  </div>
 
                  <div style="color: #150089; font-size: 14px; margin-bottom: 16px; font-weight: 700;">Here are your access details:</div>
