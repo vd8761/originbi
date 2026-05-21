@@ -1205,7 +1205,7 @@ export class StudentService {
       // 5. Create Registration (FREE for Tech Assessment)
       const registration = this.sessionRepo.manager.create(Registration, {
         userId: user.id,
-        registrationSource: 'SELF',
+        registrationSource: dto.registration_source || 'SELF',
         fullName: dto.full_name,
         mobileNumber: dto.mobile_number,
         countryCode: dto.country_code ?? '+91',
