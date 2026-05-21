@@ -120,4 +120,8 @@ export class CreateRegistrationDto {
   @IsString()
   @IsOptional()
   role?: string;
+
+  @IsString()
+  @IsOptional()
+  registration_source?: string;
 }
