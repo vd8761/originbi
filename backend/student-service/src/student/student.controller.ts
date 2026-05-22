@@ -61,6 +61,21 @@ export class StudentController {
     return this.studentService.registerTechAssessment(dto);
   }
 
+  @Post('upgrade/info')
+  async getUpgradeInfo(@Body() body: { email: string }) {
+    return this.studentService.getUpgradeInfo(body.email);
+  }
+
+  @Post('upgrade/create-order')
+  async createUpgradeOrder(@Body() body: { email: string }) {
+    return this.studentService.createUpgradeOrder(body.email);
+  }
+
+  @Post('upgrade/verify-and-register')
+  async verifyUpgradeAndRegister(@Body() body: any) {
+    return this.studentService.verifyUpgradeAndRegister(body);
+  }
+
   @Post('validate-registration')
   async validateRegistration(
     @Body() dto: { email: string; mobile_number?: string },

@@ -192,5 +192,61 @@ export const studentService = {
             console.error("Verify debrief payment failed", error);
             throw error;
         }
+    },
+
+    async getUpgradeInfo(email: string) {
+        try {
+            const res = await fetch(`${API_URL}/student/upgrade/info`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email }),
+            });
+            if (!res.ok) return null;
+            return await res.json();
+        } catch (error) {
+            console.error("Failed to check upgrade info", error);
+            return null;
+        }
+    },
+
+    async createUpgradeOrder(email: string) {
+        try {
+            const res = await fetch(`${API_URL}/student/upgrade/create-order`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email }),
+            });
+            if (!res.ok) throw new Error("Failed to create upgrade order");
+            return await res.json();
+        } catch (error) {
+            console.error("Failed to create upgrade order", error);
+            throw error;
+        }
+    },
+
+    async verifyUpgradePayment(payload: {
+        email: string;
+        razorpay_order_id: string;
+        razorpay_payment_id: string;
+        razorpay_signature: string;
+        program_code: string;
+        school_level?: string;
+        school_stream?: string;
+        student_board?: string;
+        department_degree_id?: number;
+        current_year?: string;
+    }) {
+        try {
+            const res = await fetch(`${API_URL}/student/upgrade/verify-and-register`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            if (!res.ok) throw new Error("Upgrade payment verification failed");
+            return await res.json();
+        } catch (error) {
+            console.error("Verify upgrade payment failed", error);
+            throw error;
+        }
     }
 };
