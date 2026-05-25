@@ -237,6 +237,38 @@ export class StudentService {
       };
     }
 
+    // Find if user has a main app registration (isTechAssessment is 0 or 2)
+    const originBiRegistration = await this.registrationRepo.findOne({
+      where: {
+        userId: user.id,
+        isDeleted: false,
+        isTechAssessment: In([0, 2]),
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!originBiRegistration) {
+      const techOnlyRegistration = await this.registrationRepo.findOne({
+        where: {
+          userId: user.id,
+          isDeleted: false,
+          isTechAssessment: 1,
+        },
+      });
+
+      if (techOnlyRegistration) {
+        return {
+          redirectUrl: '/student/upgrade',
+          isAssessmentMode: false,
+          status: 'TECH_ONLY_UPGRADE_REQUIRED',
+          debug: {
+            step: 'Check Tech Assessment Flag',
+            result: 'User is tech-assessment-only, upgrade required',
+          },
+        };
+      }
+    }
+
     const incompleteStatuses = [
       'NOT_STARTED',
       'IN_PROGRESS',
@@ -753,6 +785,27 @@ export class StudentService {
       await this.userRepo.save(user);
       this.logger.log(`Updated hasChangedPassword metadata for user: ${email}`);
     }
+  }
+
+  async recordLogin(email: string, ip: string): Promise<void> {
+    const user = await this.userRepo.findOne({
+      where: { email: ILike(email) },
+    });
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    user.loginCount = (user.loginCount || 0) + 1;
+    if (!user.firstLoginAt) {
+      user.firstLoginAt = new Date();
+    }
+    user.lastLoginAt = new Date();
+    user.lastLoginIp = ip;
+
+    await this.userRepo.save(user);
+    this.logger.log(
+      `Recorded login audit for student user: ${email} from IP: ${ip}`,
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -2760,6 +2813,335 @@ export class StudentService {
       this.logger.error(
         `Failed to save level unlocked notification: ${err.message}`,
       );
+    }
+  }
+
+  async getUpgradeInfo(email: string) {
+    const user = await this.userRepo.findOne({
+      where: { email: ILike(email) },
+    });
+    if (!user) throw new BadRequestException('User not found');
+
+    const techReg = await this.registrationRepo.findOne({
+      where: { userId: user.id, isDeleted: false, isTechAssessment: 1 },
+      relations: ['program'],
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!techReg)
+      throw new BadRequestException('No tech assessment registration found');
+
+    const existingOriginBi = await this.registrationRepo.findOne({
+      where: {
+        userId: user.id,
+        isDeleted: false,
+        isTechAssessment: In([0, 2]),
+      },
+    });
+    if (existingOriginBi) {
+      return { alreadyUpgraded: true };
+    }
+
+    const programCode = techReg.program?.code || 'COLLEGE_STUDENT';
+    let amount = 999;
+    if (programCode === 'SCHOOL_STUDENT') amount = 749;
+    else if (programCode === 'EMPLOYEE') amount = 1499;
+
+    let departmentName = '';
+    if (techReg.departmentDegreeId) {
+      const row = await this.departmentDegreeRepo.findOne({
+        where: { id: String(techReg.departmentDegreeId) as any },
+        relations: ['department', 'degreeType'],
+      });
+      if (row) {
+        const degreeName = row.degreeType?.name || '';
+        const deptName = row.department?.name || '';
+        const fullName = `${degreeName} ${deptName}`.trim();
+        departmentName = this.normalizeDepartmentDisplayName(fullName);
+      }
+    }
+
+    return {
+      alreadyUpgraded: false,
+      user: {
+        email: user.email,
+        fullName: techReg.fullName,
+        mobileNumber: techReg.mobileNumber,
+        gender: techReg.gender,
+        countryCode: techReg.countryCode,
+      },
+      program: {
+        code: programCode,
+        name: techReg.program?.name || '',
+        assessmentTitle:
+          techReg.program?.assessmentTitle || techReg.program?.name || '',
+        description: techReg.program?.description || '',
+      },
+      details: {
+        schoolLevel: techReg.schoolLevel,
+        schoolStream: techReg.schoolStream,
+        studentBoard: techReg.studentBoard,
+        departmentDegreeId: techReg.departmentDegreeId,
+        departmentName,
+        currentYear:
+          techReg.metadata?.currentYear || techReg.metadata?.current_year || '',
+        currentRole:
+          techReg.metadata?.currentRole || techReg.metadata?.current_role || '',
+        roleDescription:
+          techReg.metadata?.roleDescription ||
+          techReg.metadata?.role_description ||
+          '',
+      },
+      amount,
+    };
+  }
+
+  async createUpgradeOrder(email: string) {
+    const razorpayKeyId = this.configService.get<string>('RAZORPAY_KEY_ID');
+    const razorpayKeySecret = this.configService.get<string>(
+      'RAZORPAY_KEY_SECRET',
+    );
+
+    if (!razorpayKeyId || !razorpayKeySecret) {
+      throw new Error('Payment gateway not configured');
+    }
+
+    const user = await this.userRepo.findOne({
+      where: { email: ILike(email) },
+    });
+    if (!user) throw new BadRequestException('User not found');
+
+    const techReg = await this.registrationRepo.findOne({
+      where: { userId: user.id, isDeleted: false, isTechAssessment: 1 },
+      relations: ['program'],
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!techReg)
+      throw new BadRequestException('No tech assessment registration found');
+
+    const programCode = techReg.program?.code || 'COLLEGE_STUDENT';
+    let configAmount = 999;
+    if (programCode === 'SCHOOL_STUDENT') configAmount = 749;
+    else if (programCode === 'EMPLOYEE') configAmount = 1499;
+
+    const amount = configAmount * 100;
+    const currency = 'INR';
+
+    const orderData = {
+      amount,
+      currency,
+      receipt: `upgrade_${String(Date.now())}`,
+      notes: { email, plan: 'originbi_upgrade', programCode },
+    };
+
+    const response = await fetch('https://api.razorpay.com/v1/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization:
+          'Basic ' +
+          Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString(
+            'base64',
+          ),
+      },
+      body: JSON.stringify(orderData),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      this.logger.error(`Razorpay upgrade order creation failed: ${err}`);
+      throw new Error('Failed to create payment order');
+    }
+
+    const order = await response.json();
+    return {
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      keyId: razorpayKeyId,
+    };
+  }
+
+  async verifyUpgradeAndRegister(dto: {
+    email: string;
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }) {
+    const razorpayKeySecret = this.configService.get<string>(
+      'RAZORPAY_KEY_SECRET',
+    );
+    if (!razorpayKeySecret) {
+      throw new Error('Payment gateway not configured');
+    }
+
+    const crypto = await import('crypto');
+    const expectedSignature = crypto
+      .createHmac('sha256', razorpayKeySecret)
+      .update(`${dto.razorpay_order_id}|${dto.razorpay_payment_id}`)
+      .digest('hex');
+
+    if (expectedSignature !== dto.razorpay_signature) {
+      this.logger.warn(
+        `Upgrade verification failed signature check for ${dto.email}`,
+      );
+      return { success: false, message: 'Payment verification failed' };
+    }
+
+    const user = await this.userRepo.findOne({
+      where: { email: ILike(dto.email) },
+    });
+    if (!user) return { success: false, message: 'User not found' };
+
+    const techReg = await this.registrationRepo.findOne({
+      where: { userId: user.id, isDeleted: false, isTechAssessment: 1 },
+      relations: ['program'],
+      order: { createdAt: 'DESC' },
+    });
+    if (!techReg)
+      return { success: false, message: 'No tech registration found' };
+
+    const program = techReg.program;
+    if (!program) return { success: false, message: 'Program not found' };
+
+    const programCode = program.code || 'COLLEGE_STUDENT';
+    let configAmount = 999;
+    if (programCode === 'SCHOOL_STUDENT') configAmount = 749;
+    else if (programCode === 'EMPLOYEE') configAmount = 1499;
+
+    let savedReg: Registration;
+
+    try {
+      await this.registrationRepo.manager.transaction(async (manager) => {
+        const newReg = manager.create(Registration, {
+          userId: user.id,
+          registrationSource: 'SELF',
+          fullName: techReg.fullName,
+          mobileNumber: techReg.mobileNumber,
+          countryCode: techReg.countryCode,
+          gender: techReg.gender,
+          schoolLevel: techReg.schoolLevel,
+          schoolStream: techReg.schoolStream,
+          studentBoard: techReg.studentBoard,
+          departmentDegreeId: techReg.departmentDegreeId,
+          programId: program.id,
+          status: 'COMPLETED',
+          paymentStatus: 'PAID',
+          paymentAmount: configAmount.toString(),
+          paymentProvider: 'RAZORPAY',
+          paymentReference: dto.razorpay_payment_id,
+          paidAt: new Date(),
+          isTechAssessment: 0,
+          metadata: {
+            upgradedFromTech: true,
+            originalTechRegistrationId: techReg.id,
+            ...(techReg.metadata || {}),
+          },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as any);
+
+        savedReg = await manager.save(Registration, newReg);
+
+        await manager.update(Registration, techReg.id, {
+          isTechAssessment: 2,
+        });
+      });
+    } catch (error) {
+      this.logger.error(
+        `Upgrade database transaction failed: ${error.message}`,
+        error.stack,
+      );
+      return { success: false, message: `Upgrade failed: ${error.message}` };
+    }
+
+    try {
+      const now = new Date();
+      const validFrom = new Date(now.getTime() + 5 * 60000);
+      const validTo = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      const session = this.sessionRepo.create({
+        userId: user.id,
+        registrationId: savedReg.id,
+        programId: program.id,
+        status: 'NOT_STARTED',
+        validFrom: validFrom,
+        validTo: validTo,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      const savedSession = await this.sessionRepo.save(session);
+
+      const levels = await this.levelRepo.find({
+        where: { isMandatory: true },
+        order: { levelNumber: 'ASC' },
+      });
+
+      for (const level of levels) {
+        const attempt = this.attemptRepo.create({
+          assessmentSessionId: savedSession.id,
+          assessmentLevelId: level.id,
+          userId: user.id,
+          registrationId: savedReg.id,
+          programId: program.id,
+          status: 'NOT_STARTED',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        const savedAttempt = await this.attemptRepo.save(attempt);
+
+        if (level.levelNumber === 1 || level.name.includes('Level 1')) {
+          await this.generateQuestionsForAttempt(
+            savedAttempt,
+            user,
+            savedReg,
+            level,
+          );
+        }
+      }
+
+      this.fireAssessmentInstructionsWhatsapp(savedReg).catch((err) =>
+        this.logger.error(
+          `Instructions WhatsApp failed for ${savedReg.mobileNumber}: ${err.message}`,
+        ),
+      );
+
+      const programTitle = program.assessmentTitle || program.name;
+      try {
+        await this.sendWelcomeEmail(
+          user.email,
+          savedReg.fullName,
+          'Your existing password',
+          validFrom,
+          programTitle,
+          false,
+          false,
+        );
+      } catch (emailErr) {
+        this.logger.error(
+          `Welcome email failed after upgrade for ${user.email}: ${emailErr.message}`,
+        );
+      }
+
+      return {
+        success: true,
+        message: 'Upgrade successful. Exam scheduled.',
+        userId: user.id,
+        registrationId: savedReg.id,
+      };
+    } catch (schedError) {
+      this.logger.error(
+        `Scheduling assessment after upgrade failed: ${schedError.message}`,
+        schedError.stack,
+      );
+      return {
+        success: true,
+        message:
+          'Upgrade successful, but assessment scheduling failed. Please contact support.',
+        userId: user.id,
+        registrationId: savedReg.id,
+      };
     }
   }
 

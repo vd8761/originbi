@@ -15,9 +15,10 @@ interface CustomSelectProps {
     placeholder?: string;
     label?: string;
     required?: boolean;
+    disabled?: boolean;
 }
 
-const CustomSelect: React.FC<CustomSelectProps> = ({ options, value, onChange, onOpenChange, placeholder = "Select", label, required }) => {
+const CustomSelect: React.FC<CustomSelectProps> = ({ options, value, onChange, onOpenChange, placeholder = "Select", label, required, disabled }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -35,12 +36,14 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ options, value, onChange, o
     }, [onOpenChange]);
 
     const handleSelect = (val: string) => {
+        if (disabled) return;
         onChange(val);
         setIsOpen(false);
         onOpenChange?.(false);
     };
 
     const toggleOpen = () => {
+        if (disabled) return;
         const next = !isOpen;
         setIsOpen(next);
         onOpenChange?.(next);
@@ -56,8 +59,9 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ options, value, onChange, o
             <div className="relative">
                 <button
                     type="button"
+                    disabled={disabled}
                     onClick={toggleOpen}
-                    className={`w-full flex items-center justify-between bg-gray-50 dark:bg-white/10 border border-transparent rounded-xl px-4 py-3.5 text-sm transition-all duration-200 focus:outline-none ${isOpen ? 'border-brand-green ring-1 ring-brand-green/20' : ''}`}
+                    className={`w-full flex items-center justify-between bg-gray-50 dark:bg-white/10 border border-transparent rounded-xl px-4 py-3.5 text-sm transition-all duration-200 focus:outline-none ${isOpen ? 'border-brand-green ring-1 ring-brand-green/20' : ''} ${disabled ? 'opacity-80 cursor-not-allowed' : ''}`}
                 >
                     <span className={selectedOption ? "text-brand-text-light-primary dark:text-white font-medium" : "text-gray-400 dark:text-white/70"}>
                         {selectedOption ? selectedOption.label : placeholder}

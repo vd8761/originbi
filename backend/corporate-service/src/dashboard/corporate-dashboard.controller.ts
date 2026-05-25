@@ -6,6 +6,7 @@ import {
   Query,
   Param,
   BadRequestException,
+  Req,
 } from '@nestjs/common';
 import { CorporateDashboardService } from './corporate-dashboard.service';
 import { CounsellingReportService } from './counselling-report.service';
@@ -36,6 +37,19 @@ export class CorporateDashboardController {
       throw new BadRequestException('Email is required');
     }
     return this.dashboardService.initiateCorporateReset(email);
+  }
+
+  @Post('record-login')
+  async recordLogin(@Req() req: any, @Body('email') email: string) {
+    if (!email) {
+      throw new BadRequestException('Email is required');
+    }
+    let ip = (req.headers['x-forwarded-for'] as string) || req.ip || req.socket.remoteAddress || '';
+    if (ip && ip.includes(',')) {
+      ip = ip.split(',')[0].trim();
+    }
+    await this.dashboardService.recordLogin(email, ip);
+    return { success: true };
   }
 
   @Get('profile')

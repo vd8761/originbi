@@ -75,6 +75,11 @@ export default function StudentLayout({
         }
 
         const checkStatus = async () => {
+            if (pathname?.includes('/student/upgrade')) {
+                setCheckingStatus(false);
+                return;
+            }
+
             // 1. Check Session Storage Flag (Fastest)
             if (sessionStorage.getItem('isAssessmentMode') === 'true') {
                 if (!pathname?.includes('/student/assessment')) {
@@ -88,6 +93,14 @@ export default function StudentLayout({
             if (email) {
                 try {
                     const status = await studentService.checkLoginStatus(email);
+
+                    if (status?.status === 'TECH_ONLY_UPGRADE_REQUIRED') {
+                        if (!pathname?.includes('/student/upgrade')) {
+                            router.push('/student/upgrade');
+                        }
+                        setCheckingStatus(false);
+                        return;
+                    }
 
                     if (status?.isAssessmentMode) {
                         sessionStorage.setItem('isAssessmentMode', 'true');
@@ -143,7 +156,8 @@ export default function StudentLayout({
 
     // Detect special modes for Header
     const isAssessmentPage = pathname?.includes('/student/assessment');
-    const hideNav = isAssessmentPage && !isReportReady;
+    const isUpgradePage = pathname?.includes('/student/upgrade');
+    const hideNav = (isAssessmentPage && !isReportReady) || isUpgradePage;
     const showAssessmentOnly = isAssessmentModeFlag && !isReportReady;
     const shouldApplyZoom = !isPublic && (!isAssessmentPage || isReportReady);
     const pageBaseBackgroundClass = (isAssessmentPage && !isReportReady)
