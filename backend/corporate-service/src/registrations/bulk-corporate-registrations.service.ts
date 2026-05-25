@@ -612,54 +612,57 @@ export class BulkCorporateRegistrationsService {
         let groupAssessmentId = null;
 
         // A. Create/Find Group
-        let group = allGroups.find(
-          (g) =>
-            this.normalizeString(g.name) ===
-              this.normalizeString(batch.groupName) ||
-            (g.code &&
-              this.normalizeString(g.code) ===
-                this.normalizeString(batch.groupName)),
-        );
-        try {
-          // If group doesn't exist in map but was passed, Create it ONLY if we are sure?
-          // Actually corporateRegistrationsService.registerCandidate handles group creation per row.
-          // But we need Group ID for the Header.
-          // So we MUST ensure group exists HERE.
+        let group: Groups | null = null;
+        if (batch.groupName) {
+          group = allGroups.find(
+            (g) =>
+              this.normalizeString(g.name) ===
+                this.normalizeString(batch.groupName) ||
+              (g.code &&
+                this.normalizeString(g.code) ===
+                  this.normalizeString(batch.groupName)),
+          ) || null;
+          try {
+            // If group doesn't exist in map but was passed, Create it ONLY if we are sure?
+            // Actually corporateRegistrationsService.registerCandidate handles group creation per row.
+            // But we need Group ID for the Header.
+            // So we MUST ensure group exists HERE.
 
-          if (!group) {
-            group = this.groupsRepo.create({
-              name: batch.groupName,
-              corporateAccountId: corporateAccountId,
-              createdByUserId: createdById,
-              isActive: true,
-              // code: ... auto
-            });
-            await this.groupsRepo.save(group);
-            // Add to cache
-            allGroups.push(group);
+            if (!group) {
+              group = this.groupsRepo.create({
+                name: batch.groupName,
+                corporateAccountId: corporateAccountId,
+                createdByUserId: createdById,
+                isActive: true,
+                // code: ... auto
+              });
+              await this.groupsRepo.save(group);
+              // Add to cache
+              allGroups.push(group);
+            }
+          } catch (err) {
+            this.logger.error(
+              `Failed to find/create group ${batch.groupName}`,
+              err,
+            );
+            // Fail all rows in batch
+            for (const row of batch.rows) {
+              row.status = 'FAILED';
+              row.errorMessage = 'System Error: Failed to create Group';
+              row.resultType = 'FAILED_DB';
+              failCount++;
+            }
+            await this.bulkImportRowRepo.save(batch.rows);
+
+            // Fix stuck processing issue
+            await this.bulkImportRepo.increment(
+              { id: jobId },
+              'processedCount',
+              batch.rows.length,
+            );
+
+            continue;
           }
-        } catch (err) {
-          this.logger.error(
-            `Failed to find/create group ${batch.groupName}`,
-            err,
-          );
-          // Fail all rows in batch
-          for (const row of batch.rows) {
-            row.status = 'FAILED';
-            row.errorMessage = 'System Error: Failed to create Group';
-            row.resultType = 'FAILED_DB';
-            failCount++;
-          }
-          await this.bulkImportRowRepo.save(batch.rows);
-
-          // Fix stuck processing issue
-          await this.bulkImportRepo.increment(
-            { id: jobId },
-            'processedCount',
-            batch.rows.length,
-          );
-
-          continue;
         }
 
         // B. Create Header (GroupAssessment)
@@ -674,7 +677,7 @@ export class BulkCorporateRegistrationsService {
             : new Date();
 
           const programId = Number(batch.programType);
-          if (programId > 0) {
+          if (programId > 0 && group) {
             this.logger.log(
               `Creating GroupAssessment for Group: ${group.id}, Program: ${programId}`,
             );
@@ -694,6 +697,10 @@ export class BulkCorporateRegistrationsService {
             const savedGA =
               await this.groupAssessmentRepo.save(groupAssessment);
             groupAssessmentId = savedGA.id;
+          } else if (programId > 0 && !group) {
+            this.logger.log(
+              `No group name provided for batch. Skipping GroupAssessment creation.`,
+            );
           } else {
             // Fallback: Find any active program
             this.logger.warn(
@@ -706,24 +713,26 @@ export class BulkCorporateRegistrationsService {
                 `Using Default Program: ${defaultProgram.name} (ID: ${defaultProgram.id})`,
               );
 
-              const groupAssessment = this.groupAssessmentRepo.create({
-                groupId: Number(group.id),
-                programId: Number(defaultProgram.id),
-                validFrom,
-                validTo,
-                totalCandidates: batch.rows.length,
-                status: 'NOT_STARTED',
-                corporateAccountId: corporateAccountId,
-                createdByUserId: createdById,
-                metadata: {
-                  importId: jobId,
-                  source: 'BULK_UPLOAD',
-                  note: 'Used default program',
-                },
-              });
-              const savedGA =
-                await this.groupAssessmentRepo.save(groupAssessment);
-              groupAssessmentId = savedGA.id;
+              if (group) {
+                const groupAssessment = this.groupAssessmentRepo.create({
+                  groupId: Number(group.id),
+                  programId: Number(defaultProgram.id),
+                  validFrom,
+                  validTo,
+                  totalCandidates: batch.rows.length,
+                  status: 'NOT_STARTED',
+                  corporateAccountId: corporateAccountId,
+                  createdByUserId: createdById,
+                  metadata: {
+                    importId: jobId,
+                    source: 'BULK_UPLOAD',
+                    note: 'Used default program',
+                  },
+                });
+                const savedGA =
+                  await this.groupAssessmentRepo.save(groupAssessment);
+                groupAssessmentId = savedGA.id;
+              }
 
               // Important: Update the DTOs in this batch to use this program ID
               for (const d of batch.dtos) {
@@ -813,10 +822,12 @@ export class BulkCorporateRegistrationsService {
           const dto = batch.dtos[i];
 
           try {
-            if (!groupAssessmentId) {
+            if (batch.groupName && !groupAssessmentId) {
               throw new Error('Group Assessment ID missing.');
             }
-            dto.groupAssessmentId = Number(groupAssessmentId);
+            if (groupAssessmentId) {
+              dto.groupAssessmentId = Number(groupAssessmentId);
+            }
 
             const email = this.normalizeEmail(
               row.rawData['Email'] || row.rawData['email'],
@@ -1286,47 +1297,44 @@ export class BulkCorporateRegistrationsService {
       'corporate',
       'Group',
     ]);
-    if (!groupNameInput) {
-      rowEntity.status = 'INVALID';
-      rowEntity.errorMessage = 'Group Name/Corporate is required';
-      return rowEntity;
-    }
 
-    rowEntity.status = 'READY'; // Default to READY (New Group)
+    rowEntity.status = 'READY'; // Default to READY (New Group or No Group)
     rowEntity.matchedGroupId = null;
     rowEntity.groupMatchScore = 0;
 
-    const normalizedInput = this.normalizeString(groupNameInput);
+    if (groupNameInput) {
+      const normalizedInput = this.normalizeString(groupNameInput);
 
-    // 1. Exact Match
-    if (groupMap.has(normalizedInput)) {
-      const g = groupMap.get(normalizedInput);
-      rowEntity.matchedGroupId = Number(g.id);
-      rowEntity.groupMatchScore = 100;
-    } else {
-      // 2. Fuzzy Match
-      let bestMatch: Groups | null = null;
-      let minDistance = Infinity;
+      // 1. Exact Match
+      if (groupMap.has(normalizedInput)) {
+        const g = groupMap.get(normalizedInput);
+        rowEntity.matchedGroupId = Number(g.id);
+        rowEntity.groupMatchScore = 100;
+      } else {
+        // 2. Fuzzy Match
+        let bestMatch: Groups | null = null;
+        let minDistance = Infinity;
 
-      for (const g of allGroups) {
-        if (Math.abs(g.name.length - groupNameInput.length) > 3) continue;
+        for (const g of allGroups) {
+          if (Math.abs(g.name.length - groupNameInput.length) > 3) continue;
 
-        const dist = this.levenshtein(
-          groupNameInput.toLowerCase(),
-          g.name.toLowerCase(),
-        );
-        if (dist < minDistance) {
-          minDistance = dist;
-          bestMatch = g;
+          const dist = this.levenshtein(
+            groupNameInput.toLowerCase(),
+            g.name.toLowerCase(),
+          );
+          if (dist < minDistance) {
+            minDistance = dist;
+            bestMatch = g;
+          }
         }
-      }
 
-      if (bestMatch && minDistance <= 2) {
-        rowEntity.matchedGroupId = Number(bestMatch.id);
-        const len = Math.max(groupNameInput.length, bestMatch.name.length);
-        const score = Math.round((1 - minDistance / len) * 100);
-        rowEntity.groupMatchScore = score;
-        rowEntity.status = 'NEEDS_CONFIRMATION';
+        if (bestMatch && minDistance <= 2) {
+          rowEntity.matchedGroupId = Number(bestMatch.id);
+          const len = Math.max(groupNameInput.length, bestMatch.name.length);
+          const score = Math.round((1 - minDistance / len) * 100);
+          rowEntity.groupMatchScore = score;
+          rowEntity.status = 'NEEDS_CONFIRMATION';
+        }
       }
     }
 

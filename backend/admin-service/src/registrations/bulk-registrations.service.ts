@@ -498,30 +498,33 @@ export class BulkRegistrationsService {
 
         try {
           // A. Ensure Group Exists
-          let group = await this.groupsRepo.findOne({
-            where: { name: batch.groupName },
-          });
-
-          if (!group) {
-            group = await this.groupsRepo
-              .createQueryBuilder('g')
-              .where('LOWER(g.name) = :name', {
-                name: batch.groupName.toLowerCase(),
-              })
-              .orWhere('LOWER(g.code) = :code', {
-                code: batch.groupName.toLowerCase(),
-              })
-              .getOne();
-          }
-
-          if (!group) {
-            this.logger.log(`Creating new group: ${batch.groupName}`);
-            group = this.groupsRepo.create({
-              name: batch.groupName,
-              createdByUserId: job.createdById,
-              isActive: true,
+          let group: Groups | null = null;
+          if (batch.groupName) {
+            group = await this.groupsRepo.findOne({
+              where: { name: batch.groupName },
             });
-            group = await this.groupsRepo.save(group);
+
+            if (!group) {
+              group = await this.groupsRepo
+                .createQueryBuilder('g')
+                .where('LOWER(g.name) = :name', {
+                  name: batch.groupName.toLowerCase(),
+                })
+                .orWhere('LOWER(g.code) = :code', {
+                  code: batch.groupName.toLowerCase(),
+                })
+                .getOne();
+            }
+
+            if (!group) {
+              this.logger.log(`Creating new group: ${batch.groupName}`);
+              group = this.groupsRepo.create({
+                name: batch.groupName,
+                createdByUserId: job.createdById,
+                isActive: true,
+              });
+              group = await this.groupsRepo.save(group);
+            }
           }
 
           // B. Create Group Assessment Header
@@ -529,7 +532,7 @@ export class BulkRegistrationsService {
           const templateDto = batch.dtos[0];
           const { programType, examStart, examEnd } = templateDto;
 
-          if (programType) {
+          if (programType && group) {
             const validFrom = examStart ? new Date(examStart) : new Date();
             const validTo = examEnd ? new Date(examEnd) : null;
             const program = await this.programRepo.findOne({
@@ -558,6 +561,10 @@ export class BulkRegistrationsService {
               await this.groupAssessmentRepo.save(groupAssessment);
             groupAssessmentId = Number(savedGA.id);
             this.logger.log(`Created GroupAssessment ID: ${groupAssessmentId}`);
+          } else if (programType && !group) {
+            this.logger.log(
+              `No group name provided for batch. Skipping GroupAssessment creation.`,
+            );
           } else {
             // Fallback: Find any active program
             this.logger.warn(
@@ -572,23 +579,25 @@ export class BulkRegistrationsService {
               const validFrom = examStart ? new Date(examStart) : new Date();
               const validTo = examEnd ? new Date(examEnd) : null;
 
-              const groupAssessment = this.groupAssessmentRepo.create({
-                groupId: Number(group.id),
-                programId: Number(defaultProgram.id),
-                validFrom,
-                validTo,
-                totalCandidates: batch.rows.length,
-                status: 'NOT_STARTED',
-                createdByUserId: job.createdById,
-                metadata: {
-                  importId: jobId,
-                  source: 'BULK_UPLOAD',
-                  note: 'Used default program',
-                },
-              });
-              const savedGA =
-                await this.groupAssessmentRepo.save(groupAssessment);
-              groupAssessmentId = Number(savedGA.id);
+              if (group) {
+                const groupAssessment = this.groupAssessmentRepo.create({
+                  groupId: Number(group.id),
+                  programId: Number(defaultProgram.id),
+                  validFrom,
+                  validTo,
+                  totalCandidates: batch.rows.length,
+                  status: 'NOT_STARTED',
+                  createdByUserId: job.createdById,
+                  metadata: {
+                    importId: jobId,
+                    source: 'BULK_UPLOAD',
+                    note: 'Used default program',
+                  },
+                });
+                const savedGA =
+                  await this.groupAssessmentRepo.save(groupAssessment);
+                groupAssessmentId = Number(savedGA.id);
+              }
 
               // Important: Update the DTOs in this batch to use this program ID,
               // otherwise registrationsService.create might look for null
@@ -634,12 +643,14 @@ export class BulkRegistrationsService {
           const dto = batch.dtos[i];
 
           try {
-            if (!groupAssessmentId) {
+            if (batch.groupName && !groupAssessmentId) {
               throw new Error(
                 'Group Assessment ID is missing despite successful header creation.',
               );
             }
-            dto.groupAssessmentId = groupAssessmentId;
+            if (groupAssessmentId) {
+              dto.groupAssessmentId = groupAssessmentId;
+            }
 
             const existingUser = await this.userRepo
               .createQueryBuilder('u')
@@ -983,56 +994,53 @@ export class BulkRegistrationsService {
       'corporate',
       'Group',
     ]);
-    if (!groupNameInput) {
-      rowEntity.status = 'INVALID';
-      rowEntity.errorMessage = 'Group Name/Corporate is required';
-      return rowEntity;
-    }
 
-    rowEntity.status = 'READY'; // Default to READY (New Group)
+    rowEntity.status = 'READY'; // Default to READY (New Group or No Group)
     rowEntity.matchedGroupId = null;
     rowEntity.groupMatchScore = 0;
 
-    const normalizedInput = this.normalizeString(groupNameInput);
+    if (groupNameInput) {
+      const normalizedInput = this.normalizeString(groupNameInput);
 
-    // 1. Exact Match
-    if (groupMap.has(normalizedInput)) {
-      const g = groupMap.get(normalizedInput);
-      rowEntity.matchedGroupId = Number(g!.id);
-      rowEntity.groupMatchScore = 100;
-      // Status remains READY (Exact match is good to go)
-    } else {
-      // 2. Fuzzy Match
-      // Find closest group
-      let bestMatch: Groups | null = null;
-      let minDistance = Infinity;
+      // 1. Exact Match
+      if (groupMap.has(normalizedInput)) {
+        const g = groupMap.get(normalizedInput);
+        rowEntity.matchedGroupId = Number(g!.id);
+        rowEntity.groupMatchScore = 100;
+        // Status remains READY (Exact match is good to go)
+      } else {
+        // 2. Fuzzy Match
+        // Find closest group
+        let bestMatch: Groups | null = null;
+        let minDistance = Infinity;
 
-      for (const g of allGroups) {
-        // Optimization: Skip if length difference is too big
-        if (Math.abs(g.name.length - groupNameInput.length) > 3) continue;
+        for (const g of allGroups) {
+          // Optimization: Skip if length difference is too big
+          if (Math.abs(g.name.length - groupNameInput.length) > 3) continue;
 
-        const dist = this.levenshtein(
-          groupNameInput.toLowerCase(),
-          g.name.toLowerCase(),
-        );
-        if (dist < minDistance) {
-          minDistance = dist;
-          bestMatch = g;
+          const dist = this.levenshtein(
+            groupNameInput.toLowerCase(),
+            g.name.toLowerCase(),
+          );
+          if (dist < minDistance) {
+            minDistance = dist;
+            bestMatch = g;
+          }
         }
-      }
 
-      // Thresholds: Distance <= 2 usually implies typo (School A vs SchoolA or Schol A)
-      if (bestMatch && minDistance <= 2) {
-        rowEntity.matchedGroupId = Number(bestMatch.id);
-        // Calculate rough score
-        const len = Math.max(groupNameInput.length, bestMatch.name.length);
-        const score = Math.round((1 - minDistance / len) * 100);
-        rowEntity.groupMatchScore = score;
+        // Thresholds: Distance <= 2 usually implies typo (School A vs SchoolA or Schol A)
+        if (bestMatch && minDistance <= 2) {
+          rowEntity.matchedGroupId = Number(bestMatch.id);
+          // Calculate rough score
+          const len = Math.max(groupNameInput.length, bestMatch.name.length);
+          const score = Math.round((1 - minDistance / len) * 100);
+          rowEntity.groupMatchScore = score;
 
-        // Mark for Confirmation
-        rowEntity.status = 'NEEDS_CONFIRMATION';
+          // Mark for Confirmation
+          rowEntity.status = 'NEEDS_CONFIRMATION';
+        }
+        // 3. Else: No Match found -> New Group (Status READY, matchId null)
       }
-      // 3. Else: No Match found -> New Group (Status READY, matchId null)
     }
 
     return rowEntity;
