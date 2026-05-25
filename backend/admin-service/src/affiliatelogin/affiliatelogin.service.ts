@@ -55,4 +55,19 @@ export class AffiliateLoginService {
   findByCognitoSub(sub: string): Promise<AdminUser | null> {
     return this.usersRepo.findOne({ where: { cognitoSub: sub } });
   }
+
+  async recordLogin(userId: number, ip: string): Promise<void> {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) return;
+
+    user.loginCount = (user.loginCount || 0) + 1;
+    if (!user.firstLoginAt) {
+      user.firstLoginAt = new Date();
+    }
+    user.lastLoginAt = new Date();
+    user.lastLoginIp = ip;
+
+    await this.usersRepo.save(user);
+  }
 }
+

@@ -152,6 +152,18 @@ const LoginForm: React.FC<LoginFormProps> = ({
       localStorage.setItem('originbi_id_token', idTokenJwt);
 
       const studentApiUrl = process.env.NEXT_PUBLIC_STUDENT_API_URL;
+
+      // Record Login Audit
+      try {
+        await fetch(`${studentApiUrl}/student/record-login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: values.email })
+        });
+      } catch (recordError) {
+        console.error('Failed to record login audit', recordError);
+      }
+
       try {
         const response = await fetch(`${studentApiUrl}/student/login-status`, {
           method: 'POST',

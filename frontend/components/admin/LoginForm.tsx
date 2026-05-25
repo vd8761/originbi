@@ -248,6 +248,22 @@ const LoginForm: React.FC<LoginFormProps> = ({
         }));
       }
 
+      // Record Login Audit
+      try {
+        const recordUrl = portalMode === 'affiliate'
+          ? `${apiBase}/affiliates/record-login`
+          : `${apiBase}/admin/record-login`;
+        await fetch(recordUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${idTokenJwt}`,
+            'Content-Type': 'application/json'
+          }
+        });
+      } catch (recordError) {
+        console.error('Failed to record login audit', recordError);
+      }
+
       onLoginSuccess();
     } catch (err: unknown) {
       console.error('Cognito signIn or backend error:', err);
