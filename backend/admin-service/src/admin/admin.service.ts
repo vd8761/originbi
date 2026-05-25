@@ -301,4 +301,20 @@ export class AdminService {
   getMessage() {
     return { message: 'Admin service working!' };
   }
+
+  async recordLogin(userId: number, ip: string): Promise<void> {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) return;
+
+    user.loginCount = (user.loginCount || 0) + 1;
+    if (!user.firstLoginAt) {
+      user.firstLoginAt = new Date();
+    }
+    user.lastLoginAt = new Date();
+    user.lastLoginIp = ip;
+
+    await this.userRepo.save(user);
+    this.logger.log(`Recorded login audit for admin/affiliate user: ${user.email} (ID: ${userId}) from IP: ${ip}`);
+  }
 }
+

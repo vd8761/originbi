@@ -136,6 +136,21 @@ const LoginForm: React.FC<LoginFormProps> = ({
       // --- Fetch and Store User Profile ---
       try {
         const CORPORATE_API = process.env.NEXT_PUBLIC_CORPORATE_API_URL;
+
+        // Record Login Audit
+        try {
+          await fetch(`${CORPORATE_API}/dashboard/record-login`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`
+            },
+            body: JSON.stringify({ email: values.email })
+          });
+        } catch (recordError) {
+          console.error('Failed to record corporate login audit', recordError);
+        }
+
         const profileRes = await fetch(`${CORPORATE_API}/dashboard/profile?email=${encodeURIComponent(values.email)}`, {
           headers: { Authorization: `Bearer ${accessToken}` }
         });

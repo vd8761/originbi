@@ -786,6 +786,26 @@ export class StudentService {
     }
   }
 
+  async recordLogin(email: string, ip: string): Promise<void> {
+    const user = await this.userRepo.findOne({
+      where: { email: ILike(email) },
+    });
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    user.loginCount = (user.loginCount || 0) + 1;
+    if (!user.firstLoginAt) {
+      user.firstLoginAt = new Date();
+    }
+    user.lastLoginAt = new Date();
+    user.lastLoginIp = ip;
+
+    await this.userRepo.save(user);
+    this.logger.log(`Recorded login audit for student user: ${email} from IP: ${ip}`);
+  }
+
+
   // ---------------------------------------------------------------------------
   // PUBLIC REGISTER
   // ---------------------------------------------------------------------------

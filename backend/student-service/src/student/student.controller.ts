@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Logger } from '@nestjs/common';
+import { Controller, Post, Body, Logger, Req, BadRequestException } from '@nestjs/common';
 import { PgBossService } from '@wavezync/nestjs-pgboss';
 import { StudentService } from './student.service';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
@@ -38,6 +38,19 @@ export class StudentController {
   @Post('login-status')
   async checkLoginRedirect(@Body() body: { email: string }) {
     return this.studentService.checkLoginStatus(body.email);
+  }
+
+  @Post('record-login')
+  async recordLogin(@Req() req: any, @Body() body: { email: string }) {
+    if (!body.email) {
+      throw new BadRequestException('Email is required');
+    }
+    let ip = (req.headers['x-forwarded-for'] as string) || req.ip || req.socket.remoteAddress || '';
+    if (ip && ip.includes(',')) {
+      ip = ip.split(',')[0].trim();
+    }
+    await this.studentService.recordLogin(body.email, ip);
+    return { success: true };
   }
 
   @Post('progress')

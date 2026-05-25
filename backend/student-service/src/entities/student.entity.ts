@@ -34,4 +34,22 @@ export class User {
 
   @Column({ name: 'login_count', default: 0 })
   loginCount: number;
+
+  @Column({
+    name: 'first_login_at',
+    type: 'timestamp with time zone',
+    nullable: true,
+  })
+  firstLoginAt?: Date;
+
+  @Column({
+    name: 'last_login_at',
+    type: 'timestamp with time zone',
+    nullable: true,
+  })
+  lastLoginAt?: Date;
+
+  @Column({ name: 'last_login_ip', nullable: true })
+  lastLoginIp?: string;
 }
+
