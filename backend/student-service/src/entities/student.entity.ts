@@ -52,4 +52,3 @@ export class User {
   @Column({ name: 'last_login_ip', nullable: true })
   lastLoginIp?: string;
 }
-

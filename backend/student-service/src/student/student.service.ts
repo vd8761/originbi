@@ -802,9 +802,10 @@ export class StudentService {
     user.lastLoginIp = ip;
 
     await this.userRepo.save(user);
-    this.logger.log(`Recorded login audit for student user: ${email} from IP: ${ip}`);
+    this.logger.log(
+      `Recorded login audit for student user: ${email} from IP: ${ip}`,
+    );
   }
-
 
   // ---------------------------------------------------------------------------
   // PUBLIC REGISTER
@@ -2815,7 +2816,9 @@ export class StudentService {
   }
 
   async getUpgradeInfo(email: string) {
-    const user = await this.userRepo.findOne({ where: { email: ILike(email) } });
+    const user = await this.userRepo.findOne({
+      where: { email: ILike(email) },
+    });
     if (!user) throw new BadRequestException('User not found');
 
     const techReg = await this.registrationRepo.findOne({
@@ -2824,10 +2827,15 @@ export class StudentService {
       order: { createdAt: 'DESC' },
     });
 
-    if (!techReg) throw new BadRequestException('No tech assessment registration found');
+    if (!techReg)
+      throw new BadRequestException('No tech assessment registration found');
 
     const existingOriginBi = await this.registrationRepo.findOne({
-      where: { userId: user.id, isDeleted: false, isTechAssessment: In([0, 2]) },
+      where: {
+        userId: user.id,
+        isDeleted: false,
+        isTechAssessment: In([0, 2]),
+      },
     });
     if (existingOriginBi) {
       return { alreadyUpgraded: true };
@@ -2864,7 +2872,8 @@ export class StudentService {
       program: {
         code: programCode,
         name: techReg.program?.name || '',
-        assessmentTitle: techReg.program?.assessmentTitle || techReg.program?.name || '',
+        assessmentTitle:
+          techReg.program?.assessmentTitle || techReg.program?.name || '',
         description: techReg.program?.description || '',
       },
       details: {
@@ -2873,9 +2882,14 @@ export class StudentService {
         studentBoard: techReg.studentBoard,
         departmentDegreeId: techReg.departmentDegreeId,
         departmentName,
-        currentYear: techReg.metadata?.currentYear || techReg.metadata?.current_year || '',
-        currentRole: techReg.metadata?.currentRole || techReg.metadata?.current_role || '',
-        roleDescription: techReg.metadata?.roleDescription || techReg.metadata?.role_description || '',
+        currentYear:
+          techReg.metadata?.currentYear || techReg.metadata?.current_year || '',
+        currentRole:
+          techReg.metadata?.currentRole || techReg.metadata?.current_role || '',
+        roleDescription:
+          techReg.metadata?.roleDescription ||
+          techReg.metadata?.role_description ||
+          '',
       },
       amount,
     };
@@ -2883,13 +2897,17 @@ export class StudentService {
 
   async createUpgradeOrder(email: string) {
     const razorpayKeyId = this.configService.get<string>('RAZORPAY_KEY_ID');
-    const razorpayKeySecret = this.configService.get<string>('RAZORPAY_KEY_SECRET');
+    const razorpayKeySecret = this.configService.get<string>(
+      'RAZORPAY_KEY_SECRET',
+    );
 
     if (!razorpayKeyId || !razorpayKeySecret) {
       throw new Error('Payment gateway not configured');
     }
 
-    const user = await this.userRepo.findOne({ where: { email: ILike(email) } });
+    const user = await this.userRepo.findOne({
+      where: { email: ILike(email) },
+    });
     if (!user) throw new BadRequestException('User not found');
 
     const techReg = await this.registrationRepo.findOne({
@@ -2898,7 +2916,8 @@ export class StudentService {
       order: { createdAt: 'DESC' },
     });
 
-    if (!techReg) throw new BadRequestException('No tech assessment registration found');
+    if (!techReg)
+      throw new BadRequestException('No tech assessment registration found');
 
     const programCode = techReg.program?.code || 'COLLEGE_STUDENT';
     let configAmount = 999;
@@ -2921,7 +2940,9 @@ export class StudentService {
         'Content-Type': 'application/json',
         Authorization:
           'Basic ' +
-          Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString('base64'),
+          Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString(
+            'base64',
+          ),
       },
       body: JSON.stringify(orderData),
     });
@@ -2947,7 +2968,9 @@ export class StudentService {
     razorpay_payment_id: string;
     razorpay_signature: string;
   }) {
-    const razorpayKeySecret = this.configService.get<string>('RAZORPAY_KEY_SECRET');
+    const razorpayKeySecret = this.configService.get<string>(
+      'RAZORPAY_KEY_SECRET',
+    );
     if (!razorpayKeySecret) {
       throw new Error('Payment gateway not configured');
     }
@@ -2959,11 +2982,15 @@ export class StudentService {
       .digest('hex');
 
     if (expectedSignature !== dto.razorpay_signature) {
-      this.logger.warn(`Upgrade verification failed signature check for ${dto.email}`);
+      this.logger.warn(
+        `Upgrade verification failed signature check for ${dto.email}`,
+      );
       return { success: false, message: 'Payment verification failed' };
     }
 
-    const user = await this.userRepo.findOne({ where: { email: ILike(dto.email) } });
+    const user = await this.userRepo.findOne({
+      where: { email: ILike(dto.email) },
+    });
     if (!user) return { success: false, message: 'User not found' };
 
     const techReg = await this.registrationRepo.findOne({
@@ -2971,7 +2998,8 @@ export class StudentService {
       relations: ['program'],
       order: { createdAt: 'DESC' },
     });
-    if (!techReg) return { success: false, message: 'No tech registration found' };
+    if (!techReg)
+      return { success: false, message: 'No tech registration found' };
 
     const program = techReg.program;
     if (!program) return { success: false, message: 'Program not found' };
@@ -3020,7 +3048,10 @@ export class StudentService {
         });
       });
     } catch (error) {
-      this.logger.error(`Upgrade database transaction failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Upgrade database transaction failed: ${error.message}`,
+        error.stack,
+      );
       return { success: false, message: `Upgrade failed: ${error.message}` };
     }
 
@@ -3087,7 +3118,9 @@ export class StudentService {
           false,
         );
       } catch (emailErr) {
-        this.logger.error(`Welcome email failed after upgrade for ${user.email}: ${emailErr.message}`);
+        this.logger.error(
+          `Welcome email failed after upgrade for ${user.email}: ${emailErr.message}`,
+        );
       }
 
       return {
@@ -3097,10 +3130,14 @@ export class StudentService {
         registrationId: savedReg.id,
       };
     } catch (schedError) {
-      this.logger.error(`Scheduling assessment after upgrade failed: ${schedError.message}`, schedError.stack);
+      this.logger.error(
+        `Scheduling assessment after upgrade failed: ${schedError.message}`,
+        schedError.stack,
+      );
       return {
         success: true,
-        message: 'Upgrade successful, but assessment scheduling failed. Please contact support.',
+        message:
+          'Upgrade successful, but assessment scheduling failed. Please contact support.',
         userId: user.id,
         registrationId: savedReg.id,
       };
