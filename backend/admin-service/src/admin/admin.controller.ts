@@ -10,12 +10,15 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 
-import { Request } from 'express';
 import { AdminService } from './admin.service';
 import { AdminLoginGuard } from '../adminlogin/adminlogin.guard';
 
-interface AdminRequest extends Request {
+interface AdminRequest {
   user?: Record<string, any>;
+  headers?: any;
+  ip?: string;
+  socket?: any;
+  [key: string]: any;
 }
 
 @Controller('admin')
