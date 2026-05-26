@@ -4,6 +4,7 @@ export const getTechWelcomeEmailTemplate = (
   pass: string,
   frontendUrl: string,
   assets: { popper: string; pattern: string; footer: string; logo: string },
+  isTemporary?: boolean,
 ) => `
 <!DOCTYPE html>
 <html>
@@ -79,7 +80,7 @@ export const getTechWelcomeEmailTemplate = (
                <!-- Logo Area -->
                <td style="padding: 40px 0 0 40px; vertical-align: top;">
                   <img src="${assets.logo}" alt="Origin BI" width="150" style="display: block; border: 0;" />
-               </td>
+                </td>
                <!-- Confetti Image -->
                <td style="width: 150px; padding: 20px 20px 0 0; vertical-align: top; text-align: right;">
                   <img src="${assets.popper}" alt="Confetti" width="120" style="display: block; border: 0;" />
@@ -116,7 +117,7 @@ export const getTechWelcomeEmailTemplate = (
                      <td style="font-size: 14px; color: #000000; padding: 5px 0;">${to}</td>
                    </tr>
                    <tr>
-                     <td style="font-size: 14px; color: #707070; padding: 5px 0;">Password</td>
+                     <td style="font-size: 14px; color: #707070; padding: 5px 0;">${isTemporary ? 'Temporary Password' : 'Password'}</td>
                      <td style="font-size: 14px; color: #000000; padding: 5px 0;">${pass}</td>
                    </tr>
                  </table>
