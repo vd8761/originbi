@@ -4170,14 +4170,15 @@ ${report.fullReportText}`,
       let targetUserId: number | null = null;
       let targetName = searchTerm;
       let targetIndex = -1;
+      let selfLookup: any[] = [];
+      let results: any[] = [];
 
       // RBAC: Students can only generate reports for themselves
       if (userRole === 'STUDENT') {
-        let selfLookup: any[] = [];
         // Try user_id first
         if (userId && userId > 0) {
           selfLookup = await this.executeDatabaseQuery(
-            `SELECT r.user_id, r.full_name FROM registrations r WHERE r.user_id = $1 AND r.is_deleted = false ORDER BY r.created_at DESC LIMIT 1`,
+            `SELECT r.user_id, r.full_name, r.id as registration_id, r.metadata as reg_metadata FROM registrations r WHERE r.user_id = $1 AND r.is_deleted = false ORDER BY r.created_at DESC LIMIT 1`,
             [userId]
           );
         }
@@ -4186,7 +4187,7 @@ ${report.fullReportText}`,
           const email = user?.email || user?.sub;
           this.logger.log(`📋 Custom report: userId=${userId} lookup failed, trying email: ${email}`);
           selfLookup = await this.executeDatabaseQuery(
-            `SELECT r.user_id, r.full_name FROM registrations r JOIN users u ON r.user_id = u.id WHERE u.email = $1 AND r.is_deleted = false ORDER BY r.created_at DESC LIMIT 1`,
+            `SELECT r.user_id, r.full_name, r.id as registration_id, r.metadata as reg_metadata FROM registrations r JOIN users u ON r.user_id = u.id WHERE u.email = $1 AND r.is_deleted = false ORDER BY r.created_at DESC LIMIT 1`,
             [email]
           );
         }
@@ -4227,7 +4228,7 @@ ${report.fullReportText}`,
 
           if (userRole === 'CORPORATE' && corporateId) {
             lookupSql = `
-              SELECT r.user_id, r.full_name, u.email,
+              SELECT r.user_id, r.full_name, u.email, r.id as registration_id, r.metadata as reg_metadata,
                      CASE
                        WHEN LOWER(r.full_name) = $2 THEN 100
                        WHEN LOWER(r.full_name) LIKE $3 THEN 92
@@ -4248,7 +4249,7 @@ ${report.fullReportText}`,
           } else {
             // ADMIN: search all
             lookupSql = `
-              SELECT r.user_id, r.full_name, u.email,
+              SELECT r.user_id, r.full_name, u.email, r.id as registration_id, r.metadata as reg_metadata,
                      CASE
                        WHEN LOWER(r.full_name) = $2 THEN 100
                        WHEN LOWER(r.full_name) LIKE $3 THEN 92
@@ -4267,7 +4268,7 @@ ${report.fullReportText}`,
             lookupParams = [fuzzyLike, exactLower, prefixLower];
           }
 
-          const results = await this.executeDatabaseQuery(lookupSql, lookupParams);
+          results = await this.executeDatabaseQuery(lookupSql, lookupParams);
 
           if (results && results.length > 1 && targetIndex < 0) {
             let response = `**👥 I found multiple close matches for "${targetName}".**\n\nPlease reply with the exact full name:\n\n`;
@@ -4335,6 +4336,49 @@ ${report.fullReportText}`,
           searchType: 'error',
           confidence: 0,
         };
+      }
+
+      // Check registration metadata for target candidate's current role and experience
+      let bestMatch: any = null;
+      if (userRole === 'STUDENT') {
+        if (selfLookup && selfLookup.length > 0) {
+          bestMatch = selfLookup[0];
+        }
+      } else {
+        if (results && results.length > 0) {
+          const resolvedIndex = targetIndex >= 0 ? targetIndex : 0;
+          bestMatch = results[resolvedIndex];
+        }
+      }
+
+      const parseMetadata = (value: any): Record<string, any> => {
+        if (!value) return {};
+        if (typeof value === 'string') {
+          try {
+            return JSON.parse(value);
+          } catch {
+            return {};
+          }
+        }
+        return value;
+      };
+
+      if (bestMatch) {
+        const regMetadata = parseMetadata(bestMatch.reg_metadata || bestMatch.metadata);
+        const currentRole = String(regMetadata.currentRole || '').trim();
+        const yearsOfExperience = regMetadata.yearsOfExperience;
+
+        const isRoleMissing = !currentRole || currentRole.toLowerCase() === 'not specified' || currentRole === '';
+        const isExperienceMissing = yearsOfExperience === undefined || yearsOfExperience === null || String(yearsOfExperience).toLowerCase().includes('not specified');
+
+        if (isRoleMissing || isExperienceMissing) {
+          this.logger.log(`⚠️ Profile details missing in registration metadata for ${targetName}. Asking user to specify.`);
+          return {
+            answer: `**📝 I'm ready to generate ${targetName}'s Career Fitment Report!**\n\nHowever, their **Current Role** or **Years of Experience** are not specified in their profile metadata.\n\nPlease reply with their details in the following format:\n\n\`\`\`\nName: ${targetName}\nCurrent Role: [e.g. Senior Software Engineer or Student]\nYears of Experience: [e.g. 5 or 0 for students]\n\`\`\``,
+            searchType: 'chat_profile_request',
+            confidence: 0.95,
+          };
+        }
       }
 
       this.logger.log(`📊 Generating Custom Career Fitment Report for ${targetName} (userId: ${targetUserId})`);
@@ -4483,11 +4527,16 @@ ${report.fullReportText}`,
         (bestMatch.user_role === 'STUDENT' ? 'Student' : '') || 
         '',
       ).trim();
+      
+      const isStudentRole =
+        bestMatch.user_role === 'STUDENT' ||
+        resolvedCurrentRole.toLowerCase().includes('student');
+
       const resolvedJobDescription = String(
         bestRegMetadata.roleDescription ||
           bestRegMetadata.currentJobDescription ||
           providedJobDescription ||
-          (bestMatch.user_role === 'STUDENT' ? 'Student' : '') ||
+          (isStudentRole ? 'Student' : '') ||
           '',
       ).trim();
 

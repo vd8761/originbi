@@ -594,6 +594,9 @@ Return ONLY the JSON array, no other text.`;
     /**
      * Generate executive insight via AI
      */
+    /**
+     * Generate executive insight via AI
+     */
     private async generateExecutiveInsight(
         profile: CareerProfileData,
         fitment: RoleFitmentScore,
@@ -619,10 +622,35 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
                 [{ role: 'user', content: prompt }],
                 { maxTokens: 500, logger: this.logger },
             );
-            return content || 'Based on current assessment, you show strong potential for role transition with focused development.';
+            return content || this.getRichDynamicExecutiveInsight(profile, fitment, readiness, agile);
         } catch (error) {
             this.logger.error('Error generating executive insight:', error);
-            return 'Based on current assessment, you show strong potential for role transition with focused development.';
+            return this.getRichDynamicExecutiveInsight(profile, fitment, readiness, agile);
+        }
+    }
+
+    /**
+     * Get rich, dynamic executive insight fallback based on student/corporate status and target role
+     */
+    private getRichDynamicExecutiveInsight(
+        profile: CareerProfileData,
+        fitment: RoleFitmentScore,
+        readiness: FutureRoleReadiness,
+        agile: AgileProfile,
+    ): string {
+        const isStudent =
+            profile.currentRole?.toUpperCase() === 'STUDENT' ||
+            profile.currentRole?.toLowerCase().includes('student') ||
+            profile.currentRole?.toLowerCase().includes('not specified') ||
+            profile.yearsOfExperience === 0;
+
+        const name = profile.fullName;
+        const target = profile.expectedFutureRole || 'their future career path';
+
+        if (isStudent) {
+            return `${name} is a highly motivated and promising individual with a strong learning agility level of ${agile.level} (${agile.percentage}%). Their behavioral profile and cognitive capability make them well-suited for growth and development in ${target}. With dedicated focus on acquiring specialized skills, they have the potential to excel in their academic and professional journey.\n\nTo maximize their potential, ${name} should focus on developing key strengths, improving communication, gaining practical experience through projects or internships, and staying updated with industry trends. This proactive approach will enhance their overall career readiness and competitive positioning in the job market.\n\nAs a student, ${name} is in an ideal position to leverage their current strengths and pursue specialized courses or hands-on practice. Doing so will build a robust academic foundation and ensure a successful transition into their desired professional role.`;
+        } else {
+            return `Based on the assessment, ${name} shows a final role fitment score of ${fitment.totalScore}% with a ${readiness.adjacencyType} transition profile towards the ${target} position. Their behavioral alignment and experience readiness indicate strong core competencies that can be leveraged for this career shift.\n\nTo ensure a seamless transition, ${name} should focus on bridge-building initiatives: mapping current operational expertise to strategic demands, elevating executive communication, and strengthening core domain knowledge required for the target role.\n\nWith a focused development roadmap and the support of Origin BI's transition insights, ${name} is well-positioned to bridge the identified skill gaps and achieve sustained success in their future professional endeavors.`;
         }
     }
 
