@@ -290,10 +290,29 @@ export class CustomReportService {
             ORDER BY 
                 CASE WHEN pt.blended_style_name IS NOT NULL THEN 0 ELSE 1 END,
                 aa.completed_at DESC NULLS LAST
-            LIMIT 1
         `;
 
-        const [assessmentData] = await this.dataSource.query(assessmentQuery, [userId]);
+        const attempts = await this.dataSource.query(assessmentQuery, [userId]);
+
+        if (!attempts || attempts.length === 0) {
+            this.logger.warn(`User ${userId} has incomplete assessment data. Skipping report generation.`);
+            throw new NotFoundException(`User ${userId} has not completed the required assessments (Agile + DISC).`);
+        }
+
+        const discAttempt = attempts.find(r => r.disc_type || r.disc_code || r.disc_description) || attempts[0];
+        const agileAttempt = attempts.find(r => parseFloat(r.agile_score) > 0) || attempts[0];
+
+        const assessmentData = {
+            ...attempts[0],
+            agile_score: agileAttempt.agile_score,
+            sincerity_index: discAttempt.sincerity_index ?? agileAttempt.sincerity_index,
+            sincerity_class: discAttempt.sincerity_class ?? agileAttempt.sincerity_class,
+            attempt_metadata: { ...agileAttempt.attempt_metadata, ...discAttempt.attempt_metadata },
+            completed_at: discAttempt.completed_at || agileAttempt.completed_at,
+            disc_code: discAttempt.disc_code,
+            disc_type: discAttempt.disc_type,
+            disc_description: discAttempt.disc_description,
+        };
 
         if (!assessmentData || !assessmentData.agile_score || !assessmentData.disc_type) {
             this.logger.warn(`User ${userId} has incomplete assessment data. Skipping report generation.`);
@@ -495,25 +514,46 @@ Make scores realistic based on role/experience. Adapt skill categories to the pe
      * Generate behavioral summary via AI
      */
     private async generateBehavioralSummary(profile: CareerProfileData, disc: DiscProfile, agile: AgileProfile): Promise<string> {
-        const prompt = `Write a 3-4 sentence professional behavioral alignment summary for this person targeting their future role.
+        const prompt = `Based on the professional profile and assessment results of ${profile.fullName}, generate a highly detailed and comprehensive "1. Behavioral Alignment Summary" of 300-450 words targeting their future role: ${profile.expectedFutureRole}.
 
-Current Role: ${profile.currentRole}
-Expected Future Role: ${profile.expectedFutureRole}
-DISC Dominant Trait: ${disc.dominantTrait}
-Experience: ${profile.yearsOfExperience} years in ${profile.currentIndustry}
+Profile Details:
+- Name: ${profile.fullName}
+- Current Role: ${profile.currentRole}
+- Years of Experience: ${profile.yearsOfExperience}
+- Current Industry: ${profile.currentIndustry}
+- Expected Future Role: ${profile.expectedFutureRole}
+- DISC Dominant Trait: ${disc.dominantTrait} (${disc.traitDescription})
+- Agile/Agility Level: ${agile.level} (${agile.description})
 
-Focus on how their behavioral profile aligns with the target role. Be specific and insightful. No bullet points, just flowing text.`;
+The summary MUST consist of exactly two parts:
+
+Part 1:
+"The behavioral profile indicates a professional who naturally operates with:"
+Followed by exactly 4 detailed, descriptive bullet points/lines (each starting with -) analyzing their behavioral characteristics based on their DISC trait and professional experience. Make each point rich and professional (15-25 words each).
+Example:
+- High standards and structured thinking (process + precision mindset) to ensure reliable operations.
+- Direct, outcome-driven leadership with a strong focus on clear decisions, structured tasks, and execution accountability.
+- Data-backed judgment, preferring logical analytics, objective research, and detailed facts over emotion in decisions.
+- Systems and governance orientation, utilizing standardized policies, repeatable frameworks, and scalable quality controls.
+
+Part 2:
+A rich, detailed paragraph of 4-6 sentences explaining how this behavioral combination aligns with the demands of their expected future role (${profile.expectedFutureRole}) in scaling organizations, contrasting it with other styles, and highlighting their optimal leadership environment.
+
+IMPORTANT CONSTRAINTS:
+- Do NOT mention specific DISC scores, D/I/S/C percentages, or agile score numbers.
+- Write in third person, professional and analytical tone.
+- Do NOT recommend any courses or training programs.`;
 
         try {
             const content = await resilientLLMCall(
                 this.groqClient,
                 [{ role: 'user', content: prompt }],
-                { maxTokens: 500, logger: this.logger },
+                { maxTokens: 800, logger: this.logger },
             );
-            return content || this.getDefaultBehavioralSummary(disc);
+            return content || this.getRichDefaultBehavioralSummary(profile, disc, agile);
         } catch (error) {
             this.logger.error('Error generating behavioral summary:', error);
-            return this.getDefaultBehavioralSummary(disc);
+            return this.getRichDefaultBehavioralSummary(profile, disc, agile);
         }
     }
 
@@ -554,6 +594,9 @@ Return ONLY the JSON array, no other text.`;
     /**
      * Generate executive insight via AI
      */
+    /**
+     * Generate executive insight via AI
+     */
     private async generateExecutiveInsight(
         profile: CareerProfileData,
         fitment: RoleFitmentScore,
@@ -579,10 +622,35 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
                 [{ role: 'user', content: prompt }],
                 { maxTokens: 500, logger: this.logger },
             );
-            return content || 'Based on current assessment, you show strong potential for role transition with focused development.';
+            return content || this.getRichDynamicExecutiveInsight(profile, fitment, readiness, agile);
         } catch (error) {
             this.logger.error('Error generating executive insight:', error);
-            return 'Based on current assessment, you show strong potential for role transition with focused development.';
+            return this.getRichDynamicExecutiveInsight(profile, fitment, readiness, agile);
+        }
+    }
+
+    /**
+     * Get rich, dynamic executive insight fallback based on student/corporate status and target role
+     */
+    private getRichDynamicExecutiveInsight(
+        profile: CareerProfileData,
+        fitment: RoleFitmentScore,
+        readiness: FutureRoleReadiness,
+        agile: AgileProfile,
+    ): string {
+        const isStudent =
+            profile.currentRole?.toUpperCase() === 'STUDENT' ||
+            profile.currentRole?.toLowerCase().includes('student') ||
+            profile.currentRole?.toLowerCase().includes('not specified') ||
+            profile.yearsOfExperience === 0;
+
+        const name = profile.fullName;
+        const target = profile.expectedFutureRole || 'their future career path';
+
+        if (isStudent) {
+            return `${name} is a highly motivated and promising individual with a strong learning agility level of ${agile.level} (${agile.percentage}%). Their behavioral profile and cognitive capability make them well-suited for growth and development in ${target}. With dedicated focus on acquiring specialized skills, they have the potential to excel in their academic and professional journey.\n\nTo maximize their potential, ${name} should focus on developing key strengths, improving communication, gaining practical experience through projects or internships, and staying updated with industry trends. This proactive approach will enhance their overall career readiness and competitive positioning in the job market.\n\nAs a student, ${name} is in an ideal position to leverage their current strengths and pursue specialized courses or hands-on practice. Doing so will build a robust academic foundation and ensure a successful transition into their desired professional role.`;
+        } else {
+            return `Based on the assessment, ${name} shows a final role fitment score of ${fitment.totalScore}% with a ${readiness.adjacencyType} transition profile towards the ${target} position. Their behavioral alignment and experience readiness indicate strong core competencies that can be leveraged for this career shift.\n\nTo ensure a seamless transition, ${name} should focus on bridge-building initiatives: mapping current operational expertise to strategic demands, elevating executive communication, and strengthening core domain knowledge required for the target role.\n\nWith a focused development roadmap and the support of Origin BI's transition insights, ${name} is well-positioned to bridge the identified skill gaps and achieve sustained success in their future professional endeavors.`;
         }
     }
 
@@ -658,14 +726,14 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
 
         const totalScore = Math.round(behavioralScore + experienceScore + skillCoverage + growthFeasibility);
 
-        // Generate verdict
+        // Generate verdict matching standard ranges (80+=Strong, 60-79=Moderate, <60=Development Needed)
         let verdict: string;
         if (totalScore >= 80) {
             verdict = 'STRONG FIT. Highly aligned with role requirements.';
         } else if (totalScore >= 60) {
-            verdict = 'CONDITIONAL STRONG FIT. Well-suited with minor development areas.';
-        } else {
             verdict = 'MODERATE FIT. Good potential with focused development needed.';
+        } else {
+            verdict = 'DEVELOPMENT NEEDED. Significant alignment and development required.';
         }
 
         return {
@@ -705,16 +773,28 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
     private extractSkillInsights(skills: SkillCategory[]): { highStrengthAreas: string[]; developableAreas: string[] } {
         const highStrength: string[] = [];
         const developable: string[] = [];
+        const allSkills: { name: string; score: number }[] = [];
 
         skills.forEach(cat => {
             cat.skills.forEach(skill => {
+                allSkills.push({ name: skill.name, score: skill.score });
                 if (skill.score >= 4.0) {
-                    highStrength.push(skill.name.toLowerCase());
+                    highStrength.push(skill.name);
                 } else if (skill.score < 3.5) {
-                    developable.push(skill.name.toLowerCase());
+                    developable.push(skill.name);
                 }
             });
         });
+
+        if (highStrength.length === 0 && allSkills.length > 0) {
+            const sorted = [...allSkills].sort((a, b) => b.score - a.score);
+            highStrength.push(...sorted.slice(0, 5).map(s => s.name));
+        }
+
+        if (developable.length === 0 && allSkills.length > 0) {
+            const sorted = [...allSkills].sort((a, b) => a.score - b.score);
+            developable.push(...sorted.slice(0, 5).map(s => s.name));
+        }
 
         return {
             highStrengthAreas: highStrength.slice(0, 5),
@@ -782,12 +862,16 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
             ]);
 
             const currentRole = extractField([
+                /curr[en]{1,3}t\s*role[:\s]*([^\n]+)/i,
+                /curr[en]{1,3}ect\s*role[:\s]*([^\n]+)/i,
                 /current\s*role[:\s]*([^\n]+)/i,
                 /(?:working as|position|designation)[:\s]*([^\n]+)/i,
             ]);
 
             const currentJobDescription = extractField([
                 /(?:current\s*)?job\s*description[:\s]*([^\n]+(?:\n(?![A-Z][a-z]*:)[^\n]+)*)/i,
+                /role\s*des[cr]{1,3}iption[:\s]*([^\n]+(?:\n(?![A-Z][a-z]*:)[^\n]+)*)/i,
+                /role\s*description[:\s]*([^\n]+(?:\n(?![A-Z][a-z]*:)[^\n]+)*)/i,
                 /responsibilities[:\s]*([^\n]+(?:\n(?![A-Z][a-z]*:)[^\n]+)*)/i,
             ]);
 
@@ -869,6 +953,7 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
         let realAgileProfile: AgileProfile | null = null;
         let realSkillCategories: SkillCategory[] | null = null;
         let dbProfileOverrides: Partial<CareerProfileData> = {};
+        let dbAssessmentSessionId: string | null = null;
 
         try {
             // Normalize the input name for matching
@@ -885,6 +970,7 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
                     r.assessment_session_id,
                     r.metadata as reg_metadata,
                     u.email as user_email,
+                    u.role as user_role,
                     
                     -- Assessment Attempt Data
                     aa.id as attempt_id,
@@ -936,6 +1022,7 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
 
             if (results && results.length > 0) {
                 const latestRegistration = results[0];
+                dbAssessmentSessionId = latestRegistration.assessment_session_id || null;
                 const latestRegMetadata = parseJsonObject(
                     latestRegistration.reg_metadata,
                 );
@@ -943,18 +1030,21 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
                     latestRegistration.attempt_metadata,
                 );
 
+                const isStudent = latestRegistration.user_role === 'STUDENT' || !latestRegistration.company_name;
                 dbProfileOverrides = {
                     fullName: latestRegistration.full_name || profileInput.name,
                     email: latestRegistration.user_email || '',
                     currentRole:
                         latestRegMetadata.currentRole ||
                         latestAttemptMetadata.currentRole ||
-                        profileInput.currentRole,
+                        profileInput.currentRole ||
+                        (isStudent ? 'Student' : ''),
                     currentJobDescription:
                         latestRegMetadata.roleDescription ||
                         latestRegMetadata.currentJobDescription ||
                         latestAttemptMetadata.jobDescription ||
-                        profileInput.currentJobDescription,
+                        profileInput.currentJobDescription ||
+                        (isStudent ? 'Student' : ''),
                     yearsOfExperience:
                         latestRegMetadata.yearsOfExperience ??
                         latestAttemptMetadata.yearsOfExperience ??
@@ -979,35 +1069,37 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
                 results.forEach((r: any, idx: number) => {
                     this.logger.log(`  [${idx}] ${r.full_name} | attempt_id: ${r.attempt_id} | status: ${r.attempt_status} | agile_score: ${r.agile_score} | disc_type: ${r.disc_type}`);
                 });
-
                 // Find COMPLETED attempts - filter by status
                 const completedAttempts = results.filter((r: any) => r.attempt_status === 'COMPLETED');
                 this.logger.log(`📊 Found ${completedAttempts.length} COMPLETED attempts`);
 
-                // Get the best/latest completed attempt
+                // Combine attempts by scanning for DISC and Agile attributes across all completed attempts.
+                const discAttempt = completedAttempts.find((r: any) => r.disc_type || r.disc_code || r.dominant_trait_id || r.report_disc_scores) || completedAttempts[0];
+                const agileAttempt = completedAttempts.find((r: any) => parseFloat(r.agile_score) > 0 || r.report_agile_scores || r.attempt_metadata?.agile_scores) || completedAttempts[0];
+
                 const latestAttempt = completedAttempts[0];
 
                 if (latestAttempt) {
                     hasAssessmentData = true;
-                    this.logger.log(`✅ Using COMPLETED assessment for ${latestAttempt.full_name}`);
-                    this.logger.log(`   📈 Agile Score: ${latestAttempt.agile_score}`);
-                    this.logger.log(`   📊 DISC Type: ${latestAttempt.disc_type} (${latestAttempt.disc_code})`);
-                    this.logger.log(`   📋 Trait ID: ${latestAttempt.dominant_trait_id}`);
+                    this.logger.log(`✅ Using COMPLETED assessments (Combined: DISC Attempt ${discAttempt?.attempt_id}, Agile Attempt ${agileAttempt?.attempt_id})`);
+                    this.logger.log(`   📈 Agile Score: ${agileAttempt?.agile_score}`);
+                    this.logger.log(`   📊 DISC Type: ${discAttempt?.disc_type} (${discAttempt?.disc_code})`);
+                    this.logger.log(`   📋 Trait ID: ${discAttempt?.dominant_trait_id || latestAttempt.dominant_trait_id}`);
 
                     // 1. EXTRACT DISC PROFILE
                     // Priority: disc_type from personality_traits > report_disc_scores > attempt_metadata
                     let discScores: any = null;
-                    let dominantTraitName = latestAttempt.disc_type || null;
-                    let traitDescription = latestAttempt.disc_description || '';
+                    let dominantTraitName = discAttempt?.disc_type || null;
+                    let traitDescription = discAttempt?.disc_description || '';
 
                     // Try to get DISC scores from different sources
-                    if (latestAttempt.report_disc_scores) {
-                        discScores = typeof latestAttempt.report_disc_scores === 'string'
-                            ? JSON.parse(latestAttempt.report_disc_scores)
-                            : latestAttempt.report_disc_scores;
+                    if (discAttempt?.report_disc_scores) {
+                        discScores = typeof discAttempt.report_disc_scores === 'string'
+                            ? JSON.parse(discAttempt.report_disc_scores)
+                            : discAttempt.report_disc_scores;
                         this.logger.log(`   📊 DISC Scores from report: ${JSON.stringify(discScores)}`);
-                    } else if (latestAttempt.attempt_metadata?.disc_scores) {
-                        discScores = latestAttempt.attempt_metadata.disc_scores;
+                    } else if (discAttempt?.attempt_metadata?.disc_scores) {
+                        discScores = discAttempt.attempt_metadata.disc_scores;
                         this.logger.log(`   📊 DISC Scores from attempt metadata: ${JSON.stringify(discScores)}`);
                     } else {
                         // Scan all completed attempts for DISC metadata
@@ -1019,9 +1111,9 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
                     }
 
                     // Build DISC Profile
-                    if (dominantTraitName || discScores || latestAttempt.disc_code) {
+                    if (dominantTraitName || discScores || discAttempt?.disc_code) {
                         realDiscProfile = {
-                            dominantTrait: dominantTraitName || latestAttempt.disc_code || 'D',
+                            dominantTrait: dominantTraitName || discAttempt?.disc_code || 'D',
                             traitDescription: traitDescription || 'Assessment completed - behavioral profile analyzed.',
                             scoreD: Number(discScores?.D || discScores?.d || 0),
                             scoreI: Number(discScores?.I || discScores?.i || 0),
@@ -1032,7 +1124,7 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
                     } else {
                         this.logger.warn(`   ⚠️ No DISC profile data found, but assessment is completed`);
                         // Still create a profile with the dominant trait if we have it
-                        if (latestAttempt.dominant_trait_id) {
+                        if (discAttempt?.dominant_trait_id) {
                             realDiscProfile = {
                                 dominantTrait: 'Assessed',
                                 traitDescription: 'Behavioral assessment completed.',
@@ -1042,17 +1134,17 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
                     }
 
                     // 2. EXTRACT AGILE PROFILE (from total_score)
-                    const agileTotal = Number(latestAttempt.agile_score || 0);
+                    const agileTotal = Number(agileAttempt?.agile_score || 0);
                     if (agileTotal > 0) {
                         realAgileProfile = this.getAgileProfile(agileTotal);
                         this.logger.log(`   ✅ Built Agile Profile: ${realAgileProfile.level} (${agileTotal}/125 = ${realAgileProfile.percentage}%)`);
                     } else {
                         // Try to get from report agile_scores
                         let agileScores: any = null;
-                        if (latestAttempt.report_agile_scores) {
-                            agileScores = typeof latestAttempt.report_agile_scores === 'string'
-                                ? JSON.parse(latestAttempt.report_agile_scores)
-                                : latestAttempt.report_agile_scores;
+                        if (agileAttempt?.report_agile_scores) {
+                            agileScores = typeof agileAttempt.report_agile_scores === 'string'
+                                ? JSON.parse(agileAttempt.report_agile_scores)
+                                : agileAttempt.report_agile_scores;
                             const agileFromReport = Number(agileScores?.total || agileScores?.score || 0);
                             realAgileProfile = this.getAgileProfile(agileFromReport);
                             this.logger.log(`   ✅ Built Agile Profile from report: ${realAgileProfile.level}`);
@@ -1244,7 +1336,7 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
 
         // Generate report ID (indicates whether it used real data or not)
         const reportPrefix = hasValidAssessmentData ? 'OBI-CFR' : 'OBI-CHAT';
-        const reportId = `${reportPrefix}-${new Date().getMonth() + 1}/${new Date().getFullYear().toString().slice(2)}-${profile.fullName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 3)}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+        const reportId = dbAssessmentSessionId || `${reportPrefix}-${new Date().getMonth() + 1}/${new Date().getFullYear().toString().slice(2)}-${profile.fullName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 3)}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
 
         this.logger.log(`📄 Generated report: ${reportId} (Assessment Data: ${hasValidAssessmentData ? 'YES' : 'NO'})`);
 
@@ -1306,16 +1398,13 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
      * Get NOT ASSESSED behavioral summary
      */
     private getNotAssessedBehavioralSummary(profile: CareerProfileData): string {
-        return `⚠️ ASSESSMENT NOT COMPLETED
+        return `The behavioral profile indicates a professional who naturally operates with:
+- Solid operational foundation with ${profile.yearsOfExperience} years of experience as ${profile.currentRole || 'a candidate'}.
+- Domain-specific expertise in the ${profile.currentIndustry || 'target'} industry.
+- Structured thinking and process orientation, which can be leveraged for scalable workflows.
+- Professional ambition and commitment to strategic growth toward a ${profile.expectedFutureRole || 'future'} track.
 
-${profile.fullName} has not completed the Origin BI behavioral and agility assessment. Without assessment data, we cannot provide accurate behavioral analysis or skill evaluation.
-
-To receive a comprehensive Career Fitment Report with accurate insights, please:
-1. Register on the Origin BI platform
-2. Complete the full behavioral and agility assessment
-3. Request a new report after assessment completion
-
-The profile information provided indicates ${profile.yearsOfExperience} years of experience in ${profile.currentIndustry} as ${profile.currentRole}, with aspirations toward ${profile.expectedFutureRole}. However, accurate fitment analysis requires completion of our standardized assessment.`;
+Without active assessment data, this summary represents a career trajectory projection. To receive a personalized, data-backed behavioral alignment analysis and specific style indicators, please complete the behavioral and agility assessments on the Origin BI platform.`;
     }
 
     /**
@@ -1388,12 +1477,59 @@ Contact your administrator or visit the Origin BI platform to complete your asse
     }
 
     /**
+     * Helper to return an extremely detailed, rich default summary based on candidate's DISC blended style
+     */
+    private getRichDefaultBehavioralSummary(profile: CareerProfileData, discProfile: DiscProfile, agileProfile: AgileProfile): string {
+        const style = (discProfile.dominantTrait || '').toUpperCase();
+        let bullets: string[] = [];
+        let paragraph = '';
+
+        if (style.includes('STRUCTURED SUPPORTER') || style.includes('CS') || style.includes('SC')) {
+            bullets = [
+                'High standards and structured thinking (process + precision mindset) to ensure reliable operations.',
+                'Direct, outcome-driven leadership with a strong focus on clear decisions, structured tasks, and execution accountability.',
+                'Data-backed judgment, preferring logical analytics, objective research, and detailed facts over emotion in decisions.',
+                'Systems and governance orientation, utilizing standardized policies, repeatable frameworks, and scalable quality controls.'
+            ];
+            paragraph = `This behavioral combination aligns strongly with ${profile.expectedFutureRole || 'target'} roles in scaling organizations, where success depends on building repeatable people systems, enforcing performance discipline, and establishing measurable governance. Compared to highly relationship-centric or 'emotion-first' styles, this structured leadership style performs best when leading operations as a rigorous operating system for business growth, connecting talent outcomes to productivity KPIs.`;
+        } else if (style.includes('DOMINANT') || style.includes('D')) {
+            bullets = [
+                'Commanding and outcome-driven leadership style with a natural focus on fast decisions, goal completion, and high accountability.',
+                'High standards for performance, constantly pushing the organization and team to achieve challenging strategic objectives.',
+                'Direct and clear communication, minimizing ambiguity and keeping team members focused on business impact and speed.',
+                'Strategic problem-solving orientation, comfortable navigating crises and making tough choices under high-pressure scenarios.'
+            ];
+            paragraph = `This decisive behavioral profile aligns perfectly with high-growth and turnaround initiatives for ${profile.expectedFutureRole || 'target'} positions. Their competitive drive and focus on performance KPIs enable them to establish clear operational direction and build a high-performance culture. They accelerate fastest in environments requiring rapid change, business transformation, and clear outcome-based governance.`;
+        } else if (style.includes('INFLUENCER') || style.includes('I')) {
+            bullets = [
+                'Inspiring and people-centric leadership style, excelling at stakeholder engagement, team motivation, and cultural influence.',
+                'Highly collaborative communication, building consensus and alignment across cross-functional teams with empathy.',
+                'Creative and innovative problem-solving, bringing fresh perspectives, energetic ideas, and strategic agility to growth.',
+                'Relationship-driven alignment, leveraging storytelling and positive reinforcement to drive adoption of organizational change.'
+            ];
+            paragraph = `This expressive and highly interactive profile performs exceptionally well in ${profile.expectedFutureRole || 'target'} roles where success relies on culture engineering, stakeholder negotiation, and change adoption. Their natural warmth and influence enable them to build strong employer brands and scale hiring operations through high engagement. They thrive when leading through collaboration and driving strategic vision.`;
+        } else {
+            // Default generic fallback
+            bullets = [
+                `Strong professional capability as a ${profile.currentRole || 'candidate'} with a solid foundation in the ${profile.currentIndustry || 'domain'} industry.`,
+                `Outcome-driven operational leadership with a focus on structured tasks, team ownership, and consistent execution.`,
+                `Analytical and data-backed judgment, leveraging experience and logical problem-solving for business growth.`,
+                `Adaptable transition orientation, demonstrating readiness to align behavioral style with new strategic responsibilities.`
+            ];
+            paragraph = `This professional profile demonstrates a balanced blend of operational focus and readiness for career growth. Their behavioral indicators suggest strong capability to transition into a ${profile.expectedFutureRole || 'target'} track, where they can build repeatable systems, optimize team performance, and align people objectives with business KPIs.`;
+        }
+
+        return `The behavioral profile indicates a professional who naturally operates with:\n` + 
+               bullets.map(b => `- ${b}`).join('\n') + `\n\n` + paragraph;
+    }
+
+    /**
      * Generate behavioral summary for chat-based profile (with real assessment data)
      */
     private async generateChatBehavioralSummary(profile: CareerProfileData, discProfile: DiscProfile, agileProfile: AgileProfile): Promise<string> {
-        const prompt = `Based on this professional profile, generate a 2-3 paragraph behavioral summary:
+        const prompt = `Based on the professional profile and assessment results of ${profile.fullName}, generate a highly detailed and comprehensive "1. Behavioral Alignment Summary" of 300-450 words targeting their future role: ${profile.expectedFutureRole}.
 
-Profile:
+Profile Details:
 - Name: ${profile.fullName}
 - Current Role: ${profile.currentRole}
 - Job Description: ${profile.currentJobDescription}
@@ -1401,31 +1537,39 @@ Profile:
 - Relevant Experience: ${profile.relevantExperience}
 - Current Industry: ${profile.currentIndustry}
 - Expected Future Role: ${profile.expectedFutureRole}
+- DISC Dominant Trait: ${discProfile.dominantTrait} (${discProfile.traitDescription})
+- Agile/Agility Level: ${agileProfile.level} (${agileProfile.description})
 
-Write a professional behavioral summary that:
-1. Analyzes their behavioral traits based on their professional experience and role
-2. Discusses their readiness and adaptability for the target role
-3. Identifies behavioral strengths and potential development areas based on their career trajectory
+The summary MUST consist of exactly two parts:
 
-IMPORTANT RULES:
-- Do NOT mention any DISC profile, DISC type, D/I/S/C categories, or DISC scores
-- Do NOT mention any Agile/Agility scores, percentages, or specific agility levels
-- Do NOT recommend any courses, certifications, Coursera, edX, Udemy, or external training programs
-- Focus on professional behavioral insights derived from their experience and role
+Part 1:
+"The behavioral profile indicates a professional who naturally operates with:"
+Followed by exactly 4 detailed, descriptive bullet points/lines (each starting with -) analyzing their behavioral characteristics based on their DISC trait and professional experience. Make each point rich and professional (15-25 words each).
+Example:
+- High standards and structured thinking (process + precision mindset) to ensure reliable operations.
+- Direct, outcome-driven leadership with a strong focus on clear decisions, structured tasks, and execution accountability.
+- Data-backed judgment, preferring logical analytics, objective research, and detailed facts over emotion in decisions.
+- Systems and governance orientation, utilizing standardized policies, repeatable frameworks, and scalable quality controls.
 
-Write in third person, professional tone. No bullet points, just flowing paragraphs.`;
+Part 2:
+A rich, detailed paragraph of 4-6 sentences explaining how this behavioral combination aligns with the demands of their expected future role (${profile.expectedFutureRole}) in scaling organizations, contrasting it with other styles, and highlighting their optimal leadership environment.
+
+IMPORTANT CONSTRAINTS:
+- Do NOT mention specific DISC scores, D/I/S/C percentages, or agile score numbers.
+- Write in third person, professional and analytical tone.
+- Do NOT recommend any courses or training programs.`;
 
         try {
             const response = await resilientLLMCall(
                 this.groqClient,
                 [{ role: 'user', content: prompt }],
-                { maxTokens: 500, temperature: 0.7, logger: this.logger },
+                { maxTokens: 800, temperature: 0.7, logger: this.logger },
             );
 
-            return response || this.getDefaultAssessedBehavioralSummary(profile, discProfile, agileProfile);
+            return response || this.getRichDefaultBehavioralSummary(profile, discProfile, agileProfile);
         } catch (error) {
             this.logger.error(`Failed to generate behavioral summary: ${error.message}`);
-            return this.getDefaultAssessedBehavioralSummary(profile, discProfile, agileProfile);
+            return this.getRichDefaultBehavioralSummary(profile, discProfile, agileProfile);
         }
     }
 
@@ -1433,18 +1577,20 @@ Write in third person, professional tone. No bullet points, just flowing paragra
      * Default behavioral summary for assessed profiles
      */
     private getDefaultAssessedBehavioralSummary(profile: CareerProfileData, discProfile: DiscProfile, agileProfile: AgileProfile): string {
-        return `Based on the Origin BI assessment, ${profile.fullName} demonstrates strong professional capabilities with ${profile.yearsOfExperience} years of experience as ${profile.currentRole} in the ${profile.currentIndustry} industry. The assessment reveals strong adaptability to change and new challenges, indicating ${agileProfile.percentage >= 70 ? 'excellent' : agileProfile.percentage >= 50 ? 'good' : 'developing'} readiness for career transitions.
-
-The behavioral assessment suggests ${discProfile.traitDescription || 'a balanced approach to work and leadership'}. Combined with their career trajectory toward ${profile.expectedFutureRole}, this indicates ${agileProfile.percentage >= 60 ? 'readiness for strategic leadership challenges' : 'potential for growth with focused development'}.`;
+        return this.getRichDefaultBehavioralSummary(profile, discProfile, agileProfile);
     }
 
     /**
      * Default behavioral summary for chat-based profiles (no assessment)
      */
     private getDefaultChatBehavioralSummary(profile: CareerProfileData): string {
-        return `Based on their ${profile.yearsOfExperience} years of experience as ${profile.currentRole} in the ${profile.currentIndustry} industry, this professional demonstrates a strong foundation in their domain. Their career trajectory from their current role to the aspired position of ${profile.expectedFutureRole} suggests ambition and strategic career planning.
+        return `The behavioral profile indicates a professional who naturally operates with:
+- Structured thinking and process orientation, which can be leveraged for scalable workflows.
+- Professional ambition and commitment to strategic growth toward a ${profile.expectedFutureRole || 'future'} track.
+- Outcome-driven operational leadership with a focus on structured tasks, team ownership, and consistent execution.
+- Domain-specific expertise in the ${profile.currentIndustry || 'target'} industry.
 
-The profile indicates structured thinking and outcome-driven leadership qualities. Their experience in ${profile.relevantExperience || profile.currentIndustry} provides valuable insights that can be leveraged in the target role. This professional is likely to bring discipline, process orientation, and domain expertise to new challenges.`;
+Based on their ${profile.yearsOfExperience} years of experience as ${profile.currentRole} in the ${profile.currentIndustry} industry, this professional demonstrates a strong foundation in their domain. Their career trajectory from their current role to the aspired position of ${profile.expectedFutureRole} suggests ambition and strategic career planning. Their experience in ${profile.relevantExperience || profile.currentIndustry} provides valuable insights that can be leveraged in the target role.`;
     }
     /**
      * Generate TEAM / GROUP Report - Delegates to OverallRoleFitmentService

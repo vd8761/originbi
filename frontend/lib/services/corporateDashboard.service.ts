@@ -350,7 +350,14 @@ export const corporateDashboardService = {
         }
 
         if (!res.ok) {
-            throw new Error("Failed to search report");
+            let errorMsg = "Failed to search report";
+            try {
+                const errData = await res.json();
+                if (errData.message) {
+                    errorMsg = errData.message;
+                }
+            } catch (e) {}
+            throw new Error(errorMsg);
         }
         return res.json();
     }

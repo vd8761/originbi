@@ -476,11 +476,18 @@ export class RagService {
       /^\s*(?:[a-z]+\.?\s*){1,4}\s+report\b/i.test(q)
       && !/\b(test|assessment|exam|overall|custom|fitment|placement|program|batch|group)\b/.test(q);
 
-    if (/\b(career\s*report|future\s*role|role\s*readiness)\b/.test(q) ||
+    const isCareerQuery = /\b(career|fitment|readiness|future\s*role|role\s*readiness)\b/i.test(q);
+
+    if (isCareerQuery && (/\b(career\s*report|future\s*role|role\s*readiness|fitment|readiness)\b/.test(q) ||
       (/\breport\b/.test(q) && /\b(for|of|about)\b/.test(q)) ||
-      bareNameReportPattern) {
+      bareNameReportPattern)) {
       const name = this.extractName(message);
       return { intent: 'career_report', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    if (!isCareerQuery && (/\breport\b/.test(q) || bareNameReportPattern)) {
+      const name = this.extractName(message);
+      return { intent: 'person_lookup', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
     }
 
     if (/\b(list|show|get|display|view)\b\s+(my|our)?\s*\b(candidates?|students?|employees?|resources?|staff|members?|people|peoples|persons?)\b/.test(q)) {
@@ -1475,7 +1482,14 @@ export class RagService {
         }
       }
 
-      const disambiguationSelectionMatch = normalizedQ.match(/^#?\s*(\d+)(?:[\s,.-]*[a-z][a-z\s.'-]{0,40})?$/i);
+      let disambiguationSelectionMatch = normalizedQ.match(/^#?\s*(\d+)\.?\s*$/i);
+      if (!disambiguationSelectionMatch) {
+        disambiguationSelectionMatch = normalizedQ.match(/^(?:option|choice|select|number|num|#)?\s*(\d+)\.?\s*$/i);
+      }
+      if (!disambiguationSelectionMatch) {
+        disambiguationSelectionMatch = normalizedQ.match(/^#?\s*(\d+)[\s,.-]+[a-z0-9][^\n]{0,80}$/i);
+      }
+
       if (disambiguationSelectionMatch) {
         const disambigKey = this.getDisambiguationKey(user);
         const ctx = this.disambiguationCache.get(disambigKey);
@@ -3152,13 +3166,17 @@ Please tell me the target role first, for example:
     const term = searchTerm!;
 
     // Check if user specified a number (e.g., "anjaly #2" or "anjaly 2")
+    // Only treat as index selection if the matched number is small (<= 15) to avoid treating mobile suffixes as selection indices
     const numberMatch = term.match(/(.+?)\s*[#]?\s*(\d+)$/);
     let targetIndex = 0;
     let cleanSearchTerm = term;
 
     if (numberMatch) {
-      cleanSearchTerm = numberMatch[1].trim();
-      targetIndex = parseInt(numberMatch[2]) - 1; // Convert to 0-based index
+      const parsedNum = parseInt(numberMatch[2], 10);
+      if (parsedNum <= 15) {
+        cleanSearchTerm = numberMatch[1].trim();
+        targetIndex = parsedNum - 1; // Convert to 0-based index
+      }
     }
 
     // Extract email if present in the search term (e.g., "anjaly anjaly@email.com")
@@ -3215,6 +3233,7 @@ Please tell me the target role first, for example:
       const careerReportSql = `
                 SELECT 
                     r.id,
+                    r.user_id,
                     r.full_name,
                     r.gender,
                     r.mobile_number,
@@ -3224,6 +3243,7 @@ Please tell me the target role first, for example:
                     r.student_board,
                     r.registration_source,
                     u.email,
+                    u.role as user_role,
                     aa.total_score,
                     aa.sincerity_index,
                     pt.blended_style_name as behavioral_style,
@@ -3269,10 +3289,13 @@ Please tell me the target role first, for example:
         }
         personData = await this.dataSource.query(`
                 SELECT 
-                  r.id, r.full_name, r.gender, r.mobile_number,
+                  r.id,
+                  r.user_id,
+                  r.full_name, r.gender, r.mobile_number,
                   r.metadata as reg_metadata,
                     r.school_level, r.school_stream, r.student_board, r.registration_source,
                     u.email,
+                    u.role as user_role,
                     aa.total_score, aa.sincerity_index,
                     pt.blended_style_name as behavioral_style,
                     pt.blended_style_desc as behavior_description,
@@ -3390,28 +3413,34 @@ Please tell me the target role first, for example:
       const scoreToUse = person.best_score || person.total_score;
 
       // ── Build smart ProfileInput based on actual student data ──
-      const isStudent = !person.company_name; // No corporate = student
+      const isStudent = person.user_role === 'STUDENT' || !person.company_name; // No corporate / role is STUDENT = student
       const schoolInfo = [person.school_level, person.school_stream, person.student_board].filter(Boolean).join(' / ');
       const deptInfo = [person.degree_name, person.department_name].filter(Boolean).join(' — ');
+
       const storedCurrentRole = String(regMetadata.currentRole || '').trim();
-      const storedRoleDescription = String(
-        regMetadata.roleDescription || regMetadata.currentJobDescription || '',
-      ).trim();
 
-      if (!storedCurrentRole || !storedRoleDescription) {
+      let storedYearsOfExperience = regMetadata.yearsOfExperience;
+      if ((storedYearsOfExperience === undefined || storedYearsOfExperience === null || storedYearsOfExperience === '') && isStudent) {
+        storedYearsOfExperience = 0;
+      }
+
+      const isRoleMissing = !storedCurrentRole || storedCurrentRole.toLowerCase() === 'not specified' || storedCurrentRole === '';
+      const isExperienceMissing = storedYearsOfExperience === undefined || storedYearsOfExperience === null || String(storedYearsOfExperience).toLowerCase().includes('not specified') || storedYearsOfExperience === '';
+
+      if (isRoleMissing || isExperienceMissing) {
         const missingFields: string[] = [];
-        if (!storedCurrentRole) missingFields.push('Current Role');
-        if (!storedRoleDescription) missingFields.push('Role Description');
+        if (isRoleMissing) missingFields.push('Current Role');
+        if (isExperienceMissing) missingFields.push('Years of Experience');
 
-        const currentRoleLine = !storedCurrentRole
-          ? `Current Role: [Your current job title]\n`
-          : '';
-        const roleDescriptionLine = !storedRoleDescription
-          ? `Role Description: [Briefly describe responsibilities]\n`
-          : '';
+        const currentRoleLine = isRoleMissing
+          ? `Current Role: [Your current job title or Student]\n`
+          : `Current Role: ${storedCurrentRole}\n`;
+        const yearsOfExperienceLine = isExperienceMissing
+          ? `Years of Experience: [e.g. 5 or 0 for students]\n`
+          : `Years of Experience: ${storedYearsOfExperience}\n`;
 
         return {
-          answer: `**⚠️ ${person.full_name || cleanSearchTerm} is found, but ${missingFields.join(' and ')} ${missingFields.length === 1 ? 'is' : 'are'} missing in registration metadata.**\n\nPlease provide the missing details in this format:\n\n\`\`\`\nName: ${person.full_name || cleanSearchTerm}\n${currentRoleLine}${roleDescriptionLine}\`\`\`\n\nIf these fields are already saved in DB next time, I will use them automatically.`,
+          answer: `**⚠️ ${person.full_name || cleanSearchTerm} is found, but ${missingFields.join(' and ')} ${missingFields.length === 1 ? 'is' : 'are'} missing in registration metadata.**\n\nPlease provide the missing details in this format:\n\n\`\`\`\nName: ${person.full_name || cleanSearchTerm}\n${currentRoleLine}${yearsOfExperienceLine}\`\`\`\n\nAfter you provide this, I will save it to the registration metadata and generate the report immediately.`,
           searchType: 'chat_profile_request',
           confidence: 0.95,
         };
@@ -3420,6 +3449,12 @@ Please tell me the target role first, for example:
       const currentRole = storedCurrentRole || (isStudent
         ? (deptInfo ? `Student (${deptInfo})` : (schoolInfo ? `Student (${schoolInfo})` : 'Student'))
         : (person.company_name ? `Employee at ${person.company_name}` : 'Assessment Candidate'));
+
+      const storedRoleDescription = String(
+        regMetadata.roleDescription || 
+        regMetadata.currentJobDescription || 
+        (isStudent ? 'Student' : currentRole || 'Professional')
+      ).trim();
       const currentIndustry = regMetadata.currentIndustry || (isStudent
         ? (person.department_name || 'Education / Academics')
         : (person.company_name || 'Professional'));
@@ -3448,8 +3483,18 @@ Please tell me the target role first, for example:
         attemptCount: person.attempt_count ? parseInt(person.attempt_count) : undefined,
       } as any);
 
+      const downloadUrl = `/rag/custom-report/pdf?userId=${person.user_id}&type=career_fitment`;
+
       return {
-        answer: report.fullReportText,
+        answer: `### 📊 **Career Fitment & Future Role Readiness Report**
+
+I'm ready to generate **${person.full_name}'s Career Fitment & Future Role Readiness Report**! 🎯
+
+📄 **[Click here to download your personalized PDF Report](${downloadUrl})**
+
+---
+
+${report.fullReportText}`,
         searchType: 'career_report',
         reportId: report.reportId,
         confidence: 0.95,
@@ -3680,12 +3725,16 @@ Please tell me the target role first, for example:
     const userId = user?.id;
 
     // Check for disambiguation number (e.g., "jai #2" or bare "2")
+    // Only treat as index selection if the matched number is small (<= 15) to avoid treating mobile suffixes as selection indices
     const numberMatch = searchTerm.match(/(.+?)\s*[#]?\s*(\d+)$/);
     let targetIndex = -1;
     let cleanSearch = searchTerm;
     if (numberMatch && numberMatch[1].trim().length > 0) {
-      cleanSearch = numberMatch[1].trim();
-      targetIndex = parseInt(numberMatch[2]) - 1; // 0-based
+      const parsedNum = parseInt(numberMatch[2], 10);
+      if (parsedNum <= 15) {
+        cleanSearch = numberMatch[1].trim();
+        targetIndex = parsedNum - 1; // 0-based
+      }
     }
 
     try {
@@ -4119,203 +4168,7 @@ Please tell me the target role first, for example:
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLER: CUSTOM REPORT (Career Fitment, etc.)
-  // ═══════════════════════════════════════════════════════════════════════════
-  private async handleCustomReport(user: any, searchTerm: string | null, question: string): Promise<QueryResult> {
-    try {
-      const userRole = user?.role || 'STUDENT';
-      const corporateId = user?.corporateId;
-      const userId = user?.id;
-      let targetUserId: number | null = null;
-      let targetName = searchTerm;
-      let targetIndex = -1;
-
-      // RBAC: Students can only generate reports for themselves
-      if (userRole === 'STUDENT') {
-        let selfLookup: any[] = [];
-        // Try user_id first
-        if (userId && userId > 0) {
-          selfLookup = await this.executeDatabaseQuery(
-            `SELECT r.user_id, r.full_name FROM registrations r WHERE r.user_id = $1 AND r.is_deleted = false ORDER BY r.created_at DESC LIMIT 1`,
-            [userId]
-          );
-        }
-        // Fallback: use email when userId is 0 or lookup failed
-        if (selfLookup.length === 0 && (user?.email || user?.sub)) {
-          const email = user?.email || user?.sub;
-          this.logger.log(`📋 Custom report: userId=${userId} lookup failed, trying email: ${email}`);
-          selfLookup = await this.executeDatabaseQuery(
-            `SELECT r.user_id, r.full_name FROM registrations r JOIN users u ON r.user_id = u.id WHERE u.email = $1 AND r.is_deleted = false ORDER BY r.created_at DESC LIMIT 1`,
-            [email]
-          );
-        }
-        if (selfLookup.length > 0) {
-          targetUserId = parseInt(selfLookup[0].user_id);
-          targetName = selfLookup[0].full_name;
-        } else {
-          return {
-            answer: `I couldn't find your registration data. Please make sure you've completed your profile.`,
-            searchType: 'error',
-            confidence: 0,
-          };
-        }
-      } else {
-        // ADMIN or CORPORATE: lookup by name
-        if (!targetName) {
-          targetName = this.extractName(question);
-        }
-
-        if (targetName) {
-          const numberMatch = targetName.match(/(.+?)\s*[#]?\s*(\d+)$/);
-          if (numberMatch) {
-            targetName = numberMatch[1].trim();
-            targetIndex = parseInt(numberMatch[2], 10) - 1;
-          }
-
-          this.logger.log(`🔍 Looking up user by name: "${targetName}"`);
-
-          // RBAC: Corporate users can only find candidates in their company
-          let lookupSql: string;
-          let lookupParams: any[];
-          const fuzzyLike = `%${targetName.toLowerCase()}%`;
-          const exactLower = targetName.toLowerCase();
-          const prefixLower = `${targetName.toLowerCase()}%`;
-
-          if (userRole === 'CORPORATE' && corporateId) {
-            lookupSql = `
-              SELECT r.user_id, r.full_name, u.email,
-                     CASE
-                       WHEN LOWER(r.full_name) = $2 THEN 100
-                       WHEN LOWER(r.full_name) LIKE $3 THEN 92
-                       WHEN LOWER(split_part(r.full_name, ' ', 1)) = $2 THEN 90
-                       WHEN LOWER(split_part(r.full_name, ' ', 1)) LIKE $3 THEN 86
-                       WHEN LOWER(r.full_name) LIKE $1 THEN 70
-                       ELSE 0
-                     END AS match_score
-              FROM registrations r
-              LEFT JOIN users u ON r.user_id = u.id
-              WHERE LOWER(r.full_name) LIKE $1
-              AND r.is_deleted = false
-              AND r.corporate_account_id = $4
-              ORDER BY match_score DESC, r.created_at DESC
-              LIMIT 10
-            `;
-            lookupParams = [fuzzyLike, exactLower, prefixLower, corporateId];
-          } else {
-            // ADMIN: search all
-            lookupSql = `
-              SELECT r.user_id, r.full_name, u.email,
-                     CASE
-                       WHEN LOWER(r.full_name) = $2 THEN 100
-                       WHEN LOWER(r.full_name) LIKE $3 THEN 92
-                       WHEN LOWER(split_part(r.full_name, ' ', 1)) = $2 THEN 90
-                       WHEN LOWER(split_part(r.full_name, ' ', 1)) LIKE $3 THEN 86
-                       WHEN LOWER(r.full_name) LIKE $1 THEN 70
-                       ELSE 0
-                     END AS match_score
-              FROM registrations r
-              LEFT JOIN users u ON r.user_id = u.id
-              WHERE LOWER(r.full_name) LIKE $1
-              AND r.is_deleted = false
-              ORDER BY match_score DESC, r.created_at DESC
-              LIMIT 10
-            `;
-            lookupParams = [fuzzyLike, exactLower, prefixLower];
-          }
-
-          const results = await this.executeDatabaseQuery(lookupSql, lookupParams);
-
-          if (results && results.length > 1 && targetIndex < 0) {
-            let response = `**👥 I found multiple close matches for "${targetName}".**\n\nPlease reply with the exact full name:\n\n`;
-            results.slice(0, 5).forEach((person: any, idx: number) => {
-              response += `**${idx + 1}.** ${person.full_name}\n`;
-            });
-            response += `\nYou can also reply with a number (e.g. **1** or **2**).`;
-
-            this.disambiguationCache.set(this.getDisambiguationKey(user), {
-              searchTerm: targetName,
-              timestamp: Date.now(),
-              handler: 'custom_report',
-              options: results.slice(0, 10).map((p: any) => {
-                const email = p.email ? ` ${p.email}` : '';
-                return `${p.full_name}${email}`.trim();
-              }),
-            });
-
-            return {
-              answer: response,
-              searchType: 'disambiguation',
-              confidence: 0.72,
-            };
-          }
-
-          if (results && results.length > 1 && targetIndex >= 0) {
-            if (targetIndex >= results.length) {
-              return {
-                answer: `**❌ Invalid selection.** Please use a number between 1 and ${results.length}.`,
-                searchType: 'disambiguation',
-                confidence: 0.4,
-              };
-            }
-            targetUserId = parseInt(results[targetIndex].user_id);
-            targetName = results[targetIndex].full_name;
-            this.logger.log(`✅ Selected disambiguated user: ${targetName} (ID: ${targetUserId})`);
-          }
-
-          if (!targetUserId && results && results.length > 0) {
-            targetUserId = parseInt(results[0].user_id);
-            targetName = results[0].full_name;
-            this.logger.log(`✅ Found user: ${targetName} (ID: ${targetUserId})`);
-          }
-
-          if (!results || results.length === 0) {
-            const scopeMsg = userRole === 'CORPORATE' ? ' in your organization' : '';
-            return {
-              answer: `**⚠️ User "${targetName}" not found${scopeMsg}.** Please check the name and try again.\n\nYou can ask:\n- "Generate career fitment report for [full name]"\n- "Custom report for [person name]"`,
-              searchType: 'error',
-              confidence: 0,
-            };
-          }
-        } else {
-          return {
-            answer: `**⚠️ Please specify a name for the report.** \n\nExample:\n- "Generate career fitment report for Anjaly"\n- "Custom report for John Smith"`,
-            searchType: 'error',
-            confidence: 0,
-          };
-        }
-      }
-
-      if (!targetUserId) {
-        return {
-          answer: `**⚠️ No user specified.** Please provide a name to generate the report for.\n\nExample: "Generate career fitment report for Anjaly"`,
-          searchType: 'error',
-          confidence: 0,
-        };
-      }
-
-      this.logger.log(`📊 Generating Custom Career Fitment Report for ${targetName} (userId: ${targetUserId})`);
-
-      // Use userId to avoid ambiguity when multiple users share the same name.
-      const downloadUrl = `/rag/custom-report/pdf?userId=${targetUserId}&type=career_fitment`;
-
-      return {
-        answer: `I'm ready to generate **${targetName}'s Career Fitment & Future Role Readiness Report**! 🎯\n\n📄 **[Click here to download the personalized PDF Report](${downloadUrl})**\n\nThis report includes:\n- Profile Snapshot\n- Behavioral Alignment Summary\n- Skill Assessment with AI-generated scores\n- Future Role Readiness Mapping\n- Role Fitment Score\n- Industry Suitability Analysis\n- Transition Requirements\n- Executive Insights\n\nDownload the PDF for the complete analysis!`,
-        searchType: 'custom_report',
-        confidence: 0.95,
-      };
-    } catch (error) {
-      this.logger.error(`Custom report error: ${error.message}`);
-      return {
-        answer: `**I couldn't generate the custom report right now.** ${this.sanitizeErrorForUser(error)}`,
-        searchType: 'error',
-        confidence: 0,
-      };
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // HANDLER: CHAT-BASED PROFILE REPORT (User provides profile data in chat)
-  // ═══════════════════════════════════════════════════════════════════════════
-  private async handleChatProfileReport(question: string, user?: any): Promise<QueryResult> {
+  // ═══════════════════════════════════════════�  private async handleChatProfileReport(question: string, user?: any): Promise<QueryResult> {
     try {
       this.logger.log('📋 Processing chat-based profile for custom report generation');
 
@@ -4340,17 +4193,23 @@ Please tell me the target role first, for example:
       const profileGuardParams: any[] = [`\\m${profileData.name}\\M`];
       const profileUserRole = (user?.role || 'STUDENT').toUpperCase();
       const profileCorporateId = user?.corporateId;
+      const profileUserId = user?.id;
+
       if (profileUserRole === 'CORPORATE' && profileCorporateId) {
         corporateFilter = ' AND r.corporate_account_id = $2';
         profileGuardParams.push(profileCorporateId);
+      } else if (profileUserRole === 'STUDENT' && profileUserId) {
+        corporateFilter = ' AND r.user_id = $2';
+        profileGuardParams.push(profileUserId);
       }
 
-          let dbCheck = await this.dataSource.query(
+      let dbCheck = await this.dataSource.query(
         `SELECT r.id, r.full_name, r.user_id,
-          r.metadata as reg_metadata,
-                (SELECT COUNT(*) FROM assessment_attempts aa
-                 WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
+          r.metadata as reg_metadata, u.role as user_role,
+                 (SELECT COUNT(*) FROM assessment_attempts aa
+                  WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
          FROM registrations r
+         LEFT JOIN users u ON r.user_id = u.id
          WHERE r.full_name ~* $1 AND r.is_deleted = false${corporateFilter}
          ORDER BY r.created_at DESC LIMIT 5`,
         profileGuardParams
@@ -4365,13 +4224,17 @@ Please tell me the target role first, for example:
         if (profileUserRole === 'CORPORATE' && profileCorporateId) {
           iLikeFilter2 = ' AND r.corporate_account_id = $2';
           iLikeParams2.push(profileCorporateId);
+        } else if (profileUserRole === 'STUDENT' && profileUserId) {
+          iLikeFilter2 = ' AND r.user_id = $2';
+          iLikeParams2.push(profileUserId);
         }
         dbCheck = await this.dataSource.query(
           `SELECT r.id, r.full_name, r.user_id,
-            r.metadata as reg_metadata,
+            r.metadata as reg_metadata, u.role as user_role,
                   (SELECT COUNT(*) FROM assessment_attempts aa
                    WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
            FROM registrations r
+           LEFT JOIN users u ON r.user_id = u.id
            WHERE LOWER(r.full_name) LIKE $1 AND r.is_deleted = false${iLikeFilter2}
            ORDER BY r.created_at DESC LIMIT 5`,
           iLikeParams2
@@ -4431,12 +4294,261 @@ Please tell me the target role first, for example:
       const providedJobDescription = profileData.currentJobDescription?.trim() || '';
 
       const resolvedCurrentRole = String(
-        bestRegMetadata.currentRole || providedCurrentRole || '',
+        bestRegMetadata.currentRole || 
+        providedCurrentRole || 
+        (bestMatch.user_role === 'STUDENT' ? 'Student' : '') || 
+        '',
       ).trim();
+      
+      const isStudentRole =
+        bestMatch.user_role === 'STUDENT' ||
+        resolvedCurrentRole.toLowerCase().includes('student');
+
+      const providedYears = profileData.yearsOfExperience;
+      const storedYears = bestRegMetadata.yearsOfExperience;
+
+      let resolvedYearsOfExperience = 
+        (storedYears !== undefined && storedYears !== null && storedYears !== '')
+          ? Number(storedYears)
+          : (providedYears !== null ? Number(providedYears) : null);
+
+      if (resolvedYearsOfExperience === null && isStudentRole) {
+        resolvedYearsOfExperience = 0;
+      }
+
+      const isRoleMissing = !resolvedCurrentRole || resolvedCurrentRole.toLowerCase() === 'not specified' || resolvedCurrentRole === '';
+      const isExperienceMissing = resolvedYearsOfExperience === undefined || resolvedYearsOfExperience === null || String(resolvedYearsOfExperience).toLowerCase().includes('not specified') || resolvedYearsOfExperience === '';
+
+      if (isRoleMissing || isExperienceMissing) {
+        const missingFields: string[] = [];
+        if (isRoleMissing) missingFields.push('Current Role');
+        if (isExperienceMissing) missingFields.push('Years of Experience');
+
+        const currentRoleLine = isRoleMissing
+          ? `Current Role: [Your current job title or Student]\n`
+          : `Current Role: ${resolvedCurrentRole}\n`;
+        const yearsOfExperienceLine = isExperienceMissing
+          ? `Years of Experience: [e.g. 5 or 0 for students]\n`
+          : `Years of Experience: ${resolvedYearsOfExperience}\n`;
+
+        return {
+          answer: `**⚠️ ${bestMatch.full_name} is found, but ${missingFields.join(' and ')} ${missingFields.length === 1 ? 'is' : 'are'} missing in registration metadata.**\n\nPlease provide only the missing details:\n\n\`\`\`\nName: ${bestMatch.full_name}\n${currentRoleLine}${yearsOfExperienceLine}\`\`\`\n\nAfter you provide this, I will generate the report immediately.`,
+          searchType: 'chat_profile_request',
+          confidence: 0.95,
+        };
+      }
+
       const resolvedJobDescription = String(
         bestRegMetadata.roleDescription ||
           bestRegMetadata.currentJobDescription ||
           providedJobDescription ||
+          (isStudentRole ? 'Student' : resolvedCurrentRole || 'Professional') ||
+          '',
+      ).trim();
+
+      // Encode the profile data as base64 for the URL — merge DB data with provided profile
+      const reportPayload = {
+        name: bestMatch.full_name, // Use the DB name for accuracy
+        currentRole: resolvedCurrentRole,
+        currentJobDescription: resolvedJobDescription,
+        yearsOfExperience: resolvedYearsOfExperience,
+        relevantExperience: profileData.relevantExperience || bestRegMetadata.relevantExperience || '',
+        currentIndustry:
+          bestRegMetadata.currentIndustry || profileData.currentIndustry || 'Not Specified',
+        expectedFutureRole:
+          bestRegMetadata.expectedFutureRole ||
+          profileData.expectedFutureRole ||
+          'Not Specified',
+        expectedIndustry:
+          bestRegMetadata.expectedIndustry || profileData.expectedIndustry || '',
+      };
+
+      // Save/update the metadata in database registrations table
+      const updatedMetadata = {
+        ...bestRegMetadata,
+        currentRole: reportPayload.currentRole,
+        roleDescription: reportPayload.currentJobDescription,
+        currentJobDescription: reportPayload.currentJobDescription,
+        yearsOfExperience: reportPayload.yearsOfExperience,
+        relevantExperience: reportPayload.relevantExperience,
+        currentIndustry: reportPayload.currentIndustry,
+        expectedFutureRole: reportPayload.expectedFutureRole,
+        expectedIndustry: reportPayload.expectedIndustry,
+      };
+
+      try {
+        await this.dataSource.query(
+          `UPDATE registrations SET metadata = $1 WHERE id = $2`,
+          [JSON.stringify(updatedMetadata), bestMatch.id]
+        );
+        this.logger.log(`💾 Saved updated metadata to registration ID ${bestMatch.id}`);
+      } catch (dbErr) {
+        this.logger.error(`Error saving metadata to registration: ${dbErr.message}`);
+      }
+
+      const encodedProfile = Buffer.from(JSON.stringify(reportPayload)).toString('base64');ars of Experience** are not specified in their profile metadata.\n\nPlease reply with their details in the following format:\n\n\`\`\`\nName: ${targetName}\n${currentRoleLine}${yearsOfExperienceLine}\`\`\`\n\nAfter you provide this, I will save it to the registration metadata and generate the report immediately.`,
+            searchType: 'chat_profile_request',
+            confidence: 0.95,
+          };
+        }
+      }
+
+      this.logger.log(`📊 Generating Custom Career Fitment Report for ${targetName} (userId: ${targetUserId})`);
+
+      // Use userId to avoid ambiguity when multiple users share the same name.
+      const downloadUrl = `/rag/custom-report/pdf?userId=${targetUserId}&type=career_fitment`;
+
+      return {
+        answer: `I'm ready to generate **${targetName}'s Career Fitment & Future Role Readiness Report**! 🎯\n\n📄 **[Click here to download the personalized PDF Report](${downloadUrl})**\n\nThis report includes:\n- Profile Snapshot\n- Behavioral Alignment Summary\n- Skill Assessment with AI-generated scores\n- Future Role Readiness Mapping\n- Role Fitment Score\n- Industry Suitability Analysis\n- Transition Requirements\n- Executive Insights\n\nDownload the PDF for the complete analysis!`,
+        searchType: 'custom_report',
+        confidence: 0.95,
+      };
+    } catch (error) {
+      this.logger.error(`Custom report error: ${error.message}`);
+      return {
+        answer: `**I couldn't generate the custom report right now.** ${this.sanitizeErrorForUser(error)}`,
+        searchType: 'error',
+        confidence: 0,
+      };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HANDLER: CHAT-BASED PROFILE REPORT (User provides profile data in chat)
+  // ═══════════════════════════════════════════════════════════════════════════
+  private async handleChatProfileReport(question: string, user?: any): Promise<QueryResult> {
+    try {
+      this.logger.log('📋 Processing chat-based profile for custom report generation');
+
+      // Parse profile from chat message
+      const profileData = this.parseProfileFromChat(question);
+
+      if (!profileData) {
+        return {
+          answer: `**📝 I detected you want to generate a custom report!**\n\nPlease provide the following details in your message:\n\n\`\`\`\nName: [Full Name]\nCurrent Role: [Your current job title]\nCurrent Job Description: [Brief description of responsibilities]\nYears of Experience: [Number]\nRelevant Experience: [Key focus areas]\nCurrent Industry: [Industry name]\nExpected Future Role: [Target role you aspire to]\n\`\`\`\n\n**Example:**\n\`\`\`\nName: Anjaly\nCurrent Role: VP- Sales and Marketing\nCurrent Job Description: Driving revenue growth and brand positioning\nYears of Experience: 15\nRelevant Experience: 10 years in Retail industry\nCurrent Industry: IT\nExpected Future Role: CTO for Aerospace/BFSI\n\`\`\`\n\nOnce you provide these details, I'll generate a personalized Career Fitment Report for you!`,
+          searchType: 'chat_profile_request',
+          confidence: 0.9,
+        };
+      }
+
+      // ══════════════════════════════════════════════════════════
+      // DB VALIDATION: Verify the person exists in our database
+      // with completed assessment data before generating a report.
+      // We NEVER generate reports for people not in our system.
+      // Uses word-boundary matching for precision (prevents "jai" → "JAISHREE")
+      // ══════════════════════════════════════════════════════════
+      let corporateFilter = '';
+      const profileGuardParams: any[] = [`\\m${profileData.name}\\M`];
+      const profileUserRole = (user?.role || 'STUDENT').toUpperCase();
+      const profileCorporateId = user?.corporateId;
+      if (profileUserRole === 'CORPORATE' && profileCorporateId) {
+        corporateFilter = ' AND r.corporate_account_id = $2';
+        profileGuardParams.push(profileCorporateId);
+      }
+
+          let dbCheck = await this.dataSource.query(
+        `SELECT r.id, r.full_name, r.user_id,
+          r.metadata as reg_metadata, u.role as user_role,
+                (SELECT COUNT(*) FROM assessment_attempts aa
+                 WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
+         FROM registrations r
+         LEFT JOIN users u ON r.user_id = u.id
+         WHERE r.full_name ~* $1 AND r.is_deleted = false${corporateFilter}
+         ORDER BY r.created_at DESC LIMIT 5`,
+        profileGuardParams
+      );
+
+      // Fallback to ILIKE if word-boundary returned 0
+      let usedProfileILIKEFallback = false;
+      if (!dbCheck || dbCheck.length === 0) {
+        usedProfileILIKEFallback = true;
+        const iLikeParams2: any[] = [`%${profileData.name.toLowerCase()}%`];
+        let iLikeFilter2 = '';
+        if (profileUserRole === 'CORPORATE' && profileCorporateId) {
+          iLikeFilter2 = ' AND r.corporate_account_id = $2';
+          iLikeParams2.push(profileCorporateId);
+        }
+        dbCheck = await this.dataSource.query(
+          `SELECT r.id, r.full_name, r.user_id,
+            r.metadata as reg_metadata, u.role as user_role,
+                  (SELECT COUNT(*) FROM assessment_attempts aa
+                   WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
+           FROM registrations r
+           LEFT JOIN users u ON r.user_id = u.id
+           WHERE LOWER(r.full_name) LIKE $1 AND r.is_deleted = false${iLikeFilter2}
+           ORDER BY r.created_at DESC LIMIT 5`,
+          iLikeParams2
+        );
+      }
+
+      if (!dbCheck || dbCheck.length === 0) {
+        const scopeMsg = profileUserRole === 'CORPORATE' ? ' within your organization' : '';
+        this.logger.warn(`❌ Chat profile report: "${profileData.name}" not found${scopeMsg}`);
+        return {
+          answer: `**⚠️ "${profileData.name}" was not found${scopeMsg}.**\n\nTry this:\n• Check the spelling\n• Ask **"list candidates"**\n• Ask the person to complete assessment before report generation`,
+          searchType: 'person_not_found',
+          confidence: 0.95,
+        };
+      }
+
+      // If ILIKE fallback was used, verify exact word-token match
+      if (usedProfileILIKEFallback && !this.hasExactTokenMatch(profileData.name, dbCheck)) {
+        this.logger.log(`⚠️ Chat profile: ILIKE matched but no exact token for "${profileData.name}" — showing fuzzy disambiguation`);
+        return this.buildFuzzyDisambiguation(profileData.name, dbCheck, 'career_report');
+      }
+
+      // Check if at least one match has completed assessments
+      const withAssessment = dbCheck.filter((r: any) => parseInt(r.completed_count) > 0);
+      if (withAssessment.length === 0) {
+        const names = dbCheck.map((r: any) => r.full_name).join(', ');
+        this.logger.warn(`❌ Chat profile report: "${profileData.name}" found but no completed assessments`);
+        return {
+          answer: `**⚠️ Found "${names}", but no completed assessments yet.**\n\nCareer Fitment Report is available after assessment completion.\n\n**Next steps:**\n1. Complete behavioral assessment\n2. Complete aptitude/agile assessment`,
+          searchType: 'no_assessment_data',
+          confidence: 0.95,
+        };
+      }
+
+      // Use the best match from DB (person with completed assessment)
+      const bestMatch = withAssessment[0];
+      this.logger.log(`✅ DB validated: ${bestMatch.full_name} (userId: ${bestMatch.user_id}, assessments: ${bestMatch.completed_count})`);
+
+      const parseMetadata = (value: any): Record<string, any> => {
+        if (!value) return {};
+        if (typeof value === 'string') {
+          try {
+            return JSON.parse(value);
+          } catch {
+            return {};
+          }
+        }
+        return value;
+      };
+
+      const bestRegMetadata = parseMetadata(bestMatch.reg_metadata);
+      const providedCurrentRole =
+        profileData.currentRole &&
+        profileData.currentRole.toLowerCase() !== 'not specified'
+          ? profileData.currentRole.trim()
+          : '';
+      const providedJobDescription = profileData.currentJobDescription?.trim() || '';
+
+      const resolvedCurrentRole = String(
+        bestRegMetadata.currentRole || 
+        providedCurrentRole || 
+        (bestMatch.user_role === 'STUDENT' ? 'Student' : '') || 
+        '',
+      ).trim();
+      
+      const isStudentRole =
+        bestMatch.user_role === 'STUDENT' ||
+        resolvedCurrentRole.toLowerCase().includes('student');
+
+      const resolvedJobDescription = String(
+        bestRegMetadata.roleDescription ||
+          bestRegMetadata.currentJobDescription ||
+          providedJobDescription ||
+          (isStudentRole ? 'Student' : '') ||
           '',
       ).trim();
 
@@ -4478,6 +4590,29 @@ Please tell me the target role first, for example:
           bestRegMetadata.expectedIndustry || profileData.expectedIndustry || '',
       };
 
+      // Save/update the metadata in database registrations table
+      const updatedMetadata = {
+        ...bestRegMetadata,
+        currentRole: reportPayload.currentRole,
+        roleDescription: reportPayload.currentJobDescription,
+        currentJobDescription: reportPayload.currentJobDescription,
+        yearsOfExperience: reportPayload.yearsOfExperience,
+        relevantExperience: reportPayload.relevantExperience || bestRegMetadata.relevantExperience || '',
+        currentIndustry: reportPayload.currentIndustry || bestRegMetadata.currentIndustry || '',
+        expectedFutureRole: reportPayload.expectedFutureRole || bestRegMetadata.expectedFutureRole || '',
+        expectedIndustry: reportPayload.expectedIndustry || bestRegMetadata.expectedIndustry || '',
+      };
+
+      try {
+        await this.dataSource.query(
+          `UPDATE registrations SET metadata = $1 WHERE id = $2`,
+          [JSON.stringify(updatedMetadata), bestMatch.id]
+        );
+        this.logger.log(`💾 Saved updated metadata to registration ID ${bestMatch.id}`);
+      } catch (dbErr) {
+        this.logger.error(`Error saving metadata to registration: ${dbErr.message}`);
+      }
+
       const encodedProfile = Buffer.from(JSON.stringify(reportPayload)).toString('base64');
       const downloadUrl = `/rag/chat-report/download?profile=${encodedProfile}`;
 
@@ -4504,7 +4639,7 @@ Please tell me the target role first, for example:
     name: string;
     currentRole: string;
     currentJobDescription: string;
-    yearsOfExperience: number;
+    yearsOfExperience: number | null;
     relevantExperience: string;
     currentIndustry: string;
     expectedFutureRole: string;
@@ -4527,12 +4662,15 @@ Please tell me the target role first, for example:
       ]);
 
       const currentRole = extractField([
+        /curr[en]{1,3}t\s*role[:\s]*([^\n]+)/i,
+        /curr[en]{1,3}ect\s*role[:\s]*([^\n]+)/i,
         /current\s*role[:\s]*([^\n]+)/i,
         /(?:working as|position|designation)[:\s]*([^\n]+)/i,
       ]);
 
       const currentJobDescription = extractField([
         /(?:current\s*)?job\s*description[:\s]*([^\n]+(?:\n(?![A-Z][a-z]*:)[^\n]+)*)/i,
+        /role\s*des[cr]{1,3}iption[:\s]*([^\n]+(?:\n(?![A-Z][a-z]*:)[^\n]+)*)/i,
         /role\s*description[:\s]*([^\n]+(?:\n(?![A-Z][a-z]*:)[^\n]+)*)/i,
         /responsibilities[:\s]*([^\n]+)/i,
       ]);
@@ -4542,7 +4680,7 @@ Please tell me the target role first, for example:
         /(\d+)\s*years?\s*(?:of\s*)?experience/i,
         /experience[:\s]*(\d+)/i,
       ]);
-      const yearsOfExperience = parseInt(yearsStr) || 0;
+      const yearsOfExperience = yearsStr ? parseInt(yearsStr, 10) : null;
       const relevantExperience = extractField([
         /relevant\s*experience[:\s\(]*([^\n\)]+)/i,
         /key\s*focus\s*areas?[:\s]*([^\n]+)/i,
@@ -4891,6 +5029,23 @@ Please tell me the target role first, for example:
     includePersonality: boolean;
   } {
     const q = question.toLowerCase();
+
+    // Career Report / Career Fitment / Role Readiness overrides
+    // Diverts queries asking for general reports or career/readiness/fitment reports
+    // to the 'career_report' intent instead of letting them fall to 'person_lookup'
+    if (/\b(career\s*report|fitment\s*report|career\s*fitment|role\s*readiness|readiness\s*report)\b/.test(q) ||
+        (/\breport\b/.test(q) && /\b(for|of|about)\b/.test(q) && !/\b(test|assessment|aptitude|agile|exam)\s+report\b/.test(q))) {
+      const name = this.extractName(question);
+      if (name) {
+        this.logger.log(`🔄 Domain override: career report keywords detected — routing to career_report for "${name}"`);
+        return {
+          intent: 'career_report',
+          searchTerm: name,
+          table: 'assessment_attempts',
+          includePersonality: true,
+        };
+      }
+    }
 
     if (result.intent.startsWith('affiliate_') || /\baffiliate|referral|commission|settlement|payout\b/.test(q)) {
       // Determine the best affiliate sub-intent
@@ -5330,8 +5485,15 @@ Please tell me the target role first, for example:
       return { intent: 'count', searchTerm: null, table: 'registrations', includePersonality: false, gender } as any;
     }
 
-    // Chat profile report (contains structured "Name:", "Current Role:", etc.)
-    if (/name\s*:/i.test(q) && (/current\s*role\s*:/i.test(q) || /experience\s*:/i.test(q) || /industry\s*:/i.test(q))) {
+    // Chat profile report (contains structured "Name:", "Current/Currect/Curret Role:", etc.)
+    const isProfileTemplate = /name\s*:/i.test(q) && (
+      /curr[en]{1,3}t\s*role\s*:/i.test(q) || 
+      /curr[en]{1,3}ect\s*role\s*:/i.test(q) || 
+      /role\s*des[cr]{1,3}iption\s*:/i.test(q) ||
+      /experience\s*:/i.test(q) || 
+      /industry\s*:/i.test(q)
+    );
+    if (isProfileTemplate) {
       return { intent: 'chat_profile_report', searchTerm: null, table: 'none', includePersonality: false };
     }
 
@@ -5530,8 +5692,10 @@ Please tell me the target role first, for example:
 
     // Career report for someone
     // SAFETY: Exclude program/batch/group queries (already handled above)
-    if (/\b(career\s*report|future\s*role|role\s*readiness)\b/.test(q) ||
-        (/\bgenerate.*report\b/.test(q) && !batchGroupProgramGuard.test(q))) {
+    const isCareerQuery = /\b(career|fitment|readiness|future\s*role|role\s*readiness)\b/i.test(q);
+
+    if (isCareerQuery && (/\b(career\s*report|future\s*role|role\s*readiness|fitment|readiness)\b/.test(q) ||
+        (/\bgenerate.*report\b/.test(q) && !batchGroupProgramGuard.test(q)))) {
       const name = this.extractName(question);
       return { intent: 'career_report', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
     }
@@ -5541,10 +5705,8 @@ Please tell me the target role first, for example:
     if (/\breport\b/i.test(q) && /\b(for|of|about)\s+/i.test(q)) {
       const name = this.extractName(question);
       if (name) {
-        const isTestReport = /\b(test\s+reports?|assessment\s+reports?|exam\s+reports?)\b/i.test(q);
-        const isTestResults = /\b(test\s+results?|test\s+scores?|assessment\s+results?|exam\s+results?|exam\s+scores?|score\s+details?)\b/i.test(q);
         return {
-          intent: isTestReport ? 'person_lookup' : (isTestResults ? 'person_lookup' : 'career_report'),
+          intent: isCareerQuery ? 'career_report' : 'person_lookup',
           searchTerm: name,
           table: 'assessment_attempts',
           includePersonality: true,
@@ -5557,10 +5719,8 @@ Please tell me the target role first, for example:
       // First try extractName which is smarter about finding actual person names
       const nameFromExtract = this.extractName(question);
       if (nameFromExtract) {
-        const isTestReport = /\b(test\s+reports?|assessment\s+reports?|exam\s+reports?)\b/i.test(q);
-        const isTestResults = /\b(test\s+results?|test\s+scores?|assessment\s+results?|exam\s+results?|exam\s+scores?|score\s+details?)\b/i.test(q);
         return {
-          intent: isTestReport ? 'person_lookup' : (isTestResults ? 'person_lookup' : 'career_report'),
+          intent: isCareerQuery ? 'career_report' : 'person_lookup',
           searchTerm: nameFromExtract,
           table: 'assessment_attempts',
           includePersonality: true,
@@ -5589,10 +5749,8 @@ Please tell me the target role first, for example:
         cleanedBeforeReport = cleanedBeforeReport.replace(leadingStopWords, '').trim();
       }
       if (cleanedBeforeReport.length >= 2 && !/^(show|get|list|create|generate|overall|custom|my|test|exam|assessment)$/i.test(cleanedBeforeReport)) {
-        const isTestReport = /\b(test\s+reports?|assessment\s+reports?|exam\s+reports?)\b/i.test(q);
-        const isTestResults = /\b(test\s+results?|test\s+scores?|assessment\s+results?|exam\s+results?|exam\s+scores?|score\s+details?)\b/i.test(q);
         return {
-          intent: isTestReport ? 'person_lookup' : (isTestResults ? 'person_lookup' : 'career_report'),
+          intent: isCareerQuery ? 'career_report' : 'person_lookup',
           searchTerm: cleanedBeforeReport,
           table: 'assessment_attempts',
           includePersonality: true,

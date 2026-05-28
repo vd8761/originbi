@@ -5,19 +5,6 @@ import {
   SkillCategory,
 } from '../../rag/custom-report.service';
 
-// Table of Contents Items
-const TOC_ITEMS = [
-  'Profile Snapshot',
-  'Behavioral Alignment Summary',
-  'Skill-wise Capability Assessment',
-  'Overall Skill Coverage Insight',
-  'Future Role Readiness Mapping',
-  'Role Fitment Score Analysis',
-  'Industry-Specific Suitability',
-  'Key Transition Requirements',
-  'Origin BI Executive Insight',
-];
-
 export class CareerFitmentReport extends BaseReport {
   private data: CareerFitmentReportData;
 
@@ -27,40 +14,24 @@ export class CareerFitmentReport extends BaseReport {
   }
 
   public generate(): Buffer {
-    // 1. Cover Page
+    // Page 1: Cover Page
     this.generateCoverPage();
 
-    // 2. Table of Contents
-    this._currentBackground = 'Content_Background.jpg';
-    this._useStdMargins = false;
-    this.doc.addPage();
-    this.generateTableOfContents();
-
-    // 3. Content pages with watermark background
+    // Page 2+: Profile Snapshot, Behavioral Summary, Skill Assessment Category rendering, Radar Chart, and Overall Insights (dynamic)
     this._currentBackground = 'Watermark_Background.jpg';
     this._useStdMargins = true;
-
-    // Page 3: Profile + Behavioral Summary
     this.doc.addPage();
-    this.generateProfileSection();
-    this.generateBehavioralSummary();
+    this.generatePage2();
 
-    // Page 4+: Skill Assessment
+    // Page 4: Future Role Readiness Mapping Table & Scores, Fitment Score & Verdict
     this.doc.addPage();
-    this.generateSkillAssessment();
+    this.generatePage5();
 
-    // Readiness & Fitment
+    // Page 5: Industry Suitability, Transition Requirements, Executive Insight
     this.doc.addPage();
-    this.generateReadinessSection();
-    this.generateFitmentScore();
+    this.generatePage6();
 
-    // Industry Suitability, Transition, Executive Insight
-    this.doc.addPage();
-    this.generateIndustrySuitability();
-    this.generateTransitionRequirements();
-    this.generateExecutiveInsight();
-
-    // Add footers
+    // Add footers to all content pages
     this.addFooters();
 
     this.doc.end();
@@ -69,14 +40,14 @@ export class CareerFitmentReport extends BaseReport {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // COVER PAGE
+  // COVER PAGE (PAGE 1)
   // ═══════════════════════════════════════════════════════════════════════════
   private generateCoverPage(): void {
     this._useStdMargins = false;
     this._currentBackground = null;
 
-    // Background Image - Use Handbook_Cover_Default.jpg
-    const bgPath = this.getAssetPath('Handbook_Cover_Default.jpg');
+    // Background Image - Use Cover_Background.jpg
+    const bgPath = this.getAssetPath('Cover_Background.jpg');
     if (fs.existsSync(bgPath)) {
       this.doc.image(bgPath, 0, 0, {
         width: this.PAGE_WIDTH,
@@ -87,311 +58,464 @@ export class CareerFitmentReport extends BaseReport {
       this.doc.rect(0, 0, this.PAGE_WIDTH, this.PAGE_HEIGHT).fill('#F0F8FF');
     }
 
-    // Title - Top Left Area
-    const titleStartY = 30;
-    this.doc
-      .font(this.FONT_SORA_BOLD)
-      .fontSize(30)
-      .fillColor(this.COLOR_DEEP_BLUE)
-      .text('Career Fitment &', 30, titleStartY, { align: 'left' })
-      .text('Future Role Readiness', 30, titleStartY + 48, { align: 'left' })
-      .text('Report', 30, titleStartY + 96, { align: 'left' });
+    // --- Vertical Reference Number ---
+    if (this.data.reportId && !this.data.reportId.startsWith('OBI-CFR') && !this.data.reportId.startsWith('OBI-CHAT')) {
+      const refNoX = this.PAGE_WIDTH - 47;
+      const refNoY = 150;
 
-    // Rotated Reference Number on Right Edgey
-    this.doc.save();
-    this.doc.rotate(-90, { origin: [this.PAGE_WIDTH - 20, 200] });
-    this.doc
-      .font('Helvetica')
-      .fontSize(7)
-      .fillColor('#AAAAAA')
-      .opacity(0.5)
-      .text(`${this.data.reportId}`, this.PAGE_WIDTH - 200, 200 - 10);
-    this.doc.restore();
-    this.doc.opacity(1);
+      this.doc.save(); // Save state before rotation
 
-    // Bottom Section - User Name & Info
-    const bottomY = this.PAGE_HEIGHT - 150;
+      this.doc.translate(refNoX, refNoY);
+      this.doc.rotate(-90, { origin: [0, 0] });
 
-    // Left Side: Name, Title, Date
-    this.doc
-      .font(this.FONT_SORA_BOLD)
-      .fontSize(20)
-      .fillColor(this.COLOR_DEEP_BLUE)
-      .text(
-        this.data.profile.fullName
-          .split(/Current Role|Job Description|Experience/i)[0]
-          .trim()
-          .substring(0, 50),
-        50,
-        bottomY,
-      );
-
-    this.doc
-      .font(this.FONT_REGULAR)
-      .fontSize(14)
-      .fillColor(this.COLOR_BLACK)
-      .text('Future Role Readiness Assessment', 50, bottomY + 32);
-
-    const dateStr = this.data.generatedDate.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
-    this.doc
-      .font(this.FONT_REGULAR)
-      .fontSize(11)
-      .fillColor('#666666')
-      .text(dateStr, 50, bottomY + 58);
-
-    // Right Side: Company Name
-    this.doc
-      .font(this.FONT_SORA_BOLD)
-      .fontSize(13)
-      .fillColor(this.COLOR_DEEP_BLUE)
-      .text('Infiniti Software', this.PAGE_WIDTH - 250, bottomY + 40, {
-        width: 200,
-        align: 'right',
-      });
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // TABLE OF CONTENTS
-  // ═══════════════════════════════════════════════════════════════════════════
-  private generateTableOfContents(): void {
-    const headerX = 20 * this.MM;
-    const headerY = 25 * this.MM;
-
-    this.doc
-      .font(this.FONT_SORA_BOLD)
-      .fontSize(32)
-      .fillColor(this.COLOR_DEEP_BLUE)
-      .text('Table of Contents', headerX, headerY);
-
-    let currentY = 55 * this.MM;
-    const circleCenterX = 28 * this.MM;
-    const circleRadius = 4.5 * this.MM;
-
-    TOC_ITEMS.forEach((item, index) => {
-      const circleY = currentY + circleRadius;
-
-      // Circle with number
       this.doc
-        .lineWidth(0.5 * this.MM)
-        .strokeColor(this.COLOR_BRIGHT_GREEN)
-        .circle(circleCenterX, circleY, circleRadius)
-        .stroke();
-
-      // Number inside circle
-      this.doc
-        .font(this.FONT_SORA_BOLD)
-        .fontSize(11)
-        .fillColor(this.COLOR_DEEP_BLUE)
-        .text((index + 1).toString(), circleCenterX - 4, circleY - 5, {
-          width: 8,
-          align: 'center',
-        });
-
-      // TOC Item Text
-      this.doc
-        .font(this.FONT_SORA_SEMIBOLD)
-        .fontSize(14)
+        .font(this.FONT_REGULAR)
+        .fontSize(8)
         .fillColor(this.COLOR_BLACK)
-        .text(item, 40 * this.MM, currentY, {
-          width: this.PAGE_WIDTH - 55 * this.MM,
-        });
+        .opacity(0.4)
+        .text(this.data.reportId, 0, 0);
 
-      currentY = currentY + 16 * this.MM;
-    });
+      this.doc.restore(); // Restore state (undo rotation)
+      this.doc.opacity(1);
+    }
+
+    // --- Title Wrapping ---
+    const titleWidth = this.PAGE_WIDTH - 100;
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(38)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text('Career Fitment &', 35, 12, { width: titleWidth, align: 'left' })
+      .text('Future Role Readiness', 35, 12 + 44, { width: titleWidth, align: 'left' })
+      .text('Report', 35, 12 + 88, { width: titleWidth, align: 'left' });
+
+    // --- Footer Elements ---
+    const footerY = this.PAGE_HEIGHT - 90;
+
+    // Draw "Self Guidance" / "Future Role Readiness" Label
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(20)
+      .fillColor(this.COLOR_BLACK)
+      .text('Future Role Readiness', 35, footerY);
+
+    // Draw Date
+    const dateString = this.data.generatedDate.toLocaleDateString(
+      'en-GB',
+      { day: 'numeric', month: 'long', year: 'numeric' },
+    );
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(16)
+      .fillColor(this.COLOR_BLACK)
+      .text(dateString, 35, footerY + 25);
+
+    // --- Name Alignment with Smart Wrapping ---
+    this.doc.font(this.FONT_SORA_BOLD).fontSize(22);
+
+    const nameWidthLimit = 300;
+    const rawName = this.data.profile.fullName
+      .split(/Current Role|Job Description|Experience/i)[0]
+      .trim();
+
+    const nameText = this.getSmartSplitName(rawName, nameWidthLimit);
+
+    const rightMarginLimit = 35;
+    const nameX = this.PAGE_WIDTH - nameWidthLimit - rightMarginLimit - 20;
+    const nameBaseY = footerY + 20;
+
+    const nameOptions = {
+      width: nameWidthLimit + 20,
+      align: 'right' as const,
+    };
+
+    const totalNameHeight = this.doc.heightOfString(nameText, nameOptions);
+    const singleLineHeight = this.doc.heightOfString('M', nameOptions);
+
+    const adjustedNameY = nameBaseY - (totalNameHeight - singleLineHeight);
+
+    this.doc
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text(nameText, nameX, adjustedNameY, nameOptions);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // PROFILE SECTION
+  // PAGE 2: Profile Snapshot, Behavioral Summary, Skill Assessment Part 1
   // ═══════════════════════════════════════════════════════════════════════════
-  private generateProfileSection(): void {
-    // Header
-    this.doc
-      .font(this.FONT_REGULAR)
-      .fontSize(9)
-      .fillColor('#888888')
-      .text('CAREER FITMENT REPORT FOR:', this.MARGIN_STD, this.MARGIN_STD);
-
+  private generatePage2(): void {
+    // Royal Purple Title Header at the top of Page 2
     this.doc
       .font(this.FONT_SORA_BOLD)
       .fontSize(22)
       .fillColor(this.COLOR_DEEP_BLUE)
-      .text(this.data.profile.fullName, this.MARGIN_STD, this.doc.y + 4);
+      .text('Career Fitment & Future Role Readiness', this.MARGIN_STD, this.MARGIN_STD - 15)
+      .text('Report', this.MARGIN_STD, this.MARGIN_STD + 13);
 
+    // 1. Profile Snapshot - Shifted down to accommodate the header title
     this.doc
-      .font(this.FONT_SORA_SEMIBOLD)
-      .fontSize(11)
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(15)
       .fillColor(this.COLOR_BLACK)
-      .text(
-        `Target Role: ${this.data.profile.expectedFutureRole}`,
-        this.MARGIN_STD,
-        this.doc.y + 6,
-      );
+      .text('Profile Snapshot', this.MARGIN_STD, this.MARGIN_STD + 55);
 
-    this.doc.moveDown(1.2);
+    let currentY = this.MARGIN_STD + 77;
+    const profile = this.data.profile as any;
+    const isStudent =
+      profile.currentRole?.toUpperCase() === 'STUDENT' ||
+      profile.currentRole?.toLowerCase().includes('student') ||
+      profile.currentRole?.toLowerCase().includes('not specified') ||
+      profile.yearsOfExperience === 0;
 
-    // 1. Profile Snapshot
-    this.h2('1. Profile Snapshot');
-    this.doc.moveDown(0.2);
+    const items: { label: string; value: string }[] = [];
+    
+    if (isStudent) {
+      // Dynamic Student Snapshot Fields
+      items.push({ label: 'Name', value: profile.fullName });
+      items.push({ label: 'Status', value: 'Student' });
+      
+      let academicBg = profile.currentIndustry || 'Education / Academics';
+      if (academicBg.includes('Not Specified')) academicBg = 'Education / Academics';
+      items.push({ label: 'Academic Background', value: academicBg });
+      
+      let program = 'School Students';
+      if (profile.currentRole && profile.currentRole.includes('—')) {
+        program = profile.currentRole.split('—')[1].trim();
+      } else if (profile.currentRole && profile.currentRole.includes('-')) {
+        program = profile.currentRole.split('-')[1].trim();
+      } else if (profile.programName) {
+        program = profile.programName;
+      }
+      items.push({ label: 'Program', value: program });
+      
+      const behavioralProfile = this.data.discProfile?.dominantTrait || 'Analytical and Detail-Oriented';
+      items.push({ label: 'Behavioral Profile', value: behavioralProfile });
+      
+      const scoreVal = profile.totalScore || this.data.agileProfile?.rawScore || 117;
+      items.push({ label: 'Assessment Score', value: String(scoreVal) });
+    } else {
+      // Corporate Snapshot Fields
+      items.push({ label: 'Name', value: profile.fullName });
+      if (profile.currentRole && !profile.currentRole.includes('Not Specified')) {
+        items.push({ label: 'Current Role', value: profile.currentRole });
+      }
+      if (profile.yearsOfExperience !== undefined && profile.yearsOfExperience !== null && profile.yearsOfExperience > 0) {
+        items.push({ label: 'Total Experience', value: `${profile.yearsOfExperience} Years` });
+      }
+      if (profile.relevantExperience && !profile.relevantExperience.includes('Not Specified') && profile.relevantExperience !== 'N/A') {
+        items.push({ label: 'Relevant Experience', value: profile.relevantExperience });
+      }
+      if (profile.currentIndustry && !profile.currentIndustry.includes('Not Specified')) {
+        items.push({ label: 'Current Industry', value: profile.currentIndustry });
+      }
+      if (profile.expectedFutureRole && !profile.expectedFutureRole.includes('Not Specified')) {
+        items.push({ label: 'Expected Future Role', value: profile.expectedFutureRole });
+      }
+    }
 
-    const profile = this.data.profile;
-    const snapshotData = [
-      ['Name', profile.fullName],
-      ['Current Role', profile.currentRole],
-      ['Total Experience', `${profile.yearsOfExperience} Years`],
-      ['Relevant Experience', profile.relevantExperience || 'N/A'],
-      ['Current Industry', profile.currentIndustry],
-      ['Expected Future Role', profile.expectedFutureRole],
-    ];
-
-    this.table(['Profile Attribute', 'Details'], snapshotData, {
-      colWidths: [170, 330],
-      headerColor: this.COLOR_DEEP_BLUE,
-      headerTextColor: '#FFFFFF',
-      fontSize: 10,
-      headerFontSize: 10,
-      cellPadding: 6,
+    items.forEach((item) => {
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(10)
+        .fillColor(this.COLOR_BLACK)
+        .text(`${item.label}: `, this.MARGIN_STD, currentY, { continued: true })
+        .font(this.FONT_REGULAR)
+        .text(item.value);
+      currentY += 15;
     });
 
-    this.doc.moveDown(0.8);
-  }
+    currentY += 15;
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // BEHAVIORAL SUMMARY
-  // ═══════════════════════════════════════════════════════════════════════════
-  private generateBehavioralSummary(): void {
-    this.h2('2. Behavioral Alignment Summary');
-    this.doc.moveDown(0.2);
-
+    // 2. Behavioral Summary
     this.doc
-      .font(this.FONT_REGULAR)
-      .fontSize(10)
-      .fillColor(this.COLOR_BLACK)
-      .text(this.data.behavioralSummary, this.MARGIN_STD, this.doc.y, {
-        width: this.PAGE_WIDTH - 2 * this.MARGIN_STD,
-        align: 'justify',
-      });
-  }
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(13)
+      .fillColor(this.COLOR_DEEP_BLUE) // Color header royal purple
+      .text('1. Behavioral Alignment Summary', this.MARGIN_STD, currentY);
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SKILL ASSESSMENT
-  // ═══════════════════════════════════════════════════════════════════════════
-  private generateSkillAssessment(): void {
-    this.h2('3. Skill-wise Capability Assessment (Score out of 5)');
-    this.doc.moveDown(0.2);
+    currentY += 20;
 
-    this.data.skillCategories.forEach((category) => {
-      this.ensureSpace(100);
-      this.h3(category.category);
-      this.doc.moveDown(0.1);
+    let summaryText = this.data.behavioralSummary || '';
+    
+    // Clean up duplicate headings and part markers inside the behavioral summary summaryText
+    summaryText = summaryText.replace(/\*?\*?\d*\.?\s*Behavioral\s+Alignment\s+Summary\*?\*?/gi, '');
+    summaryText = summaryText.replace(/\*?\*?Part\s*\d+[:*\s]*?\*?\*?/gi, '');
+    summaryText = summaryText.replace(/^\s*[:*_\-\s]*\n+/gm, ''); // Remove empty lines containing junk chars
+    summaryText = summaryText.replace(/^\s*\n+/, ''); // strip leading blank lines
+    summaryText = summaryText.replace(/\n{3,}/g, '\n\n'); // collapse multiple empty lines
+    
+    const lines = summaryText.split('\n');
+    let inList = false;
+    let listItems: string[] = [];
 
-      const skillRows = category.skills.map((s) => [
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+
+      const bulletMatch = trimmed.match(/^[-*•]\s*(.+)/);
+      if (bulletMatch) {
+        listItems.push(bulletMatch[1]);
+        inList = true;
+      } else {
+        if (inList && listItems.length > 0) {
+          this.list(listItems, { indent: 15, fontSize: 9.5, y: currentY, gap: 8 });
+          currentY = this.doc.y + 5;
+          listItems = [];
+          inList = false;
+        }
+
+        this.doc
+          .font(this.FONT_REGULAR)
+          .fontSize(9.5)
+          .fillColor(this.COLOR_BLACK)
+          .text(trimmed, this.MARGIN_STD, currentY, {
+            width: this.PAGE_WIDTH - 2 * this.MARGIN_STD,
+            align: 'justify',
+          });
+        currentY = this.doc.y + 10;
+      }
+    });
+
+    if (inList && listItems.length > 0) {
+      this.list(listItems, { indent: 15, fontSize: 9.5, y: currentY, gap: 8 });
+      currentY = this.doc.y + 10;
+    }
+
+    currentY = currentY + 10;
+
+    // 3. Skill Assessment Header
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(13)
+      .fillColor(this.COLOR_DEEP_BLUE) // Color header royal purple
+      .text('2. Skill-wise Capability Assessment (Score out of 5)', this.MARGIN_STD, currentY);
+
+    currentY += 25;
+
+    // Unified dynamic skill categories loop
+    const categories = this.data.skillCategories;
+    
+    for (let idx = 0; idx < categories.length; idx++) {
+      const cat = categories[idx];
+      const skillsCount = cat.skills.length;
+      // Estimate height needed: header (15) + table header (20) + rows (skillsCount * 18) + gap (20)
+      const heightNeeded = 15 + 20 + (skillsCount * 18) + 20;
+
+      // Check if we need a page break (current page is Page 2, Page 3, etc.)
+      if (currentY + heightNeeded > this.PAGE_HEIGHT - this.MARGIN_STD) {
+        this.doc.addPage();
+        currentY = this.MARGIN_STD + 15;
+      }
+
+      // Draw Category Header
+      this.doc
+        .font(this.FONT_SORA_SEMIBOLD)
+        .fontSize(11)
+        .fillColor(this.COLOR_BLACK)
+        .text(cat.category, this.MARGIN_STD, currentY);
+
+      // Draw Category Table
+      const rows = cat.skills.map(s => [
         s.name,
         s.score.toFixed(1),
-        s.insight || '-',
+        s.insight || '-'
       ]);
 
-      this.table(['Skill', 'Score', 'Insight'], skillRows, {
+      this.table(['Skill', 'Score', 'Insight'], rows, {
         colWidths: [140, 55, 305],
         fontSize: 9,
         headerFontSize: 9,
         cellPadding: 5,
         headerColor: this.COLOR_DEEP_BLUE,
         headerTextColor: '#FFFFFF',
+        borderColor: '#CCCCCC',
+        y: currentY + 15
       });
 
-      this.doc.moveDown(0.4);
-    });
-
-    // Skill Radar Chart (Visual)
-    this.ensureSpace(200);
-    this.h3('Capability Snapshot (Visual)');
-    this.drawRadarChart(this.PAGE_WIDTH / 2, this.doc.y + 120, 100);
-    this.doc.y += 260;
-
-    // Overall Skill Insight
-    this.ensureSpace(120);
-    this.doc.x = this.MARGIN_STD; // Reset X alignment
-    this.h2('4. Overall Skill Coverage Insight');
-    this.doc.moveDown(0.2);
-
-    this.h3('High Strength Areas:');
-    if (this.data.overallSkillInsight.highStrengthAreas.length > 0) {
-      this.list(this.data.overallSkillInsight.highStrengthAreas, {
-        indent: 20,
-      });
-    } else {
-      this.p('No high strength areas identified.');
+      currentY = this.doc.y + 15;
     }
 
-    this.h3('Developable Areas:');
-    if (this.data.overallSkillInsight.developableAreas.length > 0) {
-      this.list(this.data.overallSkillInsight.developableAreas, { indent: 20 });
-    } else {
-      this.p('No critical development areas identified.');
+    // Now call generatePage4(currentY) on the same page (or dynamic new page)
+    // Estimate height needed for Capability Snapshot & Overall Skill Coverage Insight
+    const snapshotHeightNeeded = 360;
+    if (currentY + snapshotHeightNeeded > this.PAGE_HEIGHT - this.MARGIN_STD) {
+      this.doc.addPage();
+      currentY = this.MARGIN_STD + 15;
     }
+
+    this.generatePage4(currentY);
+  }
+
+  private generatePage4(currentY: number): void {
+    // Visual Snapshot Header
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(11)
+      .fillColor(this.COLOR_DEEP_BLUE) // Royal purple title
+      .text('Capability Snapshot (Visual)', this.MARGIN_STD, currentY);
+
+    // Draw Radar Chart - Set centerY to currentY + 130 (Huge radius 85)
+    const chartY = currentY + 130;
+    this.drawRadarChart(this.PAGE_WIDTH / 2, chartY, 85);
+
+    // Radar Chart Caption - Positioned safely below radar chart bottom label
+    const captionY = chartY + 145; // Increased gap to completely resolve overlap
+    const captionText = "The visual snapshot above illustrates the candidate's balance of competencies. A wider span indicates higher proficiency across dimensions. Use this to identify if the profile is 'Operational' (skewed towards Ops/Talent) or 'Strategic' (skewed towards Strategy/Communication).";
+    
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(8.5)
+      .fillColor('#555555')
+      .text(
+        captionText,
+        this.MARGIN_STD,
+        captionY,
+        {
+          width: this.PAGE_WIDTH - 2 * this.MARGIN_STD,
+          align: 'center'
+        }
+      );
+
+    const captionTextHeight = this.doc.heightOfString(
+      captionText,
+      { width: this.PAGE_WIDTH - 2 * this.MARGIN_STD, align: 'center' }
+    );
+    const postCaptionY = captionY + captionTextHeight + 25;
+
+    // Check if Overall Skill Coverage Insight fits on the current page.
+    // Estimated height needed for the insight is 110 points.
+    let insightY = postCaptionY;
+    if (insightY + 110 > this.PAGE_HEIGHT - this.MARGIN_STD) {
+      this.doc.addPage();
+      insightY = this.MARGIN_STD + 15;
+    }
+
+    // 3. Overall Skill Coverage Insight
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(13)
+      .fillColor(this.COLOR_DEEP_BLUE) // Royal purple title
+      .text('3. Overall Skill Coverage Insight', this.MARGIN_STD, insightY);
+
+    const strengthY = this.doc.y + 12;
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(10)
+      .fillColor(this.COLOR_BLACK)
+      .text('• ', this.MARGIN_STD, strengthY, { continued: true })
+      .font(this.FONT_SORA_BOLD)
+      .text('High Strength Areas: ', { continued: true })
+      .font(this.FONT_REGULAR)
+      .text(this.data.overallSkillInsight.highStrengthAreas.join(', '));
+
+    const developableY = this.doc.y + 10;
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(10)
+      .fillColor(this.COLOR_BLACK)
+      .text('• ', this.MARGIN_STD, developableY, { continued: true })
+      .font(this.FONT_SORA_BOLD)
+      .text('Moderate / Developable Areas: ', { continued: true })
+      .font(this.FONT_REGULAR)
+      .text(this.data.overallSkillInsight.developableAreas.join(', '));
+
+    // Dynamic concluding sentence
+    const concludingY = this.doc.y + 12;
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(10)
+      .fillColor(this.COLOR_BLACK)
+      .text('These are scaling refinements, not capability blockers.', this.MARGIN_STD, concludingY);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // READINESS SECTION
+  // PAGE 5: Future Role Readiness Mapping Table & Scores, Fitment Score & Verdict
   // ═══════════════════════════════════════════════════════════════════════════
-  private generateReadinessSection(): void {
+  private generatePage5(): void {
+    let currentY = this.MARGIN_STD + 15;
+
+    // 4. Future Role Readiness Mapping Title
     const profile = this.data.profile;
-    // Only show mapping if values are meaningful
-    const showMapping =
-      profile.currentRole !== 'Aspiring Professional' &&
-      profile.expectedFutureRole !== 'Next Level Role';
-    const headerText = showMapping
-      ? `5. Future Role Readiness Mapping (${profile.currentRole} -> ${profile.expectedFutureRole})`
-      : `5. Future Role Readiness Mapping`;
+    const hasCurrent = profile.currentRole && !profile.currentRole.includes('Not Specified');
+    const hasExpected = profile.expectedFutureRole && !profile.expectedFutureRole.includes('Not Specified');
+    const readinessTitle = (hasCurrent && hasExpected)
+      ? `4. Future Role Readiness Mapping (${profile.currentRole} -> ${profile.expectedFutureRole})`
+      : `4. Future Role Readiness Mapping`;
 
-    this.h2(headerText);
-    this.doc.moveDown(0.2);
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(13)
+      .fillColor(this.COLOR_DEEP_BLUE) // Royal purple title
+      .text(readinessTitle, this.MARGIN_STD, currentY);
 
+    currentY = this.doc.y + 15;
+
+    // Dimensions Table
     const readiness = this.data.futureRoleReadiness;
     const readinessRows = readiness.dimensions.map((d) => [
       d.name,
       d.alignment,
     ]);
 
-    this.table(['Dimension', 'Alignment Level'], readinessRows, {
-      colWidths: [250, 250],
+    this.table(['Dimension', 'Alignment'], readinessRows, {
+      colWidths: [220, 280],
       headerColor: this.COLOR_DEEP_BLUE,
       headerTextColor: '#FFFFFF',
-      fontSize: 10,
-      cellPadding: 6,
+      borderColor: '#CCCCCC',
+      fontSize: 9.5,
+      cellPadding: 5,
+      y: currentY
     });
 
-    this.doc.moveDown(0.4);
+    currentY = this.doc.y + 10;
 
+    // Scores (Gold/Amber Highlighted Readiness Score)
     this.doc
       .font(this.FONT_SORA_BOLD)
-      .fontSize(12)
+      .fontSize(11)
       .fillColor(this.COLOR_DEEP_BLUE)
-      .text(`Future Role Readiness Score: ${readiness.readinessScore}%`);
+      .text('Future Role Readiness Score: ', this.MARGIN_STD, currentY, { continued: true })
+      .fillColor('#E67E22') // Gold/Amber highlight
+      .text(`${readiness.readinessScore}%`);
 
     this.doc
       .font(this.FONT_REGULAR)
-      .fontSize(11)
+      .fontSize(10.5)
       .fillColor(this.COLOR_BLACK)
-      .text(`Adjacency Type: ${readiness.adjacencyType}`);
+      .text(`Adjacency Type: ${readiness.adjacencyType}`, this.MARGIN_STD, this.doc.y + 4);
 
-    this.doc.moveDown(1);
-  }
+    currentY = this.doc.y + 15;
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // FITMENT SCORE
-  // ═══════════════════════════════════════════════════════════════════════════
-  private generateFitmentScore(): void {
-    this.ensureSpace(180);
-    this.h2(
-      `6. Role Fitment Score - ${this.data.profile.expectedFutureRole} (Out of 100)`,
-    );
-    this.doc.moveDown(0.2);
+    // Interpretation Table (Green, Amber, Red backgrounds)
+    const readinessRanges = [
+      ['80% - 100%', 'High Readiness (Green) - Ready for immediate transition'],
+      ['60% - 79%', 'Moderate Readiness (Amber) - Transitionable with support'],
+      ['0% - 59%', 'Low Readiness (Red) - Significant gaps exist']
+    ];
+    this.table(['Range', 'Interpretation'], readinessRanges, {
+      colWidths: [120, 380],
+      headerColor: this.COLOR_DEEP_BLUE,
+      headerTextColor: '#FFFFFF',
+      borderColor: '#CCCCCC',
+      fontSize: 8.5,
+      headerFontSize: 8.5,
+      cellPadding: 4,
+      y: currentY,
+      rowColors: ['#E2F7E5', '#FFF9E6', '#FCE8E6'] // Row backgrounds
+    });
 
+    currentY = this.doc.y + 20;
+
+    // 5. Role Fitment Score Title
+    const fitmentTitle = `5. Role Fitment Score - ${this.data.profile.expectedFutureRole} (Out of 100)`;
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(13)
+      .fillColor(this.COLOR_DEEP_BLUE) // Color header royal purple
+      .text(fitmentTitle, this.MARGIN_STD, currentY);
+
+    currentY += 20;
+
+    // Fitment Components Table
     const fitment = this.data.roleFitmentScore;
     const fitmentRows = fitment.components.map((fc) => [
       fc.name,
@@ -400,93 +524,143 @@ export class CareerFitmentReport extends BaseReport {
     ]);
 
     this.table(['Component', 'Weight', 'Score'], fitmentRows, {
-      colWidths: [230, 120, 150],
+      colWidths: [220, 100, 180],
       headerColor: this.COLOR_DEEP_BLUE,
       headerTextColor: '#FFFFFF',
-      fontSize: 10,
-      cellPadding: 6,
+      borderColor: '#CCCCCC',
+      fontSize: 9.5,
+      cellPadding: 5,
+      y: currentY
     });
 
-    this.doc.moveDown(0.4);
+    currentY = this.doc.y + 10;
 
+    // Fitment Score (Green Highlighted Score)
     this.doc
       .font(this.FONT_SORA_BOLD)
-      .fontSize(14)
-      .fillColor(this.COLOR_DEEP_BLUE)
-      .text(`Final Role Fitment Score: ${fitment.totalScore}%`);
-
-    this.doc.moveDown(0.3);
-
-    this.doc
-      .font(this.FONT_SORA_SEMIBOLD)
       .fontSize(11)
-      .fillColor(this.COLOR_BLACK)
-      .text('Verdict:');
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text('Final Role Fitment Score: ', this.MARGIN_STD, currentY, { continued: true })
+      .fillColor('#2ECC71') // Green highlight
+      .text(`${fitment.totalScore}%`);
 
-    this.doc.font(this.FONT_REGULAR).fontSize(10).text(fitment.verdict);
+    currentY = this.doc.y + 15;
 
-    this.doc.moveDown(1);
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // INDUSTRY SUITABILITY
-  // ═══════════════════════════════════════════════════════════════════════════
-  private generateIndustrySuitability(): void {
-    this.ensureSpace(120);
-    this.h2('7. Industry-Specific Suitability');
-    this.doc.moveDown(0.2);
-
-    // Create table for consistent layout
-    const industryRows = this.data.industrySuitability.map((ind) => [
-      ind.industry,
-      ind.suitability,
-      ind.idealFor,
-    ]);
-
-    this.table(['Industry', 'Suitability', 'Ideal For'], industryRows, {
-      colWidths: [180, 70, 250],
+    // Fitment Interpretation Table
+    const fitmentRanges = [
+      ['80% - 100%', 'Strong Fit (Green) - Highly aligned with role Reqs'],
+      ['60% - 79%', 'Moderate Fit (Amber) - Good potential with gaps'],
+      ['0% - 59%', 'Low Fit (Red) - Significant misalignment']
+    ];
+    this.table(['Range', 'Interpretation'], fitmentRanges, {
+      colWidths: [120, 380],
       headerColor: this.COLOR_DEEP_BLUE,
       headerTextColor: '#FFFFFF',
-      fontSize: 9,
-      headerFontSize: 10,
-      cellPadding: 8,
+      borderColor: '#CCCCCC',
+      fontSize: 8.5,
+      headerFontSize: 8.5,
+      cellPadding: 4,
+      y: currentY,
+      rowColors: ['#E2F7E5', '#FFF9E6', '#FCE8E6'] // Row backgrounds
     });
 
-    this.doc.moveDown(0.5);
+    currentY = this.doc.y + 15;
+
+    // Verdict Paragraph (Italicized)
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(10)
+      .fillColor(this.COLOR_BLACK)
+      .text('Verdict: ', this.MARGIN_STD, currentY, { continued: true })
+      .font('Helvetica-Oblique') // Italic verdict
+      .fontSize(9.5)
+      .text(fitment.verdict);
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // TRANSITION REQUIREMENTS
-  // ═══════════════════════════════════════════════════════════════════════════
-  private generateTransitionRequirements(): void {
-    this.ensureSpace(120);
-    this.h2('8. Key Transition Requirements');
-    this.doc.moveDown(0.2);
+  private generatePage6(): void {
+    let currentY = this.MARGIN_STD + 15;
+
+    // 6. Industry Specific Suitability
+    const industryTitle = `6. Industry-Specific ${this.data.profile.expectedFutureRole} Suitability`;
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(13)
+      .fillColor(this.COLOR_DEEP_BLUE) // Color header royal purple
+      .text(industryTitle, this.MARGIN_STD, currentY);
+
+    currentY += 25;
+
+    // Text block style for industry suitability
+    this.data.industrySuitability.forEach((ind) => {
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(11)
+        .fillColor(this.COLOR_DEEP_BLUE)
+        .text(ind.industry, this.MARGIN_STD, currentY);
+      
+      currentY += 15;
+      this.doc
+        .font(this.FONT_REGULAR)
+        .fontSize(10)
+        .fillColor(this.COLOR_BLACK)
+        .text(`Suitability: ${ind.suitability}`, this.MARGIN_STD, currentY);
+      
+      currentY += 14;
+      const detailLabel = ind.suitability === 'High' ? 'Ideal for' : 'Requires stronger';
+      this.doc
+        .text(`${detailLabel}: ${ind.idealFor}`, this.MARGIN_STD, currentY);
+      
+      currentY += 20;
+    });
+
+    currentY += 10;
+
+    // 7. Key Transition Requirements
+    const transitionTitle = `7. Key Transition Requirements (Critical for ${this.data.profile.expectedFutureRole} Readiness)`;
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(13)
+      .fillColor(this.COLOR_DEEP_BLUE) // Color header royal purple
+      .text(transitionTitle, this.MARGIN_STD, currentY);
+
+    currentY += 20;
 
     const profile = this.data.profile;
-    this.p(
-      `To transition from ${profile.currentRole} to ${profile.expectedFutureRole}, the following shifts are required:`,
-    );
-    this.list(this.data.transitionRequirements, { indent: 20, type: 'number' });
+    const isStudent =
+      profile.currentRole?.toUpperCase() === 'STUDENT' ||
+      profile.currentRole?.toLowerCase().includes('student') ||
+      profile.currentRole?.toLowerCase().includes('not specified') ||
+      profile.yearsOfExperience === 0;
 
-    this.doc.moveDown(1);
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // EXECUTIVE INSIGHT
-  // ═══════════════════════════════════════════════════════════════════════════
-  private generateExecutiveInsight(): void {
-    this.ensureSpace(100);
-    this.h2('9. Origin BI Executive Insight');
-    this.doc.moveDown(0.2);
+    const transitionPrefix = isStudent
+      ? 'The following transition steps and adjustments are recommended:'
+      : `To move from ${profile.currentRole} to ${profile.expectedFutureRole}, the following shifts are required:`;
 
     this.doc
       .font(this.FONT_REGULAR)
-      .fontSize(11)
+      .fontSize(10)
       .fillColor(this.COLOR_BLACK)
-      .text(this.data.executiveInsight, {
+      .text(transitionPrefix, this.MARGIN_STD, currentY);
+
+    this.list(this.data.transitionRequirements, { indent: 15, fontSize: 9.5, y: this.doc.y + 8 });
+
+    currentY = this.doc.y + 20;
+
+    // 8. ORIGIN BI Executive Insight
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(13)
+      .fillColor(this.COLOR_DEEP_BLUE) // Color header royal purple
+      .text('8. ORIGIN BI Executive Insight (Closure)', this.MARGIN_STD, currentY);
+
+    currentY += 20;
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(10)
+      .fillColor(this.COLOR_BLACK)
+      .text(this.data.executiveInsight, this.MARGIN_STD, currentY, {
         width: this.PAGE_WIDTH - 2 * this.MARGIN_STD,
-        align: 'justify',
+        align: 'justify'
       });
   }
 
@@ -523,15 +697,18 @@ export class CareerFitmentReport extends BaseReport {
         .fillColor(this.COLOR_BLACK)
         .text('Origin BI', this.MARGIN_STD, textY, { lineBreak: false });
 
-      const titleWidth = this.doc.widthOfString('Origin BI');
-      this.doc
-        .fillColor('#A9A9A9')
-        .text(
-          ` #${this.data.reportId}`,
-          this.MARGIN_STD + titleWidth + 5,
-          textY,
-          { lineBreak: false },
-        );
+      // Only print report ID if it doesn't start with OBI-CFR or OBI-CHAT
+      if (this.data.reportId && !this.data.reportId.startsWith('OBI-CFR') && !this.data.reportId.startsWith('OBI-CHAT')) {
+        const titleWidth = this.doc.widthOfString('Origin BI');
+        this.doc
+          .fillColor('#A9A9A9')
+          .text(
+            ` #${this.data.reportId}`,
+            this.MARGIN_STD + titleWidth + 2,
+            textY,
+            { lineBreak: false },
+          );
+      }
 
       // Right Text - Page Number
       this.doc
@@ -552,18 +729,30 @@ export class CareerFitmentReport extends BaseReport {
   ): void {
     this.doc.save();
 
-    const categories = this.data.skillCategories.map((c) => c.category);
-    const scores = this.data.skillCategories.map((c) => {
-      const sum = c.skills.reduce((a, b) => a + b.score, 0);
-      return c.skills.length > 0 ? sum / c.skills.length : 0;
+    const categories = ['Communication', 'People Ops', 'Talent', 'Strategy'];
+    
+    // Sum/average scores for each mapped category, falling back to index matching if category names differ
+    const scores = categories.map((cat, idx) => {
+      let dbCat = this.data.skillCategories.find((c) => {
+        const name = c.category.toLowerCase();
+        if (cat === 'Communication') return name.includes('communication') || name.includes('foundation');
+        if (cat === 'People Ops') return name.includes('people') || name.includes('operations') || name.includes('interpersonal');
+        if (cat === 'Talent') return name.includes('talent') || name.includes('culture') || name.includes('core');
+        if (cat === 'Strategy') return name.includes('business') || name.includes('strategy') || name.includes('leadership');
+        return false;
+      });
+
+      // Fallback: Use index to match standard categories if name match failed
+      if (!dbCat) {
+        dbCat = this.data.skillCategories[idx];
+      }
+
+      if (!dbCat || !dbCat.skills || dbCat.skills.length === 0) return 0;
+      const sum = dbCat.skills.reduce((a, b) => a + b.score, 0);
+      return sum / dbCat.skills.length;
     });
 
     const numPoints = categories.length;
-    if (numPoints < 3) {
-      this.doc.restore();
-      return;
-    }
-
     const maxScore = 5;
 
     // Draw Web Grid
@@ -575,29 +764,37 @@ export class CareerFitmentReport extends BaseReport {
       this.doc.circle(centerX, centerY, r).stroke();
     }
 
-    // Axis Lines
+    // Axis Lines & Labels
     for (let i = 0; i < numPoints; i++) {
       const angle = (Math.PI * 2 * i) / numPoints - Math.PI / 2;
       const x = centerX + Math.cos(angle) * radius;
       const y = centerY + Math.sin(angle) * radius;
       this.doc.moveTo(centerX, centerY).lineTo(x, y).stroke();
 
-      // Labels
-      const labelX = centerX + Math.cos(angle) * (radius + 25);
-      const labelY = centerY + Math.sin(angle) * (radius + 25);
+      // Label offsets to prevent overlaps
+      let offsetX = -45;
+      let offsetY = -6;
+      if (Math.cos(angle) > 0.1) offsetX = 10;
+      else if (Math.cos(angle) < -0.1) offsetX = -100;
+      else offsetX = -45;
+
+      if (Math.sin(angle) > 0.1) offsetY = 10;
+      else if (Math.sin(angle) < -0.1) offsetY = -15;
+
+      const labelX = centerX + Math.cos(angle) * (radius + 15);
+      const labelY = centerY + Math.sin(angle) * (radius + 15);
+
       this.doc
         .fillColor(this.COLOR_BLACK)
         .fontSize(8)
         .font(this.FONT_REGULAR)
-        .text(categories[i], labelX - 45, labelY - 6, {
+        .text(categories[i], labelX + offsetX, labelY + offsetY, {
           width: 90,
           align: 'center',
         });
     }
 
     // Draw Data Polygon
-    this.doc.lineWidth(2).strokeColor(this.COLOR_DEEP_BLUE).fillOpacity(0.2);
-
     const points: [number, number][] = [];
     for (let i = 0; i < numPoints; i++) {
       const score = Math.max(0, Math.min(scores[i], maxScore));
@@ -609,19 +806,64 @@ export class CareerFitmentReport extends BaseReport {
       ]);
     }
 
+    // Style data polygon using expected translucent green fill and deep blue border
+    this.doc.lineWidth(2);
+    this.doc.strokeColor(this.COLOR_DEEP_BLUE);
+    this.doc.fillColor('#19D36A');
+    this.doc.fillOpacity(0.25);
+
     this.doc.moveTo(points[0][0], points[0][1]);
     for (let i = 1; i < points.length; i++) {
       this.doc.lineTo(points[i][0], points[i][1]);
     }
-    this.doc.lineTo(points[0][0], points[0][1]);
-    this.doc.fillColor(this.COLOR_DEEP_BLUE).fillAndStroke();
+    this.doc.closePath();
+    this.doc.fillAndStroke();
+
+    // Restore fillOpacity for solid dots
     this.doc.fillOpacity(1);
 
     // Draw data points
     points.forEach(([px, py]) => {
-      this.doc.circle(px, py, 4).fill(this.COLOR_DEEP_BLUE);
+      this.doc.circle(px, py, 3.5).fill(this.COLOR_DEEP_BLUE);
     });
 
     this.doc.restore();
+  }
+
+  /**
+   * Smart name split algorithm identical to student service BaseReport
+   */
+  private getSmartSplitName(fullName: string, maxWidth: number): string {
+    const currentWidth = this.doc.widthOfString(fullName);
+    if (currentWidth <= maxWidth) {
+      return fullName;
+    }
+
+    const words = fullName.trim().split(/\s+/);
+    const totalWords = words.length;
+
+    if (totalWords === 1) return fullName;
+
+    let splitIndex = Math.floor(totalWords / 2);
+    if (splitIndex < 1) splitIndex = 1;
+
+    while (splitIndex < totalWords) {
+      const line1Candidate = words.slice(0, splitIndex).join(' ');
+      const charCount = line1Candidate.replace(/[^a-zA-Z]/g, '').length;
+      if (charCount > 3) {
+        break;
+      }
+      splitIndex++;
+    }
+
+    const line2Words = words.slice(splitIndex);
+    if (line2Words.length === 1) {
+      const lastWord = line2Words[0].replace(/[^a-zA-Z]/g, '');
+      if (lastWord.length <= 2) {
+        return fullName;
+      }
+    }
+
+    return words.slice(0, splitIndex).join(' ') + '\n' + words.slice(splitIndex).join(' ');
   }
 }

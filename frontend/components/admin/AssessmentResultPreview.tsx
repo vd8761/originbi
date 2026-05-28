@@ -362,6 +362,7 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                             )}
                         </div>
                     ) : (
+                        <>
                         <button
                             onClick={() => handleDownloadReport(false)}
                             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
@@ -375,6 +376,86 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                             <DownloadIcon className="w-3 h-3" />
                             Download Report
                         </button>
+                        <button
+                            onClick={async () => {
+                                if (isDownloadingRef.current) return;
+                                if (!session?.userId) {
+                                    alert("User ID not found for this session.");
+                                    return;
+                                }
+                                try {
+                                    isDownloadingRef.current = true;
+                                    setDownloading(true);
+                                    setDownloadProgress('Initializing...');
+                                    
+                                    const studentId = session.userId; 
+                                    const startData = await assessmentService.generateStudentReport(studentId, true);
+                                    
+                                    if (!startData.success || !startData.jobId) {
+                                        throw new Error("Failed to start report generation");
+                                    }
+                                    
+                                    const jobId = startData.jobId;
+                                    
+                                    let isComplete = false;
+                                    while (!isComplete && isDownloadingRef.current) {
+                                        try {
+                                            const statusData = await assessmentService.getDownloadStatus(jobId);
+                                            
+                                            if (statusData.status === 'PROCESSING') {
+                                                setDownloadProgress(statusData.progress || 'Processing...');
+                                                await new Promise(resolve => setTimeout(resolve, 1000));
+                                            } else if (statusData.status === 'COMPLETED') {
+                                                isComplete = true;
+                                                setDownloadProgress('Downloading...');
+
+                                                if (!statusData.downloadUrl) {
+                                                    throw new Error('Download URL missing from report status.');
+                                                }
+                                                
+                                                const extendedData = statusData as any;
+                                                if (extendedData.password) {
+                                                    setGeneratedPassword(extendedData.password);
+                                                }
+
+                                                window.location.href = buildReportApiUrl(statusData.downloadUrl);
+                                                
+                                                setTimeout(() => {
+                                                    setDownloading(false);
+                                                    setDownloadProgress('');
+                                                }, 2000);
+                                            } else if (statusData.status === 'ERROR') {
+                                                isComplete = true;
+                                                throw new Error(statusData.error || 'Generation failed');
+                                            }
+                                        } catch (err) {
+                                            console.error("Polling error", err);
+                                            isComplete = true;
+                                            setDownloading(false);
+                                            alert("Failed to download report. Please try again.");
+                                        }
+                                    }
+                                    
+                                } catch (error) {
+                                    console.error("Download failed", error);
+                                    setDownloading(false);
+                                    alert("Failed to initiate download.");
+                                } finally {
+                                    isDownloadingRef.current = false;
+                                }
+                            }}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                status === 'COMPLETED' 
+                                ? 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green cursor-pointer' 
+                                : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
+                            }`}
+                            disabled={status !== 'COMPLETED'}
+                            title={status !== 'COMPLETED' ? 'Exam must be completed to download report' : ''}
+                        >
+                            <DownloadIcon className="w-3 h-3" />
+                            Download Short Report
+                        </button>
+                        </>
                     )}
 
                     {/* Send Email Split Button */}
