@@ -167,9 +167,11 @@ export const assessmentService = {
 
     async generateStudentReport(
         studentId: string,
+        short?: boolean,
     ): Promise<{ success: boolean; jobId: string; statusUrl: string }> {
+        const queryParams = short ? '?json=true&short=true' : '?json=true';
         const res = await fetch(
-            buildReportApiUrl(`/generate/student/${studentId}?json=true`),
+            buildReportApiUrl(`/generate/student/${studentId}${queryParams}`),
             {
                 method: "GET",
                 headers: {

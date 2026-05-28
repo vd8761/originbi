@@ -49,6 +49,8 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     const [downloadProgress, setDownloadProgress] = useState('');
     const isDownloadingRef = useRef(false);
     const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+    const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
+    const downloadDropdownRef = useRef<HTMLDivElement>(null);
 
     // Send Email State
     const [sendingEmail, setSendingEmail] = useState(false);
@@ -95,6 +97,94 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     const isStarted = status !== 'NOT_STARTED' && status !== 'ASSIGNED';
     const allLevelsCompleted = session?.status === 'COMPLETED';
     // Simplified completion logic: if status is COMPLETED, it's done.
+
+    // Check if program supports short report (School & College students only)
+    const programId = session?.programId ? Number(session.programId) : null;
+    const programCode = (session?.program as any)?.code || (session?.groupAssessment?.program as any)?.code || null;
+    const isShortReportAvailable = programCode === 'SCHOOL_STUDENT' || programCode === 'COLLEGE_STUDENT' || programId === 1 || programId === 2;
+
+    // Close download dropdown on outside click
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (downloadDropdownRef.current && !downloadDropdownRef.current.contains(event.target as Node)) {
+                setShowDownloadDropdown(false);
+            }
+        };
+        if (showDownloadDropdown) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showDownloadDropdown]);
+
+    // Shared download handler
+    const handleDownloadReport = async (short: boolean = false) => {
+        if (isDownloadingRef.current) return;
+        if (!session?.userId) {
+            alert("User ID not found for this session.");
+            return;
+        }
+        try {
+            isDownloadingRef.current = true;
+            setDownloading(true);
+            setShowDownloadDropdown(false);
+            setDownloadProgress('Initializing...');
+            
+            const studentId = session.userId; 
+            const startData = await assessmentService.generateStudentReport(studentId, short || undefined);
+            
+            if (!startData.success || !startData.jobId) {
+                throw new Error("Failed to start report generation");
+            }
+            
+            const jobId = startData.jobId;
+            
+            let isComplete = false;
+            while (!isComplete && isDownloadingRef.current) {
+                try {
+                    const statusData = await assessmentService.getDownloadStatus(jobId);
+                    
+                    if (statusData.status === 'PROCESSING') {
+                        setDownloadProgress(statusData.progress || 'Processing...');
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    } else if (statusData.status === 'COMPLETED') {
+                        isComplete = true;
+                        setDownloadProgress('Downloading...');
+
+                        if (!statusData.downloadUrl) {
+                            throw new Error('Download URL missing from report status.');
+                        }
+                        
+                        const extendedData = statusData as any;
+                        if (extendedData.password) {
+                            setGeneratedPassword(extendedData.password);
+                        }
+
+                        window.location.href = buildReportApiUrl(statusData.downloadUrl);
+                        
+                        setTimeout(() => {
+                            setDownloading(false);
+                            setDownloadProgress('');
+                        }, 2000);
+                    } else if (statusData.status === 'ERROR') {
+                        isComplete = true;
+                        throw new Error(statusData.error || 'Generation failed');
+                    }
+                } catch (err) {
+                    console.error("Polling error", err);
+                    isComplete = true;
+                    setDownloading(false);
+                    alert("Failed to download report. Please try again.");
+                }
+            }
+            
+        } catch (error) {
+            console.error("Download failed", error);
+            setDownloading(false);
+            alert("Failed to initiate download.");
+        } finally {
+            isDownloadingRef.current = false;
+        }
+    };
 
     // Calculation for progress bar
     const totalMandatoryLevels = levels.length || 4; // fallback
@@ -232,75 +322,39 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                             <LoadingIcon className="w-3 h-3 text-brand-green animate-spin" />
                             <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{downloadProgress}</span>
                          </div>
+                    ) : isShortReportAvailable ? (
+                        <div className="relative" ref={downloadDropdownRef}>
+                            <button
+                                onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-brand-green/10 hover:bg-brand-green/20 text-brand-green rounded-lg text-xs font-medium transition-colors"
+                            >
+                                <DownloadIcon className="w-3 h-3" />
+                                Download Report
+                                <svg className={`w-3 h-3 transition-transform ${showDownloadDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                            {showDownloadDropdown && (
+                                <div className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
+                                    <button
+                                        onClick={() => handleDownloadReport(false)}
+                                        className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
+                                    >
+                                        <DownloadIcon className="w-3 h-3 text-brand-green" />
+                                        Full Report
+                                    </button>
+                                    <div className="border-t border-gray-100 dark:border-white/5" />
+                                    <button
+                                        onClick={() => handleDownloadReport(true)}
+                                        className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
+                                    >
+                                        <DownloadIcon className="w-3 h-3 text-blue-500" />
+                                        Short Report
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     ) : (
                         <button
-                            onClick={async () => {
-                                if (isDownloadingRef.current) return;
-                                if (!session?.userId) {
-                                    alert("User ID not found for this session.");
-                                    return;
-                                }
-                                try {
-                                    isDownloadingRef.current = true;
-                                    setDownloading(true);
-                                    setDownloadProgress('Initializing...');
-                                    
-                                    const studentId = session.userId; 
-                                    const startData = await assessmentService.generateStudentReport(studentId);
-                                    
-                                    if (!startData.success || !startData.jobId) {
-                                        throw new Error("Failed to start report generation");
-                                    }
-                                    
-                                    const jobId = startData.jobId;
-                                    
-                                    let isComplete = false;
-                                    while (!isComplete && isDownloadingRef.current) {
-                                        try {
-                                            const statusData = await assessmentService.getDownloadStatus(jobId);
-                                            
-                                            if (statusData.status === 'PROCESSING') {
-                                                setDownloadProgress(statusData.progress || 'Processing...');
-                                                await new Promise(resolve => setTimeout(resolve, 1000));
-                                            } else if (statusData.status === 'COMPLETED') {
-                                                isComplete = true;
-                                                setDownloadProgress('Downloading...');
-
-                                                if (!statusData.downloadUrl) {
-                                                    throw new Error('Download URL missing from report status.');
-                                                }
-                                                
-                                                const extendedData = statusData as any;
-                                                if (extendedData.password) {
-                                                    setGeneratedPassword(extendedData.password);
-                                                }
-
-                                                window.location.href = buildReportApiUrl(statusData.downloadUrl);
-                                                
-                                                setTimeout(() => {
-                                                    setDownloading(false);
-                                                    setDownloadProgress('');
-                                                }, 2000);
-                                            } else if (statusData.status === 'ERROR') {
-                                                isComplete = true;
-                                                throw new Error(statusData.error || 'Generation failed');
-                                            }
-                                        } catch (err) {
-                                            isComplete = true;
-                                            console.error("Polling error", err);
-                                            setDownloading(false);
-                                            alert("Failed to download report. Please try again.");
-                                        }
-                                    }
-                                    
-                                } catch (error) {
-                                    console.error("Download failed", error);
-                                    setDownloading(false);
-                                    alert("Failed to initiate download.");
-                                } finally {
-                                    isDownloadingRef.current = false;
-                                }
-                            }}
+                            onClick={() => handleDownloadReport(false)}
                             className="flex items-center gap-2 px-3 py-1.5 bg-brand-green/10 hover:bg-brand-green/20 text-brand-green rounded-lg text-xs font-medium transition-colors"
                         >
                             <DownloadIcon className="w-3 h-3" />
