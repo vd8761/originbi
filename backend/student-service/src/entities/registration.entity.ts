@@ -45,6 +45,9 @@ export class Registration {
   @Column({ name: 'program_id', nullable: true })
   programId: number;
 
+  @Column({ name: 'department_degree_id', nullable: true })
+  departmentDegreeId: number;
+
   @Column({ name: 'status', default: 'INCOMPLETE' })
   status: string;
 

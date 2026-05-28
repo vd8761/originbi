@@ -6,7 +6,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, ILike } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
@@ -609,6 +609,25 @@ export class CorporateDashboardService {
     return {
       message: 'Password reset link sent to your email.',
     };
+  }
+
+  async recordLogin(email: string, ip: string): Promise<void> {
+    const user = await this.userRepo.findOne({
+      where: { email: ILike(email) },
+    });
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    user.loginCount = (user.loginCount || 0) + 1;
+    if (!user.firstLoginAt) {
+      user.firstLoginAt = new Date();
+    }
+    user.lastLoginAt = new Date();
+    user.lastLoginIp = ip;
+
+    await this.userRepo.save(user);
+    console.log(`[CorporateDashboardService] Recorded login audit for email: ${email} from IP: ${ip}`);
   }
 
   async getProfile(email: string) {

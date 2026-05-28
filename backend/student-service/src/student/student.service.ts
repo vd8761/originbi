@@ -35,6 +35,7 @@ import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
 import { getTechWelcomeEmailTemplate } from '../mail/templates/tech-welcome.template';
+import { getTechAssessmentCertificateTemplate } from '../mail/templates/tech-assessment-certificate.template';
 
 import { getDebriefTeamNotificationEmailTemplate } from '../mail/templates/debrief-team-notification.template';
 import { SettingsService } from '../settings/settings.service';
@@ -128,14 +129,22 @@ export class StudentService {
     } as any);
   }
 
-  private async createCognitoUser(email: string, password: string) {
+  private async createCognitoUser(
+    email: string,
+    password: string,
+    role?: string,
+  ) {
     const authServiceUrl =
       process.env.AUTH_SERVICE_URL || 'http://localhost:4000'; // Default or Env
     try {
       const res = await firstValueFrom(
         this.httpService.post(
           `${authServiceUrl}/internal/cognito/users`,
-          { email, password },
+          {
+            email,
+            password,
+            groupName: role || 'STUDENT',
+          },
           { proxy: false },
         ),
       );
@@ -228,6 +237,38 @@ export class StudentService {
       };
     }
 
+    // Find if user has a main app registration (isTechAssessment is 0 or 2)
+    const originBiRegistration = await this.registrationRepo.findOne({
+      where: {
+        userId: user.id,
+        isDeleted: false,
+        isTechAssessment: In([0, 2]),
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!originBiRegistration) {
+      const techOnlyRegistration = await this.registrationRepo.findOne({
+        where: {
+          userId: user.id,
+          isDeleted: false,
+          isTechAssessment: 1,
+        },
+      });
+
+      if (techOnlyRegistration) {
+        return {
+          redirectUrl: '/student/upgrade',
+          isAssessmentMode: false,
+          status: 'TECH_ONLY_UPGRADE_REQUIRED',
+          debug: {
+            step: 'Check Tech Assessment Flag',
+            result: 'User is tech-assessment-only, upgrade required',
+          },
+        };
+      }
+    }
+
     const incompleteStatuses = [
       'NOT_STARTED',
       'IN_PROGRESS',
@@ -246,7 +287,10 @@ export class StudentService {
 
     if (incompleteSession) {
       const isTech = await this.registrationRepo.findOne({
-        where: { id: incompleteSession.registrationId, isTechAssessment: In([1, 2]) },
+        where: {
+          id: incompleteSession.registrationId,
+          isTechAssessment: In([1, 2]),
+        },
       });
       if (isTech) {
         incompleteSession = null;
@@ -743,6 +787,27 @@ export class StudentService {
     }
   }
 
+  async recordLogin(email: string, ip: string): Promise<void> {
+    const user = await this.userRepo.findOne({
+      where: { email: ILike(email) },
+    });
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    user.loginCount = (user.loginCount || 0) + 1;
+    if (!user.firstLoginAt) {
+      user.firstLoginAt = new Date();
+    }
+    user.lastLoginAt = new Date();
+    user.lastLoginIp = ip;
+
+    await this.userRepo.save(user);
+    this.logger.log(
+      `Recorded login audit for student user: ${email} from IP: ${ip}`,
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // PUBLIC REGISTER
   // ---------------------------------------------------------------------------
@@ -765,6 +830,7 @@ export class StudentService {
         const cognitoRes = await this.createCognitoUser(
           dto.email,
           dto.password,
+          dto.role,
         );
         cognitoSub = cognitoRes.sub || '';
       } catch (e) {
@@ -783,7 +849,7 @@ export class StudentService {
 
       user = this.userRepo.create({
         email: dto.email,
-        role: 'STUDENT',
+        role: dto.role || 'STUDENT',
         // cognitoSub: cognitoSub, // If User entity has this field. It doesn't seem to have it in the file view I saw earlier.
         // I checked student.entity.ts earlier and it didn't have cognitoSub column explicitly shown in `Showing lines 1 to 38`.
         // Let's check if I missed it.
@@ -1101,7 +1167,8 @@ export class StudentService {
             programTitle,
             savedReg.metadata?.debrief === true ||
               savedReg.metadata?.debrief === 'true',
-            (savedReg.isTechAssessment as any) === 1 || (savedReg.isTechAssessment as any) === 2,
+            (savedReg.isTechAssessment as any) === 1 ||
+              (savedReg.isTechAssessment as any) === 2,
           );
           this.logger.log(`Welcome email sent successfully to ${dto.email}`);
         } catch (emailErr) {
@@ -1154,6 +1221,7 @@ export class StudentService {
         const cognitoRes = await this.createCognitoUser(
           dto.email,
           dto.password,
+          dto.role,
         );
         cognitoSub = cognitoRes.sub || '';
       } catch (e) {
@@ -1164,7 +1232,7 @@ export class StudentService {
       // 3. Create User Entity
       user = this.userRepo.create({
         email: dto.email,
-        role: 'STUDENT',
+        role: dto.role || 'STUDENT',
         metadata: {
           fullName: dto.full_name,
           mobileNumber: dto.mobile_number,
@@ -1191,7 +1259,7 @@ export class StudentService {
       // 5. Create Registration (FREE for Tech Assessment)
       const registration = this.sessionRepo.manager.create(Registration, {
         userId: user.id,
-        registrationSource: 'SELF',
+        registrationSource: dto.registration_source || 'SELF',
         fullName: dto.full_name,
         mobileNumber: dto.mobile_number,
         countryCode: dto.country_code ?? '+91',
@@ -1223,61 +1291,13 @@ export class StudentService {
         registration,
       );
 
-      // 6. Create Assessment Session with Schedule
-      const now = new Date();
-      const validFrom = new Date(now.getTime() + 5 * 60000); // +5 mins
-      const validTo = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // +7 days
-
-      const session = this.sessionRepo.create({
-        userId: user.id,
-        registrationId: savedReg.id,
-        programId: program.id,
-        status: 'NOT_STARTED',
-        validFrom: validFrom,
-        validTo: validTo,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-      const savedSession = await this.sessionRepo.save(session);
-
-      // 7. Create Attempts (Level 1 Mandated)
-      const levels = await this.levelRepo.find({
-        where: { isMandatory: true },
-        order: { levelNumber: 'ASC' },
-      });
-
-      for (const level of levels) {
-        const attempt = this.attemptRepo.create({
-          assessmentSessionId: savedSession.id,
-          assessmentLevelId: level.id,
-          userId: user.id,
-          registrationId: savedReg.id,
-          programId: program.id,
-          status: 'NOT_STARTED',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-        const savedAttempt = await this.attemptRepo.save(attempt);
-
-        if (level.levelNumber === 1 || level.name.includes('Level 1')) {
-          await this.generateQuestionsForAttempt(
-            savedAttempt,
-            user,
-            savedReg,
-            level,
-          );
-        }
-      }
-
-      // Send Welcome Email
+      // 6. Send Welcome Email (Skip main application assessment scheduling as we only want tech assessment)
       const shouldSendEmail =
         savedReg.metadata?.sendEmail === true ||
         savedReg.metadata?.sendEmail === 'true';
 
       if (shouldSendEmail) {
-        const validFrom = session.validFrom
-          ? new Date(session.validFrom)
-          : new Date();
+        const validFrom = new Date();
         const programTitle = program.assessmentTitle || program.name;
 
         try {
@@ -1292,7 +1312,8 @@ export class StudentService {
             programTitle,
             savedReg.metadata?.debrief === true ||
               savedReg.metadata?.debrief === 'true',
-            (savedReg.isTechAssessment as any) === 1 || (savedReg.isTechAssessment as any) === 2,
+            (savedReg.isTechAssessment as any) === 1 ||
+              (savedReg.isTechAssessment as any) === 2,
           );
           this.logger.log(
             `Tech welcome email sent successfully to ${dto.email}`,
@@ -1912,7 +1933,7 @@ export class StudentService {
     } = await this.settingsService.getEmailConfig('registration_email_config');
     const ccEmail = ccAddresses.join(', ');
     const bccEmail = bccAddresses.join(', ');
-    const fromAddress = `"${fromName}" <${fromEmail}>`;
+    const fromAddress = '"' + fromName + '" <' + fromEmail + '>';
 
     this.logger.log(`[Email Debug] Sending from: ${fromAddress}, to: ${to}`);
 
@@ -2795,6 +2816,335 @@ export class StudentService {
     }
   }
 
+  async getUpgradeInfo(email: string) {
+    const user = await this.userRepo.findOne({
+      where: { email: ILike(email) },
+    });
+    if (!user) throw new BadRequestException('User not found');
+
+    const techReg = await this.registrationRepo.findOne({
+      where: { userId: user.id, isDeleted: false, isTechAssessment: 1 },
+      relations: ['program'],
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!techReg)
+      throw new BadRequestException('No tech assessment registration found');
+
+    const existingOriginBi = await this.registrationRepo.findOne({
+      where: {
+        userId: user.id,
+        isDeleted: false,
+        isTechAssessment: In([0, 2]),
+      },
+    });
+    if (existingOriginBi) {
+      return { alreadyUpgraded: true };
+    }
+
+    const programCode = techReg.program?.code || 'COLLEGE_STUDENT';
+    let amount = 999;
+    if (programCode === 'SCHOOL_STUDENT') amount = 749;
+    else if (programCode === 'EMPLOYEE') amount = 1499;
+
+    let departmentName = '';
+    if (techReg.departmentDegreeId) {
+      const row = await this.departmentDegreeRepo.findOne({
+        where: { id: String(techReg.departmentDegreeId) as any },
+        relations: ['department', 'degreeType'],
+      });
+      if (row) {
+        const degreeName = row.degreeType?.name || '';
+        const deptName = row.department?.name || '';
+        const fullName = `${degreeName} ${deptName}`.trim();
+        departmentName = this.normalizeDepartmentDisplayName(fullName);
+      }
+    }
+
+    return {
+      alreadyUpgraded: false,
+      user: {
+        email: user.email,
+        fullName: techReg.fullName,
+        mobileNumber: techReg.mobileNumber,
+        gender: techReg.gender,
+        countryCode: techReg.countryCode,
+      },
+      program: {
+        code: programCode,
+        name: techReg.program?.name || '',
+        assessmentTitle:
+          techReg.program?.assessmentTitle || techReg.program?.name || '',
+        description: techReg.program?.description || '',
+      },
+      details: {
+        schoolLevel: techReg.schoolLevel,
+        schoolStream: techReg.schoolStream,
+        studentBoard: techReg.studentBoard,
+        departmentDegreeId: techReg.departmentDegreeId,
+        departmentName,
+        currentYear:
+          techReg.metadata?.currentYear || techReg.metadata?.current_year || '',
+        currentRole:
+          techReg.metadata?.currentRole || techReg.metadata?.current_role || '',
+        roleDescription:
+          techReg.metadata?.roleDescription ||
+          techReg.metadata?.role_description ||
+          '',
+      },
+      amount,
+    };
+  }
+
+  async createUpgradeOrder(email: string) {
+    const razorpayKeyId = this.configService.get<string>('RAZORPAY_KEY_ID');
+    const razorpayKeySecret = this.configService.get<string>(
+      'RAZORPAY_KEY_SECRET',
+    );
+
+    if (!razorpayKeyId || !razorpayKeySecret) {
+      throw new Error('Payment gateway not configured');
+    }
+
+    const user = await this.userRepo.findOne({
+      where: { email: ILike(email) },
+    });
+    if (!user) throw new BadRequestException('User not found');
+
+    const techReg = await this.registrationRepo.findOne({
+      where: { userId: user.id, isDeleted: false, isTechAssessment: 1 },
+      relations: ['program'],
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!techReg)
+      throw new BadRequestException('No tech assessment registration found');
+
+    const programCode = techReg.program?.code || 'COLLEGE_STUDENT';
+    let configAmount = 999;
+    if (programCode === 'SCHOOL_STUDENT') configAmount = 749;
+    else if (programCode === 'EMPLOYEE') configAmount = 1499;
+
+    const amount = configAmount * 100;
+    const currency = 'INR';
+
+    const orderData = {
+      amount,
+      currency,
+      receipt: `upgrade_${String(Date.now())}`,
+      notes: { email, plan: 'originbi_upgrade', programCode },
+    };
+
+    const response = await fetch('https://api.razorpay.com/v1/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization:
+          'Basic ' +
+          Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString(
+            'base64',
+          ),
+      },
+      body: JSON.stringify(orderData),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      this.logger.error(`Razorpay upgrade order creation failed: ${err}`);
+      throw new Error('Failed to create payment order');
+    }
+
+    const order = await response.json();
+    return {
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      keyId: razorpayKeyId,
+    };
+  }
+
+  async verifyUpgradeAndRegister(dto: {
+    email: string;
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }) {
+    const razorpayKeySecret = this.configService.get<string>(
+      'RAZORPAY_KEY_SECRET',
+    );
+    if (!razorpayKeySecret) {
+      throw new Error('Payment gateway not configured');
+    }
+
+    const crypto = await import('crypto');
+    const expectedSignature = crypto
+      .createHmac('sha256', razorpayKeySecret)
+      .update(`${dto.razorpay_order_id}|${dto.razorpay_payment_id}`)
+      .digest('hex');
+
+    if (expectedSignature !== dto.razorpay_signature) {
+      this.logger.warn(
+        `Upgrade verification failed signature check for ${dto.email}`,
+      );
+      return { success: false, message: 'Payment verification failed' };
+    }
+
+    const user = await this.userRepo.findOne({
+      where: { email: ILike(dto.email) },
+    });
+    if (!user) return { success: false, message: 'User not found' };
+
+    const techReg = await this.registrationRepo.findOne({
+      where: { userId: user.id, isDeleted: false, isTechAssessment: 1 },
+      relations: ['program'],
+      order: { createdAt: 'DESC' },
+    });
+    if (!techReg)
+      return { success: false, message: 'No tech registration found' };
+
+    const program = techReg.program;
+    if (!program) return { success: false, message: 'Program not found' };
+
+    const programCode = program.code || 'COLLEGE_STUDENT';
+    let configAmount = 999;
+    if (programCode === 'SCHOOL_STUDENT') configAmount = 749;
+    else if (programCode === 'EMPLOYEE') configAmount = 1499;
+
+    let savedReg: Registration;
+
+    try {
+      await this.registrationRepo.manager.transaction(async (manager) => {
+        const newReg = manager.create(Registration, {
+          userId: user.id,
+          registrationSource: 'SELF',
+          fullName: techReg.fullName,
+          mobileNumber: techReg.mobileNumber,
+          countryCode: techReg.countryCode,
+          gender: techReg.gender,
+          schoolLevel: techReg.schoolLevel,
+          schoolStream: techReg.schoolStream,
+          studentBoard: techReg.studentBoard,
+          departmentDegreeId: techReg.departmentDegreeId,
+          programId: program.id,
+          status: 'COMPLETED',
+          paymentStatus: 'PAID',
+          paymentAmount: configAmount.toString(),
+          paymentProvider: 'RAZORPAY',
+          paymentReference: dto.razorpay_payment_id,
+          paidAt: new Date(),
+          isTechAssessment: 0,
+          metadata: {
+            upgradedFromTech: true,
+            originalTechRegistrationId: techReg.id,
+            ...(techReg.metadata || {}),
+          },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as any);
+
+        savedReg = await manager.save(Registration, newReg);
+
+        await manager.update(Registration, techReg.id, {
+          isTechAssessment: 2,
+        });
+      });
+    } catch (error) {
+      this.logger.error(
+        `Upgrade database transaction failed: ${error.message}`,
+        error.stack,
+      );
+      return { success: false, message: `Upgrade failed: ${error.message}` };
+    }
+
+    try {
+      const now = new Date();
+      const validFrom = new Date(now.getTime() + 5 * 60000);
+      const validTo = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      const session = this.sessionRepo.create({
+        userId: user.id,
+        registrationId: savedReg.id,
+        programId: program.id,
+        status: 'NOT_STARTED',
+        validFrom: validFrom,
+        validTo: validTo,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      const savedSession = await this.sessionRepo.save(session);
+
+      const levels = await this.levelRepo.find({
+        where: { isMandatory: true },
+        order: { levelNumber: 'ASC' },
+      });
+
+      for (const level of levels) {
+        const attempt = this.attemptRepo.create({
+          assessmentSessionId: savedSession.id,
+          assessmentLevelId: level.id,
+          userId: user.id,
+          registrationId: savedReg.id,
+          programId: program.id,
+          status: 'NOT_STARTED',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        const savedAttempt = await this.attemptRepo.save(attempt);
+
+        if (level.levelNumber === 1 || level.name.includes('Level 1')) {
+          await this.generateQuestionsForAttempt(
+            savedAttempt,
+            user,
+            savedReg,
+            level,
+          );
+        }
+      }
+
+      this.fireAssessmentInstructionsWhatsapp(savedReg).catch((err) =>
+        this.logger.error(
+          `Instructions WhatsApp failed for ${savedReg.mobileNumber}: ${err.message}`,
+        ),
+      );
+
+      const programTitle = program.assessmentTitle || program.name;
+      try {
+        await this.sendWelcomeEmail(
+          user.email,
+          savedReg.fullName,
+          'Your existing password',
+          validFrom,
+          programTitle,
+          false,
+          false,
+        );
+      } catch (emailErr) {
+        this.logger.error(
+          `Welcome email failed after upgrade for ${user.email}: ${emailErr.message}`,
+        );
+      }
+
+      return {
+        success: true,
+        message: 'Upgrade successful. Exam scheduled.',
+        userId: user.id,
+        registrationId: savedReg.id,
+      };
+    } catch (schedError) {
+      this.logger.error(
+        `Scheduling assessment after upgrade failed: ${schedError.message}`,
+        schedError.stack,
+      );
+      return {
+        success: true,
+        message:
+          'Upgrade successful, but assessment scheduling failed. Please contact support.',
+        userId: user.id,
+        registrationId: savedReg.id,
+      };
+    }
+  }
+
   private async sendAdminNotification(data: any) {
     const adminServiceUrl =
       this.configService.get('ADMIN_SERVICE_URL') || 'http://localhost:4001';
@@ -2812,5 +3162,145 @@ export class StudentService {
         err.message,
       );
     }
+  }
+  // --- Tech Assessment Certificate Email --------------------------------------
+
+  /**
+   * Sends a certificate email after a tech assessment is completed.
+   * Called via internal HTTP from assessment-service.
+   * Uses the existing AWS SES v2 transporter + tech-assessment-certificate template.
+   */
+  async sendTechCertificateEmail(payload: {
+    toEmail: string;
+    userName: string;
+    assessmentTitle: string;
+    assessmentModule: string;
+    overallScorePercent: number;
+    grade: string;
+    certificateId: string;
+    completedAt: string;
+    verifyUrl?: string;
+  }): Promise<void> {
+    const {
+      toEmail,
+      userName,
+      assessmentTitle,
+      assessmentModule,
+      overallScorePercent,
+      grade,
+      certificateId,
+      completedAt,
+      verifyUrl: incomingVerifyUrl,
+    } = payload;
+
+    const transporter = this.createEmailTransporter();
+
+    const {
+      fromName,
+      fromAddress: fromEmail,
+      ccAddresses,
+      bccAddresses,
+      replyToAddress,
+    } = await this.settingsService.getEmailConfig(
+      'tech_certificate_email_config',
+    );
+
+    const fromAddress = '"' + fromName + '" <' + fromEmail + '>';
+
+    const apiUrl =
+      this.configService.get<string>('API_URL') || 'http://localhost:4004';
+    const techFrontendUrl =
+      this.configService.get<string>('TECH_FRONTEND_URL') ||
+      this.configService.get<string>('FRONTEND_URL') ||
+      'http://localhost:3000';
+
+    const assets = {
+      logo: `${apiUrl}/assets/logo-light.png`,
+      footer: `${apiUrl}/assets/Email_Vector.png`,
+    };
+
+    const verifyUrl =
+      incomingVerifyUrl || `${techFrontendUrl}/verify/${certificateId}`;
+
+    const formattedDate = new Date(completedAt).toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
+    const gradeLabel = this.getTechGradeLabel(grade);
+    const moduleLabel = this.getTechModuleLabel(assessmentModule);
+
+    const emailHtml = getTechAssessmentCertificateTemplate(
+      userName,
+      assessmentTitle,
+      moduleLabel,
+      overallScorePercent,
+      grade,
+      gradeLabel,
+      certificateId,
+      formattedDate,
+      verifyUrl,
+      techFrontendUrl,
+      assets,
+    );
+
+    const subject = `You have successfully completed the ${assessmentTitle} - Your Certificate is Ready ??`;
+
+    const mailOptions: Record<string, any> = {
+      from: fromAddress,
+      to: toEmail,
+      subject,
+      html: emailHtml,
+    };
+
+    const ccEmail = ccAddresses.join(', ');
+    const bccEmail = bccAddresses.join(', ');
+    if (ccEmail) mailOptions.cc = ccEmail;
+    if (bccEmail) mailOptions.bcc = bccEmail;
+    if (replyToAddress) mailOptions.replyTo = replyToAddress;
+
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      this.logger.log(
+        `[TechCertEmail] Sent to ${toEmail} [${certificateId}]: ${JSON.stringify(info)}`,
+      );
+    } catch (err: any) {
+      this.logger.error(
+        `[TechCertEmail] Failed to send to ${toEmail}: ${err.message}`,
+        err.stack,
+      );
+      throw err;
+    }
+  }
+
+  private getTechGradeLabel(grade: string): string {
+    const map: Record<string, string> = {
+      'A+': 'Outstanding',
+      A: 'Excellent',
+      'B+': 'Very Good',
+      B: 'Good',
+      C: 'Average',
+      D: 'Below Average',
+      F: 'Needs Improvement',
+    };
+    return map[grade] || grade;
+  }
+
+  private getTechModuleLabel(module: string): string {
+    if (module.startsWith('coding:')) {
+      const lang = module.slice('coding:'.length);
+      const name = lang.charAt(0).toUpperCase() + lang.slice(1);
+      return `${name} Coding Assessment`;
+    }
+    const map: Record<string, string> = {
+      aptitude: 'Technical Aptitude',
+      grammar: 'Communication Skills',
+      communication: 'Communication Skills',
+      mnc: 'MNC Readiness',
+      role: 'Role-Based Assessment',
+      coding: 'Coding Assessment',
+    };
+    return map[module] || module;
   }
 }

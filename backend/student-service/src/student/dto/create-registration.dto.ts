@@ -116,4 +116,12 @@ export class CreateRegistrationDto {
 
   @IsOptional()
   is_tech_assessment?: number;
+
+  @IsString()
+  @IsOptional()
+  role?: string;
+
+  @IsString()
+  @IsOptional()
+  registration_source?: string;
 }

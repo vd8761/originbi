@@ -6,14 +6,19 @@ import {
   Body,
   Req,
   UseGuards,
+  Post,
+  BadRequestException,
 } from '@nestjs/common';
 
-import { Request } from 'express';
 import { AdminService } from './admin.service';
 import { AdminLoginGuard } from '../adminlogin/adminlogin.guard';
 
-interface AdminRequest extends Request {
+interface AdminRequest {
   user?: Record<string, any>;
+  headers?: any;
+  ip?: string;
+  socket?: any;
+  [key: string]: any;
 }
 
 @Controller('admin')
@@ -28,6 +33,20 @@ export class AdminController {
 
       user: req.user, // set in AdminLoginGuard
     };
+  }
+
+  @Post('record-login')
+  async recordLogin(@Req() req: AdminRequest) {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new BadRequestException('User context missing');
+    }
+    let ip = (req.headers['x-forwarded-for'] as string) || req.ip || req.socket.remoteAddress || '';
+    if (ip && ip.includes(',')) {
+      ip = ip.split(',')[0].trim();
+    }
+    await this.adminService.recordLogin(userId, ip);
+    return { success: true };
   }
 
   @Get('dashboard-stats')

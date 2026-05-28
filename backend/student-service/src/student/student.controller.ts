@@ -1,4 +1,12 @@
-import { Controller, Post, Body, Logger } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Logger,
+  Req,
+  BadRequestException,
+} from '@nestjs/common';
+import { Request } from 'express';
 import { PgBossService } from '@wavezync/nestjs-pgboss';
 import { StudentService } from './student.service';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
@@ -40,6 +48,23 @@ export class StudentController {
     return this.studentService.checkLoginStatus(body.email);
   }
 
+  @Post('record-login')
+  async recordLogin(@Req() req: Request, @Body() body: { email: string }) {
+    if (!body.email) {
+      throw new BadRequestException('Email is required');
+    }
+    let ip =
+      (req.headers['x-forwarded-for'] as string) ||
+      req.ip ||
+      req.socket.remoteAddress ||
+      '';
+    if (ip && ip.includes(',')) {
+      ip = ip.split(',')[0].trim();
+    }
+    await this.studentService.recordLogin(body.email, ip);
+    return { success: true };
+  }
+
   @Post('progress')
   async getAssessmentProgress(@Body() body: { email: string }) {
     return this.studentService.getAssessmentProgress(body.email);
@@ -59,6 +84,29 @@ export class StudentController {
   @Post('register/tech')
   async registerTechAssessment(@Body() dto: CreateRegistrationDto) {
     return this.studentService.registerTechAssessment(dto);
+  }
+
+  @Post('upgrade/info')
+  async getUpgradeInfo(@Body() body: { email: string }) {
+    return this.studentService.getUpgradeInfo(body.email);
+  }
+
+  @Post('upgrade/create-order')
+  async createUpgradeOrder(@Body() body: { email: string }) {
+    return this.studentService.createUpgradeOrder(body.email);
+  }
+
+  @Post('upgrade/verify-and-register')
+  async verifyUpgradeAndRegister(
+    @Body()
+    body: {
+      email: string;
+      razorpay_order_id: string;
+      razorpay_payment_id: string;
+      razorpay_signature: string;
+    },
+  ) {
+    return this.studentService.verifyUpgradeAndRegister(body);
   }
 
   @Post('validate-registration')
@@ -219,5 +267,28 @@ export class StudentController {
     }
 
     return { message: 'Placement report email sending started' };
+  }
+  /**
+   * Internal endpoint called by assessment-service after a tech assessment is submitted.
+   * Sends a certificate email to the student via AWS SES.
+   * POST /student/tech-certificate-email
+   */
+  @Post('tech-certificate-email')
+  async sendTechCertificateEmail(
+    @Body()
+    body: {
+      toEmail: string;
+      userName: string;
+      assessmentTitle: string;
+      assessmentModule: string;
+      overallScorePercent: number;
+      grade: string;
+      certificateId: string;
+      completedAt: string;
+      verifyUrl?: string;
+    },
+  ) {
+    await this.studentService.sendTechCertificateEmail(body);
+    return { success: true, message: 'Certificate email sent' };
   }
 }
