@@ -135,8 +135,8 @@ export class FutureRoleReportService {
     let fullReportText = await this.generateFullReportWithAI(profile);
 
     // Strip out any generated Report ID from the chat response text
-    fullReportText = fullReportText.replace(/(?:\*\*?)?Report ID:(?:\*\*?)?\s*CFRR-\w+-\d+/gi, '');
-    fullReportText = fullReportText.replace(/(?:\*\*?)?Report ID:(?:\*\*?)?\s*CFRR-\w+/gi, '');
+    fullReportText = fullReportText.replace(/^[#\*\s]*Report\s*ID[:\s\*]*CFRR-\w+[-\w]*/gim, '');
+    fullReportText = fullReportText.replace(/^[#\*\s]*Report\s*ID[:\s\*]*CFRR-XXX/gim, '');
     // Clean up any double blank lines at the start and collapse consecutive newlines
     fullReportText = fullReportText.replace(/^\s*\n+/, '');
     fullReportText = fullReportText.replace(/\n{3,}/g, '\n\n');

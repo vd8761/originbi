@@ -17,25 +17,17 @@ export class CareerFitmentReport extends BaseReport {
     // Page 1: Cover Page
     this.generateCoverPage();
 
-    // Page 2: Profile Snapshot, Behavioral Summary, and Skill Assessment Part 1
+    // Page 2+: Profile Snapshot, Behavioral Summary, Skill Assessment Category rendering, Radar Chart, and Overall Insights (dynamic)
     this._currentBackground = 'Watermark_Background.jpg';
     this._useStdMargins = true;
     this.doc.addPage();
     this.generatePage2();
 
-    // Page 3: Skill Assessment Part 2 (rest of Comm, People Ops, Talent, Biz Part 1)
-    this.doc.addPage();
-    this.generatePage3();
-
-    // Page 4: Skill Assessment Part 3 (rest of Biz), Capability Visual, Overall Insight, Future Title
-    this.doc.addPage();
-    this.generatePage4();
-
-    // Page 5: Future Role Readiness Mapping Table & Scores, Fitment Score & Verdict
+    // Page 4: Future Role Readiness Mapping Table & Scores, Fitment Score & Verdict
     this.doc.addPage();
     this.generatePage5();
 
-    // Page 6: Industry Suitability, Transition Requirements, Executive Insight
+    // Page 5: Industry Suitability, Transition Requirements, Executive Insight
     this.doc.addPage();
     this.generatePage6();
 
@@ -93,9 +85,9 @@ export class CareerFitmentReport extends BaseReport {
       .font(this.FONT_SORA_BOLD)
       .fontSize(38)
       .fillColor(this.COLOR_DEEP_BLUE)
-      .text('Career Fitment &', 35, 30, { width: titleWidth, align: 'left' })
-      .text('Future Role Readiness', 35, 30 + 44, { width: titleWidth, align: 'left' })
-      .text('Report', 35, 30 + 88, { width: titleWidth, align: 'left' });
+      .text('Career Fitment &', 35, 12, { width: titleWidth, align: 'left' })
+      .text('Future Role Readiness', 35, 12 + 44, { width: titleWidth, align: 'left' })
+      .text('Report', 35, 12 + 88, { width: titleWidth, align: 'left' });
 
     // --- Footer Elements ---
     const footerY = this.PAGE_HEIGHT - 90;
@@ -243,9 +235,13 @@ export class CareerFitmentReport extends BaseReport {
     currentY += 20;
 
     let summaryText = this.data.behavioralSummary || '';
-    // Clean up duplicate/double headings inside the behavioral summary summaryText
-    summaryText = summaryText.replace(/^(?:#*\s*(?:1\.)?\s*\*?\*?behavioral\s+alignment\s+summary\*?\*?[:\s]*)/i, '');
+    
+    // Clean up duplicate headings and part markers inside the behavioral summary summaryText
+    summaryText = summaryText.replace(/\*?\*?\d*\.?\s*Behavioral\s+Alignment\s+Summary\*?\*?/gi, '');
+    summaryText = summaryText.replace(/\*?\*?Part\s*\d+[:*\s]*?\*?\*?/gi, '');
+    summaryText = summaryText.replace(/^\s*[:*_\-\s]*\n+/gm, ''); // Remove empty lines containing junk chars
     summaryText = summaryText.replace(/^\s*\n+/, ''); // strip leading blank lines
+    summaryText = summaryText.replace(/\n{3,}/g, '\n\n'); // collapse multiple empty lines
     
     const lines = summaryText.split('\n');
     let inList = false;
@@ -293,180 +289,63 @@ export class CareerFitmentReport extends BaseReport {
       .fillColor(this.COLOR_DEEP_BLUE) // Color header royal purple
       .text('2. Skill-wise Capability Assessment (Score out of 5)', this.MARGIN_STD, currentY);
 
-    currentY += 20;
+    currentY += 25;
 
-    // First Skill Category (Communication Skills)
-    const commCategory = this.data.skillCategories.find(c => c.category.toLowerCase().includes('communication')) || this.data.skillCategories[0];
-    if (commCategory) {
+    // Unified dynamic skill categories loop
+    const categories = this.data.skillCategories;
+    
+    for (let idx = 0; idx < categories.length; idx++) {
+      const cat = categories[idx];
+      const skillsCount = cat.skills.length;
+      // Estimate height needed: header (15) + table header (20) + rows (skillsCount * 18) + gap (20)
+      const heightNeeded = 15 + 20 + (skillsCount * 18) + 20;
+
+      // Check if we need a page break (current page is Page 2, Page 3, etc.)
+      if (currentY + heightNeeded > this.PAGE_HEIGHT - this.MARGIN_STD) {
+        this.doc.addPage();
+        currentY = this.MARGIN_STD + 15;
+      }
+
+      // Draw Category Header
       this.doc
         .font(this.FONT_SORA_SEMIBOLD)
         .fontSize(11)
         .fillColor(this.COLOR_BLACK)
-        .text(commCategory.category, this.MARGIN_STD, currentY);
+        .text(cat.category, this.MARGIN_STD, currentY);
 
-      const firstTwoCommSkills = commCategory.skills.slice(0, 2);
-      const commRows1 = firstTwoCommSkills.map(s => [
+      // Draw Category Table
+      const rows = cat.skills.map(s => [
         s.name,
         s.score.toFixed(1),
         s.insight || '-'
       ]);
 
-      this.table(['Skill', 'Score', 'Insight'], commRows1, {
+      this.table(['Skill', 'Score', 'Insight'], rows, {
         colWidths: [140, 55, 305],
         fontSize: 9,
         headerFontSize: 9,
         cellPadding: 5,
         headerColor: this.COLOR_DEEP_BLUE,
         headerTextColor: '#FFFFFF',
-        borderColor: '#CCCCCC', // Light grey borders
+        borderColor: '#CCCCCC',
         y: currentY + 15
       });
+
+      currentY = this.doc.y + 15;
     }
+
+    // Now call generatePage4(currentY) on the same page (or dynamic new page)
+    // Estimate height needed for Capability Snapshot & Overall Skill Coverage Insight
+    const snapshotHeightNeeded = 360;
+    if (currentY + snapshotHeightNeeded > this.PAGE_HEIGHT - this.MARGIN_STD) {
+      this.doc.addPage();
+      currentY = this.MARGIN_STD + 15;
+    }
+
+    this.generatePage4(currentY);
   }
 
-  private generatePage3(): void {
-    const categories = this.data.skillCategories;
-    const commCategory = categories.find(c => c.category.toLowerCase().includes('communication')) || categories[0];
-    const peopleOpsCategory = categories.find(c => c.category.toLowerCase().includes('people') || c.category.toLowerCase().includes('operations')) || categories[1];
-    const talentCategory = categories.find(c => c.category.toLowerCase().includes('talent') || c.category.toLowerCase().includes('culture')) || categories[2];
-    const businessCategory = categories.find(c => c.category.toLowerCase().includes('business') || c.category.toLowerCase().includes('strategy')) || categories[3];
-
-    // Rest of Communication Skills
-    let currentY = this.MARGIN_STD + 15;
-    if (commCategory && commCategory.skills.length > 2) {
-      const remainingCommSkills = commCategory.skills.slice(2);
-      const commRows2 = remainingCommSkills.map(s => [
-        s.name,
-        s.score.toFixed(1),
-        s.insight || '-'
-      ]);
-
-      this.table(['Skill', 'Score', 'Insight'], commRows2, {
-        colWidths: [140, 55, 305],
-        fontSize: 9,
-        headerFontSize: 9,
-        cellPadding: 5,
-        headerColor: this.COLOR_DEEP_BLUE,
-        headerTextColor: '#FFFFFF',
-        borderColor: '#CCCCCC',
-        y: currentY
-      });
-      currentY = this.doc.y + 10;
-    }
-
-    // People Operations & HR Excellence
-    if (peopleOpsCategory) {
-      this.doc
-        .font(this.FONT_SORA_SEMIBOLD)
-        .fontSize(11)
-        .fillColor(this.COLOR_BLACK)
-        .text(peopleOpsCategory.category, this.MARGIN_STD, currentY);
-
-      const peopleOpsRows = peopleOpsCategory.skills.map(s => [
-        s.name,
-        s.score.toFixed(1),
-        s.insight || '-'
-      ]);
-
-      this.table(['Skill', 'Score', 'Insight'], peopleOpsRows, {
-        colWidths: [140, 55, 305],
-        fontSize: 9,
-        headerFontSize: 9,
-        cellPadding: 5,
-        headerColor: this.COLOR_DEEP_BLUE,
-        headerTextColor: '#FFFFFF',
-        borderColor: '#CCCCCC',
-        y: currentY + 15
-      });
-      currentY = this.doc.y + 10;
-    }
-
-    // Talent & Culture
-    if (talentCategory) {
-      this.doc
-        .font(this.FONT_SORA_SEMIBOLD)
-        .fontSize(11)
-        .fillColor(this.COLOR_BLACK)
-        .text(talentCategory.category, this.MARGIN_STD, currentY);
-
-      const talentRows = talentCategory.skills.map(s => [
-        s.name,
-        s.score.toFixed(1),
-        s.insight || '-'
-      ]);
-
-      this.table(['Skill', 'Score', 'Insight'], talentRows, {
-        colWidths: [140, 55, 305],
-        fontSize: 9,
-        headerFontSize: 9,
-        cellPadding: 5,
-        headerColor: this.COLOR_DEEP_BLUE,
-        headerTextColor: '#FFFFFF',
-        borderColor: '#CCCCCC',
-        y: currentY + 15
-      });
-      currentY = this.doc.y + 10;
-    }
-
-    // Business & Strategy Part 1 (First 2)
-    if (businessCategory) {
-      this.doc
-        .font(this.FONT_SORA_SEMIBOLD)
-        .fontSize(11)
-        .fillColor(this.COLOR_BLACK)
-        .text(businessCategory.category, this.MARGIN_STD, currentY);
-
-      const firstTwoBizSkills = businessCategory.skills.slice(0, 2);
-      const bizRows1 = firstTwoBizSkills.map(s => [
-        s.name,
-        s.score.toFixed(1),
-        s.insight || '-'
-      ]);
-
-      this.table(['Skill', 'Score', 'Insight'], bizRows1, {
-        colWidths: [140, 55, 305],
-        fontSize: 9,
-        headerFontSize: 9,
-        cellPadding: 5,
-        headerColor: this.COLOR_DEEP_BLUE,
-        headerTextColor: '#FFFFFF',
-        borderColor: '#CCCCCC',
-        y: currentY + 15
-      });
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // PAGE 4: Skill Assessment Part 3, Visual snapshot, Overall Insight, Future Title
-  // ═══════════════════════════════════════════════════════════════════════════
-  private generatePage4(): void {
-    const categories = this.data.skillCategories;
-    const businessCategory = categories.find(c => c.category.toLowerCase().includes('business') || c.category.toLowerCase().includes('strategy')) || categories[3];
-
-    let currentY = this.MARGIN_STD + 15;
-
-    // Remaining Business Skills
-    if (businessCategory && businessCategory.skills.length > 2) {
-      const remainingBizSkills = businessCategory.skills.slice(2);
-      const bizRows2 = remainingBizSkills.map(s => [
-        s.name,
-        s.score.toFixed(1),
-        s.insight || '-'
-      ]);
-
-      this.table(['Skill', 'Score', 'Insight'], bizRows2, {
-        colWidths: [140, 55, 305],
-        fontSize: 9,
-        headerFontSize: 9,
-        cellPadding: 5,
-        headerColor: this.COLOR_DEEP_BLUE,
-        headerTextColor: '#FFFFFF',
-        borderColor: '#CCCCCC',
-        y: currentY
-      });
-      currentY = this.doc.y + 10;
-    }
-
+  private generatePage4(currentY: number): void {
     // Visual Snapshot Header
     this.doc
       .font(this.FONT_SORA_SEMIBOLD)
@@ -474,18 +353,20 @@ export class CareerFitmentReport extends BaseReport {
       .fillColor(this.COLOR_DEEP_BLUE) // Royal purple title
       .text('Capability Snapshot (Visual)', this.MARGIN_STD, currentY);
 
-    // Draw Radar Chart - Set centerY to currentY + 115 (Huge radius 85)
-    const chartY = currentY + 115;
+    // Draw Radar Chart - Set centerY to currentY + 130 (Huge radius 85)
+    const chartY = currentY + 130;
     this.drawRadarChart(this.PAGE_WIDTH / 2, chartY, 85);
 
     // Radar Chart Caption - Positioned safely below radar chart bottom label
-    const captionY = chartY + 110;
+    const captionY = chartY + 145; // Increased gap to completely resolve overlap
+    const captionText = "The visual snapshot above illustrates the candidate's balance of competencies. A wider span indicates higher proficiency across dimensions. Use this to identify if the profile is 'Operational' (skewed towards Ops/Talent) or 'Strategic' (skewed towards Strategy/Communication).";
+    
     this.doc
       .font(this.FONT_REGULAR)
       .fontSize(8.5)
       .fillColor('#555555')
       .text(
-        "The visual snapshot above illustrates the candidate's balance of competencies. A wider span indicates higher proficiency across dimensions. Use this to identify if the profile is 'Operational' (skewed towards Ops/Talent) or 'Strategic' (skewed towards Strategy/Communication).",
+        captionText,
         this.MARGIN_STD,
         captionY,
         {
@@ -494,15 +375,28 @@ export class CareerFitmentReport extends BaseReport {
         }
       );
 
+    const captionTextHeight = this.doc.heightOfString(
+      captionText,
+      { width: this.PAGE_WIDTH - 2 * this.MARGIN_STD, align: 'center' }
+    );
+    const postCaptionY = captionY + captionTextHeight + 25;
+
+    // Check if Overall Skill Coverage Insight fits on the current page.
+    // Estimated height needed for the insight is 110 points.
+    let insightY = postCaptionY;
+    if (insightY + 110 > this.PAGE_HEIGHT - this.MARGIN_STD) {
+      this.doc.addPage();
+      insightY = this.MARGIN_STD + 15;
+    }
+
     // 3. Overall Skill Coverage Insight
-    const insightY = captionY + 50;
     this.doc
       .font(this.FONT_SORA_SEMIBOLD)
       .fontSize(13)
       .fillColor(this.COLOR_DEEP_BLUE) // Royal purple title
       .text('3. Overall Skill Coverage Insight', this.MARGIN_STD, insightY);
 
-    const strengthY = insightY + 20;
+    const strengthY = this.doc.y + 12;
     this.doc
       .font(this.FONT_REGULAR)
       .fontSize(10)
@@ -513,7 +407,7 @@ export class CareerFitmentReport extends BaseReport {
       .font(this.FONT_REGULAR)
       .text(this.data.overallSkillInsight.highStrengthAreas.join(', '));
 
-    const developableY = strengthY + 16;
+    const developableY = this.doc.y + 10;
     this.doc
       .font(this.FONT_REGULAR)
       .fontSize(10)
@@ -525,15 +419,21 @@ export class CareerFitmentReport extends BaseReport {
       .text(this.data.overallSkillInsight.developableAreas.join(', '));
 
     // Dynamic concluding sentence
-    const concludingY = developableY + 20;
+    const concludingY = this.doc.y + 12;
     this.doc
       .font(this.FONT_REGULAR)
       .fontSize(10)
       .fillColor(this.COLOR_BLACK)
       .text('These are scaling refinements, not capability blockers.', this.MARGIN_STD, concludingY);
+  }
 
-    // 4. Future Role Readiness Mapping Title - Hardcoded near the bottom to flow into Page 5
-    const titleY = this.PAGE_HEIGHT - this.MARGIN_STD - 25;
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PAGE 5: Future Role Readiness Mapping Table & Scores, Fitment Score & Verdict
+  // ═══════════════════════════════════════════════════════════════════════════
+  private generatePage5(): void {
+    let currentY = this.MARGIN_STD + 15;
+
+    // 4. Future Role Readiness Mapping Title
     const profile = this.data.profile;
     const hasCurrent = profile.currentRole && !profile.currentRole.includes('Not Specified');
     const hasExpected = profile.expectedFutureRole && !profile.expectedFutureRole.includes('Not Specified');
@@ -545,14 +445,9 @@ export class CareerFitmentReport extends BaseReport {
       .font(this.FONT_SORA_SEMIBOLD)
       .fontSize(13)
       .fillColor(this.COLOR_DEEP_BLUE) // Royal purple title
-      .text(readinessTitle, this.MARGIN_STD, titleY);
-  }
+      .text(readinessTitle, this.MARGIN_STD, currentY);
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // PAGE 5: Future Role Readiness Mapping Table & Scores, Fitment Score & Verdict
-  // ═══════════════════════════════════════════════════════════════════════════
-  private generatePage5(): void {
-    let currentY = this.MARGIN_STD + 15;
+    currentY = this.doc.y + 15;
 
     // Dimensions Table
     const readiness = this.data.futureRoleReadiness;

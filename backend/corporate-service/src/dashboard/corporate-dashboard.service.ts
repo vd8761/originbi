@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
   InternalServerErrorException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, ILike } from 'typeorm';
@@ -1896,7 +1897,8 @@ export class CorporateDashboardService {
         p.name as program_name,
         p.assessment_title,
         dpt.name as department_name,
-        dt.name as degree_type_name
+        dt.name as degree_type_name,
+        r.corporate_account_id
       FROM assessment_reports ar
       JOIN assessment_attempts aa ON aa.assessment_session_id = ar.assessment_session_id
       JOIN registrations r ON aa.registration_id = r.id
@@ -1910,23 +1912,28 @@ export class CorporateDashboardService {
         ar.report_number = ANY($1::text[])
         OR regexp_replace(ar.report_number, '^OBI-G[0-9]+-', 'OBI-') = ANY($1::text[])
       )
-        AND (r.corporate_account_id = $2 OR r.corporate_account_id IS NULL)
       ORDER BY aa.dominant_trait_id DESC NULLS LAST
       LIMIT 1
     `;
 
     const result = await this.dataSource.query(query, [
       reportNumbers,
-      corporateAccountId,
     ]);
 
     if (!result || result.length === 0) {
       throw new NotFoundException(
-        `Report not found for ID: ${reportNumberInput.trim().toUpperCase()}`,
+        `No report found for ID: ${reportNumberInput.trim().toUpperCase()}`,
       );
     }
 
     const row = result[0];
+
+    // Check account restriction
+    if (corporateAccountId && row.corporate_account_id && Number(row.corporate_account_id) !== Number(corporateAccountId)) {
+      throw new ForbiddenException(
+        `This candidate is registered under another company and their report cannot be viewed.`
+      );
+    }
 
     // Parse DISC scores from attempt metadata
     const attemptMeta = row.attempt_metadata || {};

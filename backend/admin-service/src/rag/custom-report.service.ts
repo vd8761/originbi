@@ -698,14 +698,14 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
 
         const totalScore = Math.round(behavioralScore + experienceScore + skillCoverage + growthFeasibility);
 
-        // Generate verdict
+        // Generate verdict matching standard ranges (80+=Strong, 60-79=Moderate, <60=Development Needed)
         let verdict: string;
         if (totalScore >= 80) {
             verdict = 'STRONG FIT. Highly aligned with role requirements.';
         } else if (totalScore >= 60) {
-            verdict = 'CONDITIONAL STRONG FIT. Well-suited with minor development areas.';
-        } else {
             verdict = 'MODERATE FIT. Good potential with focused development needed.';
+        } else {
+            verdict = 'DEVELOPMENT NEEDED. Significant alignment and development required.';
         }
 
         return {
@@ -749,11 +749,11 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
 
         skills.forEach(cat => {
             cat.skills.forEach(skill => {
-                allSkills.push({ name: skill.name.toLowerCase(), score: skill.score });
+                allSkills.push({ name: skill.name, score: skill.score });
                 if (skill.score >= 4.0) {
-                    highStrength.push(skill.name.toLowerCase());
+                    highStrength.push(skill.name);
                 } else if (skill.score < 3.5) {
-                    developable.push(skill.name.toLowerCase());
+                    developable.push(skill.name);
                 }
             });
         });
