@@ -476,11 +476,18 @@ export class RagService {
       /^\s*(?:[a-z]+\.?\s*){1,4}\s+report\b/i.test(q)
       && !/\b(test|assessment|exam|overall|custom|fitment|placement|program|batch|group)\b/.test(q);
 
-    if (/\b(career\s*report|future\s*role|role\s*readiness)\b/.test(q) ||
+    const isCareerQuery = /\b(career|fitment|readiness|future\s*role|role\s*readiness)\b/i.test(q);
+
+    if (isCareerQuery && (/\b(career\s*report|future\s*role|role\s*readiness|fitment|readiness)\b/.test(q) ||
       (/\breport\b/.test(q) && /\b(for|of|about)\b/.test(q)) ||
-      bareNameReportPattern) {
+      bareNameReportPattern)) {
       const name = this.extractName(message);
       return { intent: 'career_report', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
+    }
+
+    if (!isCareerQuery && (/\breport\b/.test(q) || bareNameReportPattern)) {
+      const name = this.extractName(message);
+      return { intent: 'person_lookup', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
     }
 
     if (/\b(list|show|get|display|view)\b\s+(my|our)?\s*\b(candidates?|students?|employees?|resources?|staff|members?|people|peoples|persons?)\b/.test(q)) {
@@ -1475,7 +1482,14 @@ export class RagService {
         }
       }
 
-      const disambiguationSelectionMatch = normalizedQ.match(/^#?\s*(\d+)(?:[\s,.-]*[a-z][a-z\s.'-]{0,40})?$/i);
+      let disambiguationSelectionMatch = normalizedQ.match(/^#?\s*(\d+)\.?\s*$/i);
+      if (!disambiguationSelectionMatch) {
+        disambiguationSelectionMatch = normalizedQ.match(/^(?:option|choice|select|number|num|#)?\s*(\d+)\.?\s*$/i);
+      }
+      if (!disambiguationSelectionMatch) {
+        disambiguationSelectionMatch = normalizedQ.match(/^#?\s*(\d+)[\s,.-]+[a-z0-9][^\n]{0,80}$/i);
+      }
+
       if (disambiguationSelectionMatch) {
         const disambigKey = this.getDisambiguationKey(user);
         const ctx = this.disambiguationCache.get(disambigKey);
@@ -3152,13 +3166,17 @@ Please tell me the target role first, for example:
     const term = searchTerm!;
 
     // Check if user specified a number (e.g., "anjaly #2" or "anjaly 2")
+    // Only treat as index selection if the matched number is small (<= 15) to avoid treating mobile suffixes as selection indices
     const numberMatch = term.match(/(.+?)\s*[#]?\s*(\d+)$/);
     let targetIndex = 0;
     let cleanSearchTerm = term;
 
     if (numberMatch) {
-      cleanSearchTerm = numberMatch[1].trim();
-      targetIndex = parseInt(numberMatch[2]) - 1; // Convert to 0-based index
+      const parsedNum = parseInt(numberMatch[2], 10);
+      if (parsedNum <= 15) {
+        cleanSearchTerm = numberMatch[1].trim();
+        targetIndex = parsedNum - 1; // Convert to 0-based index
+      }
     }
 
     // Extract email if present in the search term (e.g., "anjaly anjaly@email.com")
@@ -3215,6 +3233,7 @@ Please tell me the target role first, for example:
       const careerReportSql = `
                 SELECT 
                     r.id,
+                    r.user_id,
                     r.full_name,
                     r.gender,
                     r.mobile_number,
@@ -3224,6 +3243,7 @@ Please tell me the target role first, for example:
                     r.student_board,
                     r.registration_source,
                     u.email,
+                    u.role as user_role,
                     aa.total_score,
                     aa.sincerity_index,
                     pt.blended_style_name as behavioral_style,
@@ -3269,10 +3289,13 @@ Please tell me the target role first, for example:
         }
         personData = await this.dataSource.query(`
                 SELECT 
-                  r.id, r.full_name, r.gender, r.mobile_number,
+                  r.id,
+                  r.user_id,
+                  r.full_name, r.gender, r.mobile_number,
                   r.metadata as reg_metadata,
                     r.school_level, r.school_stream, r.student_board, r.registration_source,
                     u.email,
+                    u.role as user_role,
                     aa.total_score, aa.sincerity_index,
                     pt.blended_style_name as behavioral_style,
                     pt.blended_style_desc as behavior_description,
@@ -3390,12 +3413,17 @@ Please tell me the target role first, for example:
       const scoreToUse = person.best_score || person.total_score;
 
       // ── Build smart ProfileInput based on actual student data ──
-      const isStudent = !person.company_name; // No corporate = student
+      const isStudent = person.user_role === 'STUDENT' || !person.company_name; // No corporate / role is STUDENT = student
       const schoolInfo = [person.school_level, person.school_stream, person.student_board].filter(Boolean).join(' / ');
       const deptInfo = [person.degree_name, person.department_name].filter(Boolean).join(' — ');
-      const storedCurrentRole = String(regMetadata.currentRole || '').trim();
+      const storedCurrentRole = String(
+        regMetadata.currentRole || 
+        (isStudent ? 'Student' : '')
+      ).trim();
       const storedRoleDescription = String(
-        regMetadata.roleDescription || regMetadata.currentJobDescription || '',
+        regMetadata.roleDescription || 
+        regMetadata.currentJobDescription || 
+        (isStudent ? 'Student' : '')
       ).trim();
 
       if (!storedCurrentRole || !storedRoleDescription) {
@@ -3448,8 +3476,18 @@ Please tell me the target role first, for example:
         attemptCount: person.attempt_count ? parseInt(person.attempt_count) : undefined,
       } as any);
 
+      const downloadUrl = `/rag/custom-report/pdf?userId=${person.user_id}&type=career_fitment`;
+
       return {
-        answer: report.fullReportText,
+        answer: `### 📊 **Career Fitment & Future Role Readiness Report**
+
+I'm ready to generate **${person.full_name}'s Career Fitment & Future Role Readiness Report**! 🎯
+
+📄 **[Click here to download your personalized PDF Report](${downloadUrl})**
+
+---
+
+${report.fullReportText}`,
         searchType: 'career_report',
         reportId: report.reportId,
         confidence: 0.95,
@@ -3680,12 +3718,16 @@ Please tell me the target role first, for example:
     const userId = user?.id;
 
     // Check for disambiguation number (e.g., "jai #2" or bare "2")
+    // Only treat as index selection if the matched number is small (<= 15) to avoid treating mobile suffixes as selection indices
     const numberMatch = searchTerm.match(/(.+?)\s*[#]?\s*(\d+)$/);
     let targetIndex = -1;
     let cleanSearch = searchTerm;
     if (numberMatch && numberMatch[1].trim().length > 0) {
-      cleanSearch = numberMatch[1].trim();
-      targetIndex = parseInt(numberMatch[2]) - 1; // 0-based
+      const parsedNum = parseInt(numberMatch[2], 10);
+      if (parsedNum <= 15) {
+        cleanSearch = numberMatch[1].trim();
+        targetIndex = parsedNum - 1; // 0-based
+      }
     }
 
     try {
@@ -4167,8 +4209,11 @@ Please tell me the target role first, for example:
         if (targetName) {
           const numberMatch = targetName.match(/(.+?)\s*[#]?\s*(\d+)$/);
           if (numberMatch) {
-            targetName = numberMatch[1].trim();
-            targetIndex = parseInt(numberMatch[2], 10) - 1;
+            const parsedNum = parseInt(numberMatch[2], 10);
+            if (parsedNum <= 15) {
+              targetName = numberMatch[1].trim();
+              targetIndex = parsedNum - 1;
+            }
           }
 
           this.logger.log(`🔍 Looking up user by name: "${targetName}"`);
@@ -4347,10 +4392,11 @@ Please tell me the target role first, for example:
 
           let dbCheck = await this.dataSource.query(
         `SELECT r.id, r.full_name, r.user_id,
-          r.metadata as reg_metadata,
+          r.metadata as reg_metadata, u.role as user_role,
                 (SELECT COUNT(*) FROM assessment_attempts aa
                  WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
          FROM registrations r
+         LEFT JOIN users u ON r.user_id = u.id
          WHERE r.full_name ~* $1 AND r.is_deleted = false${corporateFilter}
          ORDER BY r.created_at DESC LIMIT 5`,
         profileGuardParams
@@ -4368,10 +4414,11 @@ Please tell me the target role first, for example:
         }
         dbCheck = await this.dataSource.query(
           `SELECT r.id, r.full_name, r.user_id,
-            r.metadata as reg_metadata,
+            r.metadata as reg_metadata, u.role as user_role,
                   (SELECT COUNT(*) FROM assessment_attempts aa
                    WHERE aa.registration_id = r.id AND aa.status = 'COMPLETED') as completed_count
            FROM registrations r
+           LEFT JOIN users u ON r.user_id = u.id
            WHERE LOWER(r.full_name) LIKE $1 AND r.is_deleted = false${iLikeFilter2}
            ORDER BY r.created_at DESC LIMIT 5`,
           iLikeParams2
@@ -4431,12 +4478,16 @@ Please tell me the target role first, for example:
       const providedJobDescription = profileData.currentJobDescription?.trim() || '';
 
       const resolvedCurrentRole = String(
-        bestRegMetadata.currentRole || providedCurrentRole || '',
+        bestRegMetadata.currentRole || 
+        providedCurrentRole || 
+        (bestMatch.user_role === 'STUDENT' ? 'Student' : '') || 
+        '',
       ).trim();
       const resolvedJobDescription = String(
         bestRegMetadata.roleDescription ||
           bestRegMetadata.currentJobDescription ||
           providedJobDescription ||
+          (bestMatch.user_role === 'STUDENT' ? 'Student' : '') ||
           '',
       ).trim();
 
@@ -4477,6 +4528,29 @@ Please tell me the target role first, for example:
         expectedIndustry:
           bestRegMetadata.expectedIndustry || profileData.expectedIndustry || '',
       };
+
+      // Save/update the metadata in database registrations table
+      const updatedMetadata = {
+        ...bestRegMetadata,
+        currentRole: reportPayload.currentRole,
+        roleDescription: reportPayload.currentJobDescription,
+        currentJobDescription: reportPayload.currentJobDescription,
+        yearsOfExperience: reportPayload.yearsOfExperience,
+        relevantExperience: reportPayload.relevantExperience || bestRegMetadata.relevantExperience || '',
+        currentIndustry: reportPayload.currentIndustry || bestRegMetadata.currentIndustry || '',
+        expectedFutureRole: reportPayload.expectedFutureRole || bestRegMetadata.expectedFutureRole || '',
+        expectedIndustry: reportPayload.expectedIndustry || bestRegMetadata.expectedIndustry || '',
+      };
+
+      try {
+        await this.dataSource.query(
+          `UPDATE registrations SET metadata = $1 WHERE id = $2`,
+          [JSON.stringify(updatedMetadata), bestMatch.id]
+        );
+        this.logger.log(`💾 Saved updated metadata to registration ID ${bestMatch.id}`);
+      } catch (dbErr) {
+        this.logger.error(`Error saving metadata to registration: ${dbErr.message}`);
+      }
 
       const encodedProfile = Buffer.from(JSON.stringify(reportPayload)).toString('base64');
       const downloadUrl = `/rag/chat-report/download?profile=${encodedProfile}`;
@@ -4527,12 +4601,15 @@ Please tell me the target role first, for example:
       ]);
 
       const currentRole = extractField([
+        /curr[en]{1,3}t\s*role[:\s]*([^\n]+)/i,
+        /curr[en]{1,3}ect\s*role[:\s]*([^\n]+)/i,
         /current\s*role[:\s]*([^\n]+)/i,
         /(?:working as|position|designation)[:\s]*([^\n]+)/i,
       ]);
 
       const currentJobDescription = extractField([
         /(?:current\s*)?job\s*description[:\s]*([^\n]+(?:\n(?![A-Z][a-z]*:)[^\n]+)*)/i,
+        /role\s*des[cr]{1,3}iption[:\s]*([^\n]+(?:\n(?![A-Z][a-z]*:)[^\n]+)*)/i,
         /role\s*description[:\s]*([^\n]+(?:\n(?![A-Z][a-z]*:)[^\n]+)*)/i,
         /responsibilities[:\s]*([^\n]+)/i,
       ]);
@@ -4891,6 +4968,23 @@ Please tell me the target role first, for example:
     includePersonality: boolean;
   } {
     const q = question.toLowerCase();
+
+    // Career Report / Career Fitment / Role Readiness overrides
+    // Diverts queries asking for general reports or career/readiness/fitment reports
+    // to the 'career_report' intent instead of letting them fall to 'person_lookup'
+    if (/\b(career\s*report|fitment\s*report|career\s*fitment|role\s*readiness|readiness\s*report)\b/.test(q) ||
+        (/\breport\b/.test(q) && /\b(for|of|about)\b/.test(q) && !/\b(test|assessment|aptitude|agile|exam)\s+report\b/.test(q))) {
+      const name = this.extractName(question);
+      if (name) {
+        this.logger.log(`🔄 Domain override: career report keywords detected — routing to career_report for "${name}"`);
+        return {
+          intent: 'career_report',
+          searchTerm: name,
+          table: 'assessment_attempts',
+          includePersonality: true,
+        };
+      }
+    }
 
     if (result.intent.startsWith('affiliate_') || /\baffiliate|referral|commission|settlement|payout\b/.test(q)) {
       // Determine the best affiliate sub-intent
@@ -5330,8 +5424,15 @@ Please tell me the target role first, for example:
       return { intent: 'count', searchTerm: null, table: 'registrations', includePersonality: false, gender } as any;
     }
 
-    // Chat profile report (contains structured "Name:", "Current Role:", etc.)
-    if (/name\s*:/i.test(q) && (/current\s*role\s*:/i.test(q) || /experience\s*:/i.test(q) || /industry\s*:/i.test(q))) {
+    // Chat profile report (contains structured "Name:", "Current/Currect/Curret Role:", etc.)
+    const isProfileTemplate = /name\s*:/i.test(q) && (
+      /curr[en]{1,3}t\s*role\s*:/i.test(q) || 
+      /curr[en]{1,3}ect\s*role\s*:/i.test(q) || 
+      /role\s*des[cr]{1,3}iption\s*:/i.test(q) ||
+      /experience\s*:/i.test(q) || 
+      /industry\s*:/i.test(q)
+    );
+    if (isProfileTemplate) {
       return { intent: 'chat_profile_report', searchTerm: null, table: 'none', includePersonality: false };
     }
 
@@ -5530,8 +5631,10 @@ Please tell me the target role first, for example:
 
     // Career report for someone
     // SAFETY: Exclude program/batch/group queries (already handled above)
-    if (/\b(career\s*report|future\s*role|role\s*readiness)\b/.test(q) ||
-        (/\bgenerate.*report\b/.test(q) && !batchGroupProgramGuard.test(q))) {
+    const isCareerQuery = /\b(career|fitment|readiness|future\s*role|role\s*readiness)\b/i.test(q);
+
+    if (isCareerQuery && (/\b(career\s*report|future\s*role|role\s*readiness|fitment|readiness)\b/.test(q) ||
+        (/\bgenerate.*report\b/.test(q) && !batchGroupProgramGuard.test(q)))) {
       const name = this.extractName(question);
       return { intent: 'career_report', searchTerm: name, table: 'assessment_attempts', includePersonality: true };
     }
@@ -5541,10 +5644,8 @@ Please tell me the target role first, for example:
     if (/\breport\b/i.test(q) && /\b(for|of|about)\s+/i.test(q)) {
       const name = this.extractName(question);
       if (name) {
-        const isTestReport = /\b(test\s+reports?|assessment\s+reports?|exam\s+reports?)\b/i.test(q);
-        const isTestResults = /\b(test\s+results?|test\s+scores?|assessment\s+results?|exam\s+results?|exam\s+scores?|score\s+details?)\b/i.test(q);
         return {
-          intent: isTestReport ? 'person_lookup' : (isTestResults ? 'person_lookup' : 'career_report'),
+          intent: isCareerQuery ? 'career_report' : 'person_lookup',
           searchTerm: name,
           table: 'assessment_attempts',
           includePersonality: true,
@@ -5557,10 +5658,8 @@ Please tell me the target role first, for example:
       // First try extractName which is smarter about finding actual person names
       const nameFromExtract = this.extractName(question);
       if (nameFromExtract) {
-        const isTestReport = /\b(test\s+reports?|assessment\s+reports?|exam\s+reports?)\b/i.test(q);
-        const isTestResults = /\b(test\s+results?|test\s+scores?|assessment\s+results?|exam\s+results?|exam\s+scores?|score\s+details?)\b/i.test(q);
         return {
-          intent: isTestReport ? 'person_lookup' : (isTestResults ? 'person_lookup' : 'career_report'),
+          intent: isCareerQuery ? 'career_report' : 'person_lookup',
           searchTerm: nameFromExtract,
           table: 'assessment_attempts',
           includePersonality: true,
@@ -5589,10 +5688,8 @@ Please tell me the target role first, for example:
         cleanedBeforeReport = cleanedBeforeReport.replace(leadingStopWords, '').trim();
       }
       if (cleanedBeforeReport.length >= 2 && !/^(show|get|list|create|generate|overall|custom|my|test|exam|assessment)$/i.test(cleanedBeforeReport)) {
-        const isTestReport = /\b(test\s+reports?|assessment\s+reports?|exam\s+reports?)\b/i.test(q);
-        const isTestResults = /\b(test\s+results?|test\s+scores?|assessment\s+results?|exam\s+results?|exam\s+scores?|score\s+details?)\b/i.test(q);
         return {
-          intent: isTestReport ? 'person_lookup' : (isTestResults ? 'person_lookup' : 'career_report'),
+          intent: isCareerQuery ? 'career_report' : 'person_lookup',
           searchTerm: cleanedBeforeReport,
           table: 'assessment_attempts',
           includePersonality: true,

@@ -132,7 +132,14 @@ export class FutureRoleReportService {
     );
 
     const reportId = this.generateReportId(profile.name);
-    const fullReportText = await this.generateFullReportWithAI(profile);
+    let fullReportText = await this.generateFullReportWithAI(profile);
+
+    // Strip out any generated Report ID from the chat response text
+    fullReportText = fullReportText.replace(/(?:\*\*?)?Report ID:(?:\*\*?)?\s*CFRR-\w+-\d+/gi, '');
+    fullReportText = fullReportText.replace(/(?:\*\*?)?Report ID:(?:\*\*?)?\s*CFRR-\w+/gi, '');
+    // Clean up any double blank lines at the start and collapse consecutive newlines
+    fullReportText = fullReportText.replace(/^\s*\n+/, '');
+    fullReportText = fullReportText.replace(/\n{3,}/g, '\n\n');
 
     return {
       reportId,
@@ -418,6 +425,6 @@ Generate the COMPLETE report now using Markdown tables (pipe format). Do NOT use
   // FORMAT FOR CHAT DISPLAY
   // ═══════════════════════════════════════════════════════════════════════════
   formatForChat(report: FutureRoleReport): string {
-    return `**📊 Career Fitment Report Generated**\n\n**Report ID:** ${report.reportId}\n**Candidate:** ${report.profileSnapshot.name}\n\n---\n\n${report.fullReportText}`;
+    return `**📊 Career Fitment Report Generated**\n\n**Candidate:** ${report.profileSnapshot.name}\n\n---\n\n${report.fullReportText}`;
   }
 }
