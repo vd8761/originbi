@@ -6,6 +6,7 @@ import { CollegeReport } from '../reports/college/collegeReport';
 import { EmployeeReport } from '../reports/employee/employeeReport';
 import { CxoReport } from '../reports/cxo/cxoReport';
 import { CollegeShortReport } from '../reports/college/collegeShortReport';
+import { CollegeMBAShortReport } from '../reports/college/collegeMBAShort';
 import { EmployeeShortReport } from '../reports/employee/employeeShortReport';
 import {
   CollegeData,
@@ -186,19 +187,28 @@ export async function generateReportForUser(
       }
       break;
     }
-    case ProgramType.COLLEGE:
+    case ProgramType.COLLEGE: {
+      const collegeData = user as unknown as CollegeData;
       if (short) {
-        await new CollegeShortReport(
-          user as unknown as CollegeData,
-          pdfOptions,
-        ).generate(filePath);
+        const isMBA =
+          collegeData.dept_code?.toUpperCase().includes('MBA') ||
+          collegeData.group_name?.toUpperCase().includes('MBA') ||
+          collegeData.report_title?.toUpperCase().includes('MBA');
+
+        if (isMBA) {
+          await new CollegeMBAShortReport(collegeData, pdfOptions).generate(
+            filePath,
+          );
+        } else {
+          await new CollegeShortReport(collegeData, pdfOptions).generate(
+            filePath,
+          );
+        }
       } else {
-        await new CollegeReport(
-          user as unknown as CollegeData,
-          pdfOptions,
-        ).generate(filePath);
+        await new CollegeReport(collegeData, pdfOptions).generate(filePath);
       }
       break;
+    }
     case ProgramType.EMPLOYEE:
       if (short) {
         await new EmployeeShortReport(

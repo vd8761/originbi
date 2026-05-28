@@ -53,10 +53,10 @@ export const reportService = {
         if (!res.ok) throw new Error("Failed to generate report");
         return res.blob();
     },
-    async generateStudentReport(studentId: string) {
+    async generateStudentReport(studentId: string, short?: boolean) {
         try {
             const res = await fetch(
-                buildReportApiUrl(`/generate/student/${studentId}`),
+                buildReportApiUrl(`/generate/student/${studentId}?json=true${short ? '&short=true' : ''}`),
                 {
                     method: "GET",
                     headers: buildSecureHeaders({
