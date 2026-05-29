@@ -59,7 +59,11 @@ export class CareerFitmentReport extends BaseReport {
     }
 
     // --- Vertical Reference Number ---
-    if (this.data.reportId && !this.data.reportId.startsWith('OBI-CFR') && !this.data.reportId.startsWith('OBI-CHAT')) {
+    if (
+      this.data.reportId &&
+      !this.data.reportId.startsWith('OBI-CFR') &&
+      !this.data.reportId.startsWith('OBI-CHAT')
+    ) {
       const refNoX = this.PAGE_WIDTH - 47;
       const refNoY = 150;
 
@@ -86,7 +90,10 @@ export class CareerFitmentReport extends BaseReport {
       .fontSize(38)
       .fillColor(this.COLOR_DEEP_BLUE)
       .text('Career Fitment &', 35, 12, { width: titleWidth, align: 'left' })
-      .text('Future Role Readiness', 35, 12 + 44, { width: titleWidth, align: 'left' })
+      .text('Future Role Readiness', 35, 12 + 44, {
+        width: titleWidth,
+        align: 'left',
+      })
       .text('Report', 35, 12 + 88, { width: titleWidth, align: 'left' });
 
     // --- Footer Elements ---
@@ -100,10 +107,11 @@ export class CareerFitmentReport extends BaseReport {
       .text('Future Role Readiness', 35, footerY);
 
     // Draw Date
-    const dateString = this.data.generatedDate.toLocaleDateString(
-      'en-GB',
-      { day: 'numeric', month: 'long', year: 'numeric' },
-    );
+    const dateString = this.data.generatedDate.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
     this.doc
       .font(this.FONT_REGULAR)
       .fontSize(16)
@@ -148,7 +156,11 @@ export class CareerFitmentReport extends BaseReport {
       .font(this.FONT_SORA_BOLD)
       .fontSize(22)
       .fillColor(this.COLOR_DEEP_BLUE)
-      .text('Career Fitment & Future Role Readiness', this.MARGIN_STD, this.MARGIN_STD - 15)
+      .text(
+        'Career Fitment & Future Role Readiness',
+        this.MARGIN_STD,
+        this.MARGIN_STD - 15,
+      )
       .text('Report', this.MARGIN_STD, this.MARGIN_STD + 13);
 
     // 1. Profile Snapshot - Shifted down to accommodate the header title
@@ -167,16 +179,17 @@ export class CareerFitmentReport extends BaseReport {
       profile.yearsOfExperience === 0;
 
     const items: { label: string; value: string }[] = [];
-    
+
     if (isStudent) {
       // Dynamic Student Snapshot Fields
       items.push({ label: 'Name', value: profile.fullName });
       items.push({ label: 'Status', value: 'Student' });
-      
+
       let academicBg = profile.currentIndustry || 'Education / Academics';
-      if (academicBg.includes('Not Specified')) academicBg = 'Education / Academics';
+      if (academicBg.includes('Not Specified'))
+        academicBg = 'Education / Academics';
       items.push({ label: 'Academic Background', value: academicBg });
-      
+
       let program = 'School Students';
       if (profile.currentRole && profile.currentRole.includes('—')) {
         program = profile.currentRole.split('—')[1].trim();
@@ -186,33 +199,65 @@ export class CareerFitmentReport extends BaseReport {
         program = profile.programName;
       }
       items.push({ label: 'Program', value: program });
-      
-      const behavioralProfile = this.data.discProfile?.dominantTrait || 'Analytical and Detail-Oriented';
+
+      const behavioralProfile =
+        this.data.discProfile?.dominantTrait ||
+        'Analytical and Detail-Oriented';
       items.push({ label: 'Behavioral Profile', value: behavioralProfile });
-      
-      const scoreVal = profile.totalScore || this.data.agileProfile?.rawScore || 117;
+
+      const scoreVal =
+        profile.totalScore || this.data.agileProfile?.rawScore || 117;
       items.push({ label: 'Assessment Score', value: String(scoreVal) });
     } else {
       // Corporate Snapshot Fields
       items.push({ label: 'Name', value: profile.fullName });
-      if (profile.currentRole && !profile.currentRole.includes('Not Specified')) {
+      if (
+        profile.currentRole &&
+        !profile.currentRole.includes('Not Specified')
+      ) {
         items.push({ label: 'Current Role', value: profile.currentRole });
       }
-      if (profile.yearsOfExperience !== undefined && profile.yearsOfExperience !== null && profile.yearsOfExperience > 0) {
-        items.push({ label: 'Total Experience', value: `${profile.yearsOfExperience} Years` });
+      if (
+        profile.yearsOfExperience !== undefined &&
+        profile.yearsOfExperience !== null &&
+        profile.yearsOfExperience > 0
+      ) {
+        items.push({
+          label: 'Total Experience',
+          value: `${profile.yearsOfExperience} Years`,
+        });
       }
-      if (profile.relevantExperience && !profile.relevantExperience.includes('Not Specified') && profile.relevantExperience !== 'N/A') {
-        items.push({ label: 'Relevant Experience', value: profile.relevantExperience });
+      if (
+        profile.relevantExperience &&
+        !profile.relevantExperience.includes('Not Specified') &&
+        profile.relevantExperience !== 'N/A'
+      ) {
+        items.push({
+          label: 'Relevant Experience',
+          value: profile.relevantExperience,
+        });
       }
-      if (profile.currentIndustry && !profile.currentIndustry.includes('Not Specified')) {
-        items.push({ label: 'Current Industry', value: profile.currentIndustry });
+      if (
+        profile.currentIndustry &&
+        !profile.currentIndustry.includes('Not Specified')
+      ) {
+        items.push({
+          label: 'Current Industry',
+          value: profile.currentIndustry,
+        });
       }
-      if (profile.expectedFutureRole && !profile.expectedFutureRole.includes('Not Specified')) {
-        items.push({ label: 'Expected Future Role', value: profile.expectedFutureRole });
+      if (
+        profile.expectedFutureRole &&
+        !profile.expectedFutureRole.includes('Not Specified')
+      ) {
+        items.push({
+          label: 'Expected Future Role',
+          value: profile.expectedFutureRole,
+        });
       }
     }
 
-    const tableRows = items.map(item => [item.label, item.value]);
+    const tableRows = items.map((item) => [item.label, item.value]);
     this.table(['Field', 'Details'], tableRows, {
       colWidths: [150, 350],
       fontSize: 9.5,
@@ -221,7 +266,7 @@ export class CareerFitmentReport extends BaseReport {
       headerColor: this.COLOR_DEEP_BLUE,
       headerTextColor: '#FFFFFF',
       borderColor: '#CCCCCC',
-      y: currentY
+      y: currentY,
     });
     currentY = this.doc.y + 15;
 
@@ -237,14 +282,17 @@ export class CareerFitmentReport extends BaseReport {
     currentY += 20;
 
     let summaryText = this.data.behavioralSummary || '';
-    
+
     // Clean up duplicate headings and part markers inside the behavioral summary summaryText
-    summaryText = summaryText.replace(/\*?\*?\d*\.?\s*Behavioral\s+Alignment\s+Summary\*?\*?/gi, '');
+    summaryText = summaryText.replace(
+      /\*?\*?\d*\.?\s*Behavioral\s+Alignment\s+Summary\*?\*?/gi,
+      '',
+    );
     summaryText = summaryText.replace(/\*?\*?Part\s*\d+[:*\s]*?\*?\*?/gi, '');
     summaryText = summaryText.replace(/^\s*[:*_\-\s]*\n+/gm, ''); // Remove empty lines containing junk chars
     summaryText = summaryText.replace(/^\s*\n+/, ''); // strip leading blank lines
     summaryText = summaryText.replace(/\n{3,}/g, '\n\n'); // collapse multiple empty lines
-    
+
     const lines = summaryText.split('\n');
     let inList = false;
     let listItems: string[] = [];
@@ -259,7 +307,12 @@ export class CareerFitmentReport extends BaseReport {
         inList = true;
       } else {
         if (inList && listItems.length > 0) {
-          this.list(listItems, { indent: 15, fontSize: 9.5, y: currentY, gap: 8 });
+          this.list(listItems, {
+            indent: 15,
+            fontSize: 9.5,
+            y: currentY,
+            gap: 8,
+          });
           currentY = this.doc.y + 5;
           listItems = [];
           inList = false;
@@ -289,18 +342,22 @@ export class CareerFitmentReport extends BaseReport {
       .font(this.FONT_SORA_SEMIBOLD)
       .fontSize(13)
       .fillColor(this.COLOR_DEEP_BLUE) // Color header royal purple
-      .text('2. Skill-wise Capability Assessment (Score out of 5)', this.MARGIN_STD, currentY);
+      .text(
+        '2. Skill-wise Capability Assessment (Score out of 5)',
+        this.MARGIN_STD,
+        currentY,
+      );
 
     currentY += 25;
 
     // Unified dynamic skill categories loop
     const categories = this.data.skillCategories;
-    
+
     for (let idx = 0; idx < categories.length; idx++) {
       const cat = categories[idx];
       const skillsCount = cat.skills.length;
       // Estimate height needed: header (15) + table header (20) + rows (skillsCount * 18) + gap (20)
-      const heightNeeded = 15 + 20 + (skillsCount * 18) + 20;
+      const heightNeeded = 15 + 20 + skillsCount * 18 + 20;
 
       // Check if we need a page break (current page is Page 2, Page 3, etc.)
       if (currentY + heightNeeded > this.PAGE_HEIGHT - this.MARGIN_STD) {
@@ -316,10 +373,10 @@ export class CareerFitmentReport extends BaseReport {
         .text(cat.category, this.MARGIN_STD, currentY);
 
       // Draw Category Table
-      const rows = cat.skills.map(s => [
+      const rows = cat.skills.map((s) => [
         s.name,
         s.score.toFixed(1),
-        s.insight || '-'
+        s.insight || '-',
       ]);
 
       this.table(['Skill', 'Score', 'Insight'], rows, {
@@ -330,7 +387,7 @@ export class CareerFitmentReport extends BaseReport {
         headerColor: this.COLOR_DEEP_BLUE,
         headerTextColor: '#FFFFFF',
         borderColor: '#CCCCCC',
-        y: currentY + 15
+        y: currentY + 15,
       });
 
       currentY = this.doc.y + 15;
@@ -361,26 +418,22 @@ export class CareerFitmentReport extends BaseReport {
 
     // Radar Chart Caption - Positioned safely below radar chart bottom label
     const captionY = chartY + 145; // Increased gap to completely resolve overlap
-    const captionText = "The visual snapshot above illustrates the candidate's balance of competencies. A wider span indicates higher proficiency across dimensions. Use this to identify if the profile is 'Operational' (skewed towards Ops/Talent) or 'Strategic' (skewed towards Strategy/Communication).";
-    
+    const captionText =
+      "The visual snapshot above illustrates the candidate's balance of competencies. A wider span indicates higher proficiency across dimensions. Use this to identify if the profile is 'Operational' (skewed towards Ops/Talent) or 'Strategic' (skewed towards Strategy/Communication).";
+
     this.doc
       .font(this.FONT_REGULAR)
       .fontSize(8.5)
       .fillColor('#555555')
-      .text(
-        captionText,
-        this.MARGIN_STD,
-        captionY,
-        {
-          width: this.PAGE_WIDTH - 2 * this.MARGIN_STD,
-          align: 'center'
-        }
-      );
+      .text(captionText, this.MARGIN_STD, captionY, {
+        width: this.PAGE_WIDTH - 2 * this.MARGIN_STD,
+        align: 'center',
+      });
 
-    const captionTextHeight = this.doc.heightOfString(
-      captionText,
-      { width: this.PAGE_WIDTH - 2 * this.MARGIN_STD, align: 'center' }
-    );
+    const captionTextHeight = this.doc.heightOfString(captionText, {
+      width: this.PAGE_WIDTH - 2 * this.MARGIN_STD,
+      align: 'center',
+    });
     const postCaptionY = captionY + captionTextHeight + 25;
 
     // Check if Overall Skill Coverage Insight fits on the current page.
@@ -426,7 +479,11 @@ export class CareerFitmentReport extends BaseReport {
       .font(this.FONT_REGULAR)
       .fontSize(10)
       .fillColor(this.COLOR_BLACK)
-      .text('These are scaling refinements, not capability blockers.', this.MARGIN_STD, concludingY);
+      .text(
+        'These are scaling refinements, not capability blockers.',
+        this.MARGIN_STD,
+        concludingY,
+      );
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -437,11 +494,15 @@ export class CareerFitmentReport extends BaseReport {
 
     // 4. Future Role Readiness Mapping Title
     const profile = this.data.profile;
-    const hasCurrent = profile.currentRole && !profile.currentRole.includes('Not Specified');
-    const hasExpected = profile.expectedFutureRole && !profile.expectedFutureRole.includes('Not Specified');
-    const readinessTitle = (hasCurrent && hasExpected)
-      ? `4. Future Role Readiness Mapping (${profile.currentRole} -> ${profile.expectedFutureRole})`
-      : `4. Future Role Readiness Mapping`;
+    const hasCurrent =
+      profile.currentRole && !profile.currentRole.includes('Not Specified');
+    const hasExpected =
+      profile.expectedFutureRole &&
+      !profile.expectedFutureRole.includes('Not Specified');
+    const readinessTitle =
+      hasCurrent && hasExpected
+        ? `4. Future Role Readiness Mapping (${profile.currentRole} -> ${profile.expectedFutureRole})`
+        : `4. Future Role Readiness Mapping`;
 
     this.doc
       .font(this.FONT_SORA_SEMIBOLD)
@@ -465,7 +526,7 @@ export class CareerFitmentReport extends BaseReport {
       borderColor: '#CCCCCC',
       fontSize: 9.5,
       cellPadding: 5,
-      y: currentY
+      y: currentY,
     });
 
     currentY = this.doc.y + 10;
@@ -475,7 +536,9 @@ export class CareerFitmentReport extends BaseReport {
       .font(this.FONT_SORA_BOLD)
       .fontSize(11)
       .fillColor(this.COLOR_DEEP_BLUE)
-      .text('Future Role Readiness Score: ', this.MARGIN_STD, currentY, { continued: true })
+      .text('Future Role Readiness Score: ', this.MARGIN_STD, currentY, {
+        continued: true,
+      })
       .fillColor('#E67E22') // Gold/Amber highlight
       .text(`${readiness.readinessScore}%`);
 
@@ -483,7 +546,11 @@ export class CareerFitmentReport extends BaseReport {
       .font(this.FONT_REGULAR)
       .fontSize(10.5)
       .fillColor(this.COLOR_BLACK)
-      .text(`Adjacency Type: ${readiness.adjacencyType}`, this.MARGIN_STD, this.doc.y + 4);
+      .text(
+        `Adjacency Type: ${readiness.adjacencyType}`,
+        this.MARGIN_STD,
+        this.doc.y + 4,
+      );
 
     currentY = this.doc.y + 15;
 
@@ -491,7 +558,7 @@ export class CareerFitmentReport extends BaseReport {
     const readinessRanges = [
       ['80% - 100%', 'High Readiness (Green) - Ready for immediate transition'],
       ['60% - 79%', 'Moderate Readiness (Amber) - Transitionable with support'],
-      ['0% - 59%', 'Low Readiness (Red) - Significant gaps exist']
+      ['0% - 59%', 'Low Readiness (Red) - Significant gaps exist'],
     ];
     this.table(['Range', 'Interpretation'], readinessRanges, {
       colWidths: [120, 380],
@@ -502,7 +569,7 @@ export class CareerFitmentReport extends BaseReport {
       headerFontSize: 8.5,
       cellPadding: 4,
       y: currentY,
-      rowColors: ['#E2F7E5', '#FFF9E6', '#FCE8E6'] // Row backgrounds
+      rowColors: ['#E2F7E5', '#FFF9E6', '#FCE8E6'], // Row backgrounds
     });
 
     currentY = this.doc.y + 20;
@@ -538,7 +605,7 @@ export class CareerFitmentReport extends BaseReport {
       borderColor: '#CCCCCC',
       fontSize: 9.5,
       cellPadding: 5,
-      y: currentY
+      y: currentY,
     });
 
     currentY = this.doc.y + 10;
@@ -548,7 +615,9 @@ export class CareerFitmentReport extends BaseReport {
       .font(this.FONT_SORA_BOLD)
       .fontSize(11)
       .fillColor(this.COLOR_DEEP_BLUE)
-      .text('Final Role Fitment Score: ', this.MARGIN_STD, currentY, { continued: true })
+      .text('Final Role Fitment Score: ', this.MARGIN_STD, currentY, {
+        continued: true,
+      })
       .fillColor('#2ECC71') // Green highlight
       .text(`${fitment.totalScore}%`);
 
@@ -558,7 +627,7 @@ export class CareerFitmentReport extends BaseReport {
     const fitmentRanges = [
       ['80% - 100%', 'Strong Fit (Green) - Highly aligned with role Reqs'],
       ['60% - 79%', 'Moderate Fit (Amber) - Good potential with gaps'],
-      ['0% - 59%', 'Low Fit (Red) - Significant misalignment']
+      ['0% - 59%', 'Low Fit (Red) - Significant misalignment'],
     ];
     this.table(['Range', 'Interpretation'], fitmentRanges, {
       colWidths: [120, 380],
@@ -569,7 +638,7 @@ export class CareerFitmentReport extends BaseReport {
       headerFontSize: 8.5,
       cellPadding: 4,
       y: currentY,
-      rowColors: ['#E2F7E5', '#FFF9E6', '#FCE8E6'] // Row backgrounds
+      rowColors: ['#E2F7E5', '#FFF9E6', '#FCE8E6'], // Row backgrounds
     });
 
     currentY = this.doc.y + 15;
@@ -611,19 +680,23 @@ export class CareerFitmentReport extends BaseReport {
         .fontSize(11)
         .fillColor(this.COLOR_DEEP_BLUE)
         .text(ind.industry, this.MARGIN_STD, currentY);
-      
+
       currentY += 15;
       this.doc
         .font(this.FONT_REGULAR)
         .fontSize(10)
         .fillColor(this.COLOR_BLACK)
         .text(`Suitability: ${ind.suitability}`, this.MARGIN_STD, currentY);
-      
+
       currentY += 14;
-      const detailLabel = ind.suitability === 'High' ? 'Ideal for' : 'Requires stronger';
-      this.doc
-        .text(`${detailLabel}: ${ind.idealFor}`, this.MARGIN_STD, currentY);
-      
+      const detailLabel =
+        ind.suitability === 'High' ? 'Ideal for' : 'Requires stronger';
+      this.doc.text(
+        `${detailLabel}: ${ind.idealFor}`,
+        this.MARGIN_STD,
+        currentY,
+      );
+
       currentY += 20;
     });
 
@@ -656,7 +729,11 @@ export class CareerFitmentReport extends BaseReport {
       .fillColor(this.COLOR_BLACK)
       .text(transitionPrefix, this.MARGIN_STD, currentY);
 
-    this.list(this.data.transitionRequirements, { indent: 15, fontSize: 9.5, y: this.doc.y + 8 });
+    this.list(this.data.transitionRequirements, {
+      indent: 15,
+      fontSize: 9.5,
+      y: this.doc.y + 8,
+    });
 
     currentY = this.doc.y + 20;
 
@@ -665,7 +742,11 @@ export class CareerFitmentReport extends BaseReport {
       .font(this.FONT_SORA_SEMIBOLD)
       .fontSize(13)
       .fillColor(this.COLOR_DEEP_BLUE) // Color header royal purple
-      .text('8. ORIGIN BI Executive Insight (Closure)', this.MARGIN_STD, currentY);
+      .text(
+        '8. ORIGIN BI Executive Insight (Closure)',
+        this.MARGIN_STD,
+        currentY,
+      );
 
     currentY += 20;
     this.doc
@@ -674,7 +755,7 @@ export class CareerFitmentReport extends BaseReport {
       .fillColor(this.COLOR_BLACK)
       .text(this.data.executiveInsight, this.MARGIN_STD, currentY, {
         width: this.PAGE_WIDTH - 2 * this.MARGIN_STD,
-        align: 'justify'
+        align: 'justify',
       });
   }
 
@@ -712,7 +793,11 @@ export class CareerFitmentReport extends BaseReport {
         .text('Origin BI', this.MARGIN_STD, textY, { lineBreak: false });
 
       // Only print report ID if it doesn't start with OBI-CFR or OBI-CHAT
-      if (this.data.reportId && !this.data.reportId.startsWith('OBI-CFR') && !this.data.reportId.startsWith('OBI-CHAT')) {
+      if (
+        this.data.reportId &&
+        !this.data.reportId.startsWith('OBI-CFR') &&
+        !this.data.reportId.startsWith('OBI-CHAT')
+      ) {
         const titleWidth = this.doc.widthOfString('Origin BI');
         this.doc
           .fillColor('#A9A9A9')
@@ -744,15 +829,31 @@ export class CareerFitmentReport extends BaseReport {
     this.doc.save();
 
     const categories = ['Communication', 'People Ops', 'Talent', 'Strategy'];
-    
+
     // Sum/average scores for each mapped category, falling back to index matching if category names differ
     const scores = categories.map((cat, idx) => {
       let dbCat = this.data.skillCategories.find((c) => {
         const name = c.category.toLowerCase();
-        if (cat === 'Communication') return name.includes('communication') || name.includes('foundation');
-        if (cat === 'People Ops') return name.includes('people') || name.includes('operations') || name.includes('interpersonal');
-        if (cat === 'Talent') return name.includes('talent') || name.includes('culture') || name.includes('core');
-        if (cat === 'Strategy') return name.includes('business') || name.includes('strategy') || name.includes('leadership');
+        if (cat === 'Communication')
+          return name.includes('communication') || name.includes('foundation');
+        if (cat === 'People Ops')
+          return (
+            name.includes('people') ||
+            name.includes('operations') ||
+            name.includes('interpersonal')
+          );
+        if (cat === 'Talent')
+          return (
+            name.includes('talent') ||
+            name.includes('culture') ||
+            name.includes('core')
+          );
+        if (cat === 'Strategy')
+          return (
+            name.includes('business') ||
+            name.includes('strategy') ||
+            name.includes('leadership')
+          );
         return false;
       });
 
@@ -878,6 +979,10 @@ export class CareerFitmentReport extends BaseReport {
       }
     }
 
-    return words.slice(0, splitIndex).join(' ') + '\n' + words.slice(splitIndex).join(' ');
+    return (
+      words.slice(0, splitIndex).join(' ') +
+      '\n' +
+      words.slice(splitIndex).join(' ')
+    );
   }
 }

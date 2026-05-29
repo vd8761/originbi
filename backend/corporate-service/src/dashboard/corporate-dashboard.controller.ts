@@ -44,7 +44,11 @@ export class CorporateDashboardController {
     if (!email) {
       throw new BadRequestException('Email is required');
     }
-    let ip = (req.headers['x-forwarded-for'] as string) || req.ip || req.socket.remoteAddress || '';
+    let ip =
+      (req.headers['x-forwarded-for'] as string) ||
+      req.ip ||
+      req.socket.remoteAddress ||
+      '';
     if (ip && ip.includes(',')) {
       ip = ip.split(',')[0].trim();
     }

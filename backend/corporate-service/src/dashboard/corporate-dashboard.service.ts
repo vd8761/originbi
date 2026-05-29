@@ -628,7 +628,9 @@ export class CorporateDashboardService {
     user.lastLoginIp = ip;
 
     await this.userRepo.save(user);
-    console.log(`[CorporateDashboardService] Recorded login audit for email: ${email} from IP: ${ip}`);
+    console.log(
+      `[CorporateDashboardService] Recorded login audit for email: ${email} from IP: ${ip}`,
+    );
   }
 
   async getProfile(email: string) {
@@ -1853,7 +1855,9 @@ export class CorporateDashboardService {
 
         const shortSuffix = value.match(/-(\d{1,2})$/);
         if (shortSuffix) {
-          queue.push(value.replace(/-(\d{1,2})$/, `-${shortSuffix[1].padStart(3, '0')}`));
+          queue.push(
+            value.replace(/-(\d{1,2})$/, `-${shortSuffix[1].padStart(3, '0')}`),
+          );
         }
 
         const longSuffix = value.match(/-(\d{3})$/);
@@ -1916,9 +1920,7 @@ export class CorporateDashboardService {
       LIMIT 1
     `;
 
-    const result = await this.dataSource.query(query, [
-      reportNumbers,
-    ]);
+    const result = await this.dataSource.query(query, [reportNumbers]);
 
     if (!result || result.length === 0) {
       throw new NotFoundException(
@@ -1929,9 +1931,13 @@ export class CorporateDashboardService {
     const row = result[0];
 
     // Check account restriction
-    if (corporateAccountId && row.corporate_account_id && Number(row.corporate_account_id) !== Number(corporateAccountId)) {
+    if (
+      corporateAccountId &&
+      row.corporate_account_id &&
+      Number(row.corporate_account_id) !== Number(corporateAccountId)
+    ) {
       throw new ForbiddenException(
-        `This candidate is registered under another company and their report cannot be viewed.`
+        `This candidate is registered under another company and their report cannot be viewed.`,
       );
     }
 
