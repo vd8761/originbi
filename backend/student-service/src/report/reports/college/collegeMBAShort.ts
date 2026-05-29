@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 import * as fs from 'fs';
 import * as path from 'path';
 import { AgileScore, CollegeData } from '../../types/types';
@@ -179,11 +178,16 @@ export class CollegeMBAShortReport extends BaseReport {
    * else null. Used for the soft mismatch note on page 1.
    */
   private detectDeclaredTrack(): string | null {
-    const haystack = `${this.data.dept_code || ''} ${this.data.group_name || ''}`.toUpperCase();
+    const haystack =
+      `${this.data.dept_code || ''} ${this.data.group_name || ''}`.toUpperCase();
     const map: { keys: string[]; name: string; code: SpecializationCode }[] = [
       { keys: ['FINANCE', 'FIN'], name: 'Finance', code: 'FIN' },
       { keys: ['HUMAN RESOURCE', 'HR'], name: 'Human Resources', code: 'HR' },
-      { keys: ['BUSINESS ANALYTIC', 'ANALYTICS', 'BA '], name: 'Business Analytics', code: 'BA' },
+      {
+        keys: ['BUSINESS ANALYTIC', 'ANALYTICS', 'BA '],
+        name: 'Business Analytics',
+        code: 'BA',
+      },
       { keys: ['OPERATION', 'OPS '], name: 'Operations', code: 'OPS' },
       { keys: ['MARKETING', 'MKT '], name: 'Marketing', code: 'MKT' },
     ];
@@ -224,7 +228,7 @@ export class CollegeMBAShortReport extends BaseReport {
     y = this.drawHeader(y);
     y = this.drawHeroRecommendationCard(y + 14);
     y = this.drawReadinessProfile(y + 16);
-    y = this.drawWhyRecommendation(y + 14);
+    this.drawWhyRecommendation(y + 14);
 
     this.drawFooterStrip(1);
   }
@@ -800,7 +804,8 @@ export class CollegeMBAShortReport extends BaseReport {
       commitment: 'Needed to take full responsibility through to closure.',
       focus: 'Needed to maintain consistency across long-running tasks.',
       openness: 'Needed for adapting to new tools, feedback, and roles.',
-      respect: 'Needed for cross-functional collaboration and conflict handling.',
+      respect:
+        'Needed for cross-functional collaboration and conflict handling.',
       courage:
         'Needed for interviews, presentations, and leadership communication.',
     };
@@ -839,7 +844,13 @@ export class CollegeMBAShortReport extends BaseReport {
       drawItem(x, i, READINESS_LABEL[k], strengthExplain[k], '#2E7D32');
     });
     dev.forEach((k, i) => {
-      drawItem(x + colW + colGap, i, READINESS_LABEL[k], devExplain[k], '#ED6C02');
+      drawItem(
+        x + colW + colGap,
+        i,
+        READINESS_LABEL[k],
+        devExplain[k],
+        '#ED6C02',
+      );
     });
 
     const usedRows = Math.max(strengths.length, dev.length);
@@ -861,12 +872,10 @@ export class CollegeMBAShortReport extends BaseReport {
       .font(this.FONT_REGULAR)
       .fontSize(9.5)
       .fillColor(this.C_MUTED)
-      .text(
-        `Roles aligned with the ${spec.name} specialization.`,
-        x,
-        y + 18,
-        { width: w, lineBreak: false },
-      );
+      .text(`Roles aligned with the ${spec.name} specialization.`, x, y + 18, {
+        width: w,
+        lineBreak: false,
+      });
 
     // Pick up to 7 roles: prefer DB roles, fall back to default list
     const dbRoles = this.careerGuidance
@@ -891,7 +900,9 @@ export class CollegeMBAShortReport extends BaseReport {
         cursorY += chipH + chipGap;
       }
       this.doc.save();
-      this.doc.roundedRect(cursorX, cursorY, chipW, chipH, chipH / 2).fill(spec.accentSoft);
+      this.doc
+        .roundedRect(cursorX, cursorY, chipW, chipH, chipH / 2)
+        .fill(spec.accentSoft);
       this.doc.restore();
       this.doc
         .lineWidth(0.6)

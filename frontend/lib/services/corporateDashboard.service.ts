@@ -356,7 +356,9 @@ export const corporateDashboardService = {
                 if (errData.message) {
                     errorMsg = errData.message;
                 }
-            } catch (e) {}
+            } catch (e) {
+                // ignore
+            }
             throw new Error(errorMsg);
         }
         return res.json();
