@@ -101,7 +101,7 @@ export class FutureRoleReportService {
         apiKey,
           model: process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash',
         temperature: 0.3,
-        maxOutputTokens: 2200,
+        maxOutputTokens: 8192,
         callbacks: [getTokenTrackerCallback('Future Role Report')],
       });
     }
@@ -116,7 +116,7 @@ export class FutureRoleReportService {
         apiKey,
         model: 'llama-3.3-70b-versatile',
         temperature: 0.3,
-        maxTokens: 2200,
+        maxTokens: 8192,
         callbacks: [getTokenTrackerCallback('Future Role Report (Groq Fallback)')],
       });
     }
@@ -132,7 +132,14 @@ export class FutureRoleReportService {
     );
 
     const reportId = this.generateReportId(profile.name);
-    const fullReportText = await this.generateFullReportWithAI(profile);
+    let fullReportText = await this.generateFullReportWithAI(profile);
+
+    // Strip out any generated Report ID from the chat response text
+    fullReportText = fullReportText.replace(/^[#\*\s]*Report\s*ID[:\s\*]*CFRR-\w+[-\w]*/gim, '');
+    fullReportText = fullReportText.replace(/^[#\*\s]*Report\s*ID[:\s\*]*CFRR-XXX/gim, '');
+    // Clean up any double blank lines at the start and collapse consecutive newlines
+    fullReportText = fullReportText.replace(/^\s*\n+/, '');
+    fullReportText = fullReportText.replace(/\n{3,}/g, '\n\n');
 
     return {
       reportId,
@@ -418,6 +425,6 @@ Generate the COMPLETE report now using Markdown tables (pipe format). Do NOT use
   // FORMAT FOR CHAT DISPLAY
   // ═══════════════════════════════════════════════════════════════════════════
   formatForChat(report: FutureRoleReport): string {
-    return `**📊 Career Fitment Report Generated**\n\n**Report ID:** ${report.reportId}\n**Candidate:** ${report.profileSnapshot.name}\n\n---\n\n${report.fullReportText}`;
+    return `**📊 Career Fitment Report Generated**\n\n**Candidate:** ${report.profileSnapshot.name}\n\n---\n\n${report.fullReportText}`;
   }
 }

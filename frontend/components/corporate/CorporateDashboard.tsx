@@ -5,6 +5,7 @@ import { Search, Edit2, MoreHorizontal, CheckCircle, Clock, Users, Briefcase, Ey
 import { TrendUpIcon, TrendDownIcon, CircleArrowUpIcon, DiamondIcon } from '../icons';
 import { CorporateAccount } from '../../lib/types';
 import { corporateDashboardService } from '../../lib/services';
+import { getStoredUser } from '../../lib/auth-helpers';
 import { ToastContainer, ToastMessage } from '../ui/Toast';
 import BuyCreditsModal from './BuyCreditsModal';
 
@@ -604,11 +605,10 @@ const ProfileResult = ({ data }: { data: ReportData }) => {
     const trait = data.personalityTrait;
     const traitNameWords = trait.name ? trait.name.split(' ') : ['Unknown'];
 
-    // Build subtitle line (e.g., "B.Tech Information Technology (3rd Year)")
+    // Build subtitle line (e.g., "B.Tech Information Technology")
     const subtitleParts: string[] = [];
     if (data.degreeTypeName) subtitleParts.push(data.degreeTypeName);
     if (data.departmentName) subtitleParts.push(data.departmentName);
-    if (data.currentYear) subtitleParts.push(`(${data.currentYear})`);
     const subtitle = subtitleParts.join(' ') || data.programName || 'Assessment Completed';
 
     // Normalize career growth tips to always be { title, desc } objects
@@ -618,7 +618,7 @@ const ProfileResult = ({ data }: { data: ReportData }) => {
     });
 
     return (
-        <div className="mt-8 pt-8 text-left border-t border-gray-100 dark:border-white/5 relative overflow-hidden transition-colors">
+        <div className="mt-8 pt-8 text-left border-t border-gray-100 dark:border-white/5 relative overflow-hidden transition-colors font-['Haskoy']">
             {/* Main Content Area */}
             <div className="flex flex-col lg:flex-row gap-8 items-center lg:items-start mb-8">
 
@@ -658,11 +658,10 @@ const ProfileResult = ({ data }: { data: ReportData }) => {
                     {/* Header Info */}
                     <div className="mb-8 border-b border-gray-100 dark:border-white/5 pb-6">
                         <h1 className="text-[clamp(20px,1.5vw,26px)] font-semibold text-[#19211C] dark:text-white mb-2 leading-tight">{data.candidateName}</h1>
-                        <div className="text-[clamp(14px,1.1vw,17px)] font-medium text-[#1ED36A] mb-1 leading-snug">{subtitle}</div>
+                        <div className="text-[16px] font-medium text-[#1ED36A] mb-1 leading-snug">{subtitle}</div>
                         {data.institutionName && (
-                            <div className="text-[clamp(13px,1.1vw,16px)] font-normal text-[#19211C] dark:text-white opacity-80 leading-snug">{data.institutionName}</div>
+                            <div className="text-[16px] font-normal text-[#19211C] dark:text-white opacity-80 leading-snug">{data.institutionName}</div>
                         )}
-                        <div className="text-[clamp(12px,0.9vw,14px)] font-normal text-[#19211C] dark:text-white opacity-60 mt-2">Report ID: {data.reportNumber}</div>
                     </div>
 
                     {/* Key Strengths Section */}
@@ -681,8 +680,8 @@ const ProfileResult = ({ data }: { data: ReportData }) => {
 
                         {/* Strength List */}
                         <div>
-                            <h4 className="text-[clamp(16px,1.1vw,20px)] font-semibold text-[#19211C] dark:text-white mb-3">Key Strength</h4>
-                            <ul className="space-y-2.5">
+                            <h4 className="text-[18px] font-semibold text-[#19211C] dark:text-white mb-4">Key Strength</h4>
+                            <ul className="space-y-4">
                                 {(data.keyStrengths.length > 0 ? data.keyStrengths : [
                                     "Demonstrates strong analytical and strategic thinking.",
                                     "Adapts to new environments and challenges with ease.",
@@ -690,7 +689,7 @@ const ProfileResult = ({ data }: { data: ReportData }) => {
                                     "Maintains high standards of work quality and consistency.",
                                     "Shows resilience and determination in achieving goals."
                                 ]).map((item, i) => (
-                                    <li key={i} className="flex items-start gap-2 text-[clamp(14px,1.1vw,17px)] font-normal text-[#19211C] dark:text-white leading-snug">
+                                    <li key={i} className="flex items-start gap-2 text-[16px] font-normal text-[#19211C] dark:text-white leading-snug">
                                         <span className="mt-1.5 w-1 h-1 rounded-full bg-[#19211C] dark:bg-white shrink-0"></span>
                                         <span>{item}</span>
                                     </li>
@@ -704,37 +703,37 @@ const ProfileResult = ({ data }: { data: ReportData }) => {
             </div>
 
             {/* Bottom Section: Role Alignment & Career Tips */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 bg-[#F9F9F9] dark:bg-white/5 rounded-2xl overflow-hidden mb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 bg-[#F9F9F9] dark:bg-white/5 rounded-2xl overflow-hidden mb-12">
                 {/* Role Alignment */}
-                <div className="p-6 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-white/5">
-                    <h5 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(18px,1.4vw,22px)] font-semibold mb-4">Role Alignment</h5>
+                <div className="p-8 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-white/5">
+                    <h5 className="text-[#150089] dark:text-[#1ED36A] text-[18px] font-semibold mb-6">Role Alignment</h5>
                     {data.roleAlignment.length > 0 ? (
-                        <ul className="space-y-1">
+                        <ul className="list-disc pl-5 space-y-4 text-[16px] text-[#19211C] dark:text-white font-normal">
                             {data.roleAlignment.map((role, i) => (
-                                <li key={i} className="flex items-center gap-1 text-[clamp(14px,1.1vw,16px)] font-normal text-[#19211C] dark:text-white">
-                                    <span className="w-2 h-2 bg-[#1ED36A] rounded-full"></span> {typeof role === 'string' ? role : (role as any).name || (role as any).title || ''}
+                                <li key={i}>
+                                    {typeof role === 'string' ? role : (role as any).name || (role as any).title || ''}
                                 </li>
                             ))}
                         </ul>
                     ) : (
-                        <p className="text-[clamp(14px,1.1vw,16px)] font-normal text-[#19211C] dark:text-white opacity-60">Role alignment data will be available after full analysis.</p>
+                        <p className="text-[16px] font-normal text-[#19211C] dark:text-white opacity-60">Role alignment data will be available after full analysis.</p>
                     )}
                 </div>
 
                 {/* Career Growth Tips */}
-                <div className="p-6">
-                    <h5 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(16px,1.25vw,20px)] font-semibold mb-4">Career Growth Tips</h5>
+                <div className="p-8">
+                    <h5 className="text-[#150089] dark:text-[#1ED36A] text-[18px] font-semibold mb-6">Career Growth Tips</h5>
                     {careerTips.length > 0 ? (
-                        <div className="space-y-5">
+                        <div className="space-y-6">
                             {careerTips.map((tip, i) => (
                                 <div key={i}>
-                                    {tip.title && <span className="font-bold text-[clamp(16px,1.3vw,19px)] text-[#19211C] dark:text-white block mb-1">{tip.title}</span>}
-                                    <p className="text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white leading-relaxed font-normal">{tip.desc}</p>
+                                    {tip.title && <span className="font-semibold text-[18px] text-[#19211C] dark:text-white block mb-2">{tip.title}</span>}
+                                    <p className="text-[16px] text-[#19211C] dark:text-white leading-relaxed font-normal">{tip.desc}</p>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <p className="text-[clamp(14px,1.1vw,16px)] font-normal text-[#19211C] dark:text-white opacity-60">Career growth tips will be available after full analysis.</p>
+                        <p className="text-[16px] font-normal text-[#19211C] dark:text-white opacity-60">Career growth tips will be available after full analysis.</p>
                     )}
                 </div>
             </div>
@@ -743,16 +742,16 @@ const ProfileResult = ({ data }: { data: ReportData }) => {
             <div className="mt-8 pt-4">
                 <h3 className="text-[#150089] dark:text-[#1ED36A] text-[clamp(24px,2vw,32px)] font-semibold mb-2">{data.candidateName} is {trait.name}</h3>
                 {trait.description && (
-                    <p className="text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white leading-relaxed font-normal mb-6">
+                    <p className="text-[16px] text-[#19211C] dark:text-white leading-relaxed font-normal mb-6">
                         <span className="font-semibold text-black dark:text-white opacity-90">Description:</span> {trait.description}
                     </p>
                 )}
 
-                <div className="space-y-6">
+                <div className="space-y-8">
                     {data.keyBehaviors.length > 0 && (
                         <div>
-                            <h4 className="text-[clamp(16px,1.3vw,19px)] font-semibold text-[#19211C] dark:text-white mb-2">Key Behaviors:</h4>
-                            <ul className="list-disc pl-5 space-y-1.5 text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white font-normal">
+                            <h4 className="text-[18px] font-semibold text-[#19211C] dark:text-white mb-4">Key Behaviors:</h4>
+                            <ul className="list-disc pl-5 space-y-3 text-[16px] text-[#19211C] dark:text-white font-normal">
                                 {data.keyBehaviors.map((behavior, i) => (
                                     <li key={i}>{behavior}</li>
                                 ))}
@@ -762,8 +761,8 @@ const ProfileResult = ({ data }: { data: ReportData }) => {
 
                     {data.typicalScenarios.length > 0 && (
                         <div>
-                            <h4 className="text-[clamp(16px,1.3vw,19px)] font-semibold text-[#19211C] dark:text-white mb-2">Typical Scenarios:</h4>
-                            <ul className="list-disc pl-5 space-y-1.5 text-[clamp(14px,1.1vw,16px)] text-[#19211C] dark:text-white font-normal">
+                            <h4 className="text-[18px] font-semibold text-[#19211C] dark:text-white mb-4">Typical Scenarios:</h4>
+                            <ul className="list-disc pl-5 space-y-3 text-[16px] text-[#19211C] dark:text-white font-normal">
                                 {data.typicalScenarios.map((scenario, i) => (
                                     <li key={i}>{scenario}</li>
                                 ))}
@@ -805,8 +804,17 @@ const CorporateDashboard: React.FC = () => {
     const [startDate, setStartDate] = useState<Date | null>(null);
     const [endDate, setEndDate] = useState<Date | null>(null);
 
+    const resolveUserEmail = () => {
+        return (
+            sessionStorage.getItem('userEmail') ||
+            localStorage.getItem('userEmail') ||
+            getStoredUser().email ||
+            ''
+        );
+    };
+
     const fetchDashboardStats = async (start: Date | null = null, end: Date | null = null) => {
-        const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
+        const email = resolveUserEmail();
         if (!email) return;
 
         setLoading(true);
@@ -850,7 +858,7 @@ const CorporateDashboard: React.FC = () => {
             return;
         }
 
-        const email = sessionStorage.getItem("userEmail");
+        const email = resolveUserEmail();
         if (!email) {
             setSearchError("Please log in to search reports.");
             return;
