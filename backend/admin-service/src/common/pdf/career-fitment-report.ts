@@ -212,16 +212,18 @@ export class CareerFitmentReport extends BaseReport {
       }
     }
 
-    items.forEach((item) => {
-      this.doc
-        .font(this.FONT_SORA_BOLD)
-        .fontSize(10)
-        .fillColor(this.COLOR_BLACK)
-        .text(`${item.label}: `, this.MARGIN_STD, currentY, { continued: true })
-        .font(this.FONT_REGULAR)
-        .text(item.value);
-      currentY += 15;
+    const tableRows = items.map(item => [item.label, item.value]);
+    this.table(['Field', 'Details'], tableRows, {
+      colWidths: [150, 350],
+      fontSize: 9.5,
+      headerFontSize: 10,
+      cellPadding: 5,
+      headerColor: this.COLOR_DEEP_BLUE,
+      headerTextColor: '#FFFFFF',
+      borderColor: '#CCCCCC',
+      y: currentY
     });
+    currentY = this.doc.y + 15;
 
     currentY += 15;
 
@@ -505,6 +507,12 @@ export class CareerFitmentReport extends BaseReport {
 
     currentY = this.doc.y + 20;
 
+    // Check if Section 5 fits on the current page, else add a page
+    if (currentY + 230 > this.PAGE_HEIGHT - this.MARGIN_STD) {
+      this.doc.addPage();
+      currentY = this.MARGIN_STD + 15;
+    }
+
     // 5. Role Fitment Score Title
     const fitmentTitle = `5. Role Fitment Score - ${this.data.profile.expectedFutureRole} (Out of 100)`;
     this.doc
@@ -565,6 +573,12 @@ export class CareerFitmentReport extends BaseReport {
     });
 
     currentY = this.doc.y + 15;
+
+    // Check if Verdict fits on the current page
+    if (currentY + 30 > this.PAGE_HEIGHT - this.MARGIN_STD) {
+      this.doc.addPage();
+      currentY = this.MARGIN_STD + 15;
+    }
 
     // Verdict Paragraph (Italicized)
     this.doc
