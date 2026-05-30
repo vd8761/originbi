@@ -852,14 +852,29 @@ export class CollegeMBAShortReport extends BaseReport {
     this.doc.roundedRect(x, heroY, w, heroH, 8).fill(spec.accent);
     this.doc.restore();
 
-    // Translucent trophy emblem — universal "top pick" mark, same for all specs.
-    this.drawTrophyIcon(
-      x + w - iconGutter / 2 - 6,
-      heroY + heroH / 2,
-      heroH - 16,
-      '#FFFFFF',
-      0.2,
-    );
+    // Universal "top pick" mark — prefer the PNG asset; fall back to the
+    // drawn target if the file isn't present.
+    const iconSize = heroH - 20;
+    const iconCx = x + w - iconGutter / 2 - 6;
+    const iconCy = heroY + heroH / 2;
+    // Prefer the pre-inverted white version; fall back to the black source,
+    // then to the drawn target. Rendered translucent so it reads as a
+    // watermark, not as a competing focal point with the role name.
+    const iconPath =
+      this.resolveIconPath('top-career-match-white.png') ||
+      this.resolveIconPath('top-career-match.png');
+    if (iconPath) {
+      this.doc.save();
+      this.doc.opacity(0.35);
+      this.doc.image(iconPath, iconCx - iconSize / 2, iconCy - iconSize / 2, {
+        width: iconSize,
+        height: iconSize,
+      });
+      this.doc.restore();
+      this.doc.opacity(1);
+    } else {
+      this.drawTargetIcon(iconCx, iconCy, iconSize / 2, '#FFFFFF', 0.35);
+    }
 
     const eyebrowH = this.doc
       .font(this.FONT_SORA_SEMIBOLD)
@@ -1137,83 +1152,55 @@ export class CollegeMBAShortReport extends BaseReport {
   }
 
   /**
-   * Draws a translucent trophy emblem centered at (cx, cy).
+   * Draws a translucent target/bullseye emblem centered at (cx, cy).
    * Universal "top pick" mark — same shape regardless of specialization.
+   *
+   * Geometry: 3 concentric rings (outer/middle stroked, inner filled) plus
+   * 4 short crosshair tick marks extending just past the outer ring.
    *
    * @param cx       center x
    * @param cy       center y
-   * @param h        total icon height
-   * @param color    fill/stroke color (hex)
-   * @param opacity  0..1 fill opacity (typically ~0.18-0.25 for a watermark)
+   * @param r        outer radius
+   * @param color    stroke/fill color (hex)
+   * @param opacity  0..1 (use ~0.3-0.4 for a watermark — thin strokes need
+   *                 slightly higher opacity than filled blobs to read)
    */
-  private drawTrophyIcon(
+  private drawTargetIcon(
     cx: number,
     cy: number,
-    h: number,
+    r: number,
     color: string,
     opacity: number,
   ): void {
-    const cupW = h * 0.55;
-    const cupH = h * 0.45;
-    const cupTop = cy - h / 2;
-
     this.doc.save();
-    this.doc.fillOpacity(opacity).strokeOpacity(opacity);
-    this.doc.fillColor(color).strokeColor(color);
+    this.doc.strokeOpacity(opacity).fillOpacity(opacity);
+    this.doc.strokeColor(color).fillColor(color);
 
-    // Cup body — wide top, slightly narrower rounded bottom.
-    const tlx = cx - cupW / 2;
-    const trx = cx + cupW / 2;
-    const blx = cx - cupW * 0.4;
-    const brx = cx + cupW * 0.4;
-    this.doc
-      .moveTo(tlx, cupTop)
-      .lineTo(trx, cupTop)
-      .lineTo(brx, cupTop + cupH * 0.7)
-      .quadraticCurveTo(cx, cupTop + cupH * 1.05, blx, cupTop + cupH * 0.7)
-      .closePath()
-      .fill();
+    const ringW = Math.max(1.5, r * 0.12);
+    this.doc.lineWidth(ringW);
 
-    // Two side handles (C-curves) — drawn as strokes.
-    const handleH = cupH * 0.55;
-    const handleW = h * 0.18;
-    const handleY = cupTop + cupH * 0.1;
-    this.doc.lineWidth(Math.max(1, h * 0.06));
-    this.doc
-      .moveTo(tlx, handleY)
-      .quadraticCurveTo(
-        tlx - handleW,
-        handleY + handleH / 2,
-        tlx,
-        handleY + handleH,
-      )
-      .stroke();
-    this.doc
-      .moveTo(trx, handleY)
-      .quadraticCurveTo(
-        trx + handleW,
-        handleY + handleH / 2,
-        trx,
-        handleY + handleH,
-      )
-      .stroke();
+    // Outer ring
+    this.doc.circle(cx, cy, r).stroke();
+    // Middle ring (≈ 65% radius)
+    this.doc.circle(cx, cy, r * 0.62).stroke();
+    // Inner filled dot (≈ 22% radius)
+    this.doc.circle(cx, cy, r * 0.22).fill();
 
-    // Stem
-    const stemW = h * 0.1;
-    const stemH = h * 0.18;
-    const stemY = cupTop + cupH;
-    this.doc.rect(cx - stemW / 2, stemY, stemW, stemH).fill();
-
-    // Mid plate
-    const plateW = cupW * 0.55;
-    const plateH = h * 0.07;
-    const plateY = stemY + stemH;
-    this.doc.rect(cx - plateW / 2, plateY, plateW, plateH).fill();
-
-    // Base flange
-    const baseW = cupW * 0.95;
-    const baseH = h * 0.06;
-    this.doc.rect(cx - baseW / 2, plateY + plateH, baseW, baseH).fill();
+    // Crosshair ticks — short marks just outside the outer ring on the 4
+    // cardinal axes, giving the bullseye a "scope" feel.
+    const tickGap = r * 0.12;
+    const tickLen = r * 0.28;
+    const tickStart = r + tickGap;
+    const tickEnd = tickStart + tickLen;
+    this.doc.lineWidth(ringW * 0.9);
+    // Top
+    this.doc.moveTo(cx, cy - tickStart).lineTo(cx, cy - tickEnd).stroke();
+    // Bottom
+    this.doc.moveTo(cx, cy + tickStart).lineTo(cx, cy + tickEnd).stroke();
+    // Left
+    this.doc.moveTo(cx - tickStart, cy).lineTo(cx - tickEnd, cy).stroke();
+    // Right
+    this.doc.moveTo(cx + tickStart, cy).lineTo(cx + tickEnd, cy).stroke();
 
     this.doc.restore();
     // Reset opacity for subsequent draws.

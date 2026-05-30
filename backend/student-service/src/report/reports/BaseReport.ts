@@ -438,6 +438,22 @@ export class BaseReport {
     return candidates.find((c) => fs.existsSync(c)) ?? null;
   }
 
+  /**
+   * Resolves the path to a named asset image under
+   * `public/assets/images/icons/`. Returns null if no candidate exists,
+   * so callers can fall back gracefully.
+   */
+  protected resolveIconPath(filename: string): string | null {
+    const candidates = [
+      path.resolve(process.cwd(), `public/assets/images/icons/${filename}`),
+      path.resolve(
+        process.cwd(),
+        `../../backend/student-service/public/assets/images/icons/${filename}`,
+      ),
+    ];
+    return candidates.find((c) => fs.existsSync(c)) ?? null;
+  }
+
   protected toRoman(num: number): string {
     const lookup: { [key: string]: number } = {
       m: 1000,
