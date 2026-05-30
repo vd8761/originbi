@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call */
 import * as PDFDocument from 'pdfkit';
 import * as fs from 'fs';
+import * as path from 'path';
 
 // --- Shared Interfaces ---
 
@@ -411,6 +412,30 @@ export class BaseReport {
     if (this.doc.y + neededHeight > bottomLimit) {
       this.doc.addPage();
     }
+  }
+
+  /**
+   * Resolves the canonical Origin BI logo path. Tries multiple candidate
+   * locations because the working directory differs between dev, test, and
+   * production runs. Returns the first existing path, or null if the asset
+   * is missing entirely (in which case callers should skip rendering).
+   */
+  protected resolveLogoPath(): string | null {
+    const candidates = [
+      path.resolve(
+        process.cwd(),
+        'public/assets/images/Origin-BI-Logo-01.png',
+      ),
+      path.resolve(
+        process.cwd(),
+        '../../backend/student-service/public/assets/images/Origin-BI-Logo-01.png',
+      ),
+      path.resolve(
+        process.cwd(),
+        'public/assets/images/Origin-BI-logo.png',
+      ),
+    ];
+    return candidates.find((c) => fs.existsSync(c)) ?? null;
   }
 
   protected toRoman(num: number): string {
@@ -1185,20 +1210,26 @@ export class BaseReport {
         const headerW = this.doc.widthOfString(headers[i]);
         if (headerW > maxW) maxW = headerW;
 
-        // Measure Rows (MUST use specific Column Font)
+        // Measure Rows. We must honour per-row StyledRow overrides
+        // (font/fontSize), because a bolder face renders wider than the
+        // column's default font. Measuring with the wrong font under-sizes
+        // the column and the bolder row wraps unexpectedly.
         const colFont = getColFont(i);
-        this.doc.font(colFont).fontSize(options.fontSize || 10);
+        const colFontSize = options.fontSize || 10;
 
         rows.forEach((row) => {
           let rowData: (string | number | null | undefined | RichTableCell)[];
+          let rowFont: string | undefined;
+          let rowFontSize: number | undefined;
 
           if (Array.isArray(row)) {
             rowData = row;
           } else if (typeof row === 'object' && row !== null) {
             // Skip subheaders
             if ((row as any).type === 'subheader') return;
-            // Use data from StyledRow
             rowData = (row as any).data;
+            rowFont = (row as any).font;
+            rowFontSize = (row as any).fontSize;
           } else {
             return;
           }
@@ -1207,16 +1238,18 @@ export class BaseReport {
           const cellVal = rowData[i];
 
           if (cellVal && typeof cellVal === 'object' && 'content' in cellVal) {
-            // Rich Text: Measure maximum width of any single line (assuming lines are broken manually or we just measure longest segment)
-            // For simplicity in automatic width: measure the longest text segment.
-            // Ideally, we sum widths if on same line, but for this use case (multiline), max is fine?
-            // Actually, we should concatenate plain text to measure "approximate" or iterate.
-            // Let's just map to string for width calc if 'fit' is used.
+            // Rich Text — concatenate plain text for an approximate width.
             cellText = cellVal.content.map((c) => c.text).join('');
           } else {
             // eslint-disable-next-line @typescript-eslint/no-base-to-string
             cellText = cellVal != null ? String(cellVal) : '';
           }
+
+          // Apply the row's font override (if any) before measuring so the
+          // width matches what will actually be rendered.
+          this.doc
+            .font(rowFont || colFont)
+            .fontSize(rowFontSize || colFontSize);
 
           const cellW = this.doc.widthOfString(cellText);
           if (cellW > maxW) maxW = cellW;

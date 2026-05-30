@@ -1,5 +1,5 @@
 /**
- * MBA Specialization Suitability — supporting constants.
+ * MBA Specialization Suitability - supporting constants.
  *
  * The MBA short report ("Origin BI MBA SpecFit") ranks five MBA specializations
  * (Finance, HR, Business Analytics, Operations, Marketing) using:
@@ -51,6 +51,12 @@ export const READINESS_ORDER: ReadinessKey[] = [
   'courage',
 ];
 
+/** A career role with a short one-line description of what the role does. */
+export interface CareerRole {
+  name: string;
+  description: string;
+}
+
 export interface SpecializationMeta {
   code: SpecializationCode;
   name: string;
@@ -64,8 +70,11 @@ export interface SpecializationMeta {
   reasonOnePager: string;
   /** Bullets that flesh out the "Why this recommendation" sentence. */
   bestSuitedFor: string[];
-  /** Default career roles surfaced if the DB returns nothing for this spec. */
-  defaultRoles: string[];
+  /**
+   * Curated career roles for this specialization, with short descriptions.
+   * First entry is treated as the "Top Career Match" hero in the report.
+   */
+  defaultRoles: CareerRole[];
   /** Preparation plan items for the recommended specialization. */
   preparation: string[];
 }
@@ -85,13 +94,13 @@ export const SPECIALIZATIONS: Record<SpecializationCode, SpecializationMeta> = {
       'Risk awareness & numerical accuracy',
     ],
     defaultRoles: [
-      'Finance Analyst',
-      'Banking Associate',
-      'Equity Research Associate',
-      'Corporate Finance Trainee',
-      'Audit Associate',
-      'Treasury Analyst',
-      'Risk Analyst',
+      { name: 'Finance Analyst', description: 'Analyses financial data and supports key business decisions.' },
+      { name: 'Banking Associate', description: 'Manages client relationships and core banking operations.' },
+      { name: 'Equity Research Associate', description: 'Researches markets, companies, and recommends investments.' },
+      { name: 'Corporate Finance Trainee', description: 'Supports M&A, treasury, and capital planning activities.' },
+      { name: 'Audit Associate', description: 'Reviews financial statements for accuracy and compliance.' },
+      { name: 'Treasury Analyst', description: 'Manages cash flow, liquidity, and short-term risk exposure.' },
+      { name: 'Risk Analyst', description: 'Identifies and mitigates financial risk across the firm.' },
     ],
     preparation: [
       'Build foundations in financial accounting and corporate finance',
@@ -114,16 +123,16 @@ export const SPECIALIZATIONS: Record<SpecializationCode, SpecializationMeta> = {
       'Adaptability & employee support mindset',
     ],
     defaultRoles: [
-      'HR Executive',
-      'Talent Acquisition Associate',
-      'Learning and Development Coordinator',
-      'Employee Engagement Executive',
-      'HR Operations Associate',
-      'Training Coordinator',
-      'Client Coordination Executive',
+      { name: 'HR Executive', description: 'Handles day-to-day employee relations and HR operations.' },
+      { name: 'Talent Acquisition Associate', description: 'Sources, screens, and onboards new hires across teams.' },
+      { name: 'Learning & Development Coordinator', description: 'Designs and runs training programs for employee growth.' },
+      { name: 'Employee Engagement Executive', description: 'Drives workplace culture and engagement initiatives.' },
+      { name: 'HR Operations Associate', description: 'Maintains HRIS, payroll inputs, and compliance records.' },
+      { name: 'Training Coordinator', description: 'Schedules and tracks employee training sessions end-to-end.' },
+      { name: 'Client Coordination Executive', description: 'Bridges client needs with internal delivery teams.' },
     ],
     preparation: [
-      'Build basic HR fundamentals — recruitment lifecycle, engagement, L&D',
+      'Build basic HR fundamentals - recruitment lifecycle, engagement, L&D',
       'Practise structured interviews and group discussions weekly',
       'Strengthen Excel and HRIS documentation skills',
       'Read case studies on people management and conflict handling',
@@ -143,13 +152,13 @@ export const SPECIALIZATIONS: Record<SpecializationCode, SpecializationMeta> = {
       'Problem-solving & decision discipline',
     ],
     defaultRoles: [
-      'Business Analyst',
-      'Data Analyst',
-      'Reporting Analyst',
-      'Operations Analyst',
-      'Insights Associate',
-      'BI Developer Trainee',
-      'Analytics Consultant',
+      { name: 'Business Analyst', description: 'Translates business needs into actionable data insights.' },
+      { name: 'Data Analyst', description: 'Cleans, analyses data, and builds reports for stakeholders.' },
+      { name: 'Reporting Analyst', description: 'Produces recurring dashboards and KPI reports for leaders.' },
+      { name: 'Operations Analyst', description: 'Improves processes through quantitative analysis.' },
+      { name: 'Insights Associate', description: 'Synthesises data into clear business recommendations.' },
+      { name: 'BI Developer Trainee', description: 'Builds dashboards and analytical tools end-to-end.' },
+      { name: 'Analytics Consultant', description: 'Advises clients on data-driven strategy and execution.' },
     ],
     preparation: [
       'Practise SQL, advanced Excel, and one BI tool (Power BI / Tableau)',
@@ -172,13 +181,13 @@ export const SPECIALIZATIONS: Record<SpecializationCode, SpecializationMeta> = {
       'Documentation & quality control',
     ],
     defaultRoles: [
-      'Operations Executive',
-      'Supply Chain Associate',
-      'Process Improvement Analyst',
-      'Operations Coordinator',
-      'Logistics Associate',
-      'Quality Assurance Analyst',
-      'Service Delivery Coordinator',
+      { name: 'Operations Executive', description: 'Runs daily operations and drives process execution.' },
+      { name: 'Supply Chain Associate', description: 'Coordinates suppliers, inventory, and logistics flow.' },
+      { name: 'Process Improvement Analyst', description: 'Identifies inefficiencies and drives lean improvements.' },
+      { name: 'Operations Coordinator', description: 'Coordinates cross-functional operational activities.' },
+      { name: 'Logistics Associate', description: 'Manages shipments, warehousing, and distribution.' },
+      { name: 'Quality Assurance Analyst', description: 'Ensures product and service quality standards are met.' },
+      { name: 'Service Delivery Coordinator', description: 'Manages client service delivery operations end-to-end.' },
     ],
     preparation: [
       'Learn basics of supply chain, lean, and Six Sigma concepts',
@@ -201,13 +210,13 @@ export const SPECIALIZATIONS: Record<SpecializationCode, SpecializationMeta> = {
       'Communication & persuasion',
     ],
     defaultRoles: [
-      'Marketing Executive',
-      'Brand Associate',
-      'Digital Marketing Specialist',
-      'Content Marketing Associate',
-      'Sales & Marketing Trainee',
-      'Market Research Analyst',
-      'Customer Insights Associate',
+      { name: 'Marketing Executive', description: 'Plans and executes campaigns to drive brand visibility.' },
+      { name: 'Brand Associate', description: 'Builds and maintains brand identity and positioning.' },
+      { name: 'Digital Marketing Specialist', description: 'Runs paid, social, and SEO campaigns end-to-end.' },
+      { name: 'Content Marketing Associate', description: 'Creates content that drives audience engagement.' },
+      { name: 'Sales & Marketing Trainee', description: 'Supports lead generation and sales enablement.' },
+      { name: 'Market Research Analyst', description: 'Studies consumers and competitors for actionable insights.' },
+      { name: 'Customer Insights Associate', description: 'Analyses customer behaviour to inform strategy.' },
     ],
     preparation: [
       'Build foundations in the 4Ps, segmentation, and consumer behaviour',

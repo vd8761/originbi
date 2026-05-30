@@ -150,34 +150,47 @@ export class CollegeShortReport extends BaseReport {
       .fill(this.COLOR_DEEP_BLUE);
   }
 
+  /** Label shown as the eyebrow in the header and on the left of the footer. */
+  private readonly SNAPSHOT_LABEL = 'Report Snapshot';
+
   private drawHeader(y: number): number {
     const x = this.CONTENT_X;
     const w = this.CONTENT_W;
+
+    // ── Logo (top-left) ──
+    const logoPath = this.resolveLogoPath();
+    const logoH = 36;
+    const logoW = 90;
+    let titleLeft = x;
+    if (logoPath) {
+      this.doc.image(logoPath, x, y, { height: logoH });
+      titleLeft = x + logoW + 12;
+    }
 
     this.doc
       .font(this.FONT_SORA_SEMIBOLD)
       .fontSize(9)
       .fillColor(this.COLOR_DEEP_BLUE)
-      .text('Report Snapshot', x, y, { lineBreak: false });
+      .text(this.SNAPSHOT_LABEL, titleLeft, y + 2, { lineBreak: false });
 
     this.doc
       .font(this.FONT_SORA_BOLD)
-      .fontSize(20)
+      .fontSize(18)
       .fillColor(this.COLOR_DEEP_BLUE)
-      .text(this.data.report_title || 'Origin BI ClarityFit', x, y + 14, {
-        width: w * 0.62,
+      .text(this.data.report_title || 'Origin BI ClarityFit', titleLeft, y + 14, {
+        width: w * 0.55 - (titleLeft - x),
         lineBreak: false,
         ellipsis: true,
       });
 
-    const metaX = x + w * 0.62;
-    const metaW = w * 0.38;
+    const metaX = x + w * 0.58;
+    const metaW = w * 0.42;
 
     this.doc
       .font(this.FONT_SORA_BOLD)
       .fontSize(13)
       .fillColor(this.COLOR_BLACK)
-      .text(this.data.full_name || '-', metaX, y + 14, {
+      .text(this.data.full_name || '-', metaX, y + 4, {
         width: metaW,
         align: 'right',
         lineBreak: false,
@@ -196,20 +209,21 @@ export class CollegeShortReport extends BaseReport {
       .font(this.FONT_REGULAR)
       .fontSize(8.5)
       .fillColor(this.C_MUTED)
-      .text(`${this.data.email_id || ''}   •   ${dateString}`, metaX, y + 34, {
+      .text(`${this.data.email_id || ''}   •   ${dateString}`, metaX, y + 24, {
         width: metaW,
         align: 'right',
         lineBreak: false,
       });
 
+    const ruleY = y + Math.max(logoH, 44) + 2;
     this.doc
       .lineWidth(0.6)
       .strokeColor('#DCDCE4')
-      .moveTo(x, y + 52)
-      .lineTo(x + w, y + 52)
+      .moveTo(x, ruleY)
+      .lineTo(x + w, ruleY)
       .stroke();
 
-    return y + 52;
+    return ruleY;
   }
 
   private drawAboutReportCard(y: number, traitCode: string): number {
@@ -754,12 +768,25 @@ export class CollegeShortReport extends BaseReport {
       .lineTo(x + w, y)
       .stroke();
 
-    this.doc
-      .font(this.FONT_SORA_SEMIBOLD)
-      .fontSize(9)
-      .fillColor(this.COLOR_DEEP_BLUE)
-      .text('Origin BI', x, y + 8, { lineBreak: false });
+    // ── Logo (bottom-left, replaces old "Origin BI" text) ──
+    const logoPath = this.resolveLogoPath();
+    const logoH = 16;
+    if (logoPath) {
+      this.doc.image(logoPath, x, y + 5, { height: logoH });
+    }
 
+    // ── Snapshot label (center) ──
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(8)
+      .fillColor('#444')
+      .text(this.SNAPSHOT_LABEL, x, y + 9, {
+        width: w,
+        align: 'center',
+        lineBreak: false,
+      });
+
+    // ── Exam ref (right) ──
     this.doc
       .font(this.FONT_REGULAR)
       .fontSize(8)
