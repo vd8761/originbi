@@ -101,7 +101,7 @@ export class FutureRoleReportService {
         apiKey,
           model: process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash',
         temperature: 0.3,
-        maxOutputTokens: 2200,
+        maxOutputTokens: 8192,
         callbacks: [getTokenTrackerCallback('Future Role Report')],
       });
     }
@@ -116,7 +116,7 @@ export class FutureRoleReportService {
         apiKey,
         model: 'llama-3.3-70b-versatile',
         temperature: 0.3,
-        maxTokens: 2200,
+        maxTokens: 8192,
         callbacks: [getTokenTrackerCallback('Future Role Report (Groq Fallback)')],
       });
     }

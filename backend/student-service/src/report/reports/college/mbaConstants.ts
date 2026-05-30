@@ -10,12 +10,7 @@
  * ("MBA Specialization Suitability Report.pdf") for the underlying logic.
  */
 
-export type SpecializationCode =
-  | 'FIN'
-  | 'HR'
-  | 'BA'
-  | 'OPS'
-  | 'MKT';
+export type SpecializationCode = 'FIN' | 'HR' | 'BA' | 'OPS' | 'MKT';
 
 export type FitLevel =
   | 'Excellent Fit'
@@ -242,12 +237,45 @@ export const SPECIALIZATION_ORDER: SpecializationCode[] = [
  * Suitability score (0–100) is computed as a weighted average of the five
  * readiness percentages: Σ(pct_i * w_i) / Σ(w_i).
  */
-export const SPEC_WEIGHTS: Record<SpecializationCode, Record<ReadinessKey, number>> = {
-  FIN: { commitment: 1.2, focus: 1.5, openness: 0.6, respect: 0.7, courage: 1.0 },
-  HR:  { commitment: 1.2, focus: 0.8, openness: 1.0, respect: 1.5, courage: 1.0 },
-  BA:  { commitment: 0.9, focus: 1.4, openness: 1.3, respect: 0.7, courage: 1.0 },
-  OPS: { commitment: 1.3, focus: 1.3, openness: 0.8, respect: 1.1, courage: 0.8 },
-  MKT: { commitment: 0.8, focus: 0.8, openness: 1.2, respect: 1.0, courage: 1.5 },
+export const SPEC_WEIGHTS: Record<
+  SpecializationCode,
+  Record<ReadinessKey, number>
+> = {
+  FIN: {
+    commitment: 1.2,
+    focus: 1.5,
+    openness: 0.6,
+    respect: 0.7,
+    courage: 1.0,
+  },
+  HR: {
+    commitment: 1.2,
+    focus: 0.8,
+    openness: 1.0,
+    respect: 1.5,
+    courage: 1.0,
+  },
+  BA: {
+    commitment: 0.9,
+    focus: 1.4,
+    openness: 1.3,
+    respect: 0.7,
+    courage: 1.0,
+  },
+  OPS: {
+    commitment: 1.3,
+    focus: 1.3,
+    openness: 0.8,
+    respect: 1.1,
+    courage: 0.8,
+  },
+  MKT: {
+    commitment: 0.8,
+    focus: 0.8,
+    openness: 1.2,
+    respect: 1.0,
+    courage: 1.5,
+  },
 };
 
 /**
@@ -259,10 +287,22 @@ export const DISC_ALIGNMENT: Record<
   'D' | 'I' | 'S' | 'C',
   Record<SpecializationCode, BehavioralAlignment>
 > = {
-  D: { FIN: 'Moderate', HR: 'Low',      BA: 'Moderate', OPS: 'Strong',   MKT: 'Strong'   },
-  I: { FIN: 'Low',      HR: 'Strong',   BA: 'Low',      OPS: 'Moderate', MKT: 'Strong'   },
-  S: { FIN: 'Moderate', HR: 'Strong',   BA: 'Moderate', OPS: 'Strong',   MKT: 'Moderate' },
-  C: { FIN: 'Strong',   HR: 'Moderate', BA: 'Strong',   OPS: 'Strong',   MKT: 'Low'      },
+  D: {
+    FIN: 'Moderate',
+    HR: 'Low',
+    BA: 'Moderate',
+    OPS: 'Strong',
+    MKT: 'Strong',
+  },
+  I: { FIN: 'Low', HR: 'Strong', BA: 'Low', OPS: 'Moderate', MKT: 'Strong' },
+  S: {
+    FIN: 'Moderate',
+    HR: 'Strong',
+    BA: 'Moderate',
+    OPS: 'Strong',
+    MKT: 'Moderate',
+  },
+  C: { FIN: 'Strong', HR: 'Moderate', BA: 'Strong', OPS: 'Strong', MKT: 'Low' },
 };
 
 export const ALIGNMENT_MULTIPLIER: Record<BehavioralAlignment, number> = {

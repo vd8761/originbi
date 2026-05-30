@@ -324,9 +324,20 @@ export class CustomReportService {
         // ═══════════════════════════════════════════════════════════════
         // STEP 2: Extract metadata from JSONB fields
         // ═══════════════════════════════════════════════════════════════
-        const regMetadata = assessmentData.reg_metadata || {};
-        const userMetadata = assessmentData.user_metadata || {};
-        const attemptMetadata = assessmentData.attempt_metadata || {};
+        const parseJsonObject = (val: any) => {
+            if (!val) return {};
+            if (typeof val === 'string') {
+                try {
+                    return JSON.parse(val);
+                } catch {
+                    return {};
+                }
+            }
+            return val;
+        };
+        const regMetadata = parseJsonObject(assessmentData.reg_metadata);
+        const userMetadata = parseJsonObject(assessmentData.user_metadata);
+        const attemptMetadata = parseJsonObject(assessmentData.attempt_metadata);
 
         // ═══════════════════════════════════════════════════════════════
         // STEP 3: Build Profile from REAL data
@@ -806,24 +817,60 @@ IMPORTANT: Do NOT recommend any courses, certifications, Coursera, edX, Udemy, o
      * Default skill categories fallback
      */
     private getDefaultSkillCategories(profile: CareerProfileData): SkillCategory[] {
-        return [
+        const isTech = /software|developer|programmer|engineer|tester|tech|uiux|designer|it/i.test(
+            (profile.currentRole || '') + ' ' + (profile.expectedFutureRole || '') + ' ' + (profile.currentJobDescription || '')
+        );
+
+        const categories = [
             {
                 category: 'Communication Skills',
                 skills: [
-                    { name: 'Management Communication', score: 4.0, insight: 'Clear and structured' },
-                    { name: 'Employee Communication', score: 3.8, insight: 'Good clarity' },
-                    { name: 'Stakeholder Negotiation', score: 3.9, insight: 'Logic-based' },
+                    { name: 'Verbal Communication', score: 4.1, insight: 'Clear and structured articulation of ideas.' },
+                    { name: 'Interpersonal & Collaboration Skills', score: 3.9, insight: 'Good team alignment and empathy.' },
+                    { name: 'Presentation & Articulation', score: 3.8, insight: 'Clear projection of thoughts.' },
+                    { name: 'Written Communication', score: 4.0, insight: 'Professional and structured writing.' },
                 ],
             },
             {
-                category: 'Leadership & Strategy',
+                category: 'Analytical & Problem-Solving',
                 skills: [
-                    { name: 'Team Leadership', score: 4.2, insight: 'Strong ownership' },
-                    { name: 'Strategic Planning', score: 3.5, insight: 'Developing' },
-                    { name: 'Change Management', score: 3.7, insight: 'Good foundation' },
+                    { name: 'Critical Thinking', score: 4.2, insight: 'Strong logical reasoning and issue identification.' },
+                    { name: 'Data-Driven Decision Making', score: 3.9, insight: 'Leverages objective insights over assumptions.' },
+                    { name: 'Creative Problem Solving', score: 4.1, insight: 'Good out-of-the-box conceptualization.' },
+                ],
+            },
+            {
+                category: 'Leadership & Teamwork',
+                skills: [
+                    { name: 'Team Collaboration', score: 4.3, insight: 'Strong ownership and collaborative synergy.' },
+                    { name: 'Initiative & Adaptability', score: 4.0, insight: 'Highly responsive to structural changes.' },
+                    { name: 'Conflict Resolution', score: 3.8, insight: 'Diplomatic and positive alignment.' },
                 ],
             },
         ];
+
+        if (isTech) {
+            categories.push({
+                category: 'Software Development & Technical Skills',
+                skills: [
+                    { name: 'Software Development Practices', score: 4.3, insight: 'Good conceptual understanding of SDLC.' },
+                    { name: 'Programming Skills', score: 4.1, insight: 'Solid logical baseline and syntax comprehension.' },
+                    { name: 'Database & SQL Basics', score: 3.8, insight: 'Familiarity with query writing and structured data.' },
+                    { name: 'Testing & Quality Assurance', score: 4.0, insight: 'Detail-oriented and structured validation approach.' },
+                ],
+            });
+        } else {
+            categories.push({
+                category: 'Domain Expertise & Learning Potential',
+                skills: [
+                    { name: 'Domain Knowledge', score: 4.0, insight: 'Strong foundation in their target industry.' },
+                    { name: 'Continuous Learning', score: 4.4, insight: 'Excellent proactive learning capabilities.' },
+                    { name: 'Research Capabilities', score: 4.1, insight: 'Methodical and structured analytical skills.' },
+                ],
+            });
+        }
+
+        return categories;
     }
 
     /**
