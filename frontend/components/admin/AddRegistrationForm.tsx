@@ -9,6 +9,7 @@ import {
 } from '../icons';
 import CustomDatePicker from '../ui/CustomDatePicker';
 import CustomSelect from '../ui/CustomSelect';
+import CreatableCombobox from '../ui/CreatableCombobox';
 import MobileInput from '../ui/MobileInput';
 import { registrationService } from '../../lib/services';
 import { CreateRegistrationDto } from '../../lib/services/registration.service';
@@ -50,6 +51,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
 
   const [programs, setPrograms] = useState<Program[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [groupOptions, setGroupOptions] = useState<{ value: string; label: string }[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -100,6 +102,17 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
         setDepartments(deptRes);
       } catch (err) {
         console.error("Failed to load departments", err);
+      }
+
+      // 3) Groups (for combobox)
+      try {
+        const groupsRes = await registrationService.getGroups();
+        const opts = (Array.isArray(groupsRes) ? groupsRes : [])
+          .filter((g: any) => g && g.name)
+          .map((g: any) => ({ value: String(g.id), label: String(g.name) }));
+        setGroupOptions(opts);
+      } catch (err) {
+        console.error("Failed to load groups", err);
       }
     };
 
@@ -627,14 +640,18 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
             )}
 
             {/* Group Name */}
-            <div className="space-y-2 relative">
-              <label className={baseLabelClasses}>Group Name</label>
-              <input
-                type="text"
-                value={formData.group_name}
-                onChange={(e) => handleInputChange("group_name", e.target.value)}
-                placeholder="Enter the Group Name"
-                className={baseInputClasses}
+            <div
+              className={`space-y-2 relative ${getZIndex("group")}`}
+              onMouseEnter={() => setActiveField("group")}
+              onMouseLeave={() => setActiveField(null)}
+            >
+              <CreatableCombobox
+                label="Group Name"
+                placeholder="Type a new group or pick existing"
+                options={groupOptions}
+                value={formData.group_name || ""}
+                onChange={(val) => handleInputChange("group_name", val)}
+                onOpenChange={(isOpen) => handleOpenStatus("group", isOpen)}
               />
             </div>
 

@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import {
   AssessmentSession,
   Program,
@@ -8,6 +8,7 @@ import {
   AssessmentAttempt,
   GroupAssessment,
   Groups,
+  Registration,
   AciTraitValueNote,
   AciTrait,
   AciValue,
@@ -15,9 +16,13 @@ import {
 import { Department } from '../departments/department.entity';
 import { DepartmentDegree } from '../departments/department-degree.entity';
 import { DegreeType } from '../departments/degree-type.entity';
+import { AssessmentGenerationService } from './assessment-generation.service';
 
 @Injectable()
 export class AssessmentService {
+  private readonly logger = new Logger(AssessmentService.name);
+  private readonly ADMIN_USER_ID = 1;
+
   constructor(
     @InjectRepository(AssessmentSession)
     private readonly sessionRepo: Repository<AssessmentSession>,
@@ -37,6 +42,8 @@ export class AssessmentService {
     private readonly deptRepo: Repository<Department>,
     @InjectRepository(DepartmentDegree)
     private readonly deptDegreeRepo: Repository<DepartmentDegree>,
+    private readonly dataSource: DataSource,
+    private readonly assessmentGenService: AssessmentGenerationService,
   ) {}
 
   async findAllSessions(
@@ -544,5 +551,398 @@ export class AssessmentService {
       console.error('Error fetching group department stats:', error);
       return { departments: [] };
     }
+  }
+
+  /**
+   * Assigns a new exam (Program + date window) to every active user already
+   * registered in a Group. Find-or-creates the parent GroupAssessment, then
+   * for each eligible user that doesn't already have a session for it,
+   * creates an AssessmentSession + mandatory-level AssessmentAttempts and
+   * generates Level-1 questions. Returns a per-user summary.
+   */
+  async assignGroupExam(input: {
+    groupId: number;
+    programId: number;
+    examStart?: string;
+    examEnd?: string;
+    sendEmail?: boolean;
+  }) {
+    const { groupId, programId, examStart, examEnd } = input;
+
+    if (!groupId) throw new BadRequestException('groupId is required');
+    if (!programId) throw new BadRequestException('programId is required');
+
+    const validFrom = examStart ? new Date(examStart) : new Date();
+    const validTo = examEnd
+      ? new Date(examEnd)
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    return this.dataSource.transaction(async (manager) => {
+      const program = await manager
+        .getRepository(Program)
+        .findOne({ where: { id: programId as any } });
+      if (!program) {
+        throw new BadRequestException(`Program ${programId} not found`);
+      }
+
+      const group = await manager
+        .getRepository(Groups)
+        .findOne({ where: { id: groupId } });
+      if (!group) {
+        throw new BadRequestException(`Group ${groupId} not found`);
+      }
+
+      // 1. Find-or-create the GroupAssessment row (same dedupe key as
+      //    single-user admin create: groupId + programId + overlapping window).
+      const gaRepo = manager.getRepository(GroupAssessment);
+      let groupAssessment = await gaRepo
+        .createQueryBuilder('ga')
+        .where('ga.group_id = :groupId', { groupId })
+        .andWhere('ga.program_id = :programId', { programId })
+        .andWhere(
+          '(ga.valid_to IS NULL OR ga.valid_to >= :from) AND (ga.valid_from IS NULL OR ga.valid_from <= :to)',
+          { from: validFrom, to: validTo },
+        )
+        .orderBy('ga.created_at', 'DESC')
+        .getOne();
+
+      if (!groupAssessment) {
+        groupAssessment = gaRepo.create({
+          groupId: Number(groupId),
+          programId: Number(programId),
+          validFrom,
+          validTo,
+          totalCandidates: 0,
+          status: 'NOT_STARTED',
+          createdByUserId: this.ADMIN_USER_ID,
+          metadata: { source: 'ADMIN_ASSIGN_GROUP_EXAM' },
+        });
+        groupAssessment = await gaRepo.save(groupAssessment);
+      }
+
+      // 2. Pull every active registration in this group.
+      const registrations = await manager
+        .getRepository(Registration)
+        .createQueryBuilder('r')
+        .where('r.group_id = :groupId', { groupId })
+        .andWhere('r.is_deleted = false')
+        .getMany();
+
+      if (registrations.length === 0) {
+        return {
+          groupAssessmentId: Number(groupAssessment.id),
+          totalRegistrations: 0,
+          created: 0,
+          skipped: 0,
+          failed: 0,
+          failures: [] as { registrationId: number; reason: string }[],
+        };
+      }
+
+      // 3. Find users that already have a session for THIS GroupAssessment so
+      //    we can skip them (idempotency: repeated assign click is a no-op).
+      const existingSessions = await manager
+        .getRepository(AssessmentSession)
+        .find({
+          where: { groupAssessmentId: Number(groupAssessment.id) },
+          select: ['userId'],
+        });
+      const alreadyAssigned = new Set(
+        existingSessions.map((s) => String(s.userId)),
+      );
+
+      const levels = await manager.getRepository(AssessmentLevel).find({
+        where: { isMandatory: true },
+        order: { sortOrder: 'ASC' },
+      });
+
+      let created = 0;
+      let relinked = 0;
+      let skipped = 0;
+      let failed = 0;
+      const failures: { registrationId: number; reason: string }[] = [];
+
+      for (const registration of registrations) {
+        if (alreadyAssigned.has(String(registration.userId))) {
+          skipped++;
+          continue;
+        }
+
+        try {
+          // Prevent double-scheduling: if the user already has an
+          // unlinked session for this program (e.g. their original
+          // individual assignment), re-link it into this group assessment
+          // instead of creating a second session. Mirrors the
+          // add-candidate flow.
+          const existingUnlinked = await manager
+            .getRepository(AssessmentSession)
+            .createQueryBuilder('s')
+            .where('s.user_id = :uid', { uid: registration.userId })
+            .andWhere('s.program_id = :pid', { pid: programId })
+            .andWhere('s.group_assessment_id IS NULL')
+            .orderBy(
+              `CASE WHEN s.status = 'NOT_STARTED' THEN 0 ELSE 1 END`,
+              'ASC',
+            )
+            .addOrderBy('s.created_at', 'DESC')
+            .getOne();
+
+          if (existingUnlinked) {
+            existingUnlinked.groupAssessmentId = Number(groupAssessment.id);
+            existingUnlinked.groupId = Number(groupId);
+            await manager.save(existingUnlinked);
+            relinked++;
+            continue;
+          }
+
+          const session = manager.create(AssessmentSession, {
+            userId: registration.userId,
+            registrationId: registration.id,
+            programId: Number(programId),
+            groupId: Number(groupId),
+            groupAssessmentId: Number(groupAssessment.id),
+            status: 'NOT_STARTED',
+            validFrom,
+            validTo,
+            metadata: { source: 'ADMIN_ASSIGN_GROUP_EXAM' },
+          });
+          await manager.save(session);
+
+          for (const level of levels) {
+            const attempt = manager.create(AssessmentAttempt, {
+              userId: registration.userId,
+              registrationId: registration.id,
+              programId: Number(programId),
+              assessmentSessionId: session.id,
+              assessmentLevelId: level.id,
+              status: 'NOT_STARTED',
+            });
+            await manager.save(attempt);
+
+            if (level.levelNumber === 1 || level.name === 'Level 1') {
+              await this.assessmentGenService.generateQuestions(
+                attempt,
+                manager,
+              );
+            }
+          }
+          created++;
+        } catch (err: any) {
+          this.logger.error(
+            `assignGroupExam: failed for registration ${registration.id}`,
+            err?.stack || err,
+          );
+          failed++;
+          failures.push({
+            registrationId: Number(registration.id),
+            reason: err?.message || 'Unknown error',
+          });
+        }
+      }
+
+      // 4. Update the GroupAssessment candidate total to reflect reality.
+      const total = await manager
+        .getRepository(AssessmentSession)
+        .count({ where: { groupAssessmentId: Number(groupAssessment.id) } });
+      groupAssessment.totalCandidates = total;
+      await gaRepo.save(groupAssessment);
+
+      return {
+        groupAssessmentId: Number(groupAssessment.id),
+        totalRegistrations: registrations.length,
+        created,
+        relinked,
+        skipped,
+        failed,
+        failures,
+      };
+    });
+  }
+
+  /**
+   * Returns the pool of users that the admin can add as a candidate to a
+   * specific group assessment. Eligibility (all must hold):
+   *   - registrationSource = 'ADMIN'
+   *   - Registration.groupId IS NULL (not yet in any group)
+   *   - Registration.programId = group_assessment.program_id
+   *   - Not already linked to this group_assessment via a session
+   */
+  async findEligibleCandidatesForGroupAssessment(
+    groupAssessmentId: number,
+    search?: string,
+  ) {
+    const ga = await this.groupAssessmentRepo.findOne({
+      where: { id: groupAssessmentId },
+    });
+    if (!ga) {
+      throw new BadRequestException(
+        `GroupAssessment ${groupAssessmentId} not found`,
+      );
+    }
+
+    const qb = this.sessionRepo.manager
+      .getRepository(Registration)
+      .createQueryBuilder('r')
+      .where('r.registration_source = :src', { src: 'ADMIN' })
+      .andWhere('r.group_id IS NULL')
+      .andWhere('r.program_id = :programId', { programId: ga.programId })
+      .andWhere('r.is_deleted = false')
+      .andWhere((qbInner) => {
+        const sub = qbInner
+          .subQuery()
+          .select('s.user_id')
+          .from(AssessmentSession, 's')
+          .where('s.group_assessment_id = :gaId', { gaId: groupAssessmentId })
+          .getQuery();
+        return `r.user_id NOT IN ${sub}`;
+      });
+
+    if (search && search.trim()) {
+      const s = `%${search.trim().toLowerCase()}%`;
+      qb.andWhere(
+        '(LOWER(r.full_name) LIKE :s OR LOWER(r.mobile_number) LIKE :s)',
+        { s },
+      );
+    }
+
+    qb.orderBy('r.created_at', 'DESC').limit(50);
+
+    const rows = await qb.getMany();
+
+    // Hydrate emails from the users table (Registration doesn't store email).
+    const userIds = rows.map((r) => r.userId).filter(Boolean);
+    let emailByUserId = new Map<string, string>();
+    if (userIds.length) {
+      const users = await this.sessionRepo.manager.query(
+        `SELECT id, email FROM users WHERE id = ANY($1::bigint[])`,
+        [userIds],
+      );
+      emailByUserId = new Map(
+        users.map((u: any) => [String(u.id), String(u.email || '')]),
+      );
+      if (search && search.trim()) {
+        const s = search.trim().toLowerCase();
+        // Allow email search too — re-filter in memory since email lives in
+        // a different table.
+        const filtered = rows.filter((r) => {
+          const email = emailByUserId.get(String(r.userId)) || '';
+          return (
+            r.fullName?.toLowerCase().includes(s) ||
+            (r.mobileNumber || '').toLowerCase().includes(s) ||
+            email.toLowerCase().includes(s)
+          );
+        });
+        return filtered.map((r) => ({
+          registrationId: Number(r.id),
+          userId: Number(r.userId),
+          fullName: r.fullName,
+          email: emailByUserId.get(String(r.userId)) || null,
+          mobileNumber: r.mobileNumber,
+          countryCode: r.countryCode,
+        }));
+      }
+    }
+
+    return rows.map((r) => ({
+      registrationId: Number(r.id),
+      userId: Number(r.userId),
+      fullName: r.fullName,
+      email: emailByUserId.get(String(r.userId)) || null,
+      mobileNumber: r.mobileNumber,
+      countryCode: r.countryCode,
+    }));
+  }
+
+  /**
+   * Re-link an eligible user's existing AssessmentSession into a group
+   * assessment. Does NOT create a new session; just sets the session's
+   * groupAssessmentId + groupId, and sets the Registration.groupId so the
+   * user is recorded as being in the group. Re-validates eligibility on the
+   * server to defend against stale UI.
+   */
+  async addCandidateToGroupAssessment(
+    groupAssessmentId: number,
+    registrationId: number,
+  ) {
+    return this.dataSource.transaction(async (manager) => {
+      const ga = await manager
+        .getRepository(GroupAssessment)
+        .findOne({ where: { id: groupAssessmentId } });
+      if (!ga) {
+        throw new BadRequestException(
+          `GroupAssessment ${groupAssessmentId} not found`,
+        );
+      }
+
+      const registration = await manager
+        .getRepository(Registration)
+        .findOne({ where: { id: registrationId as any } });
+      if (!registration) {
+        throw new BadRequestException(
+          `Registration ${registrationId} not found`,
+        );
+      }
+
+      // Server-side re-validation (UI must not be trusted).
+      if (registration.registrationSource !== 'ADMIN') {
+        throw new BadRequestException(
+          'Only ADMIN-created users can be added to a group from this screen.',
+        );
+      }
+      if (registration.groupId) {
+        throw new BadRequestException(
+          'User is already in a group. Remove them from that group first.',
+        );
+      }
+      if (Number(registration.programId) !== Number(ga.programId)) {
+        throw new BadRequestException(
+          "User's program does not match the group assessment's program.",
+        );
+      }
+
+      // Find their unlinked session for this program. Prefer NOT_STARTED,
+      // tie-break by most recent.
+      const session = await manager
+        .getRepository(AssessmentSession)
+        .createQueryBuilder('s')
+        .where('s.user_id = :userId', { userId: registration.userId })
+        .andWhere('s.program_id = :programId', { programId: ga.programId })
+        .andWhere('s.group_assessment_id IS NULL')
+        .orderBy(
+          `CASE WHEN s.status = 'NOT_STARTED' THEN 0 ELSE 1 END`,
+          'ASC',
+        )
+        .addOrderBy('s.created_at', 'DESC')
+        .getOne();
+
+      if (!session) {
+        throw new BadRequestException(
+          'User has no unlinked assessment session for this program. Cannot add.',
+        );
+      }
+
+      // Re-link the session into the group assessment.
+      session.groupAssessmentId = Number(ga.id);
+      session.groupId = Number(ga.groupId);
+      await manager.save(session);
+
+      // Mark the registration as being in the group.
+      registration.group = { id: Number(ga.groupId) } as any;
+      await manager.save(registration);
+
+      // Bump candidate count.
+      const total = await manager
+        .getRepository(AssessmentSession)
+        .count({ where: { groupAssessmentId: Number(ga.id) } });
+      ga.totalCandidates = total;
+      await manager.save(ga);
+
+      return {
+        groupAssessmentId: Number(ga.id),
+        sessionId: Number(session.id),
+        registrationId: Number(registration.id),
+        totalCandidates: total,
+      };
+    });
   }
 }

@@ -229,4 +229,94 @@ export const assessmentService = {
         }
         return res.json();
     },
+
+    async getEligibleCandidatesForGroupAssessment(
+        groupAssessmentId: string | number,
+        search?: string,
+    ): Promise<{
+        registrationId: number;
+        userId: number;
+        fullName: string;
+        email: string | null;
+        mobileNumber: string;
+        countryCode: string;
+    }[]> {
+        const token = AuthService.getToken();
+        const params = new URLSearchParams();
+        if (search && search.trim()) params.set("search", search.trim());
+        const qs = params.toString();
+        const res = await fetch(
+            `${API_URL}/admin/assessments/group/${groupAssessmentId}/eligible-candidates${qs ? `?${qs}` : ""}`,
+            {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: token ? `Bearer ${token}` : "",
+                },
+            },
+        );
+        if (!res.ok) return [];
+        return res.json();
+    },
+
+    async addCandidateToGroupAssessment(
+        groupAssessmentId: string | number,
+        registrationId: number,
+    ): Promise<{
+        groupAssessmentId: number;
+        sessionId: number;
+        registrationId: number;
+        totalCandidates: number;
+    }> {
+        const token = AuthService.getToken();
+        const res = await fetch(
+            `${API_URL}/admin/assessments/group/${groupAssessmentId}/candidates`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: token ? `Bearer ${token}` : "",
+                },
+                body: JSON.stringify({ registrationId }),
+            },
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.message || "Failed to add candidate");
+        }
+        return res.json();
+    },
+
+    async assignGroupExam(payload: {
+        groupId: number;
+        programId: number;
+        examStart?: string;
+        examEnd?: string;
+        sendEmail?: boolean;
+    }): Promise<{
+        groupAssessmentId: number;
+        totalRegistrations: number;
+        created: number;
+        skipped: number;
+        failed: number;
+        failures: { registrationId: number; reason: string }[];
+    }> {
+        const token = AuthService.getToken();
+        const res = await fetch(
+            `${API_URL}/admin/assessments/assign-group-exam`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: token ? `Bearer ${token}` : "",
+                },
+                body: JSON.stringify(payload),
+            },
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.message || "Failed to assign group exam");
+        }
+        return res.json();
+    },
 };

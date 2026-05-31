@@ -1,9 +1,29 @@
-import { Controller, Get, Query, Param } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Param } from '@nestjs/common';
 import { AssessmentService } from './assessment.service';
 
 @Controller('admin/assessments')
 export class AssessmentController {
   constructor(private readonly assessmentService: AssessmentService) {}
+
+  @Post('assign-group-exam')
+  async assignGroupExam(
+    @Body()
+    body: {
+      groupId: number;
+      programId: number;
+      examStart?: string;
+      examEnd?: string;
+      sendEmail?: boolean;
+    },
+  ) {
+    return this.assessmentService.assignGroupExam({
+      groupId: Number(body.groupId),
+      programId: Number(body.programId),
+      examStart: body.examStart,
+      examEnd: body.examEnd,
+      sendEmail: body.sendEmail,
+    });
+  }
 
   @Get('sessions')
   async findAllSessions(
@@ -40,6 +60,28 @@ export class AssessmentController {
   @Get('group/:id')
   async getGroupSessionDetails(@Param('id') id: string) {
     return this.assessmentService.findGroupSessionDetails(Number(id));
+  }
+
+  @Get('group/:id/eligible-candidates')
+  async getEligibleCandidates(
+    @Param('id') id: string,
+    @Query('search') search?: string,
+  ) {
+    return this.assessmentService.findEligibleCandidatesForGroupAssessment(
+      Number(id),
+      search,
+    );
+  }
+
+  @Post('group/:id/candidates')
+  async addCandidateToGroupAssessment(
+    @Param('id') id: string,
+    @Body() body: { registrationId: number },
+  ) {
+    return this.assessmentService.addCandidateToGroupAssessment(
+      Number(id),
+      Number(body.registrationId),
+    );
   }
 
   @Get('group/:id/department-stats')

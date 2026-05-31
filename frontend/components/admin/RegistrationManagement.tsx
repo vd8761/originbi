@@ -13,6 +13,7 @@ import {
 } from '../icons';
 import AddRegistrationForm from "./AddRegistrationForm";
 import BulkUploadRegistration from "./BulkUploadRegistration"; // Import
+import AssignGroupExamModal from "./AssignGroupExamModal";
 import DateRangeFilter, {
   DateRangeOption,
 } from '../ui/DateRangeFilter';
@@ -100,6 +101,8 @@ const RegistrationManagement: React.FC = () => {
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [aiCounsellorFilter, setAiCounsellorFilter] = useState<"ENABLED" | "DISABLED" | null>(null);
   const [showAiCounsellorDropdown, setShowAiCounsellorDropdown] = useState(false);
+
+  const [showAssignGroupExamModal, setShowAssignGroupExamModal] = useState(false);
 
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const aiCounsellorDropdownRef = useRef<HTMLDivElement>(null);
@@ -552,6 +555,10 @@ const RegistrationManagement: React.FC = () => {
           setView("list");
           setSelectedRegistration(null);
         }}
+        onViewGroupAssessment={(gaId) => {
+          setSelectedGroupSessionId(String(gaId));
+          setView("group-assessment-preview");
+        }}
       />
     );
   }
@@ -619,6 +626,12 @@ const RegistrationManagement: React.FC = () => {
           end: endDate,
           label: dateRangeLabel,
         }}
+      />
+
+      <AssignGroupExamModal
+        isOpen={showAssignGroupExamModal}
+        onClose={() => setShowAssignGroupExamModal(false)}
+        onSuccess={() => fetchData()}
       />
 
       {/* Header – aligned with Corporate / Programs style */}
@@ -980,7 +993,7 @@ const RegistrationManagement: React.FC = () => {
           <button
             onClick={() => {
               if (activeTab === 'registrations') setView("add");
-              // else setView("assign"); // TODO: Implement Assign View
+              else if (activeTab === 'group') setShowAssignGroupExamModal(true);
             }}
             className="flex items-center gap-2 px-4 py-2.5 bg-brand-green border border-transparent rounded-lg text-sm font-medium text-white hover:bg-brand-green/90 transition-all shadow-lg shadow-brand-green/20 cursor-pointer"
           >

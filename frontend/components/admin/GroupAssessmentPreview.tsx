@@ -3,6 +3,7 @@ import { assessmentService } from '../../lib/services/assessment.service';
 import { buildReportApiUrl } from '../../lib/utils/reportUrl';
 import { ArrowLeftWithoutLineIcon, ArrowRightWithoutLineIcon, ChevronDownIcon, EyeVisibleIcon, FilterFunnelIcon } from '../icons';
 import ExcelExportButton from '../ui/ExcelExportButton';
+import AddCandidateModal from './AddCandidateModal';
 
 interface GroupAssessmentPreviewProps {
     sessionId: string;
@@ -49,6 +50,8 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
     const [reportEmail, setReportEmail] = useState('');
     const [sendingReportEmail, setSendingReportEmail] = useState(false);
     const [reportEmailSent, setReportEmailSent] = useState(false);
+
+    const [showAddCandidate, setShowAddCandidate] = useState(false);
 
     // Fetch Data
     const fetchGroupData = useCallback(async () => {
@@ -368,6 +371,12 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
 
     return (
         <div className="flex flex-col gap-6 font-sans h-full">
+            <AddCandidateModal
+                isOpen={showAddCandidate}
+                groupAssessmentId={sessionId}
+                onClose={() => setShowAddCandidate(false)}
+                onSuccess={() => fetchGroupData()}
+            />
             {/* Header */}
             <div>
                 <div className="flex items-center text-xs text-black dark:text-white mb-1.5 font-normal flex-wrap">
@@ -567,6 +576,12 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                         )}
                     </div>
                     <ExcelExportButton onClick={handleExport} />
+                    <button
+                        onClick={() => setShowAddCandidate(true)}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-brand-green text-white rounded-lg text-sm font-medium hover:bg-brand-green/90 shadow-lg shadow-brand-green/20 transition-all whitespace-nowrap"
+                    >
+                        + Add Candidate
+                    </button>
                 </div>
             </div>
 
