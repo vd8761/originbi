@@ -155,11 +155,7 @@ export const getTechAssessmentCertificateTemplate = (
                 </a>
               </div>
 
-              <!-- Verify note -->
-              <div style="font-size:12px;color:#909090;margin-bottom:28px;text-align:center;">
-                Verify this certificate at:<br />
-                <a href="${verifyUrl}" style="color:#150089;text-decoration:none;word-break:break-all;">${verifyUrl}</a>
-              </div>
+
 
               <!-- Divider -->
               <div style="border-top:1px solid #e2e8f0;margin-bottom:20px;"></div>
