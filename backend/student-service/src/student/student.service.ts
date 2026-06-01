@@ -3259,18 +3259,25 @@ export class StudentService {
     try {
       this.logger.log(`[TechCertEmail] Generating PDF certificate for ${toEmail}...`);
       
-      // 1. Load background template image (first from techFrontendUrl, then fallback to local path)
+      // 1. Load background template image (first try local assets path, then fallback to HTTP)
       let bgBuffer: Buffer;
-      try {
-        const response = await axios.get(`${techFrontendUrl}/certificate-template.jpg`, {
-          responseType: 'arraybuffer',
-          timeout: 5000,
-        });
-        bgBuffer = Buffer.from(response.data);
-      } catch (err) {
-        this.logger.warn(`Failed to fetch certificate background via HTTP: ${err.message}. Trying local fallback...`);
-        const localPath = path.resolve(__dirname, '../../../../OriginBi-Technical/frontend/public/certificate-template.jpg');
+      const localPath = path.resolve(__dirname, '../../public/assets/certificate-template.jpg');
+      if (fs.existsSync(localPath)) {
+        this.logger.log(`[TechCertEmail] Loading certificate background locally from ${localPath}`);
         bgBuffer = fs.readFileSync(localPath);
+      } else {
+        this.logger.warn(`Local certificate background not found at ${localPath}. Trying HTTP fetch...`);
+        try {
+          const response = await axios.get(`${techFrontendUrl}/certificate-template.jpg`, {
+            responseType: 'arraybuffer',
+            timeout: 5000,
+          });
+          bgBuffer = Buffer.from(response.data);
+        } catch (err) {
+          this.logger.error(`Failed to fetch certificate background via HTTP: ${err.message}. Trying legacy local path fallback...`);
+          const legacyPath = path.resolve(__dirname, '../../../../OriginBi-Technical/frontend/public/certificate-template.jpg');
+          bgBuffer = fs.readFileSync(legacyPath);
+        }
       }
 
       // 2. Fetch/Generate QR Code image
