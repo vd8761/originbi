@@ -1254,7 +1254,7 @@ export class BaseReport {
           const cellVal = rowData[i];
 
           if (cellVal && typeof cellVal === 'object' && 'content' in cellVal) {
-            // Rich Text — concatenate plain text for an approximate width.
+            // Rich Text - concatenate plain text for an approximate width.
             cellText = cellVal.content.map((c) => c.text).join('');
           } else {
             // eslint-disable-next-line @typescript-eslint/no-base-to-string

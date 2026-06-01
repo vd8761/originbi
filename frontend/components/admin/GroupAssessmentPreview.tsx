@@ -41,6 +41,9 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
     const [departmentStats, setDepartmentStats] = useState<any[]>([]);
     const [selectedDepartment, setSelectedDepartment] = useState<number | null>(null);
     const [downloadLoading, setDownloadLoading] = useState(false);
+    // For MBA departments, the admin can choose between the special MBA report
+    // (default) and the standard DISC-style placement handbook.
+    const [reportType, setReportType] = useState<'mba' | 'standard'>('mba');
 
     const [generating, setGenerating] = useState(false);
     const [progress, setProgress] = useState('');
@@ -80,6 +83,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
             if (stats.departments?.length > 0) {
                 setSelectedDepartment(stats.departments[0].id);
             }
+            setReportType('mba'); // default; only matters for MBA depts
             setShowDownloadModal(true);
         } catch (error) {
             console.error("Failed to fetch department stats", error);
@@ -99,7 +103,10 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
             setProgress('Initializing...');
 
             // 1. Start Job
-            const startRes = await fetch(buildReportApiUrl(`/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true`));
+            const selectedDeptForType = departmentStats.find((d: any) => d.id === selectedDepartment);
+            const isMBAForType = (selectedDeptForType?.name || '').toUpperCase().includes('MBA');
+            const reportTypeParam = isMBAForType ? `&reportType=${reportType}` : '';
+            const startRes = await fetch(buildReportApiUrl(`/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true${reportTypeParam}`));
             const startData = await startRes.json();
 
             if (!startData.success || !startData.jobId) {
@@ -167,7 +174,10 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
             setSendingReportEmail(true);
 
             // 1. Start Generation
-            const startRes = await fetch(buildReportApiUrl(`/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true`));
+            const selectedDeptForType = departmentStats.find((d: any) => d.id === selectedDepartment);
+            const isMBAForType = (selectedDeptForType?.name || '').toUpperCase().includes('MBA');
+            const reportTypeParam = isMBAForType ? `&reportType=${reportType}` : '';
+            const startRes = await fetch(buildReportApiUrl(`/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true${reportTypeParam}`));
             const startData = await startRes.json();
 
             if (!startData.success || !startData.jobId) {
@@ -716,32 +726,46 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                                 </div>
                             ) : (
                                 <div className="space-y-3 mb-6">
-                                    {departmentStats.map((dept) => (
+                                    {departmentStats.map((dept) => {
+                                        // MBA departments get a special placement report — mirror the
+                                        // backend isMBA detection in reportQueueService.processPlacementReport.
+                                        const isMBA = (dept.name || '').toUpperCase().includes('MBA');
+                                        return (
                                         <div
                                             key={dept.id}
                                             onClick={() => setSelectedDepartment(dept.id)}
-                                            className={`p-4 rounded-xl border cursor-pointer transition-all flex items-center justify-between group
+                                            className={`p-4 rounded-xl border cursor-pointer transition-all flex items-center justify-between gap-4 group
                                                 ${selectedDepartment === dept.id
                                                     ? 'border-brand-green bg-brand-green/10 ring-1 ring-brand-green'
                                                     : 'border-gray-200 dark:border-white/10 hover:border-brand-green/50 hover:bg-gray-50 dark:hover:bg-white/5'}`}
                                         >
-                                            <div className="flex items-center gap-4">
-                                                <div className={`w-5 h-5 rounded-full border flex items-center justify-center
+                                            <div className="flex items-center gap-4 min-w-0 flex-1">
+                                                <div className={`w-5 h-5 shrink-0 rounded-full border flex items-center justify-center
                                                     ${selectedDepartment === dept.id ? 'border-brand-green bg-brand-green' : 'border-gray-400'}`}>
                                                     {selectedDepartment === dept.id && <div className="w-2 h-2 rounded-full bg-brand-dark-primary"></div>}
                                                 </div>
-                                                <div>
-                                                    <p className={`font-semibold ${selectedDepartment === dept.id ? 'text-brand-green' : 'text-brand-dark-primary dark:text-white'}`}>
-                                                        {dept.name}
-                                                    </p>
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <p className={`font-semibold ${selectedDepartment === dept.id ? 'text-brand-green' : 'text-brand-dark-primary dark:text-white'}`}>
+                                                            {dept.name}
+                                                        </p>
+                                                        {isMBA && (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md whitespace-nowrap shadow-sm bg-gradient-to-r from-amber-300 to-yellow-500 text-amber-900 ring-1 ring-amber-500/50">
+                                                                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                                                    <path d="M12 2.5l2.95 5.98 6.6.96-4.78 4.66 1.13 6.58L12 17.6l-5.9 3.1 1.13-6.58L2.45 9.44l6.6-.96L12 2.5z" />
+                                                                </svg>
+                                                                Special MBA Report
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <p className="text-xs text-gray-500 mt-0.5">
                                                         {dept.completed} candidates completed
                                                     </p>
                                                 </div>
                                             </div>
 
-                                            <div className="text-right">
-                                                <span className={`text-xs font-bold px-2 py-1 rounded-md ${dept.completed === dept.total
+                                            <div className="text-right shrink-0">
+                                                <span className={`inline-block whitespace-nowrap text-xs font-bold px-2 py-1 rounded-md ${dept.completed === dept.total
                                                         ? 'bg-green-100 text-green-700'
                                                         : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'
                                                     }`}>
@@ -749,9 +773,61 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                                                 </span>
                                             </div>
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
+
+                            {/* Report Type Chooser (MBA only) */}
+                            {(() => {
+                                const sel = departmentStats.find((d: any) => d.id === selectedDepartment);
+                                const isMBASel = (sel?.name || '').toUpperCase().includes('MBA');
+                                if (!isMBASel) return null;
+                                const options: { value: 'mba' | 'standard'; title: string; desc: string }[] = [
+                                    {
+                                        value: 'mba',
+                                        title: 'Special MBA Report',
+                                        desc: 'Specialization-fit handbook (Finance, HR, BA, Ops, Marketing).',
+                                    },
+                                    {
+                                        value: 'standard',
+                                        title: 'Standard Placement Report',
+                                        desc: 'The regular DISC-style placement handbook.',
+                                    },
+                                ];
+                                return (
+                                    <div className="mb-6">
+                                        <label className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1.5 block">Report Type</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {options.map((opt) => {
+                                                const active = reportType === opt.value;
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        key={opt.value}
+                                                        onClick={() => setReportType(opt.value)}
+                                                        className={`text-left p-3 rounded-xl border transition-all ${active
+                                                            ? 'border-brand-green bg-brand-green/10 ring-1 ring-brand-green'
+                                                            : 'border-gray-200 dark:border-white/10 hover:border-brand-green/50 hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            {opt.value === 'mba' && (
+                                                                <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                                                    <path d="M12 2.5l2.95 5.98 6.6.96-4.78 4.66 1.13 6.58L12 17.6l-5.9 3.1 1.13-6.58L2.45 9.44l6.6-.96L12 2.5z" />
+                                                                </svg>
+                                                            )}
+                                                            <p className={`text-sm font-semibold ${active ? 'text-brand-green' : 'text-brand-dark-primary dark:text-white'}`}>
+                                                                {opt.title}
+                                                            </p>
+                                                        </div>
+                                                        <p className="text-[11px] text-gray-500 mt-1 leading-snug">{opt.desc}</p>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             {/* Email Input */}
                             <div>

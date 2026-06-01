@@ -5,35 +5,20 @@ import { AgileScore, CollegeData } from '../../types/types';
 import { BaseReport, StyledRow } from '../BaseReport';
 import { logger } from '../../helpers/logger';
 import {
-  ALIGNMENT_MULTIPLIER,
   BEHAVIORAL_ORIENTATION,
-  BehavioralAlignment,
-  DISC_ALIGNMENT,
-  FitLevel,
-  fitLevelFromScore,
+  detectDeclaredTrackCode,
+  DiscTrait,
   fitLevelStyle,
+  normalizeReadiness,
+  rankSpecializations,
   READINESS_LABEL,
   READINESS_ORDER,
   ReadinessKey,
   readinessBand,
   SPECIALIZATIONS,
-  SPECIALIZATION_ORDER,
-  SPEC_WEIGHTS,
-  SpecializationCode,
   SpecializationMeta,
+  SpecRanking,
 } from './mbaConstants';
-
-type DiscTrait = 'D' | 'I' | 'S' | 'C';
-
-interface SpecRanking {
-  code: SpecializationCode;
-  meta: SpecializationMeta;
-  readinessScore: number;
-  alignment: BehavioralAlignment;
-  finalScore: number;
-  fit: FitLevel;
-  rank: number;
-}
 
 /**
  * Origin BI MBA SpecFit - 2-page short report.
@@ -123,59 +108,26 @@ export class CollegeMBAShortReport extends BaseReport {
       courage: this.normalizeScore(agile.courage),
     };
 
-    const ranked: SpecRanking[] = SPECIALIZATION_ORDER.map((code) => {
-      const meta = SPECIALIZATIONS[code];
-      const weights = SPEC_WEIGHTS[code];
-      let weighted = 0;
-      let sumW = 0;
-      READINESS_ORDER.forEach((k) => {
-        weighted += this.readinessPct[k] * weights[k];
-        sumW += weights[k];
-      });
-      const readinessScore = sumW > 0 ? weighted / sumW : 0;
-      const alignment = DISC_ALIGNMENT[primary][code];
-      const finalScore = readinessScore * ALIGNMENT_MULTIPLIER[alignment];
-      return {
-        code,
-        meta,
-        readinessScore,
-        alignment,
-        finalScore,
-        fit: fitLevelFromScore(finalScore),
-        rank: 0,
-      };
-    });
-    ranked.sort((a, b) => b.finalScore - a.finalScore);
-    ranked.forEach((r, i) => (r.rank = i + 1));
-    this.rankings = ranked;
-    this.recommendedSpec = ranked[0].meta;
+    // Shared ranking math (see mbaConstants.rankSpecializations) so the short
+    // report and the MBA placement report stay perfectly consistent.
+    this.rankings = rankSpecializations(this.readinessPct, primary);
+    this.recommendedSpec = this.rankings[0].meta;
 
     this.declaredTrack = this.detectDeclaredTrack();
   }
 
   // Agile scores are documented as /25; some pipelines emit 0-100. Auto-detect.
   private normalizeScore(raw: unknown): number {
-    const v = Number(raw) || 0;
-    if (v <= 0) return 0;
-    const pct = v > 25 ? v : (v / 25) * 100;
-    return Math.max(0, Math.min(100, pct));
+    return normalizeReadiness(raw);
   }
 
   private detectDeclaredTrack(): string | null {
-    const haystack = `${this.data.dept_code || ''} ${this.data.group_name || ''}`.toUpperCase();
-    const map: { keys: string[]; name: string; code: SpecializationCode }[] = [
-      { keys: ['FINANCE', 'FIN '], name: 'Finance', code: 'FIN' },
-      { keys: ['HUMAN RESOURCE', 'HR '], name: 'Human Resources', code: 'HR' },
-      { keys: ['BUSINESS ANALYTIC', 'ANALYTICS', 'BA '], name: 'Business Analytics', code: 'BA' },
-      { keys: ['OPERATION', 'OPS '], name: 'Operations', code: 'OPS' },
-      { keys: ['MARKETING', 'MKT '], name: 'Marketing', code: 'MKT' },
-    ];
-    for (const entry of map) {
-      if (entry.keys.some((k) => haystack.includes(k))) {
-        return entry.code === this.recommendedSpec.code ? null : entry.name;
-      }
-    }
-    return null;
+    const code = detectDeclaredTrackCode(
+      this.data.dept_code,
+      this.data.group_name,
+    );
+    if (!code || code === this.recommendedSpec.code) return null;
+    return SPECIALIZATIONS[code].name;
   }
 
   // Page rendering ─────────────────────────────────────────────────────────
@@ -852,7 +804,7 @@ export class CollegeMBAShortReport extends BaseReport {
     this.doc.roundedRect(x, heroY, w, heroH, 8).fill(spec.accent);
     this.doc.restore();
 
-    // Universal "top pick" mark — prefer the PNG asset; fall back to the
+    // Universal "top pick" mark - prefer the PNG asset; fall back to the
     // drawn target if the file isn't present.
     const iconSize = heroH - 20;
     const iconCx = x + w - iconGutter / 2 - 6;
@@ -1153,7 +1105,7 @@ export class CollegeMBAShortReport extends BaseReport {
 
   /**
    * Draws a translucent target/bullseye emblem centered at (cx, cy).
-   * Universal "top pick" mark — same shape regardless of specialization.
+   * Universal "top pick" mark - same shape regardless of specialization.
    *
    * Geometry: 3 concentric rings (outer/middle stroked, inner filled) plus
    * 4 short crosshair tick marks extending just past the outer ring.
@@ -1162,7 +1114,7 @@ export class CollegeMBAShortReport extends BaseReport {
    * @param cy       center y
    * @param r        outer radius
    * @param color    stroke/fill color (hex)
-   * @param opacity  0..1 (use ~0.3-0.4 for a watermark — thin strokes need
+   * @param opacity  0..1 (use ~0.3-0.4 for a watermark - thin strokes need
    *                 slightly higher opacity than filled blobs to read)
    */
   private drawTargetIcon(
@@ -1186,7 +1138,7 @@ export class CollegeMBAShortReport extends BaseReport {
     // Inner filled dot (≈ 22% radius)
     this.doc.circle(cx, cy, r * 0.22).fill();
 
-    // Crosshair ticks — short marks just outside the outer ring on the 4
+    // Crosshair ticks - short marks just outside the outer ring on the 4
     // cardinal axes, giving the bullseye a "scope" feel.
     const tickGap = r * 0.12;
     const tickLen = r * 0.28;

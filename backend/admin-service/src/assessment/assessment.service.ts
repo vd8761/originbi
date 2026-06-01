@@ -538,14 +538,24 @@ export class AssessmentService {
         .getRawMany();
 
       return {
-        departments: stats.map((s) => ({
-          id: Number(s.id),
-          name: s.degreeName
-            ? `${s.degreeName} ${s.departmentName}`
-            : s.departmentName,
-          total: Number(s.total),
-          completed: Number(s.completed),
-        })),
+        departments: stats.map((s) => {
+          // Avoid duplicating the degree prefix when the department name already
+          // begins with it — e.g. "MBA" + "MBA (Master of Business Administration)"
+          // collapses to "MBA (Master of Business Administration)".
+          const deptName: string = s.departmentName ?? '';
+          const degreeName: string = s.degreeName ?? '';
+          const startsWithDegree =
+            degreeName &&
+            deptName.toUpperCase().startsWith(degreeName.toUpperCase());
+          return {
+            id: Number(s.id),
+            name: startsWithDegree || !degreeName
+              ? deptName
+              : `${degreeName} ${deptName}`,
+            total: Number(s.total),
+            completed: Number(s.completed),
+          };
+        }),
       };
     } catch (error) {
       console.error('Error fetching group department stats:', error);

@@ -376,3 +376,99 @@ export function fitLevelFromScore(score: number): FitLevel {
   if (score >= 48) return 'Moderate Fit';
   return 'Low Fit';
 }
+
+// ── Shared per-student specialization scoring ──────────────────────────────
+// Used by both the MBA short report (collegeMBAShort.ts) and the MBA placement
+// report (mbaPlacementReport.ts) so the ranking math stays identical.
+
+export type DiscTrait = 'D' | 'I' | 'S' | 'C';
+
+export interface SpecRanking {
+  code: SpecializationCode;
+  meta: SpecializationMeta;
+  readinessScore: number;
+  alignment: BehavioralAlignment;
+  finalScore: number;
+  fit: FitLevel;
+  rank: number;
+}
+
+/**
+ * Normalizes a single readiness indicator to a 0–100 percentage.
+ * Indicators are documented on a 0–25 scale, but some pipelines emit 0–100;
+ * values above 25 are treated as already-percentage.
+ */
+export function normalizeReadiness(raw: unknown): number {
+  const v = Number(raw) || 0;
+  if (v <= 0) return 0;
+  const pct = v > 25 ? v : (v / 25) * 100;
+  return Math.max(0, Math.min(100, pct));
+}
+
+/**
+ * Ranks all five MBA specializations for a single student.
+ *
+ * @param readinessPct  The five readiness indicators already normalized to 0–100.
+ * @param primaryTrait  The student's dominant DISC trait (D/I/S/C).
+ * @returns The five specializations sorted by finalScore desc, each with a 1-based rank.
+ */
+export function rankSpecializations(
+  readinessPct: Record<ReadinessKey, number>,
+  primaryTrait: DiscTrait,
+): SpecRanking[] {
+  const ranked: SpecRanking[] = SPECIALIZATION_ORDER.map((code) => {
+    const meta = SPECIALIZATIONS[code];
+    const weights = SPEC_WEIGHTS[code];
+    let weighted = 0;
+    let sumW = 0;
+    READINESS_ORDER.forEach((k) => {
+      weighted += readinessPct[k] * weights[k];
+      sumW += weights[k];
+    });
+    const readinessScore = sumW > 0 ? weighted / sumW : 0;
+    const alignment = DISC_ALIGNMENT[primaryTrait][code];
+    const finalScore = readinessScore * ALIGNMENT_MULTIPLIER[alignment];
+    return {
+      code,
+      meta,
+      readinessScore,
+      alignment,
+      finalScore,
+      fit: fitLevelFromScore(finalScore),
+      rank: 0,
+    };
+  });
+  ranked.sort((a, b) => b.finalScore - a.finalScore);
+  ranked.forEach((r, i) => (r.rank = i + 1));
+  return ranked;
+}
+
+/**
+ * Detects a student's declared MBA track from their department code / group name
+ * (e.g. "MBA_FINANCE" or a group named "MBA - Marketing"). Returns the matching
+ * specialization code, or null when no specialization keyword is present (e.g. a
+ * general "MBA" department).
+ */
+export function detectDeclaredTrackCode(
+  deptCode?: string | null,
+  groupName?: string | null,
+): SpecializationCode | null {
+  // Tokenize on non-letters and drop the generic "MBA" marker so it can't
+  // accidentally match short specialization codes (e.g. "MBA" contains "BA").
+  const tokens = `${deptCode || ''} ${groupName || ''}`
+    .toUpperCase()
+    .split(/[^A-Z]+/)
+    .filter((t) => t && t !== 'MBA');
+
+  const map: { keys: string[]; code: SpecializationCode }[] = [
+    { keys: ['FINANCE', 'FIN'], code: 'FIN' },
+    { keys: ['HR', 'HUMAN', 'RESOURCE', 'RESOURCES'], code: 'HR' },
+    { keys: ['ANALYTICS', 'ANALYTIC', 'BA'], code: 'BA' },
+    { keys: ['OPERATIONS', 'OPERATION', 'OPS'], code: 'OPS' },
+    { keys: ['MARKETING', 'MKT'], code: 'MKT' },
+  ];
+  for (const entry of map) {
+    if (entry.keys.some((k) => tokens.includes(k))) return entry.code;
+  }
+  return null;
+}

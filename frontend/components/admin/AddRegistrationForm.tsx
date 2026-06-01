@@ -51,7 +51,13 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
 
   const [programs, setPrograms] = useState<Program[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [groupOptions, setGroupOptions] = useState<{ value: string; label: string }[]>([]);
+  const [groupOptions, setGroupOptions] = useState<
+    {
+      value: string;
+      label: string;
+      programs: { id: string; name: string }[];
+    }[]
+  >([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -107,9 +113,31 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
       // 3) Groups (for combobox)
       try {
         const groupsRes = await registrationService.getGroups();
-        const opts = (Array.isArray(groupsRes) ? groupsRes : [])
-          .filter((g: any) => g && g.name)
-          .map((g: any) => ({ value: String(g.id), label: String(g.name) }));
+        // The registration ultimately resolves a group by name, and several
+        // groups can share a name (e.g. multiple "CollegeGroup"). Merge by name
+        // and union their program sets so the dropdown shows one clean entry.
+        const byName = new Map<
+          string,
+          { value: string; label: string; programs: Map<string, string> }
+        >();
+        for (const g of Array.isArray(groupsRes) ? groupsRes : []) {
+          if (!g || !g.name) continue;
+          const key = String(g.name).trim().toLowerCase();
+          const entry =
+            byName.get(key) ??
+            { value: String(g.id), label: String(g.name), programs: new Map() };
+          if (Array.isArray(g.programs)) {
+            for (const p of g.programs) {
+              if (p?.id != null) entry.programs.set(String(p.id), String(p.name));
+            }
+          }
+          byName.set(key, entry);
+        }
+        const opts = Array.from(byName.values()).map((e) => ({
+          value: e.value,
+          label: e.label,
+          programs: Array.from(e.programs, ([id, name]) => ({ id, name })),
+        }));
         setGroupOptions(opts);
       } catch (err) {
         console.error("Failed to load groups", err);
@@ -126,6 +154,46 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
   const isEmployeeProgram =
     selectedProgram?.code === "EMPLOYEE" ||
     selectedProgram?.name?.trim().toUpperCase() === "EMPLOYEE";
+
+  // Normalize ids to trimmed strings so a number-vs-string never causes a
+  // false mismatch.
+  const sameProgram = (a: unknown, b: unknown) =>
+    a != null && b != null && String(a).trim() === String(b).trim();
+
+  // Group combobox options. A group can span multiple programs (from its
+  // scheduled assessments + members). It is disabled only when a program is
+  // selected AND that program is NOT among the group's programs. Groups with no
+  // known program stay selectable for any program.
+  const selectedProgramId = formData.program_id;
+  const groupComboOptions = groupOptions.map((g) => {
+    const hasPrograms = g.programs.length > 0;
+    const matches = g.programs.some((p) =>
+      sameProgram(p.id, selectedProgramId)
+    );
+    const mismatch = !!selectedProgramId && hasPrograms && !matches;
+    const names = g.programs.map((p) => p.name).join(", ");
+    return {
+      value: g.value,
+      label: g.label,
+      disabled: mismatch,
+      infoText: mismatch
+        ? `This group is used for ${names || "another program"}, but you selected "${selectedProgram?.name ?? "another program"}". Choose a matching group or change the Program Type.`
+        : undefined,
+    };
+  });
+
+  // When an existing group is picked, adopt its program for the "group first"
+  // flow — but only when it's unambiguous (the group maps to exactly one
+  // program). Multi-program groups don't auto-pick.
+  const handleGroupSelected = (opt: { value: string }) => {
+    const full = groupOptions.find((g) => g.value === opt.value);
+    if (
+      full?.programs.length === 1 &&
+      !sameProgram(full.programs[0].id, formData.program_id)
+    ) {
+      handleInputChange("program_id", full.programs[0].id);
+    }
+  };
 
   // --- Handlers ---
   const handleInputChange = (
@@ -459,6 +527,20 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                 options={programOptions}
                 value={formData.program_id}
                 onChange={(val) => {
+                  // If the already-chosen group can't be used for the newly
+                  // selected program, clear it so we never submit a mismatch.
+                  const currentGroup = groupOptions.find(
+                    (g) =>
+                      g.label.trim().toLowerCase() ===
+                      (formData.group_name || "").trim().toLowerCase()
+                  );
+                  if (
+                    currentGroup &&
+                    currentGroup.programs.length > 0 &&
+                    !currentGroup.programs.some((p) => sameProgram(p.id, val))
+                  ) {
+                    handleInputChange("group_name", "");
+                  }
                   handleInputChange("program_id", val);
                   handleInputChange("school_level", "");
                   handleInputChange("school_stream", "");
@@ -648,9 +730,10 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
               <CreatableCombobox
                 label="Group Name"
                 placeholder="Type a new group or pick existing"
-                options={groupOptions}
+                options={groupComboOptions}
                 value={formData.group_name || ""}
                 onChange={(val) => handleInputChange("group_name", val)}
+                onSelectOption={handleGroupSelected}
                 onOpenChange={(isOpen) => handleOpenStatus("group", isOpen)}
               />
             </div>

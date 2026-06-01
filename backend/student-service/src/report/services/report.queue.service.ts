@@ -15,11 +15,13 @@ export class ReportQueueService {
     groupId: number,
     deptDegreeId: number,
     jobId: string,
+    reportTypeOverride?: 'standard' | 'mba',
   ): Promise<void> {
     return reportQueueService.processPlacementReport(
       groupId,
       deptDegreeId,
       jobId,
+      reportTypeOverride,
     );
   }
 

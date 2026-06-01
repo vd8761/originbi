@@ -4,12 +4,18 @@ import { ChevronDownIcon } from "../icons";
 interface Option {
   value: string;
   label: string;
+  /** When true, the option is shown greyed-out and cannot be selected. */
+  disabled?: boolean;
+  /** Explanation shown via the info button when the option is disabled. */
+  infoText?: string;
 }
 
 interface CreatableComboboxProps {
   options: Option[];
   value: string;
   onChange: (value: string) => void;
+  /** Fired (in addition to onChange) when an existing option is picked. */
+  onSelectOption?: (option: Option) => void;
   onOpenChange?: (isOpen: boolean) => void;
   placeholder?: string;
   label?: string;
@@ -21,6 +27,7 @@ const CreatableCombobox: React.FC<CreatableComboboxProps> = ({
   options,
   value,
   onChange,
+  onSelectOption,
   onOpenChange,
   placeholder = "Type or select",
   label,
@@ -63,8 +70,15 @@ const CreatableCombobox: React.FC<CreatableComboboxProps> = ({
     onOpenChange?.(next);
   };
 
-  const handleSelect = (label: string) => {
+  const handleCreate = (label: string) => {
     onChange(label);
+    setOpen(false);
+  };
+
+  const handleSelectOption = (option: Option) => {
+    if (option.disabled) return;
+    onChange(option.label);
+    onSelectOption?.(option);
     setOpen(false);
   };
 
@@ -108,26 +122,50 @@ const CreatableCombobox: React.FC<CreatableComboboxProps> = ({
             {showCreate && (
               <button
                 type="button"
-                onClick={() => handleSelect(trimmed)}
+                onClick={() => handleCreate(trimmed)}
                 className="w-full text-left px-4 py-3 text-sm font-medium text-brand-green hover:bg-gray-50 dark:hover:bg-white/5 border-b border-gray-100 dark:border-white/5"
               >
                 + Create &quot;{trimmed}&quot;
               </button>
             )}
-            {filtered.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => handleSelect(option.label)}
-                className={`w-full text-left px-4 py-3 text-sm transition-colors font-medium border-b border-gray-100 dark:border-white/5 last:border-0 ${
-                  value.trim().toLowerCase() === option.label.toLowerCase()
-                    ? "bg-brand-green text-white"
-                    : "text-brand-text-light-primary dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
+            {filtered.map((option) =>
+              option.disabled ? (
+                <div
+                  key={option.value}
+                  className="w-full flex items-center justify-between gap-2 px-4 py-3 text-sm font-medium border-b border-gray-100 dark:border-white/5 last:border-0 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none"
+                >
+                  <span className="truncate">{option.label}</span>
+                  <div className="relative shrink-0 group/info">
+                    <span
+                      aria-label="Why is this group disabled?"
+                      className="w-5 h-5 flex items-center justify-center rounded-full bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-gray-300"
+                    >
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 5a1.25 1.25 0 110 2.5A1.25 1.25 0 0112 7zm1.25 10h-2.5v-6.5h2.5V17z" />
+                      </svg>
+                    </span>
+                    {option.infoText && (
+                      <div className="pointer-events-none absolute right-0 top-7 z-[110] w-60 p-2.5 rounded-lg bg-gray-900 text-white text-[11px] leading-snug shadow-xl opacity-0 invisible group-hover/info:opacity-100 group-hover/info:visible transition-opacity duration-150">
+                        {option.infoText}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleSelectOption(option)}
+                  className={`w-full text-left px-4 py-3 text-sm transition-colors font-medium border-b border-gray-100 dark:border-white/5 last:border-0 ${
+                    value.trim().toLowerCase() === option.label.toLowerCase()
+                      ? "bg-brand-green text-white"
+                      : "text-brand-text-light-primary dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              )
+            )}
             {filtered.length === 0 && !showCreate && (
               <div className="px-4 py-3 text-sm text-gray-500 text-center">
                 No groups yet — start typing to create one
