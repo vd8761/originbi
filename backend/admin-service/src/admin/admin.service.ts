@@ -201,13 +201,25 @@ export class AdminService {
     const [schoolCount, collegeCount, totalCorporateCount, cxoCount] =
       await Promise.all([
         this.registrationRepo.count({
-          where: { schoolLevel: Not(IsNull()), isDeleted: false, isTechAssessment: In([0, 2]) },
+          where: {
+            schoolLevel: Not(IsNull()),
+            isDeleted: false,
+            isTechAssessment: In([0, 2]),
+          },
         }),
         this.registrationRepo.count({
-          where: { departmentDegreeId: Not(IsNull()), isDeleted: false, isTechAssessment: In([0, 2]) },
+          where: {
+            departmentDegreeId: Not(IsNull()),
+            isDeleted: false,
+            isTechAssessment: In([0, 2]),
+          },
         }),
         this.registrationRepo.count({
-          where: { corporateAccountId: Not(IsNull()), isDeleted: false, isTechAssessment: In([0, 2]) },
+          where: {
+            corporateAccountId: Not(IsNull()),
+            isDeleted: false,
+            isTechAssessment: In([0, 2]),
+          },
         }),
         this.registrationRepo
           .createQueryBuilder('r')
@@ -314,7 +326,8 @@ export class AdminService {
     user.lastLoginIp = ip;
 
     await this.userRepo.save(user);
-    this.logger.log(`Recorded login audit for admin/affiliate user: ${user.email} (ID: ${userId}) from IP: ${ip}`);
+    this.logger.log(
+      `Recorded login audit for admin/affiliate user: ${user.email} (ID: ${userId}) from IP: ${ip}`,
+    );
   }
 }
-

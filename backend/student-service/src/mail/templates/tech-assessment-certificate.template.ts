@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Tech Assessment Certificate Email Template
  * Professional redesign � per-assessment completion message, emoji subject,
  * no localhost URLs, clean layout.
@@ -151,7 +151,7 @@ export const getTechAssessmentCertificateTemplate = (
               <div style="margin-bottom:20px;text-align:center;">
                 <a href="${verifyUrl}"
                    style="display:inline-block;background-color:#150089;color:#ffffff;padding:15px 36px;border-radius:5px;text-decoration:none;font-size:15px;font-weight:700;letter-spacing:0.3px;">
-                  View &amp; Download Certificate
+                  Verify Certificate
                 </a>
               </div>
 

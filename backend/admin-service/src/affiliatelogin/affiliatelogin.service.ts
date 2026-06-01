@@ -70,4 +70,3 @@ export class AffiliateLoginService {
     await this.usersRepo.save(user);
   }
 }
-
