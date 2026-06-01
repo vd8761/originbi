@@ -33,6 +33,10 @@ import {
 } from '@originbi/shared-entities';
 import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
+import * as PDFDocument from 'pdfkit';
+import * as fs from 'fs';
+import * as path from 'path';
+import axios from 'axios';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
 import { getTechWelcomeEmailTemplate } from '../mail/templates/tech-welcome.template';
 import { getTechAssessmentCertificateTemplate } from '../mail/templates/tech-assessment-certificate.template';
@@ -3207,22 +3211,25 @@ export class StudentService {
 
     const fromAddress = '"' + fromName + '" <' + fromEmail + '>';
 
-    const apiUrl =
-      this.configService.get<string>('API_URL') || 'http://localhost:4004';
     const techFrontendUrl =
       this.configService.get<string>('TECH_FRONTEND_URL') ||
       this.configService.get<string>('FRONTEND_URL') ||
       'http://localhost:3000';
 
+    const publicStudentApiUrl =
+      techFrontendUrl.replace(/\/$/, '') + '/student-api';
+
     const assets = {
-      logo: `${apiUrl}/assets/logo-light.png`,
-      footer: `${apiUrl}/assets/Email_Vector.png`,
+      logo: `${techFrontendUrl}/Origin-BI-Logo-01.png`,
+      footer: `${publicStudentApiUrl}/assets/Email_Vector.png`,
     };
 
     const verifyUrl =
       incomingVerifyUrl || `${techFrontendUrl}/verify/${certificateId}`;
 
-    const formattedDate = new Date(completedAt).toLocaleDateString('en-US', {
+    const rawDate = completedAt ? new Date(completedAt) : new Date();
+    const validDate = isNaN(rawDate.getTime()) ? new Date() : rawDate;
+    const formattedDate = validDate.toLocaleDateString('en-US', {
       month: 'long',
       day: 'numeric',
       year: 'numeric',
@@ -3245,7 +3252,200 @@ export class StudentService {
       assets,
     );
 
-    const subject = `You have successfully completed the ${assessmentTitle} - Your Certificate is Ready ??`;
+    const subjectRaw = `You have successfully completed the ${assessmentTitle} - Your Certificate is Ready \u{1F393}`;
+    const subject = `=?UTF-8?B?${Buffer.from(subjectRaw).toString('base64')}?=`;
+
+    // --- Generate Certificate PDF ---
+    let pdfBuffer: Buffer | null = null;
+    try {
+      this.logger.log(
+        `[TechCertEmail] Generating PDF certificate for ${toEmail}...`,
+      );
+
+      const getRootPath = () => {
+        return path.resolve(__dirname, '../..');
+      };
+
+      const rootPath = getRootPath();
+
+      // 1. Load background template image (first try local assets path, then fallback to HTTP)
+      let bgBuffer: Buffer;
+      const localPath = path.join(
+        rootPath,
+        'public/assets/certificate-template.jpg',
+      );
+      if (fs.existsSync(localPath)) {
+        this.logger.log(
+          `[TechCertEmail] Loading certificate background locally from ${localPath}`,
+        );
+        bgBuffer = fs.readFileSync(localPath);
+      } else {
+        this.logger.warn(
+          `Local certificate background not found at ${localPath}. Trying HTTP fetch...`,
+        );
+        try {
+          const response = await axios.get(
+            `${techFrontendUrl}/certificate-template.jpg`,
+            {
+              responseType: 'arraybuffer',
+              timeout: 5000,
+            },
+          );
+          bgBuffer = Buffer.from(response.data);
+        } catch (err) {
+          this.logger.error(
+            `Failed to fetch certificate background via HTTP: ${err.message}. Trying legacy local path fallback...`,
+          );
+          const legacyPath = path.resolve(
+            __dirname,
+            '../../../../OriginBi-Technical/frontend/public/certificate-template.jpg',
+          );
+          bgBuffer = fs.readFileSync(legacyPath);
+        }
+      }
+
+      // 2. Fetch/Generate QR Code image
+      let qrBuffer: Buffer | null = null;
+      try {
+        const qrResponse = await axios.get(
+          `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(verifyUrl)}`,
+          { responseType: 'arraybuffer', timeout: 5000 },
+        );
+        qrBuffer = Buffer.from(qrResponse.data);
+      } catch (err) {
+        this.logger.error(
+          `Failed to fetch verification QR code: ${err.message}`,
+        );
+      }
+
+      // 3. Build the PDF document using pdfkit
+      const doc = new PDFDocument({
+        size: [842, 595], // A4 Landscape
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      });
+
+      // Register custom fonts matching the frontend CertificatePreviewModal
+      const fontsDir = path.join(rootPath, 'public/assets/fonts');
+      const dmSerifPath = path.join(fontsDir, 'DMSerifDisplay-Italic.ttf');
+      const openSansBoldPath = path.join(fontsDir, 'OpenSans-Bold.ttf');
+      const openSansRegularPath = path.join(fontsDir, 'OpenSans-Regular.ttf');
+
+      const hasDmSerif = fs.existsSync(dmSerifPath);
+      const hasOpenSansBold = fs.existsSync(openSansBoldPath);
+      const hasOpenSansRegular = fs.existsSync(openSansRegularPath);
+
+      if (hasDmSerif) doc.registerFont('DMSerif-Italic', dmSerifPath);
+      if (hasOpenSansBold) doc.registerFont('OpenSans-Bold', openSansBoldPath);
+      if (hasOpenSansRegular)
+        doc.registerFont('OpenSans-Regular', openSansRegularPath);
+
+      const titleFont = hasOpenSansBold ? 'OpenSans-Bold' : 'Helvetica-Bold';
+      const bodyFont = hasOpenSansRegular ? 'OpenSans-Regular' : 'Helvetica';
+      const nameFont = hasDmSerif ? 'DMSerif-Italic' : 'Times-Italic';
+
+      const chunks: Buffer[] = [];
+      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+
+      const pdfPromise = new Promise<Buffer>((resolve, reject) => {
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', (err: any) =>
+          reject(err instanceof Error ? err : new Error(String(err))),
+        );
+      });
+
+      // Draw background template (matches frontend /certificate-template.jpg)
+      doc.image(bgBuffer, 0, 0, { width: 842, height: 595 });
+
+      // --- Positions calibrated to match frontend CertificatePreviewModal.tsx ---
+      // Frontend uses cqw (container query width) units; 100cqw = 842pt
+
+      // Date (right 7%, top 12%) — Open Sans Bold 2.8cqw ≈ 24pt
+      doc
+        .font(titleFont)
+        .fontSize(24)
+        .fillColor('#ffffff')
+        .text(formattedDate, 580, 71, { width: 203, align: 'right' });
+
+      // Assessment Title (left 7%, top 27%) — Open Sans Bold, 7cqw or 5.5cqw
+      const titleFontSize = assessmentTitle.length > 20 ? 46 : 59;
+      doc
+        .font(titleFont)
+        .fontSize(titleFontSize)
+        .fillColor('#ffffff')
+        .text(assessmentTitle, 59, 160, { width: 630, lineGap: -2 });
+
+      const domainPhrase = (() => {
+        const mod = assessmentModule;
+        if (mod.startsWith('coding:')) {
+          const lang = mod.slice('coding:'.length);
+          const langName = lang.charAt(0).toUpperCase() + lang.slice(1);
+          return `validating programming and problem-solving skills in ${langName}`;
+        }
+        switch (mod) {
+          case 'aptitude':
+            return 'evaluating logical reasoning and numerical agility';
+          case 'communication':
+          case 'grammar':
+            return 'assessing communication and professional writing skills';
+          case 'coding':
+            return 'validating programming and problem-solving skills';
+          case 'mnc':
+            return 'assessing aptitude and MNC professional readiness';
+          case 'role':
+            return 'evaluating role-based judgment and decision-making';
+          default:
+            return 'evaluating core competencies and professional skills';
+        }
+      })();
+
+      const part1 = `Awarded for successfully completing the ${assessmentTitle}, ${domainPhrase} with `;
+      const part2 = `Grade ${grade}`;
+      const part3 = ` and `;
+      const part4 = `${overallScorePercent}%`;
+      const part5 = ` score, demonstrating professional competency.`;
+
+      const descY = doc.y + 12;
+      doc.font(bodyFont).fontSize(17).fillColor('#e2e8f0'); // slate-200
+
+      // Draw description with Grade and Score highlighted in green matching the frontend preview
+      doc.text(part1, 59, descY, { width: 580, lineGap: 6, continued: true });
+      doc.fillColor('#34d399').font(titleFont).text(part2, { continued: true });
+      doc.fillColor('#e2e8f0').font(bodyFont).text(part3, { continued: true });
+      doc.fillColor('#34d399').font(titleFont).text(part4, { continued: true });
+      doc.fillColor('#e2e8f0').font(bodyFont).text(part5);
+
+      // Student Name — DM Serif Display Italic, 7.2cqw ≈ 61pt
+      // Frontend position: left 7%, top 54.0cqw (54% of container width = 454pt)
+      // Title-cased name
+      const titleCaseName = userName
+        .split(' ')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ');
+      doc
+        .font(nameFont)
+        .fontSize(58)
+        .fillColor('#111827')
+        .text(titleCaseName, 59, 454, { width: 550 });
+
+      // QR Code (right 6.2%, top 74.5% → ~443pt from top)
+      if (qrBuffer) {
+        // White background padding behind QR (aligned to y = 443 to match frontend top: 74.5% exactly)
+        doc.rect(689, 443, 102, 102).fill('#ffffff');
+        // Center the 88pt QR code inside the 102pt white padding
+        doc.image(qrBuffer, 696, 450, { width: 88, height: 88 });
+      }
+
+      doc.end();
+      pdfBuffer = await pdfPromise;
+      this.logger.log(
+        `[TechCertEmail] Generated PDF successfully (${pdfBuffer.length} bytes)`,
+      );
+    } catch (pdfErr) {
+      this.logger.error(
+        `[TechCertEmail] Failed to generate PDF: ${pdfErr.message}`,
+        pdfErr.stack,
+      );
+    }
 
     const mailOptions: Record<string, any> = {
       from: fromAddress,
@@ -3253,6 +3453,17 @@ export class StudentService {
       subject,
       html: emailHtml,
     };
+
+    if (pdfBuffer) {
+      const cleanFileName = `${userName.replace(/\s+/g, '_')}_${assessmentTitle.replace(/\s+/g, '_')}_Certificate.pdf`;
+      mailOptions.attachments = [
+        {
+          filename: cleanFileName,
+          content: pdfBuffer,
+          contentType: 'application/pdf',
+        },
+      ];
+    }
 
     const ccEmail = ccAddresses.join(', ');
     const bccEmail = bccAddresses.join(', ');

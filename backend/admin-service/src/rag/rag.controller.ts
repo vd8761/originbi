@@ -403,7 +403,18 @@ export class RagController {
         }
 
         const registration = lookupResult[0];
-        const regMetadata = registration.metadata || {};
+        const parseJsonObject = (val: any) => {
+          if (!val) return {};
+          if (typeof val === 'string') {
+            try {
+              return JSON.parse(val);
+            } catch {
+              return {};
+            }
+          }
+          return val;
+        };
+        const regMetadata = parseJsonObject(registration.metadata);
 
         // Use the chat-based method with the user's name and any metadata we have
         reportData = await this.customReportService.generateChatBasedReport({

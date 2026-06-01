@@ -41,7 +41,11 @@ export class AdminController {
     if (!userId) {
       throw new BadRequestException('User context missing');
     }
-    let ip = (req.headers['x-forwarded-for'] as string) || req.ip || req.socket.remoteAddress || '';
+    let ip =
+      (req.headers['x-forwarded-for'] as string) ||
+      req.ip ||
+      req.socket.remoteAddress ||
+      '';
     if (ip && ip.includes(',')) {
       ip = ip.split(',')[0].trim();
     }

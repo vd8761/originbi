@@ -53,6 +53,7 @@ export interface TableOptions {
   cellPadding?: number;
   gap?: number;
   colWidths?: number[];
+  rowColors?: string[];
 }
 
 export interface RoadmapItem {
@@ -674,7 +675,7 @@ export class BaseReport {
       .fontSize(options.fontSize || 10)
       .fillColor('black');
 
-    rows.forEach((row) => {
+    rows.forEach((row, rowIndex) => {
       // A. Calculate Max Row Height
       let maxRowHeight = 0;
       row.forEach((text, i) => {
@@ -697,6 +698,14 @@ export class BaseReport {
       row.forEach((text, i) => {
         const cw = colWidths[i];
 
+        // Draw Row/Cell Background if rowColors exists
+        if (options.rowColors && options.rowColors[rowIndex]) {
+          this.doc
+            .rect(currentX, currentY, cw, maxRowHeight)
+            .fillColor(options.rowColors[rowIndex])
+            .fill();
+        }
+
         // Border
         this.doc
           .rect(currentX, currentY, cw, maxRowHeight)
@@ -705,9 +714,11 @@ export class BaseReport {
           .stroke();
 
         // Text
-        this.doc.text(text, currentX + cellPadding, currentY + cellPadding, {
-          width: cw - 2 * cellPadding,
-        });
+        this.doc
+          .fillColor('black') // ensure text is black since we filled a color!
+          .text(text, currentX + cellPadding, currentY + cellPadding, {
+            width: cw - 2 * cellPadding,
+          });
 
         currentX += cw;
       });

@@ -11,6 +11,8 @@
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@neondatabase/serverless": "^1.0.2",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-tooltip": "^1.2.8",
     "@types/node": "^20.19.26",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^18.2.0",
@@ -20,6 +22,7 @@
     "axios": "^1.13.2",
     "date-fns": "^4.1.0",
     "flag-icons": "^7.5.0",
+    "framer-motion": "^12.40.0",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.555.0",
     "next": "^16.1.6",
