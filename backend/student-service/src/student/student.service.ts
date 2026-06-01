@@ -39,7 +39,7 @@ import * as path from 'path';
 import axios from 'axios';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
 import { getTechWelcomeEmailTemplate } from '../mail/templates/tech-welcome.template';
-import { getTechAssessmentCertificateTemplate, getTechCertificateDomainPhrase } from '../mail/templates/tech-assessment-certificate.template';
+import { getTechAssessmentCertificateTemplate } from '../mail/templates/tech-assessment-certificate.template';
 
 import { getDebriefTeamNotificationEmailTemplate } from '../mail/templates/debrief-team-notification.template';
 import { SettingsService } from '../settings/settings.service';
@@ -3211,14 +3211,13 @@ export class StudentService {
 
     const fromAddress = '"' + fromName + '" <' + fromEmail + '>';
 
-    const apiUrl =
-      this.configService.get<string>('API_URL') || 'http://localhost:4004';
     const techFrontendUrl =
       this.configService.get<string>('TECH_FRONTEND_URL') ||
       this.configService.get<string>('FRONTEND_URL') ||
       'http://localhost:3000';
 
-    const publicStudentApiUrl = techFrontendUrl.replace(/\/$/, '') + '/student-api';
+    const publicStudentApiUrl =
+      techFrontendUrl.replace(/\/$/, '') + '/student-api';
 
     const assets = {
       logo: `${techFrontendUrl}/Origin-BI-Logo-01.png`,
@@ -3259,8 +3258,10 @@ export class StudentService {
     // --- Generate Certificate PDF ---
     let pdfBuffer: Buffer | null = null;
     try {
-      this.logger.log(`[TechCertEmail] Generating PDF certificate for ${toEmail}...`);
-      
+      this.logger.log(
+        `[TechCertEmail] Generating PDF certificate for ${toEmail}...`,
+      );
+
       const getRootPath = () => {
         // If running from dist, go up one more level
         if (__dirname.includes('dist')) {
@@ -3268,26 +3269,41 @@ export class StudentService {
         }
         return path.resolve(__dirname, '../..');
       };
-      
+
       const rootPath = getRootPath();
-      
+
       // 1. Load background template image (first try local assets path, then fallback to HTTP)
       let bgBuffer: Buffer;
-      const localPath = path.join(rootPath, 'public/assets/certificate-template.jpg');
+      const localPath = path.join(
+        rootPath,
+        'public/assets/certificate-template.jpg',
+      );
       if (fs.existsSync(localPath)) {
-        this.logger.log(`[TechCertEmail] Loading certificate background locally from ${localPath}`);
+        this.logger.log(
+          `[TechCertEmail] Loading certificate background locally from ${localPath}`,
+        );
         bgBuffer = fs.readFileSync(localPath);
       } else {
-        this.logger.warn(`Local certificate background not found at ${localPath}. Trying HTTP fetch...`);
+        this.logger.warn(
+          `Local certificate background not found at ${localPath}. Trying HTTP fetch...`,
+        );
         try {
-          const response = await axios.get(`${techFrontendUrl}/certificate-template.jpg`, {
-            responseType: 'arraybuffer',
-            timeout: 5000,
-          });
+          const response = await axios.get(
+            `${techFrontendUrl}/certificate-template.jpg`,
+            {
+              responseType: 'arraybuffer',
+              timeout: 5000,
+            },
+          );
           bgBuffer = Buffer.from(response.data);
         } catch (err) {
-          this.logger.error(`Failed to fetch certificate background via HTTP: ${err.message}. Trying legacy local path fallback...`);
-          const legacyPath = path.resolve(__dirname, '../../../../OriginBi-Technical/frontend/public/certificate-template.jpg');
+          this.logger.error(
+            `Failed to fetch certificate background via HTTP: ${err.message}. Trying legacy local path fallback...`,
+          );
+          const legacyPath = path.resolve(
+            __dirname,
+            '../../../../OriginBi-Technical/frontend/public/certificate-template.jpg',
+          );
           bgBuffer = fs.readFileSync(legacyPath);
         }
       }
@@ -3297,17 +3313,19 @@ export class StudentService {
       try {
         const qrResponse = await axios.get(
           `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(verifyUrl)}`,
-          { responseType: 'arraybuffer', timeout: 5000 }
+          { responseType: 'arraybuffer', timeout: 5000 },
         );
         qrBuffer = Buffer.from(qrResponse.data);
       } catch (err) {
-        this.logger.error(`Failed to fetch verification QR code: ${err.message}`);
+        this.logger.error(
+          `Failed to fetch verification QR code: ${err.message}`,
+        );
       }
 
       // 3. Build the PDF document using pdfkit
       const doc = new PDFDocument({
         size: [842, 595], // A4 Landscape
-        margins: { top: 0, bottom: 0, left: 0, right: 0 }
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
       });
 
       // Register custom fonts matching the frontend CertificatePreviewModal
@@ -3322,18 +3340,21 @@ export class StudentService {
 
       if (hasDmSerif) doc.registerFont('DMSerif-Italic', dmSerifPath);
       if (hasOpenSansBold) doc.registerFont('OpenSans-Bold', openSansBoldPath);
-      if (hasOpenSansRegular) doc.registerFont('OpenSans-Regular', openSansRegularPath);
+      if (hasOpenSansRegular)
+        doc.registerFont('OpenSans-Regular', openSansRegularPath);
 
       const titleFont = hasOpenSansBold ? 'OpenSans-Bold' : 'Helvetica-Bold';
       const bodyFont = hasOpenSansRegular ? 'OpenSans-Regular' : 'Helvetica';
       const nameFont = hasDmSerif ? 'DMSerif-Italic' : 'Times-Italic';
 
       const chunks: Buffer[] = [];
-      doc.on('data', chunk => chunks.push(chunk));
-      
+      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+
       const pdfPromise = new Promise<Buffer>((resolve, reject) => {
         doc.on('end', () => resolve(Buffer.concat(chunks)));
-        doc.on('error', err => reject(err));
+        doc.on('error', (err: any) =>
+          reject(err instanceof Error ? err : new Error(String(err))),
+        );
       });
 
       // Draw background template (matches frontend /certificate-template.jpg)
@@ -3343,17 +3364,19 @@ export class StudentService {
       // Frontend uses cqw (container query width) units; 100cqw = 842pt
 
       // Date (right 7%, top 12%) — Open Sans Bold 2.8cqw ≈ 24pt
-      doc.font(titleFont)
-         .fontSize(24)
-         .fillColor('#ffffff')
-         .text(formattedDate, 580, 71, { width: 203, align: 'right' });
+      doc
+        .font(titleFont)
+        .fontSize(24)
+        .fillColor('#ffffff')
+        .text(formattedDate, 580, 71, { width: 203, align: 'right' });
 
       // Assessment Title (left 7%, top 27%) — Open Sans Bold, 7cqw or 5.5cqw
       const titleFontSize = assessmentTitle.length > 20 ? 46 : 59;
-      doc.font(titleFont)
-         .fontSize(titleFontSize)
-         .fillColor('#ffffff')
-         .text(assessmentTitle, 59, 160, { width: 630, lineGap: -2 });
+      doc
+        .font(titleFont)
+        .fontSize(titleFontSize)
+        .fillColor('#ffffff')
+        .text(assessmentTitle, 59, 160, { width: 630, lineGap: -2 });
 
       const domainPhrase = (() => {
         const mod = assessmentModule;
@@ -3386,9 +3409,7 @@ export class StudentService {
       const part5 = ` score, demonstrating professional competency.`;
 
       const descY = doc.y + 12;
-      doc.font(bodyFont)
-         .fontSize(17)
-         .fillColor('#e2e8f0'); // slate-200
+      doc.font(bodyFont).fontSize(17).fillColor('#e2e8f0'); // slate-200
 
       // Draw description with Grade and Score highlighted in green matching the frontend preview
       doc.text(part1, 59, descY, { width: 580, lineGap: 6, continued: true });
@@ -3400,11 +3421,15 @@ export class StudentService {
       // Student Name — DM Serif Display Italic, 7.2cqw ≈ 61pt
       // Frontend position: left 7%, top 54.0cqw (54% of container width = 454pt)
       // Title-cased name
-      const titleCaseName = userName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
-      doc.font(nameFont)
-         .fontSize(58)
-         .fillColor('#111827')
-         .text(titleCaseName, 59, 454, { width: 550 });
+      const titleCaseName = userName
+        .split(' ')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ');
+      doc
+        .font(nameFont)
+        .fontSize(58)
+        .fillColor('#111827')
+        .text(titleCaseName, 59, 454, { width: 550 });
 
       // QR Code (right 6.2%, top 74.5% → ~443pt from top)
       if (qrBuffer) {
@@ -3416,9 +3441,14 @@ export class StudentService {
 
       doc.end();
       pdfBuffer = await pdfPromise;
-      this.logger.log(`[TechCertEmail] Generated PDF successfully (${pdfBuffer.length} bytes)`);
+      this.logger.log(
+        `[TechCertEmail] Generated PDF successfully (${pdfBuffer.length} bytes)`,
+      );
     } catch (pdfErr) {
-      this.logger.error(`[TechCertEmail] Failed to generate PDF: ${pdfErr.message}`, pdfErr.stack);
+      this.logger.error(
+        `[TechCertEmail] Failed to generate PDF: ${pdfErr.message}`,
+        pdfErr.stack,
+      );
     }
 
     const mailOptions: Record<string, any> = {
