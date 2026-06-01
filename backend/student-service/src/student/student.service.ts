@@ -3228,7 +3228,9 @@ export class StudentService {
     const verifyUrl =
       incomingVerifyUrl || `${techFrontendUrl}/verify/${certificateId}`;
 
-    const formattedDate = new Date(completedAt).toLocaleDateString('en-US', {
+    const rawDate = completedAt ? new Date(completedAt) : new Date();
+    const validDate = isNaN(rawDate.getTime()) ? new Date() : rawDate;
+    const formattedDate = validDate.toLocaleDateString('en-US', {
       month: 'long',
       day: 'numeric',
       year: 'numeric',
@@ -3259,9 +3261,19 @@ export class StudentService {
     try {
       this.logger.log(`[TechCertEmail] Generating PDF certificate for ${toEmail}...`);
       
+      const getRootPath = () => {
+        // If running from dist, go up one more level
+        if (__dirname.includes('dist')) {
+          return path.resolve(__dirname, '../../..');
+        }
+        return path.resolve(__dirname, '../..');
+      };
+      
+      const rootPath = getRootPath();
+      
       // 1. Load background template image (first try local assets path, then fallback to HTTP)
       let bgBuffer: Buffer;
-      const localPath = path.resolve(__dirname, '../../public/assets/certificate-template.jpg');
+      const localPath = path.join(rootPath, 'public/assets/certificate-template.jpg');
       if (fs.existsSync(localPath)) {
         this.logger.log(`[TechCertEmail] Loading certificate background locally from ${localPath}`);
         bgBuffer = fs.readFileSync(localPath);
@@ -3299,7 +3311,7 @@ export class StudentService {
       });
 
       // Register custom fonts matching the frontend CertificatePreviewModal
-      const fontsDir = path.resolve(__dirname, '../../public/assets/fonts');
+      const fontsDir = path.join(rootPath, 'public/assets/fonts');
       const dmSerifPath = path.join(fontsDir, 'DMSerifDisplay-Italic.ttf');
       const openSansBoldPath = path.join(fontsDir, 'OpenSans-Bold.ttf');
       const openSansRegularPath = path.join(fontsDir, 'OpenSans-Regular.ttf');
