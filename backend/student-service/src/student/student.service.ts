@@ -3252,7 +3252,7 @@ export class StudentService {
       assets,
     );
 
-    const subjectRaw = `You have successfully completed the ${assessmentTitle} - Your Certificate is Ready 🎓`;
+    const subjectRaw = `You have successfully completed the ${assessmentTitle} - Your Certificate is Ready \u{1F393}`;
     const subject = `=?UTF-8?B?${Buffer.from(subjectRaw).toString('base64')}?=`;
 
     // --- Generate Certificate PDF ---
@@ -3263,10 +3263,6 @@ export class StudentService {
       );
 
       const getRootPath = () => {
-        // If running from dist, go up one more level
-        if (__dirname.includes('dist')) {
-          return path.resolve(__dirname, '../../..');
-        }
         return path.resolve(__dirname, '../..');
       };
 
