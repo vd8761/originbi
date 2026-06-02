@@ -16,6 +16,7 @@ import {
   AciValue,
   Program,
   Registration,
+  OriginbiSetting,
 } from '@originbi/shared-entities';
 import { Department } from '../departments/department.entity';
 import { DepartmentDegree } from '../departments/department-degree.entity';
@@ -43,6 +44,7 @@ import { AssessmentController } from './assessment.controller';
       DepartmentDegree,
       Program,
       Registration,
+      OriginbiSetting,
     ]),
   ],
   controllers: [AssessmentController],

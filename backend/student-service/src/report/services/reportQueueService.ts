@@ -203,7 +203,11 @@ export const reportQueueService = {
   // ============================================================================
   // WORKER 2: GROUP REPORTS (Bulk Generation & Zipping)
   // ============================================================================
-  async processGroupReports(groupId: string, jobId: string) {
+  async processGroupReports(
+    groupId: string,
+    jobId: string,
+    programId?: string,
+  ) {
     logger.info(`=================================================`);
     const jobDir = path.join(TEMP_DIR, jobId);
     let groupName: string = '';
@@ -222,8 +226,10 @@ export const reportQueueService = {
       fs.mkdirSync(jobDir, { recursive: true });
 
       logger.info(`[JOB:${jobId}] Fetching data...`);
-      const groupData: MergedReportData[] =
-        await fetchGroupAssessmentData(groupId);
+      const groupData: MergedReportData[] = await fetchGroupAssessmentData(
+        groupId,
+        programId,
+      );
       const totalUsers = groupData.length;
 
       if (totalUsers === 0) {

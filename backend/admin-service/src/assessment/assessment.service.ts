@@ -58,8 +58,24 @@ export class AssessmentService {
     userId?: string,
     type?: string,
     emailStatus?: string,
+    groupBy?: string,
   ) {
     try {
+      // COMBINED "BY GROUP" VIEW: aggregate group_assessments by (group, program)
+      // so a cohort spread across several exam windows shows as ONE row.
+      if (type === 'group' && groupBy === 'group') {
+        return this.findGroupsCombined(
+          page,
+          limit,
+          search,
+          sortBy,
+          sortOrder,
+          startDate,
+          endDate,
+          status,
+        );
+      }
+
       // NEW LOGIC FOR GROUP ASSESSMENTS
       if (type === 'group') {
         const qb = this.groupAssessmentRepo
@@ -336,6 +352,179 @@ export class AssessmentService {
       };
     } catch (error) {
       console.error('Error fetching group session details:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * "By Group" list: aggregates group_assessments by (group_id, program_id) so
+   * each cohort+program shows as a single combined row regardless of how many
+   * exam windows it spans. Status is rolled up; candidate count is summed; the
+   * window is min(start)..max(end).
+   */
+  async findGroupsCombined(
+    page: number,
+    limit: number,
+    search?: string,
+    sortBy?: string,
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
+    startDate?: string,
+    endDate?: string,
+    status?: string,
+  ) {
+    const qb = this.groupAssessmentRepo
+      .createQueryBuilder('ga')
+      .leftJoin(Program, 'p', 'p.id = ga.programId')
+      .leftJoin(Groups, 'g', 'g.id = ga.groupId')
+      .select('ga.group_id', 'groupId')
+      .addSelect('ga.program_id', 'programId')
+      .addSelect('g.name', 'groupName')
+      .addSelect('p.name', 'programName')
+      .addSelect('p.assessment_title', 'assessmentTitle')
+      .addSelect('COUNT(ga.id)', 'assessmentCount')
+      .addSelect('COALESCE(SUM(ga.total_candidates), 0)', 'totalCandidates')
+      .addSelect('MIN(ga.valid_from)', 'firstStart')
+      .addSelect('MAX(ga.valid_to)', 'lastEnd')
+      .addSelect("BOOL_AND(ga.status = 'COMPLETED')", 'allCompleted')
+      .addSelect("BOOL_AND(ga.status = 'NOT_STARTED')", 'allNotStarted')
+      .groupBy('ga.group_id')
+      .addGroupBy('ga.program_id')
+      .addGroupBy('g.name')
+      .addGroupBy('p.name')
+      .addGroupBy('p.assessment_title');
+
+    if (search) {
+      const s = `%${search.toLowerCase()}%`;
+      qb.andWhere(
+        '(LOWER(p.name) LIKE :s OR LOWER(p.assessment_title) LIKE :s OR LOWER(g.name) LIKE :s)',
+        { s },
+      );
+    }
+    if (startDate)
+      qb.andWhere('ga.valid_from >= :startDate', {
+        startDate: `${startDate} 00:00:00`,
+      });
+    if (endDate)
+      qb.andWhere('ga.valid_from <= :endDate', {
+        endDate: `${endDate} 23:59:59`,
+      });
+    // status filter applies at the window level (a group is included if it has a
+    // window in that status); the rolled-up row status is computed separately.
+    if (status) qb.andWhere('ga.status = :status', { status });
+
+    // Sort on an aggregate alias.
+    const sortMap: Record<string, string> = {
+      group_name: 'g.name',
+      program_name: 'p.name',
+      exam_starts_on: 'MIN(ga.valid_from)',
+      exam_ends_on: 'MAX(ga.valid_to)',
+      no_of_candidates: 'COALESCE(SUM(ga.total_candidates), 0)',
+    };
+    qb.orderBy(sortMap[sortBy ?? ''] ?? 'MIN(ga.valid_from)', sortOrder);
+
+    // Aggregate rows are few (one per group+program) — fetch all, count, slice.
+    const allRows = await qb.getRawMany();
+    const total = allRows.length;
+    const pageRows = allRows.slice((page - 1) * limit, page * limit);
+
+    const data = pageRows.map((r) => ({
+      // synthetic id so the frontend can route to the combined detail view
+      id: `${r.groupId}:${r.programId}`,
+      groupId: Number(r.groupId),
+      programId: Number(r.programId),
+      groupName: r.groupName || 'N/A',
+      program: {
+        id: Number(r.programId),
+        name: r.programName,
+        assessmentTitle: r.assessmentTitle,
+      },
+      assessmentCount: Number(r.assessmentCount),
+      totalCandidates: Number(r.totalCandidates),
+      validFrom: r.firstStart,
+      validTo: r.lastEnd,
+      createdAt: r.firstStart,
+      status: r.allCompleted
+        ? 'COMPLETED'
+        : r.allNotStarted
+          ? 'NOT_STARTED'
+          : 'IN_PROGRESS',
+      // parity fields with the per-assessment rows
+      userId: 0,
+      registrationId: 0,
+      currentLevel: 0,
+      totalLevels: 0,
+    }));
+
+    return { data, total, page, limit };
+  }
+
+  /**
+   * Combined detail for a (group, program): every exam window plus the merged
+   * candidate list across all windows, deduped to ONE row per student (their
+   * latest completed session). The report button uses group.id, which the
+   * group-scoped report endpoint already supports.
+   */
+  async findGroupCombinedDetails(groupId: number, programId: number) {
+    try {
+      const group = await this.dataSource
+        .getRepository(Groups)
+        .findOne({ where: { id: groupId } });
+
+      const assessments = await this.groupAssessmentRepo.find({
+        where: { groupId, programId },
+        relations: ['program'],
+        order: { validFrom: 'ASC' },
+      });
+
+      const program =
+        assessments[0]?.program ||
+        (await this.dataSource
+          .getRepository(Program)
+          .findOne({ where: { id: programId } }));
+
+      // All sessions for this (group, program), ordered so the latest completed
+      // session per user comes first, then dedup in memory.
+      const sessions = await this.sessionRepo
+        .createQueryBuilder('s')
+        .leftJoinAndSelect('s.user', 'u')
+        .leftJoinAndSelect('s.registration', 'r')
+        .where('s.group_id = :groupId', { groupId })
+        .andWhere('s.program_id = :programId', { programId })
+        .orderBy('s.user_id', 'ASC')
+        .addOrderBy('s.completed_at', 'DESC', 'NULLS LAST')
+        .addOrderBy('s.created_at', 'DESC')
+        .getMany();
+
+      const seen = new Set<number>();
+      const dedupedSessions = sessions.filter((s) => {
+        const uid = Number(s.userId);
+        if (seen.has(uid)) return false;
+        seen.add(uid);
+        return true;
+      });
+
+      return {
+        groupId,
+        programId,
+        group: group ? { id: group.id, name: group.name } : null,
+        program,
+        totalAssessments: assessments.length,
+        totalCandidates: dedupedSessions.length,
+        assessments: assessments.map((ga) => ({
+          id: ga.id,
+          status: ga.status,
+          validFrom: ga.validFrom,
+          validTo: ga.validTo,
+          totalCandidates: ga.totalCandidates,
+        })),
+        sessions: dedupedSessions.map((s) => ({
+          ...s,
+          userFullName: s.registration?.fullName || 'N/A',
+          userEmail: s.user?.email || 'N/A',
+        })),
+      };
+    } catch (error) {
+      console.error('Error fetching group combined details:', error);
       throw error;
     }
   }

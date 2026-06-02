@@ -77,14 +77,19 @@ export class ReportController {
   generateGroupReport(
     @Param('group_id') groupId: string,
     @Query('json') json: string,
+    @Query('programId') programId: string,
     @Res() res: Response,
   ): void {
-    logger.info(`[API] Start Group Report: Group ${groupId}`);
+    logger.info(
+      `[API] Start Group Report: Group ${groupId}${
+        programId ? ` Program ${programId}` : ''
+      }`,
+    );
 
     const jobId = `group_${groupId}_${Date.now()}`;
 
     this.reportQueue
-      .processGroupReports(groupId, jobId)
+      .processGroupReports(groupId, jobId, programId)
       .catch((err) => logger.error('Background Job Error', err));
 
     if (json === 'true') {

@@ -24,6 +24,7 @@ import AssessmentSessionsTable from "./AssessmentSessionsTable"; // Import
 import RegistrationPreview from "./RegistrationPreview"; // Import
 import AssessmentResultPreview from "./AssessmentResultPreview"; // Import
 import GroupAssessmentPreview from './GroupAssessmentPreview';
+import GroupCombinedPreview from './GroupCombinedPreview';
 import GroupCandidateAssessmentPreview from './GroupCandidateAssessmentPreview'; // Import
 import BulkEmailTab from './BulkEmailTab'; // Import
 import { Registration } from '../../lib/types';
@@ -41,9 +42,14 @@ const useDebounce = (value: string, delay: number) => {
 };
 
 const RegistrationManagement: React.FC = () => {
-  const [view, setView] = useState<"list" | "add" | "bulk" | "preview" | "assessment-preview" | "group-assessment-preview" | "group-candidate-assessment-preview">("list");
+  const [view, setView] = useState<"list" | "add" | "bulk" | "preview" | "assessment-preview" | "group-assessment-preview" | "group-combined-preview" | "group-candidate-assessment-preview">("list");
   const searchParams = useSearchParams();
   const initialTab = searchParams.get('tab') as "registrations" | "individual" | "group" | "send-emails";
+
+  // Group Assessments view mode: combined "By Group" (default) vs per-window "By Assessment".
+  const initialGroupView = (searchParams.get('groupView') as "group" | "assessment") || "group";
+  const [groupView, setGroupView] = useState<"group" | "assessment">(initialGroupView);
+  const [selectedGroupCombined, setSelectedGroupCombined] = useState<{ groupId: string; programId: string } | null>(null);
 
   const [activeTab, setActiveTab] = useState<"registrations" | "individual" | "group" | "send-emails">(
     initialTab || "registrations"
@@ -203,7 +209,8 @@ const RegistrationManagement: React.FC = () => {
           {
             ...dateFilters,
             status: statusFilter || undefined,
-            type: 'group'
+            type: 'group',
+            groupBy: groupView,
           }
         )
       ]);
@@ -246,7 +253,8 @@ const RegistrationManagement: React.FC = () => {
     sortColumn,
     sortOrder,
     statusFilter,
-    aiCounsellorFilter
+    aiCounsellorFilter,
+    groupView
   ]);
 
   const handleSort = (column: string) => {
@@ -337,6 +345,14 @@ const RegistrationManagement: React.FC = () => {
   };
 
   const handleViewGroupSession = (id: string) => {
+    // In combined "By Group" mode the row id is "groupId:programId" -> open the
+    // combined detail. Otherwise it's a single GroupAssessment id.
+    if (groupView === 'group' && typeof id === 'string' && id.includes(':')) {
+      const [groupId, programId] = id.split(':');
+      setSelectedGroupCombined({ groupId, programId });
+      setView("group-combined-preview");
+      return;
+    }
     setSelectedGroupSessionId(id);
     setView("group-assessment-preview");
   };
@@ -580,6 +596,20 @@ const RegistrationManagement: React.FC = () => {
   // Note: The original `if (view === "group-assessment-preview" && selectedGroupSessionId)`
   // block is replaced and updated to use `selectedSession` for consistency,
   // and a new `group-candidate-assessment-preview` view is added.
+
+  if (view === 'group-combined-preview' && selectedGroupCombined) {
+    return (
+      <GroupCombinedPreview
+        groupId={selectedGroupCombined.groupId}
+        programId={selectedGroupCombined.programId}
+        onBack={() => {
+          setView('list');
+          setSelectedGroupCombined(null);
+        }}
+        onViewSession={handleViewGroupCandidateSession}
+      />
+    );
+  }
 
   if (view === 'group-assessment-preview' && selectedGroupSessionId) {
     // Find the group session from the sessions list if needed, or pass ID directly
@@ -988,6 +1018,29 @@ const RegistrationManagement: React.FC = () => {
               <span>Bulk Registration</span>
               <BulkUploadIcon className="w-[18px] h-[18px] text-[#150089] dark:text-white" />
             </button>
+          )}
+
+          {/* Group Assessments view toggle: By Group (combined) vs By Assessment */}
+          {activeTab === 'group' && (
+            <div className="inline-flex rounded-lg border border-gray-200 dark:border-[#FFFFFF1F] bg-white dark:bg-[#FFFFFF1F] p-0.5 shadow-sm">
+              {(['group', 'assessment'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => {
+                    if (groupView === mode) return;
+                    setGroupView(mode);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition-all cursor-pointer ${
+                    groupView === mode
+                      ? 'bg-brand-green text-white shadow'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10'
+                  }`}
+                >
+                  {mode === 'group' ? 'By Group' : 'By Assessment'}
+                </button>
+              ))}
+            </div>
           )}
 
           <button

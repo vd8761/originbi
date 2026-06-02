@@ -57,6 +57,7 @@ export const assessmentService = {
             userId?: string;
             type?: "individual" | "group";
             emailStatus?: 'sent' | 'not_sent' | 'third_party';
+            groupBy?: "group" | "assessment";
         },
     ): Promise<PaginatedResponse<AssessmentSession>> {
         const params = new URLSearchParams();
@@ -71,6 +72,9 @@ export const assessmentService = {
         if (filters?.userId) params.set("userId", filters.userId);
         if (filters?.type) params.set("type", filters.type);
         if (filters?.emailStatus) params.set("emailStatus", filters.emailStatus);
+        // Combined "By Group" aggregation (one row per group+program).
+        if (filters?.type === "group" && filters?.groupBy === "group")
+            params.set("groupBy", "group");
 
         const token = AuthService.getToken();
 
@@ -144,6 +148,23 @@ export const assessmentService = {
         });
         if (!res.ok)
             throw new Error("Failed to fetch group assessment details");
+        return res.json();
+    },
+
+    async getGroupCombined(groupId: string | number, programId: string | number): Promise<any> {
+        const token = AuthService.getToken();
+        const res = await fetch(
+            `${API_URL}/admin/assessments/group-combined/${groupId}/${programId}`,
+            {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: token ? `Bearer ${token}` : "",
+                },
+            },
+        );
+        if (!res.ok)
+            throw new Error("Failed to fetch combined group details");
         return res.json();
     },
 

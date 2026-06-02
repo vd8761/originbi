@@ -304,6 +304,18 @@ export default function SettingsManagement() {
         }
 
         if (item.valueType === 'json') {
+            // Dedicated editor for the open-question distribution setting
+            // (array of {questionType, count, selection} rows).
+            if (item.category === 'assessment' && item.key === 'open_question_distribution') {
+                return (
+                    <DistributionEditor
+                        value={Array.isArray(item.value) ? item.value : []}
+                        isReadonly={item.isReadonly}
+                        onChange={(next) => handleValueChange(item.category, item.key, next)}
+                    />
+                );
+            }
+
             if (item.key.endsWith('_config')) {
                 const isLocal = item.value && typeof item.value === 'object' && item.value.mode === 'local';
                 return (
@@ -686,6 +698,139 @@ function ArrayChipInput({ values, isReadonly, onChange }: { values: string[], is
                     className="flex-1 min-w-[120px] border-0 bg-transparent py-1 px-1 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:ring-0"
                 />
             )}
+        </div>
+    );
+}
+
+// ------------------------------------------------------------------
+// Editor for the open-question distribution setting.
+// Value shape: [{ questionType: string|null, count: number, selection: 'random'|'set_sequential' }, ...]
+// Lives next to ArrayChipInput so we don't proliferate components.
+// ------------------------------------------------------------------
+interface DistributionRow {
+    questionType: string | null;
+    count: number;
+    selection: 'random' | 'set_sequential';
+}
+
+function DistributionEditor({
+    value,
+    isReadonly,
+    onChange,
+}: {
+    value: DistributionRow[];
+    isReadonly: boolean;
+    onChange: (next: DistributionRow[]) => void;
+}) {
+    const rows: DistributionRow[] = value.map((r) => ({
+        questionType: r.questionType ?? null,
+        count: Number(r.count) || 0,
+        selection: r.selection === 'set_sequential' ? 'set_sequential' : 'random',
+    }));
+
+    const update = (i: number, patch: Partial<DistributionRow>) => {
+        const next = rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r));
+        onChange(next);
+    };
+    const remove = (i: number) => onChange(rows.filter((_, idx) => idx !== i));
+    const add = () =>
+        onChange([...rows, { questionType: '', count: 10, selection: 'random' }]);
+
+    const total = rows.reduce((s, r) => s + (Number(r.count) || 0), 0);
+
+    return (
+        <div className="w-full max-w-2xl space-y-3">
+            <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
+                <table className="w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-white/5 text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <tr>
+                            <th className="px-3 py-2 font-medium">Question Type</th>
+                            <th className="px-3 py-2 font-medium w-24">Count</th>
+                            <th className="px-3 py-2 font-medium w-44">Selection</th>
+                            <th className="px-3 py-2 font-medium w-12"></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-white/10">
+                        {rows.length === 0 && (
+                            <tr>
+                                <td colSpan={4} className="px-3 py-4 text-center text-gray-400 dark:text-gray-500">
+                                    No groups configured. Click "Add group" to pick open questions.
+                                </td>
+                            </tr>
+                        )}
+                        {rows.map((row, i) => (
+                            <tr key={i} className="bg-white dark:bg-transparent">
+                                <td className="px-3 py-2">
+                                    <input
+                                        type="text"
+                                        disabled={isReadonly}
+                                        value={row.questionType ?? ''}
+                                        onChange={(e) =>
+                                            update(i, {
+                                                questionType: e.target.value === '' ? null : e.target.value,
+                                            })
+                                        }
+                                        placeholder="e.g. OPEN, SURVEY (blank = any type)"
+                                        className="w-full rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green"
+                                    />
+                                </td>
+                                <td className="px-3 py-2">
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        disabled={isReadonly}
+                                        value={row.count}
+                                        onChange={(e) => update(i, { count: Number(e.target.value) || 0 })}
+                                        className="w-full rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green"
+                                    />
+                                </td>
+                                <td className="px-3 py-2">
+                                    <select
+                                        disabled={isReadonly}
+                                        value={row.selection}
+                                        onChange={(e) =>
+                                            update(i, {
+                                                selection:
+                                                    e.target.value === 'set_sequential'
+                                                        ? 'set_sequential'
+                                                        : 'random',
+                                            })
+                                        }
+                                        className="w-full rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green"
+                                    >
+                                        <option value="random">random (shuffled)</option>
+                                        <option value="set_sequential">set_sequential (no shuffle)</option>
+                                    </select>
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                    <button
+                                        type="button"
+                                        disabled={isReadonly}
+                                        onClick={() => remove(i)}
+                                        className="rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10 disabled:opacity-40"
+                                        title="Remove this group"
+                                    >
+                                        Remove
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+                <button
+                    type="button"
+                    disabled={isReadonly}
+                    onClick={add}
+                    className="rounded-xl bg-brand-green/10 px-4 py-2 text-sm font-medium text-brand-green hover:bg-brand-green/20 transition-colors disabled:opacity-40"
+                >
+                    + Add group
+                </button>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Total open questions per assessment: <strong className="text-gray-700 dark:text-gray-200">{total}</strong>
+                </span>
+            </div>
         </div>
     );
 }

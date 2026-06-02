@@ -25,8 +25,12 @@ export class ReportQueueService {
     );
   }
 
-  processGroupReports(groupId: string, jobId: string): Promise<void> {
-    return reportQueueService.processGroupReports(groupId, jobId);
+  processGroupReports(
+    groupId: string,
+    jobId: string,
+    programId?: string,
+  ): Promise<void> {
+    return reportQueueService.processGroupReports(groupId, jobId, programId);
   }
 
   processUserReports(userIds: string[], jobId: string): Promise<void> {

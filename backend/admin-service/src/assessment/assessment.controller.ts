@@ -38,6 +38,7 @@ export class AssessmentController {
     @Query('userId') userId?: string,
     @Query('type') type?: string,
     @Query('emailStatus') emailStatus?: string,
+    @Query('groupBy') groupBy?: string,
   ) {
     const pageNum = Number(page) || 1;
     const limitNum = Number(limit) || 10;
@@ -54,12 +55,24 @@ export class AssessmentController {
       userId,
       type,
       emailStatus,
+      groupBy,
     );
   }
 
   @Get('group/:id')
   async getGroupSessionDetails(@Param('id') id: string) {
     return this.assessmentService.findGroupSessionDetails(Number(id));
+  }
+
+  @Get('group-combined/:groupId/:programId')
+  async getGroupCombinedDetails(
+    @Param('groupId') groupId: string,
+    @Param('programId') programId: string,
+  ) {
+    return this.assessmentService.findGroupCombinedDetails(
+      Number(groupId),
+      Number(programId),
+    );
   }
 
   @Get('group/:id/eligible-candidates')
