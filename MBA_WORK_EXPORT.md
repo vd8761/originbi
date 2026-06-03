@@ -99,8 +99,21 @@ Source of truth: **`MBA Questions (2).xlsx`** (3 sets, English + Tamil inline; s
 - ✅ Runbook authored.
 - ✅ Confirmed `category` rule against the codebase.
 
+## 6b. SURVEY (Type-B) — BUILT (2026, set-based logic)
+
+The survey logic was finalised and implemented. **New rule (replaces the old 2-main:1-open / 40+20 interleave):**
+- `open_questions` gains **`set_number`**, **`context_text_en`**, **`context_text_ta`** (migration `014_open_questions_survey_sets.sql`).
+- Survey questions are `question_type='SURVEY'`, in **5 sets × 20**.
+- Per assessment: the distribution setting `[{"questionType":"SURVEY","count":10,"selection":"set_random"}]` → **pick ONE random set, then 10 random questions from it**, **scattered at random positions** among the 40 main (40 + 10 = 50). Count stays admin-configurable.
+- New selection mode **`set_random`** added to all 3 generation services + the admin Settings dropdown.
+- Exam-engine Go `OpenQuestion` struct gained `SetNumber/ContextTextEn/ContextTextTa` so context is served; the exam frontend ([AssessmentStarter.tsx](frontend/components/student/AssessmentStarter.tsx)) already renders context from `open_question` — **no frontend change needed**.
+- Import: `database/scripts/generate_mba_survey_sql.py` → `database/scripts/mba_survey_questions.sql` (**100 Q / 400 options**, bilingual, non-scoring options `is_valid=false`). Verify with `database/scripts/verify_mba_survey.sql`.
+- Survey options are **non-scoring** (no DISC factor, `is_valid=false`).
+
+All 3 NestJS services typecheck clean; exam-engine `go build` clean; frontend typechecks clean.
+
 ## 7. What's PENDING / TO-DO (resume here)
-1. **Survey (Type-B) questions** — content not yet provided, and the **set-based linked selection rule** ("no shuffle, set-based, questions are linked") still needs Sriharan's explanation. The config already accommodates it via `selection:'set_sequential'`; the generator + selection logic must be extended once the rule is known. Decide storage: same `open_questions` table with `question_type='SURVEY'` + set/order in metadata (assumed) vs new table.
+1. **Run survey on Local:** apply migration 014 → run `mba_survey_questions.sql` → `verify_mba_survey.sql` (all PASS) → register a College candidate → confirm `assessment_answers` = 40 MAIN + 10 OPEN, OPEN all from a **single** survey set, scattered. (Old open questions already deactivated by Sriharan.)
 2. **Local runbook completion** — R1/R2 (deactivate old), R3 (verify-block test), R5 (functional registration test through admin/corporate/self), R6 (ACI off). Import (R4) already done on Local.
 3. **Functional test** — start services; confirm the admin Settings distribution editor renders; register a College student → 40 main + 20 open interleaved 2:1, set ∈ {1,2,3}; flip questions inactive → guard blocks.
 4. **Set the distribution split** to the agreed 10+10 once SURVEY questions exist.
@@ -115,9 +128,14 @@ Source of truth: **`MBA Questions (2).xlsx`** (3 sets, English + Tamil inline; s
 ## 9. Key file index
 ```
 database/migrations/013_open_question_distribution.sql        # admin setting (migration)
-database/scripts/generate_mba_questions_sql.py               # Excel -> SQL generator
-database/scripts/mba_college_level1_questions.sql            # generated import (120 Q / 480 opts)
-database/scripts/verify_mba_college_level1.sql               # 14 checks + sample
+database/migrations/014_open_questions_survey_sets.sql        # survey: open_questions cols + setting
+database/scripts/generate_mba_questions_sql.py               # main Excel -> SQL generator
+database/scripts/mba_college_level1_questions.sql            # generated MAIN import (120 Q / 480 opts)
+database/scripts/verify_mba_college_level1.sql               # 14 checks + sample (main)
+database/scripts/generate_mba_survey_sql.py                  # survey Excel -> SQL generator
+database/scripts/mba_survey_questions.sql                    # generated SURVEY import (100 Q / 400 opts)
+database/scripts/verify_mba_survey.sql                       # survey checks
+database/scripts/verify_mba_registration_generation.sql      # per-attempt generation check (40 main + open)
 MBA_College_Level1_Runbook.md                                # R0-R6 Local->Live runbook
 MBA_WORK_EXPORT.md                                           # this handoff
 backend/admin-service/src/assessment/assessment-generation.service.ts

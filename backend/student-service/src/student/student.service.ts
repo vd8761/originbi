@@ -1644,23 +1644,18 @@ export class StudentService {
     // (originbi_settings -> assessment.open_question_distribution).
     const openQuestions = await this.selectOpenQuestionIds();
 
-    // 4. Interleave Questions (2 Main : 1 Open) until BOTH pools are exhausted.
-    // Driven by pool sizes (not a hard-coded 20) so the open-question count
-    // stays admin-configurable while every main question is used.
-    const finalQuestions: { id: number; type: 'MAIN' | 'OPEN' }[] = [];
-    let mainIdx = 0;
-    let openIdx = 0;
-
-    while (mainIdx < mainQuestions.length || openIdx < openQuestions.length) {
-      for (let j = 0; j < 2 && mainIdx < mainQuestions.length; j++) {
-        finalQuestions.push({ id: mainQuestions[mainIdx++].id, type: 'MAIN' });
-      }
-      if (openIdx < openQuestions.length)
-        finalQuestions.push({ id: openQuestions[openIdx++].id, type: 'OPEN' });
+    // 4. Build the final order: all main questions, with the open/survey
+    // questions SCATTERED at random positions among them (no fixed ratio —
+    // they "appear anywhere in the exam").
+    const finalQuestions: { id: number; type: 'MAIN' | 'OPEN' }[] =
+      mainQuestions.map((q: any) => ({ id: q.id, type: 'MAIN' as const }));
+    for (const oq of openQuestions) {
+      const pos = Math.floor(Math.random() * (finalQuestions.length + 1));
+      finalQuestions.splice(pos, 0, { id: oq.id, type: 'OPEN' });
     }
 
     this.logger.log(
-      `[Assessment] Generated ${finalQuestions.length} interleaved questions (Main: ${mainIdx}, Open: ${openIdx})`,
+      `[Assessment] Generated ${finalQuestions.length} questions (Main: ${mainQuestions.length}, Open: ${openQuestions.length}, scattered)`,
     );
 
     // 5. Bulk Insert Answers
@@ -1722,6 +1717,35 @@ export class StudentService {
     for (const group of groups) {
       const count = Number(group?.count) || 0;
       if (count <= 0) continue;
+
+      // 'set_random': pick ONE random set for this type, then `count` random
+      // questions from within that set (the SURVEY rule).
+      if (group.selection === 'set_random') {
+        const setParams: any[] = [];
+        let setSql = `SELECT DISTINCT set_number FROM open_questions
+          WHERE is_active = true AND is_deleted = false AND set_number IS NOT NULL`;
+        if (group.questionType) {
+          setParams.push(group.questionType);
+          setSql += ` AND question_type = $${setParams.length}`;
+        }
+        const setRows = await this.answerRepo.query(setSql, setParams);
+        if (!setRows || setRows.length === 0) continue;
+        const chosen =
+          setRows[Math.floor(Math.random() * setRows.length)].set_number;
+
+        const qParams: any[] = [chosen];
+        let qSql = `SELECT id FROM open_questions
+          WHERE is_active = true AND is_deleted = false AND set_number = $1`;
+        if (group.questionType) {
+          qParams.push(group.questionType);
+          qSql += ` AND question_type = $${qParams.length}`;
+        }
+        qParams.push(count);
+        qSql += ` ORDER BY RANDOM() LIMIT $${qParams.length}`;
+        const rows = await this.answerRepo.query(qSql, qParams);
+        picked.push(...rows);
+        continue;
+      }
 
       const params: any[] = [];
       let sql = `SELECT id FROM open_questions WHERE is_active = true AND is_deleted = false`;

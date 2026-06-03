@@ -463,8 +463,14 @@ export default function SettingsManagement() {
                                             : true;
                                         const isDimmed = isReportPasswordField && !reportPasswordEnabled;
 
+                                        // Wide editors (e.g. the distribution table) render full-width,
+                                        // stacked below the label — not squeezed into the side input column.
+                                        const isFullWidth = item.valueType === 'json'
+                                            && item.category === 'assessment'
+                                            && item.key === 'open_question_distribution';
+
                                         return (
-                                        <div key={item.id} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-8 border-b border-gray-50 dark:border-white/[0.02] last:border-0 last:pb-0 transition-opacity duration-200 ${isDimmed ? 'opacity-40 pointer-events-none' : ''}`}>
+                                        <div key={item.id} className={`${isFullWidth ? 'flex flex-col gap-4' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-6'} pb-8 border-b border-gray-50 dark:border-white/[0.02] last:border-0 last:pb-0 transition-opacity duration-200 ${isDimmed ? 'opacity-40 pointer-events-none' : ''}`}>
                                             <div className="sm:max-w-md">
                                                 <label htmlFor={item.key} className="flex items-center text-[15px] font-semibold leading-6 text-gray-900 dark:text-white">
                                                     {item.label}
@@ -499,7 +505,7 @@ export default function SettingsManagement() {
                                                 )}
                                             </p>
                                         </div>
-                                        <div className="mt-2 sm:mt-0 flex-shrink-0 w-full sm:w-auto sm:max-w-[300px]">
+                                        <div className={isFullWidth ? 'w-full' : 'mt-2 sm:mt-0 flex-shrink-0 w-full sm:w-auto sm:max-w-[300px]'}>
                                             {renderInput(item)}
                                         </div>
                                     </div>
@@ -710,7 +716,7 @@ function ArrayChipInput({ values, isReadonly, onChange }: { values: string[], is
 interface DistributionRow {
     questionType: string | null;
     count: number;
-    selection: 'random' | 'set_sequential';
+    selection: 'random' | 'set_random' | 'set_sequential';
 }
 
 function DistributionEditor({
@@ -725,7 +731,12 @@ function DistributionEditor({
     const rows: DistributionRow[] = value.map((r) => ({
         questionType: r.questionType ?? null,
         count: Number(r.count) || 0,
-        selection: r.selection === 'set_sequential' ? 'set_sequential' : 'random',
+        selection:
+            r.selection === 'set_sequential'
+                ? 'set_sequential'
+                : r.selection === 'set_random'
+                    ? 'set_random'
+                    : 'random',
     }));
 
     const update = (i: number, patch: Partial<DistributionRow>) => {
@@ -739,15 +750,15 @@ function DistributionEditor({
     const total = rows.reduce((s, r) => s + (Number(r.count) || 0), 0);
 
     return (
-        <div className="w-full max-w-2xl space-y-3">
-            <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
-                <table className="w-full text-sm">
+        <div className="w-full max-w-5xl space-y-3">
+            <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-white/10">
+                <table className="w-full text-sm min-w-[640px]">
                     <thead className="bg-gray-50 dark:bg-white/5 text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
                         <tr>
-                            <th className="px-3 py-2 font-medium">Question Type</th>
+                            <th className="px-3 py-2 font-medium w-[40%]">Question Type</th>
                             <th className="px-3 py-2 font-medium w-24">Count</th>
-                            <th className="px-3 py-2 font-medium w-44">Selection</th>
-                            <th className="px-3 py-2 font-medium w-12"></th>
+                            <th className="px-3 py-2 font-medium w-64">Selection</th>
+                            <th className="px-3 py-2 font-medium w-20"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-white/10">
@@ -790,16 +801,14 @@ function DistributionEditor({
                                         value={row.selection}
                                         onChange={(e) =>
                                             update(i, {
-                                                selection:
-                                                    e.target.value === 'set_sequential'
-                                                        ? 'set_sequential'
-                                                        : 'random',
+                                                selection: e.target.value as DistributionRow['selection'],
                                             })
                                         }
                                         className="w-full rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green"
                                     >
-                                        <option value="random">random (shuffled)</option>
-                                        <option value="set_sequential">set_sequential (no shuffle)</option>
+                                        <option value="random">random (N random of type)</option>
+                                        <option value="set_random">set_random (one set, then N random)</option>
+                                        <option value="set_sequential">set_sequential (one set, fixed order)</option>
                                     </select>
                                 </td>
                                 <td className="px-3 py-2 text-right">

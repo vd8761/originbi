@@ -15,6 +15,7 @@ import {
     LoadingIcon,
     DownloadIcon
 } from '../icons';
+import SurveyAnswersView, { SurveyAnswersData } from './SurveyAnswersView';
 
 interface AssessmentResultPreviewProps {
     session: AssessmentSession | null;
@@ -41,6 +42,8 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
     const [session, setSession] = useState<AssessmentSession | null>(initialSession);
     const [levels, setLevels] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState(0);
+    const [surveyData, setSurveyData] = useState<SurveyAnswersData | null>(null);
+    const [surveyLoading, setSurveyLoading] = useState(false);
 
     // Download State
     const [downloading, setDownloading] = useState(false);
@@ -79,7 +82,26 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
             }
         };
         fetchSessionDetails();
+
+        // Fetch SURVEY answers (non-scoring open questions). Drives the Survey tab:
+        // present -> tab enabled; absent -> tab shown but disabled.
+        const fetchSurvey = async () => {
+            if (!initialSession?.id) return;
+            try {
+                setSurveyLoading(true);
+                const data = await assessmentService.getSurveyAnswers(initialSession.id);
+                setSurveyData(data);
+            } catch (error) {
+                console.error("Failed to fetch survey answers", error);
+                setSurveyData(null);
+            } finally {
+                setSurveyLoading(false);
+            }
+        };
+        fetchSurvey();
     }, [initialSession]);
+
+    const hasSurvey = (surveyData?.total ?? 0) > 0;
 
     // Helper to format dates
     const formatDate = (dateStr?: string) => {
@@ -894,6 +916,28 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                             </div>
                         );
                     })}
+                    {/* Survey Tab — always shown; enabled only if the candidate had survey questions */}
+                    {(() => {
+                        const surveyTabIndex = levels.length + 1;
+                        const isActive = activeTab === surveyTabIndex;
+                        return (
+                            <div
+                                onClick={() => hasSurvey && setActiveTab(surveyTabIndex)}
+                                className={`flex items-center gap-2 text-sm font-medium pb-4 transition-colors whitespace-nowrap ${isActive
+                                    ? 'text-brand-green border-b-2 border-brand-green font-bold cursor-default'
+                                    : hasSurvey
+                                        ? 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white cursor-pointer'
+                                        : 'text-gray-400 dark:text-white/50 cursor-not-allowed'
+                                    }`}
+                                title={hasSurvey ? 'Survey responses' : 'No survey questions in this assessment'}
+                            >
+                                Survey
+                                {!isActive && !hasSurvey && (
+                                    <LockIcon className="w-3 h-3 text-gray-400 dark:text-white/70" />
+                                )}
+                            </div>
+                        );
+                    })()}
                 </div>
 
                 {/* Progress Indicator */}
@@ -918,6 +962,9 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
 
             {/* Main Content Area */}
             {activeTab === 0 ? renderOverallReport() :
+                activeTab === levels.length + 1 ? (
+                    <SurveyAnswersView data={surveyData} loading={surveyLoading} />
+                ) :
                 // Level Reports
                 (() => {
                     const levelIndex = activeTab - 1;

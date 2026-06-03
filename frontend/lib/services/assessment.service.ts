@@ -151,6 +151,37 @@ export const assessmentService = {
         return res.json();
     },
 
+    async getSurveyAnswers(sessionId: string | number): Promise<{
+        setNumber: number | null;
+        total: number;
+        answered: number;
+        answers: Array<{
+            sequence: number;
+            questionId: number;
+            setNumber: number | null;
+            theme: string | null;
+            contextEn: string | null;
+            contextTa: string | null;
+            questionEn: string | null;
+            questionTa: string | null;
+            status: string;
+            answered: boolean;
+            selectedOptionId: number | null;
+            options: Array<{ id: number; displayOrder: number; textEn: string | null; textTa: string | null; selected: boolean }>;
+        }>;
+    }> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/admin/assessments/sessions/${sessionId}/survey-answers`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: token ? `Bearer ${token}` : "",
+            },
+        });
+        if (!res.ok) throw new Error("Failed to fetch survey answers");
+        return res.json();
+    },
+
     async getGroupCombined(groupId: string | number, programId: string | number): Promise<any> {
         const token = AuthService.getToken();
         const res = await fetch(

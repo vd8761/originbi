@@ -529,6 +529,84 @@ export class AssessmentService {
     }
   }
 
+  /**
+   * Survey (open question_type='SURVEY') answers for a session: the questions
+   * shown to this candidate plus the option they picked. Non-scoring — purely
+   * for the admin "Survey" preview tab. Empty array => no survey in this exam.
+   */
+  async findSurveyAnswers(sessionId: number) {
+    const rows = await this.dataSource.query(
+      `SELECT a.question_sequence  AS seq,
+              oq.id                AS question_id,
+              oq.set_number        AS set_number,
+              oq.context_text_en   AS context_en,
+              oq.context_text_ta   AS context_ta,
+              oq.question_text_en  AS question_en,
+              oq.question_text_ta  AS question_ta,
+              oq.metadata->>'theme' AS theme,
+              a.open_option_id     AS selected_option_id,
+              a.status             AS status
+       FROM assessment_answers a
+       JOIN open_questions oq ON a.open_question_id = oq.id
+       WHERE a.assessment_session_id = $1
+         AND a.question_source = 'OPEN'
+         AND oq.question_type = 'SURVEY'
+       ORDER BY a.question_sequence ASC`,
+      [sessionId],
+    );
+
+    if (!rows || rows.length === 0) {
+      return { setNumber: null, total: 0, answered: 0, answers: [] };
+    }
+
+    const questionIds = rows.map((r: any) => r.question_id);
+    const opts = await this.dataSource.query(
+      `SELECT id, open_question_id, option_text_en, option_text_ta, display_order
+       FROM open_question_options
+       WHERE open_question_id = ANY($1)
+       ORDER BY open_question_id, display_order ASC`,
+      [questionIds],
+    );
+
+    const optsByQ = new Map<string, any[]>();
+    for (const o of opts) {
+      const k = String(o.open_question_id);
+      if (!optsByQ.has(k)) optsByQ.set(k, []);
+      optsByQ.get(k)!.push(o);
+    }
+
+    const answers = rows.map((r: any) => {
+      const selId = r.selected_option_id != null ? String(r.selected_option_id) : null;
+      return {
+        sequence: r.seq,
+        questionId: Number(r.question_id),
+        setNumber: r.set_number,
+        theme: r.theme || null,
+        contextEn: r.context_en,
+        contextTa: r.context_ta,
+        questionEn: r.question_en,
+        questionTa: r.question_ta,
+        status: r.status,
+        answered: selId != null,
+        selectedOptionId: selId != null ? Number(selId) : null,
+        options: (optsByQ.get(String(r.question_id)) || []).map((o: any) => ({
+          id: Number(o.id),
+          displayOrder: o.display_order,
+          textEn: o.option_text_en,
+          textTa: o.option_text_ta,
+          selected: selId != null && String(o.id) === selId,
+        })),
+      };
+    });
+
+    return {
+      setNumber: rows[0].set_number,
+      total: answers.length,
+      answered: answers.filter((a) => a.answered).length,
+      answers,
+    };
+  }
+
   async getSessionDetails(id: number) {
     try {
       const session = await this.sessionRepo

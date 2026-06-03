@@ -17,7 +17,7 @@ import {
 interface OpenQuestionGroup {
   questionType?: string | null; // open_questions.question_type to draw from; null/omitted = any
   count: number; // how many to pick from this group (configurable count shown in the exam)
-  selection?: 'random' | 'set_sequential'; // 'random' = shuffled; 'set_sequential' = fixed order (linked survey sets)
+  selection?: 'random' | 'set_random' | 'set_sequential'; // 'random' = N random of type; 'set_random' = pick one set then N random within; 'set_sequential' = one set in fixed order
 }
 
 @Injectable()
@@ -99,53 +99,34 @@ export class AssessmentGenerationService {
     // (originbi_settings -> assessment.open_question_distribution).
     const openQuestions = await this.selectOpenQuestions(manager);
 
-    // 3. Interleave 2 Main : 1 Open until BOTH pools are exhausted.
-    // Driven by pool sizes (not a hard-coded 20) so the open-question count
-    // stays admin-configurable while every main question is used.
+    // 3. Build the final order: all main questions, with the open/survey
+    // questions SCATTERED at random positions among them (no fixed ratio —
+    // they "appear anywhere in the exam").
     const answersToInsert: Partial<AssessmentAnswer>[] = [];
-    let mainIdx = 0;
-    let openIdx = 0;
     let seq = 1;
 
-    while (mainIdx < mainQuestions.length || openIdx < openQuestions.length) {
-      // Add up to 2 Main
-      for (let j = 0; j < 2 && mainIdx < mainQuestions.length; j++) {
-        const q = mainQuestions[mainIdx++];
-        answersToInsert.push({
-          assessmentAttemptId: attempt.id,
-          assessmentSessionId: attempt.assessmentSessionId,
-          userId: attempt.userId,
-          registrationId: attempt.registrationId,
-          programId: attempt.programId,
-          assessmentLevelId: attempt.assessmentLevelId,
-          questionSource: 'MAIN',
-          mainQuestionId: q.id,
-          questionSequence: seq++,
-          questionOptionsOrder: JSON.stringify(
-            this.shuffleOptions([1, 2, 3, 4]),
-          ), // Store as string
-          status: 'NOT_ANSWERED',
-        });
-      }
-      // Add 1 Open
-      if (openIdx < openQuestions.length) {
-        const oq = openQuestions[openIdx++];
-        answersToInsert.push({
-          assessmentAttemptId: attempt.id,
-          assessmentSessionId: attempt.assessmentSessionId,
-          userId: attempt.userId,
-          registrationId: attempt.registrationId,
-          programId: attempt.programId,
-          assessmentLevelId: attempt.assessmentLevelId,
-          questionSource: 'OPEN',
-          openQuestionId: oq.id,
-          questionSequence: seq++,
-          questionOptionsOrder: JSON.stringify(
-            this.shuffleOptions([1, 2, 3, 4]),
-          ),
-          status: 'NOT_ANSWERED',
-        });
-      }
+    const ordered: Array<{ source: 'MAIN' | 'OPEN'; id: number }> =
+      mainQuestions.map((q) => ({ source: 'MAIN' as const, id: q.id }));
+    for (const oq of openQuestions) {
+      const pos = Math.floor(Math.random() * (ordered.length + 1));
+      ordered.splice(pos, 0, { source: 'OPEN', id: oq.id });
+    }
+
+    for (const item of ordered) {
+      answersToInsert.push({
+        assessmentAttemptId: attempt.id,
+        assessmentSessionId: attempt.assessmentSessionId,
+        userId: attempt.userId,
+        registrationId: attempt.registrationId,
+        programId: attempt.programId,
+        assessmentLevelId: attempt.assessmentLevelId,
+        questionSource: item.source,
+        mainQuestionId: item.source === 'MAIN' ? item.id : undefined,
+        openQuestionId: item.source === 'OPEN' ? item.id : undefined,
+        questionSequence: seq++,
+        questionOptionsOrder: JSON.stringify(this.shuffleOptions([1, 2, 3, 4])),
+        status: 'NOT_ANSWERED',
+      });
     }
 
     // 4. Bulk Insert
@@ -179,6 +160,41 @@ export class AssessmentGenerationService {
     for (const group of groups) {
       const count = Number(group?.count) || 0;
       if (count <= 0) continue;
+
+      // 'set_random': pick ONE random set for this type, then `count` random
+      // questions from within that set (the SURVEY rule).
+      if (group.selection === 'set_random') {
+        let setsQb = manager
+          .createQueryBuilder(OpenQuestion, 'oq')
+          .select('DISTINCT oq.set_number', 'setNumber')
+          .where('oq.is_active = true')
+          .andWhere('oq.is_deleted = false')
+          .andWhere('oq.set_number IS NOT NULL');
+        if (group.questionType) {
+          setsQb = setsQb.andWhere('oq.question_type = :qt', {
+            qt: group.questionType,
+          });
+        }
+        const sets = (await setsQb.getRawMany<{ setNumber: number }>()).map(
+          (s) => s.setNumber,
+        );
+        if (sets.length === 0) continue;
+        const chosenSet = sets[Math.floor(Math.random() * sets.length)];
+
+        let qb = manager
+          .createQueryBuilder(OpenQuestion, 'oq')
+          .where('oq.is_active = true')
+          .andWhere('oq.is_deleted = false')
+          .andWhere('oq.set_number = :sn', { sn: chosenSet });
+        if (group.questionType) {
+          qb = qb.andWhere('oq.question_type = :qt', {
+            qt: group.questionType,
+          });
+        }
+        const rows = await qb.orderBy('RANDOM()').limit(count).getMany();
+        picked.push(...rows);
+        continue;
+      }
 
       let qb = manager
         .createQueryBuilder(OpenQuestion, 'oq')

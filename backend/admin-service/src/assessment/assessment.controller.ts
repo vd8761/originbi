@@ -107,6 +107,11 @@ export class AssessmentController {
     return this.assessmentService.getSessionDetails(Number(id));
   }
 
+  @Get('sessions/:id/survey-answers')
+  async getSurveyAnswers(@Param('id') id: string) {
+    return this.assessmentService.findSurveyAnswers(Number(id));
+  }
+
   @Get('levels')
   async getLevels() {
     return this.assessmentService.getLevels();
