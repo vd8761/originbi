@@ -1951,9 +1951,7 @@ export class StudentService {
     const defaultFrontendUrl =
       this.configService.get<string>('FRONTEND_URL') ??
       'https://mind.originbi.com/';
-    const techFrontendUrl =
-      this.configService.get<string>('TECH_FRONTEND_URL') ||
-      'https://evaluation.originbi.com';
+    const techFrontendUrl = 'https://evaluation.originbi.com';
     const frontendUrl = isTechAssessment ? techFrontendUrl : defaultFrontendUrl;
 
     const emailSubject = isTechAssessment
@@ -3211,10 +3209,7 @@ export class StudentService {
 
     const fromAddress = '"' + fromName + '" <' + fromEmail + '>';
 
-    const techFrontendUrl =
-      this.configService.get<string>('TECH_FRONTEND_URL') ||
-      this.configService.get<string>('FRONTEND_URL') ||
-      'https://evaluation.originbi.com';
+    const techFrontendUrl = 'https://evaluation.originbi.com';
 
     const publicStudentApiUrl =
       techFrontendUrl.replace(/\/$/, '') + '/student-api';
