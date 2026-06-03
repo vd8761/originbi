@@ -1953,7 +1953,7 @@ export class StudentService {
       'https://mind.originbi.com/';
     const techFrontendUrl =
       this.configService.get<string>('TECH_FRONTEND_URL') ||
-      'http://localhost:3000';
+      'https://evaluation.originbi.com';
     const frontendUrl = isTechAssessment ? techFrontendUrl : defaultFrontendUrl;
 
     const emailSubject = isTechAssessment
@@ -3214,7 +3214,7 @@ export class StudentService {
     const techFrontendUrl =
       this.configService.get<string>('TECH_FRONTEND_URL') ||
       this.configService.get<string>('FRONTEND_URL') ||
-      'http://localhost:3000';
+      'https://evaluation.originbi.com';
 
     const publicStudentApiUrl =
       techFrontendUrl.replace(/\/$/, '') + '/student-api';
