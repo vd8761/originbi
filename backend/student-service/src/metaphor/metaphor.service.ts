@@ -6,9 +6,9 @@ import {
   MetaphorQuestion,
   MetaphorAnswer,
   MetaphorTranslationJob,
-  AssessmentAttempt,
   OriginbiSetting,
 } from '@originbi/shared-entities';
+import { AssessmentAttempt } from '../entities/assessment_attempt.entity';
 import { METAPHOR_TRANSLATE_QUEUE } from './metaphor.constants';
 
 export interface MetaphorConfig {
