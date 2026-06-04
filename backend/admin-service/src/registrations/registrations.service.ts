@@ -24,6 +24,7 @@ import {
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { GroupsService } from '../groups/groups.service';
 import { AssessmentGenerationService } from '../assessment/assessment-generation.service';
+import { MetaphorGenerationService } from '../assessment/metaphor-generation.service';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
 import { SettingsService } from '../settings/settings.service';
 import { WhatsappTemplatesService } from '../whatsapp/whatsapp-templates.service';
@@ -60,6 +61,7 @@ export class RegistrationsService {
 
     private readonly groupsService: GroupsService,
     private readonly assessmentGenService: AssessmentGenerationService,
+    private readonly metaphorGenService: MetaphorGenerationService,
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
@@ -449,6 +451,14 @@ export class RegistrationsService {
               throw err;
             }
           }
+          // Generate Level 3 (Metaphor) — gated; skips silently if no bank.
+          else if (
+            level.levelNumber === 3 ||
+            level.name?.includes('Metaphor') ||
+            (level as any).patternType === 'METAPHOR'
+          ) {
+            await this.metaphorGenService.generate(attempt, manager);
+          }
         }
 
         // G. Update Registration to COMPLETED
@@ -654,6 +664,14 @@ export class RegistrationsService {
             );
             throw err;
           }
+        }
+        // Generate Level 3 (Metaphor) — gated; skips silently if no bank.
+        else if (
+          level.levelNumber === 3 ||
+          level.name?.includes('Metaphor') ||
+          (level as any).patternType === 'METAPHOR'
+        ) {
+          await this.metaphorGenService.generate(attempt, manager);
         }
       }
 
