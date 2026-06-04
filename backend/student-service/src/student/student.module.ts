@@ -28,6 +28,7 @@ import {
   DegreeType,
 } from '@originbi/shared-entities';
 import { SettingsModule } from '../settings/settings.module';
+import { MetaphorModule } from '../metaphor/metaphor.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { SettingsModule } from '../settings/settings.module';
     ]),
     HttpModule,
     SettingsModule,
+    MetaphorModule,
   ],
   controllers: [StudentController, SubscriptionController],
   providers: [StudentService, SubscriptionService, StudentProcessor],

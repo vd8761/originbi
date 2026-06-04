@@ -42,6 +42,7 @@ import { SettingsService } from '../settings/settings.service';
 import { WhatsappTemplatesService } from '../whatsapp/whatsapp-templates.service';
 import { SmsService, SmsTemplate } from '../sms/sms.service';
 import { SubscriptionService } from './subscription.service';
+import { MetaphorGenerationService } from '../metaphor/metaphor-generation.service';
 
 export interface AssessmentProgressItem {
   id: number;
@@ -95,6 +96,7 @@ export class StudentService {
     private readonly whatsappTemplates: WhatsappTemplatesService,
     private readonly smsService: SmsService,
     private readonly subscriptionService: SubscriptionService,
+    private readonly metaphorGeneration: MetaphorGenerationService,
   ) {}
 
   /**
@@ -1156,6 +1158,18 @@ export class StudentService {
             user,
             savedReg,
             level,
+          );
+        }
+        // Generate Level 3 (Metaphor) questions — gated; skips silently if no
+        // metaphor bank, so it never affects Level 1/2.
+        else if (
+          level.levelNumber === 3 ||
+          level.name?.includes('Metaphor') ||
+          (level as any).patternType === 'METAPHOR'
+        ) {
+          await this.metaphorGeneration.generate(
+            savedAttempt,
+            this.sessionRepo.manager,
           );
         }
       }

@@ -3,9 +3,21 @@ import { EntityManager } from 'typeorm';
 import {
   MetaphorQuestion,
   MetaphorAnswer,
-  AssessmentAttempt,
   OriginbiSetting,
 } from '@originbi/shared-entities';
+
+/**
+ * Minimal attempt shape needed for generation — structural so any service's
+ * AssessmentAttempt entity (shared or local) can be passed.
+ */
+export interface MetaphorAttemptCtx {
+  id: number;
+  assessmentSessionId?: number | null;
+  userId?: number | null;
+  registrationId?: number | null;
+  programId?: number | null;
+  assessmentLevelId?: number | null;
+}
 
 /**
  * Generates the candidate's Level 3 (Metaphor) questions for an attempt.
@@ -18,7 +30,7 @@ import {
 export class MetaphorGenerationService {
   private readonly logger = new Logger(MetaphorGenerationService.name);
 
-  async generate(attempt: AssessmentAttempt, manager: EntityManager): Promise<void> {
+  async generate(attempt: MetaphorAttemptCtx, manager: EntityManager): Promise<void> {
     // How many questions to show (admin setting, default 20).
     let count = 20;
     try {
