@@ -1142,7 +1142,17 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
           return step;
         })
       );
-      router.push(`/student/assessment/start?attempt_id=${selectedAssessment.attemptId}`);
+      // Level 3 "Metaphor" uses a dedicated voice-answer page; everything else
+      // (Level 1 MCQ, ACI, ...) uses the standard runner. Gated so Level 1/2 are
+      // unaffected.
+      const isMetaphor =
+        selectedAssessment.id === '3' ||
+        /metaphor/i.test(selectedAssessment.title || '');
+      if (isMetaphor) {
+        router.push(`/student/metaphor?attemptId=${selectedAssessment.attemptId}`);
+      } else {
+        router.push(`/student/assessment/start?attempt_id=${selectedAssessment.attemptId}`);
+      }
     } else {
       console.error("No attempt ID found. Selected Assessment:", selectedAssessment);
       alert("Error: Unable to start assessment. No Assessment Attempt ID found. Please check console (F12) for details.");
