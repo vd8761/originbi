@@ -127,6 +127,15 @@ export class MetaphorService {
     );
 
     const config = await this.getConfig();
+    // Images are stored as a relative path ("/assets/images/<set>.<q>.webp");
+    // the origin is admin-configurable so the whole library can be repointed.
+    const imageBase = String(await this.readSetting('image_base_url', '')).replace(/\/+$/, '');
+    const buildImageUrl = (p: string | null): string | null => {
+      if (!p) return null;
+      if (/^https?:\/\//i.test(p)) return p; // already absolute
+      if (!imageBase) return p; // relative fallback (served from app origin)
+      return `${imageBase}${p.startsWith('/') ? '' : '/'}${p}`;
+    };
     return {
       config,
       total: rows.length,
@@ -138,7 +147,7 @@ export class MetaphorService {
         answered: r.status === 'ANSWERED',
         spokenLanguage: r.spoken_language,
         savedAnswer: r.answer_text || '',
-        imageUrl: r.image_url,
+        imageUrl: buildImageUrl(r.image_url),
         imageDescEn: r.image_desc_en,
         imageDescTa: r.image_desc_ta,
         contextEn: r.context_en,
