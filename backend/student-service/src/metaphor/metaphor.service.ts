@@ -1,6 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
+import { PgBossService } from '@wavezync/nestjs-pgboss';
 import {
   MetaphorQuestion,
   MetaphorAnswer,
@@ -8,6 +9,7 @@ import {
   AssessmentAttempt,
   OriginbiSetting,
 } from '@originbi/shared-entities';
+import { METAPHOR_TRANSLATE_QUEUE } from './metaphor.constants';
 
 export interface MetaphorConfig {
   questionCount: number;
@@ -37,7 +39,27 @@ export class MetaphorService {
     @InjectRepository(OriginbiSetting)
     private readonly settingRepo: Repository<OriginbiSetting>,
     private readonly dataSource: DataSource,
+    private readonly pgBoss: PgBossService,
   ) {}
+
+  /** Enqueue a translation job for an attempt (best-effort; the sweep is the safety net). */
+  private async enqueueTranslation(attemptId: number): Promise<void> {
+    try {
+      await this.pgBoss.boss.send(METAPHOR_TRANSLATE_QUEUE, { attemptId });
+    } catch (e) {
+      this.logger.warn(
+        `[Metaphor] enqueue translation failed for attempt ${attemptId} (sweep will retry): ${
+          (e as Error)?.message
+        }`,
+      );
+    }
+  }
+
+  /** Manual (admin) re-translate trigger. */
+  async translateNow(attemptId: number) {
+    await this.enqueueTranslation(attemptId);
+    return { success: true, queued: true };
+  }
 
   // ---- settings (with safe defaults) ----
   private async readSetting<T>(key: string, fallback: T): Promise<T> {
@@ -183,6 +205,8 @@ export class MetaphorService {
       job.total = pendingCount;
     }
     await this.jobRepo.save(job);
+
+    if (pendingCount > 0) await this.enqueueTranslation(attemptId);
 
     return { success: true, translationsPending: pendingCount };
   }

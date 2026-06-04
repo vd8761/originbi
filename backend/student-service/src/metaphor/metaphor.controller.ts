@@ -41,4 +41,10 @@ export class MetaphorController {
   finish(@Param('attemptId') attemptId: string) {
     return this.metaphor.finishAttempt(Number(attemptId));
   }
+
+  // Admin: manually (re-)queue translation for an attempt.
+  @Post('admin/translate/:attemptId')
+  translateNow(@Param('attemptId') attemptId: string) {
+    return this.metaphor.translateNow(Number(attemptId));
+  }
 }
