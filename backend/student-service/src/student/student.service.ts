@@ -1160,17 +1160,24 @@ export class StudentService {
             level,
           );
         }
-        // Generate Level 3 (Metaphor) questions — gated; skips silently if no
-        // metaphor bank, so it never affects Level 1/2.
+        // Generate Level 3 (Metaphor) questions — gated + NON-FATAL: a metaphor
+        // failure must never break the core registration / Level 1.
         else if (
           level.levelNumber === 3 ||
           level.name?.includes('Metaphor') ||
           (level as any).patternType === 'METAPHOR'
         ) {
-          await this.metaphorGeneration.generate(
-            savedAttempt,
-            this.sessionRepo.manager,
-          );
+          try {
+            await this.metaphorGeneration.generate(
+              savedAttempt,
+              this.sessionRepo.manager,
+            );
+          } catch (err) {
+            this.logger.error(
+              `[Metaphor] generation failed for attempt ${savedAttempt.id} (non-fatal):`,
+              err as Error,
+            );
+          }
         }
       }
 

@@ -452,12 +452,21 @@ export class RegistrationsService {
             }
           }
           // Generate Level 3 (Metaphor) — gated; skips silently if no bank.
+          // NON-FATAL: a metaphor failure must never roll back the core
+          // registration (Level 1). Toggling Level 3 can't break other levels.
           else if (
             level.levelNumber === 3 ||
             level.name?.includes('Metaphor') ||
             (level as any).patternType === 'METAPHOR'
           ) {
-            await this.metaphorGenService.generate(attempt, manager);
+            try {
+              await this.metaphorGenService.generate(attempt, manager);
+            } catch (err) {
+              this.logger.error(
+                `Metaphor generation failed for Attempt ${attempt.id} (non-fatal):`,
+                err,
+              );
+            }
           }
         }
 
@@ -665,13 +674,20 @@ export class RegistrationsService {
             throw err;
           }
         }
-        // Generate Level 3 (Metaphor) — gated; skips silently if no bank.
+        // Generate Level 3 (Metaphor) — gated + NON-FATAL (see create()).
         else if (
           level.levelNumber === 3 ||
           level.name?.includes('Metaphor') ||
           (level as any).patternType === 'METAPHOR'
         ) {
-          await this.metaphorGenService.generate(attempt, manager);
+          try {
+            await this.metaphorGenService.generate(attempt, manager);
+          } catch (err) {
+            this.logger.error(
+              `Metaphor generation failed for Attempt ${attempt.id} (non-fatal):`,
+              err,
+            );
+          }
         }
       }
 
