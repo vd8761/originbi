@@ -10,6 +10,7 @@ import {
 } from '@originbi/shared-entities';
 import { AssessmentAttempt } from '../entities/assessment_attempt.entity';
 import { METAPHOR_TRANSLATE_QUEUE } from './metaphor.constants';
+import { MetaphorGenerationService } from './metaphor-generation.service';
 
 export interface MetaphorConfig {
   questionCount: number;
@@ -40,6 +41,7 @@ export class MetaphorService {
     private readonly settingRepo: Repository<OriginbiSetting>,
     private readonly dataSource: DataSource,
     private readonly pgBoss: PgBossService,
+    private readonly generation: MetaphorGenerationService,
   ) {}
 
   /** Enqueue a translation job for an attempt (best-effort; the sweep is the safety net). */
@@ -103,10 +105,7 @@ export class MetaphorService {
     return { provider: cfg.provider, params: cfg.params || {}, token: null };
   }
 
-  /** The candidate's generated questions for an attempt + page config. Resumable. */
-  async getQuestionsForAttempt(attemptId: number) {
-    const rows = await this.dataSource.query(
-      `SELECT a.id              AS answer_id,
+  private readonly QUESTIONS_SQL = `SELECT a.id              AS answer_id,
               a.question_sequence AS seq,
               a.status           AS status,
               a.spoken_language  AS spoken_language,
@@ -122,10 +121,45 @@ export class MetaphorService {
        FROM metaphor_answers a
        JOIN metaphor_questions q ON a.metaphor_question_id = q.id
        WHERE a.assessment_attempt_id = $1
-       ORDER BY a.question_sequence ASC`,
-      [attemptId],
-    );
+       ORDER BY a.question_sequence ASC`;
 
+  /** The candidate's generated questions for an attempt + page config. Resumable. */
+  async getQuestionsForAttempt(attemptId: number) {
+    let rows = await this.dataSource.query(this.QUESTIONS_SQL, [attemptId]);
+
+    // Lazy generation: if this Level-3 attempt has no questions yet (e.g. the
+    // level was enabled AFTER registration and the exam-engine created the
+    // attempt on the fly), generate them now, then re-query.
+    if (!rows || rows.length === 0) {
+      const attempt = await this.attemptRepo.findOne({ where: { id: attemptId } });
+      if (attempt) {
+        try {
+          await this.generation.generate(
+            {
+              id: Number((attempt as any).id),
+              assessmentSessionId: (attempt as any).assessmentSessionId ?? null,
+              userId: (attempt as any).userId ?? null,
+              registrationId: (attempt as any).registrationId ?? null,
+              programId: (attempt as any).programId ?? null,
+              assessmentLevelId: (attempt as any).assessmentLevelId ?? null,
+            },
+            this.dataSource.manager,
+          );
+          rows = await this.dataSource.query(this.QUESTIONS_SQL, [attemptId]);
+        } catch (e) {
+          this.logger.warn(
+            `[Metaphor] lazy generation failed for attempt ${attemptId}: ${
+              (e as Error)?.message
+            }`,
+          );
+        }
+      }
+    }
+
+    return this.buildQuestionsResponse(rows);
+  }
+
+  private async buildQuestionsResponse(rows: any[]) {
     const config = await this.getConfig();
     // Images are stored as a relative path ("/assets/images/<set>.<q>.webp");
     // the origin is admin-configurable so the whole library can be repointed.
