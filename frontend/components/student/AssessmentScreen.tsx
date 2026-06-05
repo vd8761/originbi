@@ -39,7 +39,6 @@ const PDF_RENDER_MAX_WIDTH = 1080;
 const PDF_RENDER_PIXEL_RATIO_CAP = 1.35;
 const REPORT_PREVIEW_CACHE_VERSION = 'v3';
 const REPORT_PREVIEW_CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
-const REPORT_READY_COMPLETION_COUNT = 2;
 const REPORT_READY_STORAGE_KEY = 'studentReportReady';
 
 // =============================================
@@ -1035,7 +1034,10 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       return;
     }
 
-    const reportReady = completedAssessmentCount >= REPORT_READY_COMPLETION_COUNT;
+    // Report is ready only when EVERY assigned level is completed — not a fixed
+    // count — so enabling Level 3/4 keeps the student in the assessment until done.
+    const reportReady =
+      assessments.length > 0 && completedAssessmentCount >= assessments.length;
     setForceReportPageMode(reportReady);
 
     if (typeof window !== 'undefined') {
@@ -1063,7 +1065,8 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   const overallPercentage = totalQuestions > 0 ? Math.round((totalCompleted / totalQuestions) * 100) : 0;
 
   const isReportPageMode =
-    completedAssessmentCount >= REPORT_READY_COMPLETION_COUNT || forceReportPageMode;
+    (assessments.length > 0 && completedAssessmentCount >= assessments.length) ||
+    forceReportPageMode;
   const canPreviewReport = isReportPageMode;
 
   const loadPdfIntoViewer = async (

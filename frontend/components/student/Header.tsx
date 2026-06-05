@@ -244,11 +244,14 @@ const Header: React.FC<HeaderProps> = ({
                 const progressData = await studentService.getAssessmentProgress(email);
                 if (!isMounted) return;
 
-                const completedCount = Array.isArray(progressData)
-                    ? progressData.filter((step: any) => String(step?.status || '').toUpperCase() === 'COMPLETED').length
-                    : 0;
+                const steps = Array.isArray(progressData) ? progressData : [];
+                const completedCount = steps.filter(
+                    (step: any) => String(step?.status || '').toUpperCase() === 'COMPLETED',
+                ).length;
 
-                const nextReportReady = completedCount >= 2;
+                // Report is ready only when EVERY assigned level is completed (not a
+                // fixed count), so enabling Level 3/4 keeps the assessment open until done.
+                const nextReportReady = steps.length > 0 && completedCount >= steps.length;
                 setIsReportReady(nextReportReady);
                 sessionStorage.setItem(REPORT_READY_STORAGE_KEY, nextReportReady ? 'true' : 'false');
                 localStorage.setItem(REPORT_READY_STORAGE_KEY, nextReportReady ? 'true' : 'false');

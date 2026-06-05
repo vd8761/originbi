@@ -1000,13 +1000,14 @@ func (s *ExamService) IsLastLevel(attemptID int64) (bool, error) {
 		return false, err
 	}
 
-	// Check count of attempts in same session with higher level number
+	// "Last level" = there is NO higher MANDATORY level still to do. We count
+	// mandatory LEVELS (not attempts), because a higher level may be enabled
+	// after the student registered and not yet have an attempt — completing the
+	// current level creates/unlocks it. This keeps the student in the assessment
+	// (no premature report) whenever Level 3/4/... is turned on.
 	var count int64
-	// Filter out CANCELLED or other invalid statuses if necessary, but mainly just check existence
-	err := db.Table("assessment_attempts").
-		Joins("JOIN assessment_levels ON assessment_levels.id = assessment_attempts.assessment_level_id").
-		Where("assessment_attempts.assessment_session_id = ? AND assessment_attempts.status != 'CANCELLED' AND assessment_levels.level_number > ?",
-			attempt.AssessmentSessionID, currentLevel.LevelNumber).
+	err := db.Table("assessment_levels").
+		Where("level_number > ? AND is_mandatory = ?", currentLevel.LevelNumber, true).
 		Count(&count).Error
 
 	if err != nil {
