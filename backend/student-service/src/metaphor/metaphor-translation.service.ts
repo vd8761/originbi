@@ -9,6 +9,7 @@ import {
   MetaphorTranslationJob,
   OriginbiSetting,
 } from '@originbi/shared-entities';
+import { MetaphorReportService } from './metaphor-report.service';
 
 const DEFAULT_MODEL = 'gemini-2.0-flash';
 
@@ -31,6 +32,7 @@ export class MetaphorTranslationService {
     @InjectRepository(OriginbiSetting)
     private readonly settingRepo: Repository<OriginbiSetting>,
     private readonly http: HttpService,
+    private readonly reports: MetaphorReportService,
   ) {}
 
   /** Translate everything pending for one attempt. Throws on failure so the
@@ -49,6 +51,7 @@ export class MetaphorTranslationService {
         status: 'DONE',
         translated: job.translated,
       });
+      await this.reports.enqueueIfReady(attemptId);
       return;
     }
 
@@ -174,6 +177,7 @@ export class MetaphorTranslationService {
       translated: translatedTotal,
       lastError: null,
     });
+    await this.reports.enqueueIfReady(attemptId);
     this.logger.log(`[Metaphor] Translated ${done} answers for attempt ${attemptId}.`);
   }
 

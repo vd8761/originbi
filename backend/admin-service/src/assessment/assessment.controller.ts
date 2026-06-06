@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, Query, Param } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Param, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { AssessmentService } from './assessment.service';
 
 @Controller('admin/assessments')
@@ -110,6 +111,32 @@ export class AssessmentController {
   @Get('sessions/:id/survey-answers')
   async getSurveyAnswers(@Param('id') id: string) {
     return this.assessmentService.findSurveyAnswers(Number(id));
+  }
+
+  @Get('sessions/:id/metaphor-report')
+  async getMetaphorReport(@Param('id') id: string) {
+    return this.assessmentService.findMetaphorReport(Number(id));
+  }
+
+  @Post('metaphor/:attemptId/report/retry')
+  async retryMetaphorReport(@Param('attemptId') attemptId: string) {
+    return this.assessmentService.retryMetaphorReport(Number(attemptId));
+  }
+
+  @Get('metaphor/:attemptId/report/pdf')
+  async downloadMetaphorReportPdf(
+    @Param('attemptId') attemptId: string,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.assessmentService.generateMetaphorReportPdf(
+      Number(attemptId),
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="metaphor-report-${attemptId}.pdf"`,
+    );
+    res.send(pdf);
   }
 
   @Get('levels')

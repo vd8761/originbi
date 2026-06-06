@@ -120,6 +120,61 @@ export class SettingsService {
     }
   }
 
+  async getClaudeModels(): Promise<{
+    models: Array<{ value: string; label: string; description?: string }>;
+    error?: string;
+  }> {
+    const apiKey =
+      String((await this.getValue<string>('metaphor', 'claude_api_key')) || '').trim() ||
+      process.env.ANTHROPIC_API_KEY ||
+      '';
+
+    if (!apiKey) {
+      return {
+        models: [],
+        error: 'Claude API key is not configured.',
+      };
+    }
+
+    try {
+      const res = await firstValueFrom(
+        this.http.get('https://api.anthropic.com/v1/models', {
+          timeout: 30000,
+          headers: {
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+          },
+        }),
+      );
+      const rows = Array.isArray((res as any).data?.data)
+        ? (res as any).data.data
+        : Array.isArray((res as any).data?.models)
+          ? (res as any).data.models
+          : [];
+      const models = rows
+        .map((model: any) => {
+          const id = String(model.id || model.name || '').trim();
+          const displayName = String(model.display_name || model.displayName || id).trim();
+          return {
+            value: id,
+            label: displayName && displayName !== id ? `${displayName} (${id})` : id,
+            description: model.created_at ? `Created ${model.created_at}` : undefined,
+          };
+        })
+        .filter((model: any) => model.value.startsWith('claude-'))
+        .sort((a: any, b: any) => a.label.localeCompare(b.label));
+
+      return { models };
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.error?.message ||
+        err?.message ||
+        'Failed to fetch Claude models.';
+      this.logger.warn(`Failed to fetch Claude models: ${msg}`);
+      return { models: [], error: msg };
+    }
+  }
+
   private isMetaphorGeminiModel(modelName: string): boolean {
     const name = String(modelName || '').toLowerCase();
     if (!name.startsWith('gemini-')) return false;

@@ -32,6 +32,11 @@ export class SettingsController {
     return this.settingsService.getGeminiModels();
   }
 
+  @Get('metaphor/claude-models')
+  async getClaudeModels() {
+    return this.settingsService.getClaudeModels();
+  }
+
   // ---------------------------------------------------------
   // GET /settings/:category — Settings for a specific category
   // ---------------------------------------------------------

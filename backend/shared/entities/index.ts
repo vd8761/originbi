@@ -83,6 +83,8 @@ export { MetaphorQuestion } from './metaphor-question.entity';
 export { MetaphorAnswer } from './metaphor-answer.entity';
 export { MetaphorTranscriptionJob } from './metaphor-transcription-job.entity';
 export { MetaphorTranslationJob } from './metaphor-translation-job.entity';
+export { MetaphorReport } from './metaphor-report.entity';
+export { MetaphorReportJob } from './metaphor-report-job.entity';
 export { AiUsageLog } from './ai-usage-log.entity';
 
 // ============================================

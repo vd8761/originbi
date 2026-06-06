@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import PDFDocument from 'pdfkit';
 import {
   AssessmentSession,
   Program,
@@ -605,6 +606,274 @@ export class AssessmentService {
       answered: answers.filter((a) => a.answered).length,
       answers,
     };
+  }
+
+  async findMetaphorReport(sessionId: number) {
+    const attemptRows = await this.dataSource.query(
+      `SELECT aa.id, aa.status, aa.started_at, aa.completed_at
+       FROM assessment_attempts aa
+       JOIN assessment_levels al ON al.id = aa.assessment_level_id
+       WHERE aa.assessment_session_id = $1
+         AND (LOWER(al.name) LIKE '%metaphor%' OR LOWER(COALESCE(al.pattern_type, '')) = 'metaphor' OR al.level_number = 3)
+       ORDER BY aa.id DESC
+       LIMIT 1`,
+      [sessionId],
+    );
+
+    if (!attemptRows || attemptRows.length === 0) {
+      return {
+        attempt: null,
+        total: 0,
+        answered: 0,
+        missing: 0,
+        readyForReport: false,
+        answers: [],
+        job: null,
+        report: null,
+      };
+    }
+
+    const attemptId = Number(attemptRows[0].id);
+    const answers = await this.dataSource.query(
+      `SELECT a.id,
+              a.question_sequence AS "sequence",
+              a.status,
+              a.spoken_language AS "spokenLanguage",
+              a.answer_text_web AS "webTranscript",
+              a.answer_text_original AS "finalTranscript",
+              a.answer_text_en AS "englishText",
+              a.translation_status AS "translationStatus",
+              a.transcription_status AS "transcriptionStatus",
+              a.transcription_source AS "transcriptionSource",
+              a.transcription_error AS "transcriptionError",
+              a.transcription_retry_count AS "transcriptionRetryCount",
+              a.transcription_next_retry_at AS "transcriptionNextRetryAt",
+              q.context_text_en AS "contextEn",
+              q.context_text_ta AS "contextTa",
+              q.question_text_en AS "questionEn",
+              q.question_text_ta AS "questionTa",
+              q.image_url AS "imageUrl",
+              q.image_description_en AS "imageDescriptionEn",
+              q.image_description_ta AS "imageDescriptionTa"
+       FROM metaphor_answers a
+       JOIN metaphor_questions q ON q.id = a.metaphor_question_id
+       WHERE a.assessment_attempt_id = $1
+       ORDER BY a.question_sequence ASC`,
+      [attemptId],
+    );
+
+    const jobRows = await this.dataSource.query(
+      `SELECT id,
+              status,
+              retry_count AS "retryCount",
+              max_retries AS "maxRetries",
+              next_retry_at AS "nextRetryAt",
+              last_error AS "lastError",
+              started_at AS "startedAt",
+              completed_at AS "completedAt",
+              updated_at AS "updatedAt"
+       FROM metaphor_report_jobs
+       WHERE assessment_attempt_id = $1
+       LIMIT 1`,
+      [attemptId],
+    );
+
+    const reportRows = await this.dataSource.query(
+      `SELECT id,
+              model,
+              markdown,
+              generated_at AS "generatedAt",
+              updated_at AS "updatedAt"
+       FROM metaphor_reports
+       WHERE assessment_attempt_id = $1
+       LIMIT 1`,
+      [attemptId],
+    );
+
+    const total = answers.length;
+    const answered = answers.filter((a: any) => a.status === 'ANSWERED').length;
+    const missing = total - answered;
+    const readyForReport =
+      total > 0 &&
+      answers.every((a: any) => {
+        if (a.status === 'NOT_ANSWERED') return true;
+        return a.translationStatus === 'DONE' && String(a.englishText || '').trim();
+      });
+
+    return {
+      attempt: {
+        id: attemptId,
+        status: attemptRows[0].status,
+        startedAt: attemptRows[0].started_at,
+        completedAt: attemptRows[0].completed_at,
+      },
+      total,
+      answered,
+      missing,
+      readyForReport,
+      answers,
+      job: jobRows[0] || null,
+      report: reportRows[0] || null,
+    };
+  }
+
+  async retryMetaphorReport(attemptId: number) {
+    const existingReport = await this.dataSource.query(
+      `SELECT id FROM metaphor_reports WHERE assessment_attempt_id = $1 LIMIT 1`,
+      [attemptId],
+    );
+    if (existingReport?.length) {
+      return { success: false, reason: 'report_exists' };
+    }
+
+    await this.dataSource.query(
+      `INSERT INTO metaphor_report_jobs
+         (assessment_attempt_id, status, retry_count, max_retries, next_retry_at, last_error, created_at, updated_at)
+       VALUES ($1, 'PENDING', 0, 5, NULL, NULL, NOW(), NOW())
+       ON CONFLICT (assessment_attempt_id)
+       DO UPDATE SET status = 'PENDING',
+                     retry_count = 0,
+                     next_retry_at = NULL,
+                     last_error = NULL,
+                     updated_at = NOW()`,
+      [attemptId],
+    );
+
+    return { success: true, queued: true };
+  }
+
+  async generateMetaphorReportPdf(attemptId: number): Promise<Buffer> {
+    const reportRows = await this.dataSource.query(
+      `SELECT markdown, model, generated_at AS "generatedAt"
+       FROM metaphor_reports
+       WHERE assessment_attempt_id = $1
+       LIMIT 1`,
+      [attemptId],
+    );
+
+    if (!reportRows?.length || !String(reportRows[0].markdown || '').trim()) {
+      throw new BadRequestException('Metaphor report is not generated yet.');
+    }
+
+    const answerRows = await this.dataSource.query(
+      `SELECT a.question_sequence AS sequence,
+              a.status,
+              a.answer_text_original AS "finalTranscript",
+              a.answer_text_en AS "englishText",
+              q.question_text_en AS "questionEn"
+       FROM metaphor_answers a
+       JOIN metaphor_questions q ON q.id = a.metaphor_question_id
+       WHERE a.assessment_attempt_id = $1
+       ORDER BY a.question_sequence ASC`,
+      [attemptId],
+    );
+
+    return new Promise<Buffer>((resolve, reject) => {
+      const doc = new PDFDocument({
+        size: 'A4',
+        margins: { top: 54, bottom: 54, left: 54, right: 54 },
+        info: {
+          Title: `Metaphor Claude Report ${attemptId}`,
+          Author: 'OriginBI',
+        },
+      });
+      const buffers: Buffer[] = [];
+
+      doc.on('data', (buffer) => buffers.push(buffer));
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
+      doc.on('error', reject);
+
+      const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      const ensureSpace = (height = 80) => {
+        if (doc.y + height > doc.page.height - doc.page.margins.bottom) doc.addPage();
+      };
+      const cleanInline = (value: string) =>
+        value
+          .replace(/\*\*(.*?)\*\*/g, '$1')
+          .replace(/__(.*?)__/g, '$1')
+          .replace(/`([^`]+)`/g, '$1')
+          .replace(/\[(.*?)\]\((.*?)\)/g, '$1');
+
+      doc.font('Helvetica-Bold').fontSize(18).fillColor('#111827').text('Metaphor Claude Report');
+      doc.moveDown(0.4);
+      doc
+        .font('Helvetica')
+        .fontSize(9)
+        .fillColor('#6b7280')
+        .text(`Attempt ID: ${attemptId}`)
+        .text(reportRows[0].model ? `Model: ${reportRows[0].model}` : '')
+        .text(reportRows[0].generatedAt ? `Generated: ${new Date(reportRows[0].generatedAt).toLocaleString('en-GB')}` : '');
+      doc.moveDown(1);
+
+      String(reportRows[0].markdown)
+        .split(/\r?\n/)
+        .forEach((raw) => {
+          const line = raw.trim();
+          if (!line) {
+            doc.moveDown(0.55);
+            return;
+          }
+          ensureSpace();
+          if (line.startsWith('# ')) {
+            doc.moveDown(0.45);
+            doc.font('Helvetica-Bold').fontSize(16).fillColor('#111827').text(cleanInline(line.slice(2)), { width: pageWidth });
+          } else if (line.startsWith('## ')) {
+            doc.moveDown(0.4);
+            doc.font('Helvetica-Bold').fontSize(14).fillColor('#111827').text(cleanInline(line.slice(3)), { width: pageWidth });
+          } else if (line.startsWith('### ')) {
+            doc.moveDown(0.3);
+            doc.font('Helvetica-Bold').fontSize(12).fillColor('#111827').text(cleanInline(line.slice(4)), { width: pageWidth });
+          } else if (/^\d+\.\s+/.test(line)) {
+            doc.font('Helvetica').fontSize(10.5).fillColor('#111827').text(cleanInline(line), {
+              width: pageWidth,
+              indent: 16,
+              lineGap: 3,
+            });
+          } else if (/^[-*]\s+/.test(line)) {
+            doc.font('Helvetica').fontSize(10.5).fillColor('#111827').text(`- ${cleanInline(line.slice(2))}`, {
+              width: pageWidth,
+              indent: 16,
+              lineGap: 3,
+            });
+          } else {
+            doc.font('Helvetica').fontSize(10.5).fillColor('#111827').text(cleanInline(line), {
+              width: pageWidth,
+              lineGap: 3,
+            });
+          }
+        });
+
+      if (answerRows?.length) {
+        doc.addPage();
+        doc.font('Helvetica-Bold').fontSize(16).fillColor('#111827').text('Question Transcript Appendix');
+        doc.moveDown(0.8);
+        for (const answer of answerRows) {
+          ensureSpace(140);
+          doc.font('Helvetica-Bold').fontSize(11).fillColor('#111827').text(`Question ${answer.sequence}`);
+          doc.font('Helvetica').fontSize(9.5).fillColor('#374151').text(cleanInline(String(answer.questionEn || 'Metaphor question')), {
+            width: pageWidth,
+            lineGap: 2,
+          });
+          doc.moveDown(0.25);
+          doc.font('Helvetica-Bold').fontSize(9.5).fillColor('#111827').text('Transcript');
+          doc.font('Helvetica').fontSize(9.5).fillColor('#374151').text(String(answer.finalTranscript || '[No answer submitted]'), {
+            width: pageWidth,
+            lineGap: 2,
+          });
+          if (answer.englishText) {
+            doc.moveDown(0.25);
+            doc.font('Helvetica-Bold').fontSize(9.5).fillColor('#111827').text('English Translation');
+            doc.font('Helvetica').fontSize(9.5).fillColor('#374151').text(String(answer.englishText), {
+              width: pageWidth,
+              lineGap: 2,
+            });
+          }
+          doc.moveDown(0.8);
+        }
+      }
+
+      doc.end();
+    });
   }
 
   async getSessionDetails(id: number) {

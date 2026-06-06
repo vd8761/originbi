@@ -35,6 +35,8 @@ interface GeminiModelOption {
     description?: string;
 }
 
+type ModelOption = GeminiModelOption;
+
 interface SelectOption {
     value: string;
     label: string;
@@ -54,6 +56,7 @@ export default function SettingsManagement() {
 
     // Modal state for feature-specific overrides
     const [activeOverrideKey, setActiveOverrideKey] = useState<string | null>(null);
+    const [activeMarkdownSkill, setActiveMarkdownSkill] = useState<SettingItem | null>(null);
     const [visibleSensitiveFields, setVisibleSensitiveFields] = useState<Record<string, boolean>>({});
 
     const toggleToConfigMap: Record<string, string> = {
@@ -278,6 +281,31 @@ export default function SettingsManagement() {
                         isReadonly={item.isReadonly}
                         onChange={(next) => handleValueChange(item.category, item.key, next)}
                     />
+                );
+            }
+
+            if (item.category === 'metaphor' && item.key === 'claude_report_model') {
+                return (
+                    <ClaudeModelSelect
+                        value={String(item.value || '')}
+                        isReadonly={item.isReadonly}
+                        onChange={(next) => handleValueChange(item.category, item.key, next)}
+                    />
+                );
+            }
+
+            if (item.category === 'metaphor' && item.key === 'report_skill_markdown') {
+                return (
+                    <div className="flex items-center justify-end">
+                        <button
+                            type="button"
+                            onClick={() => setActiveMarkdownSkill(item)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-brand-green/10 px-4 py-2.5 text-sm font-medium text-brand-green transition-colors hover:bg-brand-green/20 focus:outline-none focus:ring-2 focus:ring-brand-green/40"
+                        >
+                            <ProfileIcon className="h-4 w-4" />
+                            Edit / Preview
+                        </button>
+                    </div>
                 );
             }
 
@@ -562,11 +590,19 @@ export default function SettingsManagement() {
 
             {/* Modal for email overrides */}
             {activeOverrideKey && (
-                <EmailOverrideModal 
+                <EmailOverrideModal
                     isOpen={!!activeOverrideKey}
                     onClose={() => setActiveOverrideKey(null)}
                     configItem={settingsGrouped['email']?.find(s => s.key === activeOverrideKey)}
                     onChange={(newVal: any) => handleValueChange('email', activeOverrideKey as string, newVal)}
+                />
+            )}
+
+            {activeMarkdownSkill && (
+                <MarkdownSkillModal
+                    item={settingsGrouped[activeMarkdownSkill.category]?.find((s) => s.key === activeMarkdownSkill.key) || activeMarkdownSkill}
+                    onClose={() => setActiveMarkdownSkill(null)}
+                    onChange={(next) => handleValueChange(activeMarkdownSkill.category, activeMarkdownSkill.key, next)}
                 />
             )}
         </div>
@@ -1143,6 +1179,183 @@ function GeminiModelSelect({
         </div>
     );
 }
+
+function ClaudeModelSelect({
+    value,
+    isReadonly,
+    onChange,
+}: {
+    value: string;
+    isReadonly: boolean;
+    onChange: (next: string) => void;
+}) {
+    const [models, setModels] = useState<ModelOption[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchModels = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const { data } = await api.get('/settings/metaphor/claude-models');
+            setModels(Array.isArray(data.models) ? data.models : []);
+            setError(data.error || null);
+        } catch (err: any) {
+            setModels([]);
+            setError(err.response?.data?.message || 'Failed to fetch Claude models.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        void fetchModels();
+    }, []);
+
+    const options = [...models];
+    if (value && !options.some((model) => model.value === value)) {
+        options.unshift({ value, label: `${value} (current)` });
+    }
+
+    return (
+        <div className="w-full max-w-lg space-y-2">
+            <div className="flex gap-2">
+                <SettingsSelect
+                    value={value}
+                    disabled={isReadonly || loading || options.length === 0}
+                    options={options}
+                    placeholder="No Claude models available"
+                    onChange={onChange}
+                />
+                <button
+                    type="button"
+                    disabled={isReadonly || loading}
+                    onClick={() => void fetchModels()}
+                    className="rounded-xl bg-brand-green/10 px-4 py-2.5 text-sm font-medium text-brand-green hover:bg-brand-green/20 transition-colors disabled:opacity-40"
+                >
+                    {loading ? 'Loading' : 'Refresh'}
+                </button>
+            </div>
+            {error && (
+                <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                    {error}
+                </p>
+            )}
+        </div>
+    );
+}
+
+function MarkdownSkillModal({
+    item,
+    onClose,
+    onChange,
+}: {
+    item: SettingItem;
+    onClose: () => void;
+    onChange: (next: string) => void;
+}) {
+    const [tab, setTab] = useState<'edit' | 'preview'>('edit');
+    const value = String(item.value || '');
+
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') onClose();
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
+
+    return ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
+            <div
+                className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-white/10 dark:bg-[#19211C]"
+                onMouseDown={(event) => event.stopPropagation()}
+            >
+                <div className="flex flex-col gap-4 border-b border-gray-200 px-6 py-5 dark:border-white/10 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{item.label}</h2>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{item.description}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="flex rounded-xl bg-gray-100 p-1 dark:bg-white/5">
+                            {(['edit', 'preview'] as const).map((mode) => (
+                                <button
+                                    key={mode}
+                                    type="button"
+                                    onClick={() => setTab(mode)}
+                                    className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+                                        tab === mode
+                                            ? 'bg-white text-gray-900 shadow-sm dark:bg-[#273127] dark:text-white'
+                                            : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                                    }`}
+                                >
+                                    {mode}
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded-xl px-3 py-2 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white"
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto p-6">
+                    {tab === 'edit' ? (
+                        <textarea
+                            disabled={item.isReadonly}
+                            value={value}
+                            onChange={(event) => onChange(event.target.value)}
+                            className={`min-h-[58vh] w-full resize-y rounded-xl border-0 bg-gray-50 px-4 py-3 font-mono text-sm leading-6 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 transition-all placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-brand-green dark:bg-white/5 dark:text-white dark:ring-white/10 ${item.isReadonly ? 'cursor-not-allowed opacity-60' : 'hover:ring-gray-300 dark:hover:ring-white/20'}`}
+                        />
+                    ) : (
+                        <MarkdownPreview markdown={value} />
+                    )}
+                </div>
+            </div>
+        </div>,
+        document.body,
+    );
+}
+
+const MarkdownPreview = ({ markdown }: { markdown: string }) => {
+    const lines = markdown.split(/\r?\n/);
+    return (
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-sm text-gray-700 dark:border-white/10 dark:bg-black/10 dark:text-gray-200">
+            <div className="space-y-3">
+                {lines.map((raw, index) => {
+                    const line = raw.trim();
+                    if (!line) return <div key={index} className="h-1" />;
+                    if (/^-{3,}$/.test(line)) return <div key={index} className="my-4 border-t border-gray-200 dark:border-white/10" />;
+                    if (line.startsWith('### ')) return <h4 key={index} className="pt-2 text-sm font-semibold text-gray-900 dark:text-white">{line.slice(4)}</h4>;
+                    if (line.startsWith('## ')) return <h3 key={index} className="pt-3 text-base font-semibold text-[#150089] dark:text-white">{line.slice(3)}</h3>;
+                    if (line.startsWith('# ')) return <h2 key={index} className="text-lg font-semibold text-[#150089] dark:text-white">{line.slice(2)}</h2>;
+                    const ordered = line.match(/^(\d+)\.\s+(.*)$/);
+                    if (ordered) {
+                        return (
+                            <div key={index} className="flex gap-3">
+                                <span className="w-5 font-semibold text-brand-green">{ordered[1]}.</span>
+                                <p className="leading-6">{ordered[2]}</p>
+                            </div>
+                        );
+                    }
+                    if (line.startsWith('- ')) {
+                        return (
+                            <div key={index} className="flex gap-3">
+                                <span className="text-brand-green">-</span>
+                                <p className="leading-6">{line.slice(2)}</p>
+                            </div>
+                        );
+                    }
+                    return <p key={index} className="whitespace-pre-wrap leading-6">{line}</p>;
+                })}
+            </div>
+        </div>
+    );
+};
 
 interface LangRow { code: string; label: string; native: string }
 

@@ -43,6 +43,54 @@ export interface AssessmentSession {
     emailSentTo?: string | null;
 }
 
+export interface MetaphorReportStatus {
+    attempt: { id: number; status: string; startedAt?: string; completedAt?: string } | null;
+    total: number;
+    answered: number;
+    missing: number;
+    readyForReport: boolean;
+    answers: Array<{
+        id: number;
+        sequence: number;
+        status: string;
+        spokenLanguage: string | null;
+        webTranscript: string | null;
+        finalTranscript: string | null;
+        englishText: string | null;
+        translationStatus: string;
+        transcriptionStatus: string;
+        transcriptionSource: string | null;
+        transcriptionError: string | null;
+        transcriptionRetryCount: number;
+        transcriptionNextRetryAt: string | null;
+        contextEn: string | null;
+        contextTa: string | null;
+        questionEn: string | null;
+        questionTa: string | null;
+        imageUrl: string | null;
+        imageDescriptionEn: string | null;
+        imageDescriptionTa: string | null;
+    }>;
+    job: {
+        id: number;
+        status: string;
+        retryCount: number;
+        maxRetries: number;
+        nextRetryAt: string | null;
+        lastError: string | null;
+        startedAt: string | null;
+        completedAt: string | null;
+        updatedAt: string | null;
+    } | null;
+    report: {
+        id: number;
+        model: string | null;
+        markdown: string;
+        generatedAt: string | null;
+        updatedAt: string | null;
+    } | null;
+}
+
 export const assessmentService = {
     async getSessions(
         page: number,
@@ -179,6 +227,44 @@ export const assessmentService = {
             },
         });
         if (!res.ok) throw new Error("Failed to fetch survey answers");
+        return res.json();
+    },
+
+    async getMetaphorReport(sessionId: string | number): Promise<MetaphorReportStatus> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/admin/assessments/sessions/${sessionId}/metaphor-report`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: token ? `Bearer ${token}` : "",
+            },
+        });
+        if (!res.ok) throw new Error("Failed to fetch metaphor report");
+        return res.json();
+    },
+
+    async downloadMetaphorReportPdf(attemptId: string | number): Promise<Blob> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/admin/assessments/metaphor/${attemptId}/report/pdf`, {
+            method: "GET",
+            headers: {
+                Authorization: token ? `Bearer ${token}` : "",
+            },
+        });
+        if (!res.ok) throw new Error("Failed to download metaphor report PDF");
+        return res.blob();
+    },
+
+    async retryMetaphorReport(attemptId: string | number): Promise<{ success: boolean; queued?: boolean; reason?: string }> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/admin/assessments/metaphor/${attemptId}/report/retry`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: token ? `Bearer ${token}` : "",
+            },
+        });
+        if (!res.ok) throw new Error("Failed to retry metaphor report");
         return res.json();
     },
 

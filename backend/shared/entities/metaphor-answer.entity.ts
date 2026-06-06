@@ -62,6 +62,15 @@ export class MetaphorAnswer {
     @Column({ name: 'transcription_error', type: 'text', nullable: true })
     transcriptionError: string | null;
 
+    @Column({ name: 'transcription_retry_count', type: 'int', default: 0 })
+    transcriptionRetryCount: number;
+
+    @Column({ name: 'transcription_next_retry_at', type: 'timestamptz', nullable: true })
+    transcriptionNextRetryAt: Date | null;
+
+    @Column({ name: 'transcription_last_attempt_at', type: 'timestamptz', nullable: true })
+    transcriptionLastAttemptAt: Date | null;
+
     @Column({ name: 'status', type: 'varchar', length: 20, default: 'NOT_ANSWERED' })
     status: 'NOT_ANSWERED' | 'ANSWERED';
 

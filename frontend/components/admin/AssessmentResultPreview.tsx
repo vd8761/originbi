@@ -1,6 +1,6 @@
 
-import React, { useEffect, useState, useRef } from 'react';
-import { AssessmentSession, assessmentService } from '../../lib/services/assessment.service';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
+import { AssessmentSession, MetaphorReportStatus, assessmentService } from '../../lib/services/assessment.service';
 import { buildReportApiUrl } from '../../lib/utils/reportUrl';
 import {
     ArrowLeftWithoutLineIcon,
@@ -16,6 +16,7 @@ import {
     DownloadIcon
 } from '../icons';
 import SurveyAnswersView, { SurveyAnswersData } from './SurveyAnswersView';
+import MetaphorReportPanel from './MetaphorReportPanel';
 
 interface AssessmentResultPreviewProps {
     session: AssessmentSession | null;
@@ -44,6 +45,9 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
     const [activeTab, setActiveTab] = useState(0);
     const [surveyData, setSurveyData] = useState<SurveyAnswersData | null>(null);
     const [surveyLoading, setSurveyLoading] = useState(false);
+    const [metaphorData, setMetaphorData] = useState<MetaphorReportStatus | null>(null);
+    const [metaphorLoading, setMetaphorLoading] = useState(false);
+    const [metaphorRetrying, setMetaphorRetrying] = useState(false);
 
     // Download State
     const [downloading, setDownloading] = useState(false);
@@ -58,6 +62,20 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
     const [emailSent, setEmailSent] = useState(false);
     const [showEmailPopup, setShowEmailPopup] = useState(false);
     const [customEmail, setCustomEmail] = useState('');
+
+    const fetchMetaphorReport = useCallback(async (showLoading = false) => {
+        if (!initialSession?.id) return;
+        try {
+            if (showLoading) setMetaphorLoading(true);
+            const data = await assessmentService.getMetaphorReport(initialSession.id);
+            setMetaphorData(data);
+        } catch (error) {
+            console.error("Failed to fetch metaphor report", error);
+            setMetaphorData(null);
+        } finally {
+            if (showLoading) setMetaphorLoading(false);
+        }
+    }, [initialSession?.id]);
 
     useEffect(() => {
         const fetchLevels = async () => {
@@ -99,7 +117,23 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
             }
         };
         fetchSurvey();
-    }, [initialSession]);
+        fetchMetaphorReport(true);
+    }, [initialSession, fetchMetaphorReport]);
+
+    useEffect(() => {
+        const jobStatus = metaphorData?.job?.status;
+        const shouldPoll =
+            !!metaphorData?.attempt &&
+            !metaphorData?.report &&
+            (metaphorData.readyForReport || jobStatus === 'PENDING' || jobStatus === 'PROCESSING');
+        if (!shouldPoll) return;
+
+        const timer = window.setInterval(() => {
+            void fetchMetaphorReport(false);
+        }, 8000);
+
+        return () => window.clearInterval(timer);
+    }, [fetchMetaphorReport, metaphorData?.attempt, metaphorData?.job?.status, metaphorData?.readyForReport, metaphorData?.report]);
 
     const hasSurvey = (surveyData?.total ?? 0) > 0;
 
@@ -787,14 +821,42 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
         );
     };
 
+    const handleRetryMetaphorReport = async () => {
+        if (!metaphorData?.attempt?.id) return;
+        try {
+            setMetaphorRetrying(true);
+            await assessmentService.retryMetaphorReport(metaphorData.attempt.id);
+            await fetchMetaphorReport(false);
+        } catch (error) {
+            console.error("Failed to retry metaphor report", error);
+            alert("Failed to retry Metaphor report generation.");
+        } finally {
+            setMetaphorRetrying(false);
+        }
+    };
+
+    const renderMetaphorReport = (levelAttempt?: any, levelData?: any) => {
+        return (
+            <MetaphorReportPanel
+                data={metaphorData}
+                loading={metaphorLoading}
+                retrying={metaphorRetrying}
+                onRetry={handleRetryMetaphorReport}
+                formatDate={formatDate}
+                stats={renderStatsBar(levelAttempt, levelData)}
+                displayData={displayData}
+            />
+        );
+    };
+
     // Mock Data for Reports (Replace with Real Data later)
-    const discBreakdownData = [
+    const _discBreakdownData = [
         { value: 'Dominance', score: '30', note: 'Direct and decisive.' },
         { value: 'Influence', score: '28', note: 'Enthusiastic and persuasive.' },
         { value: 'Steadiness', score: '22', note: 'Patient and reliable.' },
         { value: 'Compliance', score: '20', note: 'Precise and analytical.' },
     ];
-    const discCompatibilityData = {
+    const _discCompatibilityData = {
         totalScore: '100 / 125',
         level: 'Influential Leader',
         tag: 'Leads with enthusiasm and builds strong relationships.',
@@ -975,24 +1037,31 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                         const levelId = String(level?.id);
                         const aId = String(a.assessmentLevelId);
                         const alId = a.assessmentLevel ? String(a.assessmentLevel.id) : null;
-
-                        console.log(`Debug Attempt Match: Level ${levelId} vs Attempt ${a.id} (LevelId: ${aId}, RelId: ${alId})`);
-
                         return aId === levelId || alId === levelId;
                     });
 
-                    console.log('Found attempt for level:', level?.name, attempt);
+                    const levelName = String(level?.name || attempt?.assessmentLevel?.name || '').toLowerCase();
+                    const patternType = String(level?.pattern_type || level?.patternType || attempt?.assessmentLevel?.patternType || '').toLowerCase();
+                    const levelNumber = Number(level?.levelNumber || level?.level_number || attempt?.assessmentLevel?.levelNumber || 0);
+                    const isMetaphor = patternType === 'metaphor' || levelName.includes('metaphor') || levelNumber === 3;
+                    const isDisc = patternType === 'disc' || levelName.includes('disc') || levelName === 'behavioral insight';
+                    const isAci = patternType === 'aci' || levelName.includes('aci') || levelName.includes('agile');
 
-                    // Check for DISC pattern in robust ways: patternType (database), name includes 'disc', or exact name 'Behavioral Insight'
-                    const isDisc = level?.pattern_type === 'DISC' || level?.patternType === 'DISC' || level?.name.toLowerCase().includes('disc') || level?.name === 'Behavioral Insight';
-
-                    if (isDisc) {
+                    if (isMetaphor) {
+                        return renderMetaphorReport(attempt, level);
+                    } else if (isDisc) {
                         const { breakdown, compatibility } = getDiscData(attempt);
                         return renderLevelReport('DISC', breakdown, compatibility, attempt, level);
-                    } else {
+                    } else if (isAci) {
                         const { breakdown, compatibility } = getAciData(attempt);
                         return renderLevelReport('ACI', breakdown, compatibility, attempt, level);
                     }
+
+                    return (
+                        <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-8 text-sm text-gray-500 dark:text-gray-400">
+                            No report renderer is configured for this assessment level.
+                        </div>
+                    );
                 })()
             }
 

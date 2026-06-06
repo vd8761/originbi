@@ -1,6 +1,6 @@
 
-import React, { useEffect, useState, useRef } from 'react';
-import { AssessmentSession } from '../../lib/services/assessment.service';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
+import { AssessmentSession, MetaphorReportStatus } from '../../lib/services/assessment.service';
 import { assessmentService } from '../../lib/services/assessment.service';
 import { buildReportApiUrl } from '../../lib/utils/reportUrl';
 import {
@@ -18,6 +18,7 @@ import {
     LoadingIcon,
 } from '../icons';
 import SurveyAnswersView, { SurveyAnswersData } from './SurveyAnswersView';
+import MetaphorReportPanel from './MetaphorReportPanel';
 
 interface AssessmentResultPreviewProps {
     session: AssessmentSession;
@@ -46,6 +47,9 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     const [activeTab, setActiveTab] = useState(0);
     const [surveyData, setSurveyData] = useState<SurveyAnswersData | null>(null);
     const [surveyLoading, setSurveyLoading] = useState(false);
+    const [metaphorData, setMetaphorData] = useState<MetaphorReportStatus | null>(null);
+    const [metaphorLoading, setMetaphorLoading] = useState(false);
+    const [metaphorRetrying, setMetaphorRetrying] = useState(false);
 
     // Download State
     const [downloading, setDownloading] = useState(false);
@@ -60,6 +64,20 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     const [emailSent, setEmailSent] = useState(false);
     const [showEmailPopup, setShowEmailPopup] = useState(false);
     const [customEmail, setCustomEmail] = useState('');
+
+    const fetchMetaphorReport = useCallback(async (showLoading = false) => {
+        if (!initialSession?.id) return;
+        try {
+            if (showLoading) setMetaphorLoading(true);
+            const data = await assessmentService.getMetaphorReport(initialSession.id);
+            setMetaphorData(data);
+        } catch (error) {
+            console.error("Failed to fetch metaphor report", error);
+            setMetaphorData(null);
+        } finally {
+            if (showLoading) setMetaphorLoading(false);
+        }
+    }, [initialSession?.id]);
 
     useEffect(() => {
         const fetchLevels = async () => {
@@ -101,7 +119,21 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
             }
         };
         fetchSurvey();
-    }, [initialSession]);
+        fetchMetaphorReport(true);
+    }, [initialSession, fetchMetaphorReport]);
+
+    useEffect(() => {
+        const jobStatus = metaphorData?.job?.status;
+        const shouldPoll =
+            !!metaphorData?.attempt &&
+            !metaphorData?.report &&
+            (metaphorData.readyForReport || jobStatus === 'PENDING' || jobStatus === 'PROCESSING');
+        if (!shouldPoll) return;
+        const timer = window.setInterval(() => {
+            void fetchMetaphorReport(false);
+        }, 8000);
+        return () => window.clearInterval(timer);
+    }, [fetchMetaphorReport, metaphorData?.attempt, metaphorData?.job?.status, metaphorData?.readyForReport, metaphorData?.report]);
 
     const hasSurvey = (surveyData?.total ?? 0) > 0;
 
@@ -657,27 +689,55 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
         );
     };
 
+    const handleRetryMetaphorReport = async () => {
+        if (!metaphorData?.attempt?.id) return;
+        try {
+            setMetaphorRetrying(true);
+            await assessmentService.retryMetaphorReport(metaphorData.attempt.id);
+            await fetchMetaphorReport(false);
+        } catch (error) {
+            console.error("Failed to retry metaphor report", error);
+            alert("Failed to retry Metaphor report generation.");
+        } finally {
+            setMetaphorRetrying(false);
+        }
+    };
+
+    const renderMetaphorReport = (levelAttempt?: any, levelData?: any) => {
+        return (
+            <MetaphorReportPanel
+                data={metaphorData}
+                loading={metaphorLoading}
+                retrying={metaphorRetrying}
+                onRetry={handleRetryMetaphorReport}
+                formatDate={formatDate}
+                stats={renderStatsBar(levelAttempt, levelData)}
+                displayData={displayData}
+            />
+        );
+    };
+
     // Mock Data for Reports (Replace with Real Data later)
-    const aciBreakdownData = [
+    const _aciBreakdownData = [
         { value: 'Commitment', score: '24', note: 'Deeply dedicated and consistent.' },
         { value: 'Focus', score: '22', note: 'Exceptionally attentive to detail and priority.' },
         { value: 'Openness', score: '18', note: 'Learning to adapt and welcome diverse approaches.' },
         { value: 'Respect', score: '19', note: 'Professional tone with scope to show empathy.' },
         { value: 'Courage', score: '23', note: 'Honest and principled; leads through integrity.' },
     ];
-    const discBreakdownData = [
+    const _discBreakdownData = [
         { value: 'Dominance', score: '30', note: 'Direct and decisive.' },
         { value: 'Influence', score: '28', note: 'Enthusiastic and persuasive.' },
         { value: 'Steadiness', score: '22', note: 'Patient and reliable.' },
         { value: 'Compliance', score: '20', note: 'Precise and analytical.' },
     ];
-    const aciCompatibilityData = {
+    const _aciCompatibilityData = {
         totalScore: '106 / 125',
         level: 'Agile Naturalist',
         tag: 'Embodies agility instinctively; thrives in collaboration and adapts with ease.',
         interpretation: 'You combine discipline with flexibility — upholding standards while remaining open to change.'
     };
-    const discCompatibilityData = {
+    const _discCompatibilityData = {
         totalScore: '100 / 125',
         level: 'Influential Leader',
         tag: 'Leads with enthusiasm and builds strong relationships.',
@@ -870,16 +930,28 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                         return aId === levelId || alId === levelId;
                     });
 
-                    // Check for DISC pattern in robust ways: patternType (database), name includes 'disc', or exact name 'Behavioral Insight'
-                    const isDisc = level?.pattern_type === 'DISC' || level?.patternType === 'DISC' || level?.name.toLowerCase().includes('disc') || level?.name === 'Behavioral Insight';
+                    const levelName = String(level?.name || attempt?.assessmentLevel?.name || '').toLowerCase();
+                    const patternType = String(level?.pattern_type || level?.patternType || attempt?.assessmentLevel?.patternType || '').toLowerCase();
+                    const levelNumber = Number(level?.levelNumber || level?.level_number || attempt?.assessmentLevel?.levelNumber || 0);
+                    const isMetaphor = patternType === 'metaphor' || levelName.includes('metaphor') || levelNumber === 3;
+                    const isDisc = patternType === 'disc' || levelName.includes('disc') || levelName === 'behavioral insight';
+                    const isAci = patternType === 'aci' || levelName.includes('aci') || levelName.includes('agile');
 
-                    if (isDisc) {
+                    if (isMetaphor) {
+                        return renderMetaphorReport(attempt, level);
+                    } else if (isDisc) {
                         const { breakdown, compatibility } = getDiscData(attempt);
                         return renderLevelReport('DISC', breakdown, compatibility, attempt, level);
-                    } else {
+                    } else if (isAci) {
                         const { breakdown, compatibility } = getAciData(attempt);
                         return renderLevelReport('ACI', breakdown, compatibility, attempt, level);
                     }
+
+                    return (
+                        <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-8 text-sm text-gray-500 dark:text-gray-400">
+                            No report renderer is configured for this assessment level.
+                        </div>
+                    );
                 })()
             }
 

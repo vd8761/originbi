@@ -15,6 +15,7 @@ import { R2Service } from '../r2/r2.service';
 import { METAPHOR_TRANSLATE_QUEUE } from './metaphor.constants';
 
 const DEFAULT_GEMINI_MODEL = 'gemini-2.0-flash';
+const MAX_TRANSCRIPTION_RETRIES = 5;
 
 @Injectable()
 export class MetaphorTranscriptionService {
@@ -39,14 +40,14 @@ export class MetaphorTranscriptionService {
     const job = await this.ensureJob(attemptId);
     await this.jobRepo.update(job.id, { status: 'PROCESSING', lastError: null });
 
-    const pending = await this.answerRepo.find({
-      where: {
-        assessmentAttemptId: attemptId,
-        transcriptionStatus: 'PENDING',
-        audioStorageKey: Not(IsNull()),
-      },
-      order: { questionSequence: 'ASC' },
-    });
+    const pending = await this.answerRepo
+      .createQueryBuilder('a')
+      .where('a.assessment_attempt_id = :attemptId', { attemptId })
+      .andWhere('a.transcription_status = :status', { status: 'PENDING' })
+      .andWhere('a.audio_storage_key IS NOT NULL')
+      .andWhere('(a.transcription_next_retry_at IS NULL OR a.transcription_next_retry_at <= NOW())')
+      .orderBy('a.question_sequence', 'ASC')
+      .getMany();
 
     if (pending.length === 0) {
       await this.completeIfTerminal(attemptId, job.id);
@@ -71,6 +72,7 @@ export class MetaphorTranscriptionService {
       await this.answerRepo.update(answer.id, {
         transcriptionStatus: 'PROCESSING',
         transcriptionError: null,
+        transcriptionLastAttemptAt: new Date(),
       });
       try {
         const buffer = await this.r2.getObjectBuffer(answer.audioStorageKey);
@@ -107,6 +109,10 @@ export class MetaphorTranscriptionService {
           transcriptionSource: 'gemini',
           transcriptionStatus: 'DONE',
           transcriptionError: null,
+          transcriptionRetryCount: 0,
+          transcriptionNextRetryAt: null,
+          transcriptionLastAttemptAt: new Date(),
+          translationStatus: transcript.trim() ? 'PENDING' : 'NONE',
           audioStorageKey: deletedAudio ? null : answer.audioStorageKey,
         });
       } catch (err) {
@@ -123,13 +129,45 @@ export class MetaphorTranscriptionService {
           status: 'FAILED',
           error: message,
         });
-        await this.answerRepo.update(answer.id, {
-          transcriptionStatus: 'FAILED',
-          transcriptionError: message,
-          transcriptionSource: answer.transcriptionSource || 'web',
-        });
+        const retryCount = Number(answer.transcriptionRetryCount || 0) + 1;
+        if (retryCount >= MAX_TRANSCRIPTION_RETRIES) {
+          const fallback = String(answer.answerTextWeb || answer.answerTextOriginal || '').trim();
+          let deletedAudio = false;
+          if (answer.audioStorageKey) {
+            try {
+              await this.r2.deleteFile(answer.audioStorageKey);
+              deletedAudio = true;
+            } catch (deleteErr) {
+              this.logger.warn(
+                `[Metaphor] Final fallback set but R2 delete failed for ${answer.audioStorageKey}: ${this.errorMessage(
+                  deleteErr,
+                )}`,
+              );
+            }
+          }
+          await this.answerRepo.update(answer.id, {
+            answerTextOriginal: fallback,
+            transcriptionStatus: 'FAILED',
+            transcriptionError: message,
+            transcriptionSource: 'web',
+            transcriptionRetryCount: retryCount,
+            transcriptionNextRetryAt: null,
+            transcriptionLastAttemptAt: new Date(),
+            translationStatus: fallback ? 'PENDING' : 'NONE',
+            audioStorageKey: deletedAudio ? null : answer.audioStorageKey,
+          });
+        } else {
+          await this.answerRepo.update(answer.id, {
+            transcriptionStatus: 'PENDING',
+            transcriptionError: message,
+            transcriptionSource: answer.transcriptionSource || 'web',
+            transcriptionRetryCount: retryCount,
+            transcriptionNextRetryAt: new Date(Date.now() + this.backoffMs(retryCount)),
+            transcriptionLastAttemptAt: new Date(),
+          });
+        }
         this.logger.warn(
-          `[Metaphor] Gemini transcription failed for answer ${answer.id}: ${message}`,
+          `[Metaphor] Gemini transcription failed for answer ${answer.id} (retry ${retryCount}/${MAX_TRANSCRIPTION_RETRIES}): ${message}`,
         );
       }
     }
@@ -217,12 +255,12 @@ export class MetaphorTranscriptionService {
     await this.jobRepo.update(jobId, {
       total,
       transcribed,
-      status: retryable > 0 ? 'FAILED' : 'DONE',
+      status: retryable > 0 ? 'PENDING' : 'DONE',
       lastError: retryable > 0 ? `${retryable} answer(s) still need transcription.` : null,
     });
 
     if (retryable > 0) {
-      throw new Error(`${retryable} answer(s) still need transcription.`);
+      return;
     }
 
     await this.pgBoss.boss.send(METAPHOR_TRANSLATE_QUEUE, { attemptId });
@@ -257,6 +295,11 @@ export class MetaphorTranscriptionService {
       job = await this.jobRepo.save(job);
     }
     return job;
+  }
+
+  private backoffMs(retryCount: number): number {
+    const minutes = Math.min(60, Math.max(1, 2 ** (retryCount - 1)));
+    return minutes * 60 * 1000;
   }
 
   private errorMessage(err: unknown): string {

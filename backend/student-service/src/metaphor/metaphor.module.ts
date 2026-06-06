@@ -6,19 +6,25 @@ import {
   MetaphorAnswer,
   MetaphorTranscriptionJob,
   MetaphorTranslationJob,
+  MetaphorReport,
+  MetaphorReportJob,
   AiUsageLog,
   OriginbiSetting,
 } from '@originbi/shared-entities';
 // Use the student-service LOCAL AssessmentAttempt (not the shared one) so we
 // don't register a duplicate/relational entity into this service's connection.
 import { AssessmentAttempt } from '../entities/assessment_attempt.entity';
+import { AssessmentLevel } from '../entities/assessment_level.entity';
+import { AssessmentSession } from '../entities/assessment_session.entity';
 import { MetaphorController } from './metaphor.controller';
 import { MetaphorService } from './metaphor.service';
 import { MetaphorGenerationService } from './metaphor-generation.service';
 import { MetaphorTranslationService } from './metaphor-translation.service';
 import { MetaphorTranscriptionService } from './metaphor-transcription.service';
+import { MetaphorReportService } from './metaphor-report.service';
 import { MetaphorProcessor } from './metaphor.processor';
 import { MetaphorTranscriptionProcessor } from './metaphor-transcription.processor';
+import { MetaphorReportProcessor } from './metaphor-report.processor';
 import { R2Module } from '../r2/r2.module';
 
 @Module({
@@ -30,8 +36,12 @@ import { R2Module } from '../r2/r2.module';
       MetaphorAnswer,
       MetaphorTranscriptionJob,
       MetaphorTranslationJob,
+      MetaphorReport,
+      MetaphorReportJob,
       AiUsageLog,
       AssessmentAttempt,
+      AssessmentLevel,
+      AssessmentSession,
       OriginbiSetting,
     ]),
   ],
@@ -41,7 +51,9 @@ import { R2Module } from '../r2/r2.module';
     MetaphorGenerationService,
     MetaphorTranslationService,
     MetaphorTranscriptionService,
+    MetaphorReportService,
     MetaphorTranscriptionProcessor,
+    MetaphorReportProcessor,
     MetaphorProcessor,
   ],
   exports: [MetaphorService, MetaphorGenerationService, TypeOrmModule],

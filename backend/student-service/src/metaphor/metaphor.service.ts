@@ -10,12 +10,15 @@ import {
   OriginbiSetting,
 } from '@originbi/shared-entities';
 import { AssessmentAttempt } from '../entities/assessment_attempt.entity';
+import { AssessmentLevel } from '../entities/assessment_level.entity';
+import { AssessmentSession } from '../entities/assessment_session.entity';
 import {
   METAPHOR_TRANSCRIBE_QUEUE,
   METAPHOR_TRANSLATE_QUEUE,
 } from './metaphor.constants';
 import { MetaphorGenerationService } from './metaphor-generation.service';
 import { R2Service } from '../r2/r2.service';
+import { MetaphorReportService } from './metaphor-report.service';
 
 export interface MetaphorConfig {
   questionCount: number;
@@ -42,12 +45,17 @@ export class MetaphorService {
     private readonly transcriptionJobRepo: Repository<MetaphorTranscriptionJob>,
     @InjectRepository(AssessmentAttempt)
     private readonly attemptRepo: Repository<AssessmentAttempt>,
+    @InjectRepository(AssessmentLevel)
+    private readonly levelRepo: Repository<AssessmentLevel>,
+    @InjectRepository(AssessmentSession)
+    private readonly sessionRepo: Repository<AssessmentSession>,
     @InjectRepository(OriginbiSetting)
     private readonly settingRepo: Repository<OriginbiSetting>,
     private readonly dataSource: DataSource,
     private readonly pgBoss: PgBossService,
     private readonly generation: MetaphorGenerationService,
     private readonly r2: R2Service,
+    private readonly reports: MetaphorReportService,
   ) {}
 
   /** Enqueue a translation job for an attempt (best-effort; the sweep is the safety net). */
@@ -79,6 +87,10 @@ export class MetaphorService {
   async translateNow(attemptId: number) {
     await this.enqueueTranslation(attemptId);
     return { success: true, queued: true };
+  }
+
+  async retryReport(attemptId: number) {
+    return this.reports.manualRetry(attemptId);
   }
 
   // ---- settings (with safe defaults) ----
@@ -288,6 +300,7 @@ export class MetaphorService {
     attempt.status = 'COMPLETED';
     (attempt as any).completedAt = new Date();
     await this.attemptRepo.save(attempt);
+    await this.completeSessionIfAllMandatoryAttemptsDone(attempt);
 
     const translationPendingCount = await this.answerRepo.count({
       where: { assessmentAttemptId: attemptId, translationStatus: 'PENDING' },
@@ -341,7 +354,41 @@ export class MetaphorService {
     await this.jobRepo.save(job);
 
     if (translationPendingCount > 0) await this.enqueueTranslation(attemptId);
+    else await this.reports.enqueueIfReady(attemptId);
 
     return { success: true, translationsPending: translationPendingCount };
+  }
+
+  private async completeSessionIfAllMandatoryAttemptsDone(
+    attempt: AssessmentAttempt,
+  ): Promise<void> {
+    const sessionId = Number((attempt as any).assessmentSessionId);
+    if (!sessionId) return;
+
+    const mandatoryLevels = await this.levelRepo.find({
+      where: { isMandatory: true },
+    });
+    if (!mandatoryLevels.length) return;
+
+    const mandatoryLevelIds = mandatoryLevels.map((level) => Number(level.id));
+    const attempts = await this.attemptRepo.find({
+      where: { assessmentSessionId: sessionId },
+    });
+    const attemptsByLevelId = new Map(
+      attempts.map((row) => [Number((row as any).assessmentLevelId), row]),
+    );
+
+    const allMandatoryAttemptsDone = mandatoryLevelIds.every((levelId) => {
+      const levelAttempt = attemptsByLevelId.get(levelId);
+      return levelAttempt?.status === 'COMPLETED';
+    });
+    if (!allMandatoryAttemptsDone) return;
+
+    const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
+    if (!session || session.status === 'COMPLETED') return;
+
+    session.status = 'COMPLETED';
+    session.completedAt = new Date();
+    await this.sessionRepo.save(session);
   }
 }
