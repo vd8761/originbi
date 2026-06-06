@@ -37,6 +37,7 @@ export class ReportController {
     @Param('group_id') rawGroupId: string,
     @Param('department_degree_id') rawDeptDegreeId: string,
     @Query('json') json: string,
+    @Query('reportType') reportType: string,
     @Res() res: Response,
   ): void {
     const groupId = parseInt(rawGroupId);
@@ -47,14 +48,17 @@ export class ReportController {
       return;
     }
 
+    const reportTypeOverride: 'standard' | 'mba' | undefined =
+      reportType === 'standard' || reportType === 'mba' ? reportType : undefined;
+
     logger.info(
-      `[API] Start Placement Report: Group ${groupId}, Dept ${deptDegreeId}`,
+      `[API] Start Placement Report: Group ${groupId}, Dept ${deptDegreeId}, Override=${reportTypeOverride ?? 'auto'}`,
     );
 
     const jobId = `placement_${groupId}_${deptDegreeId}_${Date.now()}`;
 
     this.reportQueue
-      .processPlacementReport(groupId, deptDegreeId, jobId)
+      .processPlacementReport(groupId, deptDegreeId, jobId, reportTypeOverride)
       .catch((err) => logger.error('Background Job Error', err));
 
     if (json === 'true') {
@@ -73,14 +77,19 @@ export class ReportController {
   generateGroupReport(
     @Param('group_id') groupId: string,
     @Query('json') json: string,
+    @Query('programId') programId: string,
     @Res() res: Response,
   ): void {
-    logger.info(`[API] Start Group Report: Group ${groupId}`);
+    logger.info(
+      `[API] Start Group Report: Group ${groupId}${
+        programId ? ` Program ${programId}` : ''
+      }`,
+    );
 
     const jobId = `group_${groupId}_${Date.now()}`;
 
     this.reportQueue
-      .processGroupReports(groupId, jobId)
+      .processGroupReports(groupId, jobId, programId)
       .catch((err) => logger.error('Background Job Error', err));
 
     if (json === 'true') {

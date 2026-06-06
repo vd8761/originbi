@@ -46,6 +46,7 @@ import { SettingsService } from '../settings/settings.service';
 import { WhatsappTemplatesService } from '../whatsapp/whatsapp-templates.service';
 import { SmsService, SmsTemplate } from '../sms/sms.service';
 import { SubscriptionService } from './subscription.service';
+import { MetaphorGenerationService } from '../metaphor/metaphor-generation.service';
 
 export interface AssessmentProgressItem {
   id: number;
@@ -99,6 +100,7 @@ export class StudentService {
     private readonly whatsappTemplates: WhatsappTemplatesService,
     private readonly smsService: SmsService,
     private readonly subscriptionService: SubscriptionService,
+    private readonly metaphorGeneration: MetaphorGenerationService,
   ) {}
 
   /**
@@ -828,6 +830,28 @@ export class StudentService {
         throw new BadRequestException('User already exists');
       }
 
+      // 1b. Pre-flight: ensure active questions exist BEFORE creating anything.
+      // This self-registration flow is not transactional, so blocking early
+      // avoids orphaned Cognito/DB records when questions are unavailable.
+      {
+        const preflightProgramCode = dto.program_code || 'SCHOOL_STUDENT';
+        const preflightProgram = await this.sessionRepo.manager.findOne(
+          Program,
+          { where: { code: preflightProgramCode } },
+        );
+        if (!preflightProgram) {
+          throw new BadRequestException(
+            `Program ${preflightProgramCode} not found`,
+          );
+        }
+        const level1 = await this.levelRepo.findOne({
+          where: { isMandatory: true, levelNumber: 1 },
+        });
+        if (level1) {
+          await this.assertActiveQuestionsExist(preflightProgram.id, level1.id);
+        }
+      }
+
       // 2. Create User in Cognito
       let cognitoSub = '';
       try {
@@ -1139,6 +1163,25 @@ export class StudentService {
             savedReg,
             level,
           );
+        }
+        // Generate Level 3 (Metaphor) questions — gated + NON-FATAL: a metaphor
+        // failure must never break the core registration / Level 1.
+        else if (
+          level.levelNumber === 3 ||
+          level.name?.includes('Metaphor') ||
+          (level as any).patternType === 'METAPHOR'
+        ) {
+          try {
+            await this.metaphorGeneration.generate(
+              savedAttempt,
+              this.sessionRepo.manager,
+            );
+          } catch (err) {
+            this.logger.error(
+              `[Metaphor] generation failed for attempt ${savedAttempt.id} (non-fatal):`,
+              err as Error,
+            );
+          }
         }
       }
 
@@ -1615,33 +1658,29 @@ export class StudentService {
     mainQuery += ` ORDER BY RANDOM() LIMIT 40`;
     const mainQuestions = await this.answerRepo.query(mainQuery, mainParams);
 
-    // Fetch OPEN Questions (Limit 20)
-    // Fetch OPEN Questions (Limit 20)
-    const openQuery = `
-      SELECT id FROM open_questions 
-      WHERE is_active = true 
-        AND is_deleted = false
-      ORDER BY RANDOM() LIMIT 20
-    `;
-    const openQuestions = await this.answerRepo.query(openQuery);
+    // Guard: never build an empty/partial assessment. If every main question is
+    // deactivated, block with a clear error (defense-in-depth; register() also
+    // pre-checks this before any persistence).
+    if (!mainQuestions || mainQuestions.length === 0) {
+      throw new Error('No active questions available for this program/level.');
+    }
 
-    // 4. Interleave Questions (2 Main : 1 Open)
-    const finalQuestions: { id: number; type: 'MAIN' | 'OPEN' }[] = [];
-    let mainIdx = 0;
-    let openIdx = 0;
+    // Fetch OPEN questions per the admin-configurable distribution
+    // (originbi_settings -> assessment.open_question_distribution).
+    const openQuestions = await this.selectOpenQuestionIds();
 
-    // We want 20 chunks of (2 Main + 1 Open) = 60 questions
-    for (let i = 0; i < 20; i++) {
-      if (mainIdx < mainQuestions.length)
-        finalQuestions.push({ id: mainQuestions[mainIdx++].id, type: 'MAIN' });
-      if (mainIdx < mainQuestions.length)
-        finalQuestions.push({ id: mainQuestions[mainIdx++].id, type: 'MAIN' });
-      if (openIdx < openQuestions.length)
-        finalQuestions.push({ id: openQuestions[openIdx++].id, type: 'OPEN' });
+    // 4. Build the final order: all main questions, with the open/survey
+    // questions SCATTERED at random positions among them (no fixed ratio —
+    // they "appear anywhere in the exam").
+    const finalQuestions: { id: number; type: 'MAIN' | 'OPEN' }[] =
+      mainQuestions.map((q: any) => ({ id: q.id, type: 'MAIN' as const }));
+    for (const oq of openQuestions) {
+      const pos = Math.floor(Math.random() * (finalQuestions.length + 1));
+      finalQuestions.splice(pos, 0, { id: oq.id, type: 'OPEN' });
     }
 
     this.logger.log(
-      `[Assessment] Generated ${finalQuestions.length} interleaved questions (Main: ${mainIdx}, Open: ${openIdx})`,
+      `[Assessment] Generated ${finalQuestions.length} questions (Main: ${mainQuestions.length}, Open: ${openQuestions.length}, scattered)`,
     );
 
     // 5. Bulk Insert Answers
@@ -1662,6 +1701,120 @@ export class StudentService {
             ) VALUES ${values.join(',')}
         `;
       await this.answerRepo.query(insertQuery);
+    }
+  }
+
+  /**
+   * Selects the open (non-DISC) question IDs for a Level-1 assessment based on
+   * the admin-configurable distribution stored in originbi_settings
+   * (category 'assessment', key 'open_question_distribution').
+   *
+   * Falls back to the legacy behaviour (20 random, any type) if the setting is
+   * missing or malformed, so the assessment never silently breaks.
+   *
+   * NOTE: 'set_sequential' groups (linked survey sets) are currently picked in
+   * fixed id order (no shuffle). Full set-grouping selection is pending.
+   */
+  private async selectOpenQuestionIds(): Promise<{ id: number }[]> {
+    let groups: Array<{
+      questionType?: string | null;
+      count: number;
+      selection?: string;
+    }> = [{ questionType: null, count: 20, selection: 'random' }];
+
+    try {
+      const rows = await this.answerRepo.query(
+        `SELECT value_json FROM originbi_settings
+         WHERE category = 'assessment' AND setting_key = 'open_question_distribution'
+         LIMIT 1`,
+      );
+      const value = rows?.[0]?.value_json;
+      if (Array.isArray(value) && value.length > 0) {
+        groups = value;
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Could not read open_question_distribution setting, using legacy default (20 random). ${err?.message}`,
+      );
+    }
+
+    const picked: { id: number }[] = [];
+    for (const group of groups) {
+      const count = Number(group?.count) || 0;
+      if (count <= 0) continue;
+
+      // 'set_random': pick ONE random set for this type, then `count` random
+      // questions from within that set (the SURVEY rule).
+      if (group.selection === 'set_random') {
+        const setParams: any[] = [];
+        let setSql = `SELECT DISTINCT set_number FROM open_questions
+          WHERE is_active = true AND is_deleted = false AND set_number IS NOT NULL`;
+        if (group.questionType) {
+          setParams.push(group.questionType);
+          setSql += ` AND question_type = $${setParams.length}`;
+        }
+        const setRows = await this.answerRepo.query(setSql, setParams);
+        if (!setRows || setRows.length === 0) continue;
+        const chosen =
+          setRows[Math.floor(Math.random() * setRows.length)].set_number;
+
+        const qParams: any[] = [chosen];
+        let qSql = `SELECT id FROM open_questions
+          WHERE is_active = true AND is_deleted = false AND set_number = $1`;
+        if (group.questionType) {
+          qParams.push(group.questionType);
+          qSql += ` AND question_type = $${qParams.length}`;
+        }
+        qParams.push(count);
+        qSql += ` ORDER BY RANDOM() LIMIT $${qParams.length}`;
+        const rows = await this.answerRepo.query(qSql, qParams);
+        picked.push(...rows);
+        continue;
+      }
+
+      const params: any[] = [];
+      let sql = `SELECT id FROM open_questions WHERE is_active = true AND is_deleted = false`;
+      if (group.questionType) {
+        params.push(group.questionType);
+        sql += ` AND question_type = $${params.length}`;
+      }
+      // Linked/survey groups keep their authored order (no shuffle);
+      // legacy open questions are randomized.
+      sql +=
+        group.selection === 'set_sequential'
+          ? ` ORDER BY id ASC`
+          : ` ORDER BY RANDOM()`;
+      params.push(count);
+      sql += ` LIMIT $${params.length}`;
+
+      const rows = await this.answerRepo.query(sql, params);
+      picked.push(...rows);
+    }
+
+    return picked;
+  }
+
+  /**
+   * Pre-flight guard for self-registration: confirms at least one active main
+   * question exists for the given program + Level 1 BEFORE any user/registration
+   * is persisted (this flow is not transactional, so we must check up front to
+   * avoid orphaned records). Throws a clear error if questions are unavailable.
+   */
+  private async assertActiveQuestionsExist(
+    programId: number,
+    levelId: number,
+  ): Promise<void> {
+    const rows = await this.answerRepo.query(
+      `SELECT 1 FROM assessment_questions
+       WHERE program_id = $1 AND assessment_level_id = $2
+         AND is_active = true AND is_deleted = false
+       LIMIT 1`,
+      [programId, levelId],
+    );
+    if (!rows || rows.length === 0) {
+      throw new BadRequestException(
+        'Questions are currently unavailable for this program. Please contact the administrator.',
+      );
     }
   }
 

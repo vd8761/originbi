@@ -617,11 +617,31 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 			// Check if a next level generally exists in the system (Check only MANDATORY levels)
 			if err := tx.Where("level_number > ? AND is_mandatory = ?", currentLevel.LevelNumber, true).Order("level_number ASC").First(&nextLevel).Error; err == nil {
 
-				// Check if this specific user/session HAS an attempt for this next level
+				// Check if this specific user/session HAS an attempt for this next level.
 				var nextAttempt models.AssessmentAttempt
-				if err := tx.Where("assessment_session_id = ? AND assessment_level_id = ?", answerRecord.AssessmentSessionID, nextLevel.ID).First(&nextAttempt).Error; err == nil {
+				attemptErr := tx.Where("assessment_session_id = ? AND assessment_level_id = ?", answerRecord.AssessmentSessionID, nextLevel.ID).First(&nextAttempt).Error
 
-					// CASE A: Next Level Exists AND User has an attempt for it -> Unlock it
+				// If the level was enabled AFTER this student registered, the attempt
+				// won't exist yet. Create it so the student proceeds to the next level
+				// instead of being sent to the report (any exam can be toggled on/off).
+				if attemptErr != nil {
+					levelID := nextLevel.ID
+					nextAttempt = models.AssessmentAttempt{
+						AssessmentSessionID: answerRecord.AssessmentSessionID,
+						UserID:              answerRecord.UserID,
+						RegistrationID:      answerRecord.RegistrationID,
+						ProgramID:           answerRecord.ProgramID,
+						AssessmentLevelID:   &levelID,
+						Status:              "NOT_STARTED",
+					}
+					if createErr := tx.Create(&nextAttempt).Error; createErr != nil {
+						fmt.Printf("[SubmitAnswer] Failed to create next-level attempt (level %d): %v\n", nextLevel.LevelNumber, createErr)
+					}
+				}
+
+				if nextAttempt.ID != 0 {
+
+					// CASE A: Next Level Exists AND User has (or now has) an attempt -> Unlock it
 					hasNextLevel = true
 
 					unlockAt := now.Add(time.Duration(nextLevel.UnlockAfterHours) * time.Hour)
@@ -980,13 +1000,14 @@ func (s *ExamService) IsLastLevel(attemptID int64) (bool, error) {
 		return false, err
 	}
 
-	// Check count of attempts in same session with higher level number
+	// "Last level" = there is NO higher MANDATORY level still to do. We count
+	// mandatory LEVELS (not attempts), because a higher level may be enabled
+	// after the student registered and not yet have an attempt — completing the
+	// current level creates/unlocks it. This keeps the student in the assessment
+	// (no premature report) whenever Level 3/4/... is turned on.
 	var count int64
-	// Filter out CANCELLED or other invalid statuses if necessary, but mainly just check existence
-	err := db.Table("assessment_attempts").
-		Joins("JOIN assessment_levels ON assessment_levels.id = assessment_attempts.assessment_level_id").
-		Where("assessment_attempts.assessment_session_id = ? AND assessment_attempts.status != 'CANCELLED' AND assessment_levels.level_number > ?",
-			attempt.AssessmentSessionID, currentLevel.LevelNumber).
+	err := db.Table("assessment_levels").
+		Where("level_number > ? AND is_mandatory = ?", currentLevel.LevelNumber, true).
 		Count(&count).Error
 
 	if err != nil {

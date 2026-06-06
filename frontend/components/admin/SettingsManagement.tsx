@@ -304,6 +304,38 @@ export default function SettingsManagement() {
         }
 
         if (item.valueType === 'json') {
+            // Dedicated editor for the open-question distribution setting
+            // (array of {questionType, count, selection} rows).
+            if (item.category === 'assessment' && item.key === 'open_question_distribution') {
+                return (
+                    <DistributionEditor
+                        value={Array.isArray(item.value) ? item.value : []}
+                        isReadonly={item.isReadonly}
+                        onChange={(next) => handleValueChange(item.category, item.key, next)}
+                    />
+                );
+            }
+
+            // Level 3 metaphor: STT provider (object) + supported languages (array of objects)
+            if (item.category === 'metaphor' && item.key === 'stt_provider') {
+                return (
+                    <SttProviderEditor
+                        value={item.value && typeof item.value === 'object' ? item.value : { provider: 'web_speech', params: {} }}
+                        isReadonly={item.isReadonly}
+                        onChange={(next) => handleValueChange(item.category, item.key, next)}
+                    />
+                );
+            }
+            if (item.category === 'metaphor' && item.key === 'supported_languages') {
+                return (
+                    <LanguagesEditor
+                        value={Array.isArray(item.value) ? item.value : []}
+                        isReadonly={item.isReadonly}
+                        onChange={(next) => handleValueChange(item.category, item.key, next)}
+                    />
+                );
+            }
+
             if (item.key.endsWith('_config')) {
                 const isLocal = item.value && typeof item.value === 'object' && item.value.mode === 'local';
                 return (
@@ -451,8 +483,16 @@ export default function SettingsManagement() {
                                             : true;
                                         const isDimmed = isReportPasswordField && !reportPasswordEnabled;
 
+                                        // Wide editors (e.g. the distribution table) render full-width,
+                                        // stacked below the label — not squeezed into the side input column.
+                                        const isFullWidth = item.valueType === 'json'
+                                            && (
+                                                (item.category === 'assessment' && item.key === 'open_question_distribution')
+                                                || (item.category === 'metaphor' && (item.key === 'stt_provider' || item.key === 'supported_languages'))
+                                            );
+
                                         return (
-                                        <div key={item.id} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-8 border-b border-gray-50 dark:border-white/[0.02] last:border-0 last:pb-0 transition-opacity duration-200 ${isDimmed ? 'opacity-40 pointer-events-none' : ''}`}>
+                                        <div key={item.id} className={`${isFullWidth ? 'flex flex-col gap-4' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-6'} pb-8 border-b border-gray-50 dark:border-white/[0.02] last:border-0 last:pb-0 transition-opacity duration-200 ${isDimmed ? 'opacity-40 pointer-events-none' : ''}`}>
                                             <div className="sm:max-w-md">
                                                 <label htmlFor={item.key} className="flex items-center text-[15px] font-semibold leading-6 text-gray-900 dark:text-white">
                                                     {item.label}
@@ -487,7 +527,7 @@ export default function SettingsManagement() {
                                                 )}
                                             </p>
                                         </div>
-                                        <div className="mt-2 sm:mt-0 flex-shrink-0 w-full sm:w-auto sm:max-w-[300px]">
+                                        <div className={isFullWidth ? 'w-full' : 'mt-2 sm:mt-0 flex-shrink-0 w-full sm:w-auto sm:max-w-[300px]'}>
                                             {renderInput(item)}
                                         </div>
                                     </div>
@@ -686,6 +726,254 @@ function ArrayChipInput({ values, isReadonly, onChange }: { values: string[], is
                     className="flex-1 min-w-[120px] border-0 bg-transparent py-1 px-1 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:ring-0"
                 />
             )}
+        </div>
+    );
+}
+
+// ------------------------------------------------------------------
+// Editor for the open-question distribution setting.
+// Value shape: [{ questionType: string|null, count: number, selection: 'random'|'set_sequential' }, ...]
+// Lives next to ArrayChipInput so we don't proliferate components.
+// ------------------------------------------------------------------
+interface DistributionRow {
+    questionType: string | null;
+    count: number;
+    selection: 'random' | 'set_random' | 'set_sequential';
+}
+
+function DistributionEditor({
+    value,
+    isReadonly,
+    onChange,
+}: {
+    value: DistributionRow[];
+    isReadonly: boolean;
+    onChange: (next: DistributionRow[]) => void;
+}) {
+    const rows: DistributionRow[] = value.map((r) => ({
+        questionType: r.questionType ?? null,
+        count: Number(r.count) || 0,
+        selection:
+            r.selection === 'set_sequential'
+                ? 'set_sequential'
+                : r.selection === 'set_random'
+                    ? 'set_random'
+                    : 'random',
+    }));
+
+    const update = (i: number, patch: Partial<DistributionRow>) => {
+        const next = rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r));
+        onChange(next);
+    };
+    const remove = (i: number) => onChange(rows.filter((_, idx) => idx !== i));
+    const add = () =>
+        onChange([...rows, { questionType: '', count: 10, selection: 'random' }]);
+
+    const total = rows.reduce((s, r) => s + (Number(r.count) || 0), 0);
+
+    return (
+        <div className="w-full max-w-5xl space-y-3">
+            <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-white/10">
+                <table className="w-full text-sm min-w-[640px]">
+                    <thead className="bg-gray-50 dark:bg-white/5 text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <tr>
+                            <th className="px-3 py-2 font-medium w-[40%]">Question Type</th>
+                            <th className="px-3 py-2 font-medium w-24">Count</th>
+                            <th className="px-3 py-2 font-medium w-64">Selection</th>
+                            <th className="px-3 py-2 font-medium w-20"></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-white/10">
+                        {rows.length === 0 && (
+                            <tr>
+                                <td colSpan={4} className="px-3 py-4 text-center text-gray-400 dark:text-gray-500">
+                                    No groups configured. Click "Add group" to pick open questions.
+                                </td>
+                            </tr>
+                        )}
+                        {rows.map((row, i) => (
+                            <tr key={i} className="bg-white dark:bg-transparent">
+                                <td className="px-3 py-2">
+                                    <input
+                                        type="text"
+                                        disabled={isReadonly}
+                                        value={row.questionType ?? ''}
+                                        onChange={(e) =>
+                                            update(i, {
+                                                questionType: e.target.value === '' ? null : e.target.value,
+                                            })
+                                        }
+                                        placeholder="e.g. OPEN, SURVEY (blank = any type)"
+                                        className="w-full rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green"
+                                    />
+                                </td>
+                                <td className="px-3 py-2">
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        disabled={isReadonly}
+                                        value={row.count}
+                                        onChange={(e) => update(i, { count: Number(e.target.value) || 0 })}
+                                        className="w-full rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green"
+                                    />
+                                </td>
+                                <td className="px-3 py-2">
+                                    <select
+                                        disabled={isReadonly}
+                                        value={row.selection}
+                                        onChange={(e) =>
+                                            update(i, {
+                                                selection: e.target.value as DistributionRow['selection'],
+                                            })
+                                        }
+                                        className="w-full rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green"
+                                    >
+                                        <option value="random">random (N random of type)</option>
+                                        <option value="set_random">set_random (one set, then N random)</option>
+                                        <option value="set_sequential">set_sequential (one set, fixed order)</option>
+                                    </select>
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                    <button
+                                        type="button"
+                                        disabled={isReadonly}
+                                        onClick={() => remove(i)}
+                                        className="rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10 disabled:opacity-40"
+                                        title="Remove this group"
+                                    >
+                                        Remove
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+                <button
+                    type="button"
+                    disabled={isReadonly}
+                    onClick={add}
+                    className="rounded-xl bg-brand-green/10 px-4 py-2 text-sm font-medium text-brand-green hover:bg-brand-green/20 transition-colors disabled:opacity-40"
+                >
+                    + Add group
+                </button>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Total open questions per assessment: <strong className="text-gray-700 dark:text-gray-200">{total}</strong>
+                </span>
+            </div>
+        </div>
+    );
+}
+
+// ------------------------------------------------------------------
+// Level 3 metaphor — STT provider editor (object: {provider, params})
+// ------------------------------------------------------------------
+const STT_PROVIDERS = [
+    { value: 'web_speech', label: 'Browser Web Speech (free, Chrome/Edge)' },
+    { value: 'elevenlabs', label: 'ElevenLabs (realtime, cloud)' },
+    { value: 'azure', label: 'Azure Speech (cloud)' },
+    { value: 'google', label: 'Google STT (cloud)' },
+    { value: 'deepgram', label: 'Deepgram (cloud)' },
+];
+
+function SttProviderEditor({
+    value,
+    isReadonly,
+    onChange,
+}: {
+    value: { provider?: string; params?: any };
+    isReadonly: boolean;
+    onChange: (next: { provider: string; params: any }) => void;
+}) {
+    const provider = value?.provider || 'web_speech';
+    return (
+        <div className="w-full max-w-lg space-y-2">
+            <select
+                disabled={isReadonly}
+                value={provider}
+                onChange={(e) => onChange({ provider: e.target.value, params: value?.params || {} })}
+                className="w-full rounded-xl border-0 bg-gray-50 dark:bg-white/5 px-4 py-2.5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green sm:text-sm"
+            >
+                {STT_PROVIDERS.map((p) => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+            </select>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+                Cloud providers also require the API key in “STT provider API key” above. The exam page reads this and uses the matching adapter.
+            </p>
+        </div>
+    );
+}
+
+// ------------------------------------------------------------------
+// Level 3 metaphor — supported languages editor (array of {code,label,native})
+// ------------------------------------------------------------------
+interface LangRow { code: string; label: string; native: string }
+
+function LanguagesEditor({
+    value,
+    isReadonly,
+    onChange,
+}: {
+    value: LangRow[];
+    isReadonly: boolean;
+    onChange: (next: LangRow[]) => void;
+}) {
+    const rows: LangRow[] = value.map((r) => ({
+        code: r.code || '',
+        label: r.label || '',
+        native: r.native || '',
+    }));
+    const update = (i: number, patch: Partial<LangRow>) =>
+        onChange(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+    const remove = (i: number) => onChange(rows.filter((_, idx) => idx !== i));
+    const add = () => onChange([...rows, { code: '', label: '', native: '' }]);
+
+    return (
+        <div className="w-full max-w-3xl space-y-3">
+            <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-white/10">
+                <table className="w-full text-sm min-w-[480px]">
+                    <thead className="bg-gray-50 dark:bg-white/5 text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <tr>
+                            <th className="px-3 py-2 font-medium w-40">Code (BCP-47)</th>
+                            <th className="px-3 py-2 font-medium">Label</th>
+                            <th className="px-3 py-2 font-medium">Native</th>
+                            <th className="px-3 py-2 font-medium w-16"></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-white/10">
+                        {rows.length === 0 && (
+                            <tr><td colSpan={4} className="px-3 py-4 text-center text-gray-400">No languages configured.</td></tr>
+                        )}
+                        {rows.map((row, i) => (
+                            <tr key={i}>
+                                <td className="px-3 py-2">
+                                    <input type="text" disabled={isReadonly} value={row.code} placeholder="en-IN"
+                                        onChange={(e) => update(i, { code: e.target.value })}
+                                        className="w-full rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-gray-900 dark:text-white ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green" />
+                                </td>
+                                <td className="px-3 py-2">
+                                    <input type="text" disabled={isReadonly} value={row.label} placeholder="English"
+                                        onChange={(e) => update(i, { label: e.target.value })}
+                                        className="w-full rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-gray-900 dark:text-white ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green" />
+                                </td>
+                                <td className="px-3 py-2">
+                                    <input type="text" disabled={isReadonly} value={row.native} placeholder="English"
+                                        onChange={(e) => update(i, { native: e.target.value })}
+                                        className="w-full rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-gray-900 dark:text-white ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green" />
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                    <button type="button" disabled={isReadonly} onClick={() => remove(i)}
+                                        className="rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10 disabled:opacity-40">Remove</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            <button type="button" disabled={isReadonly} onClick={add}
+                className="rounded-xl bg-brand-green/10 px-4 py-2 text-sm font-medium text-brand-green hover:bg-brand-green/20 transition-colors disabled:opacity-40">+ Add language</button>
         </div>
     );
 }

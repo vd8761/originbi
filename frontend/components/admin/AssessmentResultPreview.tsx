@@ -15,6 +15,7 @@ import {
     LoadingIcon,
     DownloadIcon
 } from '../icons';
+import SurveyAnswersView, { SurveyAnswersData } from './SurveyAnswersView';
 
 interface AssessmentResultPreviewProps {
     session: AssessmentSession | null;
@@ -41,12 +42,16 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
     const [session, setSession] = useState<AssessmentSession | null>(initialSession);
     const [levels, setLevels] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState(0);
+    const [surveyData, setSurveyData] = useState<SurveyAnswersData | null>(null);
+    const [surveyLoading, setSurveyLoading] = useState(false);
 
     // Download State
     const [downloading, setDownloading] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState('');
     const isDownloadingRef = useRef(false);
     const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+    const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
+    const downloadDropdownRef = useRef<HTMLDivElement>(null);
 
     // Send Email State
     const [sendingEmail, setSendingEmail] = useState(false);
@@ -77,7 +82,26 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
             }
         };
         fetchSessionDetails();
+
+        // Fetch SURVEY answers (non-scoring open questions). Drives the Survey tab:
+        // present -> tab enabled; absent -> tab shown but disabled.
+        const fetchSurvey = async () => {
+            if (!initialSession?.id) return;
+            try {
+                setSurveyLoading(true);
+                const data = await assessmentService.getSurveyAnswers(initialSession.id);
+                setSurveyData(data);
+            } catch (error) {
+                console.error("Failed to fetch survey answers", error);
+                setSurveyData(null);
+            } finally {
+                setSurveyLoading(false);
+            }
+        };
+        fetchSurvey();
     }, [initialSession]);
+
+    const hasSurvey = (surveyData?.total ?? 0) > 0;
 
     // Helper to format dates
     const formatDate = (dateStr?: string) => {
@@ -91,6 +115,95 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
     // Derived Status
     const status = session?.status || 'NOT_STARTED';
     const isStarted = status !== 'NOT_STARTED' && status !== 'ASSIGNED';
+
+    // Check if program supports short report (School & College students only)
+    const programId = session?.programId ? Number(session.programId) : null;
+    const programCode = (session?.program as any)?.code || (session?.groupAssessment?.program as any)?.code || null;
+    const isShortReportAvailable = programCode === 'SCHOOL_STUDENT' || programCode === 'COLLEGE_STUDENT' || programId === 1 || programId === 2;
+
+    // Close download dropdown on outside click
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (downloadDropdownRef.current && !downloadDropdownRef.current.contains(event.target as Node)) {
+                setShowDownloadDropdown(false);
+            }
+        };
+        if (showDownloadDropdown) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showDownloadDropdown]);
+
+    // Shared download handler
+    const handleDownloadReport = async (short: boolean = false) => {
+        if (isDownloadingRef.current) return;
+        if (!session?.userId) {
+            alert("User ID not found for this session.");
+            return;
+        }
+        try {
+            isDownloadingRef.current = true;
+            setDownloading(true);
+            setShowDownloadDropdown(false);
+            setDownloadProgress('Initializing...');
+            
+            const studentId = session.userId; 
+            const startData = await assessmentService.generateStudentReport(studentId, short || undefined);
+            
+            if (!startData.success || !startData.jobId) {
+                throw new Error("Failed to start report generation");
+            }
+            
+            const jobId = startData.jobId;
+            
+            let isComplete = false;
+            while (!isComplete && isDownloadingRef.current) {
+                try {
+                    const statusData = await assessmentService.getDownloadStatus(jobId);
+                    
+                    if (statusData.status === 'PROCESSING') {
+                        setDownloadProgress(statusData.progress || 'Processing...');
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    } else if (statusData.status === 'COMPLETED') {
+                        isComplete = true;
+                        setDownloadProgress('Downloading...');
+
+                        if (!statusData.downloadUrl) {
+                            throw new Error('Download URL missing from report status.');
+                        }
+                        
+                        const extendedData = statusData as any;
+                        if (extendedData.password) {
+                            setGeneratedPassword(extendedData.password);
+                        }
+
+                        window.location.href = buildReportApiUrl(statusData.downloadUrl);
+                        
+                        setTimeout(() => {
+                            setDownloading(false);
+                            setDownloadProgress('');
+                        }, 2000);
+                    } else if (statusData.status === 'ERROR') {
+                        isComplete = true;
+                        throw new Error(statusData.error || 'Generation failed');
+                    }
+                } catch (err) {
+                    console.error("Polling error", err);
+                    isComplete = true;
+                    setDownloading(false);
+                    alert("Failed to download report. Please try again.");
+                }
+            }
+            
+        } catch (error) {
+            console.error("Download failed", error);
+            setDownloading(false);
+            alert("Failed to initiate download.");
+        } finally {
+            isDownloadingRef.current = false;
+        }
+    };
+
     const allLevelsCompleted = session?.status === 'COMPLETED';
     // Simplified completion logic: if status is COMPLETED, it's done.
 
@@ -234,76 +347,46 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                             <LoadingIcon className="w-3 h-3 text-brand-green animate-spin" />
                             <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{downloadProgress || 'Generating...'}</span>
                          </div>
+                    ) : isShortReportAvailable ? (
+                        <div className="relative" ref={downloadDropdownRef}>
+                            <button
+                                onClick={() => status === 'COMPLETED' && setShowDownloadDropdown(!showDownloadDropdown)}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                    status === 'COMPLETED' 
+                                    ? 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green cursor-pointer' 
+                                    : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
+                                }`}
+                                disabled={status !== 'COMPLETED'}
+                                title={status !== 'COMPLETED' ? 'Exam must be completed to download report' : ''}
+                            >
+                                <DownloadIcon className="w-3 h-3" />
+                                Download Report
+                                <svg className={`w-3 h-3 transition-transform ${showDownloadDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                            {showDownloadDropdown && (
+                                <div className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
+                                    <button
+                                        onClick={() => handleDownloadReport(false)}
+                                        className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
+                                    >
+                                        <DownloadIcon className="w-3 h-3 text-brand-green" />
+                                        Full Report
+                                    </button>
+                                    <div className="border-t border-gray-100 dark:border-white/5" />
+                                    <button
+                                        onClick={() => handleDownloadReport(true)}
+                                        className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
+                                    >
+                                        <DownloadIcon className="w-3 h-3 text-blue-500" />
+                                        Short Report
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     ) : (
                         <>
                         <button
-                            onClick={async () => {
-                                if (isDownloadingRef.current) return;
-                                if (!session?.userId) {
-                                    alert("User ID not found for this session.");
-                                    return;
-                                }
-                                try {
-                                    isDownloadingRef.current = true;
-                                    setDownloading(true);
-                                    setDownloadProgress('Initializing...');
-                                    
-                                    const studentId = session.userId; 
-                                    const startData = await assessmentService.generateStudentReport(studentId);
-                                    
-                                    if (!startData.success || !startData.jobId) {
-                                        throw new Error("Failed to start report generation");
-                                    }
-                                    
-                                    const jobId = startData.jobId;
-                                    
-                                    let isComplete = false;
-                                    while (!isComplete && isDownloadingRef.current) {
-                                        try {
-                                            const statusData = await assessmentService.getDownloadStatus(jobId);
-                                            
-                                            if (statusData.status === 'PROCESSING') {
-                                                setDownloadProgress(statusData.progress || 'Processing...');
-                                                await new Promise(resolve => setTimeout(resolve, 1000));
-                                            } else if (statusData.status === 'COMPLETED') {
-                                                isComplete = true;
-                                                setDownloadProgress('Downloading...');
-
-                                                if (!statusData.downloadUrl) {
-                                                    throw new Error('Download URL missing from report status.');
-                                                }
-                                                
-                                                const extendedData = statusData as any;
-                                                if (extendedData.password) {
-                                                    setGeneratedPassword(extendedData.password);
-                                                }
-
-                                                window.location.href = buildReportApiUrl(statusData.downloadUrl);
-                                                
-                                                setTimeout(() => {
-                                                    setDownloading(false);
-                                                    setDownloadProgress('');
-                                                }, 2000);
-                                            } else if (statusData.status === 'ERROR') {
-                                                isComplete = true;
-                                                throw new Error(statusData.error || 'Generation failed');
-                                            }
-                                        } catch (err) {
-                                            console.error("Polling error", err);
-                                            isComplete = true;
-                                            setDownloading(false);
-                                            alert("Failed to download report. Please try again.");
-                                        }
-                                    }
-                                    
-                                } catch (error) {
-                                    console.error("Download failed", error);
-                                    setDownloading(false);
-                                    alert("Failed to initiate download.");
-                                } finally {
-                                    isDownloadingRef.current = false;
-                                }
-                            }}
+                            onClick={() => handleDownloadReport(false)}
                             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                                 status === 'COMPLETED' 
                                 ? 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green cursor-pointer' 
@@ -833,6 +916,28 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                             </div>
                         );
                     })}
+                    {/* Survey Tab — always shown; enabled only if the candidate had survey questions */}
+                    {(() => {
+                        const surveyTabIndex = levels.length + 1;
+                        const isActive = activeTab === surveyTabIndex;
+                        return (
+                            <div
+                                onClick={() => hasSurvey && setActiveTab(surveyTabIndex)}
+                                className={`flex items-center gap-2 text-sm font-medium pb-4 transition-colors whitespace-nowrap ${isActive
+                                    ? 'text-brand-green border-b-2 border-brand-green font-bold cursor-default'
+                                    : hasSurvey
+                                        ? 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white cursor-pointer'
+                                        : 'text-gray-400 dark:text-white/50 cursor-not-allowed'
+                                    }`}
+                                title={hasSurvey ? 'Survey responses' : 'No survey questions in this assessment'}
+                            >
+                                Survey
+                                {!isActive && !hasSurvey && (
+                                    <LockIcon className="w-3 h-3 text-gray-400 dark:text-white/70" />
+                                )}
+                            </div>
+                        );
+                    })()}
                 </div>
 
                 {/* Progress Indicator */}
@@ -857,6 +962,9 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
 
             {/* Main Content Area */}
             {activeTab === 0 ? renderOverallReport() :
+                activeTab === levels.length + 1 ? (
+                    <SurveyAnswersView data={surveyData} loading={surveyLoading} />
+                ) :
                 // Level Reports
                 (() => {
                     const levelIndex = activeTab - 1;

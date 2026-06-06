@@ -9,9 +9,13 @@ import {
   fetchUserAssessmentData,
 } from '../helpers/groupReportHelper';
 import { MergedReportData } from '../types/types';
-import { getPlacementDetails } from '../helpers/sqlHelper';
+import {
+  getMBAPlacementDetails,
+  getPlacementDetails,
+} from '../helpers/sqlHelper';
 import { generateReportForUser } from '../helpers/reportFactory';
 import { PlacementReport } from '../reports/placement/placementReport';
+import { MBAPlacementReport } from '../reports/placement/mbaPlacementReport';
 import { logger } from '../helpers/logger';
 
 // --- Setup Temp Directory ---
@@ -31,7 +35,7 @@ export interface JobState {
 }
 
 /**
- * File-based job store — persists job state as JSON files in TEMP_DIR so that
+ * File-based job store - persists job state as JSON files in TEMP_DIR so that
  * state survives a process restart (e.g. during a deployment while a job is
  * actively being polled by handleAssessmentCompletion).
  */
@@ -98,6 +102,7 @@ export const reportQueueService = {
     groupId: number,
     deptDegreeId: number,
     jobId: string,
+    reportTypeOverride?: 'standard' | 'mba',
   ) {
     logger.info(`=================================================`);
     const jobDir = path.join(TEMP_DIR, jobId);
@@ -132,20 +137,51 @@ export const reportQueueService = {
         progress: 'Generating PDF...',
       });
 
+      // Detect MBA departments - they get a specialization-based handbook by
+      // default. An explicit reportTypeOverride from the API (e.g. the admin
+      // chose "Standard Placement Report" for an MBA dept) wins over auto-detect.
+      const autoIsMBA =
+        placementData.department_name?.toUpperCase().includes('MBA') ||
+        placementData.group_name?.toUpperCase().includes('MBA') ||
+        placementData.report_title?.toUpperCase().includes('MBA');
+      const isMBA =
+        reportTypeOverride === 'mba'
+          ? true
+          : reportTypeOverride === 'standard'
+            ? false
+            : autoIsMBA;
+
       // 2. Generate PDF Name
       const safeGroup = placementData.group_name.replace(/[^a-zA-Z0-9]/g, '_');
       const safeDept = placementData.department_name.replace(
         /[^a-zA-Z0-9]/g,
         '_',
       );
-      const fileName = `Placement_Handbook_${safeGroup}_${safeDept}.pdf`;
+      const fileName = `${
+        isMBA ? 'MBA_Placement' : 'Placement_Handbook'
+      }_${safeGroup}_${safeDept}.pdf`;
       const filePath = path.join(jobDir, fileName);
 
       logger.info(`[JOB:${jobId}] Generating ${fileName}...`);
 
-      // 3. Generate Report
-      const report = new PlacementReport(placementData);
-      await report.generate(filePath);
+      // 3. Generate Report - MBA cohorts use the specialization-based report;
+      // all others use the standard DISC-style placement handbook.
+      if (isMBA) {
+        const mbaData = await getMBAPlacementDetails(deptDegreeId, groupId);
+        if (mbaData && mbaData.total_students > 0) {
+          logger.info(
+            `[JOB:${jobId}] MBA department detected - using MBAPlacementReport (${mbaData.total_students} students).`,
+          );
+          await new MBAPlacementReport(mbaData).generate(filePath);
+        } else {
+          logger.warn(
+            `[JOB:${jobId}] MBA detected but no scored students; falling back to standard placement report.`,
+          );
+          await new PlacementReport(placementData).generate(filePath);
+        }
+      } else {
+        await new PlacementReport(placementData).generate(filePath);
+      }
 
       // 4. Complete
       logger.info(`[JOB:${jobId}] PDF Created.`);
@@ -167,7 +203,11 @@ export const reportQueueService = {
   // ============================================================================
   // WORKER 2: GROUP REPORTS (Bulk Generation & Zipping)
   // ============================================================================
-  async processGroupReports(groupId: string, jobId: string) {
+  async processGroupReports(
+    groupId: string,
+    jobId: string,
+    programId?: string,
+  ) {
     logger.info(`=================================================`);
     const jobDir = path.join(TEMP_DIR, jobId);
     let groupName: string = '';
@@ -186,8 +226,10 @@ export const reportQueueService = {
       fs.mkdirSync(jobDir, { recursive: true });
 
       logger.info(`[JOB:${jobId}] Fetching data...`);
-      const groupData: MergedReportData[] =
-        await fetchGroupAssessmentData(groupId);
+      const groupData: MergedReportData[] = await fetchGroupAssessmentData(
+        groupId,
+        programId,
+      );
       const totalUsers = groupData.length;
 
       if (totalUsers === 0) {

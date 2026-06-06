@@ -111,7 +111,7 @@ export async function getTopCollegesForStudent(
   );
 
   if (process.env.MOCK_DB === 'true') {
-    logger.info('[SchoolHelper] MOCK_DB — returning empty list');
+    logger.info('[SchoolHelper] MOCK_DB - returning empty list');
     return [];
   }
 

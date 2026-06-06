@@ -57,6 +57,7 @@ export const assessmentService = {
             userId?: string;
             type?: "individual" | "group";
             emailStatus?: 'sent' | 'not_sent' | 'third_party';
+            groupBy?: "group" | "assessment";
         },
     ): Promise<PaginatedResponse<AssessmentSession>> {
         const params = new URLSearchParams();
@@ -71,6 +72,9 @@ export const assessmentService = {
         if (filters?.userId) params.set("userId", filters.userId);
         if (filters?.type) params.set("type", filters.type);
         if (filters?.emailStatus) params.set("emailStatus", filters.emailStatus);
+        // Combined "By Group" aggregation (one row per group+program).
+        if (filters?.type === "group" && filters?.groupBy === "group")
+            params.set("groupBy", "group");
 
         const token = AuthService.getToken();
 
@@ -144,6 +148,54 @@ export const assessmentService = {
         });
         if (!res.ok)
             throw new Error("Failed to fetch group assessment details");
+        return res.json();
+    },
+
+    async getSurveyAnswers(sessionId: string | number): Promise<{
+        setNumber: number | null;
+        total: number;
+        answered: number;
+        answers: Array<{
+            sequence: number;
+            questionId: number;
+            setNumber: number | null;
+            theme: string | null;
+            contextEn: string | null;
+            contextTa: string | null;
+            questionEn: string | null;
+            questionTa: string | null;
+            status: string;
+            answered: boolean;
+            selectedOptionId: number | null;
+            options: Array<{ id: number; displayOrder: number; textEn: string | null; textTa: string | null; selected: boolean }>;
+        }>;
+    }> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/admin/assessments/sessions/${sessionId}/survey-answers`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: token ? `Bearer ${token}` : "",
+            },
+        });
+        if (!res.ok) throw new Error("Failed to fetch survey answers");
+        return res.json();
+    },
+
+    async getGroupCombined(groupId: string | number, programId: string | number): Promise<any> {
+        const token = AuthService.getToken();
+        const res = await fetch(
+            `${API_URL}/admin/assessments/group-combined/${groupId}/${programId}`,
+            {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: token ? `Bearer ${token}` : "",
+                },
+            },
+        );
+        if (!res.ok)
+            throw new Error("Failed to fetch combined group details");
         return res.json();
     },
 
@@ -226,6 +278,96 @@ export const assessmentService = {
 
         if (!res.ok) {
             throw new Error("Failed to send report email");
+        }
+        return res.json();
+    },
+
+    async getEligibleCandidatesForGroupAssessment(
+        groupAssessmentId: string | number,
+        search?: string,
+    ): Promise<{
+        registrationId: number;
+        userId: number;
+        fullName: string;
+        email: string | null;
+        mobileNumber: string;
+        countryCode: string;
+    }[]> {
+        const token = AuthService.getToken();
+        const params = new URLSearchParams();
+        if (search && search.trim()) params.set("search", search.trim());
+        const qs = params.toString();
+        const res = await fetch(
+            `${API_URL}/admin/assessments/group/${groupAssessmentId}/eligible-candidates${qs ? `?${qs}` : ""}`,
+            {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: token ? `Bearer ${token}` : "",
+                },
+            },
+        );
+        if (!res.ok) return [];
+        return res.json();
+    },
+
+    async addCandidateToGroupAssessment(
+        groupAssessmentId: string | number,
+        registrationId: number,
+    ): Promise<{
+        groupAssessmentId: number;
+        sessionId: number;
+        registrationId: number;
+        totalCandidates: number;
+    }> {
+        const token = AuthService.getToken();
+        const res = await fetch(
+            `${API_URL}/admin/assessments/group/${groupAssessmentId}/candidates`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: token ? `Bearer ${token}` : "",
+                },
+                body: JSON.stringify({ registrationId }),
+            },
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.message || "Failed to add candidate");
+        }
+        return res.json();
+    },
+
+    async assignGroupExam(payload: {
+        groupId: number;
+        programId: number;
+        examStart?: string;
+        examEnd?: string;
+        sendEmail?: boolean;
+    }): Promise<{
+        groupAssessmentId: number;
+        totalRegistrations: number;
+        created: number;
+        skipped: number;
+        failed: number;
+        failures: { registrationId: number; reason: string }[];
+    }> {
+        const token = AuthService.getToken();
+        const res = await fetch(
+            `${API_URL}/admin/assessments/assign-group-exam`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: token ? `Bearer ${token}` : "",
+                },
+                body: JSON.stringify(payload),
+            },
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.message || "Failed to assign group exam");
         }
         return res.json();
     },

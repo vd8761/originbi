@@ -19,6 +19,15 @@ export class OpenQuestion {
   @Column({ name: 'media_type', type: 'varchar', length: 20 })
   mediaType: string;
 
+  @Column({ name: 'set_number', type: 'smallint', nullable: true })
+  setNumber: number | null;
+
+  @Column({ name: 'context_text_en', type: 'text', nullable: true })
+  contextTextEn: string | null;
+
+  @Column({ name: 'context_text_ta', type: 'text', nullable: true })
+  contextTextTa: string | null;
+
   @Column({ name: 'question_text_en', type: 'text', nullable: true })
   questionTextEn: string | null;
 

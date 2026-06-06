@@ -300,6 +300,9 @@ type OpenQuestion struct {
 	ID              int64     `gorm:"primaryKey;autoIncrement" json:"id"`
 	QuestionType    string    `gorm:"type:varchar(30);not null" json:"question_type"`
 	MediaType       string    `gorm:"type:varchar(20);not null" json:"media_type"`
+	SetNumber       *int      `gorm:"column:set_number;type:smallint" json:"set_number"`
+	ContextTextEn   *string   `gorm:"column:context_text_en;type:text" json:"context_text_en"`
+	ContextTextTa   *string   `gorm:"column:context_text_ta;type:text" json:"context_text_ta"`
 	QuestionTextEn  string    `gorm:"column:question_text_en;type:text" json:"question_text_en"`
 	QuestionTextTa  *string   `gorm:"column:question_text_ta;type:text" json:"question_text_ta"`
 	AudioFile       string    `gorm:"type:varchar(255)" json:"audio_file"`

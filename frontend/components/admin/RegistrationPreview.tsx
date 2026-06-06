@@ -11,6 +11,7 @@ import DateRangePickerModal from '../ui/DateRangePickerModal';
 interface RegistrationPreviewProps {
     registration: Registration;
     onBack: () => void;
+    onViewGroupAssessment?: (groupAssessmentId: string) => void;
 }
 
 const format = (d: Date | null) => {
@@ -21,7 +22,7 @@ const format = (d: Date | null) => {
     return `${year}-${month}-${day}`;
 };
 
-const RegistrationPreview: React.FC<RegistrationPreviewProps> = ({ registration, onBack }) => {
+const RegistrationPreview: React.FC<RegistrationPreviewProps> = ({ registration, onBack, onViewGroupAssessment }) => {
     // Assessment List State
     const [sessions, setSessions] = useState<AssessmentSession[]>([]);
     const [loading, setLoading] = useState(true);
@@ -251,7 +252,30 @@ const RegistrationPreview: React.FC<RegistrationPreviewProps> = ({ registration,
                     </div>
                     <div>
                         <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Group Name</p>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">{(registration as any).groupName || '--'}</p>
+                        {(() => {
+                            const groupName = (registration as any).groupName;
+                            const linkedSession = sessions.find(
+                                (s: any) => s?.groupAssessmentId || s?.groupAssessment?.id,
+                            );
+                            const gaId =
+                                (linkedSession as any)?.groupAssessmentId ||
+                                (linkedSession as any)?.groupAssessment?.id;
+                            if (groupName && gaId && onViewGroupAssessment) {
+                                return (
+                                    <button
+                                        onClick={() => onViewGroupAssessment(String(gaId))}
+                                        className="text-sm font-medium text-brand-green hover:underline cursor-pointer text-left"
+                                    >
+                                        {groupName}
+                                    </button>
+                                );
+                            }
+                            return (
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                    {groupName || '--'}
+                                </p>
+                            );
+                        })()}
                     </div>
                     <div>
                         <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Status</p>

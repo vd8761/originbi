@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
-import { PlacementData } from '../types/placementTypes';
+import { MBAPlacementData, PlacementData } from '../types/placementTypes';
 import { getPool } from './dbPool';
 import { logger } from './logger';
 
@@ -463,6 +463,142 @@ FROM TraitGrouped;
   } finally {
     client.release();
     logger.info(`[DB-DEBUG] DB Connection released.\n`);
+  }
+}
+
+/**
+ * Fetches MBA-cohort data for the MBA placement report.
+ *
+ * Unlike getPlacementDetails (which groups students by DISC blended style), this
+ * returns a FLAT per-student list so the report can bucket students by best-fit
+ * MBA specialization via mbaConstants.rankSpecializations.
+ *
+ * One row per student: a session has multiple completed attempts, but only the
+ * attempt carrying `dominant_trait_id` is kept (filter `pt.code IS NOT NULL`),
+ * which dedupes to exactly one scored row per student - mirroring getPlacementDetails.
+ */
+export async function getMBAPlacementDetails(
+  department_degree_id: number,
+  group_id: number,
+): Promise<MBAPlacementData | null> {
+  logger.info(
+    `[MBA-PLACEMENT] 🚀 Fetching cohort for dept_degree=${department_degree_id}, group=${group_id}`,
+  );
+
+  if (process.env.MOCK_DB === 'true') {
+    logger.info('[MBA-PLACEMENT] Mocking MBA Placement Details');
+    return {
+      department_name: 'Mock MBA Dept',
+      degree_type: 'MBA',
+      exam_start_date: new Date().toISOString(),
+      total_students: 0,
+      group_name: 'Mock Group',
+      report_title: 'Mock MBA Placement',
+      exam_ref_no: 'MOCK-REF',
+      department_id: 1,
+      degree_type_id: 1,
+      department_deg_id: 1,
+      students: [],
+    } as MBAPlacementData;
+  }
+
+  const client = await getPool().connect();
+
+  try {
+    const query = `
+      WITH DuplicateCheck AS (
+        SELECT full_name, department_degree_id
+        FROM registrations
+        WHERE department_degree_id = $2
+        GROUP BY full_name, department_degree_id
+        HAVING COUNT(*) > 1
+      ),
+      RawStudentData AS (
+        SELECT
+          aa.user_id,
+          dpt.name AS department_name,
+          dpt.short_name AS dept_code,
+          dt.name AS degree_type,
+          a1.started_at,
+          gp.name AS group_name,
+          pt.code AS trait_code,
+          aa.registration_id,
+          r.full_name,
+          r.metadata ->> 'currentYear' AS current_year,
+          r.mobile_number,
+          ar.report_number,
+          ar.agile_scores,
+          dpt.id AS department_id,
+          dt.id AS degree_type_id,
+          r.department_degree_id,
+          CASE WHEN dc.full_name IS NOT NULL THEN true ELSE false END AS is_duplicate_name
+        FROM assessment_attempts aa
+        JOIN assessment_sessions a1 ON aa.assessment_session_id = a1.id
+        JOIN registrations r ON aa.registration_id = r.id
+        JOIN department_degrees dd ON r.department_degree_id = dd.id
+        JOIN departments dpt ON dd.department_id = dpt.id
+        JOIN degree_types dt ON dd.degree_type_id = dt.id
+        JOIN groups gp ON a1.group_id = gp.id
+        JOIN assessment_reports ar ON aa.assessment_session_id = ar.assessment_session_id
+        JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+        LEFT JOIN DuplicateCheck dc
+          ON r.full_name = dc.full_name
+          AND r.department_degree_id = dc.department_degree_id
+        WHERE
+          a1.group_id = $1
+          AND r.department_degree_id = $2
+          AND aa.status = 'COMPLETED'
+          AND aa.dominant_trait_id IS NOT NULL
+      )
+      SELECT JSON_BUILD_OBJECT(
+        'department_name', MAX(department_name),
+        'degree_type', MAX(degree_type),
+        'exam_start_date', MAX(started_at),
+        'total_students', COUNT(user_id),
+        'group_name', MAX(group_name),
+        'report_title', CONCAT('MBA Placement Handbook ', EXTRACT(YEAR FROM MAX(started_at))),
+        'exam_ref_no', MAX(report_number),
+        'department_id', MAX(department_id),
+        'degree_type_id', MAX(degree_type_id),
+        'department_deg_id', MAX(department_degree_id),
+        'students', COALESCE(
+          JSON_AGG(
+            JSON_BUILD_OBJECT(
+              'registration_ID', registration_id,
+              'full_name', full_name,
+              'college_year', current_year,
+              'student_exam_ref_no', report_number,
+              'duplicate_name', is_duplicate_name,
+              'mobile_number', mobile_number,
+              'agile_score', agile_scores,
+              'trait_code', trait_code,
+              'dept_code', dept_code
+            )
+          ), '[]'
+        )
+      ) AS final_json_output
+      FROM RawStudentData;
+    `;
+
+    const result = await client.query(query, [group_id, department_degree_id]);
+    const data = result.rows[0]?.final_json_output;
+
+    if (!data || !data.department_name) {
+      logger.warn(
+        `[MBA-PLACEMENT] ⚠️ No data found for group: ${group_id}, dept_degree: ${department_degree_id}`,
+      );
+      return null;
+    }
+
+    logger.info(
+      `[MBA-PLACEMENT] ✅ Fetched ${data.total_students} MBA students.`,
+    );
+    return data as MBAPlacementData;
+  } catch (error) {
+    logger.error('[MBA-PLACEMENT] ❌ SQL ERROR:', error);
+    throw error;
+  } finally {
+    client.release();
   }
 }
 
