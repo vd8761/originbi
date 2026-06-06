@@ -1151,8 +1151,13 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       const isMetaphor =
         selectedAssessment.id === '3' ||
         /metaphor/i.test(selectedAssessment.title || '');
+      const isLevel2 =
+        selectedAssessment.id === '2' ||
+        /level\s*2|aci/i.test(selectedAssessment.title || '');
       if (isMetaphor) {
         router.push(`/student/metaphor?attemptId=${selectedAssessment.attemptId}`);
+      } else if (isLevel2) {
+        router.push(`/student/level2?attemptId=${selectedAssessment.attemptId}`);
       } else {
         router.push(`/student/assessment/start?attempt_id=${selectedAssessment.attemptId}`);
       }

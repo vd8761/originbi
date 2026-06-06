@@ -199,6 +199,15 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
                 <span className="block w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 mt-1.5 shrink-0"></span>
                 {t.point3}
               </li>
+              {(assessment.id === '2' || /level\s*2|aci/i.test(assessment.title || '')) && (
+                <li className="text-[clamp(10px,0.8vw,13px)] text-brand-green flex items-start gap-3 font-semibold">
+                  <span className="block w-1.5 h-1.5 rounded-full bg-brand-green mt-1.5 shrink-0"></span>
+                  {language === 'TAM' 
+                    ? "இடது தெரிவுகளுக்கு 'E' விசையையும், வலது தெரிவுகளுக்கு 'I' விசையையும் உங்கள் விசைப்பலகையில் பயன்படுத்தவும்."
+                    : "Use the 'E' key for LEFT choices and 'I' key for RIGHT choices on your keyboard."
+                  }
+                </li>
+              )}
             </ul>
 
             {/* Progress Bar for Continue State */}
