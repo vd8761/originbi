@@ -8,6 +8,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import { studentService } from "../../../lib/services/student.service";
+import { useTheme } from "../../../contexts/ThemeContext";
+import Logo from "../../ui/Logo";
 import "./level2-exam.css";
 import {
     CheckIcon, CheckCircleIcon, ClockIcon,
@@ -18,6 +20,19 @@ import {
 const MoonIcon = ({ style }: { style?: React.CSSProperties }) => (
     <svg style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+);
+const SunIcon = ({ style }: { style?: React.CSSProperties }) => (
+    <svg style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="5" />
+        <line x1="12" y1="1" x2="12" y2="3" />
+        <line x1="12" y1="21" x2="12" y2="23" />
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+        <line x1="1" y1="12" x2="3" y2="12" />
+        <line x1="21" y1="12" x2="23" y2="12" />
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
     </svg>
 );
 const SettingsIcon = ({ style }: { style?: React.CSSProperties }) => (
@@ -112,26 +127,43 @@ const CompletionModal: React.FC<{ onBack: () => void }> = ({ onBack }) => (
 );
 
 // --- Circular Progress SVG ---
-const CircularProgress: React.FC<{ current: number; total: number }> = ({ current, total }) => {
+interface CircularProgressProps {
+    current: number;
+    total: number;
+    size?: number;
+    stroke?: number;
+    fontSize?: number;
+    showLabel?: boolean;
+}
+
+const CircularProgress: React.FC<CircularProgressProps> = ({
+    current,
+    total,
+    size = 130,
+    stroke = 7,
+    fontSize = 28,
+    showLabel = true,
+}) => {
     const pct = total > 0 ? Math.round((current / total) * 100) : 0;
-    const size = 130; const stroke = 7; const center = size / 2;
-    const r = (size - stroke) / 2; const circ = r * 2 * Math.PI;
+    const center = size / 2;
+    const r = (size - stroke) / 2;
+    const circ = r * 2 * Math.PI;
     const offset = circ - (pct / 100) * circ;
 
     return (
         <div style={{ position: "relative", width: size, height: size }}>
             <svg viewBox={`0 0 ${size} ${size}`} style={{ transform: "rotate(-90deg)", width: "100%", height: "100%" }}>
-                <circle style={{ stroke: "rgba(255,255,255,0.05)", fill: "transparent" }} strokeWidth={stroke} r={r} cx={center} cy={center} />
+                <circle style={{ stroke: "var(--line)", fill: "transparent" }} strokeWidth={stroke} r={r} cx={center} cy={center} />
                 <circle
                     stroke="var(--green-500)" strokeWidth={stroke}
                     strokeDasharray={`${circ} ${circ}`}
-                    style={{ strokeDashoffset: offset, transition: "stroke-dashoffset 0.6s ease-out", fill: "transparent", filter: "drop-shadow(0 0 8px rgba(30,211,106,0.45))" }}
+                    style={{ strokeDashoffset: offset, transition: "stroke-dashoffset 0.6s ease-out", fill: "transparent", filter: `drop-shadow(0 0 ${size / 16}px rgba(30,211,106,0.45))` }}
                     strokeLinecap="round" r={r} cx={center} cy={center}
                 />
             </svg>
             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ fontSize: 28, fontWeight: 800, color: "var(--fg-1)", lineHeight: 1 }}>{pct}%</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-2)", marginTop: 4 }}>Overall</span>
+                <span style={{ fontSize, fontWeight: 800, color: "var(--fg-1)", lineHeight: 1 }}>{pct}%</span>
+                {showLabel && <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-2)", marginTop: 4 }}>Overall</span>}
             </div>
         </div>
     );
@@ -139,6 +171,7 @@ const CircularProgress: React.FC<{ current: number; total: number }> = ({ curren
 
 // =============================================================
 export default function Level2Exam({ attemptId, onExit }: Level2ExamProps) {
+    const { theme, toggleTheme } = useTheme();
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [questions, setQuestions] = useState<Question[]>([]);
@@ -156,6 +189,7 @@ export default function Level2Exam({ attemptId, onExit }: Level2ExamProps) {
     const { language, setLanguage } = useLanguage();
     const startTimeRef = useRef(Date.now());
     const initialLoadRef = useRef(false);
+    const activeStepRef = useRef<HTMLButtonElement | null>(null);
 
     const total = questions.length;
     const q = questions[Math.min(idx, Math.max(0, total - 1))];
@@ -165,6 +199,17 @@ export default function Level2Exam({ attemptId, onExit }: Level2ExamProps) {
         const iv = setInterval(() => setOverallSeconds((p) => p + 1), 1000);
         return () => clearInterval(iv);
     }, []);
+
+    // ---------- Scroll Active Step into View ----------
+    useEffect(() => {
+        if (activeStepRef.current) {
+            activeStepRef.current.scrollIntoView({
+                behavior: "smooth",
+                block: "nearest",
+                inline: "nearest",
+            });
+        }
+    }, [idx]);
 
     // ---------- Load Questions ----------
     const fetchQuestions = useCallback(async () => {
@@ -370,11 +415,13 @@ export default function Level2Exam({ attemptId, onExit }: Level2ExamProps) {
             {/* ===== TOPBAR ===== */}
             <header className="l2-topbar">
                 <div className="l2-topbar__brand">
-                    <img className="l2-topbar__logo" src="/metaphor-assets/Origin-BI-white-logo.png" alt="Origin BI" />
+                    <Logo className="l2-topbar__logo" />
                 </div>
                 <div className="l2-topbar__spacer" />
                 <div className="l2-topbar__tools">
-                    <button className="l2-icon-btn" title="Dark mode"><MoonIcon /></button>
+                    <button className="l2-icon-btn" onClick={toggleTheme} title="Toggle theme">
+                        {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+                    </button>
                     <div className="l2-seg">
                         <button className={language !== "TAM" ? "is-active" : ""} onClick={() => setLanguage("ENG")}>ENG</button>
                         <button className={language === "TAM" ? "is-active" : ""} onClick={() => setLanguage("TAM")}>த</button>
@@ -417,7 +464,7 @@ export default function Level2Exam({ attemptId, onExit }: Level2ExamProps) {
                         <div className="l2-stat">
                             <ClockIcon />
                             <div className="l2-stat__info">
-                                <span className="l2-stat__label">Time Elapsed</span>
+                                <span className="l2-stat__label">Time</span>
                                 <span className="l2-stat__val">{fmtTime(overallSeconds)}</span>
                             </div>
                         </div>
@@ -469,28 +516,39 @@ export default function Level2Exam({ attemptId, onExit }: Level2ExamProps) {
                         </span>
                     </div>
 
-                    {/* key indicators */}
-                    <div className="l2-keys">
-                        <div
-                            className={`l2-key ${flashKey === "E" ? "is-flash" : ""}`}
-                            onClick={() => void selectSide("left")}
-                        >
-                            <div className="l2-key__badge">E</div>
-                            <div className="l2-key__label">
-                                <span className="l2-key__action">Press <b>E</b></span>
-                                <span className="l2-key__dir">for Left</span>
+                    {/* key indicators / touch indicators */}
+                    <div className="w-full flex flex-col items-center justify-center mt-2">
+                        {/* Desktop key indicators */}
+                        <div className="l2-keys">
+                            <div
+                                className={`l2-key ${flashKey === "E" ? "is-flash" : ""}`}
+                                onClick={() => void selectSide("left")}
+                            >
+                                <div className="l2-key__badge">E</div>
+                                <div className="l2-key__label">
+                                    <span className="l2-key__action">Press <b>E</b></span>
+                                    <span className="l2-key__dir">for Left</span>
+                                </div>
+                            </div>
+                            <div className="l2-key__divider" />
+                            <div
+                                className={`l2-key ${flashKey === "I" ? "is-flash" : ""}`}
+                                onClick={() => void selectSide("right")}
+                            >
+                                <div className="l2-key__badge">I</div>
+                                <div className="l2-key__label">
+                                    <span className="l2-key__action">Press <b>I</b></span>
+                                    <span className="l2-key__dir">for Right</span>
+                                </div>
                             </div>
                         </div>
-                        <div className="l2-key__divider" />
-                        <div
-                            className={`l2-key ${flashKey === "I" ? "is-flash" : ""}`}
-                            onClick={() => void selectSide("right")}
-                        >
-                            <div className="l2-key__badge">I</div>
-                            <div className="l2-key__label">
-                                <span className="l2-key__action">Press <b>I</b></span>
-                                <span className="l2-key__dir">for Right</span>
-                            </div>
+
+                        {/* Mobile touch helper */}
+                        <div className="l2-mobile-touch-helper items-center justify-center gap-2 p-2 bg-brand-light-primary dark:bg-white/5 border border-brand-light-tertiary dark:border-white/10 rounded-full px-4 mb-4 select-none">
+                            <span className="text-sm">👆</span>
+                            <span className="text-[11px] font-semibold text-brand-text-light-secondary dark:text-gray-400">
+                                {language === "TAM" ? "பதிலளிக்க இடது அல்லது வலது வகை அட்டையைத் தட்டவும்" : "Tap Left or Right Category Card to answer"}
+                            </span>
                         </div>
                     </div>
 
@@ -510,9 +568,10 @@ export default function Level2Exam({ attemptId, onExit }: Level2ExamProps) {
 
                 {/* --- RIGHT SIDEBAR (PROGRESS & STEPPER QUESTIONS) --- */}
                 <aside className="l2-sidebar">
-                    <div className="l2-progress">
+                    {/* Desktop Test Progress Block */}
+                    <div className="l2-progress hidden md:flex">
                         <span className="l2-progress__title">Test Progress</span>
-                        <CircularProgress current={answeredCount} total={total} />
+                        <CircularProgress current={answeredCount} total={total} size={130} stroke={7} fontSize={28} showLabel={true} />
                         <span className="l2-progress__desc">
                             You&apos;re in the timed <b>Reaction Test</b> block.
                         </span>
@@ -527,17 +586,27 @@ export default function Level2Exam({ attemptId, onExit }: Level2ExamProps) {
                             return (
                                 <button
                                     key={i}
+                                    ref={isCurrent ? activeStepRef : null}
                                     onClick={() => { setIdx(i); startTimeRef.current = Date.now(); }}
                                     className={`l2-step-btn ${cls}`}
                                     title={`Trial ${i + 1}`}
                                 >
                                     <div className="l2-step__circle">
-                                        {isDone ? <CheckIcon style={{ width: 14, height: 14 }} /> : <span>{i + 1}</span>}
+                                        <span>{i + 1}</span>
                                     </div>
                                     <span className="l2-step__label">Trial {i + 1}</span>
                                 </button>
                             );
                         })}
+                    </div>
+
+                    {/* Mobile Test Progress (Small, placed in the top right corner beside horizontal stepper) */}
+                    <div className="l2-progress-mobile flex md:hidden items-center gap-2">
+                        <div className="flex flex-col text-right">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-brand-text-light-secondary dark:text-gray-400">Progress</span>
+                            <span className="text-[11px] font-black text-brand-green">{answeredCount}/{total}</span>
+                        </div>
+                        <CircularProgress current={answeredCount} total={total} size={36} stroke={3} fontSize={10} showLabel={false} />
                     </div>
                 </aside>
             </div>

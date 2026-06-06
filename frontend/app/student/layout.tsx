@@ -158,6 +158,7 @@ export default function StudentLayout({
     // /student/metaphor — treat it as an assessment page (full-screen, no nav)
     // so the assessment-mode redirect doesn't bounce the student off it.
     const isAssessmentPage = pathname?.includes('/student/assessment') || pathname?.includes('/student/metaphor') || pathname?.includes('/student/level2');
+    const isActualExamPage = pathname?.includes('/student/metaphor') || pathname?.includes('/student/level2');
     const isUpgradePage = pathname?.includes('/student/upgrade');
     const hideNav = (isAssessmentPage && !isReportReady) || isUpgradePage;
     const showAssessmentOnly = isAssessmentModeFlag && !isReportReady;
@@ -188,7 +189,7 @@ export default function StudentLayout({
 
                         {/* Content Area with Top Padding - Matches AdminLayout structure */}
                         <main className={`relative z-10 w-full min-h-screen ${isAssessmentPage ? '' : 'pt-[clamp(70px,7.6vh,100px)]'} portal-bg`}>
-                            <div className={`w-full h-full px-4 sm:px-6 lg:px-8 2xl:px-12 ${isAssessmentPage ? '' : 'pt-6 sm:pt-8'} max-w-[2000px] mx-auto transition-all duration-300 relative`}>
+                            <div className={`w-full h-full ${isActualExamPage ? 'px-0' : 'px-4 sm:px-6 lg:px-8 2xl:px-12'} ${isAssessmentPage ? '' : 'pt-6 sm:pt-8'} max-w-[2000px] mx-auto transition-all duration-300 relative`}>
                                 {children}
                             </div>
                         </main>
