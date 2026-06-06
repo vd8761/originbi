@@ -27,6 +27,11 @@ export class SettingsController {
     return this.settingsService.getAllGrouped();
   }
 
+  @Get('metaphor/gemini-models')
+  async getGeminiModels() {
+    return this.settingsService.getGeminiModels();
+  }
+
   // ---------------------------------------------------------
   // GET /settings/:category — Settings for a specific category
   // ---------------------------------------------------------

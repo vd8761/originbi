@@ -162,6 +162,7 @@ export default function StudentLayout({
     const hideNav = (isAssessmentPage && !isReportReady) || isUpgradePage;
     const showAssessmentOnly = isAssessmentModeFlag && !isReportReady;
     const shouldApplyZoom = !isPublic && (!isAssessmentPage || isReportReady);
+    const shouldRenderHeader = !isAssessmentPage || isReportReady;
     const pageBaseBackgroundClass = (isAssessmentPage && !isReportReady)
         ? 'bg-transparent dark:bg-transparent'
         : 'bg-transparent dark:bg-[#19211C]';
@@ -175,16 +176,17 @@ export default function StudentLayout({
                     </div>
                 ) : (
                     <RequireStudent>
-                        {/* Persistent Header */}
-                        <div className="fixed top-0 left-0 right-0 z-50">
-                            <Header
-                                onLogout={handleLogout}
-                                currentView={currentView}
-                                onNavigate={handleNavigate}
-                                hideNav={hideNav}
-                                showAssessmentOnly={showAssessmentOnly}
-                            />
-                        </div>
+                        {shouldRenderHeader && (
+                            <div className="fixed top-0 left-0 right-0 z-50">
+                                <Header
+                                    onLogout={handleLogout}
+                                    currentView={currentView}
+                                    onNavigate={handleNavigate}
+                                    hideNav={hideNav}
+                                    showAssessmentOnly={showAssessmentOnly}
+                                />
+                            </div>
+                        )}
 
                         {/* Content Area with Top Padding - Matches AdminLayout structure */}
                         <main className={`relative z-10 w-full min-h-screen ${isAssessmentPage ? '' : 'pt-[clamp(70px,7.6vh,100px)]'} portal-bg`}>

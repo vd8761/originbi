@@ -81,6 +81,7 @@ export { OriginbiSetting } from './originbi-setting.entity';
 // Level 3 — Metaphor
 export { MetaphorQuestion } from './metaphor-question.entity';
 export { MetaphorAnswer } from './metaphor-answer.entity';
+export { MetaphorTranscriptionJob } from './metaphor-transcription-job.entity';
 export { MetaphorTranslationJob } from './metaphor-translation-job.entity';
 export { AiUsageLog } from './ai-usage-log.entity';
 

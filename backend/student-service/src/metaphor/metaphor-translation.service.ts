@@ -1,22 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
+import { InjectRepository } from '@nestjs/typeorm';
 import { firstValueFrom } from 'rxjs';
+import { Repository } from 'typeorm';
 import {
+  AiUsageLog,
   MetaphorAnswer,
   MetaphorTranslationJob,
-  AiUsageLog,
+  OriginbiSetting,
 } from '@originbi/shared-entities';
 
-const CLAUDE_URL = 'https://api.anthropic.com/v1/messages';
-const DEFAULT_MODEL = 'claude-3-5-sonnet-20241022';
+const DEFAULT_MODEL = 'gemini-2.0-flash';
 
 /**
- * Translates a Level-3 attempt's answers to English in ONE batched Claude call,
+ * Translates a Level-3 attempt's answers to English in one batched Gemini call,
  * stores the English text, and logs token usage. Idempotent per attempt: only
- * rows still needing translation are sent; success requires ALL to be done.
+ * rows still needing translation are sent; success requires all to be done.
  */
 @Injectable()
 export class MetaphorTranslationService {
@@ -29,12 +28,13 @@ export class MetaphorTranslationService {
     private readonly jobRepo: Repository<MetaphorTranslationJob>,
     @InjectRepository(AiUsageLog)
     private readonly usageRepo: Repository<AiUsageLog>,
-    private readonly config: ConfigService,
+    @InjectRepository(OriginbiSetting)
+    private readonly settingRepo: Repository<OriginbiSetting>,
     private readonly http: HttpService,
   ) {}
 
   /** Translate everything pending for one attempt. Throws on failure so the
-   *  queue retries; the job row reflects PROCESSING/DONE/FAILED. */
+   * queue retries; the job row reflects PROCESSING/DONE/FAILED. */
   async translateAttempt(attemptId: number): Promise<void> {
     const job = await this.ensureJob(attemptId);
     await this.jobRepo.update(job.id, { status: 'PROCESSING', lastError: null });
@@ -45,19 +45,27 @@ export class MetaphorTranslationService {
     });
 
     if (pending.length === 0) {
-      await this.jobRepo.update(job.id, { status: 'DONE', translated: job.translated });
+      await this.jobRepo.update(job.id, {
+        status: 'DONE',
+        translated: job.translated,
+      });
       return;
     }
 
-    const apiKey = this.config.get<string>('ANTHROPIC_API_KEY');
+    const apiKey =
+      String((await this.readSetting('gemini_api_key', '')) || '').trim() ||
+      process.env.GEMINI_API_KEY ||
+      '';
     if (!apiKey) {
-      const msg = 'ANTHROPIC_API_KEY not configured — cannot translate.';
+      const msg = 'Gemini API key not configured - cannot translate.';
       await this.jobRepo.update(job.id, { status: 'FAILED', lastError: msg });
       throw new Error(msg);
     }
-    const model = this.config.get<string>('CLAUDE_MODEL') || DEFAULT_MODEL;
 
-    // Build batched input: id + source language + text.
+    const model =
+      String((await this.readSetting('gemini_model', DEFAULT_MODEL)) || '').trim() ||
+      DEFAULT_MODEL;
+
     const items = pending.map((a) => ({
       id: a.id,
       source_language: a.spokenLanguage || 'unknown',
@@ -73,56 +81,62 @@ export class MetaphorTranslationService {
       `Items:\n${JSON.stringify(items)}`;
 
     let respText = '';
-    let usage = { input_tokens: 0, output_tokens: 0 };
+    let usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
     try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+        model,
+      )}:generateContent?key=${encodeURIComponent(apiKey)}`;
       const res = await firstValueFrom(
         this.http.post(
-          CLAUDE_URL,
+          url,
           {
-            model,
-            max_tokens: 4096,
-            messages: [{ role: 'user', content: prompt }],
-          },
-          {
-            headers: {
-              'x-api-key': apiKey,
-              'anthropic-version': '2023-06-01',
-              'content-type': 'application/json',
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: 'application/json',
             },
-            timeout: 120000,
           },
+          { timeout: 120000 },
         ),
       );
       const data: any = res.data;
-      respText = (data?.content?.[0]?.text || '').trim();
-      usage = data?.usage || usage;
+      respText = String(
+        data?.candidates?.[0]?.content?.parts?.[0]?.text || '',
+      ).trim();
+      const usageMetadata = data?.usageMetadata || {};
+      usage = {
+        inputTokens: Number(usageMetadata.promptTokenCount || 0),
+        outputTokens: Number(usageMetadata.candidatesTokenCount || 0),
+        totalTokens: Number(usageMetadata.totalTokenCount || 0),
+      };
     } catch (err: any) {
-      const msg = `Claude API call failed: ${err?.message || err}`;
+      const msg = `Gemini translation API call failed: ${
+        err?.response?.data?.error?.message || err?.message || err
+      }`;
       await this.jobRepo.update(job.id, { status: 'FAILED', lastError: msg });
       throw new Error(msg);
     }
 
-    // Log usage regardless of parse outcome.
     await this.usageRepo.insert({
       purpose: 'metaphor_translation',
       assessmentAttemptId: attemptId,
       model,
-      inputTokens: usage.input_tokens || 0,
-      outputTokens: usage.output_tokens || 0,
-      totalTokens: (usage.input_tokens || 0) + (usage.output_tokens || 0),
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      totalTokens: usage.totalTokens,
       questionCount: pending.length,
       questionIds: pending.map((p) => p.id),
       status: 'DONE',
     });
 
-    // Parse JSON (strip accidental code fences).
     let parsed: { id: number; en: string }[];
     try {
       const clean = respText.replace(/^```(json)?/i, '').replace(/```$/, '').trim();
       parsed = JSON.parse(clean);
       if (!Array.isArray(parsed)) throw new Error('not an array');
     } catch (e) {
-      const msg = `Failed to parse Claude JSON response: ${(e as Error).message}`;
+      const msg = `Failed to parse Gemini translation JSON response: ${
+        (e as Error).message
+      }`;
       await this.jobRepo.update(job.id, { status: 'FAILED', lastError: msg });
       throw new Error(msg);
     }
@@ -146,7 +160,7 @@ export class MetaphorTranslationService {
     });
 
     if (stillPending > 0) {
-      const msg = `${stillPending} answer(s) missing from Claude response — will retry.`;
+      const msg = `${stillPending} answer(s) missing from Gemini response - will retry.`;
       await this.jobRepo.update(job.id, {
         status: 'FAILED',
         translated: translatedTotal,
@@ -161,6 +175,18 @@ export class MetaphorTranslationService {
       lastError: null,
     });
     this.logger.log(`[Metaphor] Translated ${done} answers for attempt ${attemptId}.`);
+  }
+
+  private async readSetting<T>(key: string, fallback: T): Promise<T> {
+    try {
+      const row = await this.settingRepo.findOne({
+        where: { category: 'metaphor', settingKey: key },
+      });
+      const v = row?.value;
+      return v === null || v === undefined ? fallback : (v as T);
+    } catch {
+      return fallback;
+    }
   }
 
   private async ensureJob(attemptId: number): Promise<MetaphorTranslationJob> {

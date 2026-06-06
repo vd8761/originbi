@@ -5,7 +5,7 @@
    Claude Design prototype). Wired to the metaphor connectors +
    pluggable speech hook. Desktop layout; images via URL.
    ============================================================ */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import "./metaphor-exam.css";
 import {
     metaphorService,
@@ -15,17 +15,15 @@ import {
 import { useMetaphorSpeech } from "../../../lib/hooks/useMetaphorSpeech";
 import {
     MicIcon, MicOffIcon, StopIcon, ChevronDownIcon, CheckIcon, CheckCircleIcon,
-    ExpandIcon, CloseIcon, TrashIcon, ReRecordIcon, StartOverIcon, CaptureIcon,
+    ExpandIcon, CloseIcon, StartOverIcon,
     ClockIcon, ArrowRightIcon, ArrowLeftIcon, FlagFinishIcon, ImageOffIcon,
-    WifiOffIcon, InfoIcon, WarnIcon, LockIcon,
+    InfoIcon, WarnIcon,
 } from "./metaphor-icons";
 
 const fmtTime = (s: number) => {
     s = Math.max(0, Math.floor(s));
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
-
-interface Checkpoint { id: string; text: string; words: number; at: string }
 
 export default function MetaphorExam({
     attemptId,
@@ -42,36 +40,38 @@ export default function MetaphorExam({
 
     const [idx, setIdx] = useState(0);
     const [readLang, setReadLang] = useState<"EN" | "TA">("EN");
-    const [speakLang, setSpeakLang] = useState("en-IN");
+    const [speakLang, setSpeakLang] = useState("auto");
 
-    const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
-    const [editingCpId, setEditingCpId] = useState<string | null>(null);
     const [langOpen, setLangOpen] = useState(false);
 
     const [timeLeft, setTimeLeft] = useState(20 * 60);
-    const [expired, setExpired] = useState(false);
+    const [, setExpired] = useState(false);
     const [zoom, setZoom] = useState(false);
     const [showInstructions, setShowInstructions] = useState(false);
     const [confirmEmpty, setConfirmEmpty] = useState(false);
     const [finished, setFinished] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [recordingSeconds, setRecordingSeconds] = useState(0);
+    const [imageFailed, setImageFailed] = useState(false);
 
-    const workingRef = useRef<Record<number, { checkpoints: Checkpoint[]; liveText: string }>>({});
+    const workingRef = useRef<Record<number, string>>({});
     const langRef = useRef<HTMLDivElement>(null);
+    const qnavRefs = useRef<Array<HTMLButtonElement | null>>([]);
+    const transcriptBodyRef = useRef<HTMLDivElement>(null);
 
-    const MAX_CP = config?.segmentLimit ?? 5;
-    const capLabel = config?.checkpointLabel ?? "Capture";
-    const allowTyping = config?.allowTyping ?? false;
-    const limitBehavior = config?.limitBehavior ?? "disable";
     const langs = config?.supportedLanguages ?? [];
 
     const sttProvider = config?.sttProvider?.provider || "web_speech";
     const speech = useMetaphorSpeech({ provider: sttProvider, lang: speakLang });
-    const { finalText: liveText, interim, listening, micState } = speech;
+    const { finalText: liveText, interim, listening, micState, audioLevel, spectrum } = speech;
 
     const total = questions.length;
     const q = questions[Math.min(idx, Math.max(0, total - 1))];
     const isLast = idx === total - 1;
+
+    useEffect(() => {
+        setImageFailed(false);
+    }, [q?.questionId, q?.imageUrl]);
 
     // ---- load ----
     useEffect(() => {
@@ -91,9 +91,7 @@ export default function MetaphorExam({
                 setSavedAnswers(saved);
                 const firstUnanswered = data.questions.findIndex((qq) => !qq.answered);
                 setIdx(firstUnanswered === -1 ? Math.max(0, data.questions.length - 1) : firstUnanswered);
-                if (data.config.supportedLanguages?.[0]?.code) {
-                    setSpeakLang(data.config.supportedLanguages[0].code);
-                }
+                setSpeakLang("auto");
             } catch (e: any) {
                 if (active) setLoadError(e?.message || "Failed to load the assessment.");
             } finally {
@@ -124,63 +122,57 @@ export default function MetaphorExam({
     // ---- beforeunload warning if scratch exists ----
     useEffect(() => {
         const h = (e: BeforeUnloadEvent) => {
-            if (checkpoints.length > 0 || liveText.trim() || interim.trim()) { e.preventDefault(); e.returnValue = ""; }
+            if (liveText.trim() || interim.trim()) { e.preventDefault(); e.returnValue = ""; }
         };
         window.addEventListener("beforeunload", h);
         return () => window.removeEventListener("beforeunload", h);
-    }, [checkpoints, liveText, interim]);
+    }, [liveText, interim]);
+
+    useEffect(() => {
+        qnavRefs.current[idx]?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+            inline: "center",
+        });
+    }, [idx]);
+
+    useEffect(() => {
+        if (!listening) return;
+        const iv = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+        return () => clearInterval(iv);
+    }, [listening]);
+
+    useEffect(() => {
+        const body = transcriptBodyRef.current;
+        if (!body) return;
+        body.scrollTo({ top: body.scrollHeight, behavior: "smooth" });
+    }, [liveText, interim]);
 
     const T = (en?: string | null, ta?: string | null) => (readLang === "TA" && ta ? ta : en || ta || "");
 
-    // ---- checkpoint actions ----
-    const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
-    const nowStamp = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    const hasLive = liveText.trim().length > 0 || interim.trim().length > 0;
-    const atLimit = checkpoints.length >= MAX_CP && limitBehavior === "disable" && !editingCpId;
-
-    const toggleSpeak = () => { if (listening) speech.stop(); else void speech.start(); };
-
-    const handleCapture = () => {
-        const text = (liveText + (interim ? " " + interim : "")).trim();
-        if (!text) return;
-        if (editingCpId) {
-            setCheckpoints((cps) => cps.map((c) => c.id === editingCpId ? { ...c, text, words: wordCount(text), at: nowStamp() } : c));
-            setEditingCpId(null);
-        } else {
-            const cp: Checkpoint = { id: `cp_${Date.now()}`, text, words: wordCount(text), at: nowStamp() };
-            setCheckpoints((cps) => {
-                if (cps.length >= MAX_CP) return limitBehavior === "replace" ? [...cps.slice(1), cp] : cps;
-                return [...cps, cp];
-            });
-        }
-        speech.reset();
+    const toggleSpeak = () => {
         if (listening) speech.stop();
+        else void speech.start();
     };
-    const handleStartOver = () => { speech.reset(); if (listening) speech.stop(); };
-    const handleReRecord = (id: string) => { setEditingCpId(id); speech.reset(); if (listening) speech.stop(); };
-    const handleDeleteCp = (id: string) => { setCheckpoints((cps) => cps.filter((c) => c.id !== id)); if (editingCpId === id) setEditingCpId(null); };
+    const handleStartOver = () => { speech.stop(); speech.reset(); speech.resetRecording(); setRecordingSeconds(0); };
 
     const assemble = () => {
-        const parts = checkpoints.map((c) => c.text);
-        const tail = (liveText + (interim ? " " + interim : "")).trim();
-        if (tail) parts.push(tail);
-        return parts.join(" ").trim();
+        return (liveText + (interim ? " " + interim : "")).trim();
     };
 
     const switchTo = (newIdx: number) => {
         if (newIdx < 0 || newIdx >= total) return;
-        if (q) workingRef.current[q.questionId] = { checkpoints, liveText };
-        speech.stop(); speech.reset(); setEditingCpId(null);
+        if (q) workingRef.current[q.questionId] = assemble();
+        speech.stop(); speech.reset(); speech.resetRecording(); setRecordingSeconds(0);
         const target = questions[newIdx];
         const w = workingRef.current[target.questionId];
-        if (w) { setCheckpoints(w.checkpoints); speech.setFinalText(w.liveText); }
-        else if (savedAnswers[target.questionId]) { setCheckpoints([]); speech.setFinalText(savedAnswers[target.questionId]); }
-        else { setCheckpoints([]); speech.setFinalText(""); }
+        if (w) speech.setFinalText(w);
+        else if (savedAnswers[target.questionId]) speech.setFinalText(savedAnswers[target.questionId]);
+        else speech.setFinalText("");
         setIdx(newIdx);
-        if (target.spokenLanguage) setSpeakLang(target.spokenLanguage);
     };
 
-    const persistAnswer = async (answer: string) => {
+    const persistAnswer = async (answer: string, audioBlob?: Blob | null) => {
         setSavedAnswers((prev) => ({ ...prev, [q.questionId]: answer }));
         try {
             await metaphorService.saveAnswer({
@@ -188,16 +180,18 @@ export default function MetaphorExam({
                 metaphorQuestionId: q.questionId,
                 spokenLanguage: speakLang,
                 answerText: answer,
+                audioBlob: config?.audioTranscriptionEnabled ? audioBlob : null,
             });
-        } catch (e) { /* surfaced by UI state; keep local */ }
+        } catch { /* surfaced by UI state; keep local */ }
     };
 
     const goNext = async () => {
         setSaving(true);
-        await persistAnswer(assemble());
+        const answer = assemble();
+        const audioBlob = await speech.finalizeRecording();
+        await persistAnswer(answer, audioBlob);
         setSaving(false);
         if (isLast) {
-            speech.stop();
             try { await metaphorService.finish(attemptId); } catch { /* sweep retries */ }
             setFinished(true);
             return;
@@ -207,6 +201,13 @@ export default function MetaphorExam({
     const handleSaveNext = () => { if (!assemble()) { setConfirmEmpty(true); return; } void goNext(); };
 
     const blocked = micState === "denied" || micState === "unsupported";
+    const textSizeClass = (prefix: "context" | "question", text: string) => {
+        const len = text.trim().length;
+        if (len > 260) return `${prefix}--xlong`;
+        if (len > 180) return `${prefix}--long`;
+        if (len > 110) return `${prefix}--medium`;
+        return `${prefix}--short`;
+    };
 
     // ---- render ----
     if (loading) {
@@ -218,10 +219,17 @@ export default function MetaphorExam({
 
     const pct = Math.round((idx / total) * 100);
     const tcls = timeLeft <= 0 ? "is-out" : timeLeft <= 120 ? "is-low" : "";
-    const curLang = langs.find((l) => l.code === speakLang) || langs[0];
+    const speechLanguages = [{ code: "auto", label: "Auto detect", native: "Auto" }, ...langs];
+    const curLang = speechLanguages.find((l) => l.code === speakLang) || speechLanguages[0];
     const ctx = T(q.contextEn, q.contextTa);
+    const imageDesc = T(q.imageDescEn, q.imageDescTa);
+    const questionText = T(q.questionEn, q.questionTa);
+    const hasImage = Boolean(q.imageUrl && !imageFailed);
+    const spectrumBars = spectrum.length ? spectrum : Array(32).fill(0.04);
+    const spectrumSplit = Math.ceil(spectrumBars.length / 2);
+    const hasTranscript = liveText.trim().length > 0 || interim.trim().length > 0;
     const statuses = questions.map((qq, i) =>
-        i === idx ? "current" : (savedAnswers[qq.questionId]?.trim() || workingRef.current[qq.questionId]?.checkpoints?.length) ? "done" : "todo");
+        i === idx ? "current" : (savedAnswers[qq.questionId]?.trim() || workingRef.current[qq.questionId]?.trim()) ? "done" : "todo");
 
     return (
         <div className="exam layout-two-col" data-theme="dark">
@@ -263,41 +271,52 @@ export default function MetaphorExam({
                 {/* STIMULUS */}
                 <section className="stimulus">
                     <div className="stimulus__scroll">
-                        <div className="imgframe" onClick={q.imageUrl ? () => setZoom(true) : undefined} style={{ cursor: q.imageUrl ? "zoom-in" : "default" }}>
-                            {q.imageUrl ? (
+                        <div className={`imgframe ${hasImage ? "" : "is-unavailable"}`} onClick={hasImage ? () => setZoom(true) : undefined} style={{ cursor: hasImage ? "zoom-in" : "default" }}>
+                            {hasImage ? (
                                 <>
-                                    <img src={q.imageUrl} alt={T(q.imageDescEn, q.imageDescTa)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                    <img
+                                        src={q.imageUrl || ""}
+                                        alt=""
+                                        onError={(e) => {
+                                            e.currentTarget.style.display = "none";
+                                            setImageFailed(true);
+                                        }}
+                                    />
                                     <span className="imgframe__zoom"><ExpandIcon />Click to zoom</span>
                                 </>
                             ) : (
-                                <div className="imgframe__state"><ImageOffIcon /><p>Image will appear here.</p></div>
+                                <div className="imgframe__state">
+                                    <ImageOffIcon />
+                                    <strong>Image not available</strong>
+                                    {imageDesc ? <p>{imageDesc}</p> : <p>No image description is available.</p>}
+                                </div>
                             )}
                         </div>
-                        <div className="field-block"><p className="field-desc">{T(q.imageDescEn, q.imageDescTa)}</p></div>
-                        {ctx && (<div className="question-block"><p className="field-context">{ctx}</p></div>)}
+                        {hasImage && imageDesc && <div className="field-block"><p className="field-desc">{imageDesc}</p></div>}
+                        {ctx && (<div className="question-block"><p className={`field-context ${textSizeClass("context", ctx)}`}>{ctx}</p></div>)}
                         <div className="question-block">
                             <span className="field-label"><span className="bar" />Question</span>
-                            <h1 className="field-question">{T(q.questionEn, q.questionTa)}</h1>
+                            <h1 className={`field-question ${textSizeClass("question", questionText)}`}>{questionText}</h1>
                         </div>
                     </div>
                 </section>
 
                 {/* ANSWER PANEL */}
-                <section className="answer">
-                    <div className="answer__head">
+                <section className="answer voice-answer">
+                    <div className="answer__head voice-floating-head">
                         <div className="answer__title">
-                            <h3>Your Spoken Answer</h3>
-                            <span>Speak naturally — your words appear below in real time.</span>
+                            <h3><MicIcon />Voice Response</h3>
+                            <span>Your response will be transcribed automatically as you speak.</span>
                         </div>
                         <div className="lang-select dropdown align-end" ref={langRef}>
                             <span className="lang-select__cap">Answering in</span>
                             <button className={`lang-select__btn ${langOpen ? "is-open" : ""}`} onClick={() => setLangOpen((v) => !v)}>
-                                <MicIcon /><span>{curLang?.native || "English"}</span><ChevronDownIcon className="chev" />
+                                <MicIcon /><span>{curLang?.native || "Auto"}</span><ChevronDownIcon className="chev" />
                             </button>
                             {langOpen && (
                                 <div className="dropdown__menu">
                                     <div className="dropdown__head">Language you will speak in</div>
-                                    {langs.map((l) => (
+                                    {speechLanguages.map((l) => (
                                         <button key={l.code} className={`dropdown__item ${l.code === speakLang ? "is-active" : ""}`}
                                             onClick={() => { setSpeakLang(l.code); setLangOpen(false); }}>
                                             <span>{l.label} <span className="native">{l.native}</span></span>
@@ -309,105 +328,131 @@ export default function MetaphorExam({
                         </div>
                     </div>
 
-                    {/* checkpoints */}
-                    <div className="cps">
-                        <div className="cps__head">
-                            <span className="cps__head-l"><CaptureIcon />Saved Segments</span>
-                            <span className="cps__count"><b>{checkpoints.length}</b> / {MAX_CP}</span>
+                    <div className={`mic-float ${listening ? "is-live" : ""}`} style={{ "--mic-level": audioLevel, "--mic-ring": `${8 + audioLevel * 18}px` } as React.CSSProperties}>
+                        <div className="mic-float__spectrogram mic-float__spectrogram--left" aria-hidden="true">
+                            {spectrumBars.slice(0, spectrumSplit).map((amp, i) => (
+                                <span key={i} style={{ height: `${Math.max(10, amp * 100)}%`, opacity: 0.34 + amp * 0.58 }} />
+                            ))}
                         </div>
-                        {checkpoints.length === 0 ? (
-                            <div className="cp" style={{ background: "transparent", borderStyle: "dashed", justifyContent: "center" }}>
-                                <p className="cp__text" style={{ color: "var(--fg-2)", textAlign: "center" }}>No segments yet — press “{capLabel}” to pin part of your answer.</p>
-                            </div>
-                        ) : (
-                            <div className="cps__list">
-                                {checkpoints.map((cp, i) => (
-                                    <div className={`cp ${editingCpId === cp.id ? "is-editing" : ""}`} key={cp.id}>
-                                        <span className="cp__num">{i + 1}</span>
-                                        <div className="cp__body">
-                                            {editingCpId === cp.id
-                                                ? <p className="cp__text" style={{ color: "var(--green-500)", fontWeight: 600 }}>Re-recording this segment… speak now, then press “{capLabel}”.</p>
-                                                : <p className="cp__text">{cp.text}</p>}
-                                            <div className="cp__meta"><span>{cp.words} words</span><span>·</span><span>pinned {cp.at}</span></div>
-                                        </div>
-                                        <div className="cp__actions">
-                                            <button className="icon-btn" title="Re-record this segment" onClick={() => handleReRecord(cp.id)}><ReRecordIcon /></button>
-                                            <button className="icon-btn danger" title="Delete segment" onClick={() => handleDeleteCp(cp.id)}><TrashIcon /></button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        <button className="mic-fab" onClick={toggleSpeak} disabled={blocked} title={listening ? "Stop speaking" : "Start speaking"} aria-label={listening ? "Stop speaking" : "Start speaking"}>
+                            {listening ? <StopIcon /> : <MicIcon />}
+                        </button>
+                        <div className="mic-float__spectrogram mic-float__spectrogram--right" aria-hidden="true">
+                            {spectrumBars.slice(spectrumSplit).map((amp, i) => (
+                                <span key={i} style={{ height: `${Math.max(10, amp * 100)}%`, opacity: 0.34 + amp * 0.58 }} />
+                            ))}
+                        </div>
+                    </div>
+                    <div className="voice-status">
+                        <span className={listening ? "is-live" : ""}>{listening ? "Listening..." : "Tap mic to speak"}</span>
+                        <b>{fmtTime(recordingSeconds)}</b>
                     </div>
 
-                    {/* transcript */}
-                    <div className={`transcript ${listening ? "is-live" : ""} ${allowTyping ? "is-editable" : ""}`}>
-                        {allowTyping && <span className="transcript__editbadge">Typing enabled</span>}
-                        {allowTyping ? (
-                            <textarea className="transcript__editable" value={liveText} placeholder="Type or speak your answer here…" onChange={(e) => speech.setFinalText(e.target.value)} />
-                        ) : (liveText || interim || listening) ? (
-                            <div className="transcript__text">
-                                {liveText}
-                                {interim && <span className="transcript__interim">{liveText ? " " : ""}{interim}</span>}
-                                {listening && <span className="transcript__caret" />}
-                            </div>
-                        ) : (
-                            <div className="transcript__placeholder"><MicIcon /><p>Press <b>Speak</b> and start talking. Your live transcript shows up here — read-only.</p></div>
-                        )}
-                    </div>
-
-                    {listening && (
-                        <div className="listening">
-                            <div className="wave">{[0, 1, 2, 3, 4, 5, 6].map((i) => <span key={i} style={{ animationDelay: `${i * 0.09}s` }} />)}</div>
-                            <span className="listening__txt">Listening…</span>
-                            <span className="listening__hint">Press Stop to pause</span>
+                    <div className={`transcript transcript--floating ${listening ? "is-live" : ""} ${hasTranscript ? "has-text" : ""}`}>
+                        <div className="transcript__head">
+                            <span>Live Transcript</span>
+                            {speakLang === "auto" && <em>Auto detect</em>}
                         </div>
-                    )}
+                        <div className="transcript__body" ref={transcriptBodyRef}>
+                            {(liveText || interim || listening) ? (
+                                <div className="transcript__text">
+                                    {liveText}
+                                    {interim && <span className="transcript__interim">{liveText ? " " : ""}{interim}</span>}
+                                    {listening && <span className="transcript__caret" />}
+                                </div>
+                            ) : (
+                                <p className="transcript__empty">Your spoken response will appear here.</p>
+                            )}
+                        </div>
+                    </div>
 
                     {micState === "denied" && (
-                        <div className="notice err"><MicOffIcon /><span><b>Microphone access is blocked.</b> Allow it from your browser’s address bar, then press Speak.</span></div>
+                        <div className="notice err"><MicOffIcon /><span><b>Microphone access is blocked.</b> Allow it from your browser address bar, then press Speak.</span></div>
                     )}
                     {micState === "unsupported" && (
-                        <div className="notice warn"><WarnIcon /><span><b>Live voice isn’t supported here.</b> Use the latest Chrome or Edge, or ask an admin to enable typing.</span></div>
+                        <div className="notice warn"><WarnIcon /><span><b>Live voice is not supported here.</b> Use the latest Chrome or Edge.</span></div>
                     )}
 
-                    <div className="controls">
-                        <button className={`speak-btn ${listening ? "is-live" : ""}`} onClick={toggleSpeak} disabled={blocked && !allowTyping}>
-                            {listening ? <StopIcon /> : <MicIcon />}{listening ? "Stop" : editingCpId ? "Speak (re-record)" : "Speak"}
+                    <div className="mobile-voice-nav" aria-label="Voice answer controls">
+                        <button
+                            className="mobile-voice-nav__btn"
+                            onClick={() => switchTo(idx - 1)}
+                            disabled={idx === 0}
+                            title="Previous question"
+                            aria-label="Previous question"
+                        >
+                            <ArrowLeftIcon />
                         </button>
-                        <button className="cap-btn" onClick={handleCapture} disabled={!hasLive || atLimit} title={atLimit ? "Checkpoint limit reached" : ""}>
-                            <CaptureIcon />{editingCpId ? "Replace" : capLabel}
+                        <button
+                            className={`mobile-voice-nav__record ${listening ? "is-live" : ""}`}
+                            onClick={toggleSpeak}
+                            disabled={blocked}
+                            title={listening ? "Stop recording" : "Start recording"}
+                            aria-label={listening ? "Stop recording" : "Start recording"}
+                        >
+                            {listening ? <StopIcon /> : <MicIcon />}
                         </button>
-                        <button className="startover-btn" onClick={handleStartOver} disabled={!hasLive} title="Start over (clears current recording only)"><StartOverIcon /></button>
+                        <button
+                            className="mobile-voice-nav__btn is-primary"
+                            onClick={handleSaveNext}
+                            disabled={saving}
+                            title={isLast ? "Save and finish" : "Save and next"}
+                            aria-label={isLast ? "Save and finish" : "Save and next"}
+                        >
+                            {isLast ? <FlagFinishIcon /> : <ArrowRightIcon />}
+                        </button>
                     </div>
-                    {atLimit ? (
-                        <p className="controls__hint warn">You’ve reached {MAX_CP} saved segments. Delete or re-record one to capture more.</p>
-                    ) : (
-                        <p className="controls__hint">“{capLabel}” pins your current words above · “Start Over” clears only the live box · segments stay.</p>
-                    )}
+
+                    <div className="voice-actions">
+                        <button className="reset-btn" onClick={handleStartOver} disabled={!assemble()}>
+                            <StartOverIcon />Reset
+                        </button>
+                        <button className={`next-btn ${isLast ? "finish" : ""}`} onClick={handleSaveNext} disabled={saving}>
+                            {isLast ? <><FlagFinishIcon />Save &amp; Finish</> : <>Save &amp; Next<ArrowRightIcon /></>}
+                        </button>
+                    </div>
                 </section>
 
                 {/* QUESTION RAIL */}
                 <nav className="qrail" aria-label="Question navigation">
+                    <button
+                        className="qrail__arrow qrail__arrow--prev"
+                        onClick={() => switchTo(idx - 1)}
+                        disabled={idx === 0}
+                        title="Previous question"
+                        aria-label="Previous question"
+                    >
+                        <ChevronDownIcon />
+                    </button>
                     <div className="qrail__list">
                         {statuses.map((st, i) => (
-                            <button key={i} className={`qnav qnav--${st}`} onClick={() => switchTo(i)} aria-current={st === "current"}
+                            <button
+                                key={i}
+                                ref={(node) => { qnavRefs.current[i] = node; }}
+                                className={`qnav qnav--${st}`}
+                                onClick={() => switchTo(i)}
+                                aria-current={st === "current"}
+                                aria-label={`Question ${i + 1}${st === "done" ? " answered" : st === "current" ? " current" : ""}`}
                                 title={`Question ${i + 1}${st === "done" ? " — answered" : st === "current" ? " — current" : ""}`}>
-                                {st === "done" ? <CheckIcon className="qnav__check" /> : <span className="qnav__num">{i + 1}</span>}
+                                <span className="qnav__num">{i + 1}</span>
                                 <span className="qnav__label">Q{i + 1}</span>
                             </button>
                         ))}
                     </div>
+                    <button
+                        className="qrail__arrow qrail__arrow--next"
+                        onClick={() => switchTo(idx + 1)}
+                        disabled={idx === total - 1}
+                        title="Next question"
+                        aria-label="Next question"
+                    >
+                        <ChevronDownIcon />
+                    </button>
                 </nav>
             </div>
 
             {/* BOTTOM BAR */}
             <footer className="bottombar">
-                {expired ? (
-                    <span className="bottombar__helper warn"><ClockIcon />Time’s up — you can still finish and submit your answers, no rush.</span>
-                ) : (
-                    <span className="bottombar__helper"><LockIcon />Your answers save as you go — revisit any question with Previous. Captured segments stay on your device until you save.</span>
-                )}
                 <div className="bottombar__spacer" />
                 <button className="ghost-btn" onClick={() => switchTo(idx - 1)} disabled={idx === 0}><ArrowLeftIcon />Previous</button>
                 <button className={`next-btn ${isLast ? "finish" : ""}`} onClick={handleSaveNext} disabled={saving}>
@@ -416,12 +461,12 @@ export default function MetaphorExam({
             </footer>
 
             {/* LIGHTBOX */}
-            {zoom && q.imageUrl && (
+            {zoom && hasImage && q.imageUrl && (
                 <div className="lightbox" onClick={() => setZoom(false)}>
                     <button className="lightbox__close" onClick={() => setZoom(false)}><CloseIcon /></button>
                     <div className="lightbox__inner" onClick={(e) => e.stopPropagation()} style={{ width: "min(92vw, 1100px)", aspectRatio: "16/10" }}>
                         <img src={q.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                        <div className="lightbox__cap">{T(q.imageDescEn, q.imageDescTa)}</div>
+                        <div className="lightbox__cap">{imageDesc}</div>
                     </div>
                 </div>
             )}
@@ -436,8 +481,8 @@ export default function MetaphorExam({
                             {[
                                 ["Pick your spoken language", "Use the language selector — that’s the language you’ll answer in by voice."],
                                 ["Look, then speak", "Study the image, description and context. Press Speak and respond naturally — there’s no right answer."],
-                                [`Build it with “${capLabel}”`, `Pin good parts of your answer. Keep up to ${MAX_CP} segments and re-record any one.`],
-                                ["Save & Next", "Your segments and live text are stitched together and saved for that question."],
+                                ["Speak continuously", "Your live transcript appears automatically while you answer."],
+                                ["Save & Next", "Your transcript is saved for that question before you continue."],
                             ].map((s, i) => (
                                 <div className="sheet__step" key={i}>
                                     <span className="sheet__step-num">{i + 1}</span>

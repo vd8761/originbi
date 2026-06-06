@@ -1,5 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
 import { InjectRepository } from '@nestjs/typeorm';
+import { firstValueFrom } from 'rxjs';
 import { Repository } from 'typeorm';
 import { OriginbiSetting } from '@originbi/shared-entities';
 
@@ -14,6 +16,7 @@ export class SettingsService {
   constructor(
     @InjectRepository(OriginbiSetting)
     private readonly settingsRepo: Repository<OriginbiSetting>,
+    private readonly http: HttpService,
   ) {}
 
   // ---------------------------------------------------------
@@ -64,6 +67,71 @@ export class SettingsService {
       where: { category, settingKey: key },
     });
     return row ? (row.value as T) : null;
+  }
+
+  async getGeminiModels(): Promise<{
+    models: Array<{ value: string; label: string; description?: string }>;
+    error?: string;
+  }> {
+    const apiKey =
+      String((await this.getValue<string>('metaphor', 'gemini_api_key')) || '').trim() ||
+      process.env.GEMINI_API_KEY ||
+      '';
+
+    if (!apiKey) {
+      return {
+        models: [],
+        error: 'Gemini API key is not configured.',
+      };
+    }
+
+    try {
+      const res = await firstValueFrom(
+        this.http.get('https://generativelanguage.googleapis.com/v1beta/models', {
+          params: { key: apiKey },
+          timeout: 30000,
+        }),
+      );
+      const models = ((res as any).data?.models || [])
+        .filter((model: any) =>
+          Array.isArray(model.supportedGenerationMethods) &&
+          model.supportedGenerationMethods.includes('generateContent'),
+        )
+        .map((model: any) => {
+          const name = String(model.name || '').replace(/^models\//, '');
+          const displayName = String(model.displayName || name);
+          return {
+            value: name,
+            label: displayName === name ? name : `${displayName} (${name})`,
+            description: model.description || undefined,
+          };
+        })
+        .filter((model: any) => this.isMetaphorGeminiModel(model.value))
+        .sort((a: any, b: any) => a.value.localeCompare(b.value));
+
+      return { models };
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.error?.message ||
+        err?.message ||
+        'Failed to fetch Gemini models.';
+      this.logger.warn(`Failed to fetch Gemini models: ${msg}`);
+      return { models: [], error: msg };
+    }
+  }
+
+  private isMetaphorGeminiModel(modelName: string): boolean {
+    const name = String(modelName || '').toLowerCase();
+    if (!name.startsWith('gemini-')) return false;
+    return ![
+      'image',
+      'imagen',
+      'embedding',
+      'tts',
+      'veo',
+      'aqa',
+      'learnlm',
+    ].some((blocked) => name.includes(blocked));
   }
 
   // ---------------------------------------------------------

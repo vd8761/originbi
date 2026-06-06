@@ -18,9 +18,7 @@ export interface MetaphorConfig {
     allowTyping: boolean;
     durationOverride: boolean;
     durationMinutes: number;
-    checkpointLabel: string;
-    segmentLimit: number;
-    limitBehavior: "disable" | "replace" | string;
+    audioTranscriptionEnabled: boolean;
     supportedLanguages: MetaphorSpokenLanguage[];
     sttProvider: { provider: string; params?: any };
 }
@@ -84,11 +82,31 @@ export const metaphorService = {
         metaphorQuestionId: number;
         spokenLanguage?: string;
         answerText: string;
+        audioBlob?: Blob | null;
     }): Promise<{ success: boolean }> {
+        if (payload.audioBlob) {
+            const form = new FormData();
+            form.append("attemptId", String(payload.attemptId));
+            form.append("metaphorQuestionId", String(payload.metaphorQuestionId));
+            if (payload.spokenLanguage) form.append("spokenLanguage", payload.spokenLanguage);
+            form.append("answerText", payload.answerText);
+            form.append("audio", payload.audioBlob, "answer.webm");
+            const res = await fetch(`${STUDENT_API_URL}/metaphor/answers`, {
+                method: "POST",
+                body: form,
+            });
+            return json(res, "save metaphor answer");
+        }
+
         const res = await fetch(`${STUDENT_API_URL}/metaphor/answers`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
+            body: JSON.stringify({
+                attemptId: payload.attemptId,
+                metaphorQuestionId: payload.metaphorQuestionId,
+                spokenLanguage: payload.spokenLanguage,
+                answerText: payload.answerText,
+            }),
         });
         return json(res, "save metaphor answer");
     },

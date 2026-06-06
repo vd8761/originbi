@@ -5,21 +5,24 @@ import { PgBossService } from '@wavezync/nestjs-pgboss';
 import {
   MetaphorQuestion,
   MetaphorAnswer,
+  MetaphorTranscriptionJob,
   MetaphorTranslationJob,
   OriginbiSetting,
 } from '@originbi/shared-entities';
 import { AssessmentAttempt } from '../entities/assessment_attempt.entity';
-import { METAPHOR_TRANSLATE_QUEUE } from './metaphor.constants';
+import {
+  METAPHOR_TRANSCRIBE_QUEUE,
+  METAPHOR_TRANSLATE_QUEUE,
+} from './metaphor.constants';
 import { MetaphorGenerationService } from './metaphor-generation.service';
+import { R2Service } from '../r2/r2.service';
 
 export interface MetaphorConfig {
   questionCount: number;
   allowTyping: boolean;
   durationOverride: boolean;
   durationMinutes: number;
-  checkpointLabel: string;
-  segmentLimit: number;
-  limitBehavior: string;
+  audioTranscriptionEnabled: boolean;
   supportedLanguages: any[];
   sttProvider: { provider: string; params?: any };
 }
@@ -35,6 +38,8 @@ export class MetaphorService {
     private readonly answerRepo: Repository<MetaphorAnswer>,
     @InjectRepository(MetaphorTranslationJob)
     private readonly jobRepo: Repository<MetaphorTranslationJob>,
+    @InjectRepository(MetaphorTranscriptionJob)
+    private readonly transcriptionJobRepo: Repository<MetaphorTranscriptionJob>,
     @InjectRepository(AssessmentAttempt)
     private readonly attemptRepo: Repository<AssessmentAttempt>,
     @InjectRepository(OriginbiSetting)
@@ -42,6 +47,7 @@ export class MetaphorService {
     private readonly dataSource: DataSource,
     private readonly pgBoss: PgBossService,
     private readonly generation: MetaphorGenerationService,
+    private readonly r2: R2Service,
   ) {}
 
   /** Enqueue a translation job for an attempt (best-effort; the sweep is the safety net). */
@@ -51,6 +57,18 @@ export class MetaphorService {
     } catch (e) {
       this.logger.warn(
         `[Metaphor] enqueue translation failed for attempt ${attemptId} (sweep will retry): ${
+          (e as Error)?.message
+        }`,
+      );
+    }
+  }
+
+  private async enqueueTranscription(attemptId: number): Promise<void> {
+    try {
+      await this.pgBoss.boss.send(METAPHOR_TRANSCRIBE_QUEUE, { attemptId });
+    } catch (e) {
+      this.logger.warn(
+        `[Metaphor] enqueue transcription failed for attempt ${attemptId} (sweep will retry): ${
           (e as Error)?.message
         }`,
       );
@@ -82,9 +100,9 @@ export class MetaphorService {
       allowTyping: Boolean(await this.readSetting('allow_typing', false)),
       durationOverride: Boolean(await this.readSetting('duration_override', false)),
       durationMinutes: Number(await this.readSetting('duration_minutes', 20)),
-      checkpointLabel: String(await this.readSetting('checkpoint_label', 'Capture')),
-      segmentLimit: Number(await this.readSetting('segment_limit', 5)),
-      limitBehavior: String(await this.readSetting('limit_behavior', 'disable')),
+      audioTranscriptionEnabled: Boolean(
+        await this.readSetting('audio_transcription_enabled', true),
+      ),
       supportedLanguages: await this.readSetting<any[]>('supported_languages', []),
       sttProvider: await this.readSetting<{ provider: string; params?: any }>(
         'stt_provider',
@@ -198,6 +216,8 @@ export class MetaphorService {
     metaphorQuestionId: number;
     spokenLanguage?: string;
     answerText: string;
+    audioBuffer?: Buffer;
+    audioMimeType?: string;
   }) {
     const row = await this.answerRepo.findOne({
       where: {
@@ -210,12 +230,52 @@ export class MetaphorService {
         'Metaphor answer slot not found for this attempt/question.',
       );
     }
+    const audioTranscriptionEnabled = Boolean(
+      await this.readSetting('audio_transcription_enabled', true),
+    );
+    const previousAudioKey = row.audioStorageKey;
     row.answerTextOriginal = dto.answerText ?? '';
+    row.answerTextWeb = dto.answerText ?? '';
     row.spokenLanguage = dto.spokenLanguage ?? row.spokenLanguage;
+    row.transcriptionSource = 'web';
+    row.transcriptionError = null;
     row.status = 'ANSWERED';
     // Mark for translation only if there is text; empty answers stay NONE.
     row.translationStatus = (dto.answerText || '').trim() ? 'PENDING' : 'NONE';
+    row.transcriptionStatus = 'NONE';
+    row.audioStorageKey = null;
     await this.answerRepo.save(row);
+
+    if (audioTranscriptionEnabled && dto.audioBuffer?.length) {
+      const key = `metaphor-audio/${dto.attemptId}/${row.id}.webm`;
+      try {
+        await this.r2.uploadBuffer(
+          key,
+          dto.audioBuffer,
+          dto.audioMimeType || 'audio/webm',
+        );
+        row.audioStorageKey = key;
+        row.transcriptionStatus = 'PENDING';
+        row.transcriptionError = null;
+        await this.answerRepo.save(row);
+      } catch (err) {
+        this.logger.warn(
+          `[Metaphor] audio upload failed for answer ${row.id}; using web transcript: ${
+            (err as Error)?.message
+          }`,
+        );
+        row.audioStorageKey = null;
+        row.transcriptionStatus = 'NONE';
+        await this.answerRepo.save(row);
+      }
+    }
+    if (previousAudioKey && previousAudioKey !== row.audioStorageKey) {
+      try {
+        await this.r2.deleteFile(previousAudioKey);
+      } catch {
+        /* best-effort stale clip cleanup */
+      }
+    }
     return { success: true };
   }
 
@@ -229,9 +289,40 @@ export class MetaphorService {
     (attempt as any).completedAt = new Date();
     await this.attemptRepo.save(attempt);
 
-    const pendingCount = await this.answerRepo.count({
+    const translationPendingCount = await this.answerRepo.count({
       where: { assessmentAttemptId: attemptId, translationStatus: 'PENDING' },
     });
+    const transcriptionPendingCount = await this.answerRepo.count({
+      where: { assessmentAttemptId: attemptId, transcriptionStatus: 'PENDING' },
+    });
+    const audioTranscriptionEnabled = Boolean(
+      await this.readSetting('audio_transcription_enabled', true),
+    );
+
+    if (audioTranscriptionEnabled && transcriptionPendingCount > 0) {
+      let transcriptionJob = await this.transcriptionJobRepo.findOne({
+        where: { assessmentAttemptId: attemptId },
+      });
+      if (!transcriptionJob) {
+        transcriptionJob = this.transcriptionJobRepo.create({
+          assessmentAttemptId: attemptId,
+          status: 'PENDING',
+          total: transcriptionPendingCount,
+          transcribed: 0,
+        });
+      } else {
+        transcriptionJob.status = 'PENDING';
+        transcriptionJob.total = transcriptionPendingCount;
+      }
+      await this.transcriptionJobRepo.save(transcriptionJob);
+      await this.enqueueTranscription(attemptId);
+
+      return {
+        success: true,
+        translationsPending: translationPendingCount,
+        transcriptionsPending: transcriptionPendingCount,
+      };
+    }
 
     let job = await this.jobRepo.findOne({
       where: { assessmentAttemptId: attemptId },
@@ -239,18 +330,18 @@ export class MetaphorService {
     if (!job) {
       job = this.jobRepo.create({
         assessmentAttemptId: attemptId,
-        status: pendingCount > 0 ? 'PENDING' : 'DONE',
-        total: pendingCount,
+        status: translationPendingCount > 0 ? 'PENDING' : 'DONE',
+        total: translationPendingCount,
         translated: 0,
       });
     } else {
-      job.status = pendingCount > 0 ? 'PENDING' : 'DONE';
-      job.total = pendingCount;
+      job.status = translationPendingCount > 0 ? 'PENDING' : 'DONE';
+      job.total = translationPendingCount;
     }
     await this.jobRepo.save(job);
 
-    if (pendingCount > 0) await this.enqueueTranslation(attemptId);
+    if (translationPendingCount > 0) await this.enqueueTranslation(attemptId);
 
-    return { success: true, translationsPending: pendingCount };
+    return { success: true, translationsPending: translationPendingCount };
   }
 }

@@ -41,11 +41,26 @@ export class MetaphorAnswer {
     @Column({ name: 'answer_text_original', type: 'text', nullable: true })
     answerTextOriginal: string | null;
 
+    @Column({ name: 'answer_text_web', type: 'text', nullable: true })
+    answerTextWeb: string | null;
+
     @Column({ name: 'answer_text_en', type: 'text', nullable: true })
     answerTextEn: string | null;
 
     @Column({ name: 'translation_status', type: 'varchar', length: 20, default: 'NONE' })
     translationStatus: 'NONE' | 'PENDING' | 'DONE' | 'FAILED';
+
+    @Column({ name: 'audio_storage_key', type: 'varchar', length: 300, nullable: true })
+    audioStorageKey: string | null;
+
+    @Column({ name: 'transcription_status', type: 'varchar', length: 20, default: 'NONE' })
+    transcriptionStatus: 'NONE' | 'PENDING' | 'PROCESSING' | 'DONE' | 'FAILED';
+
+    @Column({ name: 'transcription_source', type: 'varchar', length: 10, nullable: true })
+    transcriptionSource: 'web' | 'gemini' | null;
+
+    @Column({ name: 'transcription_error', type: 'text', nullable: true })
+    transcriptionError: string | null;
 
     @Column({ name: 'status', type: 'varchar', length: 20, default: 'NOT_ANSWERED' })
     status: 'NOT_ANSWERED' | 'ANSWERED';

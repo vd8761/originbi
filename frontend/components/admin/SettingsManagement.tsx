@@ -29,6 +29,18 @@ interface SettingItem {
     updatedAt: string;
 }
 
+interface GeminiModelOption {
+    value: string;
+    label: string;
+    description?: string;
+}
+
+interface SelectOption {
+    value: string;
+    label: string;
+    description?: string;
+}
+
 export default function SettingsManagement() {
     const [settingsGrouped, setSettingsGrouped] = useState<Record<string, SettingItem[]>>({});
     const [activeCategory, setActiveCategory] = useState<string>("");
@@ -259,6 +271,16 @@ export default function SettingsManagement() {
         }
 
         if (item.valueType === 'string' || item.valueType === 'number') {
+            if (item.category === 'metaphor' && item.key === 'gemini_model') {
+                return (
+                    <GeminiModelSelect
+                        value={String(item.value || '')}
+                        isReadonly={item.isReadonly}
+                        onChange={(next) => handleValueChange(item.category, item.key, next)}
+                    />
+                );
+            }
+
             const fieldId = `${item.category}:${item.key}`;
             const isSensitiveTextField = item.isSensitive && item.valueType === 'string';
             const isVisible = visibleSensitiveFields[fieldId];
@@ -730,6 +752,157 @@ function ArrayChipInput({ values, isReadonly, onChange }: { values: string[], is
     );
 }
 
+function SettingsSelect({
+    value,
+    options,
+    onChange,
+    placeholder = 'Select',
+    disabled = false,
+    size = 'md',
+}: {
+    value: string;
+    options: SelectOption[];
+    onChange: (value: string) => void;
+    placeholder?: string;
+    disabled?: boolean;
+    size?: 'sm' | 'md';
+}) {
+    const [open, setOpen] = useState(false);
+    const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+    const selected = options.find((option) => option.value === value);
+
+    const close = () => setOpen(false);
+
+    const updatePosition = () => {
+        const trigger = triggerRef.current;
+        if (!trigger) return;
+        const rect = trigger.getBoundingClientRect();
+        const gap = 6;
+        const maxHeight = Math.min(280, Math.max(160, window.innerHeight - rect.bottom - gap - 12));
+        const opensUp = maxHeight < 180 && rect.top > window.innerHeight - rect.bottom;
+        const usableHeight = opensUp
+            ? Math.min(280, Math.max(160, rect.top - gap - 12))
+            : maxHeight;
+
+        setMenuStyle({
+            position: 'fixed',
+            left: rect.left,
+            top: opensUp ? undefined : rect.bottom + gap,
+            bottom: opensUp ? window.innerHeight - rect.top + gap : undefined,
+            width: rect.width,
+            maxHeight: usableHeight,
+            zIndex: 9999,
+        });
+    };
+
+    useEffect(() => {
+        if (!open) return;
+        updatePosition();
+
+        const handlePointerDown = (event: MouseEvent) => {
+            const target = event.target as Node;
+            if (triggerRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+            close();
+        };
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') close();
+        };
+        const handleViewportChange = () => updatePosition();
+
+        document.addEventListener('mousedown', handlePointerDown);
+        document.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('resize', handleViewportChange);
+        window.addEventListener('scroll', handleViewportChange, true);
+
+        return () => {
+            document.removeEventListener('mousedown', handlePointerDown);
+            document.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('resize', handleViewportChange);
+            window.removeEventListener('scroll', handleViewportChange, true);
+        };
+    }, [open]);
+
+    const choose = (next: string) => {
+        onChange(next);
+        close();
+    };
+
+    const padding = size === 'sm' ? 'px-3 py-1.5' : 'px-4 py-2.5';
+
+    return (
+        <>
+            <button
+                ref={triggerRef}
+                type="button"
+                disabled={disabled}
+                onClick={() => {
+                    if (disabled) return;
+                    setOpen((next) => !next);
+                }}
+                className={`flex w-full items-center justify-between gap-3 rounded-xl border-0 bg-gray-50 text-left text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 transition-all hover:ring-gray-300 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-green dark:bg-white/5 dark:text-white dark:ring-white/10 dark:hover:ring-white/20 sm:text-sm ${padding} ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+            >
+                <span className="min-w-0 truncate">
+                    {selected?.label || value || placeholder}
+                </span>
+                <svg
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className={`h-4 w-4 flex-shrink-0 text-gray-500 transition-transform dark:text-gray-400 ${open ? 'rotate-180' : ''}`}
+                    aria-hidden="true"
+                >
+                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                </svg>
+            </button>
+
+            {open && ReactDOM.createPortal(
+                <div
+                    ref={menuRef}
+                    style={menuStyle}
+                    className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl ring-1 ring-black/5 dark:border-white/10 dark:bg-[#202820] dark:ring-white/10"
+                >
+                    <div className="max-h-[inherit] overflow-y-auto py-1 custom-scrollbar">
+                        {options.length === 0 ? (
+                            <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                                {placeholder}
+                            </div>
+                        ) : (
+                            options.map((option) => (
+                                <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={() => choose(option.value)}
+                                    className={`flex w-full items-start justify-between gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
+                                        value === option.value
+                                            ? 'bg-brand-green text-white'
+                                            : 'text-gray-800 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-white/10'
+                                    }`}
+                                >
+                                    <span className="min-w-0">
+                                        <span className="block truncate font-medium">{option.label}</span>
+                                        {option.description && (
+                                            <span className={`mt-0.5 block line-clamp-2 text-xs ${
+                                                value === option.value ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'
+                                            }`}>
+                                                {option.description}
+                                            </span>
+                                        )}
+                                    </span>
+                                    {value === option.value && (
+                                        <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-current" />
+                                    )}
+                                </button>
+                            ))
+                        )}
+                    </div>
+                </div>,
+                document.body,
+            )}
+        </>
+    );
+}
+
 // ------------------------------------------------------------------
 // Editor for the open-question distribution setting.
 // Value shape: [{ questionType: string|null, count: number, selection: 'random'|'set_sequential' }, ...]
@@ -818,20 +991,21 @@ function DistributionEditor({
                                     />
                                 </td>
                                 <td className="px-3 py-2">
-                                    <select
-                                        disabled={isReadonly}
+                                    <SettingsSelect
                                         value={row.selection}
-                                        onChange={(e) =>
+                                        disabled={isReadonly}
+                                        options={[
+                                            { value: 'random', label: 'random (N random of type)' },
+                                            { value: 'set_random', label: 'set_random (one set, then N random)' },
+                                            { value: 'set_sequential', label: 'set_sequential (one set, fixed order)' },
+                                        ]}
+                                        onChange={(next) =>
                                             update(i, {
-                                                selection: e.target.value as DistributionRow['selection'],
+                                                selection: next as DistributionRow['selection'],
                                             })
                                         }
-                                        className="w-full rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green"
-                                    >
-                                        <option value="random">random (N random of type)</option>
-                                        <option value="set_random">set_random (one set, then N random)</option>
-                                        <option value="set_sequential">set_sequential (one set, fixed order)</option>
-                                    </select>
+                                        size="sm"
+                                    />
                                 </td>
                                 <td className="px-3 py-2 text-right">
                                     <button
@@ -889,16 +1063,12 @@ function SttProviderEditor({
     const provider = value?.provider || 'web_speech';
     return (
         <div className="w-full max-w-lg space-y-2">
-            <select
-                disabled={isReadonly}
+            <SettingsSelect
                 value={provider}
-                onChange={(e) => onChange({ provider: e.target.value, params: value?.params || {} })}
-                className="w-full rounded-xl border-0 bg-gray-50 dark:bg-white/5 px-4 py-2.5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green sm:text-sm"
-            >
-                {STT_PROVIDERS.map((p) => (
-                    <option key={p.value} value={p.value}>{p.label}</option>
-                ))}
-            </select>
+                disabled={isReadonly}
+                options={STT_PROVIDERS}
+                onChange={(next) => onChange({ provider: next, params: value?.params || {} })}
+            />
             <p className="text-xs text-gray-500 dark:text-gray-400">
                 Cloud providers also require the API key in “STT provider API key” above. The exam page reads this and uses the matching adapter.
             </p>
@@ -909,6 +1079,71 @@ function SttProviderEditor({
 // ------------------------------------------------------------------
 // Level 3 metaphor — supported languages editor (array of {code,label,native})
 // ------------------------------------------------------------------
+function GeminiModelSelect({
+    value,
+    isReadonly,
+    onChange,
+}: {
+    value: string;
+    isReadonly: boolean;
+    onChange: (next: string) => void;
+}) {
+    const [models, setModels] = useState<GeminiModelOption[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchModels = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const { data } = await api.get('/settings/metaphor/gemini-models');
+            setModels(Array.isArray(data.models) ? data.models : []);
+            setError(data.error || null);
+        } catch (err: any) {
+            setModels([]);
+            setError(err.response?.data?.message || 'Failed to fetch Gemini models.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        void fetchModels();
+    }, []);
+
+    const options = [...models];
+    if (value && !options.some((model) => model.value === value)) {
+        options.unshift({ value, label: `${value} (current)` });
+    }
+
+    return (
+        <div className="w-full max-w-lg space-y-2">
+            <div className="flex gap-2">
+                <SettingsSelect
+                    value={value}
+                    disabled={isReadonly || loading || options.length === 0}
+                    options={options}
+                    placeholder="No Gemini models available"
+                    onChange={onChange}
+                />
+                <button
+                    type="button"
+                    disabled={isReadonly || loading}
+                    onClick={() => void fetchModels()}
+                    className="rounded-xl bg-brand-green/10 px-4 py-2.5 text-sm font-medium text-brand-green hover:bg-brand-green/20 transition-colors disabled:opacity-40"
+                >
+                    {loading ? 'Loading' : 'Refresh'}
+                </button>
+            </div>
+            {error && (
+                <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                    {error}
+                </p>
+            )}
+        </div>
+    );
+}
+
 interface LangRow { code: string; label: string; native: string }
 
 function LanguagesEditor({

@@ -1,5 +1,19 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { MetaphorService } from './metaphor.service';
+
+interface MulterFile {
+  buffer: Buffer;
+  mimetype: string;
+}
 
 @Controller('metaphor')
 export class MetaphorController {
@@ -19,6 +33,7 @@ export class MetaphorController {
 
   // Save one question's assembled answer.
   @Post('answers')
+  @UseInterceptors(FileInterceptor('audio'))
   saveAnswer(
     @Body()
     body: {
@@ -27,12 +42,15 @@ export class MetaphorController {
       spokenLanguage?: string;
       answerText: string;
     },
+    @UploadedFile() audio?: MulterFile,
   ) {
     return this.metaphor.saveAnswer({
       attemptId: Number(body.attemptId),
       metaphorQuestionId: Number(body.metaphorQuestionId),
       spokenLanguage: body.spokenLanguage,
       answerText: body.answerText ?? '',
+      audioBuffer: audio?.buffer,
+      audioMimeType: audio?.mimetype,
     });
   }
 
